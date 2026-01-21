@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <title>Nova — Local, Private AI Assistant</title>
+  <meta name="description" content="Nova is a local, private AI assistant that runs entirely on your PC. Offline-first copilot with a simple web UI and command skills. No accounts. No telemetry." />
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --panel:#0f1622;
+      --panel2:#0c121c;
+      --text:#e8eef6;
+      --muted:#a9b6c7;
+      --muted2:#7f8ea3;
+      --line:#1a2330;
+      --brand:#6ee7ff;
+      --good:#7CFFB2;
+      --warn:#ffd37a;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 18px;
+      --radius2: 24px;
+      --max: 1080px;
+    }
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background:
+        radial-gradient(1200px 500px at 20% -10%, rgba(110,231,255,.12), transparent 60%),
+        radial-gradient(900px 450px at 90% 0%, rgba(124,255,178,.08), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    a{ color:inherit; text-decoration:none; }
+    .wrap{ max-width: var(--max); margin:0 auto; padding: 18px 18px 64px; }
+    .topbar{
+      position: sticky; top:0; z-index: 10;
+      backdrop-filter: blur(10px);
+      background: rgba(11,15,20,.7);
+      border-bottom: 1px solid rgba(26,35,48,.7);
+    }
+    .topbar .wrap{ padding-top:12px; padding-bottom:12px; }
+    .nav{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+    }
+    .brand{
+      display:flex; align-items:center; gap:10px;
+      font-weight:700; letter-spacing:.2px;
+    }
+    .dot{
+      width:10px; height:10px; border-radius:999px;
+      background: var(--brand);
+      box-shadow: 0 0 18px rgba(110,231,255,.6);
+    }
+    .navlinks{
+      display:flex; align-items:center; gap:14px;
+      color: var(--muted);
+      font-size: 14px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .navlinks a{ padding:8px 10px; border-radius: 999px; }
+    .navlinks a:hover{ background: rgba(255,255,255,.04); color: var(--text); }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(110,231,255,.25);
+      background: rgba(110,231,255,.06);
+      color: var(--text);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .pill .miniDot{
+      width:8px; height:8px; border-radius:999px; background: var(--good);
+      box-shadow: 0 0 12px rgba(124,255,178,.35);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1.2fr .9fr;
+      gap: 18px;
+      margin-top: 22px;
+    }
+    @media (max-width: 920px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    .card{
+      border: 1px solid rgba(26,35,48,.85);
+      background: linear-gradient(180deg, rgba(15,22,34,.92), rgba(12,18,28,.92));
+      box-shadow: var(--shadow);
+      border-radius: var(--radius2);
+      padding: 18px;
+    }
+    h1{
+      font-size: 40px;
+      line-height: 1.1;
+      margin: 6px 0 10px;
+      letter-spacing: -.6px;
+    }
+    @media (max-width: 520px){
+      h1{ font-size: 34px; }
+    }
+    .lead{
+      font-size: 16px;
+      color: var(--muted);
+      margin: 0 0 16px;
+      max-width: 62ch;
+    }
+    .tagline{
+      font-size: 18px;
+      margin: 0;
+      color: var(--text);
+    }
+    .tagline strong{ color: var(--brand); font-weight: 700; }
+    .ctaRow{
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+      align-items: center;
+    }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      font-weight: 650;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform .06s ease, background .2s ease, border-color .2s ease;
+      user-select:none;
+    }
+    .btn:hover{ background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.16); }
+    .btn:active{ transform: translateY(1px); }
+    .btn.primary{
+      background: linear-gradient(180deg, rgba(110,231,255,.18), rgba(110,231,255,.10));
+      border-color: rgba(110,231,255,.28);
+    }
+    .btn.primary:hover{ background: rgba(110,231,255,.16); border-color: rgba(110,231,255,.38); }
+    .btn.small{ padding: 10px 12px; border-radius: 12px; font-size: 13px; }
+    .micro{
+      color: var(--muted2);
+      font-size: 12px;
+      margin-top: 10px;
+    }
+    .trustRow{
+      display:flex; flex-wrap:wrap; gap: 10px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .trustItem{
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(26,35,48,.9);
+      background: rgba(255,255,255,.03);
+    }
+    .trustItem svg{ opacity:.9; }
+
+    .video{
+      padding: 0;
+      overflow:hidden;
+    }
+    .videoTop{
+      padding: 16px 16px 10px;
+      border-bottom: 1px solid rgba(26,35,48,.85);
+      display:flex; justify-content:space-between; align-items:flex-start; gap: 10px;
+    }
+    .videoTop .kicker{
+      font-size: 12px; color: var(--muted2); margin:0 0 6px;
+      letter-spacing: .18em; text-transform: uppercase;
+    }
+    .videoTop .title{
+      font-size: 16px; margin:0; color: var(--text); font-weight: 700;
+    }
+    .videoFrame{
+      aspect-ratio: 16 / 9;
+      width: 100%;
+      display:block;
+      background:
+        radial-gradient(900px 350px at 30% 0%, rgba(110,231,255,.10), transparent 60%),
+        linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border-top: 1px solid rgba(255,255,255,.03);
+      position: relative;
+    }
+    .videoInner{
+      position:absolute; inset:0;
+      display:flex; align-items:center; justify-content:center;
+      padding: 18px;
+      text-align:center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .play{
+      display:inline-flex; align-items:center; gap:10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(110,231,255,.25);
+      background: rgba(110,231,255,.06);
+      color: var(--text);
+      font-weight: 650;
+    }
+    .caption{
+      padding: 12px 16px 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    section{ margin-top: 18px; }
+    .sectionTitle{
+      font-size: 18px;
+      margin: 0 0 10px;
+      letter-spacing: -.2px;
+    }
+    .sectionSub{
+      margin: -2px 0 14px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .cards3{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+    @media (max-width: 920px){
+      .cards3{ grid-template-columns: 1fr; }
+    }
+    .miniCard{
+      border: 1px solid rgba(26,35,48,.85);
+      background: rgba(255,255,255,.03);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+    .miniCard h3{ margin: 0 0 6px; font-size: 15px; }
+    .miniCard p{ margin: 0; color: var(--muted); font-size: 13px; }
+
+    .demoGrid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    .terminal{
+      border: 1px solid rgba(26,35,48,.85);
+      background: rgba(0,0,0,.28);
+      border-radius: var(--radius);
+      overflow:hidden;
+    }
+    .termBar{
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(26,35,48,.85);
+      color: var(--muted2);
+      font-size: 12px;
+    }
+    .lights{ display:flex; gap:6px; }
+    .lights span{
+      width:10px; height:10px; border-radius:999px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    pre{
+      margin:0;
+      padding: 12px;
+      overflow:auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: #d6e3f2;
+    }
+    .muted{ color: var(--muted); }
+
+    .twoCol{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 920px){
+      .twoCol{ grid-template-columns: 1fr; }
+    }
+    ul{ margin: 10px 0 0 18px; color: var(--muted); }
+    li{ margin: 6px 0; }
+
+    .steps{
+      display:grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+    @media (max-width: 920px){
+      .steps{ grid-template-columns: 1fr; }
+    }
+    .step{
+      border: 1px solid rgba(26,35,48,.85);
+      background: rgba(255,255,255,.03);
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+    .step .num{
+      width: 30px; height: 30px; border-radius: 10px;
+      display:inline-flex; align-items:center; justify-content:center;
+      background: rgba(110,231,255,.10);
+      border: 1px solid rgba(110,231,255,.22);
+      color: var(--text);
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .step h4{ margin: 0 0 6px; font-size: 14px; }
+    .step p{ margin: 0; color: var(--muted); font-size: 13px; }
+
+    .chips{ display:flex; flex-wrap:wrap; gap: 10px; }
+    .chip{
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(26,35,48,.85);
+      background: rgba(255,255,255,.03);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .footer{
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(26,35,48,.85);
+      display:flex;
+      justify-content:space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      color: var(--muted2);
+      font-size: 12px;
+    }
+    .footLinks{ display:flex; gap: 10px; flex-wrap: wrap; }
+    .footLinks a{ padding: 6px 8px; border-radius: 999px; }
+    .footLinks a:hover{ background: rgba(255,255,255,.04); color: var(--text); }
+    code.inline{
+      padding: 2px 6px;
+      border-radius: 8px;
+      border: 1px solid rgba(26,35,48,.9);
+      background: rgba(0,0,0,.25);
+      color: #d7e7ff;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12.5px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="wrap">
+      <div class="nav">
+        <div class="brand">
+          <span class="dot" aria-hidden="true"></span>
+          <span>Nova</span>
+          <span class="pill" title="Default: binds to localhost only">
+            <span class="miniDot" aria-hidden="true"></span>
+            Local-only by default
+          </span>
+        </div>
+        <div class="navlinks">
+          <a href="#demo">Demo</a>
+          <a href="#docs">How it works</a>
+          <a href="#privacy">Privacy</a>
+          <a href="#download">Download</a>
+          <a class="btn small" href="https://github.com/YOUR_GITHUB/Nova" target="_blank" rel="noreferrer">GitHub</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <main class="wrap">
+
+    <!-- HERO + DEMO -->
+    <div class="grid">
+      <section class="card">
+        <p class="tagline"><strong>Nova</strong> is a local, private AI assistant that runs entirely on your PC.</p>
+        <h1>Offline-first AI copilot<br/>with command skills.</h1>
+        <p class="lead">
+          Chat normally, or run commands like <code class="inline">/qstatus</code> and <code class="inline">/doctor</code>.
+          No accounts. No telemetry. No cloud by default.
+        </p>
+
+        <div class="ctaRow">
+          <a class="btn primary" href="#download">Download for Windows</a>
+          <a class="btn" href="https://github.com/YOUR_GITHUB/Nova" target="_blank" rel="noreferrer">View on GitHub</a>
+          <a class="btn" href="#demo">Watch the 60s demo</a>
+        </div>
+
+        <div class="trustRow" aria-label="trust signals">
+          <span class="trustItem" title="Binds to 127.0.0.1 by default">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 2l7 4v6c0 5-3 9-7 10-4-1-7-5-7-10V6l7-4z" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M9 12l2 2 4-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Runs local
+          </span>
+          <span class="trustItem">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M8 21h8M12 17v4M7 17h10a4 4 0 0 0 4-4V9a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v4a4 4 0 0 0 4 4z" stroke="currentColor" stroke-width="1.8"/>
+            </svg>
+            Simple web UI
+          </span>
+          <span class="trustItem">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            Skill commands
+          </span>
+          <span class="trustItem">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 3v18M3 12h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            Open source
+          </span>
+        </div>
+
+        <p class="micro">
+          Default URL: <code class="inline">http://127.0.0.1:8790/app</code>
+          <span class="muted"> · </span>
+          If you bind to <code class="inline">0.0.0.0</code>, you’re exposing it to your network — use the warning in Nova.
+        </p>
+      </section>
+
+      <section class="card video" id="demo">
+        <div class="videoTop">
+          <div>
+            <p class="kicker">Demo loop</p>
+            <p class="title">/qstatus → /doctor → summarize → todo → parse URL</p>
+          </div>
+          <a class="btn small" href="#download">Get it</a>
+        </div>
+
+        <!-- Replace this placeholder with a real embed once you have it.
+             Option A: <video controls src="demo.mp4" ...>
+             Option B: YouTube/Vimeo iframe
+        -->
+        <div class="videoFrame" role="img" aria-label="Demo video placeholder">
+          <div class="videoInner">
+            <div>
+              <div class="play">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M8 5v14l11-7-11-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                </svg>
+                Drop your 45–60s screen capture here
+              </div>
+              <div style="margin-top:10px" class="muted">
+                Replace this block with a <code class="inline">&lt;video&gt;</code> tag or an iframe embed.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="caption">
+          What you’re seeing is local-only: a small server on your PC + a browser UI.
+          No account. No cloud by default.
+        </div>
+      </section>
+    </div>
+
+    <!-- WHAT YOU GET -->
+    <section class="card">
+      <h2 class="sectionTitle">What Nova gives you</h2>
+      <p class="sectionSub">Fast, local workflows that feel like a copilot — without handing your data to a service.</p>
+      <div class="cards3">
+        <div class="miniCard">
+          <h3>Chat + Commands</h3>
+          <p>Use normal chat, or run skills like <code class="inline">/qstatus</code> and <code class="inline">/doctor</code>.</p>
+        </div>
+        <div class="miniCard">
+          <h3>Skill system</h3>
+          <p>Add new commands and utilities without rewriting the core.</p>
+        </div>
+        <div class="miniCard">
+          <h3>Local by default</h3>
+          <p>Binds to <code class="inline">127.0.0.1</code> by default. Clear warnings if exposed to the network.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DEMO SCRIPT -->
+    <section class="card">
+      <h2 class="sectionTitle">What it looks like in 30 seconds</h2>
+      <p class="sectionSub">This is the exact “demo loop” you’ll record and show everywhere.</p>
+
+      <div class="demoGrid">
+        <div class="terminal">
+          <div class="termBar">
+            <div class="lights" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div>Nova — demo loop</div>
+          </div>
+          <pre>
+&gt;&gt;&gt; /qstatus
+Quick Status (smart)
+status: ok
+last_heartbeat: 2026-01-21T...
+
+&gt;&gt;&gt; /doctor
+DOCTOR: Looks good.
+No recent warnings/errors found.
+
+&gt;&gt;&gt; summarize this text: [paste paragraph...]
+Summary:
+- ...
+
+&gt;&gt;&gt; create a to-do list from: [paste messy tasks...]
+To-do:
+- ...
+- ...
+
+&gt;&gt;&gt; parse this URL: https://example.com/login?redirect=/admin&amp;token=ABC
+Parsed:
+- domain: example.com
+- path: /login
+- params: redirect, token
+</pre>
+        </div>
+
+        <div class="ctaRow">
+          <a class="btn primary" href="#download">Download</a>
+          <a class="btn" href="#docs">How it works</a>
+          <a class="btn" href="#privacy">Privacy & data</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- WHY LOCAL MATTERS -->
+    <section class="card" id="privacy">
+      <h2 class="sectionTitle">Why local matters</h2>
+      <div class="twoCol">
+        <div class="miniCard">
+          <h3>Most AI tools ship your data somewhere</h3>
+          <p class="muted">Cloud chatbots often require accounts, telemetry, or remote processing.</p>
+          <ul>
+            <li>Prompts may be transmitted off-device</li>
+            <li>Logs may be stored remotely</li>
+            <li>Policies can change</li>
+          </ul>
+        </div>
+        <div class="miniCard">
+          <h3>Nova runs on your PC</h3>
+          <p class="muted">Nova is designed to keep your work local and inspectable.</p>
+          <ul>
+            <li>Prompts stay local</li>
+            <li>Notes stay local</li>
+            <li>Logs stay local (with redaction option)</li>
+            <li>Default bind: <code class="inline">127.0.0.1</code></li>
+          </ul>
+        </div>
+      </div>
+      <p class="micro">
+        Add a dedicated “Privacy & Data” page next. Keep it plain English: what’s stored, where, and how to delete it.
+      </p>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section class="card" id="docs">
+      <h2 class="sectionTitle">How it works</h2>
+      <p class="sectionSub">Simple architecture. Easy to reason about. Easy to audit.</p>
+
+      <div class="twoCol">
+        <div class="miniCard">
+          <h3>Architecture (simple)</h3>
+          <ul>
+            <li>Nova runs a small local server</li>
+            <li>You use it through a browser UI</li>
+            <li>Skills are commands (plugins) that extend behavior</li>
+            <li>Config + logs live as plain files you can inspect</li>
+          </ul>
+        </div>
+        <div class="miniCard">
+          <h3>Built-in focus</h3>
+          <ul>
+            <li>Diagnostics: <code class="inline">/qstatus</code>, <code class="inline">/doctor</code></li>
+            <li>Notes + recall</li>
+            <li>Text transforms (summaries, lists)</li>
+            <li>Cybersecurity-friendly utilities (URL parsing)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- GET STARTED -->
+    <section class="card" id="download">
+      <h2 class="sectionTitle">Install in 5 minutes</h2>
+      <p class="sectionSub">Double-click → it works. (Windows first.)</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="num">1</div>
+          <h4>Download</h4>
+          <p>Grab the latest release from GitHub.</p>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <h4>Run installer</h4>
+          <p>Installs deps, sets startup/task, opens the UI.</p>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <h4>Open UI</h4>
+          <p>Go to <code class="inline">http://127.0.0.1:8790/app</code></p>
+        </div>
+        <div class="step">
+          <div class="num">4</div>
+          <h4>Type /qstatus</h4>
+          <p>Confirm it’s alive. Then run the demo loop.</p>
+        </div>
+      </div>
+
+      <div class="ctaRow" style="margin-top:14px;">
+        <a class="btn primary" href="https://github.com/YOUR_GITHUB/Nova/releases" target="_blank" rel="noreferrer">Download (GitHub Releases)</a>
+        <a class="btn" href="https://github.com/YOUR_GITHUB/Nova#readme" target="_blank" rel="noreferrer">5-minute setup guide</a>
+      </div>
+
+      <p class="micro">
+        Trust signal to add here: SHA256 checksums for the release zip + installer.
+      </p>
+    </section>
+
+    <!-- WHO IT'S FOR -->
+    <section class="card">
+      <h2 class="sectionTitle">Who Nova is for</h2>
+      <p class="sectionSub">If you want control, local-first workflows, and tools you can inspect — you’ll like Nova.</p>
+
+      <div class="chips" aria-label="audience chips">
+        <span class="chip">Cybersecurity learners</span>
+        <span class="chip">Power users</span>
+        <span class="chip">Privacy-first users</span>
+        <span class="chip">Developers</span>
+      </div>
+
+      <div class="twoCol" style="margin-top:14px;">
+        <div class="miniCard">
+          <h3>Common uses</h3>
+          <ul>
+            <li>Quick diagnostics</li>
+            <li>Notes + recall</li>
+            <li>Summaries and formatting</li>
+            <li>URL parsing and analysis</li>
+            <li>Local automation helpers</li>
+          </ul>
+        </div>
+        <div class="miniCard">
+          <h3>What Nova is not</h3>
+          <ul>
+            <li>Not SaaS</li>
+            <li>Not a team product</li>
+            <li>Not cloud AI by default</li>
+            <li>Not telemetry-driven</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      <div>
+        <div><strong>Nova</strong> runs locally. No accounts. No telemetry. No cloud by default.</div>
+        <div style="margin-top:6px;">Version: <span class="muted">v0.1.0</span> · Last updated: <span class="muted">2026-01-21</span></div>
+      </div>
+      <div class="footLinks">
+        <a href="#demo">Demo</a>
+        <a href="#docs">Docs</a>
+        <a href="#privacy">Privacy</a>
+        <a href="https://github.com/YOUR_GITHUB/Nova" target="_blank" rel="noreferrer">GitHub</a>
+        <a href="https://github.com/YOUR_GITHUB/Nova/releases" target="_blank" rel="noreferrer">Releases</a>
+      </div>
+    </div>
+
+  </main>
+
+</body>
+</html>
