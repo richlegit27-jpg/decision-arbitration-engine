@@ -1,0 +1,311 @@
+// C:\Users\Owner\nova\static\js\composer-service.js
+
+(() => {
+"use strict"
+
+function createComposerService(options = {}){
+  const {
+    state,
+    elements = {},
+    attachmentsService,
+    streamService,
+    renderService,
+    chatService,
+  } = options
+
+  if(!state){
+    throw new Error("NovaComposerService: state is required")
+  }
+
+  if(!streamService){
+    throw new Error("NovaComposerService: streamService is required")
+  }
+
+  const el = {
+    input: elements.input || null,
+    sendBtn: elements.sendBtn || null,
+    attachBtn: elements.attachBtn || null,
+    fileInput: elements.fileInput || null,
+    stopBtn: elements.stopBtn || null,
+    composerForm: elements.composerForm || null,
+  }
+
+  let isSending = false
+
+  function getInputValue(){
+    return String(el.input?.value || "")
+  }
+
+  function setInputValue(value){
+    if(el.input){
+      el.input.value = String(value ?? "")
+      autoResizeInput()
+    }
+
+    return getInputValue()
+  }
+
+  function clearInput(){
+    return setInputValue("")
+  }
+
+  function focusInput(){
+    try{
+      el.input?.focus()
+    }catch(error){
+      console.error("Nova focusInput error:", error)
+    }
+  }
+
+  function autoResizeInput(){
+    if(!el.input){
+      return
+    }
+
+    el.input.style.height = "auto"
+
+    const minHeight = 56
+    const maxHeight = 220
+    const scrollHeight = Number(el.input.scrollHeight || minHeight)
+    const nextHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight))
+
+    el.input.style.height = `${nextHeight}px`
+    el.input.style.overflowY = scrollHeight > maxHeight ? "auto" : "hidden"
+  }
+
+  function getPendingFiles(){
+    if(attachmentsService?.getPendingFiles){
+      return attachmentsService.getPendingFiles()
+    }
+
+    if(Array.isArray(state.pendingAttachments)){
+      return state.pendingAttachments
+    }
+
+    if(Array.isArray(state.pendingFiles)){
+      return state.pendingFiles
+    }
+
+    state.pendingAttachments = []
+    return state.pendingAttachments
+  }
+
+  function hasPendingFiles(){
+    return getPendingFiles().length > 0
+  }
+
+  function canSend(){
+    if(isSending || state.isStreaming){
+      return false
+    }
+
+    return Boolean(getInputValue().trim() || hasPendingFiles())
+  }
+
+  function updateComposerState(){
+    const sendable = canSend()
+    const busy = Boolean(isSending || state.isStreaming)
+
+    if(el.sendBtn){
+      el.sendBtn.disabled = !sendable
+    }
+
+    if(el.stopBtn){
+      el.stopBtn.hidden = !state.isStreaming
+      el.stopBtn.disabled = !state.isStreaming
+    }
+
+    if(el.attachBtn){
+      el.attachBtn.disabled = busy
+    }
+
+    if(el.fileInput){
+      el.fileInput.disabled = busy
+    }
+
+    attachmentsService?.renderPendingAttachments?.()
+    renderService?.renderPendingAttachments?.()
+  }
+
+  async function ensureChatReady(messageText = ""){
+    const existing = String(state.activeChatId || state.chatId || "").trim()
+
+    if(existing){
+      return existing
+    }
+
+    if(!chatService?.createChat){
+      throw new Error("chatService.createChat is missing")
+    }
+
+    const cleanTitle = String(messageText || "").trim()
+    const created = await chatService.createChat({
+      title: cleanTitle.slice(0, 80) || "New chat",
+    })
+
+    const chatId = String(
+      created?.chat_id ||
+      created?.id ||
+      created?.chat?.chat_id ||
+      ""
+    ).trim()
+
+    if(!chatId){
+      throw new Error("Could not create or resolve chat")
+    }
+
+    state.activeChatId = chatId
+    state.chatId = chatId
+
+    if(Array.isArray(state.chats)){
+      const exists = state.chats.some(
+        (chat) => String(chat?.chat_id || chat?.id || "") === chatId
+      )
+
+      if(!exists){
+        state.chats.unshift({
+          chat_id: chatId,
+          title: created?.title || cleanTitle.slice(0, 80) || "New chat",
+          updated_at: new Date().toISOString(),
+        })
+      }
+    }
+
+    renderService?.renderChats?.()
+
+    return chatId
+  }
+
+  async function sendCurrentMessage(){
+    const text = getInputValue()
+    const files = [...getPendingFiles()]
+
+    if(isSending || state.isStreaming){
+      return { ok: false, reason: "busy" }
+    }
+
+    if(!text.trim() && files.length === 0){
+      updateComposerState()
+      focusInput()
+      return { ok: false, reason: "empty" }
+    }
+
+    isSending = true
+    updateComposerState()
+
+    try{
+      const chatId = await ensureChatReady(text)
+
+      const result = await streamService.send({
+        chatId,
+        message: text,
+        files,
+      })
+
+      clearInput()
+      attachmentsService?.clearPendingFiles?.()
+      attachmentsService?.clearPending?.()
+      state.pendingAttachments = []
+      state.pendingFiles = []
+
+      renderService?.renderAll?.()
+
+      return result || { ok: true }
+    }catch(error){
+      console.error("Nova sendCurrentMessage error:", error)
+      renderService?.renderAll?.()
+
+      return {
+        ok: false,
+        error,
+      }
+    }finally{
+      isSending = false
+      autoResizeInput()
+      updateComposerState()
+      focusInput()
+    }
+  }
+
+  function handleInput(){
+    autoResizeInput()
+    updateComposerState()
+  }
+
+  function handleKeyDown(event){
+    if(!event){
+      return
+    }
+
+    if(event.key === "Enter" && !event.shiftKey){
+      event.preventDefault()
+      event.stopPropagation()
+      void sendCurrentMessage()
+    }
+  }
+
+  function handleAttachClick(event){
+    event?.preventDefault()
+    event?.stopPropagation()
+
+    if(isSending || state.isStreaming){
+      return
+    }
+
+    try{
+      el.fileInput?.click()
+    }catch(error){
+      console.error("Nova handleAttachClick error:", error)
+    }
+  }
+
+  function handleStopClick(event){
+    event?.preventDefault()
+    event?.stopPropagation()
+
+    streamService?.stop?.()
+    updateComposerState()
+    focusInput()
+  }
+
+  function handleSubmit(event){
+    event?.preventDefault()
+    event?.stopPropagation()
+    void sendCurrentMessage()
+  }
+
+  function bindEvents(){
+    el.input?.addEventListener("input", handleInput)
+    el.input?.addEventListener("keydown", handleKeyDown)
+    el.attachBtn?.addEventListener("click", handleAttachClick)
+    el.stopBtn?.addEventListener("click", handleStopClick)
+    el.composerForm?.addEventListener("submit", handleSubmit)
+    el.sendBtn?.addEventListener("click", handleSubmit)
+  }
+
+  function init(){
+    bindEvents()
+    autoResizeInput()
+    updateComposerState()
+  }
+
+  init()
+
+  return {
+    init,
+    getInputValue,
+    setInputValue,
+    clearInput,
+    focusInput,
+    autoResizeInput,
+    updateComposerState,
+    sendCurrentMessage,
+  }
+}
+
+window.NovaComposerService = {
+  create: createComposerService,
+  createComposerService
+}
+
+})()

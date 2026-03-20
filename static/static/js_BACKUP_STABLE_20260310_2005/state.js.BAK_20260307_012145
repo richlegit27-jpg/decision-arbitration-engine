@@ -1,0 +1,43 @@
+// C:\Users\Owner\nova\static\js\state.js
+
+window.NovaState = {
+  state: {
+    chatId: null,
+    chats: [],
+    isSending: false,
+    attachments: [],
+    theme: localStorage.getItem("nova_theme") || "dark",
+  },
+
+  els: {},
+
+  setElements() {
+    Object.assign(this.els, {
+      body: document.body,
+      chatList: document.getElementById("chatList"),
+      messages: document.getElementById("messages"),
+      input: document.getElementById("messageInput"),
+      sendBtn: document.getElementById("sendBtn"),
+      sendBtnText: document.getElementById("sendBtnText"),
+      regenBtn: document.getElementById("regenBtn"),
+      clearComposerBtn: document.getElementById("clearComposerBtn"),
+      newChatBtn: document.getElementById("newChatBtn"),
+      renameChatBtn: document.getElementById("renameChatBtn"),
+      deleteChatBtn: document.getElementById("deleteChatBtn"),
+      sidebar: document.getElementById("sidebar"),
+      sidebarToggle: document.getElementById("sidebarToggle"),
+      closeSidebarBtn: document.getElementById("closeSidebarBtn"),
+      mobileOverlay: document.getElementById("mobileOverlay"),
+      settingsBtn: document.getElementById("settingsBtn"),
+      settingsPanel: document.getElementById("settingsPanel"),
+      closeSettingsBtn: document.getElementById("closeSettingsBtn"),
+      themeToggleBtn: document.getElementById("themeToggleBtn"),
+      clearChatsBtn: document.getElementById("clearChatsBtn"),
+      attachBtn: document.getElementById("attachBtn"),
+      fileUpload: document.getElementById("fileUpload"),
+      attachmentTray: document.getElementById("attachmentTray"),
+      chatTitleTop: document.getElementById("chatTitleTop"),
+      toastHost: document.getElementById("toastHost"),
+    });
+  },
+};

@@ -1,0 +1,577 @@
+// C:\Users\Owner\nova\static\js\stream-service.js
+
+(() => {
+"use strict"
+
+function createStreamService(options = {}){
+  const {
+    state,
+    elements = {},
+    utils = {},
+    renderService,
+    chatService,
+    attachmentsService,
+  } = options
+
+  if(!state){
+    throw new Error("NovaStreamService: state is required")
+  }
+
+  const el = {
+    messages: elements.messages || null,
+  }
+
+  const generateId =
+    utils.generateId ||
+    (() => `msg_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`)
+
+  let activeController = null
+  let livePatchFrame = null
+  let pendingLivePatch = null
+
+  function escapeHtml(value){
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;")
+  }
+
+  function renderMessageHtml(content, options = {}){
+    const pending = Boolean(options.pending)
+
+    if(pending){
+      if(window.NovaMarkdown?.renderPlainText){
+        return window.NovaMarkdown.renderPlainText(content || "")
+      }
+
+      return escapeHtml(content || "").replace(/\n/g, "<br>")
+    }
+
+    if(window.NovaMarkdown?.render){
+      return window.NovaMarkdown.render(content || "")
+    }
+
+    return escapeHtml(content || "").replace(/\n/g, "<br>")
+  }
+
+  function ensureMessagesArray(){
+    if(!Array.isArray(state.messages)){
+      state.messages = []
+    }
+
+    return state.messages
+  }
+
+  function ensureChatsArray(){
+    if(!Array.isArray(state.chats)){
+      state.chats = []
+    }
+
+    return state.chats
+  }
+
+  function getActiveChatId(){
+    return String(state.activeChatId || state.chatId || "").trim()
+  }
+
+  function setStreaming(value){
+    state.isStreaming = Boolean(value)
+  }
+
+  function createLocalMessage({
+    id,
+    role,
+    content = "",
+    pending = false,
+    error = false,
+    attachments = [],
+  }){
+    const resolvedId = id || generateId()
+
+    return {
+      id: resolvedId,
+      message_id: resolvedId,
+      role: role || "assistant",
+      content: String(content ?? ""),
+      pending: Boolean(pending),
+      error: Boolean(error),
+      attachments: Array.isArray(attachments) ? attachments : [],
+    }
+  }
+
+  function pushMessage(message){
+    const messages = ensureMessagesArray()
+    messages.push(message)
+    return message
+  }
+
+  function findMessageById(messageId){
+    return ensureMessagesArray().find((msg) => {
+      return String(msg.id || msg.message_id) === String(messageId)
+    }) || null
+  }
+
+  function updateMessageContent(messageId, content){
+    const target = findMessageById(messageId)
+
+    if(!target){
+      return null
+    }
+
+    target.content = String(content ?? "")
+    return target
+  }
+
+  function appendMessageContent(messageId, chunk){
+    const target = findMessageById(messageId)
+
+    if(!target){
+      return null
+    }
+
+    target.content = `${target.content || ""}${String(chunk ?? "")}`
+    return target
+  }
+
+  function finalizeMessage(messageId, extra = {}){
+    const target = findMessageById(messageId)
+
+    if(!target){
+      return null
+    }
+
+    Object.assign(target, extra, { pending: false })
+    return target
+  }
+
+  function removeMessage(messageId){
+    const messages = ensureMessagesArray()
+    const index = messages.findIndex((msg) => {
+      return String(msg.id || msg.message_id) === String(messageId)
+    })
+
+    if(index >= 0){
+      messages.splice(index, 1)
+    }
+  }
+
+  function touchActiveChat(titleFallback = ""){
+    const chatId = getActiveChatId()
+
+    if(!chatId){
+      return
+    }
+
+    const chats = ensureChatsArray()
+    const existing = chats.find((chat) => String(chat.chat_id || chat.id) === chatId)
+
+    if(existing){
+      existing.updated = new Date().toISOString()
+      existing.updated_at = existing.updated
+
+      if((!existing.title || existing.title === "New Chat" || existing.title === "New chat") && titleFallback){
+        existing.title = titleFallback
+      }
+
+      return
+    }
+
+    chats.unshift({
+      chat_id: chatId,
+      title: titleFallback || "New chat",
+      updated: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+  }
+
+  function buildFormData({ chatId, message, files = [] }){
+    const formData = new FormData()
+    formData.append("chat_id", String(chatId || ""))
+    formData.append("message", String(message ?? ""))
+
+    for(const file of files){
+      if(file instanceof File){
+        formData.append("files", file, file.name)
+      }
+    }
+
+    return formData
+  }
+
+  function normalizeAttachmentMeta(raw){
+    if(!raw || typeof raw !== "object"){
+      return null
+    }
+
+    return {
+      attachment_id: raw.attachment_id || raw.id || "",
+      name: raw.name || raw.filename || "file",
+      content_type: raw.content_type || raw.mime_type || "",
+      size: Number(raw.size || 0),
+      text_preview: raw.text_preview || raw.preview || "",
+      url: raw.url || "",
+    }
+  }
+
+  function getMessageArticle(messageId){
+    if(!el.messages){
+      return null
+    }
+
+    return el.messages.querySelector(`[data-message-id="${CSS.escape(String(messageId))}"]`)
+  }
+
+  function patchLiveMessageDom(messageId){
+    const message = findMessageById(messageId)
+    if(!message){
+      return
+    }
+
+    const article = getMessageArticle(messageId)
+    if(!article){
+      return
+    }
+
+    const contentNode = article.querySelector(".message-content")
+    if(contentNode){
+      contentNode.innerHTML = renderMessageHtml(message.content || "", {
+        pending: message.pending,
+      })
+    }
+
+    article.classList.toggle("is-pending", !!message.pending)
+    article.classList.toggle("is-error", !!message.error)
+
+    const copyButton = article.querySelector('[data-message-action="copy"]')
+    if(copyButton){
+      copyButton.disabled = !!message.pending || !String(message.content || "").trim()
+    }
+
+    const regenerateButton = article.querySelector('[data-message-action="regenerate"]')
+    if(regenerateButton){
+      regenerateButton.disabled = !!message.pending || !!state.isStreaming
+    }
+  }
+
+  function scheduleLiveMessagePatch(messageId){
+    pendingLivePatch = messageId
+
+    if(livePatchFrame){
+      return
+    }
+
+    livePatchFrame = window.requestAnimationFrame(() => {
+      const nextId = pendingLivePatch
+      pendingLivePatch = null
+      livePatchFrame = null
+
+      if(nextId){
+        patchLiveMessageDom(nextId)
+        renderService?.scrollToBottom?.()
+      }
+    })
+  }
+
+  function flushLivePatchNow(messageId){
+    if(livePatchFrame){
+      window.cancelAnimationFrame(livePatchFrame)
+      livePatchFrame = null
+    }
+
+    pendingLivePatch = null
+    patchLiveMessageDom(messageId)
+  }
+
+  function addUserMessage(messageText, files = []){
+    const text = String(messageText ?? "")
+    const fileList = Array.isArray(files) ? files : []
+
+    const attachmentItems = fileList.map((file) => ({
+      name: file?.name || "file",
+      size: Number(file?.size || 0),
+      content_type: file?.type || "",
+    }))
+
+    const msg = createLocalMessage({
+      role: "user",
+      content: text,
+      attachments: attachmentItems,
+      pending: false,
+    })
+
+    pushMessage(msg)
+    touchActiveChat(text.trim().slice(0, 60) || "New chat")
+    renderService?.renderAll?.()
+
+    return msg
+  }
+
+  function addAssistantPlaceholder(){
+    const msg = createLocalMessage({
+      role: "assistant",
+      content: "",
+      pending: true,
+    })
+
+    pushMessage(msg)
+    renderService?.renderAll?.()
+    return msg
+  }
+
+  function syncMetaToState(meta){
+    if(!meta || typeof meta !== "object"){
+      return
+    }
+
+    const metaChatId = String(meta.chat_id || "").trim()
+
+    if(metaChatId){
+      state.activeChatId = metaChatId
+      state.chatId = metaChatId
+    }
+
+    if(meta.user_message_id){
+      state.lastUserMessageId = meta.user_message_id
+    }
+
+    if(Array.isArray(meta.attachments)){
+      state.lastUploadedAttachments = meta.attachments
+        .map(normalizeAttachmentMeta)
+        .filter(Boolean)
+    }
+  }
+
+  async function readStream(response, assistantMessageId){
+    if(!response?.body){
+      throw new Error("Streaming response body is missing")
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder("utf-8")
+    let buffer = ""
+    let fullText = ""
+
+    while(true){
+      const { value, done } = await reader.read()
+
+      if(done){
+        break
+      }
+
+      buffer += decoder.decode(value, { stream: true })
+
+      while(buffer.includes("\n\n")){
+        const splitIndex = buffer.indexOf("\n\n")
+        const rawEvent = buffer.slice(0, splitIndex)
+        buffer = buffer.slice(splitIndex + 2)
+
+        if(!rawEvent.trim()){
+          continue
+        }
+
+        const lines = rawEvent.split(/\r?\n/)
+        let eventName = "message"
+        const dataLines = []
+
+        for(const line of lines){
+          if(line.startsWith("event:")){
+            eventName = line.slice(6).trim()
+            continue
+          }
+
+          if(line.startsWith("data:")){
+            dataLines.push(line.slice(5).trim())
+          }
+        }
+
+        const dataText = dataLines.join("\n")
+        let payload = null
+
+        if(dataText){
+          try{
+            payload = JSON.parse(dataText)
+          }catch(_parseError){
+            payload = { raw: dataText }
+          }
+        }
+
+        if(eventName === "meta"){
+          syncMetaToState(payload)
+          continue
+        }
+
+        if(eventName === "token"){
+          const token = String(payload?.t ?? payload?.token ?? payload?.raw ?? "")
+          if(token){
+            fullText += token
+            appendMessageContent(assistantMessageId, token)
+            scheduleLiveMessagePatch(assistantMessageId)
+          }
+          continue
+        }
+
+        if(eventName === "done"){
+          const finalText = String(payload?.full_text ?? fullText)
+          updateMessageContent(assistantMessageId, finalText)
+          finalizeMessage(assistantMessageId, { error: false, pending: false })
+          flushLivePatchNow(assistantMessageId)
+          renderService?.renderAll?.()
+
+          return {
+            ok: true,
+            full_text: finalText,
+            chat_id: String(payload?.chat_id || getActiveChatId()),
+          }
+        }
+
+        if(eventName === "error"){
+          const errorText = String(payload?.error || payload?.message || payload?.raw || "Stream error")
+          updateMessageContent(assistantMessageId, errorText)
+          finalizeMessage(assistantMessageId, { error: true, pending: false })
+          flushLivePatchNow(assistantMessageId)
+          renderService?.renderAll?.()
+
+          return {
+            ok: false,
+            error: new Error(errorText),
+          }
+        }
+      }
+    }
+
+    const existing = findMessageById(assistantMessageId)
+    finalizeMessage(assistantMessageId, { pending: false })
+    flushLivePatchNow(assistantMessageId)
+
+    return {
+      ok: true,
+      full_text: String(existing?.content || ""),
+      chat_id: getActiveChatId(),
+    }
+  }
+
+  async function sendMessage({ chatId, message, files = [] } = {}){
+    const resolvedChatId = String(chatId || getActiveChatId()).trim()
+    const text = String(message ?? "")
+    const fileList = Array.isArray(files) ? files : []
+
+    if(!resolvedChatId){
+      throw new Error("NovaStreamService.sendMessage: chatId is required")
+    }
+
+    if(state.isStreaming){
+      return { ok: false, reason: "busy" }
+    }
+
+    state.activeChatId = resolvedChatId
+    state.chatId = resolvedChatId
+
+    addUserMessage(text, fileList)
+    const assistantMessage = addAssistantPlaceholder()
+
+    const controller = new AbortController()
+    activeController = controller
+    setStreaming(true)
+
+    try{
+      const response = await fetch("/api/chat/stream", {
+        method: "POST",
+        body: buildFormData({
+          chatId: resolvedChatId,
+          message: text,
+          files: fileList,
+        }),
+        signal: controller.signal,
+        headers: {
+          "Accept": "text/event-stream",
+        },
+      })
+
+      if(!response.ok){
+        let errorText = `HTTP ${response.status}`
+
+        try{
+          const bodyText = await response.text()
+          if(bodyText?.trim()){
+            errorText = bodyText.trim()
+          }
+        }catch(_error){
+          // ignore body parse failure
+        }
+
+        throw new Error(errorText)
+      }
+
+      const result = await readStream(response, assistantMessage.id)
+
+      touchActiveChat(text.trim().slice(0, 60) || "New chat")
+      renderService?.renderAll?.()
+
+      try{
+        await chatService?.loadChats?.()
+      }catch(error){
+        console.error("Nova sendMessage loadChats sync error:", error)
+      }
+
+      return result
+    }catch(error){
+      const isAbort = error?.name === "AbortError"
+      const messageText = isAbort
+        ? "Response stopped."
+        : `⚠️ Network/stream error: ${error.message || error}`
+
+      updateMessageContent(assistantMessage.id, messageText)
+      finalizeMessage(assistantMessage.id, {
+        error: !isAbort,
+        pending: false,
+      })
+
+      flushLivePatchNow(assistantMessage.id)
+      renderService?.renderAll?.()
+
+      return {
+        ok: false,
+        error,
+        aborted: isAbort,
+      }
+    }finally{
+      activeController = null
+      setStreaming(false)
+      attachmentsService?.renderPendingAttachments?.()
+      renderService?.renderAll?.()
+    }
+  }
+
+  function abortActiveStream(){
+    if(activeController){
+      try{
+        activeController.abort()
+      }catch(error){
+        console.error("Nova abortActiveStream error:", error)
+      }
+    }
+  }
+
+  function resetStreamingState(){
+    activeController = null
+    setStreaming(false)
+  }
+
+  return {
+    sendMessage,
+    abortActiveStream,
+    resetStreamingState,
+    addUserMessage,
+    addAssistantPlaceholder,
+    removeMessage,
+  }
+}
+
+window.NovaStreamService = {
+  create: createStreamService,
+  createStreamService,
+}
+
+})()

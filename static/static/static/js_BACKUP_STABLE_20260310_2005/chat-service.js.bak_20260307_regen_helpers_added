@@ -1,0 +1,372 @@
+// C:\Users\Owner\nova\static\js\chat-service.js
+
+(() => {
+"use strict"
+
+function createChatService(options = {}){
+  const {
+    state,
+    elements = {},
+    utils = {},
+    renderService,
+  } = options
+
+  if(!state){
+    throw new Error("NovaChatService: state is required")
+  }
+
+  const el = {
+    chatList: elements.chatList || null,
+    messages: elements.messages || null,
+  }
+
+  const generateId =
+    utils.generateId ||
+    (() => `chat_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`)
+
+  function ensureChatsArray(){
+    if(!Array.isArray(state.chats)){
+      state.chats = []
+    }
+
+    return state.chats
+  }
+
+  function ensureMessagesArray(){
+    if(!Array.isArray(state.messages)){
+      state.messages = []
+    }
+
+    return state.messages
+  }
+
+  async function readJsonSafe(response){
+    const text = await response.text()
+
+    if(!text){
+      return {}
+    }
+
+    try {
+      return JSON.parse(text)
+    } catch(error){
+      console.error("Nova readJsonSafe parse error:", error, text)
+      throw new Error("Invalid JSON response")
+    }
+  }
+
+  async function request(url, options = {}){
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+      },
+    })
+
+    if(!response.ok){
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    return readJsonSafe(response)
+  }
+
+  function normalizeChat(raw){
+    if(!raw || typeof raw !== "object"){
+      return null
+    }
+
+    const chatId = String(
+      raw.chat_id ||
+      raw.id ||
+      ""
+    ).trim()
+
+    if(!chatId){
+      return null
+    }
+
+    return {
+      chat_id: chatId,
+      title: String(raw.title || "New Chat"),
+      updated: String(raw.updated || raw.updated_at || raw.created_at || ""),
+    }
+  }
+
+  function normalizeMessage(raw){
+    if(!raw || typeof raw !== "object"){
+      return null
+    }
+
+    return {
+      id: String(raw.id || raw.message_id || generateId()),
+      role: String(raw.role || "assistant"),
+      content: String(raw.content || raw.text || ""),
+      pending: Boolean(raw.pending),
+      error: Boolean(raw.error),
+      attachments: Array.isArray(raw.attachments) ? raw.attachments : [],
+      created_at: String(raw.created_at || ""),
+    }
+  }
+
+  function setActiveChat(chatId){
+    const resolved = String(chatId || "").trim()
+    state.activeChatId = resolved
+    state.chatId = resolved
+    return resolved
+  }
+
+  async function loadChats(){
+    const data = await request("/api/chats")
+    const rawChats = Array.isArray(data?.chats) ? data.chats : []
+    const chats = rawChats.map(normalizeChat).filter(Boolean)
+
+    state.chats = chats
+
+    if(!state.activeChatId && chats.length > 0){
+      setActiveChat(chats[0].chat_id)
+    }
+
+    renderService?.renderChats?.()
+    return chats
+  }
+
+  async function loadMessages(chatId){
+    const resolvedChatId = String(chatId || state.activeChatId || state.chatId || "").trim()
+
+    if(!resolvedChatId){
+      state.messages = []
+      renderService?.renderMessages?.()
+      return []
+    }
+
+    setActiveChat(resolvedChatId)
+
+    const data = await request(`/api/chats/${encodeURIComponent(resolvedChatId)}`)
+    const rawMessages = Array.isArray(data?.messages) ? data.messages : []
+    const messages = rawMessages.map(normalizeMessage).filter(Boolean)
+
+    state.messages = messages
+    renderService?.renderMessages?.()
+    return messages
+  }
+
+  async function createChat(title = "New Chat"){
+    const payload = {
+      title: String(title || "New Chat"),
+    }
+
+    const data = await request("/api/chats", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    })
+
+    const created =
+      normalizeChat(data?.chat) ||
+      normalizeChat(data)
+
+    if(!created){
+      throw new Error("Chat creation failed")
+    }
+
+    const chats = ensureChatsArray()
+    const existingIndex = chats.findIndex((chat) => chat.chat_id === created.chat_id)
+
+    if(existingIndex >= 0){
+      chats[existingIndex] = created
+    } else {
+      chats.unshift(created)
+    }
+
+    setActiveChat(created.chat_id)
+    state.messages = []
+
+    renderService?.renderAll?.()
+
+    try {
+      await loadChats()
+    } catch(error){
+      console.error("Nova createChat loadChats sync error:", error)
+    }
+
+    return {
+      ok: true,
+      chat_id: created.chat_id,
+      chat: created,
+    }
+  }
+
+  async function refreshActiveChat(){
+    const chatId = String(state.activeChatId || state.chatId || "").trim()
+
+    if(!chatId){
+      return []
+    }
+
+    return loadMessages(chatId)
+  }
+
+  function clearMessages(){
+    state.messages = []
+    renderService?.renderMessages?.()
+  }
+
+  function getActiveChat(){
+    const chats = ensureChatsArray()
+    const activeId = String(state.activeChatId || state.chatId || "").trim()
+    return chats.find((chat) => chat.chat_id === activeId) || null
+  }
+
+  function getMessages(){
+    return ensureMessagesArray()
+  }
+
+  function getLastUserMessage(){
+    const messages = ensureMessagesArray()
+
+    for(let i = messages.length - 1; i >= 0; i -= 1){
+      const message = messages[i]
+
+      if(message && message.role === "user"){
+        return message
+      }
+    }
+
+    return null
+  }
+
+  function getLastAssistantMessage(){
+    const messages = ensureMessagesArray()
+
+    for(let i = messages.length - 1; i >= 0; i -= 1){
+      const message = messages[i]
+
+      if(message && message.role === "assistant"){
+        return message
+      }
+    }
+
+    return null
+  }
+
+  function getLastExchange(){
+    const messages = ensureMessagesArray()
+
+    let lastUserIndex = -1
+
+    for(let i = messages.length - 1; i >= 0; i -= 1){
+      const message = messages[i]
+
+      if(message && message.role === "user"){
+        lastUserIndex = i
+        break
+      }
+    }
+
+    if(lastUserIndex < 0){
+      return {
+        userMessage: null,
+        assistantMessage: null,
+        userIndex: -1,
+        assistantIndex: -1,
+      }
+    }
+
+    let lastAssistantIndex = -1
+
+    for(let i = messages.length - 1; i > lastUserIndex; i -= 1){
+      const message = messages[i]
+
+      if(message && message.role === "assistant"){
+        lastAssistantIndex = i
+        break
+      }
+    }
+
+    return {
+      userMessage: messages[lastUserIndex] || null,
+      assistantMessage: lastAssistantIndex >= 0 ? messages[lastAssistantIndex] : null,
+      userIndex: lastUserIndex,
+      assistantIndex: lastAssistantIndex,
+    }
+  }
+
+  function removeMessageById(messageId){
+    const resolvedId = String(messageId || "").trim()
+
+    if(!resolvedId){
+      return null
+    }
+
+    const messages = ensureMessagesArray()
+    const index = messages.findIndex((message) => String(message?.id || "").trim() === resolvedId)
+
+    if(index < 0){
+      return null
+    }
+
+    const removed = messages.splice(index, 1)[0] || null
+    renderService?.renderMessages?.()
+    return removed
+  }
+
+  function removeLastAssistantMessage(){
+    const exchange = getLastExchange()
+
+    if(!exchange.assistantMessage){
+      return null
+    }
+
+    const messages = ensureMessagesArray()
+    const removed = messages.splice(exchange.assistantIndex, 1)[0] || null
+
+    renderService?.renderMessages?.()
+    return removed
+  }
+
+  function canRegenerate(){
+    const exchange = getLastExchange()
+    return Boolean(exchange.userMessage)
+  }
+
+  function getRegeneratePayload(){
+    const exchange = getLastExchange()
+
+    if(!exchange.userMessage){
+      return null
+    }
+
+    return {
+      chatId: String(state.activeChatId || state.chatId || "").trim(),
+      message: String(exchange.userMessage.content || ""),
+      userMessage: exchange.userMessage,
+      assistantMessage: exchange.assistantMessage,
+    }
+  }
+
+  return {
+    loadChats,
+    loadMessages,
+    createChat,
+    refreshActiveChat,
+    clearMessages,
+    getActiveChat,
+    setActiveChat,
+    getMessages,
+    getLastUserMessage,
+    getLastAssistantMessage,
+    getLastExchange,
+    removeMessageById,
+    removeLastAssistantMessage,
+    canRegenerate,
+    getRegeneratePayload,
+  }
+}
+
+window.NovaChatService = {
+  createChatService,
+}
+
+})()

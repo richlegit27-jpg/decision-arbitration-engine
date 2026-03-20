@@ -33,6 +33,8 @@
     activeStreamController: null,
     activeAssistantBubble: null,
     activeAssistantTextNode: null,
+    activeAssistantCopyBtn: null,
+    activeAssistantMeta: null,
     activeAssistantRawText: ""
   };
 
@@ -237,7 +239,6 @@
     }
 
     autosizeFrame = requestAnimationFrame(() => {
-      const previousOverflow = input.style.overflowY;
       input.style.overflowY = "hidden";
       input.style.height = "auto";
 
@@ -252,11 +253,6 @@
       }
 
       input.style.overflowY = measured > maxHeight ? "auto" : "hidden";
-
-      if (previousOverflow !== input.style.overflowY) {
-        input.style.overflowY = measured > maxHeight ? "auto" : "hidden";
-      }
-
       autosizeFrame = null;
     });
   }
@@ -304,7 +300,9 @@
       try {
         const data = await response.json();
         detail = data?.detail || data?.error || "";
-      } catch {}
+      } catch {
+        detail = "";
+      }
       throw new Error(detail ? `HTTP ${response.status}: ${detail}` : `HTTP ${response.status}`);
     }
 
@@ -354,19 +352,16 @@
     html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
 
-    html = html.replace(
-      /^(?:-\s.+(?:\n|$))+?/gm,
-      (block) => {
-        const items = block
-          .trim()
-          .split("\n")
-          .map((line) => line.replace(/^\-\s/, "").trim())
-          .filter(Boolean)
-          .map((item) => `<li>${item}</li>`)
-          .join("");
-        return `<ul>${items}</ul>`;
-      }
-    );
+    html = html.replace(/(?:^|\n)((?:-\s.+(?:\n|$))+)/g, (_, block) => {
+      const items = block
+        .trim()
+        .split("\n")
+        .map((line) => line.replace(/^\-\s/, "").trim())
+        .filter(Boolean)
+        .map((item) => `<li>${item}</li>`)
+        .join("");
+      return `\n<ul>${items}</ul>`;
+    });
 
     html = html.replace(/\n/g, "<br>");
     return html;
@@ -381,6 +376,21 @@
     } catch (error) {
       console.warn("Copy failed:", error);
     }
+  }
+
+  function createCopyButton(getText) {
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "topbar-btn";
+    copyBtn.type = "button";
+    copyBtn.textContent = "Copy";
+    copyBtn.addEventListener("click", async () => {
+      await copyText(getText());
+      copyBtn.textContent = "Copied";
+      setTimeout(() => {
+        copyBtn.textContent = "Copy";
+      }, 1200);
+    });
+    return copyBtn;
   }
 
   function createMessageElement(role, text = "", timestamp = null) {
@@ -414,25 +424,16 @@
 
     footer.appendChild(meta);
 
+    let copyBtn = null;
     if (role === "assistant") {
-      const copyBtn = document.createElement("button");
-      copyBtn.className = "topbar-btn";
-      copyBtn.type = "button";
-      copyBtn.textContent = "Copy";
-      copyBtn.addEventListener("click", async () => {
-        await copyText(textNode.textContent || "");
-        copyBtn.textContent = "Copied";
-        setTimeout(() => {
-          copyBtn.textContent = "Copy";
-        }, 1200);
-      });
+      copyBtn = createCopyButton(() => textNode.textContent || "");
       footer.appendChild(copyBtn);
     }
 
     bubble.appendChild(footer);
     wrap.appendChild(bubble);
 
-    return { wrap, bubble, textNode, meta };
+    return { wrap, bubble, textNode, meta, copyBtn };
   }
 
   function appendMessage(role, text, timestamp = null) {
@@ -491,7 +492,8 @@
     els.sessionList.innerHTML = state.sessions.map((item) => {
       const activeClass = item.session_id === state.activeSessionId ? " active" : "";
       const title = escapeHtml(item.title || "New Chat");
-      const meta = `${Number(item.message_count || 0)} message${Number(item.message_count || 0) === 1 ? "" : "s"}`;
+      const count = Number(item.message_count || 0);
+      const meta = `${count} message${count === 1 ? "" : "s"}`;
       return `
         <button class="session-item${activeClass}" type="button" data-session-id="${escapeHtml(item.session_id)}">
           <span class="session-title">${title}</span>
@@ -816,6 +818,36 @@
     appendMessage("system", "Background is disabled for V1 lock.");
   }
 
+  function resetActiveAssistantState() {
+    state.activeAssistantBubble = null;
+    state.activeAssistantTextNode = null;
+    state.activeAssistantCopyBtn = null;
+    state.activeAssistantMeta = null;
+    state.activeAssistantRawText = "";
+  }
+
+  function updateStreamingAssistantVisual() {
+    if (!state.activeAssistantTextNode) return;
+    state.activeAssistantTextNode.textContent = state.activeAssistantRawText;
+    if (els.chatMessages) {
+      els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
+    }
+  }
+
+  function finalizeStreamingAssistant(timestamp = null) {
+    if (!state.activeAssistantTextNode) return;
+
+    state.activeAssistantTextNode.innerHTML = basicMarkdownToHtml(state.activeAssistantRawText);
+
+    if (state.activeAssistantMeta && timestamp) {
+      state.activeAssistantMeta.textContent = formatTime(timestamp);
+    }
+
+    if (els.chatMessages) {
+      els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
+    }
+  }
+
   async function processSseEvent(rawEvent, sessionId) {
     const lines = rawEvent.split("\n");
     let eventName = "message";
@@ -848,12 +880,7 @@
 
     if (eventName === "delta") {
       state.activeAssistantRawText += String(payload?.text || "");
-      if (state.activeAssistantTextNode) {
-        state.activeAssistantTextNode.textContent = state.activeAssistantRawText;
-        if (els.chatMessages) {
-          els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
-        }
-      }
+      updateStreamingAssistantVisual();
       return;
     }
 
@@ -862,9 +889,8 @@
     }
 
     if (eventName === "done") {
-      if (state.activeAssistantTextNode) {
-        state.activeAssistantTextNode.innerHTML = basicMarkdownToHtml(state.activeAssistantRawText);
-      }
+      const assistantTimestamp = payload?.message?.timestamp || Math.floor(Date.now() / 1000);
+      finalizeStreamingAssistant(assistantTimestamp);
       await refreshStateAndSession(sessionId);
     }
   }
@@ -892,6 +918,8 @@
     const assistantNode = appendMessage("assistant", "");
     state.activeAssistantBubble = assistantNode?.bubble || null;
     state.activeAssistantTextNode = assistantNode?.textNode || null;
+    state.activeAssistantCopyBtn = assistantNode?.copyBtn || null;
+    state.activeAssistantMeta = assistantNode?.meta || null;
     state.activeAssistantRawText = "";
 
     const controller = new AbortController();
@@ -941,15 +969,23 @@
       }
     } catch (error) {
       if (error?.name === "AbortError") {
+        if (state.activeAssistantRawText.trim()) {
+          finalizeStreamingAssistant(Math.floor(Date.now() / 1000));
+        } else if (state.activeAssistantBubble?.parentElement) {
+          state.activeAssistantBubble.parentElement.remove();
+        }
         appendMessage("system", "Stopped.");
       } else {
+        if (state.activeAssistantRawText.trim()) {
+          finalizeStreamingAssistant(Math.floor(Date.now() / 1000));
+        } else if (state.activeAssistantBubble?.parentElement) {
+          state.activeAssistantBubble.parentElement.remove();
+        }
         appendMessage("assistant", `Error: ${error.message}`);
       }
     } finally {
       state.activeStreamController = null;
-      state.activeAssistantBubble = null;
-      state.activeAssistantTextNode = null;
-      state.activeAssistantRawText = "";
+      resetActiveAssistantState();
       setSending(false);
     }
   }
@@ -957,7 +993,6 @@
   function stopMessage() {
     if (state.activeStreamController) {
       state.activeStreamController.abort();
-      state.activeStreamController = null;
       return;
     }
 
