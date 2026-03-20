@@ -1,5 +1,28 @@
 [
   {
+    "session_id": "7a991a78-b50d-4a5e-b9cf-4623bae3db93",
+    "title": "what do you know about me",
+    "messages": [
+      {
+        "id": "66945e9a-5ef9-4f5e-9b29-beca1fb616b1",
+        "role": "user",
+        "content": "what do you know about me",
+        "timestamp": 1774043859,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "51ca3589-ee03-4202-8083-580819ffd069",
+        "role": "assistant",
+        "content": "You are Richard Chow. You prefer direct answers and prefer to be greeted with \"hi.\" You have a project named Nova.",
+        "timestamp": 1774043859,
+        "model": "gpt-4.1-mini"
+      }
+    ],
+    "message_count": 2,
+    "created_at": 1774043853,
+    "updated_at": 1774043859
+  },
+  {
     "session_id": "72e86e22-34db-440b-943d-46a0ee64016d",
     "title": "how are you",
     "messages": [
@@ -67,10 +90,52 @@
         "content": "I'm functioning optimally, thank you! How can I assist you today, rich?",
         "timestamp": 1774041834,
         "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "6dfd45a1-e1a6-4184-a67d-ab3ca8c2f600",
+        "role": "user",
+        "content": "my name is richard chow",
+        "timestamp": 1774043827,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "11ad79f7-afd5-48da-a69f-8030f89f6482",
+        "role": "assistant",
+        "content": "Got it, Richard Chow. How can I assist you today?",
+        "timestamp": 1774043828,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "ba1ede61-ce7a-4228-9a01-941b80c407bd",
+        "role": "user",
+        "content": "i prefer direct answers",
+        "timestamp": 1774043839,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "b5627d3c-7fbb-405b-86dc-0030cb5e2194",
+        "role": "assistant",
+        "content": "Understood, Richard Chow. I will provide direct answers. What do you need help with?",
+        "timestamp": 1774043841,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "39cc98e8-8354-4b0f-85a7-2c59cfd76962",
+        "role": "user",
+        "content": "i'm working on nova",
+        "timestamp": 1774043849,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "0a67cfe5-2692-4049-8094-a1cdf8eba19f",
+        "role": "assistant",
+        "content": "Noted, Richard Chow. You're working on the project \"nova.\" What specific assistance do you need with it?",
+        "timestamp": 1774043850,
+        "model": "gpt-4.1-mini"
       }
     ],
-    "message_count": 6,
+    "message_count": 12,
     "created_at": 1774041431,
-    "updated_at": 1774041834
+    "updated_at": 1774043850
   }
 ]
