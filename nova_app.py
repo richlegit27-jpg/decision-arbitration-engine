@@ -922,4 +922,7 @@ def api_chat_stream():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=8743, debug=True)
+    host = (os.getenv("APP_HOST") or "127.0.0.1").strip()
+    port = int((os.getenv("PORT") or os.getenv("APP_PORT") or "8743").strip())
+    debug = (os.getenv("DEBUG") or "true").strip().lower() == "true"
+    app.run(host=host, port=port, debug=debug)

@@ -1,19 +1,104 @@
 [
   {
+    "session_id": "c7fc0770-0d09-41ee-ac79-670f7038f5e5",
+    "title": "is trumps cabinit a regime",
+    "messages": [
+      {
+        "id": "6d9e8768-8430-48d6-a522-001167df49f2",
+        "role": "user",
+        "content": "is trumps cabinit a regime",
+        "timestamp": 1774050256,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "0e19f2b3-14a2-43cd-b0b3-20d4c0775f27",
+        "role": "assistant",
+        "content": "No, Donald Trump's cabinet was not a regime. \n\n**Explanation:**\n- A *cabinet* refers to the group of senior officials appointed by a president or prime minister to head government departments and advise on policy.\n- A *regime* typically refers to a government, especially an authoritarian or undemocratic one.\n- Trump's cabinet was part of the U.S. executive branch during his presidency (2017–2021), functioning within the framework of the U.S. democratic system.\n- Therefore, it is accurate to call it an administration or government cabinet, not a regime.",
+        "timestamp": 1774050260,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "56b3bd37-1c74-4f77-aa9c-47828ed9a433",
+        "role": "user",
+        "content": "hi",
+        "timestamp": 1774050707,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "f550cafe-5e25-44d4-b167-0e8f652e51f0",
+        "role": "assistant",
+        "content": "Hello! How can I assist you today?",
+        "timestamp": 1774050708,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "e725db4b-a485-4edf-b316-168bc31124db",
+        "role": "user",
+        "content": "hi",
+        "timestamp": 1774050901,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "73f3eec1-df5f-40f1-b274-59fc0b6b41b9",
+        "role": "assistant",
+        "content": "Hi again! What can I do for you?",
+        "timestamp": 1774050903,
+        "model": "gpt-4.1-mini"
+      }
+    ],
+    "message_count": 6,
+    "created_at": 1774049931,
+    "updated_at": 1774050903
+  },
+  {
+    "session_id": "0b96a313-4972-4db8-88d8-e864bde7c58d",
+    "title": "New Chat",
+    "messages": [],
+    "message_count": 0,
+    "created_at": 1774049929,
+    "updated_at": 1774049929
+  },
+  {
+    "session_id": "0406e8b3-4893-40d6-a30d-50a57e6608b9",
+    "title": "hi",
+    "messages": [
+      {
+        "id": "9e4c6cd0-91ec-4142-a5d0-c12d5033d043",
+        "role": "user",
+        "content": "hi",
+        "timestamp": 1774049878,
+        "model": "gpt-4.1-mini",
+        "uploaded_files": [
+          {
+            "content_type": "image/jpeg",
+            "id": "d2492df4-8311-4042-b48e-b1b41db70cce",
+            "original_name": "rich.jpg",
+            "saved_name": "fec483ef7785413da4b6e5abbf1275d1_rich.jpg",
+            "size": 21718,
+            "uploaded_at": 1774049878,
+            "url": "/uploads/fec483ef7785413da4b6e5abbf1275d1_rich.jpg"
+          }
+        ]
+      },
+      {
+        "id": "df551f5b-d441-4718-a736-ecb0139135bb",
+        "role": "assistant",
+        "content": "Hello! How can I assist you today?",
+        "timestamp": 1774049879,
+        "model": "gpt-4.1-mini"
+      }
+    ],
+    "message_count": 2,
+    "created_at": 1774048623,
+    "updated_at": 1774049879
+  },
+  {
     "session_id": "4d835a0e-e85c-4eab-bce6-dff9d5509234",
     "title": "New Chat (Copy) (Copy 2)",
     "messages": [],
     "message_count": 0,
     "created_at": 1774048836,
     "updated_at": 1774048836
-  },
-  {
-    "session_id": "0406e8b3-4893-40d6-a30d-50a57e6608b9",
-    "title": "New Chat (Copy) (Copy)",
-    "messages": [],
-    "message_count": 0,
-    "created_at": 1774048623,
-    "updated_at": 1774048623
   },
   {
     "session_id": "0f404a4e-0628-4dcd-88a4-fd609c1d0750",
