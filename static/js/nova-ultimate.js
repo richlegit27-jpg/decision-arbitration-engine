@@ -7,263 +7,69 @@
   }
   window.__novaUltimateLoaded = true;
 
-  const BODY = document.body;
-  const ROOT = document.documentElement;
-  const MOBILE_BREAKPOINT = 760;
-  const TABLET_BREAKPOINT = 980;
+  const API = {
+    state: "/api/state",
+    chat: "/api/chat",
+    stream: "/api/chat/stream",
+    getChat: (sessionId) => `/api/chat/${encodeURIComponent(sessionId)}`,
+    models: "/api/models",
+    memory: "/api/memory",
+    addMemory: "/api/memory/add",
+    deleteMemory: "/api/memory/delete",
+    newSession: "/api/session/new",
+    deleteSession: "/api/session/delete",
+    renameSession: "/api/session/rename",
+  };
 
   const STORAGE_KEYS = {
-    theme: "nova_theme",
-    sidebarDesktopCollapsed: "nova_sidebar_desktop_collapsed",
-    memoryDesktopCollapsed: "nova_memory_desktop_collapsed",
-    activeSessionId: "nova_active_session_id"
+    activeSessionId: "nova_active_session_id",
+    selectedModel: "nova_selected_model",
+    sidebarOpen: "nova_sidebar_open",
+    memoryOpen: "nova_memory_open",
   };
 
-  const state = {
-    isSending: false,
-    sidebarOpenMobile: false,
-    memoryOpenMobile: false,
-    sidebarCollapsedDesktop: false,
-    memoryCollapsedDesktop: false,
-    attachedFiles: [],
-    recognition: null,
-    isListening: false,
-    sessions: [],
-    activeSessionId: null,
-    activeStreamController: null,
-    activeAssistantBubble: null,
-    activeAssistantTextNode: null,
-    activeAssistantCopyBtn: null,
-    activeAssistantMeta: null,
-    activeAssistantRawText: ""
-  };
+  const SIDEBAR_WIDTH = "280px";
+  const MEMORY_WIDTH = "340px";
 
-  let autosizeFrame = null;
-  let lastInputHeight = 0;
+  const app = {
+    state: {
+      sessions: [],
+      messages: [],
+      memoryItems: [],
+      activeSessionId: null,
+      currentModel: "gpt-4.1-mini",
+      isSending: false,
+      sidebarOpen: true,
+      memoryOpen: true,
+    },
+  };
 
   function byId(id) {
     return document.getElementById(id);
   }
 
-  const els = {
-    appShell: byId("appShell"),
-    sidebar: byId("sidebar"),
-    memoryPanel: byId("memoryPanel"),
-
-    toggleSidebar: byId("toggleSidebar"),
-    mobileSidebarBtn: byId("mobileSidebarBtn"),
-    memoryToggleBtnTop: byId("memoryToggleBtnTop"),
-    closeMemoryBtn: byId("closeMemoryBtn"),
-
-    newSessionBtn: byId("newSessionBtn"),
-    deleteSessionBtn: byId("deleteSessionBtn"),
-    renameSessionBtn: byId("renameSessionBtn"),
-    duplicateSessionBtn: byId("duplicateSessionBtn"),
-    pinSessionBtn: byId("pinSessionBtn"),
-    exportSessionBtn: byId("exportSessionBtn"),
-
-    themeToggleBtn: byId("themeToggleBtn"),
-    backgroundBtn: byId("backgroundBtn"),
-
-    sessionList: byId("sessionList"),
-    memoryList: byId("memoryList"),
-    memoryStatusText: byId("memoryStatusText"),
-
-    chatTitle: byId("chatTitle"),
-    chatSubtitle: byId("chatSubtitle"),
-    chatMessages: byId("chatMessages"),
-
-    modelSelect: byId("modelSelect"),
-    modelStatus: byId("modelStatus"),
-
-    attachBtn: byId("attachBtn"),
-    fileInput: byId("fileInput"),
-    attachedFiles: byId("attachedFiles"),
-
-    voiceBtn: byId("voiceBtn"),
-    messageInput: byId("messageInput"),
-    sendBtn: byId("sendBtn"),
-    stopBtn: byId("stopBtn")
-  };
-
-  function isMobile() {
-    return window.innerWidth <= MOBILE_BREAKPOINT;
-  }
-
-  function isTabletOrBelow() {
-    return window.innerWidth <= TABLET_BREAKPOINT;
-  }
-
-  function readBool(key, fallback = false) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw === null) return fallback;
-      return raw === "true";
-    } catch {
-      return fallback;
+  function qs(selectors) {
+    for (const selector of selectors) {
+      const el = document.querySelector(selector);
+      if (el) return el;
     }
+    return null;
   }
 
-  function writeBool(key, value) {
-    try {
-      localStorage.setItem(key, String(Boolean(value)));
-    } catch (error) {
-      console.warn("localStorage write failed:", key, error);
+  function qsa(selectors) {
+    for (const selector of selectors) {
+      const els = document.querySelectorAll(selector);
+      if (els && els.length) return Array.from(els);
     }
+    return [];
   }
 
-  function readText(key, fallback = "") {
-    try {
-      return localStorage.getItem(key) || fallback;
-    } catch {
-      return fallback;
-    }
+  function safeText(value) {
+    return String(value ?? "").trim();
   }
 
-  function writeText(key, value) {
-    try {
-      localStorage.setItem(key, String(value ?? ""));
-    } catch (error) {
-      console.warn("localStorage write failed:", key, error);
-    }
-  }
-
-  function getSavedTheme() {
-    return readText(STORAGE_KEYS.theme, "dark");
-  }
-
-  function saveTheme(theme) {
-    writeText(STORAGE_KEYS.theme, theme);
-  }
-
-  function setTheme(theme) {
-    const nextTheme = String(theme).toLowerCase() === "light" ? "light" : "dark";
-    ROOT.setAttribute("data-theme", nextTheme);
-    saveTheme(nextTheme);
-
-    if (els.themeToggleBtn) {
-      els.themeToggleBtn.textContent = nextTheme === "dark" ? "Light" : "Dark";
-    }
-  }
-
-  function toggleTheme() {
-    const current = ROOT.getAttribute("data-theme") === "light" ? "light" : "dark";
-    setTheme(current === "dark" ? "light" : "dark");
-  }
-
-  function updateSidebarAria() {
-    if (!els.sidebar) return;
-    const open = isMobile() ? state.sidebarOpenMobile : !state.sidebarCollapsedDesktop;
-    els.sidebar.setAttribute("aria-hidden", open ? "false" : "true");
-  }
-
-  function updateMemoryAria() {
-    if (!els.memoryPanel) return;
-    const open = isTabletOrBelow() ? state.memoryOpenMobile : !state.memoryCollapsedDesktop;
-    els.memoryPanel.setAttribute("aria-hidden", open ? "false" : "true");
-  }
-
-  function applyLayoutState() {
-    const classNames = [
-      "sidebar-open",
-      "sidebar-expanded",
-      "sidebar-collapsed",
-      "left-collapsed",
-      "memory-open",
-      "memory-collapsed",
-      "right-collapsed"
-    ];
-
-    BODY.classList.remove(...classNames);
-    if (els.appShell) {
-      els.appShell.classList.remove(...classNames);
-    }
-
-    if (isMobile()) {
-      if (state.sidebarOpenMobile) {
-        BODY.classList.add("sidebar-open");
-        if (els.appShell) els.appShell.classList.add("sidebar-open");
-      }
-    } else {
-      if (state.sidebarCollapsedDesktop) {
-        BODY.classList.add("sidebar-collapsed", "left-collapsed");
-        if (els.appShell) els.appShell.classList.add("sidebar-collapsed", "left-collapsed");
-      }
-    }
-
-    if (isTabletOrBelow()) {
-      if (state.memoryOpenMobile) {
-        BODY.classList.add("memory-open");
-        if (els.appShell) els.appShell.classList.add("memory-open");
-      }
-    } else {
-      if (state.memoryCollapsedDesktop) {
-        BODY.classList.add("memory-collapsed", "right-collapsed");
-        if (els.appShell) els.appShell.classList.add("memory-collapsed", "right-collapsed");
-      }
-    }
-
-    updateSidebarAria();
-    updateMemoryAria();
-  }
-
-  function toggleSidebar() {
-    if (isMobile()) {
-      state.sidebarOpenMobile = !state.sidebarOpenMobile;
-    } else {
-      state.sidebarCollapsedDesktop = !state.sidebarCollapsedDesktop;
-      writeBool(STORAGE_KEYS.sidebarDesktopCollapsed, state.sidebarCollapsedDesktop);
-    }
-    applyLayoutState();
-  }
-
-  function toggleMemory() {
-    if (isTabletOrBelow()) {
-      state.memoryOpenMobile = !state.memoryOpenMobile;
-    } else {
-      state.memoryCollapsedDesktop = !state.memoryCollapsedDesktop;
-      writeBool(STORAGE_KEYS.memoryDesktopCollapsed, state.memoryCollapsedDesktop);
-    }
-    applyLayoutState();
-  }
-
-  function autosizeInput() {
-    if (!els.messageInput) return;
-
-    const input = els.messageInput;
-    const minHeight = window.innerWidth <= 480 ? 50 : 54;
-    const maxHeight = 180;
-
-    if (autosizeFrame) {
-      cancelAnimationFrame(autosizeFrame);
-    }
-
-    autosizeFrame = requestAnimationFrame(() => {
-      input.style.overflowY = "hidden";
-      input.style.height = "auto";
-
-      const measured = input.scrollHeight;
-      const nextHeight = Math.max(minHeight, Math.min(measured, maxHeight));
-
-      if (nextHeight !== lastInputHeight) {
-        input.style.height = `${nextHeight}px`;
-        lastInputHeight = nextHeight;
-      } else {
-        input.style.height = `${lastInputHeight}px`;
-      }
-
-      input.style.overflowY = measured > maxHeight ? "auto" : "hidden";
-      autosizeFrame = null;
-    });
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
+  function nowUnix() {
+    return Math.floor(Date.now() / 1000);
   }
 
   function formatTime(ts) {
@@ -275,898 +81,1001 @@
     }
   }
 
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function getAppShell() { return byId("appShell"); }
+  function getSidebar() { return byId("sidebar"); }
+  function getMemoryPanel() { return byId("memoryPanel"); }
+  function getToggleSidebarBtn() { return byId("toggleSidebar"); }
+  function getMobileSidebarBtn() { return byId("mobileSidebarBtn"); }
+  function getMemoryToggleBtnTop() { return byId("memoryToggleBtnTop"); }
+  function getCloseMemoryBtn() { return byId("closeMemoryBtn"); }
+  function getChatTitleEl() { return byId("chatTitle"); }
+  function getChatSubtitleEl() { return byId("chatSubtitle"); }
+  function getModelStatusEl() { return byId("modelStatus"); }
+  function getMemoryStatusTextEl() { return byId("memoryStatusText"); }
+  function getDuplicateSessionBtn() { return byId("duplicateSessionBtn"); }
+  function getExportSessionBtn() { return byId("exportSessionBtn"); }
+  function getThemeToggleBtn() { return byId("themeToggleBtn"); }
+  function getBackgroundBtn() { return byId("backgroundBtn"); }
+  function getAttachBtn() { return byId("attachBtn"); }
+  function getVoiceBtn() { return byId("voiceBtn"); }
+  function getFileInput() { return byId("fileInput"); }
+
+  function getChatContainer() {
+    return qs([
+      "#chatMessages",
+      "#messages",
+      "#chatContainer",
+      ".chat-messages",
+      ".messages",
+    ]);
+  }
+
+  function getMessageInput() {
+    return qs([
+      "#messageInput",
+      "#composerInput",
+      "textarea[name='message']",
+      "textarea",
+    ]);
+  }
+
+  function getSendBtn() {
+    return qs([
+      "#sendBtn",
+      "#sendButton",
+      "button[data-action='send']",
+    ]);
+  }
+
+  function getStopBtn() {
+    return qs([
+      "#stopBtn",
+      "#stopButton",
+      "button[data-action='stop']",
+    ]);
+  }
+
+  function getSessionList() {
+    return qs([
+      "#sessionList",
+      "#chatList",
+      ".session-list",
+      ".chat-list",
+      "#sidebarSessionList",
+    ]);
+  }
+
+  function getSessionCountEl() {
+    return qs([
+      "#sessionCount",
+      "#chatCount",
+      ".session-count",
+    ]);
+  }
+
+  function getNewSessionBtn() {
+    return qs([
+      "#newSessionBtn",
+      "button[data-action='new-session']",
+    ]);
+  }
+
+  function getDeleteSessionBtn() {
+    return qs([
+      "#deleteSessionBtn",
+      "button[data-action='delete-session']",
+    ]);
+  }
+
+  function getRenameSessionBtn() {
+    return qs([
+      "#renameSessionBtn",
+      "button[data-action='rename-session']",
+    ]);
+  }
+
+  function getModelSelect() {
+    return qs([
+      "#modelSelect",
+      "select[data-role='model-select']",
+    ]);
+  }
+
+  function getMemoryList() {
+    return qs([
+      "#memoryList",
+      "#memoryItems",
+      ".memory-list",
+      ".memory-items",
+      "[data-role='memory-list']",
+    ]);
+  }
+
+  function getMemoryEmpty() {
+    return qs([
+      "#memoryEmpty",
+      ".memory-empty",
+      "[data-role='memory-empty']",
+    ]);
+  }
+
+  function getMemoryForm() {
+    return qs([
+      "#memoryForm",
+      "[data-role='memory-form']",
+    ]);
+  }
+
+  function getMemoryKindInput() {
+    return qs([
+      "#memoryKind",
+      "select[name='memoryKind']",
+      "input[name='memoryKind']",
+      "[data-role='memory-kind']",
+    ]);
+  }
+
+  function getMemoryValueInput() {
+    return qs([
+      "#memoryValue",
+      "input[name='memoryValue']",
+      "textarea[name='memoryValue']",
+      "[data-role='memory-value']",
+    ]);
+  }
+
+  function getMemoryRefreshBtn() {
+    return qs([
+      "#refreshMemoryBtn",
+      "button[data-action='refresh-memory']",
+    ]);
+  }
+
+  function setStatusSending(isSending) {
+    app.state.isSending = !!isSending;
+
+    const sendBtn = getSendBtn();
+    const stopBtn = getStopBtn();
+    const input = getMessageInput();
+
+    if (sendBtn) sendBtn.disabled = isSending;
+    if (stopBtn) {
+      stopBtn.disabled = !isSending;
+      stopBtn.classList.toggle("hidden", !isSending);
+    }
+    if (input) input.disabled = isSending;
+
+    updateModelStatus(isSending ? "Responding..." : `Using ${app.state.currentModel}`);
+    updateChatHeader();
+  }
+
+  function autosizeInput() {
+    const input = getMessageInput();
+    if (!input) return;
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 220)}px`;
+  }
+
+  function persistState() {
+    try {
+      localStorage.setItem(STORAGE_KEYS.activeSessionId, safeText(app.state.activeSessionId));
+      localStorage.setItem(STORAGE_KEYS.selectedModel, safeText(app.state.currentModel));
+      localStorage.setItem(STORAGE_KEYS.sidebarOpen, String(!!app.state.sidebarOpen));
+      localStorage.setItem(STORAGE_KEYS.memoryOpen, String(!!app.state.memoryOpen));
+    } catch (err) {
+      console.warn("LocalStorage save failed:", err);
+    }
+  }
+
+  function restoreState() {
+    try {
+      const savedSessionId = localStorage.getItem(STORAGE_KEYS.activeSessionId);
+      const savedModel = localStorage.getItem(STORAGE_KEYS.selectedModel);
+      const savedSidebarOpen = localStorage.getItem(STORAGE_KEYS.sidebarOpen);
+      const savedMemoryOpen = localStorage.getItem(STORAGE_KEYS.memoryOpen);
+
+      if (savedSessionId) app.state.activeSessionId = savedSessionId;
+      if (savedModel) app.state.currentModel = savedModel;
+      if (savedSidebarOpen !== null) app.state.sidebarOpen = savedSidebarOpen === "true";
+      if (savedMemoryOpen !== null) app.state.memoryOpen = savedMemoryOpen === "true";
+    } catch (err) {
+      console.warn("LocalStorage restore failed:", err);
+    }
+  }
+
   async function apiGet(url) {
-    const response = await fetch(url, {
+    const res = await fetch(url, {
       method: "GET",
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(text || `GET ${url} failed with ${res.status}`);
     }
 
-    return response.json();
+    return res.json();
   }
 
   async function apiPost(url, payload) {
-    const response = await fetch(url, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload || {})
+      body: JSON.stringify(payload || {}),
     });
 
-    if (!response.ok) {
-      let detail = "";
+    if (!res.ok) {
+      let message = `POST ${url} failed with ${res.status}`;
       try {
-        const data = await response.json();
-        detail = data?.detail || data?.error || "";
+        const data = await res.json();
+        message = data.detail || data.message || message;
       } catch {
-        detail = "";
+        const text = await res.text().catch(() => "");
+        if (text) message = text;
       }
-      throw new Error(detail ? `HTTP ${response.status}: ${detail}` : `HTTP ${response.status}`);
+      throw new Error(message);
     }
 
-    return response.json();
+    return res.json();
   }
 
-  function getActiveSession() {
-    return state.sessions.find((item) => item.session_id === state.activeSessionId) || null;
-  }
+  function updateChatHeader() {
+    const titleEl = getChatTitleEl();
+    const subtitleEl = getChatSubtitleEl();
 
-  function setActiveSessionId(sessionId) {
-    const clean = String(sessionId || "").trim();
-    state.activeSessionId = clean || null;
+    const currentSession = app.state.sessions.find(
+      (session) => session.session_id === app.state.activeSessionId
+    );
 
-    if (state.activeSessionId) {
-      writeText(STORAGE_KEYS.activeSessionId, state.activeSessionId);
-    } else {
-      writeText(STORAGE_KEYS.activeSessionId, "");
+    const title = currentSession?.title || "Nova";
+
+    let subtitle = "Ready";
+    if (app.state.isSending) {
+      subtitle = "Thinking...";
+    } else if (app.state.messages.length > 0) {
+      subtitle = `${app.state.messages.length} messages`;
     }
+
+    if (titleEl) titleEl.textContent = title;
+    if (subtitleEl) subtitleEl.textContent = subtitle;
   }
 
-  function clearMessages() {
-    if (!els.chatMessages) return;
-    els.chatMessages.innerHTML = "";
+  function updateModelStatus(text) {
+    const el = getModelStatusEl();
+    if (el) el.textContent = safeText(text || "Model ready");
   }
 
-  function renderEmptyState() {
-    if (!els.chatMessages) return;
-    els.chatMessages.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-card">
-          <div class="empty-title">Nova is ready</div>
-          <div class="empty-subtitle">Start a new message, use voice, attach files, or open memory.</div>
-        </div>
-      </div>
+  function updateMemoryStatus(text) {
+    const el = getMemoryStatusTextEl();
+    if (el) el.textContent = safeText(text || "Memory panel ready.");
+  }
+
+  function applyLayout() {
+    const appShell = getAppShell();
+    const sidebar = getSidebar();
+    const memoryPanel = getMemoryPanel();
+    const toggleSidebarBtn = getToggleSidebarBtn();
+    const mobileSidebarBtn = getMobileSidebarBtn();
+    const memoryToggleBtnTop = getMemoryToggleBtnTop();
+
+    if (!appShell || !sidebar || !memoryPanel) return;
+
+    let columns = "minmax(0, 1fr)";
+
+    if (app.state.sidebarOpen && app.state.memoryOpen) {
+      columns = `${SIDEBAR_WIDTH} minmax(0, 1fr) ${MEMORY_WIDTH}`;
+    } else if (app.state.sidebarOpen && !app.state.memoryOpen) {
+      columns = `${SIDEBAR_WIDTH} minmax(0, 1fr)`;
+    } else if (!app.state.sidebarOpen && app.state.memoryOpen) {
+      columns = `minmax(0, 1fr) ${MEMORY_WIDTH}`;
+    }
+
+    appShell.style.gridTemplateColumns = columns;
+
+    sidebar.style.display = app.state.sidebarOpen ? "" : "none";
+    sidebar.setAttribute("aria-hidden", app.state.sidebarOpen ? "false" : "true");
+
+    memoryPanel.style.display = app.state.memoryOpen ? "" : "none";
+    memoryPanel.setAttribute("aria-hidden", app.state.memoryOpen ? "false" : "true");
+
+    if (toggleSidebarBtn) {
+      toggleSidebarBtn.textContent = "☰";
+      toggleSidebarBtn.title = app.state.sidebarOpen ? "Collapse sidebar" : "Expand sidebar";
+    }
+
+    if (mobileSidebarBtn) {
+      mobileSidebarBtn.title = "Toggle sidebar";
+    }
+
+    if (memoryToggleBtnTop) {
+      memoryToggleBtnTop.textContent = "Memory";
+      memoryToggleBtnTop.title = app.state.memoryOpen ? "Close memory panel" : "Open memory panel";
+    }
+
+    persistState();
+  }
+
+  function toggleSidebar() {
+    app.state.sidebarOpen = !app.state.sidebarOpen;
+    applyLayout();
+  }
+
+  function toggleMemoryPanel() {
+    app.state.memoryOpen = !app.state.memoryOpen;
+    applyLayout();
+  }
+
+  function closeMemoryPanel() {
+    app.state.memoryOpen = false;
+    applyLayout();
+  }
+
+  function renderMessage(msg) {
+    const container = getChatContainer();
+    if (!container) return;
+
+    const role = safeText(msg?.role || "assistant").toLowerCase();
+    const content = safeText(msg?.content);
+    const timestamp = msg?.timestamp || nowUnix();
+
+    const div = document.createElement("div");
+    div.className = `message ${role}`;
+    div.innerHTML = `
+      <div class="message-role">${escapeHtml(role)}</div>
+      <div class="message-body">${escapeHtml(content).replace(/\n/g, "<br>")}</div>
+      <div class="message-time">${escapeHtml(formatTime(timestamp))}</div>
     `;
-  }
 
-  function basicMarkdownToHtml(text) {
-    let html = escapeHtml(text);
-
-    html = html.replace(/```([\s\S]*?)```/g, (_, code) => {
-      return `<pre><code>${escapeHtml(code.trim())}</code></pre>`;
-    });
-
-    html = html.replace(/`([^`\n]+)`/g, "<code>$1</code>");
-    html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
-
-    html = html.replace(/(?:^|\n)((?:-\s.+(?:\n|$))+)/g, (_, block) => {
-      const items = block
-        .trim()
-        .split("\n")
-        .map((line) => line.replace(/^\-\s/, "").trim())
-        .filter(Boolean)
-        .map((item) => `<li>${item}</li>`)
-        .join("");
-      return `\n<ul>${items}</ul>`;
-    });
-
-    html = html.replace(/\n/g, "<br>");
-    return html;
-  }
-
-  async function copyText(text) {
-    const clean = String(text || "");
-    if (!clean) return;
-
-    try {
-      await navigator.clipboard.writeText(clean);
-    } catch (error) {
-      console.warn("Copy failed:", error);
-    }
-  }
-
-  function createCopyButton(getText) {
-    const copyBtn = document.createElement("button");
-    copyBtn.className = "topbar-btn";
-    copyBtn.type = "button";
-    copyBtn.textContent = "Copy";
-    copyBtn.addEventListener("click", async () => {
-      await copyText(getText());
-      copyBtn.textContent = "Copied";
-      setTimeout(() => {
-        copyBtn.textContent = "Copy";
-      }, 1200);
-    });
-    return copyBtn;
-  }
-
-  function createMessageElement(role, text = "", timestamp = null) {
-    const wrap = document.createElement("div");
-    wrap.className = `message ${role}`;
-
-    const bubble = document.createElement("div");
-    bubble.className = "bubble";
-
-    const body = document.createElement("div");
-    body.className = "message-body";
-
-    const textNode = document.createElement("div");
-    textNode.className = "message-text";
-
-    if (role === "assistant") {
-      textNode.innerHTML = basicMarkdownToHtml(text);
-    } else {
-      textNode.textContent = text;
-    }
-
-    body.appendChild(textNode);
-    bubble.appendChild(body);
-
-    const footer = document.createElement("div");
-    footer.className = "message-footer";
-
-    const meta = document.createElement("div");
-    meta.className = "message-meta";
-    meta.textContent = timestamp ? formatTime(timestamp) : "";
-
-    footer.appendChild(meta);
-
-    let copyBtn = null;
-    if (role === "assistant") {
-      copyBtn = createCopyButton(() => textNode.textContent || "");
-      footer.appendChild(copyBtn);
-    }
-
-    bubble.appendChild(footer);
-    wrap.appendChild(bubble);
-
-    return { wrap, bubble, textNode, meta, copyBtn };
-  }
-
-  function appendMessage(role, text, timestamp = null) {
-    if (!els.chatMessages) return null;
-
-    const empty = els.chatMessages.querySelector(".empty-state");
-    if (empty) empty.remove();
-
-    const node = createMessageElement(role, text, timestamp);
-    els.chatMessages.appendChild(node.wrap);
-    els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
-    return node;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
   }
 
   function renderMessages(messages) {
-    clearMessages();
+    const container = getChatContainer();
+    if (!container) return;
 
-    if (!Array.isArray(messages) || !messages.length) {
-      renderEmptyState();
+    container.innerHTML = "";
+    const list = Array.isArray(messages) ? messages : [];
+
+    if (!list.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-card">
+            <div class="empty-title">Nova is ready</div>
+            <div class="empty-subtitle">Start a new message, use voice, attach files, or open memory.</div>
+          </div>
+        </div>
+      `;
+      updateChatHeader();
       return;
     }
 
-    for (const msg of messages) {
-      const role = String(msg?.role || "assistant").toLowerCase();
-      const content = String(msg?.content || "");
-      const timestamp = msg?.timestamp || null;
-      appendMessage(role, content, timestamp);
-    }
+    for (const msg of list) renderMessage(msg);
+    updateChatHeader();
   }
 
-  function updateHeaderFromSession(sessionRecord) {
-    if (els.chatTitle) {
-      els.chatTitle.textContent = sessionRecord?.title || "Nova";
-    }
+  function renderStreamingAssistantShell() {
+    const container = getChatContainer();
+    if (!container) return null;
 
-    if (els.chatSubtitle) {
-      const count = Number(sessionRecord?.message_count || 0);
-      els.chatSubtitle.textContent = state.activeSessionId
-        ? `${count} message${count === 1 ? "" : "s"}`
-        : "Ready";
-    }
+    const div = document.createElement("div");
+    div.className = "message assistant streaming";
+    div.innerHTML = `
+      <div class="message-role">assistant</div>
+      <div class="message-body"></div>
+      <div class="message-time">${escapeHtml(new Date().toLocaleString())}</div>
+    `;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    return div.querySelector(".message-body");
   }
 
   function renderSessions() {
-    if (!els.sessionList) return;
+    const listEl = getSessionList();
+    const countEl = getSessionCountEl();
+    const sessions = Array.isArray(app.state.sessions) ? app.state.sessions : [];
 
-    if (!state.sessions.length) {
-      els.sessionList.innerHTML = `
-        <div class="memory-card">
-          <div class="memory-card-text">No chats yet.</div>
-        </div>
-      `;
+    if (countEl) countEl.textContent = String(sessions.length);
+    if (!listEl) return;
+
+    listEl.innerHTML = "";
+
+    if (!sessions.length) {
+      listEl.innerHTML = `<div class="session-empty">No chats yet.</div>`;
+      updateChatHeader();
       return;
     }
 
-    els.sessionList.innerHTML = state.sessions.map((item) => {
-      const activeClass = item.session_id === state.activeSessionId ? " active" : "";
-      const title = escapeHtml(item.title || "New Chat");
-      const count = Number(item.message_count || 0);
-      const meta = `${count} message${count === 1 ? "" : "s"}`;
-      return `
-        <button class="session-item${activeClass}" type="button" data-session-id="${escapeHtml(item.session_id)}">
-          <span class="session-title">${title}</span>
-          <span class="session-meta">${escapeHtml(meta)}</span>
-        </button>
+    for (const session of sessions) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "session-item";
+      if (session.session_id === app.state.activeSessionId) item.classList.add("active");
+
+      item.innerHTML = `
+        <div class="session-title">${escapeHtml(session.title || "New Chat")}</div>
+        <div class="session-meta">
+          <span>${escapeHtml(String(session.message_count || 0))} messages</span>
+          <span>${escapeHtml(formatTime(session.updated_at || nowUnix()))}</span>
+        </div>
       `;
-    }).join("");
+
+      item.addEventListener("click", () => {
+        loadSession(session.session_id).catch((err) => {
+          console.error(err);
+          alert(`Failed to load session: ${err.message}`);
+        });
+      });
+
+      listEl.appendChild(item);
+    }
+
+    updateChatHeader();
   }
 
   function renderMemory() {
-    if (els.memoryStatusText) {
-      els.memoryStatusText.textContent = state.activeSessionId
-        ? `Active chat: ${state.activeSessionId}`
-        : "Memory panel ready.";
-    }
+    const listEl = getMemoryList();
+    const emptyEl = getMemoryEmpty();
+    const items = Array.isArray(app.state.memoryItems) ? app.state.memoryItems : [];
 
-    if (!els.memoryList) return;
+    if (!listEl) return;
 
-    const active = getActiveSession();
+    listEl.innerHTML = "";
 
-    const blocks = [
-      {
-        title: "Theme",
-        meta: ROOT.getAttribute("data-theme") === "light" ? "Light mode" : "Dark mode"
-      },
-      {
-        title: "Model",
-        meta: els.modelSelect ? els.modelSelect.value : "unknown"
-      }
-    ];
-
-    if (active) {
-      blocks.unshift({
-        title: active.title || "New Chat",
-        meta: `${Number(active.message_count || 0)} message${Number(active.message_count || 0) === 1 ? "" : "s"}`
-      });
-    }
-
-    els.memoryList.innerHTML = blocks.map((item) => {
-      return `
-        <div class="memory-item">
-          <div class="memory-title">${escapeHtml(item.title)}</div>
-          <div class="memory-meta">${escapeHtml(item.meta)}</div>
-        </div>
-      `;
-    }).join("");
-  }
-
-  function renderAttachedFiles() {
-    if (!els.attachedFiles) return;
-
-    if (!state.attachedFiles.length) {
-      els.attachedFiles.innerHTML = "";
+    if (!items.length) {
+      if (emptyEl) emptyEl.style.display = "";
+      listEl.innerHTML = `<div class="memory-empty-fallback">No saved memory yet.</div>`;
+      updateMemoryStatus("No saved memory yet.");
       return;
     }
 
-    els.attachedFiles.innerHTML = state.attachedFiles.map((file, index) => {
-      return `
-        <div class="attachment-chip">
-          <span>${escapeHtml(file.name)}</span>
-          <button class="remove" type="button" data-remove-file="${index}" aria-label="Remove file">x</button>
+    if (emptyEl) emptyEl.style.display = "none";
+
+    for (const item of items) {
+      const row = document.createElement("div");
+      row.className = "memory-item";
+      row.dataset.memoryId = safeText(item.id);
+
+      const kind = safeText(item.kind || "memory");
+      const value = safeText(item.value);
+      const source = safeText(item.source || "manual");
+      const updated = formatTime(item.updated_at);
+
+      row.innerHTML = `
+        <div class="memory-item-main">
+          <div class="memory-kind">${escapeHtml(kind)}</div>
+          <div class="memory-value">${escapeHtml(value)}</div>
+          <div class="memory-meta">${escapeHtml(source)}${updated ? " • " + escapeHtml(updated) : ""}</div>
         </div>
+        <button type="button" class="memory-delete-btn" title="Delete memory">×</button>
       `;
-    }).join("");
-  }
 
-  function setSending(isSending) {
-    state.isSending = Boolean(isSending);
+      const deleteBtn = row.querySelector(".memory-delete-btn");
+      if (deleteBtn) {
+        deleteBtn.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          try {
+            await deleteMemoryItem(item.id);
+          } catch (err) {
+            console.error(err);
+            alert(`Failed to delete memory: ${err.message}`);
+          }
+        });
+      }
 
-    if (els.sendBtn) els.sendBtn.disabled = state.isSending;
-    if (els.stopBtn) els.stopBtn.classList.toggle("hidden", !state.isSending);
-
-    if (els.modelStatus) {
-      els.modelStatus.textContent = state.isSending
-        ? "Streaming..."
-        : `Model: ${els.modelSelect ? els.modelSelect.value : "ready"}`;
-    }
-  }
-
-  function onFilePicked(event) {
-    const files = Array.from(event.target.files || []);
-    if (!files.length) return;
-
-    state.attachedFiles.push(...files);
-    renderAttachedFiles();
-    event.target.value = "";
-  }
-
-  function onAttachedFilesClick(event) {
-    const btn = event.target.closest("[data-remove-file]");
-    if (!btn) return;
-
-    const index = Number(btn.getAttribute("data-remove-file"));
-    if (Number.isNaN(index)) return;
-
-    state.attachedFiles.splice(index, 1);
-    renderAttachedFiles();
-  }
-
-  function setupVoice() {
-    if (!els.voiceBtn) return;
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
-
-    if (!SpeechRecognition) {
-      els.voiceBtn.addEventListener("click", () => {
-        appendMessage("system", "Voice input is not supported in this browser.");
-      });
-      return;
+      listEl.appendChild(row);
     }
 
-    state.recognition = new SpeechRecognition();
-    state.recognition.lang = "en-US";
-    state.recognition.interimResults = true;
-    state.recognition.continuous = false;
-
-    state.recognition.onstart = () => {
-      state.isListening = true;
-      els.voiceBtn.textContent = "Listening";
-    };
-
-    state.recognition.onend = () => {
-      state.isListening = false;
-      els.voiceBtn.textContent = "Voice";
-    };
-
-    state.recognition.onerror = () => {
-      state.isListening = false;
-      els.voiceBtn.textContent = "Voice";
-    };
-
-    state.recognition.onresult = (event) => {
-      if (!els.messageInput) return;
-
-      let transcript = "";
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        transcript += event.results[i][0].transcript;
-      }
-
-      els.messageInput.value = transcript.trim();
-      autosizeInput();
-    };
-
-    els.voiceBtn.addEventListener("click", () => {
-      if (!state.recognition) return;
-
-      if (state.isListening) {
-        state.recognition.stop();
-        return;
-      }
-
-      try {
-        state.recognition.start();
-      } catch (error) {
-        console.warn("Voice start blocked:", error);
-      }
-    });
+    updateMemoryStatus(`${items.length} memory item${items.length === 1 ? "" : "s"} loaded.`);
   }
 
   async function loadModels() {
-    if (!els.modelSelect) return;
+    const select = getModelSelect();
+    if (!select) return;
 
     try {
-      const data = await apiGet("/api/models");
-      const models = Array.isArray(data?.models) ? data.models : [];
-      const current = data?.default || "gpt-4.1-mini";
+      const data = await apiGet(API.models);
+      const models = Array.isArray(data.models) ? data.models : [];
 
-      els.modelSelect.innerHTML = models.map((model) => {
-        const selected = model === current ? " selected" : "";
-        return `<option value="${escapeHtml(model)}"${selected}>${escapeHtml(model)}</option>`;
-      }).join("");
-
-      if (els.modelStatus) {
-        els.modelStatus.textContent = `Model: ${els.modelSelect.value}`;
+      select.innerHTML = "";
+      for (const model of models) {
+        const option = document.createElement("option");
+        option.value = model;
+        option.textContent = model;
+        select.appendChild(option);
       }
-    } catch (error) {
-      console.warn("Could not load models:", error);
+
+      const wanted = app.state.currentModel || data.default || "gpt-4.1-mini";
+      select.value = models.includes(wanted) ? wanted : (data.default || models[0] || "gpt-4.1-mini");
+      app.state.currentModel = select.value;
+      persistState();
+      updateModelStatus(`Using ${app.state.currentModel}`);
+    } catch (err) {
+      console.warn("Model load failed:", err);
+      updateModelStatus("Model load failed");
     }
   }
 
   async function loadState() {
-    const data = await apiGet("/api/state");
-    state.sessions = Array.isArray(data?.sessions) ? data.sessions : [];
+    const data = await apiGet(API.state);
+    app.state.sessions = Array.isArray(data.sessions) ? data.sessions : [];
 
-    const savedActive = readText(STORAGE_KEYS.activeSessionId, "").trim();
-    const hasSaved = savedActive && state.sessions.some((item) => item.session_id === savedActive);
-
-    if (hasSaved) {
-      setActiveSessionId(savedActive);
-    } else if (!state.activeSessionId && state.sessions.length) {
-      setActiveSessionId(state.sessions[0].session_id);
-    } else if (state.activeSessionId && !state.sessions.some((item) => item.session_id === state.activeSessionId)) {
-      setActiveSessionId(state.sessions.length ? state.sessions[0].session_id : null);
+    if (!app.state.activeSessionId && app.state.sessions.length) {
+      app.state.activeSessionId = app.state.sessions[0].session_id;
     }
 
+    const stillExists = app.state.sessions.some(
+      (session) => session.session_id === app.state.activeSessionId
+    );
+
+    if (!stillExists) {
+      app.state.activeSessionId = app.state.sessions[0]?.session_id || null;
+    }
+
+    persistState();
     renderSessions();
-    renderMemory();
   }
 
   async function loadSession(sessionId) {
-    if (!sessionId) {
-      setActiveSessionId(null);
-      updateHeaderFromSession(null);
-      renderEmptyState();
-      renderSessions();
-      renderMemory();
-      return;
-    }
+    if (!sessionId) return;
 
-    const data = await apiGet(`/api/chat/${encodeURIComponent(sessionId)}`);
-    setActiveSessionId(data?.session_id || sessionId);
-
-    const summary = state.sessions.find((item) => item.session_id === state.activeSessionId);
-    if (summary) {
-      summary.title = data?.title || summary.title;
-      summary.message_count = Number(data?.message_count || 0);
-    }
-
-    updateHeaderFromSession({
-      title: data?.title || "New Chat",
-      message_count: Number(data?.message_count || 0)
-    });
-    renderMessages(Array.isArray(data?.messages) ? data.messages : []);
+    const data = await apiGet(API.getChat(sessionId));
+    app.state.activeSessionId = data.session_id;
+    app.state.messages = Array.isArray(data.messages) ? data.messages : [];
+    persistState();
     renderSessions();
+    renderMessages(app.state.messages);
+  }
+
+  async function loadMemory() {
+    const data = await apiGet(API.memory);
+    app.state.memoryItems = Array.isArray(data.items) ? data.items : [];
     renderMemory();
   }
 
-  async function refreshStateAndSession(preferredSessionId = null) {
+  async function addMemoryItem(kind, value) {
+    const data = await apiPost(API.addMemory, { kind, value });
+    app.state.memoryItems = Array.isArray(data.memory?.items) ? data.memory.items : [];
+    renderMemory();
+
+    const kindInput = getMemoryKindInput();
+    const valueInput = getMemoryValueInput();
+    if (kindInput) kindInput.value = "preference";
+    if (valueInput) valueInput.value = "";
+  }
+
+  async function deleteMemoryItem(id) {
+    const data = await apiPost(API.deleteMemory, { id });
+    app.state.memoryItems = Array.isArray(data.memory?.items) ? data.memory.items : [];
+    renderMemory();
+  }
+
+  async function createNewSession() {
+    const data = await apiPost(API.newSession, {});
     await loadState();
 
-    const target = preferredSessionId || state.activeSessionId || (state.sessions[0]?.session_id ?? null);
-
-    if (target) {
-      await loadSession(target);
+    if (data.session_id) {
+      await loadSession(data.session_id);
+    } else if (app.state.sessions[0]?.session_id) {
+      await loadSession(app.state.sessions[0].session_id);
     } else {
-      await loadSession(null);
+      app.state.messages = [];
+      renderMessages([]);
     }
   }
 
-  async function createSession() {
-    const data = await apiPost("/api/session/new", {});
-    await refreshStateAndSession(data?.session_id || null);
-    if (els.messageInput) {
-      els.messageInput.focus();
+  async function deleteCurrentSession() {
+    const sessionId = app.state.activeSessionId;
+    if (!sessionId) return;
+
+    const ok = confirm("Delete this chat?");
+    if (!ok) return;
+
+    await apiPost(API.deleteSession, { session_id: sessionId });
+    app.state.messages = [];
+    await loadState();
+
+    if (app.state.activeSessionId) {
+      await loadSession(app.state.activeSessionId);
+    } else {
+      renderMessages([]);
     }
   }
 
-  async function deleteSession() {
-    if (!state.activeSessionId) {
-      appendMessage("system", "No active session to delete.");
-      return;
-    }
+  async function renameCurrentSession() {
+    const sessionId = app.state.activeSessionId;
+    if (!sessionId) return;
 
-    const currentId = state.activeSessionId;
-    await apiPost("/api/session/delete", { session_id: currentId });
+    const current = app.state.sessions.find((session) => session.session_id === sessionId);
+    const title = prompt("Rename chat", current?.title || "New Chat");
+    if (!title || !title.trim()) return;
 
-    const remaining = state.sessions.filter((item) => item.session_id !== currentId);
-    const nextId = remaining[0]?.session_id || null;
-
-    await refreshStateAndSession(nextId);
-  }
-
-  async function renameSession() {
-    if (!state.activeSessionId) {
-      appendMessage("system", "No active session to rename.");
-      return;
-    }
-
-    const current = getActiveSession();
-    const nextTitle = window.prompt("Rename chat", current?.title || "New Chat");
-
-    if (nextTitle === null) return;
-
-    const clean = String(nextTitle).trim();
-    if (!clean) {
-      appendMessage("system", "Rename cancelled. Title was empty.");
-      return;
-    }
-
-    await apiPost("/api/session/rename", {
-      session_id: state.activeSessionId,
-      title: clean
+    await apiPost(API.renameSession, {
+      session_id: sessionId,
+      title: title.trim(),
     });
 
-    await refreshStateAndSession(state.activeSessionId);
+    await loadState();
+    renderSessions();
   }
 
-  async function duplicateSession() {
-    appendMessage("system", "Duplicate is disabled for V1 lock.");
+  function exportCurrentSession() {
+    const current = app.state.sessions.find(
+      (session) => session.session_id === app.state.activeSessionId
+    );
+
+    const payload = {
+      exported_at: new Date().toISOString(),
+      session_id: app.state.activeSessionId,
+      title: current?.title || "New Chat",
+      model: app.state.currentModel,
+      messages: Array.isArray(app.state.messages) ? app.state.messages : [],
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeTitle = (current?.title || "nova-chat")
+      .replace(/[^\w\-]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .toLowerCase();
+
+    a.href = url;
+    a.download = `${safeTitle || "nova-chat"}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
-  function exportSession() {
-    const active = getActiveSession();
-    if (!active || !state.activeSessionId) {
-      appendMessage("system", "No active session to export.");
-      return;
-    }
+  async function sendMessage() {
+    const input = getMessageInput();
+    if (!input) return;
 
-    apiGet(`/api/chat/${encodeURIComponent(state.activeSessionId)}`)
-      .then((data) => {
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        const safeTitle = String(data?.title || "nova-chat").replace(/[^\w\-]+/g, "_");
-        link.href = url;
-        link.download = `${safeTitle || "nova-chat"}.json`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-      })
-      .catch((error) => {
-        appendMessage("system", `Export failed: ${error.message}`);
-      });
-  }
-
-  function pinSession() {
-    appendMessage("system", "Pin is disabled for V1 lock.");
-  }
-
-  function backgroundAction() {
-    appendMessage("system", "Background is disabled for V1 lock.");
-  }
-
-  function resetActiveAssistantState() {
-    state.activeAssistantBubble = null;
-    state.activeAssistantTextNode = null;
-    state.activeAssistantCopyBtn = null;
-    state.activeAssistantMeta = null;
-    state.activeAssistantRawText = "";
-  }
-
-  function updateStreamingAssistantVisual() {
-    if (!state.activeAssistantTextNode) return;
-    state.activeAssistantTextNode.textContent = state.activeAssistantRawText;
-    if (els.chatMessages) {
-      els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
-    }
-  }
-
-  function finalizeStreamingAssistant(timestamp = null) {
-    if (!state.activeAssistantTextNode) return;
-
-    state.activeAssistantTextNode.innerHTML = basicMarkdownToHtml(state.activeAssistantRawText);
-
-    if (state.activeAssistantMeta && timestamp) {
-      state.activeAssistantMeta.textContent = formatTime(timestamp);
-    }
-
-    if (els.chatMessages) {
-      els.chatMessages.scrollTop = els.chatMessages.scrollHeight;
-    }
-  }
-
-  async function processSseEvent(rawEvent, sessionId) {
-    const lines = rawEvent.split("\n");
-    let eventName = "message";
-    const dataLines = [];
-
-    for (const line of lines) {
-      if (line.startsWith("event:")) {
-        eventName = line.slice(6).trim();
-      } else if (line.startsWith("data:")) {
-        dataLines.push(line.slice(5).trim());
-      }
-    }
-
-    const dataText = dataLines.join("\n");
-    if (!dataText) return;
-
-    let payload = {};
-    try {
-      payload = JSON.parse(dataText);
-    } catch {
-      payload = {};
-    }
-
-    if (eventName === "start") {
-      if (payload?.title && els.chatTitle) {
-        els.chatTitle.textContent = payload.title;
-      }
-      return;
-    }
-
-    if (eventName === "delta") {
-      state.activeAssistantRawText += String(payload?.text || "");
-      updateStreamingAssistantVisual();
-      return;
-    }
-
-    if (eventName === "error") {
-      throw new Error(String(payload?.message || "Stream failed."));
-    }
-
-    if (eventName === "done") {
-      const assistantTimestamp = payload?.message?.timestamp || Math.floor(Date.now() / 1000);
-      finalizeStreamingAssistant(assistantTimestamp);
-      await refreshStateAndSession(sessionId);
-    }
-  }
-
-  async function streamMessage() {
-    const input = els.messageInput;
-    if (!input || state.isSending) return;
-
-    const content = input.value.trim();
+    const content = safeText(input.value);
     if (!content) return;
 
-    if (!state.activeSessionId) {
-      await createSession();
+    if (!app.state.activeSessionId) {
+      await createNewSession();
     }
 
-    const sessionId = state.activeSessionId;
-    if (!sessionId) return;
+    const sessionId = app.state.activeSessionId;
+    const model = getModelSelect()?.value || app.state.currentModel || "gpt-4.1-mini";
+
+    const userMsg = {
+      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      role: "user",
+      content,
+      timestamp: nowUnix(),
+      model,
+    };
+
+    app.state.messages.push(userMsg);
+    renderMessages(app.state.messages);
 
     input.value = "";
     autosizeInput();
-    setSending(true);
+    setStatusSending(true);
 
-    appendMessage("user", content, Math.floor(Date.now() / 1000));
-
-    const assistantNode = appendMessage("assistant", "");
-    state.activeAssistantBubble = assistantNode?.bubble || null;
-    state.activeAssistantTextNode = assistantNode?.textNode || null;
-    state.activeAssistantCopyBtn = assistantNode?.copyBtn || null;
-    state.activeAssistantMeta = assistantNode?.meta || null;
-    state.activeAssistantRawText = "";
-
-    const controller = new AbortController();
-    state.activeStreamController = controller;
+    const streamBodyEl = renderStreamingAssistantShell();
 
     try {
-      const response = await fetch("/api/chat/stream", {
+      const response = await fetch(API.stream, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           session_id: sessionId,
           content,
-          model: els.modelSelect ? els.modelSelect.value : undefined
+          model,
         }),
-        signal: controller.signal
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      if (!response.body) {
-        throw new Error("No stream body returned.");
+      if (!response.ok || !response.body) {
+        throw new Error(`Stream failed with ${response.status}`);
       }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let buffer = "";
+      let assistantText = "";
 
       while (true) {
-        const { done, value } = await reader.read();
+        const { value, done } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
 
-        let boundaryIndex;
-        while ((boundaryIndex = buffer.indexOf("\n\n")) !== -1) {
-          const rawEvent = buffer.slice(0, boundaryIndex);
-          buffer = buffer.slice(boundaryIndex + 2);
-          await processSseEvent(rawEvent, sessionId);
-        }
-      }
+        let splitIndex;
+        while ((splitIndex = buffer.indexOf("\n\n")) !== -1) {
+          const rawEvent = buffer.slice(0, splitIndex);
+          buffer = buffer.slice(splitIndex + 2);
 
-      const leftover = buffer.trim();
-      if (leftover) {
-        await processSseEvent(leftover, sessionId);
-      }
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        if (state.activeAssistantRawText.trim()) {
-          finalizeStreamingAssistant(Math.floor(Date.now() / 1000));
-        } else if (state.activeAssistantBubble?.parentElement) {
-          state.activeAssistantBubble.parentElement.remove();
+          if (!rawEvent.trim()) continue;
+
+          const lines = rawEvent.split("\n");
+          let eventName = "message";
+          let dataText = "";
+
+          for (const line of lines) {
+            if (line.startsWith("event:")) eventName = line.slice(6).trim();
+            else if (line.startsWith("data:")) dataText += line.slice(5).trim();
+          }
+
+          let payload = {};
+          try {
+            payload = dataText ? JSON.parse(dataText) : {};
+          } catch {
+            payload = {};
+          }
+
+          if (eventName === "delta") {
+            const delta = safeText(payload.text);
+            assistantText += delta;
+            if (streamBodyEl) {
+              streamBodyEl.innerHTML = escapeHtml(assistantText).replace(/\n/g, "<br>");
+            }
+          } else if (eventName === "done") {
+            const finalMsg = payload.message || {
+              role: "assistant",
+              content: assistantText || "No response returned.",
+              timestamp: nowUnix(),
+              model,
+            };
+
+            app.state.activeSessionId = payload.session_id || app.state.activeSessionId;
+
+            const existingStreaming = getChatContainer()?.querySelector(".message.streaming");
+            if (existingStreaming) existingStreaming.remove();
+
+            app.state.messages.push(finalMsg);
+            renderMessages(app.state.messages);
+            await loadState();
+            await loadMemory();
+          } else if (eventName === "error") {
+            throw new Error(payload.message || "Unknown streaming error");
+          }
         }
-        appendMessage("system", "Stopped.");
-      } else {
-        if (state.activeAssistantRawText.trim()) {
-          finalizeStreamingAssistant(Math.floor(Date.now() / 1000));
-        } else if (state.activeAssistantBubble?.parentElement) {
-          state.activeAssistantBubble.parentElement.remove();
-        }
-        appendMessage("assistant", `Error: ${error.message}`);
       }
+    } catch (err) {
+      console.error(err);
+
+      const existingStreaming = getChatContainer()?.querySelector(".message.streaming");
+      if (existingStreaming) existingStreaming.remove();
+
+      const errorMsg = {
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        role: "assistant",
+        content: `Error: ${err.message}`,
+        timestamp: nowUnix(),
+        model,
+      };
+
+      app.state.messages.push(errorMsg);
+      renderMessages(app.state.messages);
+      updateModelStatus("Response failed");
     } finally {
-      state.activeStreamController = null;
-      resetActiveAssistantState();
-      setSending(false);
+      setStatusSending(false);
     }
   }
 
-  function stopMessage() {
-    if (state.activeStreamController) {
-      state.activeStreamController.abort();
-      return;
-    }
-
-    setSending(false);
-    appendMessage("system", "Stopped.");
+  function stopStreaming() {
+    setStatusSending(false);
+    updateModelStatus("Stopped");
   }
 
-  function wireEvents() {
-    if (els.toggleSidebar) {
-      els.toggleSidebar.addEventListener("click", toggleSidebar);
-    }
+  function bindEvents() {
+    const input = getMessageInput();
+    const sendBtn = getSendBtn();
+    const stopBtn = getStopBtn();
+    const newBtn = getNewSessionBtn();
+    const deleteBtn = getDeleteSessionBtn();
+    const renameBtn = getRenameSessionBtn();
+    const duplicateBtn = getDuplicateSessionBtn();
+    const exportBtn = getExportSessionBtn();
+    const modelSelect = getModelSelect();
+    const memoryForm = getMemoryForm();
+    const refreshMemoryBtn = getMemoryRefreshBtn();
+    const toggleSidebarBtn = getToggleSidebarBtn();
+    const mobileSidebarBtn = getMobileSidebarBtn();
+    const memoryToggleBtnTop = getMemoryToggleBtnTop();
+    const closeMemoryBtn = getCloseMemoryBtn();
+    const themeToggleBtn = getThemeToggleBtn();
+    const backgroundBtn = getBackgroundBtn();
+    const attachBtn = getAttachBtn();
+    const voiceBtn = getVoiceBtn();
+    const fileInput = getFileInput();
 
-    if (els.mobileSidebarBtn) {
-      els.mobileSidebarBtn.addEventListener("click", toggleSidebar);
-    }
-
-    if (els.memoryToggleBtnTop) {
-      els.memoryToggleBtnTop.addEventListener("click", toggleMemory);
-    }
-
-    if (els.closeMemoryBtn) {
-      els.closeMemoryBtn.addEventListener("click", toggleMemory);
-    }
-
-    if (els.themeToggleBtn) {
-      els.themeToggleBtn.addEventListener("click", () => {
-        toggleTheme();
-        renderMemory();
-      });
-    }
-
-    if (els.backgroundBtn) {
-      els.backgroundBtn.addEventListener("click", backgroundAction);
-    }
-
-    if (els.attachBtn && els.fileInput) {
-      els.attachBtn.addEventListener("click", () => els.fileInput.click());
-      els.fileInput.addEventListener("change", onFilePicked);
-    }
-
-    if (els.attachedFiles) {
-      els.attachedFiles.addEventListener("click", onAttachedFilesClick);
-    }
-
-    if (els.sendBtn) {
-      els.sendBtn.addEventListener("click", streamMessage);
-    }
-
-    if (els.stopBtn) {
-      els.stopBtn.addEventListener("click", stopMessage);
-    }
-
-    if (els.newSessionBtn) {
-      els.newSessionBtn.addEventListener("click", createSession);
-    }
-
-    if (els.deleteSessionBtn) {
-      els.deleteSessionBtn.addEventListener("click", deleteSession);
-    }
-
-    if (els.renameSessionBtn) {
-      els.renameSessionBtn.addEventListener("click", renameSession);
-    }
-
-    if (els.duplicateSessionBtn) {
-      els.duplicateSessionBtn.addEventListener("click", duplicateSession);
-    }
-
-    if (els.pinSessionBtn) {
-      els.pinSessionBtn.addEventListener("click", pinSession);
-    }
-
-    if (els.exportSessionBtn) {
-      els.exportSessionBtn.addEventListener("click", exportSession);
-    }
-
-    if (els.messageInput) {
-      els.messageInput.addEventListener("input", autosizeInput);
-      els.messageInput.addEventListener("keydown", (event) => {
+    if (input) {
+      input.addEventListener("input", autosizeInput);
+      input.addEventListener("keydown", async (event) => {
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
-          streamMessage();
+          if (!app.state.isSending) await sendMessage();
         }
       });
-    }
-
-    if (els.modelSelect) {
-      els.modelSelect.addEventListener("change", () => {
-        if (els.modelStatus) {
-          els.modelStatus.textContent = `Model: ${els.modelSelect.value}`;
-        }
-        renderMemory();
-      });
-    }
-
-    if (els.sessionList) {
-      els.sessionList.addEventListener("click", async (event) => {
-        const btn = event.target.closest("[data-session-id]");
-        if (!btn) return;
-
-        const sessionId = String(btn.getAttribute("data-session-id") || "").trim();
-        if (!sessionId) return;
-
-        await loadSession(sessionId);
-
-        if (isMobile()) {
-          state.sidebarOpenMobile = false;
-          applyLayoutState();
-        }
-      });
-    }
-
-    window.addEventListener("resize", () => {
-      applyLayoutState();
       autosizeInput();
+    }
+
+    if (sendBtn) sendBtn.addEventListener("click", async () => {
+      if (!app.state.isSending) await sendMessage();
     });
 
-    document.addEventListener("click", (event) => {
-      const clickedInsideSidebar = els.sidebar && els.sidebar.contains(event.target);
-      const clickedSidebarButton =
-        (els.toggleSidebar && els.toggleSidebar.contains(event.target)) ||
-        (els.mobileSidebarBtn && els.mobileSidebarBtn.contains(event.target));
+    if (stopBtn) stopBtn.addEventListener("click", stopStreaming);
 
-      if (isMobile() && state.sidebarOpenMobile && !clickedInsideSidebar && !clickedSidebarButton) {
-        state.sidebarOpenMobile = false;
-        applyLayoutState();
-      }
-
-      const clickedInsideMemory = els.memoryPanel && els.memoryPanel.contains(event.target);
-      const clickedMemoryButton =
-        (els.memoryToggleBtnTop && els.memoryToggleBtnTop.contains(event.target)) ||
-        (els.closeMemoryBtn && els.closeMemoryBtn.contains(event.target));
-
-      if (isTabletOrBelow() && state.memoryOpenMobile && !clickedInsideMemory && !clickedMemoryButton) {
-        state.memoryOpenMobile = false;
-        applyLayoutState();
+    if (newBtn) newBtn.addEventListener("click", async () => {
+      try {
+        await createNewSession();
+      } catch (err) {
+        console.error(err);
+        alert(`Failed to create session: ${err.message}`);
       }
     });
-  }
 
-  function initState() {
-    state.sidebarCollapsedDesktop = readBool(STORAGE_KEYS.sidebarDesktopCollapsed, false);
-    state.memoryCollapsedDesktop = readBool(STORAGE_KEYS.memoryDesktopCollapsed, false);
-    state.sidebarOpenMobile = false;
-    state.memoryOpenMobile = false;
-    state.activeSessionId = readText(STORAGE_KEYS.activeSessionId, "").trim() || null;
-  }
+    if (deleteBtn) deleteBtn.addEventListener("click", async () => {
+      try {
+        await deleteCurrentSession();
+      } catch (err) {
+        console.error(err);
+        alert(`Failed to delete session: ${err.message}`);
+      }
+    });
 
-  async function init() {
-    initState();
-    setTheme(getSavedTheme());
-    autosizeInput();
-    setupVoice();
-    wireEvents();
-    applyLayoutState();
-    renderAttachedFiles();
-    renderEmptyState();
-    renderMemory();
+    if (renameBtn) renameBtn.addEventListener("click", async () => {
+      try {
+        await renameCurrentSession();
+      } catch (err) {
+        console.error(err);
+        alert(`Failed to rename session: ${err.message}`);
+      }
+    });
 
-    await loadModels();
-    await refreshStateAndSession();
-  }
+    if (duplicateBtn) duplicateBtn.addEventListener("click", () => {
+      alert("Duplicate is not wired to the backend yet.");
+    });
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      init().catch((error) => {
-        console.error("Nova init failed:", error);
-        appendMessage("assistant", `Init error: ${error.message}`);
+    if (exportBtn) exportBtn.addEventListener("click", () => {
+      try {
+        exportCurrentSession();
+      } catch (err) {
+        console.error(err);
+        alert(`Failed to export chat: ${err.message}`);
+      }
+    });
+
+    if (modelSelect) {
+      modelSelect.addEventListener("change", () => {
+        app.state.currentModel = modelSelect.value || "gpt-4.1-mini";
+        persistState();
+        updateModelStatus(`Using ${app.state.currentModel}`);
       });
+    }
+
+    if (memoryForm) {
+      memoryForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const kind = safeText(getMemoryKindInput()?.value || "preference");
+        const value = safeText(getMemoryValueInput()?.value || "");
+
+        if (!kind || !value) {
+          alert("Memory kind and value are required.");
+          return;
+        }
+
+        try {
+          await addMemoryItem(kind, value);
+        } catch (err) {
+          console.error(err);
+          alert(`Failed to add memory: ${err.message}`);
+        }
+      });
+    }
+
+    if (refreshMemoryBtn) {
+      refreshMemoryBtn.addEventListener("click", async () => {
+        try {
+          await loadMemory();
+        } catch (err) {
+          console.error(err);
+          alert(`Failed to refresh memory: ${err.message}`);
+        }
+      });
+    }
+
+    for (const btn of qsa(["button[data-action='add-memory']"])) {
+      btn.addEventListener("click", async () => {
+        const kind = safeText(getMemoryKindInput()?.value || "preference");
+        const value = safeText(getMemoryValueInput()?.value || "");
+
+        if (!value) {
+          alert("Enter a memory value first.");
+          return;
+        }
+
+        try {
+          await addMemoryItem(kind, value);
+        } catch (err) {
+          console.error(err);
+          alert(`Failed to add memory: ${err.message}`);
+        }
+      });
+    }
+
+    if (toggleSidebarBtn) toggleSidebarBtn.addEventListener("click", toggleSidebar);
+    if (mobileSidebarBtn) mobileSidebarBtn.addEventListener("click", toggleSidebar);
+    if (memoryToggleBtnTop) memoryToggleBtnTop.addEventListener("click", toggleMemoryPanel);
+    if (closeMemoryBtn) closeMemoryBtn.addEventListener("click", closeMemoryPanel);
+
+    if (themeToggleBtn) themeToggleBtn.addEventListener("click", () => {
+      alert("Theme toggle is not wired yet.");
     });
-  } else {
-    init().catch((error) => {
-      console.error("Nova init failed:", error);
-      appendMessage("assistant", `Init error: ${error.message}`);
+
+    if (backgroundBtn) backgroundBtn.addEventListener("click", () => {
+      alert("Background picker is not wired yet.");
     });
+
+    if (attachBtn && fileInput) {
+      attachBtn.addEventListener("click", () => fileInput.click());
+    }
+
+    if (fileInput) {
+      fileInput.addEventListener("change", () => {
+        const total = fileInput.files ? fileInput.files.length : 0;
+        if (total > 0) updateModelStatus(`${total} file${total === 1 ? "" : "s"} selected`);
+      });
+    }
+
+    if (voiceBtn) {
+      voiceBtn.addEventListener("click", () => {
+        alert("Voice is not wired yet.");
+      });
+    }
   }
+
+  async function bootstrap() {
+    restoreState();
+    bindEvents();
+    setStatusSending(false);
+    applyLayout();
+    updateChatHeader();
+    updateMemoryStatus("Loading memory...");
+
+    await Promise.allSettled([loadModels(), loadState(), loadMemory()]);
+
+    if (app.state.activeSessionId) {
+      try {
+        await loadSession(app.state.activeSessionId);
+      } catch (err) {
+        console.warn("Initial session load failed:", err);
+        renderMessages([]);
+      }
+    } else {
+      renderMessages([]);
+    }
+
+    applyLayout();
+    updateChatHeader();
+
+    window.NovaApp = window.NovaApp || {};
+    window.NovaApp.state = app.state;
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    bootstrap().catch((err) => {
+      console.error("Nova bootstrap failed:", err);
+      updateModelStatus("Bootstrap failed");
+    });
+  });
 })();
