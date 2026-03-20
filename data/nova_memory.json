@@ -1,0 +1,12 @@
+{
+  "items": [
+    {
+      "id": "69826425-9a53-4ab7-9a0e-37d3881ab410",
+      "kind": "preference",
+      "value": "hi",
+      "source": "manual",
+      "created_at": 1774043287,
+      "updated_at": 1774043287
+    }
+  ]
+}
