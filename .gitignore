@@ -3,3 +3,12 @@ key.txt
 *.key
 *.pem
 __pycache__/
+runtime/
+dist/
+build/
+*_backup/
+backup_*/
+current_backup/
+*.bak
+*.zip
+logs/
