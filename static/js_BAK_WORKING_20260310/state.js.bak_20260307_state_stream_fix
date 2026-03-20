@@ -1,0 +1,43 @@
+// C:\Users\Owner\nova\static\js\state.js
+
+(() => {
+"use strict"
+
+function createState(initialState = {}){
+  return {
+    chats: Array.isArray(initialState.chats) ? initialState.chats : [],
+    messages: Array.isArray(initialState.messages) ? initialState.messages : [],
+    pendingFiles: Array.isArray(initialState.pendingFiles) ? initialState.pendingFiles : [],
+
+    activeChatId: String(
+      initialState.activeChatId ||
+      initialState.chatId ||
+      ""
+    ).trim(),
+
+    chatId: String(
+      initialState.chatId ||
+      initialState.activeChatId ||
+      ""
+    ).trim(),
+
+    isStreaming: Boolean(initialState.isStreaming),
+    isLoadingChats: Boolean(initialState.isLoadingChats),
+    isLoadingMessages: Boolean(initialState.isLoadingMessages),
+
+    lastUserMessageId: String(initialState.lastUserMessageId || "").trim(),
+    lastUploadedAttachments: Array.isArray(initialState.lastUploadedAttachments)
+      ? initialState.lastUploadedAttachments
+      : [],
+
+    ui: {
+      sidebarOpen: Boolean(initialState?.ui?.sidebarOpen),
+    },
+  }
+}
+
+window.NovaState = {
+  createState,
+}
+
+})()

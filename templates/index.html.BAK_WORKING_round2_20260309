@@ -1,0 +1,133 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nova</title>
+
+  <link rel="stylesheet" href="{{ url_for('static', path='css/base.css') }}?v=20260309_split4">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/layout.css') }}?v=20260309_split4">
+</head>
+<body class="sidebar-open">
+
+  <div id="appShell" class="app-shell">
+
+    <aside id="sidebar" class="sidebar" data-open="true">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Nova</div>
+        <button id="btnCloseSidebar" class="sidebar-close" type="button" aria-label="Close sidebar">✕</button>
+      </div>
+
+      <div class="sidebar-actions">
+        <button id="btnNewChat" class="sidebar-btn" type="button">+ New chat</button>
+      </div>
+
+      <div id="chatList" class="chat-list">
+        <div class="chat-list-empty">No chats yet</div>
+      </div>
+    </aside>
+
+    <div id="mobileOverlay" class="mobile-overlay" hidden></div>
+
+    <main class="main">
+
+      <header class="topbar">
+        <button id="btnSidebarToggle" class="sidebar-toggle" type="button" aria-label="Toggle sidebar">☰</button>
+        <div id="topbarTitle" class="topbar-title">New chat</div>
+        <div></div>
+      </header>
+
+      <section class="chat-stage">
+
+        <div id="messagesScroll" class="messages-scroll">
+
+          <div id="emptyState" class="empty-state">
+            <h1 class="empty-state-title">How can I help?</h1>
+            <p class="empty-state-subtitle">Ask Nova anything.</p>
+
+            <div id="emptySuggestions" class="empty-suggestions">
+              <button class="empty-suggestion" type="button">Help me plan my next build</button>
+              <button class="empty-suggestion" type="button">Fix a bug in my app</button>
+              <button class="empty-suggestion" type="button">Refactor this code cleanly</button>
+              <button class="empty-suggestion" type="button">Explain what this file does</button>
+            </div>
+          </div>
+
+          <div id="messages" class="messages"></div>
+
+        </div>
+
+        <div class="composer-wrap">
+
+          <div class="composer-shell">
+
+            <div id="pendingAttachments" class="pending-attachments"></div>
+
+            <div id="composer" class="composer">
+
+              <button id="attachBtn" class="composer-btn" type="button" aria-label="Attach file">
+                +
+              </button>
+
+              <textarea
+                id="input"
+                class="composer-input"
+                rows="1"
+                placeholder="Message Nova..."
+                aria-label="Message Nova"
+              ></textarea>
+
+              <button
+                id="stopBtn"
+                class="composer-btn"
+                type="button"
+                aria-label="Stop generating"
+                hidden
+              >
+                ■
+              </button>
+
+              <button
+                id="sendBtn"
+                class="composer-btn"
+                type="button"
+                aria-label="Send message"
+              >
+                ↑
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  <button id="jumpToLatestBtn" class="jump-to-latest" type="button" hidden>
+    Jump to latest
+  </button>
+
+
+  <!-- CORE SERVICES -->
+
+  <script src="{{ url_for('static', path='js/api.js') }}?v=20260309_split4"></script>
+  <script src="{{ url_for('static', path='js/stream-service.js') }}?v=20260309_split4"></script>
+  <script src="{{ url_for('static', path='js/attachments-service.js') }}?v=20260309_split4"></script>
+
+
+  <!-- NEW MODULAR CHAT SYSTEM -->
+
+  <script src="{{ url_for('static', path='js/chat-state.js') }}?v=20260309_split4"></script>
+  <script src="{{ url_for('static', path='js/chat-storage.js') }}?v=20260309_split4"></script>
+  <script src="{{ url_for('static', path='js/chat-sidebar.js') }}?v=20260309_split4"></script>
+  <script src="{{ url_for('static', path='js/chat-messages.js') }}?v=20260309_split4"></script>
+  <script src="{{ url_for('static', path='js/composer.js') }}?v=20260309_split4"></script>
+  <script src="{{ url_for('static', path='js/chat-app.js') }}?v=20260309_split4"></script>
+
+</body>
+</html>

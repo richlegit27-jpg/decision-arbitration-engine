@@ -1,0 +1,931 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Nova</title>
+
+  <!-- NOVA_UI_POLISH_ENDGAME_V2 2026-02-26 -->
+
+  <style>
+    :root{
+      --bg: #0b1020;
+      --panel: rgba(255,255,255,.06);
+      --panel2: rgba(255,255,255,.08);
+      --stroke: rgba(255,255,255,.12);
+      --text: rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.65);
+      --muted2: rgba(255,255,255,.45);
+      --brand: #7c5cff;
+      --brand2:#34d399;
+      --danger:#ff4d4f;
+      --warn:#fbbf24;
+      --ok:#22c55e;
+      --shadow: 0 20px 55px rgba(0,0,0,.45);
+      --radius2: 22px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg: #f6f7fb;
+        --panel: rgba(0,0,0,.04);
+        --panel2: rgba(0,0,0,.06);
+        --stroke: rgba(0,0,0,.10);
+        --text: rgba(0,0,0,.88);
+        --muted: rgba(0,0,0,.58);
+        --muted2: rgba(0,0,0,.42);
+        --shadow: 0 20px 55px rgba(0,0,0,.12);
+      }
+    }
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      font-family: var(--sans);
+      background:
+        radial-gradient(1200px 700px at 15% 10%, rgba(124,92,255,.22), transparent 60%),
+        radial-gradient(900px 600px at 90% 25%, rgba(52,211,153,.18), transparent 55%),
+        radial-gradient(1000px 700px at 45% 90%, rgba(251,191,36,.12), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+    .wrap{ height:100%; display:flex; justify-content:center; padding:18px; }
+    .shell{ width:min(1120px, 100%); height:100%; display:flex; flex-direction:column; gap:14px; }
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:14px 14px;
+      border:1px solid var(--stroke);
+      background: linear-gradient(180deg, var(--panel2), var(--panel));
+      border-radius: var(--radius2);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .brand{ display:flex; align-items:center; gap:12px; min-width: 260px; }
+    .logo{
+      width:38px; height:38px; border-radius:14px;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.45), rgba(255,255,255,.05) 55%),
+                  linear-gradient(135deg, rgba(124,92,255,.95), rgba(52,211,153,.85));
+      border:1px solid rgba(255,255,255,.18);
+      box-shadow: 0 12px 22px rgba(124,92,255,.20);
+      position:relative; overflow:hidden;
+    }
+    .logo:after{ content:""; position:absolute; inset:-40%;
+      background: conic-gradient(from 180deg, transparent, rgba(255,255,255,.25), transparent);
+      transform: rotate(35deg);
+    }
+    .titleblock{ display:flex; flex-direction:column; line-height:1.05; }
+    .title{ font-size: 16px; font-weight: 780; letter-spacing: .2px; }
+    .subtitle{ font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .statusrow{ display:flex; align-items:center; gap:10px; justify-content:flex-end; flex-wrap: wrap; }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 8px 10px;
+      border:1px solid var(--stroke);
+      background: rgba(255,255,255,.04);
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--muted);
+      user-select:none;
+    }
+    .dot{ width:8px; height:8px; border-radius:999px; background: var(--muted2); box-shadow: 0 0 0 2px rgba(0,0,0,.12); }
+    .dot.ok{ background: var(--ok); }
+    .dot.bad{ background: var(--danger); }
+    .dot.warn{ background: var(--warn); }
+
+    .btn{
+      appearance:none; border:1px solid var(--stroke);
+      background: rgba(255,255,255,.05); color: var(--text);
+      padding: 9px 12px; border-radius: 12px;
+      font-weight: 700; font-size: 12px; cursor:pointer;
+      transition: transform .06s ease, background .12s ease, border-color .12s ease;
+      user-select:none;
+    }
+    .btn:hover{ background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18); }
+    .btn:active{ transform: translateY(1px); }
+    .btn.primary{ border-color: rgba(124,92,255,.55); background: linear-gradient(180deg, rgba(124,92,255,.35), rgba(124,92,255,.18)); }
+    .btn.danger{ border-color: rgba(255,77,79,.45); background: linear-gradient(180deg, rgba(255,77,79,.18), rgba(255,77,79,.08)); }
+    .btn.ghost{ background: transparent; }
+    .btn.small{ padding: 7px 10px; border-radius: 11px; font-weight: 750; }
+
+    .main{ flex:1; display:flex; gap:14px; min-height: 0; }
+    .left{ flex:1; display:flex; flex-direction:column; gap:14px; min-height: 0; }
+    .right{ width: min(360px, 36%); display:flex; flex-direction:column; gap:14px; min-height:0; }
+
+    .panel{
+      border:1px solid var(--stroke);
+      background: linear-gradient(180deg, var(--panel2), var(--panel));
+      border-radius: var(--radius2);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      overflow:hidden;
+      min-height:0;
+    }
+    .panelHead{ display:flex; align-items:center; justify-content:space-between; padding: 12px 14px; border-bottom:1px solid var(--stroke); gap: 10px; flex-wrap: wrap; }
+    .tabs{ display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+    .tab{
+      border:1px solid var(--stroke);
+      background: rgba(255,255,255,.04);
+      color: var(--muted);
+      padding: 8px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor:pointer;
+      user-select:none;
+    }
+    .tab.active{
+      color: var(--text);
+      border-color: rgba(124,92,255,.55);
+      background: linear-gradient(180deg, rgba(124,92,255,.33), rgba(124,92,255,.14));
+    }
+    .panelBody{ padding: 14px; min-height:0; }
+    .output{ height: 100%; min-height:0; display:flex; flex-direction:column; gap:12px; }
+    .messages{ flex:1; min-height:0; overflow:auto; padding-right: 6px; }
+
+    .msg{
+      border:1px solid var(--stroke);
+      background: rgba(255,255,255,.04);
+      border-radius: 16px;
+      padding: 12px 12px;
+      margin-bottom: 10px;
+    }
+    .msg .meta{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:12px; margin-bottom: 8px;
+      font-size: 12px; color: var(--muted);
+    }
+    .msg .role{ font-weight: 850; color: var(--text); letter-spacing:.2px; }
+    .msg .metaRight{ display:flex; gap:8px; align-items:center; }
+
+    .bubble{
+      margin:0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 14px;
+      line-height: 1.48;
+      color: var(--text);
+    }
+    .bubble code{
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 2px 6px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.18);
+      border-radius: 10px;
+    }
+    .codeblock{
+      margin: 10px 0 0 0;
+      padding: 10px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.20);
+      overflow:auto;
+      font-family: var(--mono);
+      font-size: 12.8px;
+      line-height: 1.45;
+      white-space: pre;
+    }
+
+    .copyMini{
+      border:1px solid var(--stroke);
+      background: rgba(255,255,255,.05);
+      color: var(--muted);
+      padding: 6px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .copyMini:hover{ color: var(--text); }
+    .copyMini.on{ border-color: rgba(52,211,153,.55); color: var(--text); }
+
+    .composerRow{ display:flex; gap:10px; align-items:flex-end; }
+    .composer{
+      flex:1;
+      border:1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      border-radius: 18px;
+      padding: 10px 10px;
+    }
+    textarea{
+      width:100%; resize:none; border:none; outline:none;
+      background: transparent; color: var(--text);
+      font-size: 14px; line-height: 1.35;
+      font-family: var(--sans);
+      min-height: 42px; max-height: 220px;
+    }
+    .hintrow{
+      display:flex; justify-content:space-between; gap:12px;
+      padding-top: 8px;
+      font-size: 12px;
+      color: var(--muted2);
+      user-select:none;
+    }
+
+    .banner{
+      display:none;
+      margin: 10px 14px 0 14px;
+      border:1px solid rgba(255,77,79,.45);
+      background: rgba(255,77,79,.10);
+      color: rgba(255,255,255,.92);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+    .banner.show{ display:block; }
+
+    .foot{
+      padding: 10px 14px;
+      border-top:1px solid var(--stroke);
+      font-size: 12px;
+      color: var(--muted2);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      user-select:none;
+    }
+
+    .kv{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding: 10px 0; border-bottom:1px dashed rgba(255,255,255,.12); font-size: 13px; color: var(--muted); }
+    .kv:last-child{ border-bottom:none; }
+    .toggle{ width:46px; height:26px; border-radius:999px; border:1px solid var(--stroke); background: rgba(255,255,255,.05); position:relative; cursor:pointer; flex: 0 0 auto; }
+    .knob{ width:22px; height:22px; border-radius:999px; position:absolute; top:1px; left:1px; background: rgba(255,255,255,.65); transition: left .12s ease, background .12s ease; }
+    .toggle.on{ border-color: rgba(52,211,153,.55); background: rgba(52,211,153,.12); }
+    .toggle.on .knob{ left: 22px; background: rgba(52,211,153,.9); }
+
+    /* “circly mouse” */
+    #nova_cursor_dot{
+      position: fixed;
+      width: 12px; height: 12px;
+      border-radius: 999px;
+      border: 2px solid rgba(255,255,255,.55);
+      box-shadow: 0 0 18px rgba(124,92,255,.22);
+      pointer-events:none;
+      z-index: 999999;
+      transform: translate(-50%, -50%);
+      display:none;
+      mix-blend-mode: screen;
+    }
+
+    .messages::-webkit-scrollbar{ width: 10px; }
+    .messages::-webkit-scrollbar-thumb{
+      background: rgba(255,255,255,.14);
+      border-radius: 999px;
+      border: 2px solid rgba(0,0,0,0);
+      background-clip: padding-box;
+    }
+
+    @media (max-width: 980px){
+      body{ overflow:auto; }
+      .wrap{ padding: 12px; height:auto; }
+      .shell{ height:auto; }
+      .main{ flex-direction:column; }
+      .right{ width:100%; }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="nova_cursor_dot"></div>
+
+  <div class="wrap">
+    <div class="shell">
+
+      <div class="topbar">
+        <div class="brand">
+          <div class="logo"></div>
+          <div class="titleblock">
+            <div class="title">Nova</div>
+            <div class="subtitle">UI Polish Endgame V2 (stream + better rendering)</div>
+          </div>
+        </div>
+
+        <div class="statusrow">
+          <div class="pill" title="Which HTML is actually being served">
+            <span class="dot ok"></span>
+            <span>build:</span>
+            <span id="buildStamp" style="font-family:var(--mono); color:var(--text);">NOVA_UI_POLISH_ENDGAME_V2_2026-02-26</span>
+          </div>
+          <div class="pill" title="Backend /api/health">
+            <span class="dot" id="dotApi"></span>
+            <span id="apiStatus">api: unknown</span>
+          </div>
+          <button class="btn small ghost" id="btnPing">Ping</button>
+          <button class="btn small danger" id="btnClear">Clear</button>
+          <button class="btn small" id="btnCopyAll">Copy</button>
+        </div>
+      </div>
+
+      <div class="main">
+        <div class="left">
+          <div class="panel" style="flex:1;">
+            <div class="panelHead">
+              <div class="tabs">
+                <div class="tab active" data-mode="ask">Ask</div>
+                <div class="tab" data-mode="command">Command</div>
+                <div class="tab" data-mode="doctor">Doctor</div>
+              </div>
+
+              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <div class="pill" title="Session id used by /api/chat">
+                  <span style="color:var(--muted2);">session:</span>
+                  <span id="sessionId" style="font-family:var(--mono); color:var(--text);">default</span>
+                </div>
+                <button class="btn primary" id="btnSend">Send</button>
+                <button class="btn" id="btnStop" title="Cancel in-flight request" style="display:none;">Stop</button>
+              </div>
+            </div>
+
+            <div class="banner" id="banner"></div>
+
+            <div class="panelBody" style="height: calc(100% - 54px);">
+              <div class="output">
+                <div class="messages" id="messages"></div>
+
+                <div class="composerRow">
+                  <div class="composer">
+                    <textarea id="input" placeholder="Type here…"></textarea>
+                    <div class="hintrow">
+                      <span>Enter = send • Shift+Enter = newline • Ctrl+Enter = send</span>
+                      <span id="charCount">0</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <div class="foot">
+              <span>Mode: <span id="modeLabel" style="color:var(--text); font-weight:780;">ask</span></span>
+              <span style="font-family:var(--mono);">NOVA_UI_POLISH_ENDGAME_V2 2026-02-26</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="right">
+          <div class="panel">
+            <div class="panelHead">
+              <div style="font-weight:850;">Settings</div>
+              <div style="font-size:12px;color:var(--muted);">local</div>
+            </div>
+            <div class="panelBody">
+              <div class="kv">
+                <span>Auto-send on Enter</span>
+                <div class="toggle on" id="togEnter"><div class="knob"></div></div>
+              </div>
+
+              <div class="kv">
+                <span>Auto-scroll (sticky)</span>
+                <div class="toggle on" id="togScroll"><div class="knob"></div></div>
+              </div>
+
+              <div class="kv">
+                <span>Show “circly mouse”</span>
+                <div class="toggle on" id="togCursor"><div class="knob"></div></div>
+              </div>
+
+              <div class="kv">
+                <span>Session Id</span>
+                <input id="sessionBox" style="width:160px; border:1px solid var(--stroke); background:rgba(255,255,255,.03); color:var(--text); padding:8px 10px; border-radius:12px; font-family:var(--mono);" placeholder="default" />
+              </div>
+
+              <div class="kv">
+                <span>Tips</span>
+                <span style="color:var(--muted2);">Stop cancels fetch. Scroll disables autoscroll.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panelHead">
+              <div style="font-weight:850;">Quick Actions</div>
+              <div style="font-size:12px;color:var(--muted);">one tap</div>
+            </div>
+            <div class="panelBody" style="display:flex; flex-direction:column; gap:10px;">
+              <button class="btn" id="btnExplain">Explain last reply</button>
+              <button class="btn" id="btnSummarize">Summarize chat</button>
+              <button class="btn" id="btnPlan">Make a plan</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const $ = (id)=>document.getElementById(id);
+
+      const messages = $("messages");
+      const input = $("input");
+      const banner = $("banner");
+      const apiStatus = $("apiStatus");
+      const dotApi = $("dotApi");
+      const modeLabel = $("modeLabel");
+      const charCount = $("charCount");
+      const sessionId = $("sessionId");
+      const sessionBox = $("sessionBox");
+
+      const togEnter = $("togEnter");
+      const togScroll = $("togScroll");
+      const togCursor = $("togCursor");
+
+      const btnSend = $("btnSend");
+      const btnStop = $("btnStop");
+      const btnClear = $("btnClear");
+      const btnCopyAll = $("btnCopyAll");
+      const btnPing = $("btnPing");
+
+      const btnExplain = $("btnExplain");
+      const btnSummarize = $("btnSummarize");
+      const btnPlan = $("btnPlan");
+
+      const cursorDot = $("nova_cursor_dot");
+
+      // State
+      const state = {
+        mode: "ask",
+        autoEnter: true,
+        autoScroll: true,
+        cursor: true,
+        session: "default",
+      };
+
+      let inFlight = null; // { aborter, assistantNode, rawBuf }
+      let stickToBottom = true;
+
+      // Load persisted settings
+      try{
+        const saved = JSON.parse(localStorage.getItem("nova_ui_state_v2") || "{}");
+        Object.assign(state, saved || {});
+      }catch(e){}
+
+      function persist(){
+        try{
+          localStorage.setItem("nova_ui_state_v2", JSON.stringify(state));
+        }catch(e){}
+      }
+
+      function setToggle(el, on){
+        if(on) el.classList.add("on");
+        else el.classList.remove("on");
+      }
+
+      function showBanner(msg){
+        banner.classList.add("show");
+        banner.textContent = msg;
+      }
+      function hideBanner(){
+        banner.classList.remove("show");
+        banner.textContent = "";
+      }
+
+      // Sticky autoscroll: only scroll if user is near bottom
+      function isNearBottom(){
+        const gap = messages.scrollHeight - (messages.scrollTop + messages.clientHeight);
+        return gap < 90;
+      }
+      messages.addEventListener("scroll", ()=>{
+        stickToBottom = isNearBottom();
+      }, { passive:true });
+
+      function maybeScroll(){
+        if(state.autoScroll && stickToBottom){
+          messages.scrollTop = messages.scrollHeight + 99999;
+        }
+      }
+
+      // Simple renderer: split triple backtick code blocks, inline `code`
+      function renderTextInto(container, text){
+        container.innerHTML = "";
+        const s = (text ?? "").toString();
+
+        // Split on ``` blocks
+        const parts = s.split(/```/g);
+        for(let i=0;i<parts.length;i++){
+          const chunk = parts[i];
+          const isCode = (i % 2 === 1);
+          if(isCode){
+            // optional language at start of code fence
+            const lines = chunk.replace(/\r\n/g,"\n").split("\n");
+            if(lines.length > 1 && /^[a-zA-Z0-9_-]{1,18}$/.test(lines[0].trim())){
+              lines.shift();
+            }
+            const code = lines.join("\n");
+            const pre = document.createElement("pre");
+            pre.className = "codeblock";
+            pre.textContent = code;
+            container.appendChild(pre);
+          }else{
+            // normal text, handle inline `code`
+            const p = document.createElement("div");
+            p.className = "bubble";
+            const pieces = chunk.split(/`/g);
+            for(let j=0;j<pieces.length;j++){
+              if(j % 2 === 1){
+                const c = document.createElement("code");
+                c.textContent = pieces[j];
+                p.appendChild(c);
+              }else{
+                p.appendChild(document.createTextNode(pieces[j]));
+              }
+            }
+            container.appendChild(p);
+          }
+        }
+      }
+
+      function addMsg(role, text){
+        const box = document.createElement("div");
+        box.className = "msg";
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+
+        const left = document.createElement("div");
+        left.innerHTML = '<span class="role">'+role+'</span>';
+
+        const right = document.createElement("div");
+        right.className = "metaRight";
+
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "copyMini";
+        copyBtn.textContent = "Copy";
+        copyBtn.onclick = async ()=>{
+          try{
+            await navigator.clipboard.writeText(text || "");
+            copyBtn.classList.add("on");
+            copyBtn.textContent = "Copied";
+            setTimeout(()=>{ copyBtn.classList.remove("on"); copyBtn.textContent="Copy"; }, 900);
+          }catch(e){
+            copyBtn.textContent = "Nope";
+            setTimeout(()=>copyBtn.textContent="Copy", 900);
+          }
+        };
+
+        right.appendChild(copyBtn);
+        meta.appendChild(left);
+        meta.appendChild(right);
+
+        const body = document.createElement("div");
+        renderTextInto(body, text || "");
+
+        box.appendChild(meta);
+        box.appendChild(body);
+
+        messages.appendChild(box);
+        maybeScroll();
+        return { box, body, copyBtn };
+      }
+
+      function updateLastAssistant(text){
+        if(!inFlight || !inFlight.assistantBody) return;
+        renderTextInto(inFlight.assistantBody, text || "");
+        maybeScroll();
+      }
+
+      function setMode(m){
+        state.mode = m;
+        modeLabel.textContent = m;
+        document.querySelectorAll(".tab").forEach(t=>{
+          t.classList.toggle("active", t.getAttribute("data-mode") === m);
+        });
+        persist();
+      }
+
+      // Tabs
+      document.querySelectorAll(".tab").forEach(t=>{
+        t.addEventListener("click", ()=> setMode(t.getAttribute("data-mode")));
+      });
+
+      // Toggles
+      setToggle(togEnter, !!state.autoEnter);
+      setToggle(togScroll, !!state.autoScroll);
+      setToggle(togCursor, !!state.cursor);
+
+      togEnter.addEventListener("click", ()=>{ state.autoEnter = !state.autoEnter; setToggle(togEnter,state.autoEnter); persist(); });
+      togScroll.addEventListener("click", ()=>{ state.autoScroll = !state.autoScroll; setToggle(togScroll,state.autoScroll); persist(); });
+      togCursor.addEventListener("click", ()=>{
+        state.cursor = !state.cursor;
+        setToggle(togCursor,state.cursor);
+        if(!state.cursor){ cursorDot.style.display="none"; }
+        persist();
+      });
+
+      // Session
+      sessionBox.value = state.session || "default";
+      sessionId.textContent = state.session || "default";
+      sessionBox.addEventListener("change", ()=>{
+        state.session = (sessionBox.value || "default").trim() || "default";
+        sessionId.textContent = state.session;
+        persist();
+      });
+
+      // Cursor dot
+      document.addEventListener("mousemove", (ev)=>{
+        if(!state.cursor) return;
+        cursorDot.style.display="block";
+        cursorDot.style.left = ev.clientX + "px";
+        cursorDot.style.top  = ev.clientY + "px";
+      }, {passive:true});
+      document.addEventListener("mouseleave", ()=>{ cursorDot.style.display="none"; }, {passive:true});
+
+      // Auto-grow textarea
+      function autoGrow(){
+        input.style.height = "auto";
+        input.style.height = Math.min(input.scrollHeight, 220) + "px";
+      }
+      input.addEventListener("input", ()=>{
+        charCount.textContent = String((input.value||"").length);
+        autoGrow();
+        // draft persist per session
+        try{
+          localStorage.setItem("nova_draft_" + (state.session || "default"), input.value || "");
+        }catch(e){}
+      });
+
+      // Load draft on boot
+      try{
+        const d = localStorage.getItem("nova_draft_" + (state.session || "default"));
+        if(d){ input.value = d; charCount.textContent = String(d.length); autoGrow(); }
+      }catch(e){}
+
+      // Enter-to-send and shortcuts
+      input.addEventListener("keydown", (e)=>{
+        if(e.key === "Enter" && !e.shiftKey && state.autoEnter){
+          e.preventDefault();
+          send();
+          return;
+        }
+        if(e.key === "Enter" && e.ctrlKey){
+          e.preventDefault();
+          send();
+          return;
+        }
+      });
+
+      document.addEventListener("keydown", (e)=>{
+        if(e.ctrlKey && e.key.toLowerCase() === "l"){
+          e.preventDefault();
+          messages.innerHTML = "";
+          hideBanner();
+        }
+      });
+
+      // Buttons
+      $("btnClear").addEventListener("click", ()=>{
+        messages.innerHTML = "";
+        hideBanner();
+      });
+
+      $("btnCopyAll").addEventListener("click", async ()=>{
+        try{
+          const all = Array.from(messages.querySelectorAll(".msg")).map(m=>{
+            const role = m.querySelector(".role")?.textContent || "";
+            const text = m.innerText || "";
+            return role + "\n" + text.trim();
+          }).join("\n\n---\n\n");
+          await navigator.clipboard.writeText(all);
+          $("btnCopyAll").textContent = "Copied";
+          setTimeout(()=>$("btnCopyAll").textContent="Copy", 900);
+        }catch(e){
+          $("btnCopyAll").textContent = "Nope";
+          setTimeout(()=>$("btnCopyAll").textContent="Copy", 900);
+        }
+      });
+
+      $("btnPing").addEventListener("click", ()=> pingApi(true));
+      btnSend.addEventListener("click", ()=> send());
+
+      btnStop.addEventListener("click", ()=>{
+        try{
+          if(inFlight && inFlight.aborter){
+            inFlight.aborter.abort();
+          }
+        }catch(e){}
+      });
+
+      // Quick actions
+      btnExplain.addEventListener("click", ()=>{
+        input.value = "Explain your last reply in simpler terms.";
+        charCount.textContent = String(input.value.length);
+        autoGrow();
+        input.focus();
+      });
+      btnSummarize.addEventListener("click", ()=>{
+        input.value = "Summarize our conversation so far into bullet points.";
+        charCount.textContent = String(input.value.length);
+        autoGrow();
+        input.focus();
+      });
+      btnPlan.addEventListener("click", ()=>{
+        input.value = "Make a step-by-step plan for what we should do next.";
+        charCount.textContent = String(input.value.length);
+        autoGrow();
+        input.focus();
+      });
+
+      async function pingApi(verbose){
+        dotApi.className = "dot warn";
+        apiStatus.textContent = "api: checking…";
+        try{
+          const r = await fetch("/api/health", { method:"GET" });
+          if(r.ok){
+            dotApi.className = "dot ok";
+            apiStatus.textContent = "api: OK";
+            if(verbose) hideBanner();
+          }else{
+            dotApi.className = "dot bad";
+            apiStatus.textContent = "api: " + r.status;
+            if(verbose) showBanner("Backend health failed: HTTP " + r.status);
+          }
+        }catch(e){
+          dotApi.className = "dot bad";
+          apiStatus.textContent = "api: down";
+          if(verbose) showBanner("Backend not reachable (fetch failed). Is the backend running?");
+        }
+      }
+
+      function unwrapReply(rawText){
+        // Nova wrapper: {"ok":true,"status":200,"reply":"{...inner json...}"}
+        // inner json may have { reply, detail }
+        let out = rawText || "";
+        try{
+          const j = JSON.parse(rawText);
+          if(typeof j.reply === "string"){
+            const s = j.reply;
+            if(s.trim().startsWith("{")){
+              try{
+                const inner = JSON.parse(s);
+                out = inner.reply || inner.detail || s;
+              }catch(e2){
+                out = s;
+              }
+            }else{
+              out = s;
+            }
+          }else if(j && typeof j === "object"){
+            out = j.reply || rawText;
+          }
+        }catch(e){
+          // keep raw
+        }
+        return out;
+      }
+
+      async function send(){
+        const text = (input.value || "").trim();
+        if(!text){ return; }
+        hideBanner();
+
+        // cancel any in-flight
+        if(inFlight && inFlight.aborter){
+          try{ inFlight.aborter.abort(); }catch(e){}
+        }
+
+        addMsg("you", text);
+
+        // clear input & draft
+        input.value = "";
+        charCount.textContent = "0";
+        autoGrow();
+        try{ localStorage.setItem("nova_draft_" + (state.session || "default"), ""); }catch(e){}
+
+        const assistant = addMsg("nova", "…");
+
+        const payload = { text, mode: state.mode };
+        const url = "/api/chat?session_id=" + encodeURIComponent(state.session || "default");
+
+        const aborter = new AbortController();
+        inFlight = {
+          aborter,
+          assistantBody: assistant.body,
+          rawBuf: ""
+        };
+
+        btnStop.style.display = "inline-block";
+
+        try{
+          // Try SSE first
+          const sseUrl = "/api/chat_sse?session_id=" + encodeURIComponent(state.session || "default");
+          let usedSse = false;
+
+          try{
+            const r = await fetch(sseUrl, {
+              method:"POST",
+              headers: { "Content-Type":"application/json" },
+              body: JSON.stringify(payload),
+              signal: aborter.signal
+            });
+
+            const ct = (r.headers.get("content-type") || "").toLowerCase();
+            if(r.ok && ct.includes("text/event-stream") && r.body){
+              usedSse = true;
+
+              const reader = r.body.getReader();
+              const decoder = new TextDecoder("utf-8");
+              let buf = "";
+
+              updateLastAssistant(""); // clear "…"
+
+              while(true){
+                const { value, done } = await reader.read();
+                if(done) break;
+                buf += decoder.decode(value, { stream:true });
+
+                // parse SSE frames by \n\n
+                let idx;
+                while((idx = buf.indexOf("\n\n")) >= 0){
+                  const frame = buf.slice(0, idx);
+                  buf = buf.slice(idx + 2);
+
+                  // find data: lines
+                  const lines = frame.split("\n");
+                  for(const line of lines){
+                    if(line.startsWith("data:")){
+                      const data = line.slice(5).trim();
+                      if(!data) continue;
+                      if(data === "[DONE]") continue;
+
+                      // token event from your server: {"t":" ... "}
+                      try{
+                        const j = JSON.parse(data);
+                        if(typeof j.t === "string"){
+                          inFlight.rawBuf += j.t;
+                          updateLastAssistant(inFlight.rawBuf);
+                        }else if(typeof j.reply === "string"){
+                          inFlight.rawBuf += j.reply;
+                          updateLastAssistant(inFlight.rawBuf);
+                        }
+                      }catch(e){
+                        // if server sends plain text chunks
+                        inFlight.rawBuf += data;
+                        updateLastAssistant(inFlight.rawBuf);
+                      }
+                    }
+                  }
+                }
+              }
+
+              // Final unwrap attempt (sometimes server streams wrapper)
+              const final = unwrapReply(inFlight.rawBuf);
+              updateLastAssistant(final);
+
+              if(final.includes("invalid_api_key") || final.includes("Incorrect API key")){
+                showBanner("OpenAI API key is invalid/missing. Create a real key on platform.openai.com and set it in Nova.");
+              }
+
+              return;
+            }
+          }catch(eSse){
+            // fall back to non-stream
+          }
+
+          // Non-stream fallback
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            signal: aborter.signal
+          });
+
+          const raw = await res.text();
+
+          if(!res.ok){
+            updateLastAssistant("HTTP " + res.status + "\n\n" + raw);
+            showBanner("Request failed: HTTP " + res.status);
+            return;
+          }
+
+          const out = unwrapReply(raw);
+          updateLastAssistant(out || "(empty)");
+
+          if((out||"").includes("invalid_api_key") || (out||"").includes("Incorrect API key")){
+            showBanner("OpenAI API key is invalid/missing. Create a real key on platform.openai.com and set it in Nova.");
+          }
+
+        }catch(err){
+          const msg = (err && err.name === "AbortError") ? "Cancelled." :
+                      (err && err.message ? err.message : String(err));
+          updateLastAssistant(msg);
+        } finally {
+          btnStop.style.display = "none";
+          inFlight = null;
+        }
+      }
+
+      // Boot
+      setMode(state.mode || "ask");
+      pingApi(false);
+      setTimeout(()=>{ try{ input.focus(); }catch(e){} }, 200);
+    })();
+  </script>
+</body>
+</html>

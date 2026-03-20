@@ -1,0 +1,158 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<script id="novaDirectSend98" src="/static/js/98.direct_send.js?v=CLEAN98AUTH_20260220_035208"></script>
+
+
+  <meta charset="utf-8" />
+  <meta http-equiv="refresh" content="0; url=/app" />
+  <script>
+    // JS redirect backup (for clients that ignore meta refresh)
+    try { location.replace("/app"); } catch(e) { location.href = "/app"; }
+  </script>
+  <title>Redirecting…</title>
+<script>
+(function(){
+  try{
+    var u = "/static/js/99.patch2.js?v=20260220_121917";
+    var s = document.createElement("script");
+    s.src = u;
+    s.async = false;
+    s.onload=function(){try{if(window.__NOVA_PATCHLOADER_DEBUG__) console.log("[PATCHLOADER] loaded",u);}catch(_){}};
+    s.onerror=function(e){try{if(window.__NOVA_PATCHLOADER_DEBUG__) console.error("[PATCHLOADER] ERROR",u,e);}catch(_){}};
+    (document.head || document.documentElement).appendChild(s);
+  }catch(e){ try{ console.error("[PATCHLOADER] FAIL", e); }catch(_){} }
+})();
+</script><style id="novaSendovrStyle">
+  #out .nova-user{
+    margin: 6px 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(31,111,235,.18);
+    border: 1px solid rgba(31,111,235,.35);
+    white-space: pre-wrap;
+  }
+  #out .nova-assistant{
+    margin: 6px 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(34,34,34,.65);
+    border: 1px solid rgba(255,255,255,.08);
+    white-space: pre-wrap;
+  }
+  #out .nova-error{
+    margin: 6px 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(248,81,73,.18);
+    border: 1px solid rgba(248,81,73,.35);
+    white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+  Redirecting to /app…
+  <script src="/static/js/20.app.js?v=20260219_165756"></script>
+<script src="/static/js/97.force_novasend.js?v=FORCE97_20260220_161243"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- NOTE: UI currently serves app.html, not index.html -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

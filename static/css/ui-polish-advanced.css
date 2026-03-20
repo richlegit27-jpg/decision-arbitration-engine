@@ -1,0 +1,54 @@
+/* ===============================
+   NOVA ADVANCED POLISH
+   Subtle glows, scroll fade-ins, pulse notifications
+   =============================== */
+
+/* SCROLL FADE-IN FOR MESSAGES */
+#chatMessages > .message-bubble {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: scrollFadeIn 300ms ease forwards;
+}
+
+@keyframes scrollFadeIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* SUBTLE HOVER GLOW */
+.message-bubble.user:hover {
+  box-shadow: 0 6px 20px rgba(121,168,255,0.25), 0 0 8px rgba(121,168,255,0.08) inset;
+}
+
+.message-bubble.assistant:hover {
+  box-shadow: 0 6px 20px rgba(255,255,255,0.08), 0 0 6px rgba(255,255,255,0.03) inset;
+}
+
+/* PULSE NOTIFICATIONS (e.g., new message) */
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.03); opacity: 0.85; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.new-message-pulse {
+  animation: pulse 1s ease-in-out infinite;
+}
+
+/* MEMORY PANEL MICRO HIGHLIGHTS */
+.memory-card:hover {
+  background: color-mix(in srgb, var(--panel-2) 90%, transparent);
+  box-shadow: 0 14px 32px rgba(0,0,0,0.12), 0 0 6px rgba(255,255,255,0.02) inset;
+}
+
+/* SIDEBAR MICRO GLOW ON HOVER */
+.chat-list-item:hover {
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08), 0 0 4px rgba(121,168,255,0.08) inset;
+}
+
+/* COMPOSER MICRO PULSE ON FOCUS */
+#composer:focus-within {
+  box-shadow: 0 12px 32px rgba(121,168,255,0.15);
+}

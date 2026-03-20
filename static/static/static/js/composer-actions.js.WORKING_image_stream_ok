@@ -1,0 +1,421 @@
+// C:\Users\Owner\nova\static\js\composer-actions.js
+
+(() => {
+"use strict"
+
+function createComposerActions(options = {}){
+  const {
+    state,
+    elements = {},
+    api = {},
+    chatMessages = null,
+    chatSidebar = null,
+    chatStorage = null,
+    streamService = null,
+    inputController = null,
+    attachmentsController = null,
+    callbacks = {},
+    onStateChange = null,
+  } = options
+
+  if(!state){
+    throw new Error("NovaComposerActions: state is required")
+  }
+
+  const el = {
+    sendBtn: elements.sendBtn || null,
+    stopBtn: elements.stopBtn || null,
+    attachBtn: elements.attachBtn || null,
+    messagesScroll: elements.messagesScroll || null,
+  }
+
+  function generateId(prefix = "msg"){
+    if(window.crypto?.randomUUID){
+      return `${prefix}_${window.crypto.randomUUID()}`
+    }
+    return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`
+  }
+
+  function ensureMessages(){
+    if(!Array.isArray(state.messages)){
+      state.messages = []
+    }
+    return state.messages
+  }
+
+  function getActiveChatId(){
+    return String(state.activeChatId || "").trim()
+  }
+
+  function syncActiveChat(){
+    const chatId = getActiveChatId()
+
+    if(typeof chatStorage?.setActiveChat === "function"){
+      chatStorage.setActiveChat(chatId || "")
+    }
+  }
+
+  function persistCurrentChatMessages(){
+    const chatId = getActiveChatId()
+
+    if(!chatId){
+      return
+    }
+
+    if(typeof chatStorage?.saveMessages === "function"){
+      chatStorage.saveMessages(chatId, ensureMessages())
+    }
+  }
+
+  function rerenderMessages(){
+    chatMessages?.syncMessagesFromStorage?.(ensureMessages())
+  }
+
+  function rerenderSidebar(){
+    try{
+      if(typeof chatSidebar?.renderChatList === "function"){
+        chatSidebar.renderChatList()
+        return
+      }
+
+      if(typeof window.NovaChatApp?.renderAll === "function"){
+        window.NovaChatApp.renderAll()
+      }
+    }catch(error){
+      console.error("NovaComposer sidebar render skipped:", error)
+    }
+  }
+
+  function afterMessagesChanged(){
+    rerenderMessages()
+    persistCurrentChatMessages()
+  }
+
+  function markStreaming(flag){
+    state.isStreaming = !!flag
+
+    if(typeof onStateChange === "function"){
+      onStateChange()
+    }
+  }
+
+  function updateComposerState(){
+    const text = String(inputController?.getTrimmedInputValue?.() || "")
+    const hasText = !!text
+    const hasPending = (attachmentsController?.ensurePendingAttachments?.() || []).length > 0
+    const streaming = !!state.isStreaming
+
+    if(el.sendBtn){
+      el.sendBtn.disabled = streaming || (!hasText && !hasPending)
+      el.sendBtn.hidden = streaming
+    }
+
+    if(el.stopBtn){
+      el.stopBtn.hidden = !streaming
+    }
+
+    if(el.attachBtn){
+      el.attachBtn.disabled = streaming
+    }
+
+    attachmentsController?.renderPendingAttachments?.()
+  }
+
+  function appendLocalUserMessage(text, attachments = []){
+    const messages = ensureMessages()
+
+    const id = generateId("msg")
+    const msg = {
+      message_id: id,
+      id,
+      role: "user",
+      content: String(text || ""),
+      attachments: Array.isArray(attachments) ? attachments.slice() : [],
+      created_at: new Date().toISOString(),
+    }
+
+    messages.push(msg)
+    afterMessagesChanged()
+    return msg
+  }
+
+  function appendAssistantMessage(text, attachments = []){
+    const messages = ensureMessages()
+
+    const id = generateId("msg")
+    const msg = {
+      message_id: id,
+      id,
+      role: "assistant",
+      content: String(text || ""),
+      attachments: Array.isArray(attachments) ? attachments.slice() : [],
+      created_at: new Date().toISOString(),
+    }
+
+    messages.push(msg)
+    afterMessagesChanged()
+    return msg
+  }
+
+  function safeAutoTitle(chatId, text){
+    try{
+      if(typeof chatStorage?.hydrateChatFromMessageActivity === "function"){
+        chatStorage.hydrateChatFromMessageActivity(chatId, String(text || "").trim())
+      }
+    }catch(error){
+      console.error("NovaComposer auto-title skipped:", error)
+    }
+
+    rerenderSidebar()
+  }
+
+  async function postChat(payload){
+    if(api.fetchJson){
+      return await api.fetchJson("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+    }
+
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+
+    if(!response.ok){
+      const text = await response.text().catch(() => "")
+      throw new Error(`/api/chat failed (${response.status}) ${text}`)
+    }
+
+    return await response.json()
+  }
+
+  function clearPendingInputAndAttachments(){
+    inputController?.clearInput?.()
+    state.pendingAttachments = []
+    attachmentsController?.renderPendingAttachments?.()
+    updateComposerState()
+  }
+
+  function isAbortLikeError(error){
+    const name = String(error?.name || "")
+    const message = String(error?.message || "")
+
+    return (
+      name === "AbortError" ||
+      /aborted/i.test(message) ||
+      /abort/i.test(name)
+    )
+  }
+
+  async function ensureActiveChat(options = {}){
+    let chatId = getActiveChatId()
+
+    if(chatId){
+      syncActiveChat()
+      return chatId
+    }
+
+    const onNeedsCreateChat = options.onNeedsCreateChat || callbacks.onNeedsCreateChat
+
+    if(!chatId && typeof onNeedsCreateChat === "function"){
+      const created = await onNeedsCreateChat()
+      chatId = String(created?.chat_id || created?.id || state.activeChatId || "").trim()
+      state.activeChatId = chatId
+    }
+
+    if(!chatId && chatSidebar?.createNewChat){
+      const created = await chatSidebar.createNewChat({})
+      chatId = String(created?.chat_id || created?.id || state.activeChatId || "").trim()
+      state.activeChatId = chatId
+    }
+
+    if(!chatId){
+      throw new Error("No active chat id available.")
+    }
+
+    syncActiveChat()
+    return chatId
+  }
+
+  function handleNonStreamingReply(reply, fallbackChatId){
+    const resolvedChatId = String(
+      reply?.chat_id ||
+      reply?.chat?.chat_id ||
+      reply?.chat?.id ||
+      fallbackChatId ||
+      state.activeChatId ||
+      ""
+    ).trim()
+
+    if(resolvedChatId){
+      state.activeChatId = resolvedChatId
+      syncActiveChat()
+    }
+
+    if(Array.isArray(reply?.messages) && reply.messages.length){
+      state.messages = reply.messages.slice()
+      afterMessagesChanged()
+      return
+    }
+
+    const responseText =
+      reply?.response ??
+      reply?.reply ??
+      reply?.message ??
+      ""
+
+    const responseAttachments = Array.isArray(reply?.attachments)
+      ? reply.attachments.slice()
+      : []
+
+    if(String(responseText || "").trim() || responseAttachments.length){
+      appendAssistantMessage(String(responseText || ""), responseAttachments)
+    }else{
+      persistCurrentChatMessages()
+    }
+  }
+
+  async function sendCurrentMessage(options = {}){
+    if(state.isStreaming){
+      return
+    }
+
+    const forcedText = String(options.forcedText || "").trim()
+    const forcedAttachments = Array.isArray(options.forcedAttachments) ? options.forcedAttachments.slice() : null
+    const skipLocalUserAppend = !!options.skipLocalUserAppend
+
+    const inputText = String(inputController?.getTrimmedInputValue?.() || "")
+    const pending = attachmentsController?.ensurePendingAttachments?.() || []
+
+    const text = forcedText || inputText
+    const sourceAttachments = forcedAttachments || pending
+
+    if(!text && !sourceAttachments.length){
+      updateComposerState()
+      return
+    }
+
+    const onAfterSend = options.onAfterSend || callbacks.onAfterSend
+    const onSendError = options.onSendError || callbacks.onSendError
+
+    let aborted = false
+
+    try{
+      markStreaming(true)
+
+      const chatId = await ensureActiveChat(options)
+
+      let uploadedAttachments = sourceAttachments
+
+      if(!forcedAttachments){
+        uploadedAttachments = await attachmentsController.uploadPendingAttachments()
+      }
+
+      const attachmentPayload = attachmentsController.makeAttachmentPayload(uploadedAttachments)
+
+      if(!skipLocalUserAppend){
+        appendLocalUserMessage(text, uploadedAttachments)
+      }
+
+      safeAutoTitle(chatId, text)
+
+      if(!forcedText && !forcedAttachments){
+        clearPendingInputAndAttachments()
+      }else{
+        inputController?.clearInput?.()
+        state.pendingAttachments = []
+        attachmentsController?.renderPendingAttachments?.()
+        updateComposerState()
+      }
+
+      let reply = null
+
+      if(streamService && typeof streamService.send === "function"){
+        reply = await streamService.send({
+          chatId,
+          message: text,
+          files: attachmentPayload,
+          attachments: attachmentPayload,
+          scrollEl: el.messagesScroll,
+        })
+
+        persistCurrentChatMessages()
+      }else{
+        reply = await postChat({
+          chat_id: chatId,
+          message: text,
+          attachments: attachmentPayload,
+        })
+
+        handleNonStreamingReply(reply, chatId)
+      }
+
+      safeAutoTitle(getActiveChatId() || chatId, text)
+
+      if(typeof onAfterSend === "function"){
+        onAfterSend(reply)
+      }
+
+      return reply
+    }catch(error){
+      aborted = isAbortLikeError(error)
+
+      if(!aborted){
+        console.error("NovaComposer send error:", error)
+        appendAssistantMessage("Send failed.")
+      }
+
+      if(typeof onSendError === "function"){
+        onSendError(error)
+      }
+    }finally{
+      markStreaming(false)
+      inputController?.autoResizeInput?.()
+      updateComposerState()
+    }
+  }
+
+  function stopGenerating(){
+    if(streamService?.stop){
+      streamService.stop()
+    }
+
+    markStreaming(false)
+
+    if(typeof callbacks.onStop === "function"){
+      callbacks.onStop()
+    }
+  }
+
+  function bindEvents(){
+    el.sendBtn?.addEventListener("click", async () => {
+      await sendCurrentMessage()
+    })
+
+    el.stopBtn?.addEventListener("click", () => {
+      stopGenerating()
+    })
+
+    updateComposerState()
+  }
+
+  return {
+    bindEvents,
+    updateComposerState,
+    markStreaming,
+    sendCurrentMessage,
+    stopGenerating,
+    appendLocalUserMessage,
+    appendAssistantMessage,
+  }
+}
+
+window.NovaComposerActions = {
+  create: createComposerActions,
+  createComposerActions,
+}
+
+})()

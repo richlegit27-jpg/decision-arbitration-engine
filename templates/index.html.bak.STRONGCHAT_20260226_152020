@@ -1,0 +1,621 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Nova SERVE_TEST_150606</title>
+<!-- SERVE_TEST_20260226_150606 -->
+
+  <!-- NOVA_UI_POLISH_ENDGAME_V2 2026-02-26 -->
+
+  <style>
+    :root{
+      --bg: #0b1020;
+      --panel: rgba(255,255,255,.06);
+      --panel2: rgba(255,255,255,.08);
+      --stroke: rgba(255,255,255,.12);
+      --text: rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.65);
+      --muted2: rgba(255,255,255,.45);
+      --brand: #7c5cff;
+      --brand2:#34d399;
+      --danger:#ff4d4f;
+      --warn:#fbbf24;
+      --ok:#22c55e;
+      --shadow: 0 20px 55px rgba(0,0,0,.45);
+      --radius2: 22px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg:#f7f7fb;
+        --panel: rgba(0,0,0,.05);
+        --panel2: rgba(0,0,0,.07);
+        --stroke: rgba(0,0,0,.10);
+        --text: rgba(0,0,0,.88);
+        --muted: rgba(0,0,0,.62);
+        --muted2: rgba(0,0,0,.45);
+        --shadow: 0 18px 45px rgba(0,0,0,.12);
+      }
+    }
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      background: radial-gradient(1200px 800px at 25% 20%, rgba(124,92,255,.22), transparent 55%),
+                  radial-gradient(900px 700px at 75% 30%, rgba(52,211,153,.16), transparent 60%),
+                  var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+    }
+    .wrap{
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 18px 14px 22px;
+      display:flex;
+      flex-direction:column;
+      gap: 14px;
+      min-height:100%;
+    }
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding: 14px 14px;
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius2);
+      background: linear-gradient(180deg, var(--panel2), var(--panel));
+      box-shadow: var(--shadow);
+    }
+    .brand{
+      display:flex; align-items:center; gap:10px;
+      font-weight: 800;
+      letter-spacing:.2px;
+    }
+    .dot{
+      width:10px; height:10px; border-radius:999px;
+      background: var(--brand2);
+      box-shadow: 0 0 0 6px rgba(52,211,153,.12);
+    }
+    .pills{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+    .pill{
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--muted);
+      display:flex; align-items:center; gap:8px;
+    }
+    .pill strong{ color: var(--text); font-weight:700; }
+    .grid{
+      display:grid;
+      grid-template-columns: 1.35fr .65fr;
+      gap: 14px;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    @media (max-width: 980px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+    .card{
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius2);
+      background: linear-gradient(180deg, var(--panel2), var(--panel));
+      box-shadow: var(--shadow);
+      min-height: 0;
+      overflow:hidden;
+    }
+    .cardHd{
+      padding: 12px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      border-bottom: 1px solid var(--stroke);
+    }
+    .cardHd .title{
+      font-weight: 800;
+      letter-spacing:.2px;
+    }
+    .cardBd{ padding: 12px 14px; min-height:0; }
+
+    /* Chat */
+    .chat{
+      display:flex;
+      flex-direction:column;
+      height: 100%;
+      min-height: 0;
+    }
+    .log{
+      flex:1 1 auto;
+      min-height: 0;
+      overflow:auto;
+      padding: 12px 14px;
+      display:flex;
+      flex-direction:column;
+      gap: 10px;
+    }
+    .msg{
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      border-radius: 16px;
+      padding: 10px 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.25rem;
+    }
+    .msg.you{
+      border-color: rgba(124,92,255,.35);
+      background: rgba(124,92,255,.10);
+    }
+    .msg.nova{
+      border-color: rgba(52,211,153,.35);
+      background: rgba(52,211,153,.08);
+    }
+    .msg .meta{
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      font-family: var(--mono);
+    }
+    .composer{
+      border-top: 1px solid var(--stroke);
+      padding: 12px 14px;
+      display:flex;
+      gap: 10px;
+      align-items:flex-end;
+      background: rgba(0,0,0,.08);
+    }
+    textarea{
+      width: 100%;
+      resize: none;
+      min-height: 44px;
+      max-height: 180px;
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      color: var(--text);
+      padding: 10px 12px;
+      outline: none;
+      font-family: var(--sans);
+      line-height: 1.25rem;
+    }
+    textarea:focus{ border-color: rgba(124,92,255,.55); }
+    .btn{
+      border: 1px solid var(--stroke);
+      background: linear-gradient(180deg, rgba(124,92,255,.18), rgba(124,92,255,.10));
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 16px;
+      cursor:pointer;
+      font-weight: 800;
+      user-select:none;
+      min-width: 98px;
+    }
+    .btn:active{ transform: translateY(1px); }
+    .btn[disabled]{ opacity:.55; cursor:not-allowed; }
+
+    /* Sidebar settings */
+    .row{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding: 10px 0; border-bottom: 1px solid var(--stroke); }
+    .row:last-child{ border-bottom:0; }
+    .row .label{ font-weight: 700; }
+    .row small{ display:block; color: var(--muted); margin-top:4px; }
+    .toggle{
+      display:flex; align-items:center; gap:10px;
+      font-family: var(--mono);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    input[type="checkbox"]{ width: 18px; height: 18px; accent-color: var(--brand); cursor:pointer; }
+    input[type="text"]{
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      color: var(--text);
+      padding: 10px 12px;
+      outline:none;
+      font-family: var(--mono);
+    }
+    .hint{
+      color: var(--muted);
+      font-size: 12px;
+      font-family: var(--mono);
+      padding-top: 10px;
+    }
+    .statusLine{
+      font-family: var(--mono);
+      color: var(--muted);
+      font-size: 12px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .statusBadge{
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+    }
+    .led{
+      width:8px; height:8px; border-radius:999px; background: var(--warn);
+      box-shadow: 0 0 0 6px rgba(251,191,36,.12);
+    }
+    .led.ok{ background: var(--ok); box-shadow: 0 0 0 6px rgba(34,197,94,.12); }
+    .copyBtn{
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      color: var(--muted);
+      border-radius: 12px;
+      padding: 6px 10px;
+      cursor:pointer;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    .copyBtn:hover{ color: var(--text); }
+  </style>
+</head>
+<body>
+<!-- NOVA_UI_STAMP 20260226_151302 -->
+<div style="position:fixed;bottom:8px;right:8px;z-index:99999;font:12px monospace;background:#111;color:#0f0;padding:6px 8px;border-radius:8px;opacity:.8">UI STAMP: 20260226_151302</div>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <span class="dot"></span>
+        <div>
+          <div style="font-size:16px;">Nova</div>
+          <div class="statusLine">
+            <span class="statusBadge" title="UI build stamp">
+              <span id="buildStamp" style="font-family:var(--mono);color:var(--text);">NOVA_UI_POLISH_ENDGAME_V2_2026-02-26</span>
+            </span>
+            <span class="statusBadge" title="Backend /api/health">
+              <span class="led" id="healthLed"></span>
+              <span id="healthText">checking…</span>
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="pills">
+        <div class="pill"><strong>status</strong><span id="statusText">…</span></div>
+        <div class="pill"><strong>mode</strong><span id="modeText">ask</span></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card chat">
+        <div class="cardHd">
+          <div class="title">Chat</div>
+          <button class="copyBtn" id="copyLastBtn" title="Copy last reply">Copy last</button>
+        </div>
+        <div class="log" id="log"></div>
+        <div class="composer" id="composer">
+          <textarea id="input" placeholder="Type here…"></textarea>
+          <button class="btn" id="sendBtn">Send</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="cardHd"><div class="title">Settings</div></div>
+        <div class="cardBd">
+          <div class="row">
+            <div>
+              <div class="label">Session Id</div>
+              <small>Use a stable session id to keep context.</small>
+            </div>
+          </div>
+          <input id="sessionId" type="text" value="default" />
+
+          <div class="row">
+            <div>
+              <div class="label">Auto-send on Enter</div>
+              <small>Enter sends, Shift+Enter makes a newline.</small>
+            </div>
+            <div class="toggle">
+              <input id="autoSend" type="checkbox" checked />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <div class="label">Auto-scroll</div>
+              <small>Keeps the newest message in view.</small>
+            </div>
+            <div class="toggle">
+              <input id="autoScroll" type="checkbox" checked />
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <div class="label">Show “circly mouse”</div>
+              <small>Fun cursor dot overlay.</small>
+            </div>
+            <div class="toggle">
+              <input id="circly" type="checkbox" checked />
+            </div>
+          </div>
+
+          <div class="hint">
+            Tips: Stop cancels fetch. Scroll disables autoscroll.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function(){
+        const $ = (id)=>document.getElementById(id);
+
+        // Robust fallbacks (in case ids ever change)
+        function q(sel){ return document.querySelector(sel); }
+        function elInput(){ return $("input") || q("#input") || q("textarea") || q('input[type="text"]'); }
+        function elSend(){ return $("sendBtn") || q("#sendBtn") || q("button.btn") || q("button"); }
+        function elLog(){ return $("log") || q("#log") || q(".log") || document.body; }
+
+        const log = elLog();
+        const input = elInput();
+        const sendBtn = elSend();
+
+        const autoSend = $("autoSend");
+        const autoScroll = $("autoScroll");
+        const circly = $("circly");
+        const sessionId = $("sessionId");
+        const statusText = $("statusText");
+        const modeText = $("modeText");
+        const healthLed = $("healthLed");
+        const healthText = $("healthText");
+        const copyLastBtn = $("copyLastBtn");
+
+        let aborter = null;
+        let lastReply = "";
+
+        function nowTime(){
+          const d = new Date();
+          return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        }
+
+        function append(role, text){
+          const m = document.createElement("div");
+          m.className = "msg " + (role === "YOU" ? "you" : "nova");
+
+          const meta = document.createElement("div");
+          meta.className = "meta";
+          meta.innerHTML = `<span>${role}</span><span>${nowTime()}</span>`;
+
+          const body = document.createElement("div");
+          body.textContent = text;
+
+          m.appendChild(meta);
+          m.appendChild(body);
+          log.appendChild(m);
+
+          if(autoScroll && autoScroll.checked){
+            m.scrollIntoView({block:"end"});
+          }
+        }
+
+        async function uiHealth(){
+          try{
+            const r = await fetch("/api/health", { cache: "no-store" });
+            const j = await r.json();
+            healthText.textContent = j.ok ? "ok" : "down";
+            healthLed.classList.toggle("ok", !!j.ok);
+            statusText.textContent = j.ok ? "ready" : "down";
+          }catch(e){
+            healthText.textContent = "down";
+            healthLed.classList.remove("ok");
+            statusText.textContent = "down";
+          }
+        }
+
+        function getSession(){
+          const v = (sessionId && sessionId.value || "default").trim();
+          return v || "default";
+        }
+
+        function getKey(){
+          // Browser-side key storage (optional). If empty, server may still allow local use.
+          return (localStorage.getItem("NOVA_API_KEY") || "").trim();
+        }
+
+        async function send(){
+          if(!input) return;
+          const text = (input.value || "").trim();
+          if(!text) return;
+
+          append("YOU", text);
+          input.value = "";
+          input.focus();
+
+          if(aborter){ try{ aborter.abort(); }catch(e){} }
+          aborter = new AbortController();
+
+          sendBtn && (sendBtn.disabled = true);
+          statusText.textContent = "thinking…";
+
+          try{
+            const sid = encodeURIComponent(getSession());
+            const key = getKey();
+
+            const r = await fetch(`/api/chat?session_id=${sid}`, {
+              method:"POST",
+              headers: Object.assign(
+                { "Content-Type":"application/json" },
+                (key ? { "x-api-key": key } : {})
+              ),
+              body: JSON.stringify({ text: "[normal chat, reply briefly] " + text, message: "[normal chat, reply briefly] " + text, input: "[normal chat, reply briefly] " + text, mode: "chat" }),
+              signal: aborter.signal
+            });
+
+            const j = await r.json();
+            const reply = (j && (j.reply ?? "")) + "";
+            lastReply = reply;
+            append("NOVA", reply || JSON.stringify(j));
+            statusText.textContent = "ready";
+          } catch(e){
+            if(e && e.name === "AbortError"){
+              append("NOVA", "[cancelled]");
+            } else {
+              append("NOVA", "ERROR: " + (e && e.message ? e.message : String(e)));
+            }
+            statusText.textContent = "error";
+          } finally {
+            sendBtn && (sendBtn.disabled = false);
+          }
+        }
+
+        // Enter send / Shift+Enter newline
+        if(input){
+          input.addEventListener("keydown", (e)=>{
+            if(e.key === "Enter" && !e.shiftKey){
+              if(autoSend && !autoSend.checked) return;
+              e.preventDefault();
+              send();
+            }
+          });
+
+          // Auto-grow
+          const grow = ()=>{
+            input.style.height = "auto";
+            input.style.height = Math.min(input.scrollHeight, 180) + "px";
+          };
+          input.addEventListener("input", grow);
+          setTimeout(grow, 10);
+        }
+
+        if(sendBtn){
+          sendBtn.addEventListener("click", ()=>send());
+        }
+
+        // Copy last reply
+        if(copyLastBtn){
+          copyLastBtn.addEventListener("click", async ()=>{
+            try{
+              await navigator.clipboard.writeText(lastReply || "");
+              copyLastBtn.textContent = "Copied";
+              setTimeout(()=>copyLastBtn.textContent="Copy last", 850);
+            }catch(e){
+              append("NOVA", "Clipboard blocked by browser permissions.");
+            }
+          });
+        }
+
+        // Circly mouse (simple)
+        let dot = null;
+        function setCircly(on){
+          if(on){
+            if(dot) return;
+            dot = document.createElement("div");
+            dot.style.position="fixed";
+            dot.style.width="14px";
+            dot.style.height="14px";
+            dot.style.borderRadius="999px";
+            dot.style.pointerEvents="none";
+            dot.style.transform="translate(-50%,-50%)";
+            dot.style.border="1px solid rgba(255,255,255,.35)";
+            dot.style.boxShadow="0 0 0 6px rgba(124,92,255,.12)";
+            dot.style.zIndex="9999";
+            dot.style.display="none";
+            document.body.appendChild(dot);
+            document.addEventListener("mousemove", (ev)=>{
+              dot.style.display="block";
+              dot.style.left = ev.clientX + "px";
+              dot.style.top  = ev.clientY + "px";
+            }, {passive:true});
+            document.addEventListener("mouseleave", ()=>{ if(dot) dot.style.display="none"; }, {passive:true});
+          } else {
+            if(dot){ dot.remove(); dot=null; }
+          }
+        }
+        if(circly){
+          circly.addEventListener("change", ()=> setCircly(circly.checked));
+          setCircly(circly.checked);
+        }
+
+        // Warmup
+        modeText.textContent = "ask";
+        statusText.textContent = "booting…";
+        uiHealth();
+        setInterval(uiHealth, 6000);
+
+        // First focus
+        setTimeout(()=>{ try{ input && input.focus(); }catch(e){} }, 250);
+
+        // Stop cancels fetch
+        document.addEventListener("keydown", (e)=>{
+          if(e.key === "Escape"){
+            if(aborter){ try{ aborter.abort(); }catch(_){} }
+          }
+        });
+
+      })();
+    </script>
+  </div>
+<script>
+function NOVA_DEBUG_SEND(url, payloadObj){
+  try{
+    console.log("NOVA_SEND_URL:", url);
+    console.log("NOVA_SEND_PAYLOAD_OBJ:", payloadObj);
+    console.log("NOVA_SEND_PAYLOAD_JSON:", JSON.stringify(payloadObj));
+  }catch(e){}
+}
+</script>
+<script>
+// NOVA_FETCH_LOGGER_V1
+(function(){
+  try{
+    const _fetch = window.fetch.bind(window);
+    window.fetch = async function(input, init){
+      try{
+        const url = (typeof input === "string") ? input : (input && input.url) || "";
+        const isChat = (url || "").includes("/api/chat");
+        if(isChat){
+          try{
+            console.log("NOVA_FETCH_URL:", url);
+            console.log("NOVA_FETCH_INIT:", init || {});
+            if(init && typeof init.body === "string"){
+              console.log("NOVA_FETCH_BODY_STR:", init.body);
+              try{ console.log("NOVA_FETCH_BODY_JSON:", JSON.parse(init.body)); }catch(e){}
+            }
+          }catch(e){}
+        }
+
+        const resp = await _fetch(input, init);
+
+        if(isChat){
+          try{
+            console.log("NOVA_FETCH_STATUS:", resp.status);
+            const clone = resp.clone();
+            const txt = await clone.text();
+            console.log("NOVA_FETCH_RESP_TEXT:", txt);
+          }catch(e){
+            console.log("NOVA_FETCH_RESP_READ_ERR:", String(e));
+          }
+        }
+
+        return resp;
+      }catch(err){
+        try{ console.log("NOVA_FETCH_ERR:", String(err)); }catch(e){}
+        throw err;
+      }
+    };
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+

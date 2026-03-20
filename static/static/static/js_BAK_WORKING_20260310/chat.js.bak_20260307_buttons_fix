@@ -1,0 +1,536 @@
+﻿// C:\Users\Owner\nova\static\js\chat.js
+
+(() => {
+"use strict"
+
+const state = window.NovaState || {}
+
+const el = {
+  app: document.documentElement,
+  body: document.body,
+  sidebar: document.getElementById("sidebar"),
+  mobileOverlay: document.getElementById("mobileOverlay"),
+  btnSidebarToggle: document.getElementById("btnSidebarToggle"),
+  btnNewChat: document.getElementById("btnNewChat"),
+  chatList: document.getElementById("chatList"),
+  messages: document.getElementById("messages"),
+  input: document.getElementById("input") || document.getElementById("messageInput"),
+  sendBtn: document.getElementById("sendBtn"),
+  stopBtn: document.getElementById("stopBtn"),
+  attachBtn: document.getElementById("attachBtn"),
+  fileInput: document.getElementById("fileInput"),
+  composerForm: document.getElementById("composerForm"),
+  chatTitle: document.getElementById("chatTitle") || document.getElementById("topbarTitle")
+}
+
+const api = window.NovaAPI || null
+
+if(!state || !api){
+  console.error("Nova boot failed: missing state or api")
+  return
+}
+
+const renderService = window.NovaRenderService?.create?.({
+  state,
+  elements: {
+    messages: el.messages,
+    chatList: el.chatList,
+    chatTitle: el.chatTitle,
+  },
+})
+
+const chatService = window.NovaChatService?.create?.({
+  state,
+  api,
+  elements: {
+    chatList: el.chatList,
+  },
+})
+
+const attachmentsService = window.NovaAttachmentsService?.create?.({
+  state,
+  elements: {
+    attachBtn: el.attachBtn,
+    fileInput: el.fileInput,
+  },
+})
+
+const streamService = window.NovaStreamService?.create?.({
+  state,
+  api,
+
+  onStart(meta){
+    try{
+      renderService?.setStreaming?.(meta)
+    }catch(error){
+      console.error("renderService.setStreaming failed:", error)
+    }
+  },
+
+  onMeta(meta){
+    try{
+      renderService?.setStreaming?.(meta)
+    }catch(error){
+      console.error("renderService.setStreaming(meta) failed:", error)
+    }
+  },
+
+  onToken(token){
+    try{
+      renderService?.appendToken?.(token)
+    }catch(error){
+      console.error("renderService.appendToken failed:", error)
+    }
+  },
+
+  onDone(payload){
+    try{
+      renderService?.finishStreaming?.(payload)
+    }catch(error){
+      console.error("renderService.finishStreaming failed:", error)
+    }
+  },
+
+  onError(error){
+    try{
+      renderService?.renderError?.(error)
+    }catch(renderError){
+      console.error("renderService.renderError failed:", renderError)
+      console.error("Stream error:", error)
+    }
+  },
+
+  onFinally(){
+    try{
+      renderService?.scrollToBottom?.()
+    }catch(error){
+      console.error("renderService.scrollToBottom failed:", error)
+    }
+  },
+})
+
+const composerService = window.NovaComposerService?.create?.({
+  state,
+  elements: {
+    input: el.input,
+    sendBtn: el.sendBtn,
+    stopBtn: el.stopBtn,
+    attachBtn: el.attachBtn,
+    fileInput: el.fileInput,
+    composerForm: el.composerForm,
+  },
+  attachmentsService,
+  streamService,
+  renderService,
+  chatService,
+})
+
+function closeSidebar(){
+  el.sidebar?.classList.remove("open")
+  el.mobileOverlay?.classList.remove("show")
+}
+
+function toggleSidebar(){
+  el.sidebar?.classList.toggle("open")
+  el.mobileOverlay?.classList.toggle("show")
+}
+
+function setActiveChatTitle(title){
+  if(!el.chatTitle){
+    return
+  }
+
+  el.chatTitle.textContent = String(title || "Nova")
+}
+
+function safeMessageText(message){
+  if(!message || typeof message !== "object"){
+    return ""
+  }
+
+  return String(
+    message.text ??
+    message.content ??
+    message.message ??
+    ""
+  )
+}
+
+function getLastUserMessage(){
+  const messages = Array.isArray(state.messages) ? state.messages : []
+
+  for(let i = messages.length - 1; i >= 0; i -= 1){
+    const message = messages[i]
+    const role = String(message?.role || "").toLowerCase()
+
+    if(role === "user"){
+      return message
+    }
+  }
+
+  return null
+}
+
+async function refreshChatList(options = {}){
+  const preserveActive = options.preserveActive !== false
+
+  if(!chatService?.listChats){
+    return []
+  }
+
+  const chats = await chatService.listChats()
+
+  state.chats = Array.isArray(chats) ? chats : []
+
+  try{
+    renderService?.renderChatList?.(state.chats)
+  }catch(error){
+    console.error("renderChatList failed:", error)
+  }
+
+  if(preserveActive && state.activeChatId && Array.isArray(state.chats)){
+    const activeChat = state.chats.find((chat) => String(chat.chat_id) === String(state.activeChatId))
+    if(activeChat){
+      setActiveChatTitle(activeChat.title || "Nova")
+    }
+  }
+
+  return state.chats
+}
+
+async function loadChat(chatId, options = {}){
+  if(!chatId || !chatService?.getMessages){
+    return
+  }
+
+  const keepSidebarOpen = options.keepSidebarOpen === true
+
+  state.activeChatId = chatId
+
+  let messages = []
+  try{
+    messages = await chatService.getMessages(chatId)
+  }catch(error){
+    console.error("getMessages failed:", error)
+    throw error
+  }
+
+  state.messages = Array.isArray(messages) ? messages : []
+
+  try{
+    renderService?.renderMessages?.(state.messages)
+  }catch(error){
+    console.error("renderMessages failed:", error)
+  }
+
+  try{
+    renderService?.scrollToBottom?.()
+  }catch(error){
+    console.error("scrollToBottom failed:", error)
+  }
+
+  const activeChat = Array.isArray(state.chats)
+    ? state.chats.find((chat) => String(chat.chat_id) === String(chatId))
+    : null
+
+  setActiveChatTitle(activeChat?.title || "Nova")
+
+  if(!keepSidebarOpen){
+    closeSidebar()
+  }
+}
+
+async function createNewChat(){
+  if(!chatService?.createChat){
+    return
+  }
+
+  const created = await chatService.createChat()
+  const newChatId = created?.chat_id || created?.id || null
+
+  state.messages = []
+
+  try{
+    renderService?.clearMessages?.()
+  }catch(error){
+    console.error("clearMessages failed:", error)
+    try{
+      renderService?.renderMessages?.([])
+    }catch(renderError){
+      console.error("fallback renderMessages([]) failed:", renderError)
+    }
+  }
+
+  await refreshChatList()
+
+  if(newChatId){
+    state.activeChatId = newChatId
+    setActiveChatTitle(created?.title || "New chat")
+  }else{
+    setActiveChatTitle("New chat")
+  }
+
+  closeSidebar()
+}
+
+async function renameChatFromElement(chatItem){
+  const chatId = chatItem?.dataset?.chatId
+  if(!chatId || !chatService?.renameChat){
+    return
+  }
+
+  const currentTitleEl =
+    chatItem.querySelector(".chat-item-title") ||
+    chatItem.querySelector("[data-chat-title]")
+
+  const currentTitle = String(
+    currentTitleEl?.textContent ||
+    chatItem.dataset.title ||
+    "New chat"
+  ).trim()
+
+  const nextTitle = window.prompt("Rename chat", currentTitle)
+
+  if(nextTitle == null){
+    return
+  }
+
+  const trimmed = nextTitle.trim()
+
+  if(!trimmed || trimmed === currentTitle){
+    return
+  }
+
+  await chatService.renameChat(chatId, trimmed)
+  await refreshChatList()
+
+  if(String(state.activeChatId) === String(chatId)){
+    setActiveChatTitle(trimmed)
+  }
+}
+
+async function deleteChatFromElement(chatItem){
+  const chatId = chatItem?.dataset?.chatId
+  if(!chatId || !chatService?.deleteChat){
+    return
+  }
+
+  const ok = window.confirm("Delete this chat?")
+  if(!ok){
+    return
+  }
+
+  await chatService.deleteChat(chatId)
+
+  const wasActive = String(state.activeChatId) === String(chatId)
+
+  await refreshChatList({ preserveActive: false })
+
+  const chats = Array.isArray(state.chats) ? state.chats : []
+
+  if(!chats.length){
+    state.activeChatId = null
+    state.messages = []
+
+    try{
+      renderService?.clearMessages?.()
+    }catch(error){
+      console.error("clearMessages after delete failed:", error)
+      try{
+        renderService?.renderMessages?.([])
+      }catch(renderError){
+        console.error("renderMessages([]) after delete failed:", renderError)
+      }
+    }
+
+    setActiveChatTitle("Nova")
+    return
+  }
+
+  if(wasActive){
+    await loadChat(chats[0].chat_id)
+  }
+}
+
+async function init(){
+  try{
+    const chats = await refreshChatList({ preserveActive: false })
+
+    if(Array.isArray(chats) && chats.length > 0){
+      const firstChatId = chats[0].chat_id
+      await loadChat(firstChatId, { keepSidebarOpen: true })
+    }else{
+      state.activeChatId = null
+      state.messages = []
+      setActiveChatTitle("Nova")
+
+      try{
+        renderService?.clearMessages?.()
+      }catch(error){
+        console.error("clearMessages on init failed:", error)
+        try{
+          renderService?.renderMessages?.([])
+        }catch(renderError){
+          console.error("renderMessages([]) on init failed:", renderError)
+        }
+      }
+    }
+  }catch(error){
+    console.error("Init failed:", error)
+  }
+}
+
+el.btnSidebarToggle?.addEventListener("click", () => {
+  toggleSidebar()
+})
+
+el.mobileOverlay?.addEventListener("click", () => {
+  closeSidebar()
+})
+
+el.btnNewChat?.addEventListener("click", async () => {
+  try{
+    await createNewChat()
+  }catch(error){
+    console.error("Create chat failed:", error)
+  }
+})
+
+el.chatList?.addEventListener("click", async (event) => {
+  const actionBtn = event.target.closest("[data-chat-action]")
+
+  if(actionBtn){
+    const chatItem = actionBtn.closest("[data-chat-id]")
+    const action = String(actionBtn.dataset.chatAction || "").toLowerCase()
+
+    try{
+      if(action === "rename"){
+        await renameChatFromElement(chatItem)
+      }else if(action === "delete"){
+        await deleteChatFromElement(chatItem)
+      }
+    }catch(error){
+      console.error(`Chat action failed (${action}):`, error)
+    }
+
+    return
+  }
+
+  const item = event.target.closest("[data-chat-id]")
+
+  if(!item){
+    return
+  }
+
+  const chatId = item.dataset.chatId
+
+  if(!chatId){
+    return
+  }
+
+  if(String(chatId) === String(state.activeChatId)){
+    closeSidebar()
+    return
+  }
+
+  try{
+    await loadChat(chatId)
+  }catch(error){
+    console.error("Load chat failed:", error)
+  }
+})
+
+el.messages?.addEventListener("click", async (event) => {
+  const actionBtn = event.target.closest("[data-message-action]")
+
+  if(!actionBtn){
+    return
+  }
+
+  const action = String(actionBtn.dataset.messageAction || "").toLowerCase()
+  const messageEl = actionBtn.closest(".message")
+
+  if(!messageEl){
+    return
+  }
+
+  const role = String(messageEl.dataset.role || "").toLowerCase()
+  const textEl = messageEl.querySelector(".message-text")
+  const text = String(textEl?.innerText || textEl?.textContent || "").trim()
+
+  try{
+    if(action === "copy"){
+      if(!text){
+        return
+      }
+
+      await navigator.clipboard.writeText(text)
+
+      const originalText = actionBtn.textContent
+      actionBtn.textContent = "Copied"
+      actionBtn.disabled = true
+
+      window.setTimeout(() => {
+        actionBtn.textContent = originalText
+        actionBtn.disabled = false
+      }, 900)
+
+      return
+    }
+
+    if(action === "edit"){
+      if(role !== "user" || !el.input){
+        return
+      }
+
+      el.input.value = text
+      el.input.focus()
+
+      if(typeof el.input.setSelectionRange === "function"){
+        const end = el.input.value.length
+        el.input.setSelectionRange(end, end)
+      }
+
+      el.input.dispatchEvent?.(new Event("input", { bubbles: true }))
+      return
+    }
+
+    if(action === "regenerate"){
+      if(role !== "assistant"){
+        return
+      }
+
+      if(state.isStreaming){
+        return
+      }
+
+      const lastUser = getLastUserMessage()
+      const prompt = safeMessageText(lastUser).trim()
+
+      if(!prompt){
+        return
+      }
+
+      if(typeof composerService?.send === "function"){
+        await composerService.send({
+          chatId: state.activeChatId,
+          message: prompt,
+        })
+      }
+
+      return
+    }
+  }catch(error){
+    console.error("Message action failed:", error)
+  }
+})
+
+window.addEventListener("keydown", (event) => {
+  if(event.key === "Escape"){
+    closeSidebar()
+  }
+})
+
+init()
+
+})()

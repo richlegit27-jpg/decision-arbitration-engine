@@ -1,0 +1,281 @@
+// C:\Users\Owner\nova\static\js\stream-service.js
+
+(() => {
+"use strict"
+
+let activeController = null
+let activeMessageId = ""
+let streaming = false
+
+let callbacks = {
+  onStart: null,
+  onMeta: null,
+  onToken: null,
+  onDone: null,
+  onError: null,
+  onFinally: null,
+}
+
+function generateMessageId(prefix = "msg"){
+  if(window.crypto?.randomUUID){
+    return `${prefix}_${window.crypto.randomUUID()}`
+  }
+
+  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`
+}
+
+function setCallbacks(nextCallbacks = {}){
+  callbacks = {
+    ...callbacks,
+    ...nextCallbacks,
+  }
+}
+
+function isStreaming(){
+  return streaming
+}
+
+function stop(){
+  if(activeController){
+    try{
+      activeController.abort()
+    }catch(_error){
+      // ignore abort cleanup errors
+    }
+  }
+}
+
+function safeJsonParse(value){
+  try{
+    return JSON.parse(value)
+  }catch(_error){
+    return null
+  }
+}
+
+function emit(name, payload){
+  const handler = callbacks?.[name]
+  if(typeof handler !== "function"){
+    return
+  }
+
+  try{
+    handler(payload)
+  }catch(error){
+    console.error(`NovaStreamService ${name} callback error:`, error)
+  }
+}
+
+async function send(payload = {}){
+  if(streaming){
+    stop()
+  }
+
+  const controller = new AbortController()
+  activeController = controller
+  streaming = true
+
+  const chatId = String(payload.chatId || payload.chat_id || "").trim()
+  const message = String(payload.message || "").trim()
+  const attachments = Array.isArray(payload.attachments)
+    ? payload.attachments.slice()
+    : Array.isArray(payload.files)
+      ? payload.files.slice()
+      : []
+
+  const messageId = String(payload.messageId || payload.message_id || generateMessageId("msg")).trim()
+  activeMessageId = messageId
+
+  emit("onStart", {
+    messageId,
+    chatId,
+  })
+
+  try{
+    const response = await fetch("/api/chat_stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message,
+        attachments,
+      }),
+      signal: controller.signal,
+    })
+
+    if(!response.ok){
+      const errorText = await response.text().catch(() => "")
+      throw new Error(`/api/chat_stream failed (${response.status}) ${errorText}`.trim())
+    }
+
+    if(!response.body){
+      throw new Error("Streaming response body missing.")
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    let finalContent = ""
+    let resolvedAssistantMessageId = messageId
+    let donePayload = null
+
+    while(true){
+      const { done, value } = await reader.read()
+
+      if(done){
+        break
+      }
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split("\n")
+      buffer = lines.pop() || ""
+
+      for(const rawLine of lines){
+        const line = String(rawLine || "").trim()
+        if(!line){
+          continue
+        }
+
+        const data = safeJsonParse(line)
+        if(!data){
+          continue
+        }
+
+        const type = String(data.type || "").trim().toLowerCase()
+
+        if(type === "meta" || type === "start"){
+          resolvedAssistantMessageId = String(
+            data.message_id ||
+            data.assistant_message_id ||
+            resolvedAssistantMessageId ||
+            messageId
+          ).trim()
+
+          emit("onMeta", {
+            ...data,
+            messageId: resolvedAssistantMessageId,
+            assistant_message_id: resolvedAssistantMessageId,
+            chatId,
+          })
+
+          continue
+        }
+
+        if(type === "token"){
+          const token = String(data.token || "")
+          const tokenMessageId = String(
+            data.message_id ||
+            data.assistant_message_id ||
+            resolvedAssistantMessageId ||
+            messageId
+          ).trim()
+
+          if(tokenMessageId){
+            resolvedAssistantMessageId = tokenMessageId
+          }
+
+          finalContent += token
+
+          emit("onToken", token)
+          continue
+        }
+
+        if(type === "done"){
+          const doneMessageId = String(
+            data.message_id ||
+            data.assistant_message_id ||
+            resolvedAssistantMessageId ||
+            messageId
+          ).trim()
+
+          if(doneMessageId){
+            resolvedAssistantMessageId = doneMessageId
+          }
+
+          donePayload = {
+            ...data,
+            messageId: resolvedAssistantMessageId,
+            assistant_message_id: resolvedAssistantMessageId,
+            content: String(data.content || finalContent || ""),
+            chat_id: String(data.chat_id || chatId || "").trim(),
+          }
+
+          continue
+        }
+
+        if(type === "error"){
+          throw new Error(String(data.error || data.message || "Streaming request failed."))
+        }
+      }
+    }
+
+    const flushed = decoder.decode()
+    if(flushed){
+      buffer += flushed
+    }
+
+    if(buffer.trim()){
+      const data = safeJsonParse(buffer.trim())
+      const type = String(data?.type || "").trim().toLowerCase()
+
+      if(type === "done"){
+        const doneMessageId = String(
+          data?.message_id ||
+          data?.assistant_message_id ||
+          resolvedAssistantMessageId ||
+          messageId
+        ).trim()
+
+        if(doneMessageId){
+          resolvedAssistantMessageId = doneMessageId
+        }
+
+        donePayload = {
+          ...data,
+          messageId: resolvedAssistantMessageId,
+          assistant_message_id: resolvedAssistantMessageId,
+          content: String(data?.content || finalContent || ""),
+          chat_id: String(data?.chat_id || chatId || "").trim(),
+        }
+      }
+    }
+
+    const finalPayload = donePayload || {
+      messageId: resolvedAssistantMessageId || messageId,
+      assistant_message_id: resolvedAssistantMessageId || messageId,
+      content: finalContent,
+      chat_id: chatId,
+    }
+
+    emit("onDone", finalPayload)
+
+    return {
+      ok: true,
+      message_id: String(finalPayload.messageId || "").trim(),
+      assistant_message_id: String(finalPayload.assistant_message_id || "").trim(),
+      content: String(finalPayload.content || ""),
+      chat_id: String(finalPayload.chat_id || chatId || "").trim(),
+    }
+  }catch(error){
+    emit("onError", error)
+    throw error
+  }finally{
+    const finalMessageId = activeMessageId
+    streaming = false
+    activeController = null
+    activeMessageId = ""
+    emit("onFinally", {
+      messageId: finalMessageId,
+    })
+  }
+}
+
+window.NovaStreamService = {
+  setCallbacks,
+  send,
+  stop,
+  isStreaming,
+}
+})()

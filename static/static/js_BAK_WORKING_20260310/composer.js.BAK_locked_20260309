@@ -1,0 +1,496 @@
+// C:\Users\Owner\nova\static\js\composer.js
+
+(() => {
+"use strict"
+
+const chatStateApi = window.NovaChatState
+const chatMessages = window.NovaChatMessages
+const chatSidebar = window.NovaChatSidebar
+const api = window.NovaAPI || {}
+const attachmentsService = window.NovaAttachmentsService || null
+const streamService = window.NovaStreamService || null
+
+if(!chatStateApi){
+  throw new Error("NovaComposer: window.NovaChatState is required")
+}
+
+const { state } = chatStateApi
+
+const el = {
+  input: document.getElementById("input"),
+  sendBtn: document.getElementById("sendBtn"),
+  stopBtn: document.getElementById("stopBtn"),
+  attachBtn: document.getElementById("attachBtn"),
+  pendingAttachments: document.getElementById("pendingAttachments"),
+  emptySuggestions: document.getElementById("emptySuggestions"),
+}
+
+let eventsBound = false
+
+let callbacks = {
+  onNeedsCreateChat: null,
+  onAfterSend: null,
+  onSendError: null,
+  onStop: null,
+}
+
+function generateId(prefix = "msg"){
+  if(window.crypto?.randomUUID){
+    return `${prefix}_${window.crypto.randomUUID()}`
+  }
+  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`
+}
+
+function escapeHtml(value){
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;")
+}
+
+function ensureMessages(){
+  if(!Array.isArray(state.messages)){
+    state.messages = []
+  }
+}
+
+function ensurePendingAttachments(){
+  if(!Array.isArray(state.pendingAttachments)){
+    state.pendingAttachments = []
+  }
+  return state.pendingAttachments
+}
+
+function normalizePendingFile(file){
+  if(!file){
+    return null
+  }
+
+  if(file instanceof File){
+    return {
+      id: generateId("pending"),
+      file,
+      attachment_id: "",
+      filename: file.name || "file",
+      name: file.name || "file",
+      mime_type: file.type || "application/octet-stream",
+      type: file.type || "application/octet-stream",
+      file_size: Number(file.size || 0),
+      size: Number(file.size || 0),
+      url: "",
+      storage_path: "",
+    }
+  }
+
+  return {
+    id: String(file.id || file.attachment_id || generateId("pending")),
+    file: file.file || null,
+    attachment_id: String(file.attachment_id || ""),
+    filename: file.filename || file.name || "file",
+    name: file.name || file.filename || "file",
+    mime_type: file.mime_type || file.type || "application/octet-stream",
+    type: file.type || file.mime_type || "application/octet-stream",
+    file_size: Number(file.file_size || file.size || 0),
+    size: Number(file.size || file.file_size || 0),
+    url: file.url || "",
+    storage_path: file.storage_path || "",
+  }
+}
+
+function autoResizeInput(){
+  if(!el.input){
+    return
+  }
+  el.input.style.height = "auto"
+  el.input.style.height = Math.min(el.input.scrollHeight, 220) + "px"
+}
+
+function focusInput(){
+  el.input?.focus()
+}
+
+function setInputValue(text){
+  if(!el.input){
+    return
+  }
+  el.input.value = String(text || "")
+  autoResizeInput()
+  updateComposerState()
+}
+
+function markStreaming(flag){
+  state.isStreaming = !!flag
+  updateComposerState()
+}
+
+function renderPendingAttachments(){
+  if(!el.pendingAttachments){
+    return
+  }
+
+  const files = ensurePendingAttachments()
+
+  if(!files.length){
+    el.pendingAttachments.innerHTML = ""
+    return
+  }
+
+  el.pendingAttachments.innerHTML = files.map((file, index) => {
+    const name = escapeHtml(file.filename || file.name || "file")
+    return `
+      <div class="pending-attachment-chip">
+        <span class="pending-attachment-name">${name}</span>
+        <button
+          type="button"
+          class="pending-attachment-remove"
+          data-remove-pending-index="${index}"
+          aria-label="Remove attachment"
+        >
+          ×
+        </button>
+      </div>
+    `
+  }).join("")
+}
+
+function updateComposerState(){
+  const text = String(el.input?.value || "").trim()
+  const hasText = !!text
+  const hasPending = ensurePendingAttachments().length > 0
+  const streaming = !!state.isStreaming
+
+  if(el.sendBtn){
+    el.sendBtn.disabled = streaming || (!hasText && !hasPending)
+    el.sendBtn.hidden = streaming
+  }
+
+  if(el.stopBtn){
+    el.stopBtn.hidden = !streaming
+  }
+
+  if(el.attachBtn){
+    el.attachBtn.disabled = streaming
+  }
+
+  renderPendingAttachments()
+}
+
+function setPendingFiles(files){
+  state.pendingAttachments = Array.isArray(files)
+    ? files.map(normalizePendingFile).filter(Boolean)
+    : []
+
+  renderPendingAttachments()
+  updateComposerState()
+}
+
+function removePendingFileAt(index){
+  const files = ensurePendingAttachments().slice()
+  files.splice(index, 1)
+  state.pendingAttachments = files
+  renderPendingAttachments()
+  updateComposerState()
+}
+
+async function pickAttachments(){
+  if(attachmentsService && typeof attachmentsService.openPicker === "function"){
+    const picked = await attachmentsService.openPicker()
+    if(Array.isArray(picked) && picked.length){
+      setPendingFiles([...ensurePendingAttachments(), ...picked])
+    }
+    return
+  }
+
+  if(attachmentsService && typeof attachmentsService.pickFiles === "function"){
+    const picked = await attachmentsService.pickFiles()
+    if(Array.isArray(picked) && picked.length){
+      setPendingFiles([...ensurePendingAttachments(), ...picked])
+    }
+    return
+  }
+
+  const input = document.createElement("input")
+  input.type = "file"
+  input.multiple = true
+  input.addEventListener("change", () => {
+    const files = Array.from(input.files || [])
+    if(files.length){
+      setPendingFiles([...ensurePendingAttachments(), ...files])
+    }
+  })
+  input.click()
+}
+
+async function uploadPendingAttachments(){
+  const pending = ensurePendingAttachments()
+  if(!pending.length){
+    return []
+  }
+
+  const filesOnly = pending.map(item => item.file).filter(Boolean)
+
+  if(filesOnly.length && attachmentsService && typeof attachmentsService.uploadFiles === "function"){
+    const uploaded = await attachmentsService.uploadFiles(filesOnly)
+    return Array.isArray(uploaded) ? uploaded.map(normalizePendingFile).filter(Boolean) : []
+  }
+
+  if(attachmentsService && typeof attachmentsService.uploadPendingFiles === "function"){
+    const uploaded = await attachmentsService.uploadPendingFiles(pending)
+    return Array.isArray(uploaded) ? uploaded.map(normalizePendingFile).filter(Boolean) : []
+  }
+
+  return pending
+}
+
+function appendLocalUserMessage(text, attachments = []){
+  ensureMessages()
+
+  const id = generateId("msg")
+  const msg = {
+    message_id: id,
+    id,
+    role: "user",
+    content: text,
+    attachments,
+    created_at: new Date().toISOString(),
+  }
+
+  state.messages.push(msg)
+  chatMessages?.syncMessagesFromStorage?.(state.messages)
+  return msg
+}
+
+function appendAssistantMessage(text){
+  ensureMessages()
+
+  const id = generateId("msg")
+  const msg = {
+    message_id: id,
+    id,
+    role: "assistant",
+    content: text,
+    attachments: [],
+    created_at: new Date().toISOString(),
+  }
+
+  state.messages.push(msg)
+  chatMessages?.syncMessagesFromStorage?.(state.messages)
+  return msg
+}
+
+async function postChat(payload){
+  if(api.fetchJson){
+    return await api.fetchJson("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+  }
+
+  const response = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+
+  if(!response.ok){
+    const text = await response.text().catch(() => "")
+    throw new Error(`/api/chat failed (${response.status}) ${text}`)
+  }
+
+  return await response.json()
+}
+
+async function sendCurrentMessage(options = {}){
+  if(state.isStreaming){
+    return
+  }
+
+  const text = String(el.input?.value || "").trim()
+  const pending = ensurePendingAttachments()
+
+  if(!text && !pending.length){
+    updateComposerState()
+    return
+  }
+
+  const onNeedsCreateChat = options.onNeedsCreateChat || callbacks.onNeedsCreateChat
+  const onAfterSend = options.onAfterSend || callbacks.onAfterSend
+  const onSendError = options.onSendError || callbacks.onSendError
+
+  try{
+    markStreaming(true)
+
+    let chatId = String(state.activeChatId || "").trim()
+
+    if(!chatId && typeof onNeedsCreateChat === "function"){
+      const created = await onNeedsCreateChat()
+      chatId = String(created?.chat_id || created?.id || state.activeChatId || "").trim()
+      state.activeChatId = chatId
+    }
+
+    if(!chatId && chatSidebar?.createNewChat){
+      const created = await chatSidebar.createNewChat({})
+      chatId = String(created?.chat_id || created?.id || state.activeChatId || "").trim()
+      state.activeChatId = chatId
+    }
+
+    const uploadedAttachments = await uploadPendingAttachments()
+
+    appendLocalUserMessage(text, uploadedAttachments)
+
+    if(el.input){
+      el.input.value = ""
+      autoResizeInput()
+    }
+
+    state.pendingAttachments = []
+    renderPendingAttachments()
+    updateComposerState()
+
+    const reply = await postChat({
+      chat_id: chatId,
+      message: text,
+      attachments: uploadedAttachments.map(item => ({
+        attachment_id: item.attachment_id || item.id || "",
+        id: item.id || item.attachment_id || "",
+        filename: item.filename || item.name || "file",
+        mime_type: item.mime_type || item.type || "application/octet-stream",
+        file_size: Number(item.file_size || item.size || 0),
+        storage_path: item.storage_path || item.url || "",
+        url: item.url || "",
+      })),
+    })
+
+    if(reply?.chat_id){
+      state.activeChatId = String(reply.chat_id)
+    }else if(reply?.chat?.chat_id || reply?.chat?.id){
+      state.activeChatId = String(reply.chat.chat_id || reply.chat.id)
+    }
+
+    if(Array.isArray(reply?.messages) && reply.messages.length){
+      state.messages = reply.messages.slice()
+      chatMessages?.syncMessagesFromStorage?.(state.messages)
+    }else if(reply?.response){
+      appendAssistantMessage(String(reply.response || ""))
+    }
+
+    if(typeof onAfterSend === "function"){
+      onAfterSend(reply)
+    }
+
+    return reply
+  }catch(error){
+    console.error("NovaComposer send error:", error)
+    appendAssistantMessage("Send failed.")
+
+    if(typeof onSendError === "function"){
+      onSendError(error)
+    }
+  }finally{
+    markStreaming(false)
+    autoResizeInput()
+    updateComposerState()
+  }
+}
+
+function stopGenerating(){
+  if(streamService?.stop){
+    streamService.stop()
+  }
+
+  markStreaming(false)
+
+  if(typeof callbacks.onStop === "function"){
+    callbacks.onStop()
+  }
+}
+
+async function handleKeyDown(event){
+  if(event.key !== "Enter"){
+    return
+  }
+
+  if(event.shiftKey){
+    return
+  }
+
+  event.preventDefault()
+  await sendCurrentMessage()
+}
+
+function handleSuggestionClick(event){
+  const btn = event.target.closest(".empty-suggestion")
+  if(!btn){
+    return
+  }
+
+  setInputValue(btn.textContent || "")
+  focusInput()
+}
+
+function handlePendingAttachmentClick(event){
+  const removeBtn = event.target.closest("[data-remove-pending-index]")
+  if(!removeBtn){
+    return
+  }
+
+  const index = Number(removeBtn.getAttribute("data-remove-pending-index"))
+  if(Number.isFinite(index)){
+    removePendingFileAt(index)
+  }
+}
+
+function bindEvents(options = {}){
+  callbacks = { ...callbacks, ...options }
+
+  if(eventsBound){
+    return
+  }
+
+  el.input?.addEventListener("input", () => {
+    autoResizeInput()
+    updateComposerState()
+  })
+
+  el.input?.addEventListener("keydown", handleKeyDown)
+
+  el.sendBtn?.addEventListener("click", async () => {
+    await sendCurrentMessage()
+  })
+
+  el.stopBtn?.addEventListener("click", () => {
+    stopGenerating()
+  })
+
+  el.attachBtn?.addEventListener("click", async () => {
+    try{
+      await pickAttachments()
+    }catch(error){
+      console.error("NovaComposer attachment picker error:", error)
+    }
+  })
+
+  el.pendingAttachments?.addEventListener("click", handlePendingAttachmentClick)
+  el.emptySuggestions?.addEventListener("click", handleSuggestionClick)
+
+  eventsBound = true
+  autoResizeInput()
+  updateComposerState()
+  renderPendingAttachments()
+}
+
+window.NovaComposer = {
+  bindEvents,
+  sendCurrentMessage,
+  stopGenerating,
+  autoResizeInput,
+  updateComposerState,
+  focusInput,
+  setInputValue,
+  markStreaming,
+  setPendingFiles,
+}
+})()

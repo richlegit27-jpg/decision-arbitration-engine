@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nova Ultimate 2026 Quick Start Guide</title>
+  <style>
+    body { font-family:"Segoe UI",sans-serif; background:#0b1020; color:#ecf2ff; padding:20px; }
+    h1, h2 { color:#79a8ff; }
+    code { background:#141c33; padding:2px 4px; border-radius:4px; }
+    .section { margin-bottom:20px; }
+    img { max-width:100%; border-radius:8px; margin:8px 0; }
+  </style>
+</head>
+<body>
+  <h1>Nova Ultimate 2026 Quick Start</h1>
+
+  <div class="section">
+    <h2>1. Launch</h2>
+    <p>Open PowerShell in the Nova folder and run:</p>
+    <pre><code>.\launch_nova_portable.ps1</code></pre>
+    <p>Backend and frontend start automatically, browser opens to the chat interface.</p>
+  </div>
+
+  <div class="section">
+    <h2>2. Sidebar & Panels</h2>
+    <p>Use the sidebar toggle ☰ to collapse or expand. Each panel can be opened/closed:</p>
+    <ul>
+      <li>Memory: Shows chat history</li>
+      <li>Attachments: Upload / download / delete files</li>
+      <li>Exports: Download memory as JSON</li>
+      <li>Voice: Record audio / play TTS AI</li>
+      <li>Images: Preview uploaded images</li>
+      <li>New Chat: Create or switch sessions</li>
+    </ul>
+    <img src="https://via.placeholder.com/400x200.png?text=Sidebar+Demo" alt="Sidebar Demo">
+  </div>
+
+  <div class="section">
+    <h2>3. Chat Composer</h2>
+    <p>Type a message and click <strong>Send</strong>. AI replies stream with typing indicator.</p>
+    <ul>
+      <li>Stop: Cancel streaming</li>
+      <li>Theme: Toggle dark/light</li>
+      <li>Clear Memory: Clears current session memory</li>
+      <li>File input: Upload files or images</li>
+    </ul>
+    <img src="https://via.placeholder.com/400x200.png?text=Chat+Composer" alt="Chat Composer">
+  </div>
+
+  <div class="section">
+    <h2>4. Voice & TTS</h2>
+    <p>Voice panel allows:</p>
+    <ul>
+      <li>Start Recording / Stop Recording → auto-added to attachments</li>
+      <li>Play AI TTS → plays latest AI message</li>
+    </ul>
+    <img src="https://via.placeholder.com/400x200.png?text=Voice+Panel" alt="Voice Panel">
+  </div>
+
+  <div class="section">
+    <h2>5. Multi-Session Chat</h2>
+    <p>Create or switch between sessions in the New Chat panel. Each session keeps its own memory, attachments, and images.</p>
+    <img src="https://via.placeholder.com/400x200.png?text=New+Chat+Sessions" alt="New Chat Panel">
+  </div>
+
+  <div class="section">
+    <h2>6. Demo Mode</h2>
+    <p>Demo mode automatically opens all panels and populates sample messages and files.</p>
+  </div>
+
+  <div class="section">
+    <h2>7. Stopping Nova</h2>
+    <p>Use the printed backend PID to stop the server:</p>
+    <pre><code>Stop-Process -Id &lt;PID&gt; -Force</code></pre>
+  </div>
+</body>
+</html>

@@ -1,0 +1,118 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nova</title>
+
+  <link rel="stylesheet" href="{{ url_for('static', path='css/base.css') }}?v=20260310a">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/layout.css') }}?v=20260310a">
+</head>
+
+<body>
+
+<div id="appShell" class="app-shell">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="sidebar">
+
+    <div class="sidebar-header">
+      <div class="sidebar-title">Nova</div>
+      <button id="btnCloseSidebar" class="sidebar-close" type="button">✕</button>
+    </div>
+
+    <div class="sidebar-actions">
+      <button id="btnNewChat" class="sidebar-btn" type="button">
+        + New Chat
+      </button>
+    </div>
+
+    <div id="chatList" class="chat-list">
+      <div class="chat-list-empty">No chats yet</div>
+    </div>
+
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+
+      <button id="btnSidebarToggle" class="topbar-btn" type="button">
+        ☰
+      </button>
+
+      <div id="topbarTitle" class="topbar-title">
+        New chat
+      </div>
+
+    </header>
+
+    <!-- CHAT AREA -->
+    <section id="messagesScroll" class="messages-scroll">
+
+      <div id="messages" class="messages"></div>
+
+      <button id="jumpToLatestBtn" class="jump-to-latest" type="button">
+        Jump to latest
+      </button>
+
+    </section>
+
+    <!-- ATTACHMENTS PREVIEW -->
+    <div id="pendingAttachments" class="pending-attachments"></div>
+
+    <!-- COMPOSER -->
+    <footer class="composer">
+
+      <div class="composer-inner">
+
+        <button id="btnAttach" class="composer-btn" type="button">
+          📎
+        </button>
+
+        <textarea
+          id="chatInput"
+          class="composer-input"
+          placeholder="Message Nova..."
+          rows="1"
+        ></textarea>
+
+        <button id="btnSend" class="composer-btn send" type="button">
+          ➤
+        </button>
+
+        <button id="btnStop" class="composer-btn stop" type="button">
+          ■
+        </button>
+
+      </div>
+
+      <input
+        id="fileInput"
+        type="file"
+        multiple
+        hidden
+      >
+
+    </footer>
+
+  </main>
+
+</div>
+
+<div id="mobileOverlay" class="mobile-overlay"></div>
+
+<!-- JS -->
+
+<script src="{{ url_for('static', path='js/api.js') }}?v=20260310a"></script>
+<script src="{{ url_for('static', path='js/attachments-service.js') }}?v=20260310a"></script>
+<script src="{{ url_for('static', path='js/stream-service.js') }}?v=20260310a"></script>
+<script src="{{ url_for('static', path='js/chat-storage.js') }}?v=20260310a"></script>
+<script src="{{ url_for('static', path='js/chat-render.js') }}?v=20260310a"></script>
+<script src="{{ url_for('static', path='js/chat-actions.js') }}?v=20260310a"></script>
+<script src="{{ url_for('static', path='js/chat.js') }}?v=20260310b"></script>
+
+</body>
+</html>

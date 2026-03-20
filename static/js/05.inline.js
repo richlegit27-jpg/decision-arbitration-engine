@@ -1,0 +1,1195 @@
+﻿/* --- NOVA_CHAT_WIRE v1: /api/chat + /api/chat --- */
+function __novaUpstream(){
+  try{
+    const u = (localStorage.getItem("NOVA_UPSTREAM") || "").trim().toLowerCase();
+    return (u === "openai" || u === "ollama") ? u : "";
+  }catch(e){ return ""; }
+}
+function __novaModel(){
+  try{ return (localStorage.getItem("NOVA_MODEL") || "").trim(); }catch(e){ return ""; }
+}
+function __novaChatPayload(text){
+  const model = __novaModel();
+  const upstream = __novaUpstream();
+  const payload = {
+    messages: [{ role: "user", content: String(text ?? "") }]
+  };
+  if(upstream) payload.upstream = upstream;
+  if(model) payload.model = model;
+  return payload;
+}
+/* --- /NOVA_CHAT_WIRE v1 --- */
+/* NOVA_SAFE_ONCLICK_HELPER */
+(() => {
+  const safeOnClick = (id, fn) => {
+    try {
+      const el = (typeof $ === "function") ? $(id) : document.getElementById(id);
+      if (el) el.onclick = fn;
+    } catch {}
+  };
+
+  // Rebind the ones we know about from your log
+  safeOnClick("drawerClose", () => { try { closeDrawer(); } catch {} });
+
+  safeOnClick("drawerWrap", (e) => {
+    try {
+      const wrap = (typeof $ === "function") ? $("drawerWrap") : document.getElementById("drawerWrap");
+      if (e.target === wrap) closeDrawer();
+    } catch {}
+  });
+
+  safeOnClick("clearSearch", () => {
+    try {
+      (typeof $ === "function" ? $("search") : document.getElementById("search")).value = "";
+      const r = (typeof $ === "function" ? $("results") : document.getElementById("results"));
+      if (r) { r.style.display = "none"; r.innerHTML = ""; }
+    } catch {}
+  });
+
+  console.log("NOVA_SAFE_ONCLICK_HELPER active");
+})();
+/* NOVA_EARLY_AUTH_FETCH_V2 */
+(() => {
+  const cleanKey = (k) => {
+    k = (k || "").toString().trim();
+    if(!k) return "";
+    if(k === "undefined" || k === "null") return "";
+    return k;
+  };
+
+  const getKey = () => {
+    try { return cleanKey(localStorage.getItem("NOVA_API_KEY")); } catch {}
+    try { return cleanKey(window.state && window.state.apiKey); } catch {}
+    return "";
+  };
+
+  const origFetch = window.fetch && window.fetch.bind(window);
+  if(!origFetch) return;
+
+  window.fetch = async (input, init) => {
+    const url = (typeof input === "string") ? input : (input && input.url) ? input.url : "";
+    if(url.includes("/api/") || url.startsWith("/api/")){
+      const k = getKey();
+      init = init || {};
+      const h = (init.headers instanceof Headers) ? init.headers : new Headers(init.headers || {});
+      if(k){
+        if(!h.get("Authorization")) h.set("Authorization", "Bearer " + k);
+        if(!h.get("x-api-key"))     h.set("x-api-key", k);
+      }
+      init.headers = h;
+    }
+    return origFetch(input, init);
+  };
+
+  console.log("NOVA_EARLY_AUTH_FETCH_V2 active");
+})();
+/* NOVA_EARLY_AUTH_FETCH_V2 */
+(() => {
+  const cleanKey = (k) => {
+    k = (k || "").toString().trim();
+    if(!k) return "";
+    if(k === "undefined" || k === "null") return "";
+    return k;
+  };
+
+  const getKey = () => {
+    try { return cleanKey(localStorage.getItem("NOVA_API_KEY")); } catch {}
+    try { return cleanKey(window.state && window.state.apiKey); } catch {}
+    return "";
+  };
+
+  const origFetch = window.fetch && window.fetch.bind(window);
+  if(!origFetch) return;
+
+  window.fetch = async (input, init) => {
+    const url = (typeof input === "string") ? input : (input && input.url) ? input.url : "";
+    if(url.includes("/api/") || url.startsWith("/api/")){
+      const k = getKey();
+      init = init || {};
+      const h = (init.headers instanceof Headers) ? init.headers : new Headers(init.headers || {});
+      if(k){
+        if(!h.get("Authorization")) h.set("Authorization", "Bearer " + k);
+        if(!h.get("x-api-key"))     h.set("x-api-key", k);
+      }
+      init.headers = h;
+    }
+    return origFetch(input, init);
+  };
+
+  console.log("NOVA_EARLY_AUTH_FETCH_V2 active");
+})();
+/* NOVA_EARLY_AUTH_FETCH */
+(() => {
+  const getKey = () => {
+    try {
+      const a = (localStorage.getItem("NOVA_API_KEY") || "").trim();
+      if(a) return a;
+    } catch {}
+    try {
+      const b = (window.state && window.state.apiKey) ? String(window.state.apiKey).trim() : "";
+      if(b) return b;
+    } catch {}
+    return "";
+  };
+
+  const origFetch = window.fetch && window.fetch.bind(window);
+  if(!origFetch) return;
+
+  window.fetch = async (input, init) => {
+    const url = (typeof input === "string") ? input : (input && input.url) ? input.url : "";
+    if(url.includes("/api/") || url.startsWith("/api/")){
+      const k = getKey();
+      init = init || {};
+      const h = (init.headers instanceof Headers) ? init.headers : new Headers(init.headers || {});
+      if(k){
+        if(!h.get("Authorization")) h.set("Authorization", "Bearer " + k);
+        if(!h.get("x-api-key"))     h.set("x-api-key", k);
+      }
+      init.headers = h;
+    }
+    return origFetch(input, init);
+  };
+
+  console.log("NOVA_EARLY_AUTH_FETCH active");
+})();
+/* SELFHEAL_UNDEFINED_NOVA_API_KEY */
+(() => {
+  try {
+    const v = localStorage.getItem("NOVA_API_KEY");
+    if (v === "undefined") {
+      (() => { const v = localStorage.getItem("NOVA_API_KEY"); if(v==="undefined" || v==="null" || v===""){ console.log("CLEAN bad NOVA_API_KEY:", v); localStorage.removeItem("NOVA_API_KEY"); } else { console.log("SKIP remove NOVA_API_KEY, len=", (v||"").length); } })();
+      console.log("SELFHEAL: removed NOVA_API_KEY='undefined'");
+    }
+  } catch(e){}
+})();
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  const state = {
+    apiKey: "",
+    sessionId: "",
+    sessions: [],
+    turns: [],
+    attachments: [],
+    pendingAttachments: [],
+    abort: null,
+    searchEnabled: false,
+    upstream: "?"
+  };
+
+  // ---------- Toast ----------
+  function toast(type, title, body, ms=3200){
+    const root = $("toasts");
+    const t = document.createElement("div");
+    t.className = "toast " + (type || "");
+    t.innerHTML = `
+      <div class="dot"></div>
+      <div class="t">
+        <div class="h">${escapeHtml(title || "")}</div>
+        <div class="b">${escapeHtml(body || "")}</div>
+      </div>
+      <div class="x">✕</div>
+    `;
+    root.appendChild(t);
+    setTimeout(() => { try { t.remove(); } catch {} }, ms);
+  }
+
+  // ---------- Modal ----------
+  function closeModal(){ $("modalWrap").style.display = "none"; $("modalBody").innerHTML=""; $("modalActions").innerHTML=""; }
+  function openModal(title, bodyNodes, actionNodes){
+    $("modalTitle").textContent = title || "Modal";
+    const b = $("modalBody"); b.innerHTML="";
+    for (const n of (bodyNodes || [])) b.appendChild(n);
+    const a = $("modalActions"); a.innerHTML="";
+    for (const n of (actionNodes || [])) a.appendChild(n);
+    $("modalWrap").style.display = "grid";
+    const firstInput = b.querySelector("input,textarea,select");
+    if (firstInput) firstInput.focus();
+  }
+
+  // ---------- Drawer ----------
+  function openDrawer(){
+    $("drawerWrap").style.display = "block";
+    renderDrawer();
+  }
+  function closeDrawer(){ $("drawerWrap").style.display = "none"; }
+
+  // ---------- Helpers ----------
+  function apiHeaders() {
+  const k = (state.apiKey || "").trim();
+  const h = { "content-type": "application/json" };
+  if (k && k !== "undefined" && k !== "null") h["Authorization"] = ("Bearer " + k);
+  console.log("apiHeaders bearer len=", k.length, "sessionId=", state.sessionId);
+  return h;
+}
+  function fmtTime(ts){ try { return new Date(ts * 1000).toLocaleString(); } catch { return ""; } }
+  function escapeHtml(s){ return (s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function renderSnippet(s){
+    const safe = escapeHtml(s);
+    return safe.replaceAll("⟦", '<span class="hit">').replaceAll("⟧", "</span>");
+  }
+
+  function setPills(upstream, searchEnabled){
+    state.upstream = upstream || "?";
+    $("pillUpText").textContent = "upstream: " + state.upstream;
+    $("pillSearchText").textContent = "search: " + (searchEnabled ? "on" : "off");
+
+    const dotUp = $("dotUp");
+    dotUp.className = "pillDot " + (state.upstream === "openai" ? "ok" : (state.upstream === "mock" ? "warn" : ""));
+    const dotS = $("dotSearch");
+    dotS.className = "pillDot " + (searchEnabled ? "ok" : "bad");
+  }
+
+  async function bootHealth(){
+    const r = await fetch("/api/health");
+    const j = await r.json();
+    state.searchEnabled = !!j.search;
+    setPills(j.upstream || "?", !!j.search);
+  }
+
+  function saveKey(){
+    const k = ($("apiKey").value || "").trim();
+    state.apiKey = k;
+    if(!k || k==="undefined"){ console.log("saveKey blocked bad key:", k); toast("warn","Bad key","Key is empty/undefined"); return; } (() => {
+  const __v = (k);
+  const __s = ("" + (__v ?? "")).trim();
+  if (!__s || __s === "undefined") {
+    console.log("BLOCKED: attempted to store bad NOVA_API_KEY:", __v);
+    return;
+  }
+  (() => { const __v = (__s); const __k = (""+(__v ?? "")).trim(); if(!__k || __k==="undefined" || __k==="null"){ console.log("BLOCK NOVA_API_KEY write:", __v); return; } (() => { const __k = ("" + (__k)).trim(); if(__k && __k !== "undefined" && __k !== "null") localStorage.setItem("NOVA_API_KEY", __k); })(); console.log("STORED NOVA_API_KEY len=", __k.length); })();
+})(); console.log("saveKey stored len=", k.length);
+    toast("ok","Saved","API key stored in your browser");
+  }
+    // ---------- Per-session chat persistence ----------
+  const CHAT_PREFIX = "NOVA_CHAT_";
+  function chatKey(id){ return CHAT_PREFIX + (id || "NONE"); }
+
+  function saveChatFor(id){
+    try{
+      const el = document.getElementById("novaLog");
+      if(!el) return;
+      localStorage.setItem(chatKey(id), el.innerHTML || "");
+    }catch(e){}
+  }
+
+  function restoreChatFor(id){
+    try{
+      const el = document.getElementById("novaLog");
+      if(!el) return;
+      const html = localStorage.getItem(chatKey(id)) || "";
+      el.innerHTML = html;
+    }catch(e){}
+  }
+
+  // Safety: persist on refresh/close
+  try{
+    window.addEventListener("beforeunload", ()=>{ try { saveChatFor(sid); } catch(e) {} });
+  }catch(e){}
+  // -----------------------------------------------
+
+function loadKey(){
+    const k = (localStorage.getItem("NOVA_API_KEY") || "").trim();
+    state.apiKey = k;
+    $("apiKey").value = k;
+;(() => {
+  const el = $("apiKey");
+  if (!el || el.__novaAutosave) return;
+  el.__novaAutosave = true;
+
+  const persist = () => {
+    const v = (el.value || "").trim();
+    state.apiKey = v;
+    (() => {
+  const __v = (v);
+  const __s = ("" + (__v ?? "")).trim();
+  if (!__s || __s === "undefined") {
+    console.log("BLOCKED: attempted to store bad NOVA_API_KEY:", __v);
+    return;
+  }
+  (() => { const __v = (__s); const __k = (""+(__v ?? "")).trim(); if(!__k || __k==="undefined" || __k==="null"){ console.log("BLOCK NOVA_API_KEY write:", __v); return; } (() => { const __k = ("" + (__k)).trim(); if(__k && __k !== "undefined" && __k !== "null") localStorage.setItem("NOVA_API_KEY", __k); })(); console.log("STORED NOVA_API_KEY len=", __k.length); })();
+})();
+    console.log("AUTO-SAVE: origin=", location.origin, "len=", v.length);
+  };
+
+  el.addEventListener("input", persist);
+  el.addEventListener("blur", persist);
+  el.addEventListener("keydown", (e) => { if (e.key === "Enter") persist(); });
+
+  console.log("LOADKEY: origin=", location.origin,
+              "loaded len=", ((localStorage.getItem("NOVA_API_KEY")||"").trim()).length);
+})();
+  }
+;(() => {
+  const el = $("apiKey");
+  if (!el || el.__novaAutosave) return;
+  el.__novaAutosave = true;
+
+  const persist = () => {
+    const k = (el.value || "").trim();
+    state.apiKey = k;
+    if(!k || k==="undefined"){ console.log("saveKey blocked bad key:", k); toast("warn","Bad key","Key is empty/undefined"); return; } (() => {
+  const __v = (k);
+  const __s = ("" + (__v ?? "")).trim();
+  if (!__s || __s === "undefined") {
+    console.log("BLOCKED: attempted to store bad NOVA_API_KEY:", __v);
+    return;
+  }
+  (() => { const __v = (__s); const __k = (""+(__v ?? "")).trim(); if(!__k || __k==="undefined" || __k==="null"){ console.log("BLOCK NOVA_API_KEY write:", __v); return; } (() => { const __k = ("" + (__k)).trim(); if(__k && __k !== "undefined" && __k !== "null") localStorage.setItem("NOVA_API_KEY", __k); })(); console.log("STORED NOVA_API_KEY len=", __k.length); })();
+})(); console.log("saveKey stored len=", k.length);
+    console.log("AUTO-SAVE: NOVA_API_KEY len=", k.length);
+  };
+
+  el.addEventListener("input", persist);
+  el.addEventListener("blur", persist);
+  el.addEventListener("keydown", (e) => { if (e.key === "Enter") persist(); });
+})();
+
+  // ---------- Sessions ----------
+  async function loadSessions(){
+    const r = await fetch("/api/sessions", { headers: apiHeaders() });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || "sessions failed");
+    state.sessions = j.sessions || [];
+    renderSessions();
+  }
+
+  function renderSessions(){
+    const root = $("sessions");
+    root.innerHTML = "";
+    for (const s of state.sessions){
+      const div = document.createElement("div");
+      div.className = "sess" + (s.id === state.sessionId ? " active" : "");
+      div.innerHTML = `
+        <div class="row" style="justify-content:space-between;">
+          <div class="name">${escapeHtml(s.name)}${s.pinned ? " 📌" : ""}</div>
+          <div class="muted2">${s.turns} turns</div>
+        </div>
+        <div class="row" style="justify-content:space-between;">
+          <div class="muted2">${escapeHtml(s.id)}</div>
+          <div class="muted2">${fmtTime(s.updated_at)}</div>
+        </div>
+      `;
+      root.appendChild(div);
+    }
+  }
+
+  async function newSession(){
+    const r = await fetch("/api/session/new", { method: "POST", headers: apiHeaders() , body: "{}" });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || "new session failed");
+    await loadSessions();
+    
+    try { restoreChatFor(sid); } catch(e) {}
+await openSession(j.session_id);
+    toast("ok","New chat","Session created");
+  }
+
+  async function openSession(id, highlightTurnId=null){
+    state.sessionId = id;
+    $("results").style.display = "none";
+    $("search").value = "";
+
+    const r = await fetch("/api/session/get?session_id=" + encodeURIComponent(id), { headers: apiHeaders() });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || "session get failed");
+
+    state.turns = j.turns || [];
+    state.attachments = j.attachments || [];
+
+    $("activeTitle").textContent = (j.session?.name || "Session");
+    $("activeMeta").textContent = `${j.session?.turns ?? 0} turns • ${j.session?.attachments ?? 0} files`;
+
+    renderSessions();
+    renderChat();
+
+    if (highlightTurnId) {
+      setTimeout(() => jumpToTurn(highlightTurnId), 50);
+    } else {
+      scrollBottom();
+    }
+  }
+
+  function scrollBottom(){
+    const c = $("chat");
+    c.scrollTop = c.scrollHeight;
+  }
+
+  function jumpToTurn(turnId){
+    const node = document.querySelector(`[data-turn-id="${turnId}"]`);
+    if (!node) return;
+    node.classList.add("hl");
+    node.scrollIntoView({ behavior:"smooth", block:"center" });
+    setTimeout(() => node.classList.remove("hl"), 2600);
+  }
+
+  // ---------- Attachments ----------
+  function attachmentById(id){
+    return state.attachments.find(a => a.id === id) || state.pendingAttachments.find(a => a.id === id) || null;
+  }
+
+  function parseAttachmentMarkers(text){
+    const re = /\[\[att:([A-Za-z0-9_\-\.~]+)\]\]/g;
+    const ids = [];
+    let m;
+    while ((m = re.exec(text)) !== null) ids.push(m[1]);
+    const clean = (text || "").replace(re, "").trim();
+    return { clean, ids };
+  }
+
+  function renderMessageBody(container, content){
+    const { clean, ids } = parseAttachmentMarkers(content || "");
+    const body = document.createElement("div");
+    body.className = "msgBody";
+    body.textContent = clean;
+    container.appendChild(body);
+
+    for (const id of ids){
+      const a = attachmentById(id);
+      if (!a) continue;
+
+      if (a.kind === "image"){
+        const img = document.createElement("img");
+        img.className = "inline";
+        img.src = a.url;
+        img.alt = a.filename || "image";
+        container.appendChild(img);
+        appendAttachmentCopyRow(container, a);
+} else if (a.kind === "video"){
+        const v = document.createElement("video");
+        v.className = "inline";
+        v.src = a.url;
+        v.controls = true;
+        v.playsInline = true;
+        container.appendChild(v);
+        appendAttachmentCopyRow(container, a);
+} else if (a.kind === "audio"){
+        const audio = document.createElement("audio");
+        audio.className = "inline";
+        audio.controls = true;
+        audio.src = a.url;
+        container.appendChild(audio);
+        appendAttachmentCopyRow(container, a);
+} else {
+        const link = document.createElement("a");
+        link.href = a.url;
+        link.textContent = `Download: ${a.filename || a.id}`;
+        link.className = "aLink";
+        link.target = "_blank";
+        link.style.display = "inline-block";
+        link.style.marginTop = "10px";
+        container.appendChild(link);
+        appendAttachmentCopyRow(container, a);
+}
+    }
+  }
+
+  function renderChat(){
+    const root = $("chat");
+    root.innerHTML = "";
+    for (const t of state.turns){
+      const div = document.createElement("div");
+      const roleClass = (t.role === "user") ? "user" : "assistant";
+      div.className = "msg " + roleClass;
+      div.dataset.turnId = String(t.id || "");
+
+      const ts = (t.ts ? fmtTime(t.ts) : "");
+      div.innerHTML = `
+        <div class="msgHdr">
+          <div class="role">
+            <span>${escapeHtml(t.role)} • #${t.id}</span>
+            <span class="muted2">${escapeHtml(ts)}</span>
+          </div>
+          <div class="actions">
+            <div class="action" data-act="copy">Copy</div>
+            <div class="action" data-act="link">Link</div>
+          </div>
+        </div>
+      `;
+
+            const _copy = div.querySelector('[data-act="copy"]');
+      if(_copy) _copy.onclick = () => {
+        const { clean } = parseAttachmentMarkers(t.content || "");
+        navigator.clipboard.writeText(clean || "");
+        toast("ok","Copied","Copied message text (no attachment markers)", 1600);
+      };
+
+            const _copymd = div.querySelector('[data-act="copymd"]');
+      if(_copymd) _copymd.onclick = () => {
+        const { clean } = parseAttachmentMarkers(t.content || "");
+        navigator.clipboard.writeText(clean || "");
+        toast("ok","Copied","Copied as Markdown", 1600);
+      };
+            const _link = div.querySelector('[data-act="link"]');
+      if(_link) _link.onclick = () => {
+        const url = new URL(location.href);
+        url.hash = `turn=${t.id}`;
+        navigator.clipboard.writeText(url.toString());
+        toast("ok","Link copied","Paste it anywhere to jump back", 1800);
+      };
+
+      renderMessageBody(div, t.content || "");
+      root.appendChild(div);
+    }
+
+    // hash jump
+    const h = (location.hash || "");
+    const m = /turn=(\d+)/.exec(h);
+    if (m) setTimeout(() => jumpToTurn(parseInt(m[1],10)), 80);
+  }
+
+  function renderPendingChips(){
+    const root = $("chips");
+    root.innerHTML = "";
+
+    if (!state.pendingAttachments.length){
+      const hint = document.createElement("span");
+      hint.className = "muted2";
+      hint.textContent = "No attachments queued";
+      root.appendChild(hint);
+      return;
+    }
+
+    for (const a of state.pendingAttachments){
+      const chip = document.createElement("span");
+      chip.className = "fileChip";
+      chip.innerHTML = `${escapeHtml(a.kind)}: ${escapeHtml(a.filename)} <button title="remove">✕</button>`;
+      chip.querySelector("button").onclick = () => {
+        state.pendingAttachments = state.pendingAttachments.filter(x => x.id !== a.id);
+        renderPendingChips();
+      };
+      root.appendChild(chip);
+    }
+  }
+
+  function renderDrawer(){
+    const body = $("drawerBody");
+    body.innerHTML = "";
+    const files = state.attachments || [];
+    $("drawerMeta").textContent = state.sessionId ? `${files.length} files in ${state.sessionId}` : "No session";
+
+    if (!files.length){
+      const d = document.createElement("div");
+      d.className = "muted";
+      d.textContent = "No files yet. Attach something in chat.";
+      body.appendChild(d);
+      return;
+    }
+
+    for (const a of files){
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <div class="cardTop">
+          <div style="font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:360px;">
+            ${escapeHtml(a.filename || a.id)}
+          </div>
+          <div class="tag">${escapeHtml(a.kind)}</div>
+        </div>
+        <div class="muted2">${escapeHtml(a.mime || "")} • ${(a.size_bytes||0)} bytes</div>
+      `;
+
+      if (a.kind === "image"){
+        const img = document.createElement("img");
+        img.className = "inline";
+        img.src = a.url;
+        img.alt = a.filename || "image";
+        card.appendChild(img);
+      } else if (a.kind === "video"){
+        const v = document.createElement("video");
+        v.className = "inline";
+        v.src = a.url;
+        v.controls = true;
+        v.playsInline = true;
+        card.appendChild(v);
+      } else if (a.kind === "audio"){
+        const au = document.createElement("audio");
+        au.className = "inline";
+        au.controls = true;
+        au.src = a.url;
+        card.appendChild(au);
+      }
+
+      const link = document.createElement("a");
+      link.href = a.url;
+      link.target = "_blank";
+      link.className = "aLink";
+      link.textContent = "Open / download";
+      card.appendChild(link);
+
+      body.appendChild(card);
+    }
+  }
+
+  // ---------- Upload with progress ----------
+  function showUploadProgress(on, label="Uploading…", pct=0){
+    $("uploadBox").style.display = on ? "block" : "none";
+    $("uploadLabel").textContent = label;
+    $("uploadBar").style.width = Math.max(0, Math.min(100, pct)) + "%";
+  }
+
+  function uploadOneFile(file){
+    return new Promise(async (resolve, reject) => {
+      if (!state.sessionId) await newSession();
+
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("session_id", state.sessionId);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/upload");
+      xhr.setRequestHeader("Authorization", "Bearer " + state.apiKey);
+
+      xhr.upload.onprogress = (ev) => {
+        if (ev.lengthComputable){
+          const pct = Math.round((ev.loaded/ev.total)*100);
+          showUploadProgress(true, `Uploading ${file.name}… ${pct}%`, pct);
+        } else {
+          showUploadProgress(true, `Uploading ${file.name}…`, 20);
+        }
+      };
+
+      xhr.onload = () => {
+        showUploadProgress(false);
+        try {
+          const j = JSON.parse(xhr.responseText || "{}");
+          if (!j.ok) return reject(new Error(j.error || "upload failed"));
+          resolve(j.attachment);
+        } catch(e){ reject(e); }
+      };
+      xhr.onerror = () => { showUploadProgress(false); reject(new Error("upload network error")); };
+      xhr.send(fd);
+    });
+  }
+
+  async function uploadFiles(files){
+    if (!files.length) return;
+    toast("ok","Uploading", `${files.length} file(s)`);
+    for (const f of files){
+      const att = await uploadOneFile(f);
+      state.pendingAttachments.push(att);
+      renderPendingChips();
+      toast("ok","Attached", `${att.kind}: ${att.filename}`, 1600);
+    }
+  }
+
+  // ---------- Search ----------
+  async function searchChats(q){
+    if (!state.searchEnabled) return;
+    const qq = (q || "").trim();
+    if (!qq){
+      $("results").style.display = "none";
+      $("results").innerHTML = "";
+      return;
+    }
+    const r = await fetch("/api/search?q=" + encodeURIComponent(qq) + "&limit=60", { headers: apiHeaders() });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || "search failed");
+
+    const root = $("results");
+    root.innerHTML = "";
+    const res = j.results || [];
+    if (!res.length){
+      root.innerHTML = `<div class="resItem"><div class="muted">No matches.</div></div>`;
+    } else {
+      for (const it of res){
+        const div = document.createElement("div");
+        div.className = "resItem";
+        div.innerHTML = `
+          <div class="row" style="justify-content:space-between;">
+            <div class="muted2">${escapeHtml(it.session_id)} • #${it.turn_id} • ${escapeHtml(it.role)}</div>
+            <div class="muted2">${fmtTime(it.ts)}</div>
+          </div>
+          <div class="resSnip">${renderSnippet(it.snippet || "")}</div>
+        `;
+        div.onclick = async () => {
+          await openSession(it.session_id, it.turn_id);
+          root.style.display = "none";
+        };
+        root.appendChild(div);
+      }
+    }
+    root.style.display = "block";
+  }
+
+  let searchTmr = null;
+  function onSearch(){
+    clearTimeout(searchTmr);
+    const q = $("search").value;
+    searchTmr = setTimeout(() => searchChats(q).catch(e => toast("bad","Search error", e.message || String(e))), 220);
+  }
+
+  // ---------- Session actions ----------
+  async function renameSession(){
+    if (!state.sessionId) return;
+    const input = document.createElement("input");
+    input.placeholder = "New session name";
+    input.value = $("activeTitle").textContent || "";
+
+    const okBtn = document.createElement("button");
+    okBtn.className = "btn green";
+    okBtn.textContent = "Rename";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "btn";
+    cancelBtn.textContent = "Cancel";
+
+    okBtn.onclick = async () => {
+      const name = (input.value || "").trim();
+      if (!name) return;
+      const r = await fetch("/api/session/rename", { method:"POST", headers: apiHeaders(), body: JSON.stringify({ session_id: state.sessionId, name }) });
+      const j = await r.json();
+      if (!j.ok) return toast("bad","Rename failed", j.error || "error");
+      closeModal();
+      await loadSessions();
+      
+    try { restoreChatFor(sid); } catch(e) {}
+await openSession(state.sessionId);
+      toast("ok","Renamed", name, 1600);
+    };
+
+    openModal("Rename session", [input], [cancelBtn, okBtn]);
+  }
+
+  async function pinSession(){
+    if (!state.sessionId) return;
+    const s = state.sessions.find(x => x.id === state.sessionId);
+    const pinned = !(s && s.pinned);
+    const r = await fetch("/api/session/pin", { method:"POST", headers: apiHeaders(), body: JSON.stringify({ session_id: state.sessionId, pinned }) });
+    const j = await r.json();
+    if (!j.ok) return toast("bad","Pin failed", j.error || "error");
+    await loadSessions();
+    
+    try { restoreChatFor(sid); } catch(e) {}
+await openSession(state.sessionId);
+    toast("ok", pinned ? "Pinned" : "Unpinned", "Updated", 1400);
+  }
+
+  async function clearSession(){
+    if (!state.sessionId) return;
+
+    const text = document.createElement("div");
+    text.className = "muted";
+    text.textContent = "Clear this chat? This removes turns + facts + attachments records for this session.";
+
+    const okBtn = document.createElement("button");
+    okBtn.className = "btn red";
+    okBtn.textContent = "Clear";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "btn";
+    cancelBtn.textContent = "Cancel";
+
+    okBtn.onclick = async () => {
+      const r = await fetch("/api/session/clear", { method:"POST", headers: apiHeaders(), body: JSON.stringify({ session_id: state.sessionId }) });
+      const j = await r.json();
+      if (!j.ok) return toast("bad","Clear failed", j.error || "error");
+      closeModal();
+      await loadSessions();
+      
+    try { restoreChatFor(sid); } catch(e) {}
+await openSession(state.sessionId);
+      toast("ok","Cleared","Session cleared", 1500);
+    };
+
+    openModal("Confirm clear", [text], [cancelBtn, okBtn]);
+  }
+
+  async function deleteSession(){
+    if (!state.sessionId) return;
+
+    const text = document.createElement("div");
+    text.className = "muted";
+    text.textContent = "Delete this session permanently?";
+
+    const okBtn = document.createElement("button");
+    okBtn.className = "btn red";
+    okBtn.textContent = "Delete";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "btn";
+    cancelBtn.textContent = "Cancel";
+
+    okBtn.onclick = async () => {
+      const sid = state.sessionId;
+      const r = await fetch("/api/session/delete", { method:"POST", headers: apiHeaders(), body: JSON.stringify({ session_id: sid }) });
+      const j = await r.json();
+      if (!j.ok) return toast("bad","Delete failed", j.error || "error");
+      closeModal();
+      state.sessionId = "";
+      $("activeTitle").textContent = "No session";
+      $("activeMeta").textContent = "";
+      $("chat").innerHTML = "";
+      await loadSessions();
+      
+    try { restoreChatFor(sid); } catch(e) {}
+toast("ok","Deleted","Session removed", 1500);
+    };
+
+    openModal("Confirm delete", [text], [cancelBtn, okBtn]);
+  }
+
+  async function exportSession(){
+    if (!state.sessionId) return;
+    const r = await fetch("/api/session/export?session_id=" + encodeURIComponent(state.sessionId), { headers: apiHeaders() });
+    if (!r.ok){
+      const j = await r.json().catch(() => ({}));
+      return toast("bad","Export failed", j.error || "error");
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `nova-session-${state.sessionId}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast("ok","Exported","Downloaded JSON", 1500);
+  }
+
+  async function importSession(file){
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    const body = {
+      session_id: payload.session_id,
+      name: payload.session?.name || payload.name || "Imported chat",
+      pinned: payload.session?.pinned || false,
+      turns: payload.turns || [],
+      facts: payload.facts || {}
+    };
+    const r = await fetch("/api/session/import", { method:"POST", headers: apiHeaders(), body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!j.ok) return toast("bad","Import failed", j.error || "error");
+    await loadSessions();
+    
+    try { restoreChatFor(sid); } catch(e) {}
+await openSession(j.session_id);
+    toast("ok","Imported","Session loaded", 1600);
+  }
+
+  // ---------- Chat stream ----------
+  async function send(){
+    const text = ($("text").value || "").trim();
+    if (!text && state.pendingAttachments.length === 0) return;
+
+    if (!state.sessionId) await newSession();
+
+    const attachment_ids = state.pendingAttachments.map(a => a.id);
+    state.pendingAttachments = [];
+    renderPendingChips();
+
+    $("send").disabled = true;
+    $("stop").disabled = false;
+
+    // optimistic render
+    const userLocal = {
+      id: 0, role:"user",
+      content: text + (attachment_ids.length ? ("\n\n" + attachment_ids.map(id => `[[att:${id}]]`).join("\n")) : ""),
+      ts: Date.now()/1000
+    };
+    state.turns.push(userLocal);
+
+    const assistantLocal = { id: 0, role:"assistant", content:"", ts: Date.now()/1000 };
+    state.turns.push(assistantLocal);
+    renderChat();
+    scrollBottom();
+    $("text").value = "";
+
+    const controller = new AbortController();
+    state.abort = controller;
+
+    try{
+      const r = await fetch("/api/chat", {
+        method:"POST",
+        headers: apiHeaders(),
+        body: JSON.stringify({ session_id: state.sessionId, text, attachment_ids }),
+        signal: controller.signal
+      });
+
+      if (!r.ok){
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error || "stream failed");
+      }
+
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buf = "";
+
+      while (true){
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream:true });
+
+        let idx;
+        while ((idx = buf.indexOf("\n\n")) >= 0){
+          const chunk = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+
+          const line = chunk.split("\n").find(l => l.startsWith("data: "));
+          if (!line) continue;
+          const payload = JSON.parse(line.slice(6));
+
+          if (payload.type === "delta"){
+            assistantLocal.content += payload.delta;
+            renderChat();
+            scrollBottom();
+          } else if (payload.type === "error"){
+            assistantLocal.content += "\n\n[error] " + (payload.error || "unknown");
+            renderChat();
+            scrollBottom();
+          }
+        }
+      }
+
+      await loadSessions();
+      
+    try { restoreChatFor(sid); } catch(e) {}
+await openSession(state.sessionId);
+
+    } catch(e){
+      if (String(e).includes("AbortError")){
+        assistantLocal.content += "\n\n[stopped]";
+        toast("warn","Stopped","Stream aborted", 1400);
+      } else {
+        assistantLocal.content += "\n\n[error] " + (e?.message || e);
+        toast("bad","Send failed", e?.message || String(e));
+      }
+      renderChat();
+      scrollBottom();
+    } finally {
+      $("send").disabled = false;
+      $("stop").disabled = true;
+      state.abort = null;
+    }
+  }
+
+  function stop(){ if (state.abort) state.abort.abort(); }
+
+  // ---------- Image gen (polished modal) ----------
+  async function genImage(){
+    if (!state.sessionId) await newSession();
+
+    const input = document.createElement("textarea");
+    input.placeholder = "Describe the image you want…";
+    input.value = "";
+
+    const okBtn = document.createElement("button");
+    okBtn.className = "btn green";
+    okBtn.textContent = "Generate";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "btn";
+    cancelBtn.textContent = "Cancel";
+
+    okBtn.onclick = async () => {
+      const prompt = (input.value || "").trim();
+      if (!prompt) return;
+      okBtn.disabled = true;
+      try{
+        const r = await fetch("/api/image_generate", { method:"POST", headers: apiHeaders(), body: JSON.stringify({ session_id: state.sessionId, prompt }) });
+        const j = await r.json();
+        if (!j.ok) throw new Error(j.error || "image gen failed");
+        closeModal();
+        await loadSessions();
+        
+    try { restoreChatFor(sid); } catch(e) {}
+await openSession(state.sessionId);
+        toast("ok","Image generated","Added to chat", 1800);
+      } catch(e){
+        toast("bad","Image failed", e?.message || String(e));
+        okBtn.disabled = false;
+      }
+    };
+
+    openModal("Generate image", [input], [cancelBtn, okBtn]);
+  }
+
+  // ---------- Video analyze ----------
+  async function analyzeVideo(){
+    if (!state.sessionId) return toast("warn","No session","Create/open a session first");
+    const videos = (state.attachments || []).filter(a => a.kind === "video");
+    if (!videos.length) return toast("warn","No video","Upload a video in this session first");
+
+    const last = videos[videos.length - 1];
+    const input = document.createElement("textarea");
+    input.placeholder = "What do you want to know about the video? (optional)\nExample: 'Summarize key moments and any on-screen text.'";
+    input.value = "";
+
+    const okBtn = document.createElement("button");
+    okBtn.className = "btn green";
+    okBtn.textContent = "Analyze";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "btn";
+    cancelBtn.textContent = "Cancel";
+
+    okBtn.onclick = async () => {
+      okBtn.disabled = true;
+      try{
+        toast("ok","Analyzing video","This can take a bit for longer clips…", 2400);
+        const r = await fetch("/api/video_analyze", { method:"POST", headers: apiHeaders(), body: JSON.stringify({ session_id: state.sessionId, attachment_id: last.id, question: (input.value||"").trim() }) });
+        const j = await r.json();
+        if (!j.ok) throw new Error(j.error || "video analyze failed");
+        closeModal();
+        await loadSessions();
+        
+    try { restoreChatFor(sid); } catch(e) {}
+await openSession(state.sessionId);
+        toast("ok","Video analyzed","Transcript + analysis added", 2200);
+      } catch(e){
+        toast("bad","Analyze failed", e?.message || String(e));
+        okBtn.disabled = false;
+      }
+    };
+
+    openModal("Analyze latest video", [
+      (() => { const p=document.createElement("div"); p.className="muted2"; p.textContent=`Using: ${last.filename}`; return p; })(),
+      input
+    ], [cancelBtn, okBtn]);
+  }
+
+  // ---------- Drag & drop ----------
+  let dragDepth = 0;
+  function showDrop(on){ $("dropOverlay").style.display = on ? "grid" : "none"; }
+
+  window.addEventListener("dragenter", (e) => {
+    e.preventDefault();
+    dragDepth++;
+    showDrop(true);
+  });
+  window.addEventListener("dragover", (e) => { e.preventDefault(); });
+  window.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    dragDepth--;
+    if (dragDepth <= 0){ dragDepth = 0; showDrop(false); }
+  });
+  window.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    dragDepth = 0;
+    showDrop(false);
+    const files = [...(e.dataTransfer?.files || [])];
+    if (files.length) {
+      try { await uploadFiles(files); }
+      catch(err){ toast("bad","Upload failed", err?.message || String(err)); }
+    }
+
+  // ---------- Wire up ----------
+  $("importFile").onchange = (ev) => {
+    const f = ev.target.files?.[0];
+    if (f) importSession(f).catch(e => toast("bad","Import failed", e.message || String(e)));
+    ev.target.value = "";
+  };
+
+  $("openFiles").onclick = () => {
+    if (!state.sessionId) return toast("warn","No session","Open a session first");
+    openDrawer();
+  };
+
+  $("search").addEventListener("input", onSearch);
+
+  $("file").onchange = async (ev) => {
+    const files = [...(ev.target.files || [])];
+    ev.target.value = "";
+    if (!files.length) return;
+    try { await uploadFiles(files); }
+    catch(e){ toast("bad","Upload failed", e?.message || String(e)); }
+  };
+
+
+
+  $("text").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey){
+      e.preventDefault();
+      send().catch(err => toast("bad","Send failed", err?.message || String(err)));
+    }
+    if (e.key === "Enter" && e.ctrlKey){
+      e.preventDefault();
+      send().catch(err => toast("bad","Send failed", err?.message || String(err)));
+    }
+  });
+
+  // Global keyboard
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape"){
+      if ($("modalWrap").style.display === "grid") closeModal();
+      if ($("drawerWrap").style.display === "block") closeDrawer();
+    }
+    if (e.ctrlKey && (e.key === "k" || e.key === "K")){
+      e.preventDefault();
+      $("search").focus();
+    }
+  });
+
+  // Init
+  (async () => {
+    loadKey();
+    renderPendingChips();
+    await bootHealth();
+
+    if (!state.apiKey){ console.log("BOOT: state.apiKey empty; localStorage NOVA_API_KEY len=", (localStorage.getItem("NOVA_API_KEY")||"").length); try { if (typeof loadKey === "function") loadKey(); } catch(e){}
+if (!state.apiKey || state.apiKey==="undefined") {
+  toast("warn","API key needed","Enter NOVA API key for this browser (stored locally)");
+  return;
+} }
+
+    await loadSessions();
+    
+    try { restoreChatFor(sid); } catch(e) {}
+if (state.sessions.length) {
+      await openSession(state.sessions[0].id);
+      toast("ok","Loaded","Sessions ready", 6000);
+    } else {
+      toast("warn","No sessions","Click + New to start");
+    }
+  })().catch(e => toast("bad","Boot failed", e.message || String(e)));
+
+})();
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* NOVA_FORCE_AUTOSAVE */
+(() => {
+  try {
+    const el = document.getElementById("apiKey");
+    if (!el || el.__novaForceAutosave) return;
+    el.__novaForceAutosave = true;
+
+    const persist = () => {
+      const v = (el.value || "").trim();
+      if (!v || v === "undefined") return;
+      (() => { const __v = (v); const __k = (""+(__v ?? "")).trim(); if(!__k || __k==="undefined" || __k==="null"){ console.log("BLOCK NOVA_API_KEY write:", __v); return; } (() => { const __k = ("" + (__k)).trim(); if(__k && __k !== "undefined" && __k !== "null") localStorage.setItem("NOVA_API_KEY", __k); })(); console.log("STORED NOVA_API_KEY len=", __k.length); })();
+      try { state.apiKey = v; } catch(e){}
+      console.log("FORCE_AUTOSAVE len=", v.length);
+    };
+
+    el.addEventListener("input", persist);
+    el.addEventListener("blur", persist);
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") persist(); });
+
+    // on boot, load if present
+    const k = (localStorage.getItem("NOVA_API_KEY") || "").trim();
+    if (k && k !== "undefined") {
+      el.value = k;
+      try { state.apiKey = k; } catch(e){}
+    }
+  } catch(e){}
+})();
+
+
+
+
+
+
+
+
+
+

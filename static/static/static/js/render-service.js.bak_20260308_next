@@ -1,0 +1,395 @@
+// C:\Users\Owner\nova\static\js\render-service.js
+
+(() => {
+"use strict"
+
+function createRenderService(options = {}){
+  const {
+    state,
+    elements = {},
+  } = options
+
+  if(!state){
+    throw new Error("NovaRenderService: state is required")
+  }
+
+  const el = {
+    chatList: elements.chatList || document.getElementById("chatList"),
+    messages: elements.messages || document.getElementById("messages"),
+    messagesScroll: elements.messagesScroll || document.getElementById("messagesScroll"),
+    emptyState: elements.emptyState || document.getElementById("messagesEmpty"),
+    emptyStateShell: elements.emptyStateShell || document.getElementById("emptyStateShell"),
+    pendingAttachments: elements.pendingAttachments || document.getElementById("pendingAttachments"),
+    pendingAttachmentsList: elements.pendingAttachmentsList || document.getElementById("pendingAttachmentsList"),
+  }
+
+  const utils = window.NovaUtils || {}
+  const escapeHtml = utils.escapeHtml || function escapeHtml(value){
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;")
+  }
+
+  const formatBytes = utils.formatBytes || function formatBytes(bytes){
+    const n = Number(bytes || 0)
+
+    if(!Number.isFinite(n) || n <= 0){
+      return "0 B"
+    }
+
+    const units = ["B", "KB", "MB", "GB", "TB"]
+    let size = n
+    let i = 0
+
+    while(size >= 1024 && i < units.length - 1){
+      size /= 1024
+      i += 1
+    }
+
+    return `${size.toFixed(size >= 10 || i === 0 ? 0 : 1)} ${units[i]}`
+  }
+
+  function ensureChatsArray(){
+    if(!Array.isArray(state.chats)){
+      state.chats = []
+    }
+
+    return state.chats
+  }
+
+  function ensureMessagesArray(){
+    if(!Array.isArray(state.messages)){
+      state.messages = []
+    }
+
+    return state.messages
+  }
+
+  function getActiveChatId(){
+    return String(state.activeChatId || state.chatId || "").trim()
+  }
+
+  function isNearBottom(){
+    const scrollEl = el.messagesScroll || el.messages
+
+    if(!scrollEl){
+      return true
+    }
+
+    const remaining = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight
+    return remaining <= 80
+  }
+
+  function scrollToBottom(force = true){
+    try{
+      const scrollEl = el.messagesScroll || el.messages
+
+      if(!scrollEl){
+        return
+      }
+
+      if(!force && !isNearBottom()){
+        return
+      }
+
+      scrollEl.scrollTop = scrollEl.scrollHeight
+    }catch(_error){
+      // ignore scroll errors
+    }
+  }
+
+  function formatTime(value){
+    if(!value){
+      return ""
+    }
+
+    try{
+      const date = new Date(value)
+
+      if(Number.isNaN(date.getTime())){
+        return ""
+      }
+
+      return date.toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    }catch(_error){
+      return ""
+    }
+  }
+
+  function renderChats(){
+    if(!el.chatList){
+      return
+    }
+
+    const chats = ensureChatsArray()
+    const activeChatId = getActiveChatId()
+
+    if(chats.length === 0){
+      el.chatList.innerHTML = `<div class="chat-list-empty">No chats yet.</div>`
+      return
+    }
+
+    el.chatList.innerHTML = chats.map((chat) => {
+      const chatId = String(chat?.chat_id || chat?.id || "").trim()
+      const title = escapeHtml(chat?.title || "New chat")
+      const updated = escapeHtml(formatTime(chat?.updated_at || chat?.updated || chat?.created_at || ""))
+      const activeClass = chatId === activeChatId ? " is-active" : ""
+
+      return `
+        <article class="chat-list-item${activeClass}" data-chat-id="${escapeHtml(chatId)}">
+          <button type="button" class="chat-list-main" data-chat-action="open" data-chat-id="${escapeHtml(chatId)}">
+            <div class="chat-list-title">${title}</div>
+            <div class="chat-list-time">${updated}</div>
+          </button>
+
+          <div class="chat-list-actions">
+            <button type="button" class="chat-list-action" data-chat-action="rename" data-chat-id="${escapeHtml(chatId)}">
+              Rename
+            </button>
+            <button type="button" class="chat-list-action danger" data-chat-action="delete" data-chat-id="${escapeHtml(chatId)}">
+              Delete
+            </button>
+          </div>
+        </article>
+      `
+    }).join("")
+  }
+
+  function renderMessageAttachments(attachments){
+    if(!Array.isArray(attachments) || attachments.length === 0){
+      return ""
+    }
+
+    return `
+      <div class="message-attachments">
+        ${attachments.map((attachment, index) => {
+          const attachmentId = escapeHtml(attachment?.attachment_id || attachment?.id || `attachment-${index}`)
+          const name = escapeHtml(attachment?.name || attachment?.filename || "Attachment")
+          const size = escapeHtml(formatBytes(attachment?.size || 0))
+
+          return `
+            <div class="message-attachment" data-attachment-id="${attachmentId}">
+              <div class="message-attachment-name" title="${name}">${name}</div>
+              <div class="message-attachment-size">${size}</div>
+            </div>
+          `
+        }).join("")}
+      </div>
+    `
+  }
+
+  function renderMessageActions(message){
+    const messageId = escapeHtml(message?.message_id || message?.id || "")
+    const role = String(message?.role || "assistant").toLowerCase()
+
+    if(role === "user"){
+      return `
+        <div class="message-actions">
+          <button type="button" class="message-action-btn" data-message-action="edit" data-message-id="${messageId}" title="Edit" aria-label="Edit message">
+            Edit
+          </button>
+        </div>
+      `
+    }
+
+    return `
+      <div class="message-actions">
+        <button type="button" class="message-action-btn" data-message-action="copy" data-message-id="${messageId}" title="Copy" aria-label="Copy message">
+          Copy
+        </button>
+
+        <button type="button" class="message-action-btn" data-message-action="regenerate" data-message-id="${messageId}" title="Regenerate" aria-label="Regenerate response">
+          Regenerate
+        </button>
+      </div>
+    `
+  }
+
+  function renderMessageStatus(message){
+    const errorText = String(message?.error || "").trim()
+
+    if(errorText){
+      return `<div class="message-status is-error">Error</div>`
+    }
+
+    if(message?.thinking){
+      return `<div class="message-status is-thinking">Thinking</div>`
+    }
+
+    if(message?.streaming){
+      return `<div class="message-status is-streaming">Streaming</div>`
+    }
+
+    return ``
+  }
+
+  function renderMessages(){
+    if(!el.messages){
+      return
+    }
+
+    const shouldStick = isNearBottom()
+    const messages = ensureMessagesArray()
+
+    if(el.emptyState){
+      el.emptyState.hidden = messages.length !== 0
+    }
+
+    if(el.emptyStateShell){
+      el.emptyStateShell.hidden = messages.length !== 0
+    }
+
+    if(messages.length === 0){
+      el.messages.innerHTML = ""
+      scrollToBottom(true)
+      return
+    }
+
+    el.messages.innerHTML = messages.map((msg) => {
+      const id = escapeHtml(msg?.message_id || msg?.id || "")
+      const role = escapeHtml(msg?.role || "assistant")
+      const pendingClass = msg?.pending ? " pending" : ""
+      const errorClass = msg?.error ? " error" : ""
+      const thinkingClass = msg?.thinking ? " thinking" : ""
+      const streamingClass = msg?.streaming ? " streaming" : ""
+      const created = escapeHtml(formatTime(msg?.created_at || msg?.created || ""))
+      const attachmentsHtml = renderMessageAttachments(msg?.attachments)
+      const actionsHtml = renderMessageActions(msg)
+
+      let contentHtml = ""
+
+      if(msg?.thinking && !String(msg?.content || "").trim()){
+        contentHtml = `<div class="message-text is-thinking">Thinking</div>`
+      }else{
+        const safeContent = escapeHtml(msg?.content || "").replace(/\n/g, "<br>")
+        const cursorHtml = msg?.streaming && !msg?.error
+          ? `<span class="stream-cursor" aria-hidden="true"></span>`
+          : ""
+
+        contentHtml = `<div class="message-text">${safeContent}${cursorHtml}</div>`
+      }
+
+      return `
+        <div class="message ${role}${pendingClass}${errorClass}${thinkingClass}${streamingClass}" data-message-id="${id}">
+          <div class="bubble">
+            ${renderMessageStatus(msg)}
+            ${contentHtml}
+            ${attachmentsHtml}
+          </div>
+          <div class="message-meta">
+            <div class="message-time">${created}</div>
+          </div>
+          ${actionsHtml}
+        </div>
+      `
+    }).join("")
+
+    scrollToBottom(shouldStick)
+  }
+
+  function renderPendingAttachments(){
+    const files = Array.isArray(state.pendingAttachments)
+      ? state.pendingAttachments
+      : Array.isArray(state.pendingFiles)
+        ? state.pendingFiles
+        : []
+
+    if(el.pendingAttachments){
+      el.pendingAttachments.hidden = files.length === 0
+    }
+
+    if(!el.pendingAttachmentsList && el.pendingAttachments){
+      if(files.length === 0){
+        el.pendingAttachments.innerHTML = ""
+      }
+      return
+    }
+
+    if(!el.pendingAttachmentsList){
+      return
+    }
+
+    if(files.length === 0){
+      el.pendingAttachmentsList.innerHTML = ""
+      return
+    }
+
+    el.pendingAttachmentsList.innerHTML = files.map((file, index) => {
+      const name = escapeHtml(file?.name || "file")
+      const size = escapeHtml(formatBytes(file?.size || 0))
+
+      return `
+        <div class="pending-file" data-file-index="${index}">
+          <div class="pending-file-main">
+            <div class="pending-file-name" title="${name}">${name}</div>
+            <div class="pending-file-size">${size}</div>
+          </div>
+
+          <button type="button" class="pending-file-remove" data-file-action="remove" data-file-index="${index}" aria-label="Remove file">
+            Remove
+          </button>
+        </div>
+      `
+    }).join("")
+  }
+
+  function renderAll(){
+    renderChats()
+    renderMessages()
+    renderPendingAttachments()
+  }
+
+  function appendMessage(message){
+    const shouldStick = isNearBottom()
+    const list = ensureMessagesArray()
+    const messageId = String(message?.message_id || message?.id || "")
+
+    if(messageId){
+      const exists = list.some((item) => String(item?.message_id || item?.id || "") === messageId)
+      if(!exists){
+        list.push(message)
+      }
+    }else{
+      list.push(message)
+    }
+
+    renderMessages()
+    scrollToBottom(shouldStick)
+  }
+
+  function updateMessage(messageId, patch = {}){
+    const shouldStick = isNearBottom()
+    const list = ensureMessagesArray()
+    const target = list.find((item) => String(item?.message_id || item?.id || "") === String(messageId))
+
+    if(target){
+      Object.assign(target, patch)
+    }
+
+    renderMessages()
+    scrollToBottom(shouldStick)
+  }
+
+  return {
+    renderChats,
+    renderMessages,
+    renderPendingAttachments,
+    renderAll,
+    appendMessage,
+    updateMessage,
+    scrollToBottom,
+  }
+}
+
+window.NovaRenderService = {
+  create: createRenderService,
+  createRenderService
+}
+
+})()

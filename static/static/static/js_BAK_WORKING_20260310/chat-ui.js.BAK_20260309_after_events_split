@@ -1,0 +1,161 @@
+// C:\Users\Owner\nova\static\js\chat-ui.js
+
+(() => {
+"use strict"
+
+function createChatUiService(options = {}){
+  const {
+    state,
+    elements = {},
+    renderService = null,
+    constants = {},
+  } = options
+
+  if(!state){
+    throw new Error("NovaChatUi: state is required")
+  }
+
+  const el = {
+    body: elements.body || document.body,
+    sidebar: elements.sidebar || null,
+    mobileOverlay: elements.mobileOverlay || null,
+    messagesScroll: elements.messagesScroll || null,
+    input: elements.input || null,
+  }
+
+  const SCROLL_LOCK_THRESHOLD = Number(constants.SCROLL_LOCK_THRESHOLD || 120)
+
+  function isNearBottom(){
+    const scroller = el.messagesScroll
+    if(!scroller){
+      return true
+    }
+
+    const distance = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+    return distance <= SCROLL_LOCK_THRESHOLD
+  }
+
+  function scrollToBottom(force = false){
+    const scroller = el.messagesScroll
+    if(!scroller){
+      return
+    }
+
+    if(!force && state.hasUserScrolledUp){
+      return
+    }
+
+    scroller.scrollTop = scroller.scrollHeight
+    state.hasUserScrolledUp = false
+    renderService?.updateJumpButton?.()
+  }
+
+  function autoResizeInput(){
+    if(!el.input){
+      return
+    }
+
+    el.input.style.height = "0px"
+    const nextHeight = Math.max(52, Math.min(el.input.scrollHeight, 280))
+    el.input.style.height = `${nextHeight}px`
+  }
+
+  function focusInput(){
+    if(!el.input){
+      return
+    }
+
+    el.input.focus()
+
+    const length = el.input.value.length
+    try{
+      el.input.setSelectionRange(length, length)
+    }catch(_error){
+      // ignore selection errors
+    }
+  }
+
+  function openSidebar(){
+    if(!el.body || !el.sidebar){
+      return
+    }
+
+    el.body.classList.add("sidebar-open")
+    el.sidebar.classList.add("is-open")
+    el.sidebar.setAttribute("data-open", "true")
+
+    if(el.mobileOverlay){
+      el.mobileOverlay.hidden = false
+    }
+  }
+
+  function closeSidebar(){
+    if(!el.body || !el.sidebar){
+      return
+    }
+
+    if(window.innerWidth <= 620){
+      el.body.classList.remove("sidebar-open")
+      el.sidebar.classList.remove("is-open")
+      el.sidebar.setAttribute("data-open", "false")
+
+      if(el.mobileOverlay){
+        el.mobileOverlay.hidden = true
+      }
+      return
+    }
+
+    el.body.classList.remove("sidebar-open")
+    el.sidebar.classList.remove("is-open")
+    el.sidebar.setAttribute("data-open", "false")
+  }
+
+  function syncSidebarForViewport(){
+    if(window.innerWidth <= 620){
+      if(!el.body.classList.contains("sidebar-open")){
+        el.sidebar?.classList.remove("is-open")
+        el.sidebar?.setAttribute("data-open", "false")
+
+        if(el.mobileOverlay){
+          el.mobileOverlay.hidden = true
+        }
+      }
+      return
+    }
+
+    if(!el.body.classList.contains("sidebar-open")){
+      el.sidebar?.classList.remove("is-open")
+      el.sidebar?.setAttribute("data-open", "false")
+    }else{
+      el.sidebar?.classList.add("is-open")
+      el.sidebar?.setAttribute("data-open", "true")
+    }
+
+    if(el.mobileOverlay){
+      el.mobileOverlay.hidden = true
+    }
+  }
+
+  function handleMessagesScroll(){
+    state.hasUserScrolledUp = !isNearBottom()
+    renderService?.updateJumpButton?.()
+  }
+
+  return {
+    isNearBottom,
+    scrollToBottom,
+    autoResizeInput,
+    focusInput,
+    openSidebar,
+    closeSidebar,
+    syncSidebarForViewport,
+    handleMessagesScroll,
+  }
+}
+
+window.NovaChatUi = {
+  create: createChatUiService,
+  createChatUiService,
+}
+
+})()

@@ -1,0 +1,319 @@
+﻿// C:\Users\Owner\nova\static\js\chat.js
+
+(() => {
+"use strict"
+
+const state = window.NovaState || {}
+
+const el = {
+  sidebar: document.getElementById("sidebar"),
+  mobileOverlay: document.getElementById("mobileOverlay"),
+  btnSidebarToggle: document.getElementById("btnSidebarToggle"),
+  btnNewChat: document.getElementById("btnNewChat"),
+  chatList: document.getElementById("chatList"),
+  messages: document.getElementById("messages"),
+}
+
+const attachmentsService = window.NovaAttachmentsService?.createAttachmentsService?.({
+  state,
+  elements: {},
+})
+
+const renderService = window.NovaRenderService?.createRenderService?.({
+  state,
+  elements: {
+    messages: document.getElementById("messages"),
+    chatList: document.getElementById("chatList"),
+    pendingAttachments: document.getElementById("pendingAttachments"),
+  },
+  utils: window.NovaUtils || {},
+  attachmentsService,
+})
+
+const streamService = window.NovaStreamService?.createStreamService?.({
+  state,
+})
+
+const chatService = window.NovaChatService?.createChatService?.({
+  state,
+  elements: {
+    chatList: el.chatList,
+    messages: el.messages,
+  },
+  utils: window.NovaUtils || {},
+  renderService,
+})
+
+const composerService = window.NovaComposerService?.createComposerService?.({
+  state,
+  elements: {
+    input: document.getElementById("messageInput"),
+    sendBtn: document.getElementById("btnSend"),
+    stopBtn: document.getElementById("btnStop"),
+    attachBtn: document.getElementById("btnAttach"),
+    fileInput: document.getElementById("fileUpload"),
+    composerForm: document.getElementById("composerForm"),
+  },
+  attachmentsService,
+  streamService,
+  renderService,
+  chatService,
+})
+
+function getMessageById(id){
+  const messages = Array.isArray(state.messages) ? state.messages : []
+  return messages.find((m) => String(m?.id) === String(id))
+}
+
+function getLastUserMessage(){
+  const messages = Array.isArray(state.messages) ? state.messages : []
+
+  for(let i = messages.length - 1; i >= 0; i -= 1){
+    if(messages[i]?.role === "user"){
+      return messages[i]
+    }
+  }
+
+  return null
+}
+
+function closeMobileSidebar(){
+  el.sidebar?.classList.remove("open")
+  el.mobileOverlay?.classList.remove("open")
+}
+
+function openMobileSidebar(){
+  el.sidebar?.classList.add("open")
+  el.mobileOverlay?.classList.add("open")
+}
+
+function toggleMobileSidebar(){
+  if(el.sidebar?.classList.contains("open")){
+    closeMobileSidebar()
+  } else {
+    openMobileSidebar()
+  }
+}
+
+async function loadChats(){
+  try {
+    if(typeof chatService.loadChats === "function"){
+      await chatService.loadChats()
+    }
+
+    renderService.renderChats?.()
+  } catch(error){
+    console.error("Nova loadChats error:", error)
+  }
+}
+
+async function loadMessages(chatId){
+  try {
+    if(typeof chatService.loadMessages === "function"){
+      await chatService.loadMessages(chatId)
+    }
+
+    renderService.renderMessages?.()
+  } catch(error){
+    console.error("Nova loadMessages error:", error)
+  }
+}
+
+async function startNewChat(){
+  try {
+    attachmentsService.clearPendingFiles?.()
+    composerService.clearInput?.()
+
+    const created = await chatService.createChat("New Chat")
+    const chatId = String(created?.chat_id || created?.chat?.chat_id || "").trim()
+
+    if(chatId){
+      await chatService.loadMessages(chatId)
+    }
+
+    renderService.renderAll?.()
+    composerService.updateComposerState?.()
+    composerService.focusInput?.()
+    closeMobileSidebar()
+  } catch(error){
+    console.error("Nova startNewChat error:", error)
+  }
+}
+
+async function copyMessage(messageId){
+  const msg = getMessageById(messageId)
+  const text = String(msg?.content || "")
+
+  if(!text) return
+
+  try{
+    await navigator.clipboard.writeText(text)
+  }catch(error){
+    console.error("Copy failed", error)
+  }
+}
+
+function editMessage(messageId){
+  const msg = getMessageById(messageId)
+
+  if(!msg || msg.role !== "user"){
+    return
+  }
+
+  composerService.setInputValue?.(msg.content || "")
+  composerService.focusInput?.()
+}
+
+async function regenerateFromMessage(messageId){
+
+  const resolvedId = String(messageId || "").trim()
+  const messages = Array.isArray(state.messages) ? state.messages : []
+
+  let assistantIndex = messages.findIndex(m => String(m?.id) === resolvedId)
+
+  let seedUserMessage = null
+
+  if(assistantIndex >= 0){
+    for(let i = assistantIndex - 1; i >= 0; i--){
+      if(messages[i]?.role === "user"){
+        seedUserMessage = messages[i]
+        break
+      }
+    }
+  }
+
+  if(!seedUserMessage){
+    seedUserMessage = getLastUserMessage()
+  }
+
+  const text = String(seedUserMessage?.content || "").trim()
+
+  if(!text) return
+
+  try{
+
+    streamService.stop?.()
+
+    if(assistantIndex >= 0){
+      messages.splice(assistantIndex,1)
+    }
+
+    renderService.renderMessages?.()
+
+    composerService.setInputValue?.(text)
+    composerService.focusInput?.()
+
+    await composerService.sendCurrentMessage?.()
+
+  }catch(error){
+    console.error("Nova regenerateFromMessage error:", error)
+  }
+}
+
+function bindSidebarEvents(){
+
+  el.btnSidebarToggle?.addEventListener("click",(e)=>{
+    e.preventDefault()
+    toggleMobileSidebar()
+  })
+
+  el.mobileOverlay?.addEventListener("click",closeMobileSidebar)
+
+  el.btnNewChat?.addEventListener("click",(e)=>{
+    e.preventDefault()
+    startNewChat()
+  })
+
+  el.chatList?.addEventListener("click", async (event) => {
+
+    const item = event.target.closest("[data-chat-id]")
+    if(!item) return
+
+    const chatId = String(item.dataset.chatId || "").trim()
+    if(!chatId) return
+
+    if(state.activeChatId === chatId){
+      closeMobileSidebar()
+      return
+    }
+
+    state.activeChatId = chatId
+    state.chatId = chatId
+
+    attachmentsService.clearPendingFiles?.()
+    composerService.clearInput?.()
+
+    await loadMessages(chatId)
+
+    renderService.renderChats?.()
+    composerService.updateComposerState?.()
+    composerService.focusInput?.()
+    closeMobileSidebar()
+
+  })
+}
+
+function bindMessageEvents(){
+
+  el.messages?.addEventListener("click", async (event)=>{
+
+    const btn = event.target.closest("[data-message-action]")
+    if(!btn) return
+
+    const action = String(btn.dataset.messageAction || "").trim()
+    const messageId = String(btn.dataset.messageId || "").trim()
+
+    if(action === "copy"){
+      await copyMessage(messageId)
+      return
+    }
+
+    if(action === "edit"){
+      editMessage(messageId)
+      return
+    }
+
+    if(action === "regenerate"){
+      await regenerateFromMessage(messageId)
+    }
+
+  })
+}
+
+async function init(){
+
+  bindSidebarEvents()
+  bindMessageEvents()
+
+  attachmentsService.init?.()
+  composerService.init?.()
+
+  await loadChats()
+
+  const firstChatId = String(state.activeChatId || "").trim()
+
+  if(firstChatId){
+    await loadMessages(firstChatId)
+  }
+
+  renderService.renderAll?.()
+  composerService.updateComposerState?.()
+  composerService.focusInput?.()
+}
+
+void init()
+
+window.NovaApp = {
+  state,
+  el,
+  regenerateFromMessage,
+  services: {
+    attachmentsService,
+    renderService,
+    streamService,
+    chatService,
+    composerService,
+  },
+}
+
+})()

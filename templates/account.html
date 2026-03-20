@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nova Account</title>
+<style>
+  :root{
+    color-scheme:dark;
+  }
+
+  *{
+    box-sizing:border-box;
+  }
+
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(94,163,255,0.16), transparent 28%),
+      linear-gradient(180deg, #07111b 0%, #0b1623 100%);
+    color:#eaf2ff;
+    padding:28px;
+  }
+
+  .wrap{
+    max-width:900px;
+    margin:0 auto;
+  }
+
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:24px;
+  }
+
+  .back-link,
+  .logout-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:44px;
+    padding:0 16px;
+    border-radius:14px;
+    border:1px solid rgba(120,170,255,0.14);
+    background:rgba(255,255,255,0.05);
+    color:#eaf2ff;
+    text-decoration:none;
+    cursor:pointer;
+    font-weight:800;
+  }
+
+  .logout-btn{
+    font:inherit;
+  }
+
+  .card{
+    padding:24px;
+    border-radius:24px;
+    background:rgba(8,16,26,0.82);
+    border:1px solid rgba(120,170,255,0.14);
+    box-shadow:0 30px 80px rgba(0,0,0,0.30);
+  }
+
+  .kicker{
+    font-size:0.78rem;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    opacity:0.72;
+    font-weight:800;
+    margin-bottom:10px;
+  }
+
+  h1{
+    margin:0 0 10px;
+    font-size:2rem;
+  }
+
+  .subtext{
+    opacity:0.78;
+    line-height:1.6;
+    margin-bottom:22px;
+  }
+
+  .info-grid{
+    display:grid;
+    gap:14px;
+  }
+
+  .info-item{
+    padding:16px;
+    border-radius:16px;
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.06);
+  }
+
+  .info-label{
+    font-size:0.78rem;
+    opacity:0.68;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    font-weight:800;
+    margin-bottom:6px;
+  }
+
+  .info-value{
+    font-size:1rem;
+    font-weight:800;
+    word-break:break-word;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <a class="back-link" href="/">← Back to Nova</a>
+      <button id="logoutBtn" class="logout-btn" type="button">Log out</button>
+    </div>
+
+    <div class="card">
+      <div class="kicker">Account</div>
+      <h1>{{ username or "User" }}</h1>
+      <div class="subtext">Nova local account page.</div>
+
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">Signed in as</div>
+          <div class="info-value">{{ username or "User" }}</div>
+        </div>
+
+        <div class="info-item">
+          <div class="info-label">Auth type</div>
+          <div class="info-value">SQLite local user</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  if(logoutBtn){
+    logoutBtn.addEventListener("click", async () => {
+      logoutBtn.disabled = true;
+      logoutBtn.textContent = "Logging out...";
+
+      try{
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          credentials: "include"
+        });
+      }catch(error){
+        console.error(error);
+      }
+
+      window.location.href = "/login";
+    });
+  }
+})();
+</script>
+</body>
+</html>

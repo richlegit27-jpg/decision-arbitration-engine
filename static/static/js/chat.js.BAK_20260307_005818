@@ -1,0 +1,426 @@
+﻿// C:\Users\Owner\nova\static\js\chat.js
+
+(() => {
+"use strict"
+
+function bootNova(){
+  const el = {
+    sidebar: document.getElementById("sidebar"),
+    mobileOverlay: document.getElementById("mobileOverlay"),
+    btnSidebarToggle: document.getElementById("btnSidebarToggle"),
+    btnNewChat: document.getElementById("btnNewChat"),
+    chatList: document.getElementById("chatList"),
+    messages: document.getElementById("messages"),
+    emptyState: document.getElementById("emptyState"),
+    input: document.getElementById("promptInput"),
+    sendBtn: document.getElementById("btnSend"),
+    stopBtn: document.getElementById("btnStop"),
+    attachBtn: document.getElementById("btnAttach"),
+    fileInput: document.getElementById("fileUpload"),
+    composerForm: document.getElementById("composerForm"),
+    pendingAttachments: document.getElementById("pendingAttachments"),
+    chatTitle: document.getElementById("chatTitle"),
+  }
+
+  const NovaState = window.NovaState
+  const NovaApi = window.NovaApi
+  const NovaUtils = window.NovaUtils
+  const NovaAttachmentsService = window.NovaAttachmentsService
+  const NovaChatService = window.NovaChatService
+  const NovaMessageService = window.NovaMessageService
+  const NovaRenderService = window.NovaRenderService
+  const NovaStreamService = window.NovaStreamService
+  const NovaComposerService = window.NovaComposerService
+
+  if(!NovaState?.createState){
+    throw new Error("Nova boot failed: NovaState.createState is missing")
+  }
+
+  if(!NovaApi?.createApi){
+    throw new Error("Nova boot failed: NovaApi.createApi is missing")
+  }
+
+  if(!NovaChatService?.createChatService){
+    throw new Error("Nova boot failed: NovaChatService.createChatService is missing")
+  }
+
+  if(!NovaMessageService?.createMessageService){
+    throw new Error("Nova boot failed: NovaMessageService.createMessageService is missing")
+  }
+
+  if(!NovaRenderService?.createRenderService){
+    throw new Error("Nova boot failed: NovaRenderService.createRenderService is missing")
+  }
+
+  if(!NovaStreamService?.createStreamService){
+    throw new Error("Nova boot failed: NovaStreamService.createStreamService is missing")
+  }
+
+  if(!NovaComposerService?.createComposerService){
+    throw new Error("Nova boot failed: NovaComposerService.createComposerService is missing")
+  }
+
+  const state = NovaState.createState()
+  const utils = NovaUtils || {}
+  const api = NovaApi.createApi({
+    baseUrl: "/api",
+  })
+
+  const attachmentsService = NovaAttachmentsService?.createAttachmentsService
+    ? NovaAttachmentsService.createAttachmentsService({
+        state,
+        utils,
+        elements: {
+          fileInput: el.fileInput,
+          pendingAttachments: el.pendingAttachments,
+        },
+      })
+    : null
+
+  const chatService = NovaChatService.createChatService({
+    state,
+    utils,
+    api,
+  })
+
+  const messageService = NovaMessageService.createMessageService({
+    state,
+    utils,
+  })
+
+  let composerService = null
+
+  const renderService = NovaRenderService.createRenderService({
+    state,
+    utils,
+    elements: {
+      chatList: el.chatList,
+      messages: el.messages,
+      emptyState: el.emptyState,
+      pendingAttachments: el.pendingAttachments,
+      input: el.input,
+      sendBtn: el.sendBtn,
+      stopBtn: el.stopBtn,
+      mobileOverlay: el.mobileOverlay,
+      sidebar: el.sidebar,
+      chatTitle: el.chatTitle,
+    },
+    chatService,
+    messageService,
+    attachmentsService,
+    get composerService(){
+      return composerService
+    },
+  })
+
+  const streamService = NovaStreamService.createStreamService({
+    state,
+    api,
+    utils,
+    chatService,
+    messageService,
+    renderService,
+    attachmentsService,
+  })
+
+  composerService = NovaComposerService.createComposerService({
+    state,
+    utils,
+    elements: {
+      input: el.input,
+      sendBtn: el.sendBtn,
+      stopBtn: el.stopBtn,
+      attachBtn: el.attachBtn,
+      fileInput: el.fileInput,
+      composerForm: el.composerForm,
+      pendingAttachments: el.pendingAttachments,
+    },
+    attachmentsService,
+    streamService,
+    renderService,
+    chatService,
+  })
+
+  function setSidebarOpen(isOpen){
+    state.isSidebarOpen = Boolean(isOpen)
+
+    if(el.sidebar){
+      el.sidebar.classList.toggle("is-open", state.isSidebarOpen)
+    }
+
+    if(el.mobileOverlay){
+      el.mobileOverlay.classList.toggle("is-open", state.isSidebarOpen)
+      el.mobileOverlay.hidden = !state.isSidebarOpen
+    }
+
+    document.body.classList.toggle("sidebar-open", state.isSidebarOpen)
+  }
+
+  function closeSidebar(){
+    setSidebarOpen(false)
+  }
+
+  function toggleSidebar(){
+    setSidebarOpen(!state.isSidebarOpen)
+  }
+
+  function syncActiveChat(chatId){
+    chatService.setActiveChat(chatId)
+    renderService.renderHeader()
+    renderService.renderChatList()
+  }
+
+  async function loadChat(chatId, options = {}){
+    const targetChatId = String(chatId || "").trim()
+
+    if(!targetChatId){
+      messageService.clearMessages()
+      chatService.clearActiveChat()
+      renderService.renderAll()
+      return
+    }
+
+    state.isLoadingMessages = true
+    syncActiveChat(targetChatId)
+    renderService.renderAll()
+
+    try {
+      const messages = await chatService.loadMessages(targetChatId)
+      messageService.setMessages(messages)
+      renderService.renderAll()
+      renderService.scrollMessagesToBottomIfNeeded(true)
+    } catch(error){
+      messageService.setMessages([
+        messageService.createSystemMessage(`⚠️ Failed to load messages: ${error?.message || "Unknown error"}`),
+      ])
+      renderService.renderAll()
+    } finally {
+      state.isLoadingMessages = false
+
+      if(options.closeSidebar !== false){
+        closeSidebar()
+      }
+    }
+  }
+
+  function promptForRename(currentTitle){
+    const nextTitle = window.prompt("Rename chat", currentTitle || "")
+    return typeof nextTitle === "string" ? nextTitle.trim() : ""
+  }
+
+  async function handleRenameChat(chatId){
+    const targetChatId = String(chatId || "").trim()
+
+    if(!targetChatId){
+      return
+    }
+
+    const existing = state.chats.find(chat => String(chat.chat_id || "") === targetChatId)
+    const currentTitle = String(existing?.title || "")
+    const nextTitle = promptForRename(currentTitle)
+
+    if(!nextTitle || nextTitle === currentTitle){
+      return
+    }
+
+    try {
+      await chatService.renameChat(targetChatId, nextTitle)
+      renderService.renderHeader()
+      renderService.renderChatList()
+    } catch(error){
+      window.alert(`Rename failed: ${error?.message || "Unknown error"}`)
+    }
+  }
+
+  async function handleDeleteChat(chatId){
+    const targetChatId = String(chatId || "").trim()
+
+    if(!targetChatId){
+      return
+    }
+
+    const existing = state.chats.find(chat => String(chat.chat_id || "") === targetChatId)
+    const title = String(existing?.title || "this chat")
+    const confirmed = window.confirm(`Delete "${title}"?`)
+
+    if(!confirmed){
+      return
+    }
+
+    try {
+      await chatService.deleteChat(targetChatId)
+      renderService.renderChatList()
+
+      if(String(state.activeChatId || "") === ""){
+        messageService.clearMessages()
+        renderService.renderAll()
+      }
+    } catch(error){
+      window.alert(`Delete failed: ${error?.message || "Unknown error"}`)
+    }
+  }
+
+  async function handleNewChat(){
+    try {
+      const chat = await chatService.createChat("New chat")
+      messageService.clearMessages()
+      syncActiveChat(chat.chat_id)
+      renderService.renderAll()
+      composerService.focusInput()
+      closeSidebar()
+    } catch(error){
+      window.alert(`Failed to create chat: ${error?.message || "Unknown error"}`)
+    }
+  }
+
+  async function handleRegenerateMessage(_messageId){
+    const messages = Array.isArray(state.messages) ? state.messages : []
+
+    let lastUserMessage = null
+
+    for(let i = messages.length - 1; i >= 0; i -= 1){
+      if(String(messages[i].role || "").toLowerCase() === "user"){
+        lastUserMessage = messages[i]
+        break
+      }
+    }
+
+    if(!lastUserMessage){
+      return
+    }
+
+    if(state.isStreaming){
+      streamService.abortActiveStream()
+    }
+
+    const reversed = [...messages].reverse()
+    const latestAssistant = reversed.find(message => String(message.role || "").toLowerCase() === "assistant")
+
+    if(latestAssistant){
+      messageService.removeMessage(latestAssistant.id)
+      renderService.renderMessages()
+    }
+
+    composerService.setInputValue("")
+    renderService.renderComposerState()
+
+    try {
+      await streamService.sendMessage({
+        chatId: state.activeChatId || state.chatId,
+        message: lastUserMessage.content || "",
+        files: Array.isArray(lastUserMessage.attachments) ? lastUserMessage.attachments : [],
+      })
+      renderService.renderAll()
+    } catch(error){
+      messageService.addMessage(
+        messageService.createSystemMessage(`⚠️ Regenerate failed: ${error?.message || "Unknown error"}`)
+      )
+      renderService.renderAll()
+    }
+  }
+
+  function bindTopLevelEvents(){
+    el.btnSidebarToggle?.addEventListener("click", toggleSidebar)
+    el.btnNewChat?.addEventListener("click", () => {
+      void handleNewChat()
+    })
+
+    window.addEventListener("resize", () => {
+      if(window.innerWidth >= 960){
+        setSidebarOpen(false)
+      }
+    })
+  }
+
+  function bindRenderActions(){
+    renderService.bindMessageActions({
+      onRegenerateMessage(messageId){
+        void handleRegenerateMessage(messageId)
+      },
+    })
+
+    renderService.bindChatListActions({
+      onOpenChat(chatId){
+        void loadChat(chatId, { closeSidebar: true })
+      },
+      onRenameChat(chatId){
+        void handleRenameChat(chatId)
+      },
+      onDeleteChat(chatId){
+        void handleDeleteChat(chatId)
+      },
+    })
+
+    renderService.bindGlobalUi({
+      onCloseSidebar(){
+        closeSidebar()
+      },
+    })
+  }
+
+  async function initializeChats(){
+    try {
+      await chatService.loadChats()
+      renderService.renderChatList()
+
+      const firstChatId = String(state.activeChatId || state.chatId || state.chats?.[0]?.chat_id || "").trim()
+
+      if(firstChatId){
+        await loadChat(firstChatId, { closeSidebar: false })
+      } else {
+        renderService.renderAll()
+      }
+    } catch(error){
+      messageService.setMessages([
+        messageService.createSystemMessage(`⚠️ Failed to load chats: ${error?.message || "Unknown error"}`),
+      ])
+      renderService.renderAll()
+    }
+  }
+
+  function exposeDebug(){
+    window.Nova = {
+      state,
+      api,
+      el,
+      services: {
+        attachmentsService,
+        chatService,
+        messageService,
+        renderService,
+        streamService,
+        composerService,
+      },
+      actions: {
+        loadChat,
+        handleNewChat,
+        handleRenameChat,
+        handleDeleteChat,
+        handleRegenerateMessage,
+        setSidebarOpen,
+        toggleSidebar,
+        closeSidebar,
+      },
+    }
+  }
+
+  async function init(){
+    bindTopLevelEvents()
+    bindRenderActions()
+    composerService.init()
+    renderService.renderAll()
+    setSidebarOpen(false)
+    exposeDebug()
+    await initializeChats()
+  }
+
+  void init()
+}
+
+if(document.readyState === "loading"){
+  document.addEventListener("DOMContentLoaded", bootNova)
+} else {
+  bootNova()
+}
+
+})()

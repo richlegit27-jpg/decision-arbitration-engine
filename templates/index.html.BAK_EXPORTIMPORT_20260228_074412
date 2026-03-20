@@ -1,0 +1,988 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<!-- SERVED_TEST_20260227_215609 :: C:\Users\Owner\nova\templates\index.html -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Nova STABLE_UI_20260228_071444</title>
+
+  <!-- NOVA_UI_WORKSPACE_SESSIONS_V1 2026-02-28 -->
+
+  <style>
+    :root{
+      --bg: #0b1020;
+      --panel: rgba(255,255,255,.06);
+      --panel2: rgba(255,255,255,.08);
+      --stroke: rgba(255,255,255,.12);
+      --text: rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.65);
+      --muted2: rgba(255,255,255,.45);
+      --brand: #7c5cff;
+      --brand2:#34d399;
+      --danger:#ff4d4f;
+      --warn:#fbbf24;
+      --ok:#22c55e;
+      --shadow: 0 20px 55px rgba(0,0,0,.45);
+      --radius2: 22px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg:#f7f7fb;
+        --panel: rgba(0,0,0,.05);
+        --panel2: rgba(0,0,0,.07);
+        --stroke: rgba(0,0,0,.10);
+        --text: rgba(0,0,0,.88);
+        --muted: rgba(0,0,0,.62);
+        --muted2: rgba(0,0,0,.45);
+        --shadow: 0 20px 55px rgba(0,0,0,.12);
+      }
+    }
+    *{ box-sizing: border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      background: radial-gradient(1200px 700px at 20% 0%, rgba(124,92,255,.16), transparent 55%),
+                  radial-gradient(1000px 650px at 90% 10%, rgba(52,211,153,.10), transparent 55%),
+                  var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+    }
+    .app{
+      height:100%;
+      display:grid;
+      grid-template-columns: 260px 1fr;
+      gap: 14px;
+      padding: 14px;
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.04));
+      border: 1px solid var(--stroke);
+      border-radius: var(--radius2);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+
+    /* Sidebar */
+    .side{
+      display:flex;
+      flex-direction:column;
+      min-width: 220px;
+    }
+    .brand{
+      padding: 14px 14px 10px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 10px;
+      border-bottom: 1px solid var(--stroke);
+    }
+    .brand .logo{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight: 850;
+      letter-spacing:.2px;
+    }
+    .dot{
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--brand);
+      box-shadow: 0 0 0 6px rgba(124,92,255,.18);
+    }
+    .badge{
+      font-size:12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      color: var(--muted);
+      font-family: var(--mono);
+      background: rgba(255,255,255,.03);
+      white-space: nowrap;
+    }
+    .nav{
+      padding: 10px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .nav button{
+      width:100%;
+      text-align:left;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      color: var(--text);
+      cursor:pointer;
+      font-weight: 650;
+    }
+    .nav button:hover{ background: rgba(255,255,255,.06); }
+    .nav button.active{
+      border-color: rgba(124,92,255,.55);
+      background: rgba(124,92,255,.14);
+    }
+    .side .meta{
+      margin-top:auto;
+      padding: 12px 14px;
+      border-top: 1px solid var(--stroke);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .k{
+      display:inline-block;
+      padding: 2px 6px;
+      border-radius: 8px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      transform: translateY(-1px);
+    }
+
+    /* Main */
+    .main{
+      display:flex;
+      flex-direction:column;
+      min-width: 0;
+    }
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--stroke);
+      flex-wrap: wrap;
+    }
+    .status{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      flex-wrap: wrap;
+    }
+    .pill{
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+    }
+    .ok{ color: var(--ok); }
+    .warn{ color: var(--warn); }
+    .danger{ color: var(--danger); }
+
+    .tools{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap: wrap;
+    }
+
+    select, .inputMini{
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 14px;
+      font-family: var(--mono);
+      font-size: 12px;
+      outline: none;
+    }
+    select:focus, .inputMini:focus{
+      border-color: rgba(124,92,255,.55);
+      box-shadow: 0 0 0 4px rgba(124,92,255,.16);
+    }
+
+    .chat{
+      display:flex;
+      flex-direction:column;
+      gap: 10px;
+      padding: 14px;
+      overflow:auto;
+      flex: 1 1 auto;
+    }
+    .msg{
+      display:flex;
+      gap: 10px;
+      align-items:flex-start;
+      max-width: 980px;
+    }
+    .msg .who{
+      width: 34px; height: 34px;
+      border-radius: 12px;
+      border: 1px solid var(--stroke);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight: 850;
+      font-family: var(--mono);
+      background: rgba(255,255,255,.03);
+      flex: 0 0 auto;
+    }
+    .msg.user .who{ background: rgba(52,211,153,.12); border-color: rgba(52,211,153,.35); }
+    .msg.ai .who{ background: rgba(124,92,255,.12); border-color: rgba(124,92,255,.35); }
+
+    .bubbleWrap{
+      min-width:0;
+      flex: 1 1 auto;
+    }
+    .bubble{
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      border-radius: 16px;
+      padding: 10px 12px;
+      line-height: 1.55;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      min-width: 0;
+    }
+    .actions{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      margin-top: 6px;
+      color: var(--muted2);
+      font-size: 12px;
+      font-family: var(--mono);
+    }
+    .aBtn{
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      color: var(--muted);
+      padding: 6px 10px;
+      border-radius: 12px;
+      cursor:pointer;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    .aBtn:hover{ background: rgba(255,255,255,.06); }
+
+    .composer{
+      border-top: 1px solid var(--stroke);
+      padding: 12px 14px;
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items:end;
+    }
+    .leftControls{
+      display:flex;
+      flex-direction:column;
+      gap: 8px;
+      min-width: 0;
+    }
+    textarea{
+      width:100%;
+      min-height: 54px;
+      max-height: 240px;
+      resize: none;
+      padding: 12px 12px;
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      color: var(--text);
+      outline: none;
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.35;
+    }
+    textarea:focus{
+      border-color: rgba(124,92,255,.55);
+      box-shadow: 0 0 0 4px rgba(124,92,255,.16);
+    }
+    .hintRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      flex-wrap: wrap;
+    }
+    .toggle{
+      display:flex;
+      align-items:center;
+      gap: 8px;
+      user-select:none;
+      cursor:pointer;
+      font-family: var(--mono);
+    }
+    .toggle input{ transform: translateY(1px); }
+    .send{
+      display:flex;
+      flex-direction:column;
+      gap: 8px;
+      align-items: stretch;
+      justify-content: flex-end;
+    }
+    .btn{
+      border: 1px solid rgba(124,92,255,.5);
+      background: linear-gradient(180deg, rgba(124,92,255,.28), rgba(124,92,255,.18));
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 16px;
+      cursor:pointer;
+      font-weight: 850;
+      letter-spacing:.2px;
+      min-width: 120px;
+    }
+    .btn:hover{ filter: brightness(1.06); }
+    .btn:disabled{
+      opacity: .55;
+      cursor: not-allowed;
+      filter:none;
+    }
+    .smallBtn{
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      color: var(--muted);
+      padding: 8px 10px;
+      border-radius: 14px;
+      cursor:pointer;
+      font-family: var(--mono);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .smallBtn:hover{ background: rgba(255,255,255,.06); }
+
+    .mono{ font-family: var(--mono); }
+
+    /* Toast */
+    .toast{
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,.45);
+      border: 1px solid var(--stroke);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 14px;
+      font-family: var(--mono);
+      font-size: 12px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    .toast.show{
+      opacity: 1;
+      transform: translateX(-50%) translateY(-4px);
+    }
+    @media (prefers-color-scheme: light){
+      .toast{ background: rgba(255,255,255,.85); }
+    }
+
+    @media (max-width: 940px){
+      .app{ grid-template-columns: 1fr; }
+      .side{ display:none; }
+      .topbar{ align-items:flex-start; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <aside class="card side">
+      <div class="brand">
+        <div class="logo"><span class="dot"></span><span>Nova</span></div>
+        <div class="badge" id="buildStamp">UI</div>
+      </div>
+
+      <div class="nav">
+        <button class="active" data-mode="ask">Ask</button>
+        <button data-mode="command">Command</button>
+        <button data-mode="doctor">Doctor</button>
+      </div>
+
+      <div class="meta">
+        <div class="mono">Sessions</div>
+        <div style="margin-top:6px; line-height:1.8;">
+          Saved locally in your browser.<br/>
+          Each session has its own <span class="k">session_id</span>.
+        </div>
+        <div style="margin-top:10px;">
+          <div class="mono">Hotkeys</div>
+          <div style="margin-top:6px; line-height:1.8;">
+            <span class="k">Enter</span> send (Auto-send on)<br/>
+            <span class="k">Shift</span>+<span class="k">Enter</span> newline<br/>
+            <span class="k">Ctrl</span>+<span class="k">K</span> focus<br/>
+            <span class="k">Esc</span> clear input
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="card main">
+      <div class="topbar">
+        <div class="status">
+          <span class="pill">status: <span id="statusText" class="ok">ready</span></span>
+          <span class="pill">mode: <span id="modeText">ask</span></span>
+          <span class="pill">session: <span id="sessionText">…</span></span>
+          <span class="pill mono" id="latencyPill">lat: —</span>
+        </div>
+
+        <div class="tools">
+          <select id="sessionSelect" title="Choose a session"></select>
+          <button class="smallBtn" id="newSessBtn">New</button>
+          <button class="smallBtn" id="renameSessBtn">Rename</button>
+          <button class="smallBtn" id="deleteSessBtn">Delete</button>
+          <span class="pill mono" id="uiStamp">UI: STABLE_UI_20260228_071444</span>
+          <button class="smallBtn" id="clearBtn">Clear</button>
+          <button class="smallBtn" id="pingBtn">Ping</button>
+        </div>
+      </div>
+
+      <div id="chat" class="chat" aria-live="polite"></div>
+
+      <div class="composer">
+        <div class="leftControls">
+          <textarea id="input" placeholder="Type here…" spellcheck="false"></textarea>
+          <div class="hintRow">
+            <div>Enter = send &nbsp; • &nbsp; Shift+Enter = newline</div>
+            <label class="toggle" title="If enabled, Enter sends. If disabled, Enter inserts newline.">
+              <input id="autoSend" type="checkbox" checked />
+              <span>Auto-send on Enter</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="send">
+          <button class="btn" id="sendBtn">Send</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast">OK</div>
+
+  <script>
+  (function(){
+    "use strict";
+
+    const $ = (sel) => document.querySelector(sel);
+
+    const chatEl = $("#chat");
+    const inputEl = $("#input");
+    const sendBtn = $("#sendBtn");
+    const clearBtn = $("#clearBtn");
+    const pingBtn = $("#pingBtn");
+    const autoSendEl = $("#autoSend");
+
+    const statusText = $("#statusText");
+    const modeText = $("#modeText");
+    const sessionText = $("#sessionText");
+    const buildStamp = $("#buildStamp");
+    const latencyPill = $("#latencyPill");
+    const toastEl = $("#toast");
+
+    const sessionSelect = $("#sessionSelect");
+    const newSessBtn = $("#newSessBtn");
+    const renameSessBtn = $("#renameSessBtn");
+    const deleteSessBtn = $("#deleteSessBtn");
+
+    // ---- Storage Keys
+    const LS_AUTOSEND = "NOVA_AUTOSEND_V1";
+    const LS_MODE = "NOVA_MODE_V1";
+    const LS_DRAFT = "NOVA_DRAFT_V1";
+
+    const LS_SESSIONS = "NOVA_WORKSPACE_SESSIONS_V1"; // array of sessions
+    const LS_ACTIVE = "NOVA_WORKSPACE_ACTIVE_V1";     // active session id
+
+    // ---- Session shape:
+    // { id: string, name: string, created: number, updated: number, messages: [{role:'user'|'ai', text:string, ts:number}] }
+
+    let mode = localStorage.getItem(LS_MODE) || "ask";
+    let busy = false;
+
+    let sessions = [];
+    let activeId = null;
+
+    function now(){ return Date.now(); }
+    function uuid(){
+      return "s_" + Math.random().toString(16).slice(2,10) + Math.random().toString(16).slice(2,10);
+    }
+
+    function toast(msg){
+      try{
+        toastEl.textContent = msg || "OK";
+        toastEl.classList.add("show");
+        clearTimeout(toastEl.__t);
+        toastEl.__t = setTimeout(() => toastEl.classList.remove("show"), 900);
+      }catch(e){}
+    }
+
+    function setStatus(text, cls){
+      statusText.textContent = text;
+      statusText.className = cls || "";
+    }
+
+    function setLatency(ms){
+      if(typeof ms === "number" && isFinite(ms)) latencyPill.textContent = "lat: " + Math.round(ms) + "ms";
+      else latencyPill.textContent = "lat: —";
+    }
+
+    function scrollDown(){ try{ chatEl.scrollTop = chatEl.scrollHeight; }catch(e){} }
+
+    function setBusy(v){
+      busy = !!v;
+      sendBtn.disabled = busy;
+      inputEl.disabled = busy;
+    }
+
+    function autoGrow(){
+      try{
+        inputEl.style.height = "auto";
+        inputEl.style.height = Math.min(240, inputEl.scrollHeight) + "px";
+      }catch(e){}
+    }
+
+    function saveDraft(){
+      try{ localStorage.setItem(LS_DRAFT, inputEl.value || ""); }catch(e){}
+    }
+
+    function loadDraft(){
+      try{
+        const d = localStorage.getItem(LS_DRAFT);
+        if(typeof d === "string") inputEl.value = d;
+      }catch(e){}
+    }
+
+    // ---- Session persistence
+    function loadSessions(){
+      try{
+        const raw = localStorage.getItem(LS_SESSIONS);
+        const arr = raw ? JSON.parse(raw) : [];
+        sessions = Array.isArray(arr) ? arr : [];
+      }catch(e){
+        sessions = [];
+      }
+
+      // sanitize
+      sessions = sessions
+        .filter(s => s && typeof s.id === "string")
+        .map(s => ({
+          id: String(s.id),
+          name: typeof s.name === "string" ? s.name : "Session",
+          created: +s.created || now(),
+          updated: +s.updated || +s.created || now(),
+          messages: Array.isArray(s.messages) ? s.messages.filter(m => m && (m.role==="user"||m.role==="ai") && typeof m.text==="string").map(m => ({role:m.role, text:m.text, ts:+m.ts||now()})) : []
+        }));
+
+      // active
+      activeId = localStorage.getItem(LS_ACTIVE);
+      if(!activeId || !sessions.some(s => s.id === activeId)){
+        activeId = sessions.length ? sessions[0].id : null;
+      }
+
+      if(!sessions.length){
+        const s = newSession("Welcome");
+        sessions = [s];
+        activeId = s.id;
+        saveSessions();
+      } else {
+        saveSessions(); // normalize
+      }
+    }
+
+    function saveSessions(){
+      try{ localStorage.setItem(LS_SESSIONS, JSON.stringify(sessions)); }catch(e){}
+      try{ localStorage.setItem(LS_ACTIVE, activeId || ""); }catch(e){}
+    }
+
+    function getActive(){
+      return sessions.find(s => s.id === activeId) || null;
+    }
+
+    function newSession(name){
+      const t = now();
+      return {
+        id: uuid(),
+        name: (name && String(name).trim()) ? String(name).trim() : ("Session " + new Date(t).toLocaleString()),
+        created: t,
+        updated: t,
+        messages: []
+      };
+    }
+
+    function rebuildSessionSelect(){
+      const act = getActive();
+      sessionSelect.innerHTML = "";
+      // newest first
+      const sorted = [...sessions].sort((a,b)=> (b.updated||0)-(a.updated||0));
+
+      for(const s of sorted){
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = s.name;
+        if(act && s.id === act.id) opt.selected = true;
+        sessionSelect.appendChild(opt);
+      }
+    }
+
+    function renderMessages(){
+      chatEl.innerHTML = "";
+      const act = getActive();
+      if(!act) return;
+
+      for(const m of act.messages){
+        addMsgDom(m.role, m.text, false);
+      }
+      scrollDown();
+    }
+
+    function addMsgDom(role, text, save=true){
+      const wrap = document.createElement("div");
+      wrap.className = "msg " + (role === "user" ? "user" : "ai");
+
+      const who = document.createElement("div");
+      who.className = "who";
+      who.textContent = role === "user" ? "U" : "N";
+
+      const bubbleWrap = document.createElement("div");
+      bubbleWrap.className = "bubbleWrap";
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = text;
+
+      bubbleWrap.appendChild(bubble);
+
+      if(role === "ai"){
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "aBtn";
+        copyBtn.type = "button";
+        copyBtn.textContent = "Copy";
+        copyBtn.addEventListener("click", async () => {
+          try{
+            await navigator.clipboard.writeText(bubble.textContent || "");
+            toast("Copied");
+          }catch(e){
+            try{
+              const ta = document.createElement("textarea");
+              ta.value = bubble.textContent || "";
+              document.body.appendChild(ta);
+              ta.select();
+              document.execCommand("copy");
+              ta.remove();
+              toast("Copied");
+            }catch(e2){
+              toast("Copy failed");
+            }
+          }
+        });
+
+        actions.appendChild(copyBtn);
+        bubbleWrap.appendChild(actions);
+      }
+
+      wrap.appendChild(who);
+      wrap.appendChild(bubbleWrap);
+      chatEl.appendChild(wrap);
+      scrollDown();
+
+      if(save){
+        const act = getActive();
+        if(act){
+          act.messages.push({ role, text, ts: now() });
+          act.updated = now();
+          saveSessions();
+          rebuildSessionSelect();
+        }
+      }
+
+      return bubble;
+    }
+
+    // ---- Backend call (non-stream, stable)
+    async function postChat(text){
+      const act = getActive();
+      const sid = act ? act.id : "ui";
+      const url = "/api/chat?session_id=" + encodeURIComponent(sid);
+
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+
+      const raw = await r.text();
+      let data = null;
+      try{ data = JSON.parse(raw); }catch(e){}
+
+      if(!r.ok){
+        const msg = (data && (data.error || data.detail)) ? (data.error || data.detail) : raw;
+        const err = new Error("HTTP " + r.status + " " + msg);
+        err.status = r.status;
+        err.body = raw;
+        throw err;
+      }
+      if(data && data.reply !== undefined) return data.reply;
+      return raw;
+    }
+
+    async function send(){
+      const text0 = (inputEl.value || "");
+      const text = text0.trim();
+      if(!text || busy) return;
+
+      addMsgDom("user", text, true);
+      inputEl.value = "";
+      saveDraft();
+      autoGrow();
+
+      setBusy(true);
+      setStatus("thinking…", "warn");
+      setLatency(null);
+
+      const aiBubble = addMsgDom("ai", "…", true);
+      const t0 = performance.now();
+
+      try{
+        let payload = text;
+        if(mode === "command" && !text.startsWith("/")) payload = "/cmd " + text;
+        if(mode === "doctor" && !text.startsWith("/")) payload = "/doctor " + text;
+
+        const reply = await postChat(payload);
+
+        // Replace last AI message text in storage AND in DOM
+        aiBubble.textContent = reply;
+
+        const act = getActive();
+        if(act && act.messages.length){
+          // last message should be AI placeholder; update it
+          for(let i=act.messages.length-1; i>=0; i--){
+            if(act.messages[i].role === "ai"){
+              act.messages[i].text = reply;
+              act.messages[i].ts = now();
+              act.updated = now();
+              break;
+            }
+          }
+          saveSessions();
+          rebuildSessionSelect();
+        }
+
+        setLatency(performance.now() - t0);
+        setStatus("ready", "ok");
+      }catch(err){
+        console.error("SEND ERROR:", err);
+        aiBubble.textContent = "Error: " + (err && err.message ? err.message : String(err));
+
+        const act = getActive();
+        if(act && act.messages.length){
+          for(let i=act.messages.length-1; i>=0; i--){
+            if(act.messages[i].role === "ai"){
+              act.messages[i].text = aiBubble.textContent;
+              act.messages[i].ts = now();
+              act.updated = now();
+              break;
+            }
+          }
+          saveSessions();
+          rebuildSessionSelect();
+        }
+
+        setStatus("error", "danger");
+      }finally{
+        setBusy(false);
+        try{ inputEl.focus(); }catch(e){}
+        scrollDown();
+      }
+    }
+
+    function bindNav(){
+      const buttons = document.querySelectorAll(".nav button[data-mode]");
+      buttons.forEach(btn => {
+        btn.addEventListener("click", () => {
+          buttons.forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          mode = btn.getAttribute("data-mode") || "ask";
+          localStorage.setItem(LS_MODE, mode);
+          modeText.textContent = mode;
+          try{ inputEl.focus(); }catch(e){}
+        });
+      });
+    }
+
+    function applyAutosend(){
+      const as = localStorage.getItem(LS_AUTOSEND);
+      if(as === null){
+        localStorage.setItem(LS_AUTOSEND, "1");
+        autoSendEl.checked = true;
+      } else {
+        autoSendEl.checked = (as === "1");
+      }
+      autoSendEl.addEventListener("change", () => {
+        localStorage.setItem(LS_AUTOSEND, autoSendEl.checked ? "1" : "0");
+      });
+    }
+
+    function setActiveSession(id){
+      if(!id || !sessions.some(s => s.id === id)) return;
+      activeId = id;
+      saveSessions();
+      rebuildSessionSelect();
+      const act = getActive();
+      sessionText.textContent = act ? act.id : "…";
+      renderMessages();
+      setStatus("ready", "ok");
+      setLatency(null);
+    }
+
+    function init(){
+      buildStamp.textContent = "WORKSPACE V1";
+      modeText.textContent = mode;
+
+      loadSessions();
+      rebuildSessionSelect();
+
+      const act = getActive();
+      sessionText.textContent = act ? act.id : "…";
+
+      applyAutosend();
+      loadDraft();
+
+      // render active session messages
+      renderMessages();
+
+      // If empty session, seed with a welcome message once
+      if(act && (!act.messages || !act.messages.length)){
+        addMsgDom("ai", "Workspace sessions are live.\n- Use the dropdown to switch sessions.\n- New creates a fresh context.\n- Rename/ Delete manage your workspace.\nAll stored locally in this browser.", true);
+      }
+
+      // UI handlers
+      sendBtn.addEventListener("click", send);
+
+      inputEl.addEventListener("input", () => { autoGrow(); saveDraft(); });
+
+      inputEl.addEventListener("keydown", (ev) => {
+        if(ev.key === "Enter" && !ev.shiftKey){
+          if(autoSendEl.checked){
+            ev.preventDefault();
+            send();
+            return;
+          }
+        }
+        if(ev.key === "Escape"){
+          ev.preventDefault();
+          inputEl.value = "";
+          saveDraft();
+          autoGrow();
+          return;
+        }
+      });
+
+      document.addEventListener("keydown", (ev) => {
+        if((ev.ctrlKey || ev.metaKey) && (ev.key === "k" || ev.key === "K")){
+          ev.preventDefault();
+          try{ inputEl.focus(); }catch(e){}
+        }
+      }, { passive:false });
+
+      clearBtn.addEventListener("click", () => {
+        // Clear only the current session messages
+        const act = getActive();
+        if(act){
+          act.messages = [];
+          act.updated = now();
+          saveSessions();
+        }
+        chatEl.innerHTML = "";
+        setStatus("cleared", "ok");
+        setLatency(null);
+        toast("Cleared session");
+        try{ inputEl.focus(); }catch(e){}
+        rebuildSessionSelect();
+      });
+
+      pingBtn.addEventListener("click", async () => {
+        try{
+          setStatus("ping…", "warn");
+          const r = await fetch("/api/health");
+          const t = await r.text();
+          setStatus(r.ok ? "ready" : "error", r.ok ? "ok" : "danger");
+          addMsgDom("ai", "Ping /api/health -> HTTP " + r.status + "\n" + t, true);
+        }catch(e){
+          setStatus("error", "danger");
+          addMsgDom("ai", "Ping failed: " + (e && e.message ? e.message : String(e)), true);
+        }
+      });
+
+      sessionSelect.addEventListener("change", () => {
+        const id = sessionSelect.value;
+        setActiveSession(id);
+      });
+
+      newSessBtn.addEventListener("click", () => {
+        const name = prompt("New session name:", "New Session");
+        const s = newSession(name || "New Session");
+        sessions.push(s);
+        activeId = s.id;
+        saveSessions();
+        rebuildSessionSelect();
+        setActiveSession(s.id);
+        toast("New session");
+      });
+
+      renameSessBtn.addEventListener("click", () => {
+        const act = getActive();
+        if(!act) return;
+        const name = prompt("Rename session:", act.name);
+        if(name === null) return;
+        act.name = (String(name).trim() || act.name);
+        act.updated = now();
+        saveSessions();
+        rebuildSessionSelect();
+        toast("Renamed");
+      });
+
+      deleteSessBtn.addEventListener("click", () => {
+        const act = getActive();
+        if(!act) return;
+        const ok = confirm("Delete session '" + act.name + "'? This cannot be undone.");
+        if(!ok) return;
+
+        sessions = sessions.filter(s => s.id !== act.id);
+        if(!sessions.length){
+          const s = newSession("Welcome");
+          sessions = [s];
+          activeId = s.id;
+        } else {
+          // pick newest
+          sessions.sort((a,b)=>(b.updated||0)-(a.updated||0));
+          activeId = sessions[0].id;
+        }
+        saveSessions();
+        rebuildSessionSelect();
+        setActiveSession(activeId);
+        toast("Deleted");
+      });
+
+      bindNav();
+      autoGrow();
+      try{ inputEl.focus(); }catch(e){}
+      setStatus("ready", "ok");
+      setLatency(null);
+    }
+
+    if(document.readyState === "loading"){
+      document.addEventListener("DOMContentLoaded", init);
+    } else {
+      init();
+    }
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,490 @@
+// C:\Users\Owner\nova\static\js\chat.js
+
+(() => {
+"use strict"
+
+function byId(id){
+  return document.getElementById(id)
+}
+
+function escapeHtml(value){
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;")
+}
+
+function makeId(prefix){
+  if(window.crypto && typeof window.crypto.randomUUID === "function"){
+    return window.crypto.randomUUID()
+  }
+  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`
+}
+
+const SCROLL_LOCK_THRESHOLD = 120
+
+const el = {
+  body: document.body,
+  appShell: byId("appShell"),
+  sidebar: byId("sidebar"),
+  mobileOverlay: byId("mobileOverlay"),
+  btnSidebarToggle: byId("btnSidebarToggle"),
+  btnCloseSidebar: byId("btnCloseSidebar"),
+  btnNewChat: byId("btnNewChat"),
+  chatList: byId("chatList"),
+  messagesScroll: byId("messagesScroll"),
+  messages: byId("messages"),
+  composerWrap: byId("composerWrap"),
+  composerForm: byId("composerForm"),
+  input: byId("input"),
+  sendBtn: byId("sendBtn"),
+  stopBtn: byId("stopBtn"),
+  attachBtn: byId("attachBtn"),
+  topbarTitle: byId("topbarTitle"),
+  jumpToLatestBtn: byId("jumpToLatestBtn"),
+  emptyState: byId("emptyState"),
+  emptySuggestions: byId("emptySuggestions"),
+  pendingAttachments: byId("pendingAttachments"),
+}
+
+let stateService = null
+let renderService = null
+let uiService = null
+let eventsService = null
+let actionsService = null
+
+let state = null
+let getStoredActiveChatId = null
+let setStoredActiveChatId = null
+let ensureChatsArray = null
+let ensureMessagesArray = null
+let getActiveChat = null
+let getChatTitle = null
+let getChatId = null
+let normalizeChat = null
+let normalizeMessage = null
+
+function saveDraftForActiveChat(){
+  const chatId = String(state?.activeChatId || "")
+  if(!chatId || !el.input || !state){
+    return
+  }
+  state.draftByChatId[chatId] = el.input.value || ""
+}
+
+function restoreDraftForActiveChat(){
+  if(!el.input || !state){
+    return
+  }
+
+  const chatId = String(state.activeChatId || "")
+  const nextValue = chatId ? String(state.draftByChatId[chatId] || "") : ""
+  el.input.value = nextValue
+  autoResizeInput()
+  updateComposerState()
+}
+
+function autoResizeInput(){
+  uiService?.autoResizeInput?.()
+}
+
+function focusInput(){
+  uiService?.focusInput?.()
+}
+
+function isNearBottom(){
+  return uiService?.isNearBottom?.() ?? true
+}
+
+function scrollToBottom(force = false){
+  uiService?.scrollToBottom?.(force)
+}
+
+function openSidebar(){
+  uiService?.openSidebar?.()
+}
+
+function closeSidebar(){
+  uiService?.closeSidebar?.()
+}
+
+function syncSidebarForViewport(){
+  uiService?.syncSidebarForViewport?.()
+}
+
+function handleMessagesScroll(){
+  uiService?.handleMessagesScroll?.()
+}
+
+function updateComposerState(){
+  renderService?.updateComposerState?.()
+}
+
+function renderMessages(){
+  renderService?.renderMessages?.()
+}
+
+function renderPendingAttachments(){
+  renderService?.renderPendingAttachments?.()
+}
+
+function renderAll(){
+  renderService?.renderAll?.()
+}
+
+const api = window.NovaAPI || null
+
+let chatService = null
+let attachmentsService = null
+let streamService = null
+
+function handleResize(){
+  syncSidebarForViewport()
+  renderService?.updateJumpButton?.()
+}
+
+async function initStateService(){
+  const stateFactory =
+    window.NovaChatState?.create ||
+    window.NovaChatState?.createChatStateService ||
+    null
+
+  if(typeof stateFactory !== "function"){
+    throw new Error("Nova chat state service failed to initialize.")
+  }
+
+  stateService = stateFactory({
+    makeId,
+  })
+
+  state = stateService.state
+  getStoredActiveChatId = stateService.getStoredActiveChatId
+  setStoredActiveChatId = stateService.setStoredActiveChatId
+  ensureChatsArray = stateService.ensureChatsArray
+  ensureMessagesArray = stateService.ensureMessagesArray
+  getActiveChat = stateService.getActiveChat
+  getChatTitle = stateService.getChatTitle
+  getChatId = stateService.getChatId
+  normalizeChat = stateService.normalizeChat
+  normalizeMessage = stateService.normalizeMessage
+}
+
+async function initCoreServices(){
+  chatService = window.NovaChatService?.create?.({
+    state,
+    api,
+    elements: el,
+  }) || null
+
+  attachmentsService =
+    window.NovaAttachmentsService?.create?.({
+      state,
+      elements: el,
+      onChange(files){
+        actionsService?.setPendingFiles?.(files)
+      },
+    }) ||
+    window.NovaAttachments?.create?.({
+      state,
+      elements: el,
+      onChange(files){
+        actionsService?.setPendingFiles?.(files)
+      },
+    }) ||
+    null
+
+  const streamFactory =
+    window.NovaStreamService?.create ||
+    window.NovaStreamService?.createStreamService ||
+    null
+
+  streamService = typeof streamFactory === "function"
+    ? streamFactory({
+        state,
+        api,
+        elements: {
+          messages: el.messages,
+        },
+        onStart(){
+          state.isStreaming = true
+          renderAll()
+          scrollToBottom(true)
+        },
+        onMeta(payload = {}){
+          if(payload?.chat){
+            const incoming = normalizeChat(payload.chat)
+            const existingIndex = state.chats.findIndex((chat) => getChatId(chat) === getChatId(incoming))
+
+            if(existingIndex >= 0){
+              state.chats[existingIndex] = incoming
+            }else{
+              state.chats.unshift(incoming)
+            }
+
+            if(!state.activeChatId){
+              state.activeChatId = getChatId(incoming)
+              setStoredActiveChatId(state.activeChatId)
+            }
+          }
+
+          renderAll()
+        },
+        onToken(token){
+          const messages = ensureMessagesArray()
+          let lastMessage = messages[messages.length - 1]
+
+          if(!lastMessage || String(lastMessage.role) !== "assistant"){
+            lastMessage = normalizeMessage({
+              id: makeId("msg"),
+              role: "assistant",
+              content: "",
+            })
+            messages.push(lastMessage)
+          }
+
+          lastMessage.content = `${lastMessage.content || ""}${token || ""}`
+          renderMessages()
+          renderService?.updateJumpButton?.()
+          scrollToBottom()
+        },
+        onDone(payload = {}){
+          state.isStreaming = false
+
+          if(Array.isArray(payload?.messages)){
+            state.messages = payload.messages.map(normalizeMessage)
+          }
+
+          if(payload?.chat){
+            const incoming = normalizeChat(payload.chat)
+            const existingIndex = state.chats.findIndex((chat) => getChatId(chat) === getChatId(incoming))
+
+            if(existingIndex >= 0){
+              state.chats[existingIndex] = incoming
+            }else{
+              state.chats.unshift(incoming)
+            }
+
+            state.activeChatId = getChatId(incoming)
+            setStoredActiveChatId(state.activeChatId)
+          }
+
+          renderAll()
+          scrollToBottom(true)
+        },
+        onError(error){
+          console.error("Nova stream error:", error)
+          state.isStreaming = false
+          renderAll()
+        },
+        onFinally(){
+          state.isStreaming = false
+          updateComposerState()
+          renderAll()
+        },
+      })
+    : null
+
+  if(!streamService){
+    console.error("Nova stream service failed to initialize.", {
+      NovaStreamService: window.NovaStreamService,
+      hasCreate: typeof window.NovaStreamService?.create,
+      hasCreateStreamService: typeof window.NovaStreamService?.createStreamService,
+    })
+  }
+}
+
+async function initRenderService(){
+  const renderFactory =
+    window.NovaChatRender?.create ||
+    window.NovaChatRender?.createRenderService ||
+    null
+
+  if(typeof renderFactory !== "function"){
+    throw new Error("Nova chat render service failed to initialize.")
+  }
+
+  renderService = renderFactory({
+    state,
+    elements: el,
+    utils: {
+      escapeHtml,
+      getChatTitle,
+      getChatId,
+      ensureChatsArray,
+      ensureMessagesArray,
+      getActiveChat,
+    },
+  })
+}
+
+async function initUiService(){
+  const uiFactory =
+    window.NovaChatUi?.create ||
+    window.NovaChatUi?.createChatUiService ||
+    null
+
+  if(typeof uiFactory !== "function"){
+    throw new Error("Nova chat ui service failed to initialize.")
+  }
+
+  uiService = uiFactory({
+    state,
+    elements: el,
+    renderService,
+    constants: {
+      SCROLL_LOCK_THRESHOLD,
+    },
+  })
+}
+
+async function initActionsService(){
+  const actionsFactory =
+    window.NovaChatActions?.create ||
+    window.NovaChatActions?.createChatActionsService ||
+    null
+
+  if(typeof actionsFactory !== "function"){
+    throw new Error("Nova chat actions service failed to initialize.")
+  }
+
+  actionsService = actionsFactory({
+    state,
+    elements: el,
+    services: {
+      chatService,
+      attachmentsService,
+      streamService,
+    },
+    utils: {
+      ensureChatsArray,
+      ensureMessagesArray,
+      getChatId,
+      getChatTitle,
+      normalizeChat,
+      normalizeMessage,
+      makeId,
+      getStoredActiveChatId,
+      setStoredActiveChatId,
+      saveDraftForActiveChat,
+      restoreDraftForActiveChat,
+    },
+    ui: {
+      autoResizeInput,
+      focusInput,
+      isNearBottom,
+      scrollToBottom,
+    },
+    render: {
+      updateComposerState,
+      renderMessages,
+      renderPendingAttachments,
+      renderAll,
+    },
+  })
+}
+
+async function initEventsService(){
+  const eventsFactory =
+    window.NovaChatEvents?.create ||
+    window.NovaChatEvents?.createChatEventsService ||
+    null
+
+  if(typeof eventsFactory !== "function"){
+    throw new Error("Nova chat events service failed to initialize.")
+  }
+
+  eventsService = eventsFactory({
+    state,
+    elements: el,
+    actions: {
+      saveDraftForActiveChat,
+      updateComposerState,
+      createChat: (...args) => actionsService?.createChat?.(...args),
+      loadChat: (...args) => actionsService?.loadChat?.(...args),
+      deleteChat: (...args) => actionsService?.deleteChat?.(...args),
+      startRenameChat: (...args) => actionsService?.startRenameChat?.(...args),
+      cancelRenameChat: (...args) => actionsService?.cancelRenameChat?.(...args),
+      commitRenameFromInput: (...args) => actionsService?.commitRenameFromInput?.(...args),
+      copyMessage: (...args) => actionsService?.copyMessage?.(...args),
+      retryFromMessage: (...args) => actionsService?.retryFromMessage?.(...args),
+      deleteMessage: (...args) => actionsService?.deleteMessage?.(...args),
+      removePendingFileByIndex: (...args) => actionsService?.removePendingFileByIndex?.(...args),
+      sendCurrentMessage: (...args) => actionsService?.sendCurrentMessage?.(...args),
+      stopStreaming: (...args) => actionsService?.stopStreaming?.(...args),
+      openFilePicker: (...args) => actionsService?.openFilePicker?.(...args),
+      onResize: handleResize,
+    },
+    ui: {
+      autoResizeInput,
+      focusInput,
+      openSidebar,
+      closeSidebar,
+      handleMessagesScroll,
+      scrollToBottom,
+    },
+  })
+}
+
+async function boot(){
+  await initStateService()
+  await initCoreServices()
+  await initRenderService()
+  await initUiService()
+  await initActionsService()
+  await initEventsService()
+
+  eventsService?.wireDomEvents?.()
+  syncSidebarForViewport()
+  autoResizeInput()
+  updateComposerState()
+  renderAll()
+
+  try{
+    await actionsService?.loadChats?.()
+
+    if(state.activeChatId){
+      await actionsService?.loadChat?.(state.activeChatId)
+    }else{
+      renderAll()
+      focusInput()
+    }
+  }catch(error){
+    console.error("Nova boot error:", error)
+    renderAll()
+  }
+}
+
+window.NovaChatApp = {
+  get state(){
+    return state
+  },
+  elements: el,
+  renderAll,
+  loadChats: (...args) => actionsService?.loadChats?.(...args),
+  loadChat: (...args) => actionsService?.loadChat?.(...args),
+  createChat: (...args) => actionsService?.createChat?.(...args),
+  deleteChat: (...args) => actionsService?.deleteChat?.(...args),
+  startRenameChat: (...args) => actionsService?.startRenameChat?.(...args),
+  cancelRenameChat: (...args) => actionsService?.cancelRenameChat?.(...args),
+  persistRename: (...args) => actionsService?.persistRename?.(...args),
+  sendCurrentMessage: (...args) => actionsService?.sendCurrentMessage?.(...args),
+  stopStreaming: (...args) => actionsService?.stopStreaming?.(...args),
+  scrollToBottom,
+  setPendingFiles: (...args) => actionsService?.setPendingFiles?.(...args),
+}
+
+if(document.readyState === "loading"){
+  document.addEventListener("DOMContentLoaded", () => {
+    boot().catch((error) => {
+      console.error("Nova boot failure:", error)
+    })
+  }, { once: true })
+}else{
+  boot().catch((error) => {
+    console.error("Nova boot failure:", error)
+  })
+}
+
+})()
