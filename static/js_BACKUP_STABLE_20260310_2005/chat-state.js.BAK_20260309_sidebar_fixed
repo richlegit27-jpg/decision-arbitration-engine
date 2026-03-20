@@ -1,0 +1,123 @@
+// C:\Users\Owner\nova\static\js\chat-state.js
+
+(() => {
+"use strict"
+
+function createChatStateService(options = {}){
+  const {
+    makeId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+  } = options
+
+  const STORAGE_KEYS = {
+    activeChatId: "nova_active_chat_id",
+  }
+
+  const state = {
+    chats: [],
+    activeChatId: null,
+    messages: [],
+    renamingChatId: null,
+    isStreaming: false,
+    isLoadingChats: false,
+    isLoadingMessages: false,
+    hasUserScrolledUp: false,
+    pendingAttachments: [],
+    pendingFiles: [],
+    draftByChatId: {},
+  }
+
+  function getStoredActiveChatId(){
+    try{
+      return localStorage.getItem(STORAGE_KEYS.activeChatId) || null
+    }catch(_error){
+      return null
+    }
+  }
+
+  function setStoredActiveChatId(value){
+    try{
+      if(value){
+        localStorage.setItem(STORAGE_KEYS.activeChatId, String(value))
+      }else{
+        localStorage.removeItem(STORAGE_KEYS.activeChatId)
+      }
+    }catch(_error){
+      // ignore storage failures
+    }
+  }
+
+  function ensureChatsArray(){
+    if(!Array.isArray(state.chats)){
+      state.chats = []
+    }
+    return state.chats
+  }
+
+  function ensureMessagesArray(){
+    if(!Array.isArray(state.messages)){
+      state.messages = []
+    }
+    return state.messages
+  }
+
+  function getActiveChat(){
+    const chatId = String(state.activeChatId || "")
+    if(!chatId){
+      return null
+    }
+    return ensureChatsArray().find((chat) => String(chat.chat_id || chat.id || "") === chatId) || null
+  }
+
+  function getChatTitle(chat){
+    if(!chat){
+      return "New chat"
+    }
+    return String(chat.title || chat.name || "New chat").trim() || "New chat"
+  }
+
+  function getChatId(chat){
+    return String(chat?.chat_id || chat?.id || "")
+  }
+
+  function normalizeChat(chat){
+    const chatId = String(chat?.chat_id || chat?.id || makeId("chat"))
+    return {
+      ...chat,
+      id: chatId,
+      chat_id: chatId,
+      title: String(chat?.title || chat?.name || "New chat").trim() || "New chat",
+    }
+  }
+
+  function normalizeMessage(message){
+    const role = String(message?.role || "assistant").trim() || "assistant"
+    return {
+      ...message,
+      id: String(message?.id || message?.message_id || makeId("msg")),
+      role,
+      content: String(message?.content || message?.text || ""),
+      attachments: Array.isArray(message?.attachments) ? message.attachments : [],
+    }
+  }
+
+  return {
+    STORAGE_KEYS,
+    state,
+    getStoredActiveChatId,
+    setStoredActiveChatId,
+    ensureChatsArray,
+    ensureMessagesArray,
+    getActiveChat,
+    getChatTitle,
+    getChatId,
+    normalizeChat,
+    normalizeMessage,
+  }
+}
+
+window.NovaChatState = {
+  create: createChatStateService,
+  createChatStateService,
+}
+
+})()

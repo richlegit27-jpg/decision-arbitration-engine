@@ -1,0 +1,340 @@
+// C:\Users\Owner\nova\static\js\chat-sidebar.js
+
+(() => {
+"use strict"
+
+const chatStateApi = window.NovaChatState
+const chatStorage = window.NovaChatStorage
+
+if(!chatStateApi){
+  throw new Error("NovaChatSidebar: window.NovaChatState is required")
+}
+
+if(!chatStorage){
+  throw new Error("NovaChatSidebar: window.NovaChatStorage is required")
+}
+
+const { state } = chatStateApi
+
+const DEFAULT_CHAT_TITLE = "New chat"
+
+const el = {
+  body: document.body,
+  sidebar: document.getElementById("sidebar"),
+  mobileOverlay: document.getElementById("mobileOverlay"),
+  btnSidebarToggle: document.getElementById("btnSidebarToggle"),
+  btnCloseSidebar: document.getElementById("btnCloseSidebar"),
+  btnNewChat: document.getElementById("btnNewChat"),
+  chatList: document.getElementById("chatList"),
+  topbarTitle: document.getElementById("topbarTitle"),
+}
+
+let eventsBound = false
+let callbacks = {
+  onAfterCreate: null,
+  onAfterSwitch: null,
+  onAfterRename: null,
+  onAfterDelete: null,
+}
+
+function ensureChatsArray(){
+  if(!Array.isArray(state.chats)){
+    state.chats = []
+  }
+  return state.chats
+}
+
+function isMobile(){
+  return window.innerWidth <= 900
+}
+
+function getChatId(chat){
+  return String(chat?.chat_id || chat?.id || "").trim()
+}
+
+function escapeHtml(value){
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;")
+}
+
+function getActiveChat(){
+  const chats = ensureChatsArray()
+  const activeChatId = String(state.activeChatId || "").trim()
+  return chats.find(chat => getChatId(chat) === activeChatId) || null
+}
+
+function syncSidebarState(){
+  const open = !!state.sidebarOpen
+
+  if(el.body){
+    el.body.classList.toggle("sidebar-open", open)
+  }
+
+  if(el.sidebar){
+    el.sidebar.setAttribute("data-open", open ? "true" : "false")
+  }
+
+  if(el.mobileOverlay){
+    el.mobileOverlay.hidden = !(open && isMobile())
+  }
+
+  updateTopbarTitle()
+}
+
+function openSidebar(){
+  state.sidebarOpen = true
+  syncSidebarState()
+}
+
+function closeSidebar(){
+  state.sidebarOpen = false
+  syncSidebarState()
+}
+
+function toggleSidebar(){
+  state.sidebarOpen = !state.sidebarOpen
+  syncSidebarState()
+}
+
+function updateTopbarTitle(){
+  if(!el.topbarTitle){
+    return
+  }
+
+  const activeChat = getActiveChat()
+  el.topbarTitle.textContent = activeChat?.title || DEFAULT_CHAT_TITLE
+}
+
+function renderChatList(){
+  if(!el.chatList){
+    updateTopbarTitle()
+    return
+  }
+
+  const chats = ensureChatsArray()
+
+  if(!chats.length){
+    el.chatList.innerHTML = `<div class="chat-list-empty">No chats yet</div>`
+    updateTopbarTitle()
+    return
+  }
+
+  const activeChatId = String(state.activeChatId || "").trim()
+
+  el.chatList.innerHTML = chats.map(chat => {
+    const chatId = getChatId(chat)
+    const safeChatId = escapeHtml(chatId)
+    const titleText = String(chat?.title || DEFAULT_CHAT_TITLE)
+    const safeTitle = escapeHtml(titleText)
+    const isActive = chatId === activeChatId
+
+    return `
+      <div class="chat-list-row ${isActive ? "is-active" : ""}" data-chat-id="${safeChatId}">
+        <button
+          type="button"
+          class="chat-list-item ${isActive ? "is-active" : ""}"
+          data-chat-id="${safeChatId}"
+          title="${safeTitle}"
+        >
+          <span class="chat-list-item-title">${safeTitle}</span>
+        </button>
+
+        <div class="chat-list-actions">
+          <button
+            type="button"
+            class="chat-list-action"
+            data-action="rename"
+            data-chat-id="${safeChatId}"
+            aria-label="Rename chat"
+          >✎</button>
+          <button
+            type="button"
+            class="chat-list-action"
+            data-action="delete"
+            data-chat-id="${safeChatId}"
+            aria-label="Delete chat"
+          >🗑</button>
+        </div>
+      </div>
+    `
+  }).join("")
+
+  updateTopbarTitle()
+}
+
+async function createNewChat({ onAfterCreate } = {}){
+  const created = chatStorage.createChat({
+    title: DEFAULT_CHAT_TITLE,
+  })
+
+  const chatId = getChatId(created)
+  if(chatId){
+    state.activeChatId = chatId
+    state.messages = []
+  }
+
+  chatStorage.loadChats()
+  renderChatList()
+
+  if(typeof onAfterCreate === "function"){
+    onAfterCreate(created)
+  }
+
+  if(typeof callbacks.onAfterCreate === "function"){
+    callbacks.onAfterCreate(created)
+  }
+
+  if(isMobile()){
+    closeSidebar()
+  }
+
+  return created
+}
+
+async function switchChat(chatId){
+  const nextId = String(chatId || "").trim()
+  if(!nextId){
+    return
+  }
+
+  state.activeChatId = nextId
+  state.messages = chatStorage.loadMessages(nextId)
+  renderChatList()
+
+  if(typeof callbacks.onAfterSwitch === "function"){
+    callbacks.onAfterSwitch(nextId)
+  }
+
+  if(isMobile()){
+    closeSidebar()
+  }
+}
+
+async function renameChat(chatId){
+  const targetId = String(chatId || "").trim()
+  if(!targetId){
+    return
+  }
+
+  const chats = ensureChatsArray()
+  const current = chats.find(chat => getChatId(chat) === targetId)
+  const nextTitle = window.prompt("Rename chat", current?.title || DEFAULT_CHAT_TITLE)
+
+  if(nextTitle === null){
+    return
+  }
+
+  chatStorage.renameChat(targetId, String(nextTitle || "").trim() || DEFAULT_CHAT_TITLE)
+  chatStorage.loadChats()
+  renderChatList()
+
+  if(typeof callbacks.onAfterRename === "function"){
+    callbacks.onAfterRename(targetId)
+  }
+}
+
+async function deleteChat(chatId){
+  const targetId = String(chatId || "").trim()
+  if(!targetId){
+    return
+  }
+
+  const ok = window.confirm("Delete this chat?")
+  if(!ok){
+    return
+  }
+
+  chatStorage.removeChat(targetId)
+  chatStorage.loadChats()
+
+  const chats = ensureChatsArray()
+  if(String(state.activeChatId || "").trim() === targetId){
+    state.activeChatId = getChatId(chats[0]) || ""
+  }
+
+  if(state.activeChatId){
+    state.messages = chatStorage.loadMessages(state.activeChatId)
+  }else{
+    state.messages = []
+  }
+
+  renderChatList()
+
+  if(typeof callbacks.onAfterDelete === "function"){
+    callbacks.onAfterDelete(targetId)
+  }
+}
+
+function bindEvents(options = {}){
+  callbacks = { ...callbacks, ...options }
+
+  if(eventsBound){
+    return
+  }
+
+  el.btnSidebarToggle?.addEventListener("click", () => {
+    toggleSidebar()
+  })
+
+  el.btnCloseSidebar?.addEventListener("click", () => {
+    closeSidebar()
+  })
+
+  el.mobileOverlay?.addEventListener("click", () => {
+    closeSidebar()
+  })
+
+  el.btnNewChat?.addEventListener("click", async () => {
+    await createNewChat({})
+  })
+
+  el.chatList?.addEventListener("click", async (event) => {
+    const actionBtn = event.target.closest("[data-action][data-chat-id]")
+    if(actionBtn){
+      const action = actionBtn.getAttribute("data-action")
+      const chatId = actionBtn.getAttribute("data-chat-id") || ""
+
+      if(action === "rename"){
+        await renameChat(chatId)
+        return
+      }
+
+      if(action === "delete"){
+        await deleteChat(chatId)
+        return
+      }
+    }
+
+    const chatBtn = event.target.closest(".chat-list-item[data-chat-id]")
+    if(chatBtn){
+      const chatId = chatBtn.getAttribute("data-chat-id") || ""
+      await switchChat(chatId)
+    }
+  })
+
+  window.addEventListener("resize", () => {
+    syncSidebarState()
+  })
+
+  eventsBound = true
+  syncSidebarState()
+  renderChatList()
+}
+
+window.NovaChatSidebar = {
+  bindEvents,
+  syncSidebarState,
+  renderChatList,
+  createNewChat,
+  switchChat,
+  renameChat,
+  deleteChat,
+  openSidebar,
+  closeSidebar,
+  toggleSidebar,
+}
+})()

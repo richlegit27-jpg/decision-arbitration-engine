@@ -1,0 +1,225 @@
+// C:\Users\Owner\nova\static\js\chat-service.js
+
+(() => {
+"use strict"
+
+function createChatService(options = {}){
+  const {
+    state,
+    utils = {},
+    api,
+  } = options
+
+  if(!state){
+    throw new Error("NovaChatService: state is required")
+  }
+
+  if(!api){
+    throw new Error("NovaChatService: api is required")
+  }
+
+  function normalizeChat(chat = {}){
+    return {
+      chat_id: String(chat.chat_id || chat.id || ""),
+      title: String(chat.title || "New chat"),
+      updated: String(chat.updated || chat.updated_at || chat.created_at || ""),
+    }
+  }
+
+  function normalizeMessage(message = {}){
+    return {
+      id: String(
+        message.id ||
+        message.message_id ||
+        (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random()}`)
+      ),
+      role: String(message.role || "assistant"),
+      content: String(message.content || message.text || ""),
+      created_at: String(message.created_at || message.timestamp || ""),
+      attachments: Array.isArray(message.attachments) ? message.attachments : [],
+    }
+  }
+
+  function setChats(chats){
+    state.chats = Array.isArray(chats) ? chats.map(normalizeChat).filter(chat => chat.chat_id) : []
+    return state.chats
+  }
+
+  function setMessages(messages){
+    state.messages = Array.isArray(messages)
+      ? messages.map(normalizeMessage).filter(Boolean)
+      : []
+
+    return state.messages
+  }
+
+  function sortChatsDescending(chats = []){
+    return [...chats].sort((a, b) => {
+      const aTime = Date.parse(a.updated || "") || 0
+      const bTime = Date.parse(b.updated || "") || 0
+      return bTime - aTime
+    })
+  }
+
+  async function loadChats(){
+    state.isLoadingChats = true
+
+    try {
+      const data = await api.getChats()
+      const chats = Array.isArray(data?.chats) ? data.chats : []
+      return setChats(sortChatsDescending(chats))
+    } finally {
+      state.isLoadingChats = false
+    }
+  }
+
+  async function loadMessages(chatId){
+    const targetChatId = String(chatId || "").trim()
+
+    if(!targetChatId){
+      state.messages = []
+      return []
+    }
+
+    state.isLoadingMessages = true
+
+    try {
+      const data = await api.getChat(targetChatId)
+      const messages = Array.isArray(data?.messages) ? data.messages : []
+      return setMessages(messages)
+    } finally {
+      state.isLoadingMessages = false
+    }
+  }
+
+  async function createChat(title = ""){
+    const data = await api.createChat(title)
+    const rawChat = data?.chat || data
+    const chat = normalizeChat(rawChat)
+
+    if(!chat.chat_id){
+      throw new Error("NovaChatService: invalid chat returned from api.createChat")
+    }
+
+    const existingIndex = state.chats.findIndex(item => item.chat_id === chat.chat_id)
+
+    if(existingIndex >= 0){
+      state.chats[existingIndex] = chat
+    } else {
+      state.chats.unshift(chat)
+    }
+
+    state.chats = sortChatsDescending(state.chats)
+    state.activeChatId = chat.chat_id
+    state.chatId = chat.chat_id
+
+    return chat
+  }
+
+  async function renameChat(chatId, title){
+    const targetChatId = String(chatId || "").trim()
+    const nextTitle = String(title || "").trim()
+
+    if(!targetChatId){
+      throw new Error("NovaChatService: chatId is required")
+    }
+
+    const data = await api.renameChat(targetChatId, nextTitle)
+    const rawChat = data?.chat || {
+      chat_id: targetChatId,
+      title: nextTitle,
+      updated: new Date().toISOString(),
+    }
+
+    const updatedChat = normalizeChat(rawChat)
+    const index = state.chats.findIndex(chat => chat.chat_id === targetChatId)
+
+    if(index >= 0){
+      state.chats[index] = {
+        ...state.chats[index],
+        ...updatedChat,
+      }
+    }
+
+    state.chats = sortChatsDescending(state.chats)
+    return updatedChat
+  }
+
+  async function deleteChat(chatId){
+    const targetChatId = String(chatId || "").trim()
+
+    if(!targetChatId){
+      throw new Error("NovaChatService: chatId is required")
+    }
+
+    await api.deleteChat(targetChatId)
+
+    state.chats = state.chats.filter(chat => chat.chat_id !== targetChatId)
+
+    if(String(state.activeChatId || "") === targetChatId){
+      state.activeChatId = ""
+      state.chatId = ""
+      state.messages = []
+    }
+
+    return true
+  }
+
+  function upsertChat(chat = {}){
+    const normalized = normalizeChat(chat)
+
+    if(!normalized.chat_id){
+      return null
+    }
+
+    const index = state.chats.findIndex(item => item.chat_id === normalized.chat_id)
+
+    if(index >= 0){
+      state.chats[index] = {
+        ...state.chats[index],
+        ...normalized,
+      }
+    } else {
+      state.chats.unshift(normalized)
+    }
+
+    state.chats = sortChatsDescending(state.chats)
+    return normalized
+  }
+
+  function setActiveChat(chatId){
+    const value = String(chatId || "")
+    state.activeChatId = value
+    state.chatId = value
+    return value
+  }
+
+  function clearActiveChat(){
+    state.activeChatId = ""
+    state.chatId = ""
+    state.messages = []
+  }
+
+  return {
+    loadChats,
+    loadMessages,
+    createChat,
+    renameChat,
+    deleteChat,
+    upsertChat,
+    setChats,
+    setMessages,
+    setActiveChat,
+    clearActiveChat,
+    normalizeChat,
+    normalizeMessage,
+  }
+}
+
+window.NovaChatService = {
+  createChatService,
+}
+
+})()

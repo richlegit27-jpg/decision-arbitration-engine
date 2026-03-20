@@ -1,0 +1,204 @@
+// C:\Users\Owner\nova\static\js\attachments.js
+
+(() => {
+"use strict"
+
+function createManager(options = {}){
+  const {
+    inputEl = null,
+    buttonEl = null,
+    previewEl = null,
+    maxFiles = 10,
+  } = options
+
+  let files = []
+
+  function bind(){
+    buttonEl?.addEventListener("click", onButtonClick)
+    inputEl?.addEventListener("change", onInputChange)
+    render()
+  }
+
+  function onButtonClick(){
+    inputEl?.click()
+  }
+
+  function onInputChange(event){
+    const selected = Array.from(event?.target?.files || [])
+    if(!selected.length){
+      return
+    }
+
+    addFiles(selected)
+    clearNativeInput()
+  }
+
+  function addFiles(nextFiles = []){
+    const incoming = Array.isArray(nextFiles) ? nextFiles : []
+    const merged = [...files]
+
+    incoming.forEach(file => {
+      if(!(file instanceof File)){
+        return
+      }
+
+      const exists = merged.some(existing => {
+        return (
+          existing.name === file.name &&
+          existing.size === file.size &&
+          existing.lastModified === file.lastModified
+        )
+      })
+
+      if(!exists && merged.length < maxFiles){
+        merged.push(file)
+      }
+    })
+
+    files = merged
+    syncState()
+    render()
+  }
+
+  function removeAt(index){
+    const i = Number(index)
+
+    if(!Number.isInteger(i) || i < 0 || i >= files.length){
+      return
+    }
+
+    files = files.filter((_, fileIndex) => fileIndex !== i)
+    syncState()
+    render()
+  }
+
+  function clear(){
+    files = []
+    clearNativeInput()
+    syncState()
+    render()
+  }
+
+  function getFiles(){
+    return [...files]
+  }
+
+  function count(){
+    return files.length
+  }
+
+  function hasFiles(){
+    return files.length > 0
+  }
+
+  function clearNativeInput(){
+    if(inputEl){
+      inputEl.value = ""
+    }
+  }
+
+  function syncState(){
+    if(window.NovaState?.setSelectedFiles){
+      window.NovaState.setSelectedFiles(getFiles())
+    } else if(window.NovaState?.state){
+      window.NovaState.state.selectedFiles = getFiles()
+    }
+  }
+
+  function render(){
+    if(!previewEl){
+      return
+    }
+
+    previewEl.innerHTML = ""
+
+    if(!files.length){
+      previewEl.classList.remove("has-items")
+      return
+    }
+
+    previewEl.classList.add("has-items")
+
+    const fragment = document.createDocumentFragment()
+
+    files.forEach((file, index) => {
+      fragment.appendChild(createAttachmentChip(file, index))
+    })
+
+    previewEl.appendChild(fragment)
+  }
+
+  function createAttachmentChip(file, index){
+    const chip = document.createElement("div")
+    chip.className = "composer-attachment-chip"
+
+    const info = document.createElement("div")
+    info.className = "composer-attachment-info"
+
+    const name = document.createElement("div")
+    name.className = "composer-attachment-name"
+    name.textContent = file?.name || "attachment"
+
+    const meta = document.createElement("div")
+    meta.className = "composer-attachment-meta"
+    meta.textContent = [file?.type || "file", formatBytes(file?.size || 0)]
+      .filter(Boolean)
+      .join(" · ")
+
+    info.appendChild(name)
+    if(meta.textContent){
+      info.appendChild(meta)
+    }
+
+    const removeBtn = document.createElement("button")
+    removeBtn.type = "button"
+    removeBtn.className = "composer-attachment-remove"
+    removeBtn.setAttribute("aria-label", `Remove ${file?.name || "attachment"}`)
+    removeBtn.textContent = "×"
+    removeBtn.addEventListener("click", () => {
+      removeAt(index)
+    })
+
+    chip.appendChild(info)
+    chip.appendChild(removeBtn)
+
+    return chip
+  }
+
+  function formatBytes(bytes){
+    const n = Number(bytes || 0)
+
+    if(!Number.isFinite(n) || n <= 0){
+      return ""
+    }
+
+    const units = ["B", "KB", "MB", "GB", "TB"]
+    let size = n
+    let unitIndex = 0
+
+    while(size >= 1024 && unitIndex < units.length - 1){
+      size /= 1024
+      unitIndex += 1
+    }
+
+    const decimals = size >= 10 || unitIndex === 0 ? 0 : 1
+    return `${size.toFixed(decimals)} ${units[unitIndex]}`
+  }
+
+  return {
+    bind,
+    addFiles,
+    removeAt,
+    clear,
+    getFiles,
+    count,
+    hasFiles,
+    render,
+  }
+}
+
+window.NovaAttachments = {
+  createManager,
+}
+
+})()

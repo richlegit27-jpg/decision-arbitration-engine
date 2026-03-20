@@ -1,0 +1,267 @@
+﻿// C:\Users\Owner\nova\static\js\chat.js
+
+(() => {
+"use strict"
+
+const el = {
+  sidebar: document.getElementById("sidebar"),
+  mobileOverlay: document.getElementById("mobileOverlay"),
+  btnSidebarToggle: document.getElementById("btnSidebarToggle"),
+  btnNewChat: document.getElementById("btnNewChat"),
+  chatList: document.getElementById("chatList"),
+  messages: document.getElementById("messages"),
+  composerForm: document.getElementById("composerForm"),
+
+  // fixed input hook (no syntax error)
+  input: document.getElementById("messageInput") || document.getElementById("promptInput"),
+
+  sendBtn: document.getElementById("btnSend"),
+  stopBtn: document.getElementById("btnStop"),
+  attachBtn: document.getElementById("btnAttach"),
+  fileInput: document.getElementById("fileUpload"),
+  pendingAttachments: document.getElementById("pendingAttachments"),
+}
+
+const utils = window.NovaUtils || {}
+const stateApi = window.NovaState || {}
+const attachmentsApi = window.NovaAttachmentsService || {}
+const renderApi = window.NovaRenderService || {}
+const streamApi = window.NovaStreamService || {}
+const chatApi = window.NovaChatService || {}
+const composerApi = window.NovaComposerService || {}
+
+function requireFactory(apiObj, factoryName){
+  if(!apiObj || typeof apiObj[factoryName] !== "function"){
+    throw new Error(`Missing required factory: ${factoryName}`)
+  }
+  return apiObj[factoryName]
+}
+
+const createState = requireFactory(stateApi,"createState")
+const createAttachmentsService = requireFactory(attachmentsApi,"createAttachmentsService")
+const createRenderService = requireFactory(renderApi,"createRenderService")
+const createStreamService = requireFactory(streamApi,"createStreamService")
+const createChatService = requireFactory(chatApi,"createChatService")
+const createComposerService = requireFactory(composerApi,"createComposerService")
+
+const state = createState()
+
+const renderService = createRenderService({
+  state,
+  elements:{
+    messages:el.messages,
+    chatList:el.chatList,
+    pendingAttachments:el.pendingAttachments,
+  },
+  utils,
+})
+
+const attachmentsService = createAttachmentsService({
+  state,
+  elements:{
+    fileInput:el.fileInput,
+    pendingAttachments:el.pendingAttachments,
+  },
+  utils,
+  renderService,
+})
+
+const chatService = createChatService({
+  state,
+  elements:{
+    chatList:el.chatList,
+    messages:el.messages,
+  },
+  utils,
+  renderService,
+})
+
+const streamService = createStreamService({
+  state,
+  elements:{
+    messages:el.messages,
+  },
+  utils,
+  renderService,
+  chatService,
+  attachmentsService,
+})
+
+const composerService = createComposerService({
+  state,
+  elements:{
+    input:el.input,
+    sendBtn:el.sendBtn,
+    attachBtn:el.attachBtn,
+    fileInput:el.fileInput,
+    stopBtn:el.stopBtn,
+    composerForm:el.composerForm,
+  },
+  attachmentsService,
+  streamService,
+  renderService,
+  chatService,
+})
+
+function closeMobileSidebar(){
+  el.sidebar?.classList.remove("open")
+  el.mobileOverlay?.classList.remove("show")
+  document.body.classList.remove("sidebar-open")
+}
+
+function openMobileSidebar(){
+  el.sidebar?.classList.add("open")
+  el.mobileOverlay?.classList.add("show")
+  document.body.classList.add("sidebar-open")
+}
+
+function toggleMobileSidebar(){
+  const isOpen = el.sidebar?.classList.contains("open")
+  if(isOpen){
+    closeMobileSidebar()
+  }else{
+    openMobileSidebar()
+  }
+}
+
+async function requestJson(url,options={}){
+  const response = await fetch(url,options)
+
+  if(!response.ok){
+    throw new Error(`HTTP ${response.status}`)
+  }
+
+  const text = await response.text()
+  return text ? JSON.parse(text) : {}
+}
+
+function getMessageById(messageId){
+  return (state.messages || []).find(
+    (msg)=>String(msg.id) === String(messageId)
+  ) || null
+}
+
+function getLastUserMessage(){
+  const messages = Array.isArray(state.messages) ? state.messages : []
+
+  for(let i = messages.length - 1; i >= 0; i--){
+    if(messages[i]?.role === "user"){
+      return messages[i]
+    }
+  }
+
+  return null
+}
+
+async function loadChats(){
+  try{
+    if(typeof chatService.loadChats === "function"){
+      await chatService.loadChats()
+    }
+    renderService.renderChats?.()
+  }catch(error){
+    console.error("Nova loadChats error:",error)
+  }
+}
+
+async function loadMessages(chatId){
+  try{
+    if(typeof chatService.loadMessages === "function"){
+      await chatService.loadMessages(chatId)
+    }
+    renderService.renderMessages?.()
+  }catch(error){
+    console.error("Nova loadMessages error:",error)
+  }
+}
+
+function bindSidebarEvents(){
+
+  el.btnSidebarToggle?.addEventListener("click",(event)=>{
+    event.preventDefault()
+    toggleMobileSidebar()
+  })
+
+  el.mobileOverlay?.addEventListener("click",()=>{
+    closeMobileSidebar()
+  })
+
+  el.btnNewChat?.addEventListener("click",(event)=>{
+    event.preventDefault()
+    startNewChat()
+  })
+
+}
+
+async function startNewChat(){
+  try{
+
+    attachmentsService.clearPendingFiles?.()
+    composerService.clearInput?.()
+
+    const created = await chatService.createChat("New Chat")
+
+    const chatId = String(
+      created?.chat_id ||
+      created?.chat?.chat_id ||
+      state.activeChatId ||
+      ""
+    ).trim()
+
+    if(chatId){
+      await loadMessages(chatId)
+    }
+
+    renderService.renderAll?.()
+    composerService.updateComposerState?.()
+    composerService.focusInput?.()
+    closeMobileSidebar()
+
+  }catch(error){
+    console.error("Nova startNewChat error:",error)
+  }
+}
+
+async function init(){
+
+  bindSidebarEvents()
+
+  attachmentsService.init?.()
+  composerService.init?.()
+
+  await loadChats()
+
+  const firstChatId = String(
+    state.activeChatId ||
+    state.chatId ||
+    ""
+  ).trim()
+
+  if(firstChatId){
+    await loadMessages(firstChatId)
+  }
+
+  renderService.renderAll?.()
+  composerService.updateComposerState?.()
+  composerService.focusInput?.()
+
+}
+
+void init()
+
+window.NovaApp = {
+  state,
+  el,
+  loadChats,
+  loadMessages,
+  startNewChat,
+  services:{
+    attachmentsService,
+    renderService,
+    streamService,
+    chatService,
+    composerService,
+  },
+}
+
+})()

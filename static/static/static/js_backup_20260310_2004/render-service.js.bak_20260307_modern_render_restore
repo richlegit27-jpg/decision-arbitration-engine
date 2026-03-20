@@ -1,0 +1,360 @@
+// C:\Users\Owner\nova\static\js\render-service.js
+
+(() => {
+"use strict"
+
+function createRenderService(options = {}){
+  const {
+    state,
+    elements = {},
+    utils = {},
+    attachmentsService,
+  } = options
+
+  if(!state){
+    throw new Error("NovaRenderService: state is required")
+  }
+
+  const el = {
+    messages: elements.messages || null,
+    chatList: elements.chatList || null,
+    pendingAttachments: elements.pendingAttachments || null,
+    emptyState: elements.emptyState || document.getElementById("emptyState"),
+    input: elements.input || document.getElementById("promptInput"),
+  }
+
+  const escapeHtml = utils.escapeHtml || ((value) => String(value ?? ""))
+  const formatBytes =
+    utils.formatBytes ||
+    ((bytes) => {
+      const n = Number(bytes || 0)
+
+      if(!Number.isFinite(n) || n <= 0){
+        return "0 B"
+      }
+
+      const units = ["B", "KB", "MB", "GB", "TB"]
+      let size = n
+      let i = 0
+
+      while(size >= 1024 && i < units.length - 1){
+        size /= 1024
+        i += 1
+      }
+
+      if(i === 0){
+        return `${Math.round(size)} ${units[i]}`
+      }
+
+      return `${size < 10 ? size.toFixed(1) : Math.round(size)} ${units[i]}`
+    })
+
+  function ensureChatsArray(){
+    if(!Array.isArray(state.chats)){
+      state.chats = []
+    }
+
+    return state.chats
+  }
+
+  function ensureMessagesArray(){
+    if(!Array.isArray(state.messages)){
+      state.messages = []
+    }
+
+    return state.messages
+  }
+
+  function scrollToBottom(){
+    try {
+      if(!el.messages){
+        return
+      }
+
+      el.messages.scrollTop = el.messages.scrollHeight
+    } catch(error){
+      console.error("Nova scrollToBottom error:", error)
+    }
+  }
+
+  function configureMarkedOnce(){
+    if(!window.marked){
+      return
+    }
+
+    if(window.__novaMarkedConfigured){
+      return
+    }
+
+    try{
+      window.marked.setOptions({
+        gfm: true,
+        breaks: true,
+      })
+    }catch(error){
+      console.error("Nova marked config error:", error)
+    }
+
+    window.__novaMarkedConfigured = true
+  }
+
+  function renderAssistantMarkdown(raw){
+    const text = String(raw || "")
+
+    if(!window.marked){
+      return escapeHtml(text).replace(/\n/g, "<br>")
+    }
+
+    try{
+      configureMarkedOnce()
+      return window.marked.parse(text)
+    }catch(error){
+      console.error("Nova markdown render error:", error)
+      return escapeHtml(text).replace(/\n/g, "<br>")
+    }
+  }
+
+  function renderMessageText(msg){
+    const role = String(msg?.role || "assistant")
+    const text = String(msg?.content || "")
+
+    if(role === "assistant"){
+      return renderAssistantMarkdown(text)
+    }
+
+    return escapeHtml(text).replace(/\n/g, "<br>")
+  }
+
+  function renderChats(){
+    if(!el.chatList){
+      return
+    }
+
+    const chats = ensureChatsArray()
+    const activeChatId = String(state.activeChatId || state.chatId || "").trim()
+
+    el.chatList.innerHTML = chats.map((chat) => {
+      const chatId = String(chat?.chat_id || "").trim()
+      const title = escapeHtml(chat?.title || "New Chat")
+      const activeClass = chatId === activeChatId ? " active" : ""
+
+      return `
+        <div class="chat-item${activeClass}" data-chat-id="${escapeHtml(chatId)}">
+          <button
+            type="button"
+            class="chat-main"
+            data-chat-id="${escapeHtml(chatId)}"
+            title="${title}"
+          >
+            <span class="chat-title">${title}</span>
+          </button>
+
+          <div class="chat-actions">
+            <button
+              type="button"
+              class="chat-action-btn"
+              data-chat-action="rename"
+              data-chat-id="${escapeHtml(chatId)}"
+              aria-label="Rename chat"
+              title="Rename"
+            >
+              Rename
+            </button>
+
+            <button
+              type="button"
+              class="chat-action-btn"
+              data-chat-action="delete"
+              data-chat-id="${escapeHtml(chatId)}"
+              aria-label="Delete chat"
+              title="Delete"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      `
+    }).join("")
+  }
+
+  function renderMessageAttachments(attachments){
+    if(!Array.isArray(attachments) || attachments.length === 0){
+      return ""
+    }
+
+    return `
+      <div class="message-attachments">
+        ${attachments.map((attachment) => {
+          const name = escapeHtml(attachment?.name || "file")
+          const size = escapeHtml(formatBytes(attachment?.size || 0))
+
+          return `
+            <div class="message-attachment">
+              <div class="message-attachment-name">${name}</div>
+              <div class="message-attachment-size">${size}</div>
+            </div>
+          `
+        }).join("")}
+      </div>
+    `
+  }
+
+  function renderMessageActions(msg){
+    const role = String(msg?.role || "assistant")
+    const id = escapeHtml(msg?.id || "")
+
+    if(role === "user"){
+      return `
+        <div class="message-actions">
+          <button
+            type="button"
+            class="message-action-btn"
+            data-message-action="edit"
+            data-message-id="${id}"
+            title="Edit"
+            aria-label="Edit message"
+          >
+            Edit
+          </button>
+        </div>
+      `
+    }
+
+    return `
+      <div class="message-actions">
+        <button
+          type="button"
+          class="message-action-btn"
+          data-message-action="copy"
+          data-message-id="${id}"
+          title="Copy"
+          aria-label="Copy message"
+        >
+          Copy
+        </button>
+
+        <button
+          type="button"
+          class="message-action-btn"
+          data-message-action="regenerate"
+          data-message-id="${id}"
+          title="Regenerate response"
+          aria-label="Regenerate response"
+        >
+          Regenerate
+        </button>
+      </div>
+    `
+  }
+
+  function renderMessages(){
+    if(!el.messages){
+      return
+    }
+
+    const messages = ensureMessagesArray()
+
+    el.messages.innerHTML = messages.map((msg) => {
+      const id = escapeHtml(msg?.id || "")
+      const role = escapeHtml(msg?.role || "assistant")
+      const pendingClass = msg?.pending ? " pending" : ""
+      const errorClass = msg?.error ? " error" : ""
+      const content = renderMessageText(msg)
+      const attachmentsHtml = renderMessageAttachments(msg?.attachments)
+      const actionsHtml = renderMessageActions(msg)
+
+      return `
+        <div class="message ${role}${pendingClass}${errorClass}" data-message-id="${id}">
+          <div class="bubble">
+            ${attachmentsHtml}
+            <div class="message-text">${content}</div>
+          </div>
+          ${actionsHtml}
+        </div>
+      `
+    }).join("")
+
+    scrollToBottom()
+  }
+
+  function renderPendingAttachments(){
+    if(!el.pendingAttachments){
+      return
+    }
+
+    const files = attachmentsService?.getPendingFiles?.() || state.pendingFiles || []
+
+    if(!Array.isArray(files) || files.length === 0){
+      el.pendingAttachments.innerHTML = ""
+      el.pendingAttachments.hidden = true
+      return
+    }
+
+    el.pendingAttachments.hidden = false
+
+    el.pendingAttachments.innerHTML = files.map((file, index) => {
+      const name = escapeHtml(file?.name || "file")
+      const size = escapeHtml(formatBytes(file?.size || 0))
+
+      return `
+        <div class="pending-file" data-file-index="${index}">
+          <div class="pending-file-main">
+            <div class="pending-file-name" title="${name}">${name}</div>
+            <div class="pending-file-size">${size}</div>
+          </div>
+
+          <button
+            type="button"
+            class="pending-file-remove"
+            data-remove-file="${index}"
+            aria-label="Remove ${name}"
+            title="Remove file"
+          >
+            X
+          </button>
+        </div>
+      `
+    }).join("")
+  }
+
+  function updateEmptyState(){
+    const emptyState = el.emptyState || document.getElementById("emptyState")
+    if(!emptyState){
+      return
+    }
+
+    const messages = ensureMessagesArray()
+    const files = attachmentsService?.getPendingFiles?.() || state.pendingFiles || []
+    const hasMessages = Array.isArray(messages) && messages.length > 0
+    const hasPendingFiles = Array.isArray(files) && files.length > 0
+    const inputValue = String(el.input?.value || "").trim()
+    const hasInput = Boolean(inputValue)
+    const show = !hasMessages && !hasPendingFiles && !hasInput && !state.isStreaming
+
+    emptyState.hidden = !show
+    emptyState.classList.toggle("is-hidden", !show)
+    emptyState.setAttribute("aria-hidden", show ? "false" : "true")
+  }
+
+  function renderAll(){
+    renderChats()
+    renderMessages()
+    renderPendingAttachments()
+    updateEmptyState()
+  }
+
+  return {
+    renderChats,
+    renderMessages,
+    renderPendingAttachments,
+    renderAll,
+    scrollToBottom,
+    updateEmptyState,
+  }
+}
+
+window.NovaRenderService = {
+  createRenderService,
+}
+
+})()

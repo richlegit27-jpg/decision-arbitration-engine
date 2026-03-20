@@ -36,6 +36,15 @@ FILE_LOCK = Lock()
 
 client = OpenAI(api_key=OPENAI_API_KEY) if (OpenAI and OPENAI_API_KEY) else None
 
+MAX_CONTEXT_MESSAGES = 24
+SYSTEM_PROMPT = (
+    "You are Nova, an elite AI assistant. "
+    "Be clear, direct, intelligent, and efficient. "
+    "Give strong structured answers without fluff. "
+    "Do not invent facts. If you are unsure, say so plainly. "
+    "Keep answers practical and grounded in the user's request."
+)
+
 
 class SessionNewRequest(BaseModel):
     pass
@@ -79,12 +88,15 @@ def read_store() -> Dict[str, Any]:
             raw = SESSIONS_FILE.read_text(encoding="utf-8").strip()
             if not raw:
                 return default_store()
+
             data = json.loads(raw)
             if not isinstance(data, dict):
                 return default_store()
+
             data.setdefault("sessions", {})
             if not isinstance(data["sessions"], dict):
                 data["sessions"] = {}
+
             return data
         except Exception:
             return default_store()
@@ -239,57 +251,94 @@ def append_message(
 def get_model_list() -> List[str]:
     models = [
         OPENAI_MODEL,
-        "gpt-4.1-mini",
+        "gpt-5.4",
+        "gpt-5.4-mini",
         "gpt-4.1",
+        "gpt-4.1-mini",
         "gpt-4o-mini",
     ]
     seen = set()
     cleaned: List[str] = []
+
     for model in models:
         value = str(model or "").strip()
         if not value or value in seen:
             continue
         seen.add(value)
         cleaned.append(value)
+
     return cleaned
 
 
 def build_openai_messages(session_messages: List[Dict[str, Any]]) -> List[Dict[str, str]]:
-    messages: List[Dict[str, str]] = [
-        {
-            "role": "system",
-            "content": (
-                "You are Nova. Be clear, helpful, direct, and honest. "
-                "Do not invent facts. If you are unsure, say so plainly."
-            ),
-        }
-    ]
+    usable_messages: List[Dict[str, str]] = []
 
-    for item in session_messages:
+    for item in session_messages[-MAX_CONTEXT_MESSAGES:]:
         role = str(item.get("role") or "").strip().lower()
-        content = str(item.get("content") or "")
+        content = str(item.get("content") or "").strip()
+
         if role not in {"user", "assistant", "system"}:
             continue
-        if not content.strip():
+        if not content:
             continue
-        messages.append({"role": role, "content": content})
 
-    return messages
+        usable_messages.append({
+            "role": role,
+            "content": content,
+        })
+
+    return [
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT,
+        },
+        *usable_messages,
+    ]
+
+
+def extract_completion_text(response: Any) -> str:
+    try:
+        text = response.choices[0].message.content
+        if isinstance(text, str):
+            text = text.strip()
+            if text:
+                return text
+    except Exception:
+        pass
+
+    return "No response returned."
+
+
+def request_completion(messages: List[Dict[str, str]], model: str, stream: bool = False):
+    if client is None:
+        raise RuntimeError("Nova is running, but OPENAI_API_KEY is not set.")
+
+    return client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=0.7,
+        stream=stream,
+    )
 
 
 def get_completion_text(messages: List[Dict[str, str]], model: str) -> str:
     if client is None:
         return "Nova is running, but OPENAI_API_KEY is not set."
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=messages,
-    )
+    preferred_model = str(model or OPENAI_MODEL).strip() or OPENAI_MODEL
+    fallback_model = OPENAI_MODEL
 
     try:
-        return str(response.choices[0].message.content or "").strip() or "No response returned."
-    except Exception:
-        return "No response returned."
+        response = request_completion(messages, preferred_model, stream=False)
+        return extract_completion_text(response)
+    except Exception as first_error:
+        if preferred_model != fallback_model:
+            try:
+                response = request_completion(messages, fallback_model, stream=False)
+                return extract_completion_text(response)
+            except Exception as second_error:
+                return f"Error: {second_error}"
+        return f"Error: {first_error}"
 
 
 def stream_completion_chunks(messages: List[Dict[str, str]], model: str):
@@ -299,31 +348,41 @@ def stream_completion_chunks(messages: List[Dict[str, str]], model: str):
             yield fallback[i:i + 24]
         return
 
-    try:
-        stream = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            stream=True,
-        )
+    preferred_model = str(model or OPENAI_MODEL).strip() or OPENAI_MODEL
+    fallback_model = OPENAI_MODEL
 
-        emitted = False
+    def stream_from(selected_model: str):
+        stream = request_completion(messages, selected_model, stream=True)
         for chunk in stream:
             try:
                 delta = chunk.choices[0].delta.content or ""
             except Exception:
                 delta = ""
-
             if delta:
-                emitted = True
                 yield delta
 
+    emitted = False
+
+    try:
+        for piece in stream_from(preferred_model):
+            emitted = True
+            yield piece
         if emitted:
             return
-
     except Exception:
         pass
 
-    fallback_text = get_completion_text(messages, model)
+    if preferred_model != fallback_model:
+        try:
+            for piece in stream_from(fallback_model):
+                emitted = True
+                yield piece
+            if emitted:
+                return
+        except Exception:
+            pass
+
+    fallback_text = get_completion_text(messages, fallback_model)
     for i in range(0, len(fallback_text), 24):
         yield fallback_text[i:i + 24]
 
@@ -481,7 +540,8 @@ def api_chat_stream(payload: ChatRequest):
                     },
                 )
 
-            assistant_message = append_message(session_id, "assistant", full_text, model)
+            assistant_text = full_text.strip() or "No response returned."
+            assistant_message = append_message(session_id, "assistant", assistant_text, model)
             final_session = get_session_or_404(session_id)
 
             yield sse_event(
