@@ -1,6 +1,7 @@
 from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory, Response
 from openai import OpenAI
+import copy
 import json
 import os
 import re
@@ -440,6 +441,53 @@ def build_openai_messages(session_messages, user_request: str = ""):
     return messages
 
 
+def strip_copy_suffix(title: str) -> str:
+    clean = normalize_text(title) or "New Chat"
+    clean = re.sub(r"\s+\(copy(?:\s+\d+)?\)$", "", clean, flags=re.IGNORECASE).strip()
+    return clean or "New Chat"
+
+
+def make_duplicate_title(existing_titles, base_title: str) -> str:
+    root_title = strip_copy_suffix(base_title)[:80].strip()
+    normalized_titles = {normalize_text(title) for title in existing_titles}
+
+    candidate = f"{root_title} (Copy)"
+    if candidate not in normalized_titles:
+        return candidate
+
+    n = 2
+    while True:
+        candidate = f"{root_title} (Copy {n})"
+        if candidate not in normalized_titles:
+            return candidate
+        n += 1
+
+
+def duplicate_session_data(source_session, existing_titles):
+    ts = now()
+    cloned = copy.deepcopy(source_session)
+    cloned["session_id"] = str(uuid.uuid4())
+    cloned["created_at"] = ts
+    cloned["updated_at"] = ts
+    cloned["title"] = make_duplicate_title(existing_titles, source_session.get("title") or "New Chat")
+
+    messages = cloned.get("messages", [])
+    if not isinstance(messages, list):
+        messages = []
+
+    remapped_messages = []
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+        msg_copy = dict(msg)
+        msg_copy["id"] = str(uuid.uuid4())
+        remapped_messages.append(msg_copy)
+
+    cloned["messages"] = remapped_messages
+    cloned["message_count"] = len(remapped_messages)
+    return cloned
+
+
 ensure_default_session()
 
 
@@ -524,6 +572,40 @@ def api_session_new():
     sessions.insert(0, session)
     save_sessions(sessions)
     return jsonify({"session_id": session["session_id"]})
+
+
+@app.route("/api/session/duplicate", methods=["POST"])
+def api_session_duplicate():
+    data = request.get_json(silent=True) or {}
+    session_id = normalize_text(data.get("session_id"))
+
+    if not session_id:
+        return jsonify({"detail": "session_id is required"}), 400
+
+    sessions = load_sessions()
+    source_session = get_session(sessions, session_id)
+    if not source_session:
+        return jsonify({"detail": "Session not found"}), 404
+
+    existing_titles = {
+        normalize_text(str(session.get("title") or "New Chat"))
+        for session in sessions
+    }
+
+    duplicated = duplicate_session_data(source_session, existing_titles)
+    sessions.insert(0, duplicated)
+    save_sessions(sessions)
+
+    return jsonify({
+        "ok": True,
+        "session": {
+            "session_id": duplicated["session_id"],
+            "title": duplicated["title"],
+            "message_count": duplicated["message_count"],
+            "updated_at": duplicated["updated_at"],
+        },
+        "sessions": summarize_sessions(sessions),
+    })
 
 
 @app.route("/api/session/delete", methods=["POST"])
