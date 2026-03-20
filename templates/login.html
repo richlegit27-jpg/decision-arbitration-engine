@@ -1,0 +1,249 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nova Login</title>
+<style>
+  :root{
+    color-scheme:dark;
+  }
+
+  *{
+    box-sizing:border-box;
+  }
+
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(94,163,255,0.18), transparent 30%),
+      radial-gradient(circle at bottom right, rgba(50,215,166,0.14), transparent 28%),
+      linear-gradient(180deg, #07111b 0%, #0b1623 100%);
+    color:#eaf2ff;
+  }
+
+  .login-shell{
+    width:100%;
+    max-width:480px;
+    padding:28px;
+    border-radius:24px;
+    background:rgba(8,16,26,0.82);
+    border:1px solid rgba(120,170,255,0.14);
+    box-shadow:0 30px 80px rgba(0,0,0,0.35);
+    backdrop-filter:blur(18px);
+  }
+
+  .kicker{
+    font-size:0.78rem;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    opacity:0.72;
+    font-weight:800;
+    margin-bottom:10px;
+  }
+
+  h1{
+    margin:0 0 10px;
+    font-size:2rem;
+    line-height:1.1;
+  }
+
+  .subtext{
+    margin:0 0 22px;
+    opacity:0.78;
+    line-height:1.55;
+  }
+
+  .tabs{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-bottom:18px;
+  }
+
+  .tab-btn{
+    min-height:46px;
+    border:none;
+    border-radius:14px;
+    cursor:pointer;
+    font-weight:800;
+    color:#eaf2ff;
+    background:rgba(255,255,255,0.06);
+    border:1px solid rgba(120,170,255,0.12);
+  }
+
+  .tab-btn.active{
+    background:linear-gradient(135deg, rgba(124,199,255,0.24), rgba(88,240,199,0.22));
+    border-color:rgba(124,199,255,0.38);
+  }
+
+  .panel{
+    display:none;
+  }
+
+  .panel.active{
+    display:block;
+  }
+
+  form{
+    display:grid;
+    gap:14px;
+  }
+
+  label{
+    display:grid;
+    gap:8px;
+    font-weight:700;
+    font-size:0.95rem;
+  }
+
+  input{
+    width:100%;
+    min-height:48px;
+    border:none;
+    outline:none;
+    border-radius:14px;
+    padding:0 14px;
+    background:rgba(255,255,255,0.06);
+    color:#eaf2ff;
+    border:1px solid rgba(120,170,255,0.12);
+  }
+
+  input:focus{
+    border-color:rgba(94,163,255,0.42);
+    box-shadow:0 0 0 3px rgba(94,163,255,0.14);
+  }
+
+  .submit-btn{
+    min-height:50px;
+    border:none;
+    border-radius:14px;
+    font-weight:800;
+    cursor:pointer;
+    color:#08111c;
+    background:linear-gradient(135deg, #7cc7ff, #58f0c7);
+    margin-top:6px;
+  }
+
+  .submit-btn:hover{
+    filter:brightness(1.04);
+  }
+
+  .message{
+    min-height:20px;
+    font-size:0.92rem;
+    font-weight:700;
+  }
+
+  .message.error{
+    color:#ff9f9f;
+  }
+
+  .message.success{
+    color:#8ff0c7;
+  }
+
+  .note{
+    margin-top:18px;
+    padding:14px;
+    border-radius:14px;
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.06);
+    font-size:0.92rem;
+    line-height:1.5;
+    opacity:0.85;
+  }
+</style>
+</head>
+<body>
+  <div class="login-shell">
+    <div class="kicker">Nova Access</div>
+    <h1>Enter Nova</h1>
+    <p class="subtext">Real local account system. Create a user once, then log in normally.</p>
+
+    <div class="tabs">
+      <button id="loginTabBtn" class="tab-btn" type="button">Sign in</button>
+      <button id="registerTabBtn" class="tab-btn" type="button">Create account</button>
+    </div>
+
+    <div id="loginPanel" class="panel">
+      <form id="loginForm">
+        <label>
+          Username
+          <input id="loginUsername" type="text" name="username" value="{{ prefill_username or '' }}" autocomplete="username" required>
+        </label>
+
+        <label>
+          Password
+          <input id="loginPassword" type="password" name="password" autocomplete="current-password" required>
+        </label>
+
+        <div id="authMessage" class="message error"></div>
+
+        <button class="submit-btn" type="submit">Sign in</button>
+      </form>
+    </div>
+
+    <div id="registerPanel" class="panel">
+      <form id="registerForm">
+        <label>
+          Username
+          <input id="registerUsername" type="text" name="username" value="{{ prefill_register_username or '' }}" autocomplete="username" required>
+        </label>
+
+        <label>
+          Password
+          <input id="registerPassword" type="password" name="password" autocomplete="new-password" required>
+        </label>
+
+        <button class="submit-btn" type="submit">Create account</button>
+      </form>
+    </div>
+
+    <div class="note">
+      Username rules: 3 to 32 chars, lowercase letters, numbers, underscore, dash.<br>
+      Password rules: minimum 8 chars.
+    </div>
+  </div>
+
+<script src="{{ url_for('static', path='js/auth.js') }}"></script>
+
+<script>
+(() => {
+  "use strict";
+
+  const loginTabBtn = document.getElementById("loginTabBtn");
+  const registerTabBtn = document.getElementById("registerTabBtn");
+  const loginPanel = document.getElementById("loginPanel");
+  const registerPanel = document.getElementById("registerPanel");
+  const authMessage = document.getElementById("authMessage");
+  const activeTab = "{{ active_tab or 'login' }}";
+
+  function showTab(tabName){
+    const isLogin = tabName === "login";
+
+    loginTabBtn.classList.toggle("active", isLogin);
+    registerTabBtn.classList.toggle("active", !isLogin);
+    loginPanel.classList.toggle("active", isLogin);
+    registerPanel.classList.toggle("active", !isLogin);
+
+    if(authMessage){
+      authMessage.className = "message";
+      authMessage.textContent = "";
+    }
+  }
+
+  loginTabBtn.addEventListener("click", () => showTab("login"));
+  registerTabBtn.addEventListener("click", () => showTab("register"));
+
+  showTab(activeTab);
+})();
+</script>
+</body>
+</html>

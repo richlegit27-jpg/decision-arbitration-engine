@@ -1,0 +1,576 @@
+// C:\Users\Owner\nova\static\js\render-service.js
+
+(() => {
+"use strict"
+
+function createRenderService(options = {}){
+  const {
+    state,
+    elements = {},
+  } = options
+
+  if(!state){
+    throw new Error("NovaRenderService: state is required")
+  }
+
+  const el = {
+    messages: elements.messages || null,
+    messagesScroll: elements.messagesScroll || null,
+    emptyState: elements.emptyState || null,
+    messagesEmpty: elements.messagesEmpty || null,
+    chatList: elements.chatList || null,
+    chatListCount: elements.chatListCount || null,
+    topbarTitle: elements.topbarTitle || null,
+    topbarSubtitle: elements.topbarSubtitle || null,
+    composerMeta: elements.composerMeta || null,
+  }
+
+  function renderChatList(payload = {}){
+    const {
+      chats = [],
+      activeChatId = null,
+    } = payload
+
+    if(!el.chatList){
+      return
+    }
+
+    el.chatList.innerHTML = ""
+
+    if(!Array.isArray(chats) || chats.length === 0){
+      el.chatList.innerHTML = `
+        <div class="chat-list-empty">
+          <div class="chat-list-empty-title">No chats yet</div>
+          <div class="chat-list-empty-text">Start a new chat to begin.</div>
+        </div>
+      `
+    }else{
+      const fragment = document.createDocumentFragment()
+
+      chats.forEach((chat) => {
+        const button = document.createElement("button")
+        button.type = "button"
+        button.className = "chat-list-item"
+        button.setAttribute("data-chat-id", chat.chat_id || "")
+
+        if(chat.chat_id && chat.chat_id === activeChatId){
+          button.classList.add("is-active")
+        }
+
+        const title = escapeHtml(chat.title || "New chat")
+        const updated = formatRelativeTime(chat.updated || chat.updated_at || chat.created_at)
+
+        button.innerHTML = `
+          <div class="chat-list-item-title">${title}</div>
+          <div class="chat-list-item-meta">${updated}</div>
+        `
+
+        fragment.appendChild(button)
+      })
+
+      el.chatList.appendChild(fragment)
+    }
+
+    if(el.chatListCount){
+      el.chatListCount.textContent = String(Array.isArray(chats) ? chats.length : 0)
+    }
+  }
+
+  function renderMessages(payload = {}){
+    const {
+      messages = [],
+    } = payload
+
+    if(!el.messages){
+      return
+    }
+
+    el.messages.innerHTML = ""
+
+    const safeMessages = Array.isArray(messages) ? messages : []
+
+    toggleEmptyStates({
+      showWelcome: safeMessages.length === 0,
+      showMessagesEmpty: false,
+    })
+
+    if(safeMessages.length === 0){
+      return
+    }
+
+    const fragment = document.createDocumentFragment()
+
+    safeMessages.forEach((message) => {
+      fragment.appendChild(createMessageElement(message))
+    })
+
+    el.messages.appendChild(fragment)
+    scrollToBottom()
+  }
+
+  function renderStreamingMessage(payload = {}){
+    const { message } = payload
+
+    if(!el.messages || !message){
+      return
+    }
+
+    toggleEmptyStates({
+      showWelcome: false,
+      showMessagesEmpty: false,
+    })
+
+    const existing = el.messages.querySelector(`[data-message-id="${cssEscape(message.message_id)}"]`)
+    const nextNode = createMessageElement(message)
+
+    if(existing){
+      existing.replaceWith(nextNode)
+    }else{
+      el.messages.appendChild(nextNode)
+    }
+
+    scrollToBottom()
+  }
+
+  function removeStreamingMessage(messageId){
+    if(!el.messages || !messageId){
+      return
+    }
+
+    const node = el.messages.querySelector(`[data-message-id="${cssEscape(messageId)}"]`)
+    if(node){
+      node.remove()
+    }
+
+    const hasAnyMessages = el.messages.children.length > 0
+    if(!hasAnyMessages){
+      toggleEmptyStates({
+        showWelcome: true,
+        showMessagesEmpty: false,
+      })
+    }
+  }
+
+  function renderHeader(payload = {}){
+    const {
+      title = "Nova",
+      subtitle = "Ready",
+    } = payload
+
+    if(el.topbarTitle){
+      el.topbarTitle.textContent = title
+    }
+
+    if(el.topbarSubtitle){
+      el.topbarSubtitle.textContent = subtitle
+    }
+  }
+
+  function showComposerMeta(message, tone = "info"){
+    if(!el.composerMeta){
+      return
+    }
+
+    const cleanMessage = String(message || "").trim()
+    if(!cleanMessage){
+      hideComposerMeta()
+      return
+    }
+
+    el.composerMeta.hidden = false
+    el.composerMeta.textContent = cleanMessage
+    el.composerMeta.classList.remove("is-error", "is-success", "is-info")
+    el.composerMeta.classList.add(`is-${tone}`)
+  }
+
+  function hideComposerMeta(){
+    if(!el.composerMeta){
+      return
+    }
+
+    el.composerMeta.hidden = true
+    el.composerMeta.textContent = ""
+    el.composerMeta.classList.remove("is-error", "is-success", "is-info")
+  }
+
+  function setMessageStatus(messageId, status){
+    if(!el.messages || !messageId){
+      return
+    }
+
+    const node = el.messages.querySelector(`[data-message-id="${cssEscape(messageId)}"]`)
+    if(!node){
+      return
+    }
+
+    const statusNode = node.querySelector(".message-status")
+    if(!statusNode){
+      return
+    }
+
+    statusNode.textContent = getStatusLabel(status)
+
+    statusNode.classList.remove(
+      "is-sending",
+      "is-error",
+      "is-thinking",
+      "is-stopped",
+      "is-done"
+    )
+
+    if(status){
+      statusNode.classList.add(`is-${status}`)
+    }
+  }
+
+  function flashMessageAction(messageId, action, text){
+    if(!el.messages || !messageId || !action || !text){
+      return
+    }
+
+    const button = el.messages.querySelector(
+      `[data-message-id="${cssEscape(messageId)}"] [data-message-action="${cssEscape(action)}"]`
+    )
+
+    if(!button){
+      return
+    }
+
+    const original = button.textContent
+    button.textContent = text
+    button.disabled = true
+
+    window.setTimeout(() => {
+      button.textContent = original
+      button.disabled = false
+    }, 1200)
+  }
+
+  function createMessageElement(message){
+    const article = document.createElement("article")
+    const role = normalizeRole(message?.role)
+    const messageId = message?.message_id || `message-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    const content = String(message?.content || "")
+    const timestamp = message?.created_at || message?.updated_at || ""
+    const status = message?.status || inferStatus(message)
+    const isStreaming = !!message?.isStreaming
+
+    article.className = `message-row is-${role}`
+    article.setAttribute("data-message-id", messageId)
+
+    const attachments = Array.isArray(message?.attachments) ? message.attachments : []
+
+    article.innerHTML = `
+      <div class="message-avatar" aria-hidden="true">${role === "user" ? "Y" : "N"}</div>
+
+      <div class="message-card">
+        <div class="message-head">
+          <div class="message-author">${role === "user" ? "You" : "Nova"}</div>
+          <div class="message-meta">
+            <span class="message-time">${escapeHtml(formatClockTime(timestamp))}</span>
+            <span class="message-status ${status ? `is-${escapeHtml(status)}` : ""}">${escapeHtml(getStatusLabel(status))}</span>
+          </div>
+        </div>
+
+        <div class="message-body">
+          ${attachments.length > 0 ? renderAttachmentsHtml(attachments) : ""}
+          <div class="message-content ${isStreaming ? "is-thinking" : ""}">${renderMessageContent(content, { isStreaming })}</div>
+        </div>
+
+        <div class="message-actions">
+          <button type="button" class="message-action-btn" data-message-action="copy" data-message-id="${escapeHtml(messageId)}">Copy</button>
+          ${role === "assistant" ? `<button type="button" class="message-action-btn" data-message-action="regenerate" data-message-id="${escapeHtml(messageId)}">Regenerate</button>` : ""}
+        </div>
+      </div>
+    `
+
+    return article
+  }
+
+  function renderAttachmentsHtml(attachments){
+    return `
+      <div class="message-attachments">
+        ${attachments.map((attachment) => {
+          const name = escapeHtml(
+            attachment?.name ||
+            attachment?.filename ||
+            "Attachment"
+          )
+
+          const type = escapeHtml(
+            attachment?.content_type ||
+            attachment?.mime_type ||
+            "file"
+          )
+
+          const size = escapeHtml(formatBytes(attachment?.size || 0))
+
+          return `
+            <div class="message-attachment">
+              <div class="message-attachment-name">${name}</div>
+              <div class="message-attachment-meta">${type} • ${size}</div>
+            </div>
+          `
+        }).join("")}
+      </div>
+    `
+  }
+
+  function renderMessageContent(content, options = {}){
+    const { isStreaming = false } = options
+    const text = String(content || "")
+
+    if(!text){
+      return isStreaming
+        ? `<span class="message-thinking-text">Thinking...</span>`
+        : ""
+    }
+
+    return simpleMarkdownToHtml(text)
+  }
+
+  function simpleMarkdownToHtml(text){
+    const normalized = String(text || "").replace(/\r\n/g, "\n")
+
+    const codeBlocks = []
+    let html = normalized.replace(/```([\w-]*)\n([\s\S]*?)```/g, (_match, language, code) => {
+      const token = `@@CODEBLOCK_${codeBlocks.length}@@`
+      codeBlocks.push({
+        language: escapeHtml(language || ""),
+        code: escapeHtml(code || ""),
+      })
+      return token
+    })
+
+    html = escapeHtml(html)
+
+    html = html.replace(/^### (.+)$/gm, "<h3>$1</h3>")
+    html = html.replace(/^## (.+)$/gm, "<h2>$1</h2>")
+    html = html.replace(/^# (.+)$/gm, "<h1>$1</h1>")
+
+    html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    html = html.replace(/\*(.+?)\*/g, "<em>$1</em>")
+    html = html.replace(/`([^`\n]+)`/g, "<code>$1</code>")
+
+    html = html.replace(
+      /(https?:\/\/[^\s<]+)/g,
+      '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+    )
+
+    html = html
+      .split(/\n{2,}/)
+      .map((block) => {
+        const trimmed = block.trim()
+        if(!trimmed){
+          return ""
+        }
+
+        if(/^<h[1-3]>/.test(trimmed) || trimmed.startsWith("@@CODEBLOCK_")){
+          return trimmed
+        }
+
+        if(/^- /.test(trimmed)){
+          const items = trimmed
+            .split("\n")
+            .map((line) => line.replace(/^- /, "").trim())
+            .filter(Boolean)
+            .map((line) => `<li>${line}</li>`)
+            .join("")
+          return `<ul>${items}</ul>`
+        }
+
+        return `<p>${trimmed.replace(/\n/g, "<br>")}</p>`
+      })
+      .join("")
+
+    html = html.replace(/@@CODEBLOCK_(\d+)@@/g, (_match, index) => {
+      const block = codeBlocks[Number(index)]
+      if(!block){
+        return ""
+      }
+
+      return `
+        <pre class="message-code-block"><code class="language-${block.language}">${block.code}</code></pre>
+      `
+    })
+
+    return html
+  }
+
+  function toggleEmptyStates(payload = {}){
+    const {
+      showWelcome = false,
+      showMessagesEmpty = false,
+    } = payload
+
+    if(el.emptyState){
+      el.emptyState.hidden = !showWelcome
+    }
+
+    if(el.messagesEmpty){
+      el.messagesEmpty.hidden = !showMessagesEmpty
+    }
+  }
+
+  function scrollToBottom(){
+    if(!el.messagesScroll){
+      return
+    }
+
+    window.requestAnimationFrame(() => {
+      el.messagesScroll.scrollTop = el.messagesScroll.scrollHeight
+    })
+  }
+
+  function normalizeRole(role){
+    return role === "user" ? "user" : "assistant"
+  }
+
+  function inferStatus(message){
+    if(message?.isStreaming){
+      return "thinking"
+    }
+
+    if(message?.status){
+      return message.status
+    }
+
+    return "done"
+  }
+
+  function getStatusLabel(status){
+    switch(status){
+      case "sending":
+        return "Sending"
+      case "error":
+        return "Error"
+      case "thinking":
+        return "Thinking"
+      case "stopped":
+        return "Stopped"
+      case "done":
+        return ""
+      default:
+        return ""
+    }
+  }
+
+  function formatClockTime(value){
+    if(!value){
+      return ""
+    }
+
+    const date = new Date(value)
+    if(Number.isNaN(date.getTime())){
+      return ""
+    }
+
+    return date.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    })
+  }
+
+  function formatRelativeTime(value){
+    if(!value){
+      return "Just now"
+    }
+
+    const date = new Date(value)
+    if(Number.isNaN(date.getTime())){
+      return "Just now"
+    }
+
+    const diffMs = Date.now() - date.getTime()
+    const diffMinutes = Math.round(diffMs / 60000)
+
+    if(diffMinutes <= 0){
+      return "Just now"
+    }
+
+    if(diffMinutes === 1){
+      return "1 min ago"
+    }
+
+    if(diffMinutes < 60){
+      return `${diffMinutes} mins ago`
+    }
+
+    const diffHours = Math.round(diffMinutes / 60)
+    if(diffHours === 1){
+      return "1 hour ago"
+    }
+
+    if(diffHours < 24){
+      return `${diffHours} hours ago`
+    }
+
+    const diffDays = Math.round(diffHours / 24)
+    if(diffDays === 1){
+      return "1 day ago"
+    }
+
+    if(diffDays < 7){
+      return `${diffDays} days ago`
+    }
+
+    return date.toLocaleDateString()
+  }
+
+  function cssEscape(value){
+    if(window.CSS && typeof window.CSS.escape === "function"){
+      return window.CSS.escape(String(value))
+    }
+
+    return String(value).replace(/["\\]/g, "\\$&")
+  }
+
+  const escapeHtml = window.NovaUtils?.escapeHtml || defaultEscapeHtml
+  const formatBytes = window.NovaUtils?.formatBytes || defaultFormatBytes
+
+  return {
+    renderChatList,
+    renderMessages,
+    renderStreamingMessage,
+    removeStreamingMessage,
+    renderHeader,
+    showComposerMeta,
+    hideComposerMeta,
+    setMessageStatus,
+    flashMessageAction,
+  }
+}
+
+function defaultEscapeHtml(value){
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;")
+}
+
+function defaultFormatBytes(bytes){
+  const n = Number(bytes || 0)
+
+  if(!Number.isFinite(n) || n <= 0){
+    return "0 B"
+  }
+
+  const units = ["B", "KB", "MB", "GB", "TB"]
+  let size = n
+  let i = 0
+
+  while(size >= 1024 && i < units.length - 1){
+    size /= 1024
+    i += 1
+  }
+
+  return `${size < 10 && i > 0 ? size.toFixed(1) : Math.round(size)} ${units[i]}`
+}
+
+window.NovaRenderService = {
+  createRenderService,
+}
+
+})()

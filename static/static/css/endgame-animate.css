@@ -1,0 +1,24 @@
+/* Memory panel slide-in/out */
+.memory-panel {
+  transform: translateX(100%);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+.memory-panel.active {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* File thumbnail pop-in */
+.file-thumb {
+  transform: scale(0.8);
+  opacity: 0;
+  animation: popIn 0.25s forwards;
+}
+
+@keyframes popIn {
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

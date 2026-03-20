@@ -1,0 +1,331 @@
+// C:\Users\Owner\nova\static\js\render-service.js
+
+(() => {
+"use strict"
+
+function createRenderService(options = {}){
+
+  const {
+    state,
+    elements = {}
+  } = options
+
+  if(!state){
+    throw new Error("NovaRenderService: state is required")
+  }
+
+  const el = {
+    messages: elements.messages || document.getElementById("messages"),
+    emptyState: elements.emptyState || document.getElementById("messagesEmpty")
+  }
+
+  /* ----------------------------------------------------------- */
+  /* helpers */
+  /* ----------------------------------------------------------- */
+
+  function escapeHtml(value){
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;")
+  }
+
+  function formatTime(value){
+    if(!value){
+      return ""
+    }
+
+    try{
+      const date = new Date(value)
+      return date.toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit"
+      })
+    }catch{
+      return ""
+    }
+  }
+
+  function roleName(role){
+    if(role === "user"){
+      return "You"
+    }
+
+    if(role === "assistant"){
+      return "Nova"
+    }
+
+    return "System"
+  }
+
+  function roleInitial(role){
+    if(role === "user"){
+      return "Y"
+    }
+
+    if(role === "assistant"){
+      return "N"
+    }
+
+    return "S"
+  }
+
+  /* ----------------------------------------------------------- */
+  /* empty state */
+  /* ----------------------------------------------------------- */
+
+  function updateEmptyState(){
+    if(!el.emptyState){
+      return
+    }
+
+    if(state.messages && state.messages.length > 0){
+      el.emptyState.classList.add("is-hidden")
+    }else{
+      el.emptyState.classList.remove("is-hidden")
+    }
+  }
+
+  /* ----------------------------------------------------------- */
+  /* attachments */
+  /* ----------------------------------------------------------- */
+
+  function renderAttachments(list = []){
+    if(!Array.isArray(list) || list.length === 0){
+      return ""
+    }
+
+    const html = list.map(file => {
+
+      const name = escapeHtml(file.filename || file.name || "file")
+      const meta = escapeHtml(file.meta || file.type || "")
+
+      return `
+<div class="attachment-chip">
+  <div class="attachment-chip-body">
+    <div class="attachment-chip-name">${name}</div>
+    <div class="attachment-chip-meta">${meta}</div>
+  </div>
+</div>
+`
+    }).join("")
+
+    return `
+<div class="message-attachments">
+${html}
+</div>
+`
+  }
+
+  /* ----------------------------------------------------------- */
+  /* actions */
+  /* ----------------------------------------------------------- */
+
+  function renderActions(message){
+
+    if(!message || message.role !== "assistant"){
+      return ""
+    }
+
+    const id = escapeHtml(message.message_id || "")
+
+    return `
+<div class="message-actions">
+  <button
+    type="button"
+    class="message-action-btn"
+    data-message-action="copy"
+    data-message-id="${id}"
+  >
+    Copy
+  </button>
+
+  <button
+    type="button"
+    class="message-action-btn"
+    data-message-action="regenerate"
+    data-message-id="${id}"
+  >
+    Regenerate
+  </button>
+</div>
+`
+  }
+
+  /* ----------------------------------------------------------- */
+  /* status */
+  /* ----------------------------------------------------------- */
+
+  function renderStatus(message){
+
+    if(message.streaming){
+      return `<span class="message-status is-streaming">Streaming</span>`
+    }
+
+    if(message.error){
+      return `<span class="message-status is-error">Error</span>`
+    }
+
+    return ""
+  }
+
+  /* ----------------------------------------------------------- */
+  /* message row */
+  /* ----------------------------------------------------------- */
+
+  function renderMessage(message){
+
+    const role = message.role || "assistant"
+
+    const author = roleName(role)
+    const initial = roleInitial(role)
+
+    const time = formatTime(message.created_at)
+
+    const content = escapeHtml(message.content || "")
+
+    const streamingClass = message.streaming
+      ? "message-content is-streaming"
+      : "message-content"
+
+    const thinkingClass = message.thinking
+      ? " message-content is-thinking"
+      : ""
+
+    const errorBlock = message.error
+      ? `<div class="message-error">${escapeHtml(message.error)}</div>`
+      : ""
+
+    const attachments = renderAttachments(message.attachments)
+
+    return `
+<article class="message-row role-${role}" data-message-id="${escapeHtml(message.message_id || "")}">
+  <div class="message-avatar">${initial}</div>
+
+  <div class="message-bubble-wrap">
+
+    <div class="message-meta">
+      <span class="message-author">${author}</span>
+      ${time ? `<span class="message-time">${time}</span>` : ""}
+      ${renderStatus(message)}
+    </div>
+
+    <div class="message-bubble">
+
+      <div class="${streamingClass}${thinkingClass}">
+        ${content}
+      </div>
+
+      ${attachments}
+
+      ${errorBlock}
+
+    </div>
+
+    ${renderActions(message)}
+
+  </div>
+</article>
+`
+  }
+
+  /* ----------------------------------------------------------- */
+  /* render all */
+  /* ----------------------------------------------------------- */
+
+  function renderMessages(){
+
+    if(!el.messages){
+      return
+    }
+
+    const list = state.messages || []
+
+    const html = list.map(renderMessage).join("")
+
+    el.messages.innerHTML = html
+
+    updateEmptyState()
+  }
+
+  /* ----------------------------------------------------------- */
+  /* append message */
+  /* ----------------------------------------------------------- */
+
+  function appendMessage(message){
+
+    if(!el.messages){
+      return
+    }
+
+    const html = renderMessage(message)
+
+    el.messages.insertAdjacentHTML("beforeend", html)
+
+    updateEmptyState()
+
+    scrollToBottom()
+  }
+
+  /* ----------------------------------------------------------- */
+  /* update message */
+  /* ----------------------------------------------------------- */
+
+  function updateMessage(messageId, patch = {}){
+
+    const index = state.messages.findIndex(m => m.message_id === messageId)
+
+    if(index === -1){
+      return
+    }
+
+    const msg = state.messages[index]
+
+    Object.assign(msg, patch)
+
+    const node = el.messages.querySelector(`[data-message-id="${messageId}"]`)
+
+    if(!node){
+      renderMessages()
+      return
+    }
+
+    const wrapper = document.createElement("div")
+    wrapper.innerHTML = renderMessage(msg)
+
+    node.replaceWith(wrapper.firstElementChild)
+  }
+
+  /* ----------------------------------------------------------- */
+  /* scroll */
+  /* ----------------------------------------------------------- */
+
+  function scrollToBottom(){
+
+    if(!el.messages){
+      return
+    }
+
+    el.messages.scrollTop = el.messages.scrollHeight
+  }
+
+  /* ----------------------------------------------------------- */
+  /* public api */
+  /* ----------------------------------------------------------- */
+
+  return {
+    renderMessages,
+    appendMessage,
+    updateMessage,
+    scrollToBottom
+  }
+
+}
+
+window.NovaRenderService = {
+  create: createRenderService
+}
+
+})()

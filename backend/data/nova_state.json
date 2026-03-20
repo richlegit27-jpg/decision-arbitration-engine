@@ -1,0 +1,45 @@
+{
+  "chats": [
+    {
+      "id": "chat_1",
+      "title": "Starter Chat",
+      "created_at": "2026-03-18T00:00:00.000Z"
+    }
+  ],
+  "activeChatId": "chat_1",
+  "messagesByChatId": {
+    "chat_1": [
+      {
+        "id": "msg_1",
+        "role": "user",
+        "content": "Hey Nova, this is a starter message!"
+      },
+      {
+        "id": "msg_2",
+        "role": "assistant",
+        "content": "Hello! Here's a demo image and video to test the lightbox.",
+        "image_base64": "iVBORw0KGgoAAAANSUhEUgAAAAUA..." ,
+        "video_base64": "AAAAFGZ0eXBtcDQyAAAAAG1wN..." 
+      }
+    ]
+  },
+  "memory": {
+    "isOpen": false,
+    "items": [
+      {
+        "id": "mem_1",
+        "label": "Starter Note",
+        "content": "This is a memory item for testing."
+      },
+      {
+        "id": "mem_2",
+        "label": "Another Note",
+        "content": "Second memory item example."
+      }
+    ]
+  },
+  "ui": {
+    "sidebarOpen": false,
+    "memoryOpen": false
+  }
+}

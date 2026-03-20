@@ -1,0 +1,21 @@
+# backups (CRITICAL)
+backup*
+*backup*
+current_backup/
+restore_backup/
+
+# build / dist
+dist/
+build/
+
+# env / cache
+__pycache__/
+*.pyc
+.env
+
+# large / junk
+*.zip
+*.log
+
+# attachments (optional)
+static/attachments/
