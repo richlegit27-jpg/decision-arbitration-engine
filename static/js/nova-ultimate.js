@@ -19,6 +19,7 @@
     newSession: "/api/session/new",
     deleteSession: "/api/session/delete",
     renameSession: "/api/session/rename",
+    duplicateSession: "/api/session/duplicate",
   };
 
   const STORAGE_KEYS = {
@@ -936,6 +937,27 @@
     }
   }
 
+  async function duplicateCurrentSession() {
+    const sessionId = app.state.activeSessionId;
+    if (!sessionId) return;
+
+    const data = await apiPost(API.duplicateSession, { session_id: sessionId });
+
+    await loadState();
+
+    const newSessionId = safeText(data?.session?.session_id);
+    if (newSessionId) {
+      await loadSession(newSessionId);
+      updateModelStatus("Chat duplicated");
+      return;
+    }
+
+    if (app.state.sessions[0]?.session_id) {
+      await loadSession(app.state.sessions[0].session_id);
+      updateModelStatus("Chat duplicated");
+    }
+  }
+
   async function deleteCurrentSession() {
     const sessionId = app.state.activeSessionId;
     if (!sessionId) return;
@@ -1334,8 +1356,13 @@
     }
 
     if (duplicateBtn) {
-      duplicateBtn.addEventListener("click", () => {
-        alert("Duplicate needs a backend copy route. I left it honest instead of faking a broken clone.");
+      duplicateBtn.addEventListener("click", async () => {
+        try {
+          await duplicateCurrentSession();
+        } catch (err) {
+          console.error(err);
+          alert(`Failed to duplicate session: ${err.message}`);
+        }
       });
     }
 

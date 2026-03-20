@@ -1,11 +1,27 @@
 [
   {
-    "session_id": "21072e6d-8d99-4e8c-acfe-9971cd3cc9e7",
-    "title": "New Chat",
+    "session_id": "4d835a0e-e85c-4eab-bce6-dff9d5509234",
+    "title": "New Chat (Copy) (Copy 2)",
     "messages": [],
     "message_count": 0,
-    "created_at": 1774047516,
-    "updated_at": 1774047516
+    "created_at": 1774048836,
+    "updated_at": 1774048836
+  },
+  {
+    "session_id": "0406e8b3-4893-40d6-a30d-50a57e6608b9",
+    "title": "New Chat (Copy) (Copy)",
+    "messages": [],
+    "message_count": 0,
+    "created_at": 1774048623,
+    "updated_at": 1774048623
+  },
+  {
+    "session_id": "0f404a4e-0628-4dcd-88a4-fd609c1d0750",
+    "title": "New Chat (Copy)",
+    "messages": [],
+    "message_count": 0,
+    "created_at": 1774048617,
+    "updated_at": 1774048617
   },
   {
     "session_id": "7f50c1cc-949c-4a60-8f4f-a06ec1b94cd4",
