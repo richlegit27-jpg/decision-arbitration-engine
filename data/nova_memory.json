@@ -1,36 +1,20 @@
 {
   "items": [
     {
+      "id": "0ce234f1-d81c-40a3-83df-3a1a11c538db",
+      "kind": "preference",
+      "value": "go gym",
+      "source": "manual",
+      "created_at": 1774047014,
+      "updated_at": 1774047014
+    },
+    {
       "id": "99e99102-22c0-4f54-8ed7-40fe88e6d26d",
       "kind": "project",
       "value": "nova",
       "source": "auto",
       "created_at": 1774043849,
       "updated_at": 1774043849
-    },
-    {
-      "id": "c1d2d95e-4dff-4dc1-ae56-b2fa952d28f8",
-      "kind": "preference",
-      "value": "direct answers",
-      "source": "auto",
-      "created_at": 1774043839,
-      "updated_at": 1774043839
-    },
-    {
-      "id": "4433920a-a454-49db-92a4-f82ba6e82f6f",
-      "kind": "name",
-      "value": "richard chow",
-      "source": "auto",
-      "created_at": 1774043827,
-      "updated_at": 1774043827
-    },
-    {
-      "id": "69826425-9a53-4ab7-9a0e-37d3881ab410",
-      "kind": "preference",
-      "value": "hi",
-      "source": "manual",
-      "created_at": 1774043287,
-      "updated_at": 1774043287
     }
   ]
 }

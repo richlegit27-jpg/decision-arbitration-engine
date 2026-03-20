@@ -26,10 +26,75 @@
     selectedModel: "nova_selected_model",
     sidebarOpen: "nova_sidebar_open",
     memoryOpen: "nova_memory_open",
+    themeMode: "nova_theme_mode",
+    backgroundMode: "nova_background_mode",
+    pinnedSessionIds: "nova_pinned_session_ids",
   };
 
   const SIDEBAR_WIDTH = "280px";
   const MEMORY_WIDTH = "340px";
+  const INPUT_MIN_HEIGHT = 44;
+  const INPUT_MAX_HEIGHT = 140;
+
+  const MEMORY_LABELS = {
+    name: "Name",
+    preference: "Preference",
+    goal: "Goal",
+    project: "Project",
+    skill: "Skill",
+    workflow: "Workflow",
+    memory: "Memory",
+  };
+
+  const THEMES = {
+    dark: {
+      "--bg": "#0b1020",
+      "--panel": "#141c33",
+      "--panel-2": "#18223d",
+      "--panel-3": "#1d2947",
+      "--text": "#ecf2ff",
+      "--muted": "#95a3c7",
+      "--line": "rgba(167, 184, 255, 0.12)",
+      "--line-strong": "rgba(167, 184, 255, 0.24)",
+      "--accent": "#79a8ff",
+      "--accent-strong": "#5f93ff",
+      "--accent-soft": "rgba(121, 168, 255, 0.16)",
+      "--danger-soft": "rgba(255, 107, 129, 0.16)",
+    },
+    light: {
+      "--bg": "#eef3ff",
+      "--panel": "#ffffff",
+      "--panel-2": "#eef3ff",
+      "--panel-3": "#dfe8ff",
+      "--text": "#14213d",
+      "--muted": "#5c6b8a",
+      "--line": "rgba(20, 33, 61, 0.10)",
+      "--line-strong": "rgba(20, 33, 61, 0.20)",
+      "--accent": "#4f7dff",
+      "--accent-strong": "#355ef0",
+      "--accent-soft": "rgba(79, 125, 255, 0.14)",
+      "--danger-soft": "rgba(255, 107, 129, 0.14)",
+    },
+  };
+
+  const BACKGROUNDS = {
+    default: `
+      radial-gradient(circle at top left, rgba(121, 168, 255, 0.10), transparent 28%),
+      radial-gradient(circle at top right, rgba(121, 168, 255, 0.06), transparent 24%),
+      linear-gradient(180deg, #0b1020 0%, #0a0f1d 100%)
+    `,
+    aurora: `
+      radial-gradient(circle at 20% 15%, rgba(121, 168, 255, 0.18), transparent 22%),
+      radial-gradient(circle at 80% 10%, rgba(120, 255, 214, 0.12), transparent 20%),
+      radial-gradient(circle at 50% 100%, rgba(169, 121, 255, 0.12), transparent 28%),
+      linear-gradient(180deg, #09101b 0%, #0b1120 100%)
+    `,
+    steel: `
+      radial-gradient(circle at top left, rgba(255, 255, 255, 0.06), transparent 25%),
+      radial-gradient(circle at bottom right, rgba(121, 168, 255, 0.08), transparent 26%),
+      linear-gradient(180deg, #151a25 0%, #0f141d 100%)
+    `,
+  };
 
   const app = {
     state: {
@@ -41,6 +106,17 @@
       isSending: false,
       sidebarOpen: true,
       memoryOpen: true,
+      themeMode: "dark",
+      backgroundMode: "default",
+      pinnedSessionIds: [],
+      attachedFiles: [],
+      isVoiceListening: false,
+    },
+    streaming: {
+      controller: null,
+    },
+    voice: {
+      recognition: null,
     },
   };
 
@@ -81,6 +157,11 @@
     }
   }
 
+  function formatMemoryKind(kind) {
+    const clean = safeText(kind).toLowerCase();
+    return MEMORY_LABELS[clean] || "Memory";
+  }
+
   function escapeHtml(value) {
     return String(value ?? "")
       .replaceAll("&", "&amp;")
@@ -102,12 +183,14 @@
   function getModelStatusEl() { return byId("modelStatus"); }
   function getMemoryStatusTextEl() { return byId("memoryStatusText"); }
   function getDuplicateSessionBtn() { return byId("duplicateSessionBtn"); }
+  function getPinSessionBtn() { return byId("pinSessionBtn"); }
   function getExportSessionBtn() { return byId("exportSessionBtn"); }
   function getThemeToggleBtn() { return byId("themeToggleBtn"); }
   function getBackgroundBtn() { return byId("backgroundBtn"); }
   function getAttachBtn() { return byId("attachBtn"); }
   function getVoiceBtn() { return byId("voiceBtn"); }
   function getFileInput() { return byId("fileInput"); }
+  function getAttachedFilesBar() { return byId("attachedFiles"); }
 
   function getChatContainer() {
     return qs([
@@ -240,6 +323,37 @@
     ]);
   }
 
+  function updateModelStatus(text) {
+    const el = getModelStatusEl();
+    if (el) el.textContent = safeText(text || "Model ready");
+  }
+
+  function updateMemoryStatus(text) {
+    const el = getMemoryStatusTextEl();
+    if (el) el.textContent = safeText(text || "Memory panel ready.");
+  }
+
+  function updateChatHeader() {
+    const titleEl = getChatTitleEl();
+    const subtitleEl = getChatSubtitleEl();
+
+    const currentSession = app.state.sessions.find(
+      (session) => session.session_id === app.state.activeSessionId
+    );
+
+    const title = currentSession?.title || "Nova";
+
+    let subtitle = "Ready";
+    if (app.state.isSending) {
+      subtitle = "Thinking...";
+    } else if (app.state.messages.length > 0) {
+      subtitle = `${app.state.messages.length} messages`;
+    }
+
+    if (titleEl) titleEl.textContent = title;
+    if (subtitleEl) subtitleEl.textContent = subtitle;
+  }
+
   function setStatusSending(isSending) {
     app.state.isSending = !!isSending;
 
@@ -248,10 +362,12 @@
     const input = getMessageInput();
 
     if (sendBtn) sendBtn.disabled = isSending;
+
     if (stopBtn) {
       stopBtn.disabled = !isSending;
       stopBtn.classList.toggle("hidden", !isSending);
     }
+
     if (input) input.disabled = isSending;
 
     updateModelStatus(isSending ? "Responding..." : `Using ${app.state.currentModel}`);
@@ -261,8 +377,11 @@
   function autosizeInput() {
     const input = getMessageInput();
     if (!input) return;
-    input.style.height = "auto";
-    input.style.height = `${Math.min(input.scrollHeight, 220)}px`;
+
+    input.style.height = `${INPUT_MIN_HEIGHT}px`;
+    const next = Math.min(input.scrollHeight, INPUT_MAX_HEIGHT);
+    input.style.height = `${Math.max(INPUT_MIN_HEIGHT, next)}px`;
+    input.style.overflowY = input.scrollHeight > INPUT_MAX_HEIGHT ? "auto" : "hidden";
   }
 
   function persistState() {
@@ -271,6 +390,9 @@
       localStorage.setItem(STORAGE_KEYS.selectedModel, safeText(app.state.currentModel));
       localStorage.setItem(STORAGE_KEYS.sidebarOpen, String(!!app.state.sidebarOpen));
       localStorage.setItem(STORAGE_KEYS.memoryOpen, String(!!app.state.memoryOpen));
+      localStorage.setItem(STORAGE_KEYS.themeMode, safeText(app.state.themeMode));
+      localStorage.setItem(STORAGE_KEYS.backgroundMode, safeText(app.state.backgroundMode));
+      localStorage.setItem(STORAGE_KEYS.pinnedSessionIds, JSON.stringify(app.state.pinnedSessionIds || []));
     } catch (err) {
       console.warn("LocalStorage save failed:", err);
     }
@@ -282,11 +404,25 @@
       const savedModel = localStorage.getItem(STORAGE_KEYS.selectedModel);
       const savedSidebarOpen = localStorage.getItem(STORAGE_KEYS.sidebarOpen);
       const savedMemoryOpen = localStorage.getItem(STORAGE_KEYS.memoryOpen);
+      const savedThemeMode = localStorage.getItem(STORAGE_KEYS.themeMode);
+      const savedBackgroundMode = localStorage.getItem(STORAGE_KEYS.backgroundMode);
+      const savedPinnedSessionIds = localStorage.getItem(STORAGE_KEYS.pinnedSessionIds);
 
       if (savedSessionId) app.state.activeSessionId = savedSessionId;
       if (savedModel) app.state.currentModel = savedModel;
       if (savedSidebarOpen !== null) app.state.sidebarOpen = savedSidebarOpen === "true";
       if (savedMemoryOpen !== null) app.state.memoryOpen = savedMemoryOpen === "true";
+      if (savedThemeMode && THEMES[savedThemeMode]) app.state.themeMode = savedThemeMode;
+      if (savedBackgroundMode && BACKGROUNDS[savedBackgroundMode]) app.state.backgroundMode = savedBackgroundMode;
+
+      if (savedPinnedSessionIds) {
+        try {
+          const parsed = JSON.parse(savedPinnedSessionIds);
+          app.state.pinnedSessionIds = Array.isArray(parsed) ? parsed : [];
+        } catch {
+          app.state.pinnedSessionIds = [];
+        }
+      }
     } catch (err) {
       console.warn("LocalStorage restore failed:", err);
     }
@@ -328,35 +464,106 @@
     return res.json();
   }
 
-  function updateChatHeader() {
-    const titleEl = getChatTitleEl();
-    const subtitleEl = getChatSubtitleEl();
+  function sortMemoryItems(items) {
+    return [...items].sort((a, b) => {
+      const aTime = Number(a?.updated_at || a?.created_at || 0);
+      const bTime = Number(b?.updated_at || b?.created_at || 0);
+      return bTime - aTime;
+    });
+  }
 
-    const currentSession = app.state.sessions.find(
-      (session) => session.session_id === app.state.activeSessionId
-    );
+  function isPinnedSession(sessionId) {
+    return (app.state.pinnedSessionIds || []).includes(sessionId);
+  }
 
-    const title = currentSession?.title || "Nova";
+  function togglePinnedSession(sessionId) {
+    if (!sessionId) return;
+    const current = new Set(app.state.pinnedSessionIds || []);
+    if (current.has(sessionId)) {
+      current.delete(sessionId);
+    } else {
+      current.add(sessionId);
+    }
+    app.state.pinnedSessionIds = Array.from(current);
+    persistState();
+    renderSessions();
+    syncPinButtonLabel();
+  }
 
-    let subtitle = "Ready";
-    if (app.state.isSending) {
-      subtitle = "Thinking...";
-    } else if (app.state.messages.length > 0) {
-      subtitle = `${app.state.messages.length} messages`;
+  function getOrderedSessions() {
+    const sessions = Array.isArray(app.state.sessions) ? [...app.state.sessions] : [];
+    return sessions.sort((a, b) => {
+      const aPinned = isPinnedSession(a.session_id) ? 1 : 0;
+      const bPinned = isPinnedSession(b.session_id) ? 1 : 0;
+      if (aPinned !== bPinned) return bPinned - aPinned;
+
+      const aTime = Number(a?.updated_at || 0);
+      const bTime = Number(b?.updated_at || 0);
+      return bTime - aTime;
+    });
+  }
+
+  function applyThemeMode() {
+    const root = document.documentElement;
+    const body = document.body;
+    const themeName = THEMES[app.state.themeMode] ? app.state.themeMode : "dark";
+    const vars = THEMES[themeName];
+
+    root.setAttribute("data-theme", themeName);
+
+    Object.entries(vars).forEach(([key, value]) => {
+      root.style.setProperty(key, value);
+    });
+
+    if (body) {
+      body.style.color = vars["--text"];
     }
 
-    if (titleEl) titleEl.textContent = title;
-    if (subtitleEl) subtitleEl.textContent = subtitle;
+    const btn = getThemeToggleBtn();
+    if (btn) {
+      btn.textContent = themeName === "dark" ? "Theme: Dark" : "Theme: Light";
+      btn.title = "Toggle theme";
+    }
   }
 
-  function updateModelStatus(text) {
-    const el = getModelStatusEl();
-    if (el) el.textContent = safeText(text || "Model ready");
+  function applyBackgroundMode() {
+    const body = document.body;
+    const mode = BACKGROUNDS[app.state.backgroundMode] ? app.state.backgroundMode : "default";
+    if (body) {
+      body.style.background = BACKGROUNDS[mode];
+    }
+
+    const btn = getBackgroundBtn();
+    if (btn) {
+      const label =
+        mode === "default" ? "Background: Default" :
+        mode === "aurora" ? "Background: Aurora" :
+        "Background: Steel";
+      btn.textContent = label;
+      btn.title = "Cycle background";
+    }
   }
 
-  function updateMemoryStatus(text) {
-    const el = getMemoryStatusTextEl();
-    if (el) el.textContent = safeText(text || "Memory panel ready.");
+  function cycleThemeMode() {
+    app.state.themeMode = app.state.themeMode === "dark" ? "light" : "dark";
+    applyThemeMode();
+    persistState();
+  }
+
+  function cycleBackgroundMode() {
+    const order = ["default", "aurora", "steel"];
+    const index = order.indexOf(app.state.backgroundMode);
+    app.state.backgroundMode = order[(index + 1) % order.length];
+    applyBackgroundMode();
+    persistState();
+  }
+
+  function syncPinButtonLabel() {
+    const btn = getPinSessionBtn();
+    if (!btn) return;
+    const pinned = isPinnedSession(app.state.activeSessionId);
+    btn.textContent = pinned ? "Unpin" : "Pin";
+    btn.title = pinned ? "Unpin active chat" : "Pin active chat";
   }
 
   function applyLayout() {
@@ -463,9 +670,16 @@
     updateChatHeader();
   }
 
+  function removeStreamingShell() {
+    const existing = getChatContainer()?.querySelector(".message.streaming");
+    if (existing) existing.remove();
+  }
+
   function renderStreamingAssistantShell() {
     const container = getChatContainer();
     if (!container) return null;
+
+    removeStreamingShell();
 
     const div = document.createElement("div");
     div.className = "message assistant streaming";
@@ -474,6 +688,7 @@
       <div class="message-body"></div>
       <div class="message-time">${escapeHtml(new Date().toLocaleString())}</div>
     `;
+
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
     return div.querySelector(".message-body");
@@ -482,7 +697,7 @@
   function renderSessions() {
     const listEl = getSessionList();
     const countEl = getSessionCountEl();
-    const sessions = Array.isArray(app.state.sessions) ? app.state.sessions : [];
+    const sessions = getOrderedSessions();
 
     if (countEl) countEl.textContent = String(sessions.length);
     if (!listEl) return;
@@ -492,17 +707,19 @@
     if (!sessions.length) {
       listEl.innerHTML = `<div class="session-empty">No chats yet.</div>`;
       updateChatHeader();
+      syncPinButtonLabel();
       return;
     }
 
     for (const session of sessions) {
+      const pinned = isPinnedSession(session.session_id);
       const item = document.createElement("button");
       item.type = "button";
       item.className = "session-item";
       if (session.session_id === app.state.activeSessionId) item.classList.add("active");
 
       item.innerHTML = `
-        <div class="session-title">${escapeHtml(session.title || "New Chat")}</div>
+        <div class="session-title">${pinned ? "📌 " : ""}${escapeHtml(session.title || "New Chat")}</div>
         <div class="session-meta">
           <span>${escapeHtml(String(session.message_count || 0))} messages</span>
           <span>${escapeHtml(formatTime(session.updated_at || nowUnix()))}</span>
@@ -520,12 +737,14 @@
     }
 
     updateChatHeader();
+    syncPinButtonLabel();
   }
 
   function renderMemory() {
     const listEl = getMemoryList();
     const emptyEl = getMemoryEmpty();
-    const items = Array.isArray(app.state.memoryItems) ? app.state.memoryItems : [];
+    const rawItems = Array.isArray(app.state.memoryItems) ? app.state.memoryItems : [];
+    const items = sortMemoryItems(rawItems);
 
     if (!listEl) return;
 
@@ -545,10 +764,10 @@
       row.className = "memory-item";
       row.dataset.memoryId = safeText(item.id);
 
-      const kind = safeText(item.kind || "memory");
+      const kind = formatMemoryKind(item.kind || "memory");
       const value = safeText(item.value);
       const source = safeText(item.source || "manual");
-      const updated = formatTime(item.updated_at);
+      const updated = formatTime(item.updated_at || item.created_at);
 
       row.innerHTML = `
         <div class="memory-item-main">
@@ -575,7 +794,51 @@
       listEl.appendChild(row);
     }
 
-    updateMemoryStatus(`${items.length} memory item${items.length === 1 ? "" : "s"} loaded.`);
+    updateMemoryStatus(`${items.length} saved ${items.length === 1 ? "memory item" : "memory items"}.`);
+  }
+
+  function renderAttachedFiles() {
+    const bar = getAttachedFilesBar();
+    if (!bar) return;
+
+    const files = Array.isArray(app.state.attachedFiles) ? app.state.attachedFiles : [];
+    bar.innerHTML = "";
+
+    if (!files.length) {
+      bar.classList.remove("has-files");
+      return;
+    }
+
+    bar.classList.add("has-files");
+
+    files.forEach((file, index) => {
+      const chip = document.createElement("div");
+      chip.style.display = "inline-flex";
+      chip.style.alignItems = "center";
+      chip.style.gap = "8px";
+      chip.style.padding = "6px 10px";
+      chip.style.borderRadius = "999px";
+      chip.style.border = "1px solid var(--line)";
+      chip.style.background = "rgba(255,255,255,0.04)";
+      chip.style.fontSize = "0.78rem";
+      chip.innerHTML = `
+        <span>${escapeHtml(file.name)} (${Math.max(1, Math.round(file.size / 1024))} KB)</span>
+        <button type="button" title="Remove file" style="border:0;background:transparent;color:inherit;cursor:pointer;">×</button>
+      `;
+
+      const removeBtn = chip.querySelector("button");
+      if (removeBtn) {
+        removeBtn.addEventListener("click", () => {
+          app.state.attachedFiles.splice(index, 1);
+          renderAttachedFiles();
+          if (!app.state.attachedFiles.length) {
+            updateModelStatus(`Using ${app.state.currentModel}`);
+          }
+        });
+      }
+
+      bar.appendChild(chip);
+    });
   }
 
   async function loadModels() {
@@ -680,6 +943,8 @@
     const ok = confirm("Delete this chat?");
     if (!ok) return;
 
+    app.state.pinnedSessionIds = (app.state.pinnedSessionIds || []).filter((id) => id !== sessionId);
+
     await apiPost(API.deleteSession, { session_id: sessionId });
     app.state.messages = [];
     await loadState();
@@ -740,12 +1005,90 @@
     URL.revokeObjectURL(url);
   }
 
+  function appendVoiceTranscript(text) {
+    const input = getMessageInput();
+    if (!input || !text) return;
+
+    const current = input.value || "";
+    input.value = current ? `${current} ${text}`.trim() : text.trim();
+    input.focus();
+    autosizeInput();
+  }
+
+  function stopVoiceRecognition() {
+    if (app.voice.recognition) {
+      try {
+        app.voice.recognition.stop();
+      } catch {
+        // ignore
+      }
+    }
+    app.state.isVoiceListening = false;
+
+    const voiceBtn = getVoiceBtn();
+    if (voiceBtn) {
+      voiceBtn.textContent = "Voice";
+      voiceBtn.title = "Voice input";
+    }
+  }
+
+  function toggleVoiceRecognition() {
+    const VoiceRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!VoiceRecognition) {
+      alert("Voice input is not supported in this browser.");
+      return;
+    }
+
+    if (app.state.isVoiceListening) {
+      stopVoiceRecognition();
+      updateModelStatus(`Using ${app.state.currentModel}`);
+      return;
+    }
+
+    const recognition = new VoiceRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    app.voice.recognition = recognition;
+    app.state.isVoiceListening = true;
+
+    const voiceBtn = getVoiceBtn();
+    if (voiceBtn) {
+      voiceBtn.textContent = "Listening";
+      voiceBtn.title = "Stop voice input";
+    }
+
+    updateModelStatus("Listening...");
+
+    recognition.onresult = (event) => {
+      const text = event?.results?.[0]?.[0]?.transcript || "";
+      appendVoiceTranscript(text);
+      updateModelStatus("Voice captured");
+    };
+
+    recognition.onerror = () => {
+      updateModelStatus("Voice input failed");
+      stopVoiceRecognition();
+    };
+
+    recognition.onend = () => {
+      stopVoiceRecognition();
+      if (!app.state.isSending) {
+        updateModelStatus(`Using ${app.state.currentModel}`);
+      }
+    };
+
+    recognition.start();
+  }
+
   async function sendMessage() {
     const input = getMessageInput();
     if (!input) return;
 
     const content = safeText(input.value);
     if (!content) return;
+    if (app.state.isSending) return;
 
     if (!app.state.activeSessionId) {
       await createNewSession();
@@ -767,9 +1110,17 @@
 
     input.value = "";
     autosizeInput();
-    setStatusSending(true);
 
+    if (app.state.attachedFiles.length) {
+      updateModelStatus("Files selected locally only");
+    }
+
+    removeStreamingShell();
     const streamBodyEl = renderStreamingAssistantShell();
+
+    const controller = new AbortController();
+    app.streaming.controller = controller;
+    setStatusSending(true);
 
     try {
       const response = await fetch(API.stream, {
@@ -780,16 +1131,25 @@
           content,
           model,
         }),
+        signal: controller.signal,
       });
 
       if (!response.ok || !response.body) {
-        throw new Error(`Stream failed with ${response.status}`);
+        let errorMessage = `Stream failed with ${response.status}`;
+        try {
+          const data = await response.json();
+          errorMessage = data.detail || data.message || errorMessage;
+        } catch {
+          // ignore
+        }
+        throw new Error(errorMessage);
       }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let buffer = "";
       let assistantText = "";
+      let finished = false;
 
       while (true) {
         const { value, done } = await reader.read();
@@ -806,12 +1166,17 @@
 
           const lines = rawEvent.split("\n");
           let eventName = "message";
-          let dataText = "";
+          const dataLines = [];
 
           for (const line of lines) {
-            if (line.startsWith("event:")) eventName = line.slice(6).trim();
-            else if (line.startsWith("data:")) dataText += line.slice(5).trim();
+            if (line.startsWith("event:")) {
+              eventName = line.slice(6).trim();
+            } else if (line.startsWith("data:")) {
+              dataLines.push(line.slice(5).trim());
+            }
           }
+
+          const dataText = dataLines.join("\n");
 
           let payload = {};
           try {
@@ -820,57 +1185,74 @@
             payload = {};
           }
 
-          if (eventName === "delta") {
-            const delta = safeText(payload.text);
+          if (eventName === "start") {
+            if (payload.session_id) {
+              app.state.activeSessionId = payload.session_id;
+              persistState();
+            }
+          } else if (eventName === "delta") {
+            const delta = String(payload.text ?? "");
             assistantText += delta;
             if (streamBodyEl) {
               streamBodyEl.innerHTML = escapeHtml(assistantText).replace(/\n/g, "<br>");
             }
           } else if (eventName === "done") {
-            const finalMsg = payload.message || {
-              role: "assistant",
-              content: assistantText || "No response returned.",
-              timestamp: nowUnix(),
-              model,
-            };
-
+            finished = true;
             app.state.activeSessionId = payload.session_id || app.state.activeSessionId;
-
-            const existingStreaming = getChatContainer()?.querySelector(".message.streaming");
-            if (existingStreaming) existingStreaming.remove();
-
-            app.state.messages.push(finalMsg);
-            renderMessages(app.state.messages);
+            removeStreamingShell();
+            app.state.attachedFiles = [];
+            renderAttachedFiles();
             await loadState();
+            await loadSession(app.state.activeSessionId);
             await loadMemory();
           } else if (eventName === "error") {
             throw new Error(payload.message || "Unknown streaming error");
           }
         }
       }
+
+      if (!finished) {
+        removeStreamingShell();
+        app.state.attachedFiles = [];
+        renderAttachedFiles();
+        await loadState();
+        await loadSession(app.state.activeSessionId);
+        await loadMemory();
+      }
     } catch (err) {
       console.error(err);
+      removeStreamingShell();
 
-      const existingStreaming = getChatContainer()?.querySelector(".message.streaming");
-      if (existingStreaming) existingStreaming.remove();
+      if (err.name === "AbortError") {
+        updateModelStatus("Stopped");
+        await loadState();
+        if (app.state.activeSessionId) {
+          await loadSession(app.state.activeSessionId);
+        }
+      } else {
+        const errorMsg = {
+          id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+          role: "assistant",
+          content: `Error: ${err.message}`,
+          timestamp: nowUnix(),
+          model,
+        };
 
-      const errorMsg = {
-        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
-        role: "assistant",
-        content: `Error: ${err.message}`,
-        timestamp: nowUnix(),
-        model,
-      };
-
-      app.state.messages.push(errorMsg);
-      renderMessages(app.state.messages);
-      updateModelStatus("Response failed");
+        app.state.messages.push(errorMsg);
+        renderMessages(app.state.messages);
+        updateModelStatus("Response failed");
+      }
     } finally {
+      app.streaming.controller = null;
       setStatusSending(false);
     }
   }
 
   function stopStreaming() {
+    if (app.streaming.controller) {
+      app.streaming.controller.abort();
+      app.streaming.controller = null;
+    }
     setStatusSending(false);
     updateModelStatus("Stopped");
   }
@@ -883,6 +1265,7 @@
     const deleteBtn = getDeleteSessionBtn();
     const renameBtn = getRenameSessionBtn();
     const duplicateBtn = getDuplicateSessionBtn();
+    const pinBtn = getPinSessionBtn();
     const exportBtn = getExportSessionBtn();
     const modelSelect = getModelSelect();
     const memoryForm = getMemoryForm();
@@ -898,6 +1281,7 @@
     const fileInput = getFileInput();
 
     if (input) {
+      input.style.height = `${INPUT_MIN_HEIGHT}px`;
       input.addEventListener("input", autosizeInput);
       input.addEventListener("keydown", async (event) => {
         if (event.key === "Enter" && !event.shiftKey) {
@@ -908,51 +1292,69 @@
       autosizeInput();
     }
 
-    if (sendBtn) sendBtn.addEventListener("click", async () => {
-      if (!app.state.isSending) await sendMessage();
-    });
+    if (sendBtn) {
+      sendBtn.addEventListener("click", async () => {
+        if (!app.state.isSending) await sendMessage();
+      });
+    }
 
     if (stopBtn) stopBtn.addEventListener("click", stopStreaming);
 
-    if (newBtn) newBtn.addEventListener("click", async () => {
-      try {
-        await createNewSession();
-      } catch (err) {
-        console.error(err);
-        alert(`Failed to create session: ${err.message}`);
-      }
-    });
+    if (newBtn) {
+      newBtn.addEventListener("click", async () => {
+        try {
+          await createNewSession();
+        } catch (err) {
+          console.error(err);
+          alert(`Failed to create session: ${err.message}`);
+        }
+      });
+    }
 
-    if (deleteBtn) deleteBtn.addEventListener("click", async () => {
-      try {
-        await deleteCurrentSession();
-      } catch (err) {
-        console.error(err);
-        alert(`Failed to delete session: ${err.message}`);
-      }
-    });
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", async () => {
+        try {
+          await deleteCurrentSession();
+        } catch (err) {
+          console.error(err);
+          alert(`Failed to delete session: ${err.message}`);
+        }
+      });
+    }
 
-    if (renameBtn) renameBtn.addEventListener("click", async () => {
-      try {
-        await renameCurrentSession();
-      } catch (err) {
-        console.error(err);
-        alert(`Failed to rename session: ${err.message}`);
-      }
-    });
+    if (renameBtn) {
+      renameBtn.addEventListener("click", async () => {
+        try {
+          await renameCurrentSession();
+        } catch (err) {
+          console.error(err);
+          alert(`Failed to rename session: ${err.message}`);
+        }
+      });
+    }
 
-    if (duplicateBtn) duplicateBtn.addEventListener("click", () => {
-      alert("Duplicate is not wired to the backend yet.");
-    });
+    if (duplicateBtn) {
+      duplicateBtn.addEventListener("click", () => {
+        alert("Duplicate needs a backend copy route. I left it honest instead of faking a broken clone.");
+      });
+    }
 
-    if (exportBtn) exportBtn.addEventListener("click", () => {
-      try {
-        exportCurrentSession();
-      } catch (err) {
-        console.error(err);
-        alert(`Failed to export chat: ${err.message}`);
-      }
-    });
+    if (pinBtn) {
+      pinBtn.addEventListener("click", () => {
+        togglePinnedSession(app.state.activeSessionId);
+      });
+    }
+
+    if (exportBtn) {
+      exportBtn.addEventListener("click", () => {
+        try {
+          exportCurrentSession();
+        } catch (err) {
+          console.error(err);
+          alert(`Failed to export chat: ${err.message}`);
+        }
+      });
+    }
 
     if (modelSelect) {
       modelSelect.addEventListener("change", () => {
@@ -986,6 +1388,7 @@
     if (refreshMemoryBtn) {
       refreshMemoryBtn.addEventListener("click", async () => {
         try {
+          updateMemoryStatus("Refreshing memory...");
           await loadMemory();
         } catch (err) {
           console.error(err);
@@ -1018,13 +1421,13 @@
     if (memoryToggleBtnTop) memoryToggleBtnTop.addEventListener("click", toggleMemoryPanel);
     if (closeMemoryBtn) closeMemoryBtn.addEventListener("click", closeMemoryPanel);
 
-    if (themeToggleBtn) themeToggleBtn.addEventListener("click", () => {
-      alert("Theme toggle is not wired yet.");
-    });
+    if (themeToggleBtn) {
+      themeToggleBtn.addEventListener("click", cycleThemeMode);
+    }
 
-    if (backgroundBtn) backgroundBtn.addEventListener("click", () => {
-      alert("Background picker is not wired yet.");
-    });
+    if (backgroundBtn) {
+      backgroundBtn.addEventListener("click", cycleBackgroundMode);
+    }
 
     if (attachBtn && fileInput) {
       attachBtn.addEventListener("click", () => fileInput.click());
@@ -1032,21 +1435,30 @@
 
     if (fileInput) {
       fileInput.addEventListener("change", () => {
-        const total = fileInput.files ? fileInput.files.length : 0;
-        if (total > 0) updateModelStatus(`${total} file${total === 1 ? "" : "s"} selected`);
+        const files = Array.from(fileInput.files || []);
+        app.state.attachedFiles = files;
+        renderAttachedFiles();
+
+        const total = files.length;
+        if (total > 0) {
+          updateModelStatus(`${total} file${total === 1 ? "" : "s"} selected`);
+        } else {
+          updateModelStatus(`Using ${app.state.currentModel}`);
+        }
       });
     }
 
     if (voiceBtn) {
-      voiceBtn.addEventListener("click", () => {
-        alert("Voice is not wired yet.");
-      });
+      voiceBtn.addEventListener("click", toggleVoiceRecognition);
     }
   }
 
   async function bootstrap() {
     restoreState();
+    applyThemeMode();
+    applyBackgroundMode();
     bindEvents();
+    renderAttachedFiles();
     setStatusSending(false);
     applyLayout();
     updateChatHeader();
@@ -1066,7 +1478,10 @@
     }
 
     applyLayout();
+    applyThemeMode();
+    applyBackgroundMode();
     updateChatHeader();
+    syncPinButtonLabel();
 
     window.NovaApp = window.NovaApp || {};
     window.NovaApp.state = app.state;
