@@ -4,6 +4,7 @@ import os
 import re
 import time
 import uuid
+from threading import Lock
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Request
@@ -12,6 +13,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 import uvicorn
+
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -92,6 +94,8 @@ PREFERENCE_PREFIX_BLACKLIST = (
     "for now",
 )
 
+FILE_LOCK = Lock()
+
 
 def now() -> int:
     return int(time.time())
@@ -110,7 +114,8 @@ def load_json_file(path: Path, default: Any):
 
 
 def save_json_file(path: Path, data: Any) -> None:
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    with FILE_LOCK:
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def load_sessions() -> List[Dict[str, Any]]:
@@ -143,6 +148,40 @@ def get_session(sessions: List[Dict[str, Any]], session_id: str):
     return None
 
 
+def move_session_to_top(sessions: List[Dict[str, Any]], session_id: str) -> None:
+    idx = None
+    for i, session in enumerate(sessions):
+        if session.get("session_id") == session_id:
+            idx = i
+            break
+    if idx is None or idx == 0:
+        return
+    session = sessions.pop(idx)
+    sessions.insert(0, session)
+
+
+def create_session_object(session_id: Optional[str] = None) -> Dict[str, Any]:
+    ts = now()
+    return {
+        "session_id": session_id or str(uuid.uuid4()),
+        "title": "New Chat",
+        "messages": [],
+        "message_count": 0,
+        "created_at": ts,
+        "updated_at": ts,
+    }
+
+
+def get_or_create_session(sessions: List[Dict[str, Any]], session_id: str) -> Dict[str, Any]:
+    existing = get_session(sessions, session_id)
+    if existing:
+        return existing
+
+    new_session = create_session_object(session_id=session_id or None)
+    sessions.insert(0, new_session)
+    return new_session
+
+
 def get_context(messages: List[Dict[str, Any]], limit: int = MAX_CONTEXT_MESSAGES) -> List[Dict[str, Any]]:
     usable: List[Dict[str, Any]] = []
     for msg in messages[-limit:]:
@@ -162,7 +201,7 @@ def generate_title(text: str) -> str:
     return clean[:48].rstrip(" .,!?:;-") + "..."
 
 
-def normalize_memory_text(text: str) -> str:
+def normalize_memory_text(text: Any) -> str:
     clean = " ".join(str(text or "").split()).strip()
     clean = clean.strip(" .")
     return clean
@@ -199,8 +238,7 @@ def is_low_value_memory(value: str, kind: str) -> bool:
         return True
 
     if kind == "preference":
-        low = lowered.lower()
-        if low.startswith(PREFERENCE_PREFIX_BLACKLIST):
+        if lowered.startswith(PREFERENCE_PREFIX_BLACKLIST):
             return True
 
     for phrase in LOW_VALUE_MEMORY_PHRASES:
@@ -296,7 +334,6 @@ def extract_memory_from_message(text: str) -> None:
         ("skill", r"\bi'm good at\s+(.+)$"),
     ]
 
-    # Avoid grabbing questions like "what if I want to learn..."
     if "?" in content and not any(
         trigger in content_lower for trigger in ["my name is", "i prefer", "from now on", "going forward"]
     ):
@@ -389,9 +426,7 @@ def build_memory_prompt(user_request: str = "") -> str:
 
 
 def build_openai_messages(session_messages: List[Dict[str, Any]], user_request: str = "") -> List[Dict[str, str]]:
-    messages: List[Dict[str, str]] = [
-        {"role": "system", "content": SYSTEM_PROMPT}
-    ]
+    messages: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     memory_prompt = build_memory_prompt(user_request)
     if memory_prompt:
@@ -415,21 +450,44 @@ def summarize_sessions_for_state(sessions: List[Dict[str, Any]]) -> List[Dict[st
     return items
 
 
+def require_api_key() -> None:
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="Missing API key")
+
+
+def validate_chat_input(data: Dict[str, Any]) -> Dict[str, str]:
+    session_id = str(data.get("session_id") or "").strip()
+    content = normalize_memory_text(data.get("content"))
+    model = str(data.get("model") or OPENAI_MODEL).strip() or OPENAI_MODEL
+
+    if not content:
+        raise HTTPException(status_code=400, detail="Content cannot be empty")
+
+    return {
+        "session_id": session_id,
+        "content": content,
+        "model": model,
+    }
+
+
 app = FastAPI(title="Nova")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")
 async def index():
+    if not INDEX_FILE.exists():
+        raise HTTPException(status_code=404, detail="index.html not found")
     return FileResponse(INDEX_FILE)
 
 
@@ -458,6 +516,7 @@ async def get_chat(session_id: str):
     session = get_session(sessions, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+
     session["message_count"] = len(session.get("messages", []))
     return session
 
@@ -474,7 +533,7 @@ async def add_memory(request: Request):
     value = normalize_memory_text(data.get("value"))
 
     if not value:
-        raise HTTPException(status_code=400, detail="kind and value are required")
+        raise HTTPException(status_code=400, detail="Value is required")
 
     if is_low_value_memory(value, kind):
         raise HTTPException(status_code=400, detail="Memory value is too short, vague, or low quality")
@@ -493,6 +552,7 @@ async def delete_memory(request: Request):
     memory = load_memory()
     before = len(memory["items"])
     memory["items"] = [item for item in memory["items"] if str(item.get("id")) != memory_id]
+
     if len(memory["items"]) == before:
         raise HTTPException(status_code=404, detail="Memory item not found")
 
@@ -503,28 +563,18 @@ async def delete_memory(request: Request):
 @app.post("/api/session/new")
 async def new_session():
     sessions = load_sessions()
-
-    session_id = str(uuid.uuid4())
-    ts = now()
-    new = {
-        "session_id": session_id,
-        "title": "New Chat",
-        "messages": [],
-        "message_count": 0,
-        "created_at": ts,
-        "updated_at": ts,
-    }
-
-    sessions.insert(0, new)
+    session = create_session_object()
+    sessions.insert(0, session)
     save_sessions(sessions)
-
-    return {"session_id": session_id}
+    return {"session_id": session["session_id"]}
 
 
 @app.post("/api/session/delete")
 async def delete_session(request: Request):
     data = await request.json()
     session_id = str(data.get("session_id") or "").strip()
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id is required")
 
     sessions = load_sessions()
     new_sessions = [s for s in sessions if s.get("session_id") != session_id]
@@ -541,6 +591,8 @@ async def rename_session(request: Request):
     session_id = str(data.get("session_id") or "").strip()
     title = normalize_memory_text(data.get("title"))
 
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id is required")
     if not title:
         raise HTTPException(status_code=400, detail="Title cannot be empty")
 
@@ -551,36 +603,22 @@ async def rename_session(request: Request):
 
     session["title"] = title[:80]
     session["updated_at"] = now()
+    move_session_to_top(sessions, session_id)
     save_sessions(sessions)
     return {"ok": True}
 
 
 @app.post("/api/chat")
 async def chat_once(request: Request):
-    data = await request.json()
-    session_id = str(data.get("session_id") or "").strip()
-    content = normalize_memory_text(data.get("content"))
-    model = str(data.get("model") or OPENAI_MODEL).strip() or OPENAI_MODEL
+    payload = validate_chat_input(await request.json())
+    require_api_key()
 
-    if not content:
-        raise HTTPException(status_code=400, detail="Content cannot be empty")
-    if not OPENAI_API_KEY:
-        raise HTTPException(status_code=500, detail="Missing API key")
+    session_id = payload["session_id"]
+    content = payload["content"]
+    model = payload["model"]
 
     sessions = load_sessions()
-    session = get_session(sessions, session_id)
-
-    if not session:
-        session_id = str(uuid.uuid4())
-        session = {
-            "session_id": session_id,
-            "title": "New Chat",
-            "messages": [],
-            "message_count": 0,
-            "created_at": now(),
-            "updated_at": now(),
-        }
-        sessions.insert(0, session)
+    session = get_or_create_session(sessions, session_id)
 
     user_msg = {
         "id": str(uuid.uuid4()),
@@ -615,10 +653,11 @@ async def chat_once(request: Request):
     if session["message_count"] == 2:
         session["title"] = generate_title(content)
 
+    move_session_to_top(sessions, session["session_id"])
     save_sessions(sessions)
 
     return {
-        "session_id": session_id,
+        "session_id": session["session_id"],
         "title": session["title"],
         "message_count": session["message_count"],
         "message": assistant_msg,
@@ -628,21 +667,15 @@ async def chat_once(request: Request):
 
 @app.post("/api/chat/stream")
 async def chat_stream(request: Request):
-    data = await request.json()
-    session_id = str(data.get("session_id") or "").strip()
-    content = normalize_memory_text(data.get("content"))
-    model = str(data.get("model") or OPENAI_MODEL).strip() or OPENAI_MODEL
+    payload = validate_chat_input(await request.json())
+    require_api_key()
 
-    if not content:
-        raise HTTPException(status_code=400, detail="Content cannot be empty")
-    if not OPENAI_API_KEY:
-        raise HTTPException(status_code=500, detail="Missing API key")
+    requested_session_id = payload["session_id"]
+    content = payload["content"]
+    model = payload["model"]
 
     sessions = load_sessions()
-    session = get_session(sessions, session_id)
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session = get_or_create_session(sessions, requested_session_id)
 
     user_msg = {
         "id": str(uuid.uuid4()),
@@ -656,19 +689,20 @@ async def chat_stream(request: Request):
     extract_memory_from_message(content)
 
     openai_messages = build_openai_messages(session["messages"], user_request=content)
+    session_id = session["session_id"]
 
     def event_stream():
         assistant_text = ""
 
         try:
+            yield f"event: start\ndata: {json.dumps({'title': session['title'], 'model_used': model, 'session_id': session_id}, ensure_ascii=False)}\n\n"
+
             stream = client.chat.completions.create(
                 model=model,
                 messages=openai_messages,
                 stream=True,
                 temperature=0.7,
             )
-
-            yield f"event: start\ndata: {json.dumps({'title': session['title'], 'model_used': model}, ensure_ascii=False)}\n\n"
 
             for chunk in stream:
                 delta = chunk.choices[0].delta.content or ""
@@ -690,12 +724,13 @@ async def chat_stream(request: Request):
             if session["message_count"] == 2:
                 session["title"] = generate_title(content)
 
+            move_session_to_top(sessions, session_id)
             save_sessions(sessions)
 
             yield f"event: done\ndata: {json.dumps({'message': assistant_msg, 'session_id': session_id, 'title': session['title']}, ensure_ascii=False)}\n\n"
 
         except Exception as e:
-            yield f"event: error\ndata: {json.dumps({'message': str(e)}, ensure_ascii=False)}\n\n"
+            yield f"event: error\ndata: {json.dumps({'message': str(e), 'session_id': session_id}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         event_stream(),
