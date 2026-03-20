@@ -1,6 +1,7 @@
 from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory, Response
 from openai import OpenAI
+from werkzeug.utils import secure_filename
 import copy
 import json
 import os
@@ -12,14 +13,19 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 TEMPLATES_DIR = BASE_DIR / "templates"
 DATA_DIR = BASE_DIR / "data"
+UPLOADS_DIR = BASE_DIR / "uploads"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 SESSIONS_FILE = DATA_DIR / "nova_sessions.json"
 MEMORY_FILE = DATA_DIR / "nova_memory.json"
 
 OPENAI_API_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
 DEFAULT_MODEL = (os.getenv("OPENAI_MODEL") or "gpt-4.1-mini").strip() or "gpt-4.1-mini"
+
+MAX_UPLOAD_FILES = 10
+MAX_UPLOAD_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB per file
 
 SYSTEM_PROMPT = (
     "You are Nova, an elite AI assistant. "
@@ -84,6 +90,7 @@ PREFERENCE_PREFIX_BLACKLIST = (
 )
 
 app = Flask(__name__, static_folder=str(STATIC_DIR), template_folder=str(TEMPLATES_DIR))
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_FILES * MAX_UPLOAD_SIZE_BYTES
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 
@@ -176,14 +183,43 @@ def generate_title(text: str) -> str:
     return clean[:48].rstrip(" .,!?:;-") + "..."
 
 
-def make_message(role: str, content: str, model: str = DEFAULT_MODEL):
-    return {
+def build_upload_context(uploaded_files) -> str:
+    files = uploaded_files if isinstance(uploaded_files, list) else []
+    if not files:
+        return ""
+
+    lines = []
+    for item in files[:MAX_UPLOAD_FILES]:
+        if not isinstance(item, dict):
+            continue
+        original_name = normalize_text(item.get("original_name")) or "unknown"
+        content_type = normalize_text(item.get("content_type")) or "application/octet-stream"
+        size = int(item.get("size") or 0)
+        saved_name = normalize_text(item.get("saved_name")) or "unknown"
+        lines.append(
+            f"- name: {original_name} | type: {content_type} | size_bytes: {size} | stored_as: {saved_name}"
+        )
+
+    if not lines:
+        return ""
+
+    return "Attached files metadata:\n" + "\n".join(lines)
+
+
+def make_message(role: str, content: str, model: str = DEFAULT_MODEL, uploaded_files=None):
+    message = {
         "id": str(uuid.uuid4()),
         "role": role,
         "content": content,
         "timestamp": now(),
         "model": model,
     }
+
+    files = uploaded_files if isinstance(uploaded_files, list) else []
+    if files:
+        message["uploaded_files"] = files
+
+    return message
 
 
 def move_session_to_top(sessions, session_id: str):
@@ -430,12 +466,19 @@ def get_context(messages, limit: int = MAX_CONTEXT_MESSAGES):
     return usable
 
 
-def build_openai_messages(session_messages, user_request: str = ""):
+def build_openai_messages(session_messages, user_request: str = "", uploaded_files=None):
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     memory_prompt = build_memory_prompt(user_request)
     if memory_prompt:
         messages.append({"role": "system", "content": memory_prompt})
+
+    upload_context = build_upload_context(uploaded_files)
+    if upload_context:
+        messages.append({
+            "role": "system",
+            "content": upload_context + "\nThe files are uploaded locally. Use only this metadata unless the user provides file contents."
+        })
 
     messages.extend(get_context(session_messages))
     return messages
@@ -488,12 +531,53 @@ def duplicate_session_data(source_session, existing_titles):
     return cloned
 
 
+def make_safe_upload_name(original_name: str) -> str:
+    safe_name = secure_filename(original_name or "")
+    if not safe_name:
+        safe_name = "file"
+    prefix = uuid.uuid4().hex
+    return f"{prefix}_{safe_name}"
+
+
+def save_uploaded_file(file_storage):
+    original_name = normalize_text(getattr(file_storage, "filename", ""))
+    if not original_name:
+        raise ValueError("One of the uploaded files is missing a filename.")
+
+    saved_name = make_safe_upload_name(original_name)
+    destination = UPLOADS_DIR / saved_name
+    file_storage.save(destination)
+
+    size = destination.stat().st_size if destination.exists() else 0
+    if size > MAX_UPLOAD_SIZE_BYTES:
+        try:
+            destination.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise ValueError(f"File '{original_name}' exceeds the {MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)} MB limit.")
+
+    return {
+        "id": str(uuid.uuid4()),
+        "original_name": original_name,
+        "saved_name": saved_name,
+        "content_type": normalize_text(getattr(file_storage, "mimetype", "")) or "application/octet-stream",
+        "size": size,
+        "uploaded_at": now(),
+        "url": f"/uploads/{saved_name}",
+    }
+
+
 ensure_default_session()
 
 
 @app.route("/")
 def index():
     return send_from_directory(TEMPLATES_DIR, "index.html")
+
+
+@app.route("/uploads/<path:filename>", methods=["GET"])
+def uploaded_file(filename):
+    return send_from_directory(UPLOADS_DIR, filename, as_attachment=False)
 
 
 @app.route("/api/models", methods=["GET"])
@@ -652,12 +736,37 @@ def api_session_rename():
     return jsonify({"ok": True})
 
 
+@app.route("/api/upload", methods=["POST"])
+def api_upload():
+    files = request.files.getlist("files")
+    if not files:
+        return jsonify({"detail": "No files were uploaded"}), 400
+
+    if len(files) > MAX_UPLOAD_FILES:
+        return jsonify({"detail": f"Too many files. Max is {MAX_UPLOAD_FILES}"}), 400
+
+    uploaded = []
+    try:
+        for file_storage in files:
+            uploaded.append(save_uploaded_file(file_storage))
+    except ValueError as e:
+        return jsonify({"detail": str(e)}), 400
+    except Exception as e:
+        return jsonify({"detail": f"Upload failed: {e}"}), 500
+
+    return jsonify({
+        "ok": True,
+        "files": uploaded,
+    })
+
+
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
     data = request.get_json(silent=True) or {}
     session_id = normalize_text(data.get("session_id"))
     content = normalize_text(data.get("content"))
     model = normalize_text(data.get("model")) or DEFAULT_MODEL
+    uploaded_files = data.get("uploaded_files") if isinstance(data.get("uploaded_files"), list) else []
 
     if not content:
         return jsonify({"detail": "Content cannot be empty"}), 400
@@ -672,7 +781,7 @@ def api_chat():
         session = create_session()
         sessions.insert(0, session)
 
-    user_msg = make_message("user", content, model)
+    user_msg = make_message("user", content, model, uploaded_files=uploaded_files)
     session["messages"].append(user_msg)
     session["message_count"] = len(session["messages"])
     session["updated_at"] = now()
@@ -682,7 +791,11 @@ def api_chat():
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=build_openai_messages(session["messages"], user_request=content),
+            messages=build_openai_messages(
+                session["messages"],
+                user_request=content,
+                uploaded_files=uploaded_files,
+            ),
             temperature=0.7,
         )
         assistant_text = str(response.choices[0].message.content or "").strip() or "No response returned."
@@ -716,6 +829,7 @@ def api_chat_stream():
     session_id = normalize_text(data.get("session_id"))
     content = normalize_text(data.get("content"))
     model = normalize_text(data.get("model")) or DEFAULT_MODEL
+    uploaded_files = data.get("uploaded_files") if isinstance(data.get("uploaded_files"), list) else []
 
     if not content:
         return jsonify({"detail": "Content cannot be empty"}), 400
@@ -730,14 +844,18 @@ def api_chat_stream():
         session = create_session()
         sessions.insert(0, session)
 
-    user_msg = make_message("user", content, model)
+    user_msg = make_message("user", content, model, uploaded_files=uploaded_files)
     session["messages"].append(user_msg)
     session["message_count"] = len(session["messages"])
     session["updated_at"] = now()
 
     extract_memory_from_message(content)
 
-    openai_messages = build_openai_messages(session["messages"], user_request=content)
+    openai_messages = build_openai_messages(
+        session["messages"],
+        user_request=content,
+        uploaded_files=uploaded_files,
+    )
 
     if session["message_count"] == 1:
         session["title"] = generate_title(content)
