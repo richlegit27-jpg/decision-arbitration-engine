@@ -1,15 +1,13 @@
 services:
   - type: web
     name: nova
-    runtime: python
+    env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python app.py
+    startCommand: gunicorn nova_app:app
     envVars:
       - key: OPENAI_API_KEY
         sync: false
-      - key: APP_HOST
-        value: 0.0.0.0
-      - key: APP_PORT
-        value: 10000
       - key: OPENAI_MODEL
         value: gpt-4.1-mini
+      - key: DEBUG
+        value: false
