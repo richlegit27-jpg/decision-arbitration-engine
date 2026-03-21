@@ -90,7 +90,7 @@
             <div class="empty-card">
               <div class="empty-title">Nova is ready</div>
               <div class="empty-subtitle">
-                Start a new message, use voice, attach files, or open memory.
+                Start a new message, use voice, or open memory.
               </div>
             </div>
           </div>
@@ -201,6 +201,23 @@
   </div>
 
   <input id="fileInput" type="file" multiple class="hidden">
+
+  <script>
+    (function () {
+      const isMobile = window.innerWidth <= 768;
+      if (!isMobile) return;
+
+      const sidebar = document.getElementById("sidebar");
+      const memoryPanel = document.getElementById("memoryPanel");
+
+      if (sidebar) {
+        sidebar.setAttribute("aria-hidden", "true");
+      }
+      if (memoryPanel) {
+        memoryPanel.setAttribute("aria-hidden", "true");
+      }
+    })();
+  </script>
 
   <script src="/static/js/nova-ultimate.js"></script>
 </body>

@@ -111,8 +111,8 @@
       activeSessionId: null,
       currentModel: "gpt-4.1-mini",
       isSending: false,
-      sidebarOpen: true,
-      memoryOpen: true,
+      sidebarOpen: false,
+      memoryOpen: false,
       themeMode: "dark",
       backgroundMode: "default",
       pinnedSessionIds: [],
@@ -522,8 +522,17 @@
 
       if (savedSessionId) app.state.activeSessionId = savedSessionId;
       if (savedModel) app.state.currentModel = savedModel;
-      if (savedSidebarOpen !== null) app.state.sidebarOpen = savedSidebarOpen === "true";
-      if (savedMemoryOpen !== null) app.state.memoryOpen = savedMemoryOpen === "true";
+
+      const isMobile = window.innerWidth <= 768;
+
+      if (isMobile) {
+        app.state.sidebarOpen = false;
+        app.state.memoryOpen = false;
+      } else {
+        if (savedSidebarOpen !== null) app.state.sidebarOpen = savedSidebarOpen === "true";
+        if (savedMemoryOpen !== null) app.state.memoryOpen = savedMemoryOpen === "true";
+      }
+
       if (savedThemeMode && THEMES[savedThemeMode]) app.state.themeMode = savedThemeMode;
       if (savedBackgroundMode && BACKGROUNDS[savedBackgroundMode]) app.state.backgroundMode = savedBackgroundMode;
 
@@ -784,23 +793,71 @@
 
     if (!appShell || !sidebar || !memoryPanel) return;
 
-    let columns = "minmax(0, 1fr)";
+    const isMobile = window.innerWidth <= 768;
 
-    if (app.state.sidebarOpen && app.state.memoryOpen) {
-      columns = `${SIDEBAR_WIDTH} minmax(0, 1fr) ${MEMORY_WIDTH}`;
-    } else if (app.state.sidebarOpen && !app.state.memoryOpen) {
-      columns = `${SIDEBAR_WIDTH} minmax(0, 1fr)`;
-    } else if (!app.state.sidebarOpen && app.state.memoryOpen) {
-      columns = `minmax(0, 1fr) ${MEMORY_WIDTH}`;
+    if (isMobile) {
+      appShell.style.gridTemplateColumns = "minmax(0, 1fr)";
+
+      sidebar.style.display = app.state.sidebarOpen ? "" : "none";
+      sidebar.setAttribute("aria-hidden", app.state.sidebarOpen ? "false" : "true");
+
+      memoryPanel.style.display = app.state.memoryOpen ? "" : "none";
+      memoryPanel.setAttribute("aria-hidden", app.state.memoryOpen ? "false" : "true");
+
+      sidebar.style.position = "fixed";
+      sidebar.style.left = app.state.sidebarOpen ? "0" : "-100%";
+      sidebar.style.top = "0";
+      sidebar.style.width = "86vw";
+      sidebar.style.maxWidth = "320px";
+      sidebar.style.height = "100vh";
+      sidebar.style.zIndex = "1200";
+
+      memoryPanel.style.position = "fixed";
+      memoryPanel.style.right = app.state.memoryOpen ? "0" : "-100%";
+      memoryPanel.style.top = "0";
+      memoryPanel.style.width = "86vw";
+      memoryPanel.style.maxWidth = "360px";
+      memoryPanel.style.height = "100vh";
+      memoryPanel.style.zIndex = "1201";
+
+      appShell.style.overflow = "hidden";
+    } else {
+      let columns = "minmax(0, 1fr)";
+
+      sidebar.style.position = "";
+      sidebar.style.left = "";
+      sidebar.style.top = "";
+      sidebar.style.width = "";
+      sidebar.style.maxWidth = "";
+      sidebar.style.height = "";
+      sidebar.style.zIndex = "";
+
+      memoryPanel.style.position = "";
+      memoryPanel.style.right = "";
+      memoryPanel.style.top = "";
+      memoryPanel.style.width = "";
+      memoryPanel.style.maxWidth = "";
+      memoryPanel.style.height = "";
+      memoryPanel.style.zIndex = "";
+
+      if (app.state.sidebarOpen && app.state.memoryOpen) {
+        columns = `${SIDEBAR_WIDTH} minmax(0, 1fr) ${MEMORY_WIDTH}`;
+      } else if (app.state.sidebarOpen && !app.state.memoryOpen) {
+        columns = `${SIDEBAR_WIDTH} minmax(0, 1fr)`;
+      } else if (!app.state.sidebarOpen && app.state.memoryOpen) {
+        columns = `minmax(0, 1fr) ${MEMORY_WIDTH}`;
+      }
+
+      appShell.style.gridTemplateColumns = columns;
+
+      sidebar.style.display = app.state.sidebarOpen ? "" : "none";
+      sidebar.setAttribute("aria-hidden", app.state.sidebarOpen ? "false" : "true");
+
+      memoryPanel.style.display = app.state.memoryOpen ? "" : "none";
+      memoryPanel.setAttribute("aria-hidden", app.state.memoryOpen ? "false" : "true");
+
+      appShell.style.overflow = "";
     }
-
-    appShell.style.gridTemplateColumns = columns;
-
-    sidebar.style.display = app.state.sidebarOpen ? "" : "none";
-    sidebar.setAttribute("aria-hidden", app.state.sidebarOpen ? "false" : "true");
-
-    memoryPanel.style.display = app.state.memoryOpen ? "" : "none";
-    memoryPanel.setAttribute("aria-hidden", app.state.memoryOpen ? "false" : "true");
 
     if (toggleSidebarBtn) {
       toggleSidebarBtn.textContent = app.state.sidebarOpen ? "×" : "☰";
@@ -1928,6 +1985,8 @@
     updateChatHeader();
     syncPinButtonLabel();
     autosizeInput();
+
+    window.addEventListener("resize", applyLayout);
 
     window.NovaApp = window.NovaApp || {};
     window.NovaApp.state = app.state;

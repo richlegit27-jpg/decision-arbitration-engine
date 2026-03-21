@@ -1,39 +1,31 @@
-/* =====================
-   Nova Mobile Responsive CSS
-===================== */
+@media (max-width:768px) {
 
-@media (max-width: 980px) {
-  .layout {
-    flex-direction: column;
-    height: auto;
+  .app-shell {
+    grid-template-columns: minmax(0,1fr) !important;
   }
 
-  .sidebar {
-    width: 100%;
-    position: relative;
-    border-right: none;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+  .left-sidebar,
+  .memory-panel {
+    position:fixed;
+    top:0;
+    height:100vh;
+    width:86vw;
+    max-width:320px;
+    z-index:1200;
+    transform:translateX(-100%);
   }
 
-  .workspace {
-    flex: none;
-    width: 100%;
+  .memory-panel {
+    right:0;
+    transform:translateX(100%);
   }
 
-  .composer {
-    flex-direction: column;
+  .left-sidebar[aria-hidden="false"],
+  .memory-panel[aria-hidden="false"] {
+    transform:translateX(0);
   }
 
-  .composer-input {
-    width: 100%;
-    margin: 8px 0;
-  }
-
-  .side-panel {
-    width: 100%;
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
+  .message {
+    width:100% !important;
   }
 }
