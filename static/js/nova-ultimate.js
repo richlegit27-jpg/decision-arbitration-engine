@@ -133,6 +133,7 @@
       attachedFiles: [],
       isVoiceListening: false,
       lastUserContent: "",
+      sessionSearchQuery: "",
     },
     streaming: {
       controller: null,
@@ -213,6 +214,7 @@
   function getVoiceBtn() { return byId("voiceBtn"); }
   function getFileInput() { return byId("fileInput"); }
   function getAttachedFilesBar() { return byId("attachedFiles"); }
+  function getSessionSearchInput() { return byId("sessionSearchInput"); }
 
   function getChatContainer() {
     return qs([
@@ -354,7 +356,7 @@
     }
 
     styleEl.textContent = `
-      html, body {
+      html {
         background: var(--bg) !important;
         color: var(--text) !important;
       }
@@ -827,6 +829,19 @@
     });
   }
 
+  function getFilteredSessions() {
+    const sessions = getOrderedSessions();
+    const query = safeText(app.state.sessionSearchQuery).toLowerCase();
+
+    if (!query) return sessions;
+
+    return sessions.filter((session) => {
+      const title = safeText(session?.title).toLowerCase();
+      const sessionId = safeText(session?.session_id).toLowerCase();
+      return title.includes(query) || sessionId.includes(query);
+    });
+  }
+
   function applyThemeMode() {
     const root = document.documentElement;
     const body = document.body;
@@ -859,6 +874,7 @@
       body.style.backgroundAttachment = "fixed";
       body.style.backgroundRepeat = "no-repeat";
       body.style.backgroundSize = "cover";
+      body.style.minHeight = "100vh";
     }
 
     const btn = getBackgroundBtn();
@@ -1140,7 +1156,7 @@
   function renderSessions() {
     const listEl = getSessionList();
     const countEl = getSessionCountEl();
-    const sessions = getOrderedSessions();
+    const sessions = getFilteredSessions();
 
     if (countEl) countEl.textContent = String(sessions.length);
     if (!listEl) return;
@@ -1148,7 +1164,10 @@
     listEl.innerHTML = "";
 
     if (!sessions.length) {
-      listEl.innerHTML = `<div class="session-empty">No chats yet.</div>`;
+      const hasQuery = !!safeText(app.state.sessionSearchQuery);
+      listEl.innerHTML = hasQuery
+        ? `<div class="session-empty">No matching chats.</div>`
+        : `<div class="session-empty">No chats yet.</div>`;
       updateChatHeader();
       syncPinButtonLabel();
       return;
@@ -1766,6 +1785,53 @@
     updateChatHeader();
   }
 
+  function setupDragAndDrop() {
+    const appShell = document.getElementById("appShell");
+    if (!appShell) return;
+
+    let dragDepth = 0;
+
+    function isFileDrag(event) {
+      return event.dataTransfer && Array.from(event.dataTransfer.types).includes("Files");
+    }
+
+    appShell.addEventListener("dragenter", (e) => {
+      if (!isFileDrag(e)) return;
+      dragDepth++;
+      appShell.classList.add("drag-active");
+    });
+
+    appShell.addEventListener("dragleave", (e) => {
+      if (!isFileDrag(e)) return;
+      dragDepth--;
+      if (dragDepth <= 0) {
+        appShell.classList.remove("drag-active");
+        dragDepth = 0;
+      }
+    });
+
+    appShell.addEventListener("dragover", (e) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+    });
+
+    appShell.addEventListener("drop", (e) => {
+      if (!isFileDrag(e)) return;
+
+      e.preventDefault();
+      dragDepth = 0;
+      appShell.classList.remove("drag-active");
+
+      const files = Array.from(e.dataTransfer.files || []);
+      if (!files.length) return;
+
+      app.state.attachedFiles = files;
+      renderAttachedFiles();
+
+      updateModelStatus(`${files.length} file${files.length === 1 ? "" : "s"} ready`);
+    });
+  }
+
   function bindEvents() {
     const input = getMessageInput();
     const sendBtn = getSendBtn();
@@ -1788,6 +1854,7 @@
     const attachBtn = getAttachBtn();
     const voiceBtn = getVoiceBtn();
     const fileInput = getFileInput();
+    const sessionSearchInput = getSessionSearchInput();
 
     if (input) {
       input.style.height = `${INPUT_MIN_HEIGHT}px`;
@@ -1962,6 +2029,23 @@
       });
     }
 
+    if (sessionSearchInput) {
+      sessionSearchInput.value = app.state.sessionSearchQuery || "";
+
+      sessionSearchInput.addEventListener("input", () => {
+        app.state.sessionSearchQuery = safeText(sessionSearchInput.value);
+        renderSessions();
+      });
+
+      sessionSearchInput.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          sessionSearchInput.value = "";
+          app.state.sessionSearchQuery = "";
+          renderSessions();
+        }
+      });
+    }
+
     if (voiceBtn) {
       voiceBtn.addEventListener("click", toggleVoiceRecognition);
     }
@@ -1973,6 +2057,7 @@
     applyThemeMode();
     applyBackgroundMode();
     bindEvents();
+    setupDragAndDrop();
     renderAttachedFiles();
     setStatusSending(false);
     applyLayout();

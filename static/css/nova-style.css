@@ -200,6 +200,32 @@ button {
   text-transform: uppercase;
 }
 
+.session-search-wrap {
+  margin-top: 10px;
+}
+
+.session-search-input {
+  width: 100%;
+  min-height: 38px;
+  padding: 9px 11px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  outline: none;
+  font-size: 0.86rem;
+}
+
+.session-search-input::placeholder {
+  color: var(--muted);
+}
+
+.session-search-input:focus {
+  border-color: rgba(121, 168, 255, 0.45);
+  box-shadow: 0 0 0 4px rgba(121, 168, 255, 0.12);
+  background: rgba(255, 255, 255, 0.055);
+}
+
 .session-list,
 .memory-list {
   margin-top: 10px;
@@ -661,4 +687,14 @@ input:disabled {
   .sidebar-actions {
     grid-template-columns: 1fr;
   }
+}
+
+.app-shell.drag-active {
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
+  background: linear-gradient(
+    180deg,
+    rgba(121, 168, 255, 0.10),
+    rgba(121, 168, 255, 0.04)
+  );
 }
