@@ -1,39 +1,18 @@
 [
   {
-    "session_id": "1304b892-beaf-4043-95ba-adace4e35377",
-    "title": "what is thegcc",
-    "messages": [
-      {
-        "id": "4167952b-b4f9-4c12-a2bd-f8e6efd0f1e8",
-        "role": "user",
-        "content": "what is thegcc",
-        "timestamp": 1774122863,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "f5133122-cc76-437f-b80d-c25a21ff7199",
-        "role": "assistant",
-        "content": "The term **GCC** can refer to different things depending on the context. Here are the most common meanings:\n\n1. **GCC (GNU Compiler Collection)**:  \n   - A widely used open-source compiler system supporting various programming languages such as C, C++, Objective-C, Fortran, Ada, and more.  \n   - It is a key component of the GNU toolchain and is used to compile source code into executable programs.\n\n2. **GCC (Gulf Cooperation Council)**:  \n   - A regional political and economic alliance of six Middle Eastern countries: Saudi Arabia, Kuwait, the United Arab Emirates, Qatar, Bahrain, and Oman.  \n   - Established in 1981 to promote economic, security, and cultural cooperation.\n\nIf you specify the context, I can provide a more detailed explanation.",
-        "timestamp": 1774122866,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "b5758c03-b7fa-4b6b-908c-4dff5974f90c",
-        "role": "user",
-        "content": "hi",
-        "timestamp": 1774128982,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "e8af24de-89a0-4b8f-ba31-7d9ecc95979a",
-        "role": "assistant",
-        "content": "Hello! How can I assist you today?",
-        "timestamp": 1774128984,
-        "model": "gpt-4.1-mini"
-      }
-    ],
-    "message_count": 4,
-    "created_at": 1774122863,
-    "updated_at": 1774128984
+    "session_id": "7b484edc-5067-47d7-9089-dcc04cabf0e8",
+    "title": "New Chat Copy",
+    "messages": [],
+    "message_count": 0,
+    "created_at": 1774135959,
+    "updated_at": 1774135959
+  },
+  {
+    "session_id": "a4e023e5-a38b-4846-99a0-89a8a728a51e",
+    "title": "New Chat",
+    "messages": [],
+    "message_count": 0,
+    "created_at": 1774135954,
+    "updated_at": 1774135954
   }
 ]
