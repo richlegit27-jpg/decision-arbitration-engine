@@ -69,6 +69,8 @@ button {
   gap: 10px;
   padding: 10px;
   transition: grid-template-columns 0.18s ease;
+  background: transparent;
+  border-radius: 22px;
 }
 
 .left-sidebar,
@@ -76,10 +78,11 @@ button {
 .main-topbar,
 .chat-main,
 .composer-box {
-  background: linear-gradient(180deg, rgba(20, 28, 51, 0.96), rgba(16, 23, 42, 0.96));
+  background: linear-gradient(180deg, rgba(20, 28, 51, 0.88), rgba(16, 23, 42, 0.88));
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
+  backdrop-filter: blur(14px);
 }
 
 .left-sidebar,
@@ -282,6 +285,7 @@ button {
   display: grid;
   grid-template-rows: 56px minmax(0, 1fr) auto;
   gap: 10px;
+  background: transparent;
 }
 
 .main-topbar {
@@ -697,4 +701,5 @@ input:disabled {
     rgba(121, 168, 255, 0.10),
     rgba(121, 168, 255, 0.04)
   );
+  border-radius: 18px;
 }
