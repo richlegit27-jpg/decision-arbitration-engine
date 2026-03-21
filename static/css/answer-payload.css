@@ -1,5 +1,0 @@
-#messages { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; }
-#messages li { margin:5px 0; padding:10px; border-radius:8px; max-width:70%; word-wrap:break-word; }
-#messages li.user { background: linear-gradient(180deg, rgba(16,163,127,0.16), rgba(16,163,127,0.1)); align-self:flex-end; }
-#messages li.ai { background: linear-gradient(180deg, rgba(20,27,34,1), rgba(17,22,28,1)); color:#fff; align-self:flex-start; }
-#pendingAttachments div { padding:3px 5px; margin:2px 0; background:#222; border-radius:4px; color:#fff; }
