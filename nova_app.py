@@ -920,6 +920,22 @@ def api_chat_stream():
         },
     )
 
+# ADD THIS NEAR YOUR OTHER ROUTES (BOTTOM OF FILE)
+
+@app.route("/blog")
+def blog_index():
+    return send_from_directory(TEMPLATES_DIR, "blog.html")
+
+
+@app.route("/blog/<slug>")
+def blog_post(slug):
+    filename = f"blog_{slug}.html"
+    file_path = TEMPLATES_DIR / filename
+
+    if not file_path.exists():
+        return "Post not found", 404
+
+    return send_from_directory(TEMPLATES_DIR, filename)
 
 if __name__ == "__main__":
     host = (os.getenv("APP_HOST") or "127.0.0.1").strip()

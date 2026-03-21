@@ -24,11 +24,18 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 SESSIONS_FILE = DATA_DIR / "nova_sessions.json"
 MEMORY_FILE = DATA_DIR / "nova_memory.json"
+USAGE_FILE = DATA_DIR / "nova_usage.json"
 
 OPENAI_API_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
 OPENAI_MODEL = (os.getenv("OPENAI_MODEL") or "gpt-4.1-mini").strip()
 APP_HOST = (os.getenv("APP_HOST") or "127.0.0.1").strip()
 APP_PORT = int((os.getenv("APP_PORT") or "8743").strip())
+
+# Usage limiter config
+DEFAULT_PLAN = (os.getenv("NOVA_DEFAULT_PLAN") or "free").strip().lower()
+FREE_DAILY_MESSAGES = int((os.getenv("NOVA_FREE_DAILY_MESSAGES") or "40").strip())
+PRO_DAILY_MESSAGES = int((os.getenv("NOVA_PRO_DAILY_MESSAGES") or "300").strip())
+ADMIN_BYPASS = (os.getenv("NOVA_ADMIN_BYPASS") or "true").strip().lower() in {"1", "true", "yes", "on"}
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -101,6 +108,10 @@ def now() -> int:
     return int(time.time())
 
 
+def today_key() -> str:
+    return time.strftime("%Y-%m-%d", time.localtime())
+
+
 def load_json_file(path: Path, default: Any):
     if not path.exists():
         return default
@@ -139,6 +150,21 @@ def load_memory() -> Dict[str, Any]:
 
 def save_memory(data: Dict[str, Any]) -> None:
     save_json_file(MEMORY_FILE, data)
+
+
+def load_usage() -> Dict[str, Any]:
+    data = load_json_file(USAGE_FILE, {"profiles": {}})
+    if not isinstance(data, dict):
+        return {"profiles": {}}
+    profiles = data.get("profiles", {})
+    if not isinstance(profiles, dict):
+        profiles = {}
+    data["profiles"] = profiles
+    return data
+
+
+def save_usage(data: Dict[str, Any]) -> None:
+    save_json_file(USAGE_FILE, data)
 
 
 def get_session(sessions: List[Dict[str, Any]], session_id: str):
@@ -470,6 +496,127 @@ def validate_chat_input(data: Dict[str, Any]) -> Dict[str, str]:
     }
 
 
+def get_default_limit_for_plan(plan: str) -> int:
+    normalized = (plan or DEFAULT_PLAN).strip().lower()
+    if normalized == "pro":
+        return PRO_DAILY_MESSAGES
+    if normalized == "admin" and ADMIN_BYPASS:
+        return 10**9
+    return FREE_DAILY_MESSAGES
+
+
+def ensure_usage_profile(usage_data: Dict[str, Any], profile_id: str) -> Dict[str, Any]:
+    profiles = usage_data.setdefault("profiles", {})
+    profile = profiles.get(profile_id)
+
+    if not isinstance(profile, dict):
+        profile = {
+            "profile_id": profile_id,
+            "plan": DEFAULT_PLAN,
+            "daily": {},
+            "created_at": now(),
+            "updated_at": now(),
+        }
+        profiles[profile_id] = profile
+
+    if not isinstance(profile.get("daily"), dict):
+        profile["daily"] = {}
+
+    profile["plan"] = str(profile.get("plan") or DEFAULT_PLAN).strip().lower()
+    profile["updated_at"] = now()
+    return profile
+
+
+def cleanup_usage_days(profile: Dict[str, Any], keep_days: int = 35) -> None:
+    daily = profile.get("daily", {})
+    if not isinstance(daily, dict):
+        profile["daily"] = {}
+        return
+
+    keys = sorted(daily.keys(), reverse=True)
+    keep = set(keys[:keep_days])
+    profile["daily"] = {k: v for k, v in daily.items() if k in keep}
+
+
+def build_usage_summary(profile: Dict[str, Any]) -> Dict[str, Any]:
+    plan = str(profile.get("plan") or DEFAULT_PLAN).strip().lower()
+    limit = get_default_limit_for_plan(plan)
+    today = today_key()
+
+    daily = profile.get("daily", {})
+    today_count = int((daily.get(today) or {}).get("messages", 0))
+
+    remaining = max(0, limit - today_count) if limit < 10**8 else 999999999
+    unlimited = limit >= 10**8
+
+    return {
+        "profile_id": str(profile.get("profile_id") or "local"),
+        "plan": plan,
+        "daily_limit": None if unlimited else limit,
+        "messages_used_today": today_count,
+        "messages_remaining_today": None if unlimited else remaining,
+        "is_limited": not unlimited,
+        "today": today,
+    }
+
+
+def get_usage_summary(profile_id: str = "local") -> Dict[str, Any]:
+    usage_data = load_usage()
+    profile = ensure_usage_profile(usage_data, profile_id)
+    cleanup_usage_days(profile)
+    save_usage(usage_data)
+    return build_usage_summary(profile)
+
+
+def assert_usage_allowed(profile_id: str = "local") -> Dict[str, Any]:
+    summary = get_usage_summary(profile_id)
+    if summary["is_limited"] and int(summary["messages_remaining_today"] or 0) <= 0:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": "Daily message limit reached for your current plan.",
+                "usage": summary,
+            },
+        )
+    return summary
+
+
+def record_usage_message(profile_id: str = "local") -> Dict[str, Any]:
+    usage_data = load_usage()
+    profile = ensure_usage_profile(usage_data, profile_id)
+    cleanup_usage_days(profile)
+
+    today = today_key()
+    daily = profile.setdefault("daily", {})
+    day_row = daily.get(today)
+    if not isinstance(day_row, dict):
+        day_row = {"messages": 0}
+        daily[today] = day_row
+
+    day_row["messages"] = int(day_row.get("messages", 0)) + 1
+    profile["updated_at"] = now()
+    save_usage(usage_data)
+
+    return build_usage_summary(profile)
+
+
+def update_plan(profile_id: str, plan: str) -> Dict[str, Any]:
+    normalized = (plan or "").strip().lower()
+    if normalized not in {"free", "pro", "admin"}:
+        raise HTTPException(status_code=400, detail="Plan must be free, pro, or admin")
+
+    if normalized == "admin" and not ADMIN_BYPASS:
+        raise HTTPException(status_code=400, detail="Admin plan is disabled")
+
+    usage_data = load_usage()
+    profile = ensure_usage_profile(usage_data, profile_id)
+    profile["plan"] = normalized
+    profile["updated_at"] = now()
+    cleanup_usage_days(profile)
+    save_usage(usage_data)
+    return build_usage_summary(profile)
+
+
 app = FastAPI(title="Nova")
 
 app.add_middleware(
@@ -491,6 +638,29 @@ async def index():
     return FileResponse(INDEX_FILE)
 
 
+@app.get("/blog")
+async def blog():
+    blog_file = TEMPLATES_DIR / "blog.html"
+    if not blog_file.exists():
+        raise HTTPException(status_code=404, detail="blog.html not found")
+    return FileResponse(blog_file)
+
+
+@app.get("/landing")
+async def landing():
+    landing_file = TEMPLATES_DIR / "landing.html"
+    if not landing_file.exists():
+        raise HTTPException(status_code=404, detail="landing.html not found")
+    return FileResponse(landing_file)
+
+
+@app.get("/app")
+async def app_page():
+    if not INDEX_FILE.exists():
+        raise HTTPException(status_code=404, detail="index.html not found")
+    return FileResponse(INDEX_FILE)
+
+
 @app.get("/api/models")
 async def get_models():
     return {
@@ -507,7 +677,24 @@ async def get_models():
 @app.get("/api/state")
 async def get_state():
     sessions = load_sessions()
-    return {"sessions": summarize_sessions_for_state(sessions)}
+    usage = get_usage_summary("local")
+    return {
+        "sessions": summarize_sessions_for_state(sessions),
+        "usage": usage,
+    }
+
+
+@app.get("/api/usage")
+async def api_usage():
+    return get_usage_summary("local")
+
+
+@app.post("/api/usage/plan")
+async def api_usage_plan(request: Request):
+    data = await request.json()
+    plan = str(data.get("plan") or "").strip().lower()
+    usage = update_plan("local", plan)
+    return {"ok": True, "usage": usage}
 
 
 @app.get("/api/chat/{session_id}")
@@ -649,6 +836,7 @@ async def duplicate_session(request: Request):
 async def chat_once(request: Request):
     payload = validate_chat_input(await request.json())
     require_api_key()
+    assert_usage_allowed("local")
 
     session_id = payload["session_id"]
     content = payload["content"]
@@ -692,6 +880,7 @@ async def chat_once(request: Request):
 
     move_session_to_top(sessions, session["session_id"])
     save_sessions(sessions)
+    usage = record_usage_message("local")
 
     return {
         "session_id": session["session_id"],
@@ -699,6 +888,7 @@ async def chat_once(request: Request):
         "message_count": session["message_count"],
         "message": assistant_msg,
         "messages": session["messages"],
+        "usage": usage,
     }
 
 
@@ -706,6 +896,7 @@ async def chat_once(request: Request):
 async def chat_stream(request: Request):
     payload = validate_chat_input(await request.json())
     require_api_key()
+    assert_usage_allowed("local")
 
     requested_session_id = payload["session_id"]
     content = payload["content"]
@@ -763,8 +954,9 @@ async def chat_stream(request: Request):
 
             move_session_to_top(sessions, session_id)
             save_sessions(sessions)
+            usage = record_usage_message("local")
 
-            yield f"event: done\ndata: {json.dumps({'message': assistant_msg, 'session_id': session_id, 'title': session['title']}, ensure_ascii=False)}\n\n"
+            yield f"event: done\ndata: {json.dumps({'message': assistant_msg, 'session_id': session_id, 'title': session['title'], 'usage': usage}, ensure_ascii=False)}\n\n"
 
         except Exception as e:
             yield f"event: error\ndata: {json.dumps({'message': str(e), 'session_id': session_id}, ensure_ascii=False)}\n\n"

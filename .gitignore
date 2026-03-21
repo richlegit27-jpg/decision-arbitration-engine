@@ -3,3 +3,4 @@ uploads/
 *.bak
 *.BAK*
 *.WORKING*
+current_backup/
