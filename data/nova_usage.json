@@ -1,0 +1,15 @@
+{
+  "profiles": {
+    "local": {
+      "profile_id": "local",
+      "plan": "free",
+      "daily": {
+        "2026-03-21": {
+          "messages": 1
+        }
+      },
+      "created_at": 1774128979,
+      "updated_at": 1774135684
+    }
+  }
+}
