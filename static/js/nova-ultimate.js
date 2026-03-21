@@ -98,23 +98,9 @@
   };
 
   const BACKGROUNDS = {
-    default: `
-      radial-gradient(circle at 15% 18%, rgba(139, 92, 246, 0.22), transparent 22%),
-      radial-gradient(circle at 82% 14%, rgba(34, 197, 94, 0.14), transparent 18%),
-      radial-gradient(circle at 50% 100%, rgba(59, 130, 246, 0.14), transparent 28%),
-      linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%)
-    `,
-    aurora: `
-      radial-gradient(circle at 12% 10%, rgba(34, 197, 94, 0.24), transparent 20%),
-      radial-gradient(circle at 88% 10%, rgba(6, 182, 212, 0.18), transparent 18%),
-      radial-gradient(circle at 50% 85%, rgba(168, 85, 247, 0.18), transparent 28%),
-      linear-gradient(180deg, #07111e 0%, #0b1730 100%)
-    `,
-    steel: `
-      radial-gradient(circle at top left, rgba(255, 255, 255, 0.08), transparent 22%),
-      radial-gradient(circle at bottom right, rgba(148, 163, 184, 0.10), transparent 26%),
-      linear-gradient(180deg, #12161f 0%, #1a2230 100%)
-    `,
+    default: "default",
+    aurora: "aurora",
+    steel: "steel",
   };
 
   const app = {
@@ -362,9 +348,6 @@
       }
 
       body {
-        background-attachment: fixed !important;
-        background-repeat: no-repeat !important;
-        background-size: cover !important;
         color: var(--text) !important;
       }
 
@@ -372,11 +355,9 @@
         color: var(--text) !important;
       }
 
-      #sidebar, #memoryPanel, .left-sidebar, .right-panel, .memory-panel, .topbar, .chat-header, .composer, .sidebar-content, .main-panel {
-        background: var(--panel) !important;
+      #sidebar, #memoryPanel, .left-sidebar, .right-panel, .memory-panel, .topbar, .chat-header, .composer, .sidebar-content {
         color: var(--text) !important;
         border-color: var(--line) !important;
-        backdrop-filter: blur(14px);
       }
 
       button, select, input, textarea {
@@ -392,10 +373,9 @@
       .composer-actions button,
       .message-action-btn {
         background: linear-gradient(180deg, var(--panel-2), var(--panel-3)) !important;
-        color: var(--button-text) !important;
+        color: var(--text) !important;
         border: 1px solid var(--line) !important;
         border-radius: 12px !important;
-        box-shadow: var(--shadow);
         transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
       }
 
@@ -406,11 +386,6 @@
         transform: translateY(-1px);
         border-color: var(--line-strong) !important;
         box-shadow: 0 12px 28px rgba(0,0,0,0.18);
-      }
-
-      button:active,
-      .message-action-btn:active {
-        transform: translateY(0);
       }
 
       select,
@@ -435,183 +410,24 @@
       }
 
       .message {
-        background: var(--panel) !important;
-        border: 1px solid var(--line) !important;
-        color: var(--text) !important;
         border-radius: 18px;
-        padding: 14px;
-        margin-bottom: 14px;
         box-shadow: var(--shadow);
-      }
-
-      .message.user {
-        background: linear-gradient(180deg, var(--panel-2), var(--panel-3)) !important;
-        border-color: var(--accent-soft) !important;
-      }
-
-      .message.assistant {
-        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00)), var(--panel) !important;
       }
 
       .message-role {
-        font-size: 11px;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
         color: var(--muted) !important;
-        margin-bottom: 8px;
       }
 
       .message-body {
-        white-space: pre-wrap;
-        word-break: break-word;
-        color: var(--text) !important;
-        line-height: 1.6;
-        font-size: 15px;
-      }
-
-      .message-time {
-        margin-top: 8px;
-        font-size: 12px;
-        color: var(--muted) !important;
-      }
-
-      .message-files {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 10px;
-      }
-
-      .message-file {
-        font-size: 12px;
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: var(--accent-soft) !important;
-        border: 1px solid var(--line) !important;
         color: var(--text) !important;
       }
 
-      .message-actions {
-        display: flex;
-        gap: 8px;
-        margin-top: 10px;
-      }
-
-      .message-action-btn {
-        font-size: 12px;
-        padding: 6px 10px;
-      }
-
-      .empty-card {
-        background: linear-gradient(180deg, var(--panel), var(--panel-2)) !important;
-        color: var(--text) !important;
-        border: 1px solid var(--line) !important;
-        border-radius: 20px;
-        padding: 24px;
-        box-shadow: var(--shadow);
-      }
-
-      .empty-title {
-        font-size: 24px;
-        font-weight: 800;
-        margin-bottom: 8px;
-      }
-
+      .message-time,
+      .session-meta,
+      .memory-kind,
+      .memory-meta,
       .empty-subtitle {
         color: var(--muted) !important;
-        line-height: 1.6;
-      }
-
-      .session-item {
-        display: block;
-        width: 100%;
-        text-align: left;
-        padding: 12px;
-        margin-bottom: 10px;
-        background: linear-gradient(180deg, var(--panel-2), var(--panel)) !important;
-      }
-
-      .session-item.active {
-        border-color: var(--accent) !important;
-        box-shadow: 0 0 0 1px var(--accent-soft) inset, 0 14px 30px rgba(0,0,0,0.14);
-      }
-
-      .session-item-main {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 10px;
-      }
-
-      .session-title-wrap {
-        flex: 1;
-        min-width: 0;
-      }
-
-      .session-title {
-        font-weight: 700;
-        color: var(--text) !important;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        margin-bottom: 6px;
-      }
-
-      .session-meta {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        font-size: 12px;
-        color: var(--muted) !important;
-      }
-
-      .session-row-actions {
-        display: flex;
-        gap: 6px;
-        flex-shrink: 0;
-      }
-
-      .session-row-btn {
-        min-width: 30px;
-        height: 30px;
-        padding: 0 8px !important;
-        font-size: 12px;
-        border-radius: 10px !important;
-      }
-
-      .session-row-btn.delete {
-        background: linear-gradient(180deg, var(--danger-soft), rgba(0,0,0,0)) !important;
-      }
-
-      .session-row-btn.rename {
-        background: linear-gradient(180deg, var(--accent-soft), rgba(0,0,0,0)) !important;
-      }
-
-      .memory-item {
-        background: linear-gradient(180deg, var(--panel-2), var(--panel)) !important;
-        color: var(--text) !important;
-        border: 1px solid var(--line) !important;
-        border-radius: 16px;
-        padding: 12px;
-        margin-bottom: 10px;
-        box-shadow: var(--shadow);
-      }
-
-      .memory-kind, .memory-meta {
-        color: var(--muted) !important;
-      }
-
-      #attachedFiles.has-files {
-        margin: 8px 0 10px;
-      }
-
-      .chat-header, .topbar {
-        box-shadow: var(--shadow);
-      }
-
-      .composer textarea {
-        transition: none !important;
       }
     `;
   }
@@ -867,14 +683,61 @@
 
   function applyBackgroundMode() {
     const body = document.body;
+    const appShell = getAppShell();
+    const sidebar = getSidebar();
+    const memoryPanel = getMemoryPanel();
+    const mainPanel = byId("mainPanel");
+
     const mode = BACKGROUNDS[app.state.backgroundMode] ? app.state.backgroundMode : "default";
 
+    const strongBackgrounds = {
+      default: `
+        radial-gradient(circle at 12% 18%, rgba(139, 92, 246, 0.34), transparent 24%),
+        radial-gradient(circle at 86% 14%, rgba(34, 197, 94, 0.22), transparent 20%),
+        radial-gradient(circle at 50% 100%, rgba(59, 130, 246, 0.22), transparent 30%),
+        linear-gradient(180deg, #0a1020 0%, #101935 100%)
+      `,
+      aurora: `
+        radial-gradient(circle at 10% 10%, rgba(34, 197, 94, 0.34), transparent 24%),
+        radial-gradient(circle at 88% 12%, rgba(6, 182, 212, 0.26), transparent 22%),
+        radial-gradient(circle at 52% 84%, rgba(168, 85, 247, 0.24), transparent 30%),
+        linear-gradient(180deg, #06101c 0%, #0d1831 100%)
+      `,
+      steel: `
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.10), transparent 24%),
+        radial-gradient(circle at bottom right, rgba(148, 163, 184, 0.14), transparent 28%),
+        linear-gradient(180deg, #161b26 0%, #212a39 100%)
+      `,
+    };
+
+    const backgroundValue = strongBackgrounds[mode] || strongBackgrounds.default;
+
     if (body) {
-      body.style.background = BACKGROUNDS[mode];
+      body.style.background = backgroundValue;
       body.style.backgroundAttachment = "fixed";
       body.style.backgroundRepeat = "no-repeat";
       body.style.backgroundSize = "cover";
       body.style.minHeight = "100vh";
+    }
+
+    if (appShell) {
+      appShell.style.background = backgroundValue;
+      appShell.style.backgroundAttachment = "fixed";
+      appShell.style.backgroundRepeat = "no-repeat";
+      appShell.style.backgroundSize = "cover";
+      appShell.style.borderRadius = "22px";
+    }
+
+    if (sidebar) {
+      sidebar.style.background = "linear-gradient(180deg, rgba(20, 28, 51, 0.88), rgba(16, 23, 42, 0.88))";
+    }
+
+    if (mainPanel) {
+      mainPanel.style.background = "transparent";
+    }
+
+    if (memoryPanel) {
+      memoryPanel.style.background = "linear-gradient(180deg, rgba(20, 28, 51, 0.88), rgba(16, 23, 42, 0.88))";
     }
 
     const btn = getBackgroundBtn();
@@ -1442,12 +1305,14 @@
 
     const newSessionId = safeText(data?.session?.session_id);
     if (newSessionId) {
+      app.state.activeSessionId = newSessionId;
       await loadSession(newSessionId);
       updateModelStatus("Chat duplicated");
       return;
     }
 
     if (app.state.sessions[0]?.session_id) {
+      app.state.activeSessionId = app.state.sessions[0].session_id;
       await loadSession(app.state.sessions[0].session_id);
       updateModelStatus("Chat duplicated");
     }
@@ -1827,7 +1692,6 @@
 
       app.state.attachedFiles = files;
       renderAttachedFiles();
-
       updateModelStatus(`${files.length} file${files.length === 1 ? "" : "s"} ready`);
     });
   }
@@ -1974,25 +1838,6 @@
         } catch (err) {
           console.error(err);
           alert(`Failed to refresh memory: ${err.message}`);
-        }
-      });
-    }
-
-    for (const btn of qsa(["button[data-action='add-memory']"])) {
-      btn.addEventListener("click", async () => {
-        const kind = safeText(getMemoryKindInput()?.value || "preference");
-        const value = safeText(getMemoryValueInput()?.value || "");
-
-        if (!value) {
-          alert("Enter a memory value first.");
-          return;
-        }
-
-        try {
-          await addMemoryItem(kind, value);
-        } catch (err) {
-          console.error(err);
-          alert(`Failed to add memory: ${err.message}`);
         }
       });
     }
