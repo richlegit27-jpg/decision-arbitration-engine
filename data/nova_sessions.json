@@ -1,39 +1,10 @@
 [
   {
-    "session_id": "8100b954-27b5-4760-9791-7f4758e30391",
-    "title": "hihihi",
-    "messages": [
-      {
-        "id": "887970ca-6f95-4ed8-9371-61ea644111d4",
-        "role": "user",
-        "content": "hi",
-        "timestamp": 1774106993,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "bd06351f-6757-49e5-9109-3502743e88e9",
-        "role": "assistant",
-        "content": "Hello! How can I assist you today?",
-        "timestamp": 1774106994,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "daa8fbb7-dea8-497f-a49f-c966151cedfa",
-        "role": "user",
-        "content": "what do i like",
-        "timestamp": 1774107022,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "fd49f984-5b8e-467d-863d-91df552ed551",
-        "role": "assistant",
-        "content": "You mentioned that you like gay. How can I assist you with that preference?",
-        "timestamp": 1774107023,
-        "model": "gpt-4.1-mini"
-      }
-    ],
-    "message_count": 4,
-    "created_at": 1774106993,
-    "updated_at": 1774109332
+    "session_id": "be31719b-4233-4961-8479-9e818bc770c8",
+    "title": "are you gay ai",
+    "messages": [],
+    "message_count": 0,
+    "created_at": 1774116754,
+    "updated_at": 1774116764
   }
 ]

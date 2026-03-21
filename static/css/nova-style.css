@@ -703,3 +703,31 @@ input:disabled {
   );
   border-radius: 18px;
 }
+
+.topbar-link-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  text-decoration: none;
+  font-size: 0.82rem;
+  transition: 0.16s ease;
+}
+
+.topbar-link-chip:hover {
+  transform: translateY(-1px);
+  background: var(--panel-3);
+  border-color: var(--line-strong);
+}
+
+.topbar-link-chip.active {
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+  color: #08111f;
+  font-weight: 700;
+  border-color: transparent;
+}
