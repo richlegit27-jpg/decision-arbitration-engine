@@ -1,103 +1,64 @@
-[
-  {
-    "session_id": "c344efc7-56a1-4cd2-be75-0e8c6369515e",
-    "title": "tell me your life story",
-    "messages": [
-      {
-        "id": "cb246888-0b99-4edb-831f-33e357f97aed",
-        "role": "user",
-        "content": "tell me your life story",
-        "timestamp": 1774051417,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "efd02653-21c4-4cbf-baa5-efa89204a3fe",
-        "role": "assistant",
-        "content": "I don’t have a life story like a human would. I’m an AI created by OpenAI, designed to assist with information, answer questions, and support tasks. My purpose is to help you efficiently and accurately. If you want, I can tell you about how AI like me is developed or how I work. Would you like that?",
-        "timestamp": 1774051419,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "5aece051-2c17-47b9-8d29-6f6b553c66ba",
-        "role": "user",
-        "content": "tell me your ai story nova",
-        "timestamp": 1774051509,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "00ffa2f8-b28d-4eb5-a5c7-b5f1939a38ea",
-        "role": "assistant",
-        "content": "Certainly! Here’s a brief story of my AI development and purpose:\n\n1. **Creation**: I was developed by OpenAI, built on advanced machine learning models trained on vast amounts of text data to understand and generate human-like language.\n\n2. **Capabilities**: I can process and generate text, answer questions, assist with problem-solving, and support creative and technical tasks.\n\n3. **Purpose**: My main goal is to assist users like you efficiently, providing clear, accurate, and helpful responses.\n\n4. **Your Project Nova**: Since you mentioned your project named Nova, I’m here to support you with any information or assistance related to it, leveraging my capabilities to help you succeed.\n\nIf you want, I can share more technical details or how I can assist specifically with your project Nova.",
-        "timestamp": 1774051512,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "88500252-00a5-4c9f-95a1-530e4a81ba1b",
-        "role": "user",
-        "content": "this looks sweet",
-        "timestamp": 1774051975,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "120d1457-9b2c-4fbf-b61d-ae42262289f5",
-        "role": "assistant",
-        "content": "Glad you like it! If you want, I can help expand it, tailor it for presentations, or assist with anything else related to your project Nova or AI in general. Just let me know!",
-        "timestamp": 1774051977,
-        "model": "gpt-4.1-mini"
-      }
-    ],
-    "message_count": 6,
-    "created_at": 1774051333,
-    "updated_at": 1774051977
-  },
-  {
-    "session_id": "0b96a313-4972-4db8-88d8-e864bde7c58d",
-    "title": "New Chat",
-    "messages": [],
-    "message_count": 0,
-    "created_at": 1774049929,
-    "updated_at": 1774049929
-  },
-  {
-    "session_id": "0406e8b3-4893-40d6-a30d-50a57e6608b9",
-    "title": "hi",
-    "messages": [
-      {
-        "id": "9e4c6cd0-91ec-4142-a5d0-c12d5033d043",
-        "role": "user",
-        "content": "hi",
-        "timestamp": 1774049878,
-        "model": "gpt-4.1-mini",
-        "uploaded_files": [
-          {
-            "content_type": "image/jpeg",
-            "id": "d2492df4-8311-4042-b48e-b1b41db70cce",
-            "original_name": "rich.jpg",
-            "saved_name": "fec483ef7785413da4b6e5abbf1275d1_rich.jpg",
-            "size": 21718,
-            "uploaded_at": 1774049878,
-            "url": "/uploads/fec483ef7785413da4b6e5abbf1275d1_rich.jpg"
-          }
-        ]
-      },
-      {
-        "id": "df551f5b-d441-4718-a736-ecb0139135bb",
-        "role": "assistant",
-        "content": "Hello! How can I assist you today?",
-        "timestamp": 1774049879,
-        "model": "gpt-4.1-mini"
-      }
-    ],
-    "message_count": 2,
-    "created_at": 1774048623,
-    "updated_at": 1774049879
-  },
-  {
-    "session_id": "0f404a4e-0628-4dcd-88a4-fd609c1d0750",
-    "title": "New Chat (Copy)",
-    "messages": [],
-    "message_count": 0,
-    "created_at": 1774048617,
-    "updated_at": 1774048617
-  }
-]
+{
+  "active_session_id": "d12cc091-e382-447a-be49-e658488b3ee2",
+  "sessions": [
+    {
+      "id": "d12cc091-e382-447a-be49-e658488b3ee2",
+      "name": "tell me about the lakers now",
+      "created_at": 1774100593,
+      "updated_at": 1774100884,
+      "messages": [
+        {
+          "id": "307b8d2f-51df-4ce2-aea1-67d7d44f924c",
+          "role": "user",
+          "content": "tell me about the lakers now",
+          "timestamp": 1774100854
+        },
+        {
+          "id": "0540fd02-17ad-4bbf-a81b-2b54b2d1518d",
+          "role": "assistant",
+          "content": "The **Los Angeles Lakers** are one of the NBA’s most famous franchises, based in **Los Angeles, California**. Right now, when people talk about “the Lakers now,” they usually mean a mix of:\n\n- **Still a high-profile team**\n- **Built around star power**\n- **Always under pressure to contend**\n- **Constantly in the spotlight**, more than almost any other NBA team\n\n### Core identity\nThe Lakers are historically known for:\n- **Championship expectations**\n- Big-name stars\n- National attention\n- A “win-now” culture\n\nThey’ve won **17 NBA championships**, tied for the most in league history.\n\n### Recent era\nIn the current era, the Lakers have been centered around **LeBron James**, who remains the face of the franchise, and in recent years also **Anthony Davis** as another major star. Their success often depends on:\n- Health\n- Roster depth\n- Defense\n- Whether the supporting cast fits around their stars\n\n### What “the Lakers now” usually means\nAt this point, the Lakers are generally seen as:\n- A team trying to balance **contending immediately** with **planning for the future**\n- A franchise that can still attract major talent\n- A team judged almost entirely by playoff success\n\n### Biggest storylines around them\nTypical current Lakers storylines include:\n- How much longer **LeBron** will play\n- Whether **Anthony Davis** can stay healthy and dominate consistently\n- Trade rumors and roster changes\n- Whether they have enough shooting, defense, and bench production\n- Coaching and front-office decisions\n\n### Overall\nThe Lakers now are still:\n- **Relevant**\n- **Talented**\n- **Heavily scrutinized**\n- **Expected to compete**, not rebuild quietly\n\nIf you want, I can also give you:\n1. the **current Lakers roster**,  \n2. their **latest season outlook**, or  \n3. a **quick history of the Lakers from Kobe to LeBron**.",
+          "timestamp": 1774100863
+        },
+        {
+          "id": "59360e98-4455-4c9b-8701-243ff48905f6",
+          "role": "user",
+          "content": "what are the lakers record now",
+          "timestamp": 1774100882
+        },
+        {
+          "id": "58ea7dba-e38a-4a8b-935e-b62bd5dd976c",
+          "role": "assistant",
+          "content": "I don’t have live standings in this chat.\n\nIf you want the Lakers’ record right now, check:\n- **NBA.com**\n- **ESPN NBA standings**\n- **TheScore** or **Google: “Lakers record”**\n\nIf you want, I can also help you interpret it once you have it, like:\n- playoff position\n- last 10 games\n- home vs away\n- how they compare to the West contenders",
+          "timestamp": 1774100884
+        }
+      ]
+    },
+    {
+      "id": "7a9cf785-b7f0-4bcb-bf06-7eb39e8a2520",
+      "name": "hi",
+      "created_at": 1774100423,
+      "updated_at": 1774100547,
+      "messages": [
+        {
+          "id": "05324f92-641c-4b3f-a56d-eaffff5881cf",
+          "role": "user",
+          "content": "hi",
+          "timestamp": 1774100546
+        },
+        {
+          "id": "4941e0a8-f75d-4565-bf4e-3955772690e1",
+          "role": "assistant",
+          "content": "Hi! How can I help?",
+          "timestamp": 1774100547
+        }
+      ]
+    },
+    {
+      "id": "0df05a4d-db6d-4523-9641-6ccda089cc77",
+      "name": "New Chat",
+      "created_at": 1774100383,
+      "updated_at": 1774100383,
+      "messages": []
+    }
+  ]
+}

@@ -24,11 +24,12 @@
       <div class="sidebar-content">
         <div class="sidebar-controls">
           <button id="newSessionBtn" type="button">New</button>
-          <button id="deleteSessionBtn" type="button">Delete</button>
-          <button id="renameSessionBtn" type="button">Rename</button>
-          <button id="duplicateSessionBtn" type="button">Duplicate</button>
-          <button id="pinSessionBtn" type="button">Pin</button>
-          <button id="exportSessionBtn" type="button">Export</button>
+	  <button id="clearSessionBtn" type="button">Clear</button>
+	  <button id="renameSessionBtn" type="button">Rename</button>
+	  <button id="deleteSessionBtn" type="button">Delete</button>
+	  <button id="duplicateSessionBtn" type="button">Duplicate</button>
+	  <button id="pinSessionBtn" type="button">Pin</button>
+	  <button id="exportSessionBtn" type="button">Export</button>
         </div>
 
         <section class="sidebar-section">
@@ -36,6 +37,28 @@
           <div class="sidebar-actions">
             <button id="themeToggleBtn" type="button">Theme</button>
             <button id="backgroundBtn" type="button">Background</button>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <div class="sidebar-section-title">Admin</div>
+          <div class="sidebar-actions">
+            <button
+              id="changePasswordBtn"
+              type="button"
+              onclick="window.location.href='/admin/change-password'"
+              title="Change Nova password"
+            >
+              Change Password
+            </button>
+            <button
+              id="logoutBtn"
+              type="button"
+              onclick="window.location.href='/logout'"
+              title="Logout"
+            >
+              Logout
+            </button>
           </div>
         </section>
 
@@ -66,6 +89,18 @@
           <select id="modelSelect" class="topbar-chip" aria-label="Select model">
             <option value="gpt-4.1-mini">gpt-4.1-mini</option>
           </select>
+
+          <button
+            id="settingsBtnTop"
+            class="icon-btn"
+            type="button"
+            aria-label="Open password settings"
+            title="Open password settings"
+            onclick="window.location.href='/admin/change-password'"
+          >
+            Settings
+          </button>
+
           <button id="memoryToggleBtnTop" class="icon-btn" type="button" aria-label="Toggle memory panel" title="Toggle memory panel">
             Memory
           </button>
