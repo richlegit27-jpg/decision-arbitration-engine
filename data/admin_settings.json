@@ -1,0 +1,8 @@
+{
+  "password_hash": {
+    "algorithm": "pbkdf2_sha256",
+    "iterations": 200000,
+    "salt": "v3beCtx8aJRQfEVD52IqOQ==",
+    "hash": "H2KyBRidnmZqK6ybE2wxynPn/wH21nqqD2GKwOd8Bn4="
+  }
+}

@@ -1,0 +1,16 @@
+body {
+    font-family: 'Arial', sans-serif;
+}
+
+#chat-box {
+    max-height: 400px;
+    border-radius: 10px;
+    background-color: #f4f4f4;
+}
+
+button {
+    transition: background-color 0.3s ease;
+}
+button:hover {
+    background-color: #1D4ED8; /* Dark blue on hover */
+}

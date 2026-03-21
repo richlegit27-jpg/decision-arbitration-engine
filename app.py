@@ -608,6 +608,43 @@ async def rename_session(request: Request):
     return {"ok": True}
 
 
+@app.post("/api/session/duplicate")
+async def duplicate_session(request: Request):
+    data = await request.json()
+    session_id = str(data.get("session_id") or "").strip()
+
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id is required")
+
+    sessions = load_sessions()
+    session = get_session(sessions, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    ts = now()
+    original_messages = session.get("messages", [])
+    copied_messages: List[Dict[str, Any]] = []
+
+    if isinstance(original_messages, list):
+        for message in original_messages:
+            if isinstance(message, dict):
+                copied_messages.append(json.loads(json.dumps(message)))
+
+    duplicated = {
+        "session_id": str(uuid.uuid4()),
+        "title": f"{session.get('title') or 'New Chat'} Copy",
+        "messages": copied_messages,
+        "message_count": len(copied_messages),
+        "created_at": ts,
+        "updated_at": ts,
+    }
+
+    sessions.insert(0, duplicated)
+    save_sessions(sessions)
+
+    return {"ok": True, "session": duplicated}
+
+
 @app.post("/api/chat")
 async def chat_once(request: Request):
     payload = validate_chat_input(await request.json())
