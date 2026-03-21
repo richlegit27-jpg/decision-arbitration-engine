@@ -518,7 +518,6 @@
 
       .empty-subtitle {
         color: var(--muted) !important;
-        line-height: 1.6;
       }
 
       .session-item {
@@ -1000,6 +999,34 @@
     return `<div class="message-files">${fileRows}</div>`;
   }
 
+  function buildAssistantActionsHtml() {
+    return `
+      <div class="message-actions">
+        <button type="button" class="message-action-btn" data-action="copy-message">Copy</button>
+        <button type="button" class="message-action-btn" data-action="regenerate-message">Regenerate</button>
+      </div>
+    `;
+  }
+
+  function attachAssistantMessageActions(node, content, index) {
+    const copyBtn = node.querySelector('[data-action="copy-message"]');
+    if (copyBtn) {
+      copyBtn.addEventListener("click", () => copyToClipboard(content));
+    }
+
+    const regenBtn = node.querySelector('[data-action="regenerate-message"]');
+    if (regenBtn) {
+      regenBtn.addEventListener("click", async () => {
+        try {
+          await regenerateFromAssistantIndex(index);
+        } catch (err) {
+          console.error(err);
+          alert(`Failed to regenerate: ${err.message}`);
+        }
+      });
+    }
+  }
+
   function renderMessage(msg, index = -1) {
     const container = getChatContainer();
     if (!container) return;
@@ -1015,12 +1042,7 @@
 
     let actionsHtml = "";
     if (role === "assistant") {
-      actionsHtml = `
-        <div class="message-actions">
-          <button type="button" class="message-action-btn" data-action="copy-message">Copy</button>
-          <button type="button" class="message-action-btn" data-action="regenerate-message">Regenerate</button>
-        </div>
-      `;
+      actionsHtml = buildAssistantActionsHtml();
     }
 
     div.innerHTML = `
@@ -1031,21 +1053,8 @@
       ${actionsHtml}
     `;
 
-    const copyBtn = div.querySelector('[data-action="copy-message"]');
-    if (copyBtn) {
-      copyBtn.addEventListener("click", () => copyToClipboard(content));
-    }
-
-    const regenBtn = div.querySelector('[data-action="regenerate-message"]');
-    if (regenBtn) {
-      regenBtn.addEventListener("click", async () => {
-        try {
-          await regenerateFromAssistantIndex(index);
-        } catch (err) {
-          console.error(err);
-          alert(`Failed to regenerate: ${err.message}`);
-        }
-      });
+    if (role === "assistant") {
+      attachAssistantMessageActions(div, content, index);
     }
 
     container.appendChild(div);
@@ -1555,6 +1564,38 @@
     recognition.start();
   }
 
+  async function finalizeStreamingMessage(finalAssistantMessage, assistantText, model) {
+    const streamingNode = getChatContainer()?.querySelector(".message.streaming");
+    const finalMessage = finalAssistantMessage || {
+      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      role: "assistant",
+      content: assistantText || "No response returned.",
+      timestamp: nowUnix(),
+      model,
+    };
+
+    if (streamingNode) {
+      streamingNode.classList.remove("streaming");
+      streamingNode.dataset.messageIndex = String(app.state.messages.length);
+      streamingNode.innerHTML = `
+        <div class="message-role">assistant</div>
+        <div class="message-body">${escapeHtml(finalMessage.content || assistantText).replace(/\n/g, "<br>")}</div>
+        <div class="message-time">${escapeHtml(formatTime(finalMessage.timestamp || nowUnix()))}</div>
+        ${buildAssistantActionsHtml()}
+      `;
+      attachAssistantMessageActions(
+        streamingNode,
+        finalMessage.content || assistantText,
+        app.state.messages.length
+      );
+    } else {
+      renderMessage(finalMessage, app.state.messages.length);
+    }
+
+    app.state.messages.push(finalMessage);
+    updateChatHeader();
+  }
+
   async function sendMessage(overrideContent = null, options = {}) {
     const input = getMessageInput();
     if (!input) return;
@@ -1645,8 +1686,11 @@
       let buffer = "";
       let assistantText = "";
       let finished = false;
+      let shouldStopReading = false;
 
       while (true) {
+        if (shouldStopReading) break;
+
         const { value, done } = await reader.read();
         if (done) break;
 
@@ -1694,15 +1738,26 @@
           } else if (eventName === "done") {
             finished = true;
             app.state.activeSessionId = payload.session_id || app.state.activeSessionId;
-            removeStreamingShell();
+
+            await finalizeStreamingMessage(payload.message, assistantText, model);
+
             app.state.attachedFiles = [];
             const fileInput = getFileInput();
             if (fileInput) fileInput.value = "";
             renderAttachedFiles();
+
             await loadState();
-            await loadSession(app.state.activeSessionId);
             await loadMemory();
+            updateChatHeader();
             updateModelStatus(`Using ${app.state.currentModel}`);
+
+            shouldStopReading = true;
+            try {
+              await reader.cancel();
+            } catch {
+              // ignore
+            }
+            break;
           } else if (eventName === "error") {
             throw new Error(payload.message || "Unknown streaming error");
           }
@@ -1710,14 +1765,16 @@
       }
 
       if (!finished) {
-        removeStreamingShell();
+        await finalizeStreamingMessage(null, assistantText, model);
+
         app.state.attachedFiles = [];
         const fileInput = getFileInput();
         if (fileInput) fileInput.value = "";
         renderAttachedFiles();
+
         await loadState();
-        await loadSession(app.state.activeSessionId);
         await loadMemory();
+        updateChatHeader();
         updateModelStatus(`Using ${app.state.currentModel}`);
       }
     } catch (err) {
