@@ -1,0 +1,5 @@
+runtime/backups/
+uploads/
+*.bak
+*.BAK*
+*.WORKING*

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nova Local Chat</title>
+  <link rel="stylesheet" href="../static/css/composer-endgame.css">
+</head>
+<body>
+
+  <script>
+    // Initialize local Nova state
+    window.NovaChatState = {
+      state: {
+        messages: [],
+        pendingAttachments: [],
+        memoryItems: [],
+      }
+    }
+  </script>
+
+  <div id="workspace" style="display:flex; height:100vh;">
+
+    <!-- Messages + composer -->
+    <div style="flex:1; display:flex; flex-direction:column;">
+
+      <!-- Messages list -->
+      <div id="messagesContainer" style="flex:1; overflow-y:auto; padding:12px;"></div>
+
+      <!-- Composer -->
+      <form id="composerForm">
+        <textarea id="composerInput" placeholder="Type a message…"></textarea>
+
+        <div style="display:flex; gap:6px; margin-top:6px;">
+          <button type="button" id="attachBtn">+ Attach</button>
+          <button type="button" id="imageBtn">🖼 Image</button>
+          <button type="button" id="voiceBtn">🎤 Voice</button>
+          <button type="submit" id="sendBtn">Send</button>
+        </div>
+
+        <!-- Pending attachments -->
+        <div id="pendingAttachments"></div>
+
+        <!-- Status hints -->
+        <div id="thinkingStatus"></div>
+        <div id="voiceStatus"></div>
+        <div id="imageModeHint"></div>
+      </form>
+    </div>
+
+    <!-- Memory panel -->
+    <div id="memoryPanel" style="width:280px; border-left:1px solid rgba(255,255,255,0.1); overflow-y:auto;"></div>
+
+  </div>
+
+  <!-- Reactive JS -->
+  <script src="../static/js/composer-reactive.js"></script>
+</body>
+</html>

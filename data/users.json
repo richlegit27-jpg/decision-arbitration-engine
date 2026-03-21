@@ -1,0 +1,12 @@
+[
+  {
+    "id": 1,
+    "username": "richnova1",
+    "password_hash": "pbkdf2_sha256$200000$44fb8afc46afdc8478ebaa93b1974efb$f65efbc711f1711527d06e71d516118c6273679e9b8fb7f9126dc93ab501165e"
+  },
+  {
+    "id": 2,
+    "username": "richardchow",
+    "password_hash": "pbkdf2_sha256$200000$54cd284b3cb671614a380c11991f9bb2$7e35bed7c03c2b71bcc3cb064fccf14fe90bda6bea1122fae0dcbdc819ba1f83"
+  }
+]

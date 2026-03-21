@@ -1,0 +1,40 @@
+{
+  "active_model": "gpt-4.1-mini",
+  "users": {
+    "richlegit27": {
+      "chats": {
+        "a8a8ff47595247d5972dcef736b1dc13": {
+          "id": "a8a8ff47595247d5972dcef736b1dc13",
+          "title": "I always want PowerShell commands",
+          "created_at": "2026-03-15T13:52:55Z",
+          "updated_at": "2026-03-15T14:00:36Z",
+          "messages": [
+            {
+              "id": "ad72a1ef56704e7bacbb9efac0156752",
+              "role": "user",
+              "content": "I always want PowerShell commands",
+              "created_at": "2026-03-15T13:52:55Z"
+            },
+            {
+              "id": "f35bbfdb6537463b88647e0f339681c3",
+              "role": "assistant",
+              "content": "Got it! I\u2019ll make sure to provide PowerShell commands for your requests whenever applicable. Just let me know what you need next!",
+              "created_at": "2026-03-15T13:52:56Z"
+            }
+          ],
+          "files": []
+        }
+      },
+      "memory_items": [
+        {
+          "id": "2365c771863148089f8124602952591e",
+          "text": "User preference: Powershell commands.",
+          "kind": "preference",
+          "pinned": true,
+          "created_at": "2026-03-15T13:52:55Z",
+          "updated_at": "2026-03-15T13:52:55Z"
+        }
+      ]
+    }
+  }
+}
