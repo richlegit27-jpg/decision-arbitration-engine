@@ -1,0 +1,61 @@
+﻿<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nova</title>
+  <link rel="stylesheet" href="/static/css/nova-style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="left-sidebar">
+      <div class="sidebar-top">
+        <div class="brand-wrap">
+          <div class="brand-title">Nova</div>
+          <div class="brand-subtitle">Attachment Build</div>
+        </div>
+
+        <div class="sidebar-actions">
+          <button id="newSessionBtn" type="button">New</button>
+          <button id="renameSessionBtn" type="button">Rename</button>
+          <button id="deleteSessionBtn" type="button">Delete</button>
+        </div>
+      </div>
+
+      <div id="sessionList" class="session-list"></div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div>
+          <div id="activeSessionTitle" class="topbar-title">New Chat</div>
+          <div class="topbar-subtitle">Upload files and send with messages</div>
+        </div>
+      </header>
+
+      <section id="chatMessages" class="chat-messages"></section>
+
+      <section id="attachmentPreview" class="attachment-preview hidden"></section>
+
+      <footer class="composer">
+        <input id="fileInput" type="file" hidden>
+
+        <button id="attachBtn" class="icon-btn" type="button" title="Attach file" aria-label="Attach file">
+          📎
+        </button>
+
+        <textarea
+          id="messageInput"
+          rows="1"
+          placeholder="Message Nova..."
+          autocomplete="off"
+        ></textarea>
+
+        <button id="sendBtn" class="send-btn" type="button">Send</button>
+      </footer>
+    </main>
+  </div>
+
+  <script src="/static/js/nova-ultimate.js"></script>
+</body>
+</html>
