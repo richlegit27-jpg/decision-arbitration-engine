@@ -5,7 +5,7 @@ import re
 import time
 import uuid
 from threading import Lock
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,9 +48,38 @@ SYSTEM_PROMPT = (
     "Treat saved memory as user-specific context, not as facts about the outside world."
 )
 
+ROUTE_SYSTEM_PROMPTS = {
+    "coding": (
+        "Mode: coding. "
+        "Prioritize implementation, debugging, code correctness, architecture, and exact fixes. "
+        "Be direct. Give concrete steps and production-usable code when appropriate."
+    ),
+    "planning": (
+        "Mode: planning. "
+        "Prioritize sequencing, roadmap thinking, tradeoffs, milestones, and execution clarity. "
+        "Give structured next steps."
+    ),
+    "writing": (
+        "Mode: writing. "
+        "Prioritize wording, tone, clarity, editing, rewriting, and polished communication. "
+        "Write cleanly and naturally."
+    ),
+    "analysis": (
+        "Mode: analysis. "
+        "Prioritize diagnosis, reasoning, evaluation, comparison, and root-cause thinking. "
+        "Be precise and explicit about uncertainty."
+    ),
+    "general": (
+        "Mode: general. "
+        "Be helpful, concise, practical, and intelligent. "
+        "Use the simplest strong answer that solves the request."
+    ),
+}
+
 MAX_CONTEXT_MESSAGES = 12
 MAX_MEMORY_ITEMS = 50
 MAX_MEMORY_PROMPT_ITEMS = 12
+MAX_MEMORY_SELECTION = 8
 
 MEMORY_KIND_ORDER = ["name", "preference", "goal", "project", "skill", "workflow", "memory"]
 MEMORY_KIND_LABELS = {
@@ -405,27 +434,102 @@ def score_memory_item_for_request(item: Dict[str, Any], request_text: str) -> in
     return score
 
 
-def build_memory_prompt(user_request: str = "") -> str:
+def classify_intent(user_request: str) -> Dict[str, str]:
+    text = canonicalize_for_match(user_request)
+    reason = "default"
+    intent = "chat"
+    mode = "general"
+
+    coding_keywords = {
+        "python", "javascript", "js", "typescript", "ts", "html", "css", "sql", "flask", "fastapi",
+        "bug", "debug", "fix", "error", "traceback", "exception", "api", "endpoint", "function",
+        "code", "script", "app.py", "refactor", "backend", "frontend", "regex", "json"
+    }
+    planning_keywords = {
+        "plan", "roadmap", "next step", "next move", "milestone", "phase", "strategy",
+        "organize", "structure", "sequence", "workflow", "priority"
+    }
+    writing_keywords = {
+        "write", "rewrite", "reword", "edit", "polish", "email", "message", "caption",
+        "post", "blog", "landing page copy", "wording", "grammar"
+    }
+    analysis_keywords = {
+        "analyze", "analysis", "why", "compare", "difference", "root cause", "investigate",
+        "what happened", "evaluate", "tradeoff", "pros and cons"
+    }
+
+    if any(token in text for token in coding_keywords):
+        mode = "coding"
+        intent = "implementation"
+        reason = "matched coding keywords"
+    elif any(token in text for token in planning_keywords):
+        mode = "planning"
+        intent = "planning"
+        reason = "matched planning keywords"
+    elif any(token in text for token in writing_keywords):
+        mode = "writing"
+        intent = "writing"
+        reason = "matched writing keywords"
+    elif any(token in text for token in analysis_keywords):
+        mode = "analysis"
+        intent = "analysis"
+        reason = "matched analysis keywords"
+
+    if "?" in user_request and mode == "general":
+        intent = "question"
+        reason = "question fallback"
+
+    if text.startswith("smff") or "full file" in text or "send full file" in text:
+        mode = "coding"
+        intent = "full-file"
+        reason = "matched full-file workflow"
+
+    return {
+        "mode": mode,
+        "intent": intent,
+        "reason": reason,
+    }
+
+
+def select_relevant_memory_items(user_request: str) -> List[Dict[str, Any]]:
     data = load_memory()
     items = data.get("items", [])
     if not items:
-        return ""
+        return []
 
-    ranked = sorted(
-        items,
-        key=lambda item: (
-            score_memory_item_for_request(item, user_request),
-            int(item.get("updated_at") or item.get("created_at") or 0),
+    ranked: List[Tuple[int, Dict[str, Any]]] = []
+    for item in items:
+        score = score_memory_item_for_request(item, user_request)
+        if score > 0:
+            ranked.append((score, item))
+
+    ranked.sort(
+        key=lambda pair: (
+            pair[0],
+            int(pair[1].get("updated_at") or pair[1].get("created_at") or 0),
         ),
         reverse=True,
     )
 
-    selected = ranked[:MAX_MEMORY_PROMPT_ITEMS]
-    if not selected:
+    selected = [item for score, item in ranked if score >= 4][:MAX_MEMORY_SELECTION]
+
+    if not selected and items:
+        # Fallback: keep it intentionally small
+        selected = sorted(
+            items,
+            key=lambda item: int(item.get("updated_at") or item.get("created_at") or 0),
+            reverse=True,
+        )[:2]
+
+    return selected
+
+
+def build_memory_prompt_from_items(items: List[Dict[str, Any]]) -> str:
+    if not items:
         return ""
 
     grouped: Dict[str, List[str]] = {}
-    for item in selected:
+    for item in items[:MAX_MEMORY_PROMPT_ITEMS]:
         kind = normalize_memory_kind(str(item.get("kind") or "memory"))
         value = normalize_memory_text(str(item.get("value") or ""))
         if not value:
@@ -445,21 +549,52 @@ def build_memory_prompt(user_request: str = "") -> str:
         return ""
 
     return (
-        "Saved user memory:\n"
+        "Relevant saved user memory:\n"
         + "\n".join(lines)
         + "\nUse this only when relevant to the current request."
     )
 
 
-def build_openai_messages(session_messages: List[Dict[str, Any]], user_request: str = "") -> List[Dict[str, str]]:
+def build_router_metadata(route: Dict[str, str], memory_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    memory_preview = []
+    for item in memory_items[:3]:
+        label = MEMORY_KIND_LABELS.get(
+            normalize_memory_kind(str(item.get("kind") or "memory")),
+            "Memory",
+        )
+        value = normalize_memory_text(str(item.get("value") or ""))
+        if value:
+            memory_preview.append(f"{label}: {value}")
+
+    return {
+        "mode": route.get("mode", "general"),
+        "intent": route.get("intent", "chat"),
+        "reason": route.get("reason", "auto"),
+        "memory_hits": len(memory_items),
+        "memory_preview": memory_preview,
+        "timestamp": now(),
+    }
+
+
+def build_openai_messages(
+    session_messages: List[Dict[str, Any]],
+    user_request: str = "",
+) -> Tuple[List[Dict[str, str]], Dict[str, str], List[Dict[str, Any]]]:
+    route = classify_intent(user_request)
+    relevant_memory = select_relevant_memory_items(user_request)
+
     messages: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    memory_prompt = build_memory_prompt(user_request)
+    route_prompt = ROUTE_SYSTEM_PROMPTS.get(route["mode"], ROUTE_SYSTEM_PROMPTS["general"])
+    if route_prompt:
+        messages.append({"role": "system", "content": route_prompt})
+
+    memory_prompt = build_memory_prompt_from_items(relevant_memory)
     if memory_prompt:
         messages.append({"role": "system", "content": memory_prompt})
 
     messages.extend(get_context(session_messages))
-    return messages
+    return messages, route, relevant_memory
 
 
 def summarize_sessions_for_state(sessions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -856,9 +991,15 @@ async def chat_once(request: Request):
     session["updated_at"] = now()
     extract_memory_from_message(content)
 
+    openai_messages, route, relevant_memory = build_openai_messages(
+        session["messages"],
+        user_request=content,
+    )
+    router_meta = build_router_metadata(route, relevant_memory)
+
     response = client.chat.completions.create(
         model=model,
-        messages=build_openai_messages(session["messages"], user_request=content),
+        messages=openai_messages,
         temperature=0.7,
     )
 
@@ -870,6 +1011,7 @@ async def chat_once(request: Request):
         "content": assistant_text,
         "timestamp": now(),
         "model": model,
+        "router": router_meta,
     }
     session["messages"].append(assistant_msg)
     session["message_count"] = len(session["messages"])
@@ -889,6 +1031,7 @@ async def chat_once(request: Request):
         "message": assistant_msg,
         "messages": session["messages"],
         "usage": usage,
+        "router": router_meta,
     }
 
 
@@ -916,14 +1059,21 @@ async def chat_stream(request: Request):
     session["updated_at"] = now()
     extract_memory_from_message(content)
 
-    openai_messages = build_openai_messages(session["messages"], user_request=content)
+    openai_messages, route, relevant_memory = build_openai_messages(
+        session["messages"],
+        user_request=content,
+    )
+    router_meta = build_router_metadata(route, relevant_memory)
     session_id = session["session_id"]
 
     def event_stream():
         assistant_text = ""
 
         try:
-            yield f"event: start\ndata: {json.dumps({'title': session['title'], 'model_used': model, 'session_id': session_id}, ensure_ascii=False)}\n\n"
+            yield (
+                "event: start\n"
+                f"data: {json.dumps({'title': session['title'], 'model_used': model, 'session_id': session_id, 'router': router_meta}, ensure_ascii=False)}\n\n"
+            )
 
             stream = client.chat.completions.create(
                 model=model,
@@ -936,7 +1086,10 @@ async def chat_stream(request: Request):
                 delta = chunk.choices[0].delta.content or ""
                 if delta:
                     assistant_text += delta
-                    yield f"event: delta\ndata: {json.dumps({'text': delta, 'model_used': model}, ensure_ascii=False)}\n\n"
+                    yield (
+                        "event: delta\n"
+                        f"data: {json.dumps({'text': delta, 'model_used': model}, ensure_ascii=False)}\n\n"
+                    )
 
             assistant_msg = {
                 "id": str(uuid.uuid4()),
@@ -944,6 +1097,7 @@ async def chat_stream(request: Request):
                 "content": assistant_text.strip() or "No response returned.",
                 "timestamp": now(),
                 "model": model,
+                "router": router_meta,
             }
             session["messages"].append(assistant_msg)
             session["message_count"] = len(session["messages"])
@@ -956,10 +1110,16 @@ async def chat_stream(request: Request):
             save_sessions(sessions)
             usage = record_usage_message("local")
 
-            yield f"event: done\ndata: {json.dumps({'message': assistant_msg, 'session_id': session_id, 'title': session['title'], 'usage': usage}, ensure_ascii=False)}\n\n"
+            yield (
+                "event: done\n"
+                f"data: {json.dumps({'message': assistant_msg, 'session_id': session_id, 'title': session['title'], 'usage': usage, 'router': router_meta}, ensure_ascii=False)}\n\n"
+            )
 
         except Exception as e:
-            yield f"event: error\ndata: {json.dumps({'message': str(e), 'session_id': session_id}, ensure_ascii=False)}\n\n"
+            yield (
+                "event: error\n"
+                f"data: {json.dumps({'message': str(e), 'session_id': session_id}, ensure_ascii=False)}\n\n"
+            )
 
     return StreamingResponse(
         event_stream(),

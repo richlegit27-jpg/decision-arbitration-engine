@@ -1,3 +1,12 @@
 {
-  "items": []
+  "items": [
+    {
+      "id": "058f220c-bb42-4b64-b712-6c542a3604c3",
+      "kind": "preference",
+      "value": "hihi",
+      "source": "manual",
+      "created_at": 1774164583,
+      "updated_at": 1774164583
+    }
+  ]
 }

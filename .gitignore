@@ -4,3 +4,4 @@ uploads/
 *.BAK*
 *.WORKING*
 current_backup/
+data/*.json

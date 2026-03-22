@@ -4,213 +4,159 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Nova Blog</title>
-  <link rel="stylesheet" href="/static/css/nova-style.css">
-  <style>
-    body {
-      overflow: auto;
-    }
-
-    .site-shell {
-      min-height: 100vh;
-      padding: 18px;
-      background:
-        radial-gradient(circle at 12% 18%, rgba(139, 92, 246, 0.34), transparent 24%),
-        radial-gradient(circle at 86% 14%, rgba(34, 197, 94, 0.22), transparent 20%),
-        radial-gradient(circle at 50% 100%, rgba(59, 130, 246, 0.22), transparent 30%),
-        linear-gradient(180deg, #0a1020 0%, #101935 100%);
-      color: var(--text);
-    }
-
-    .site-container {
-      max-width: 1100px;
-      margin: 0 auto;
-    }
-
-    .site-nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 14px 16px;
-      margin-bottom: 18px;
-      border-radius: 20px;
-      border: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(20, 28, 51, 0.88), rgba(16, 23, 42, 0.88));
-      box-shadow: var(--shadow-md);
-      backdrop-filter: blur(14px);
-    }
-
-    .site-brand {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .site-brand-title {
-      font-size: 1rem;
-      font-weight: 700;
-    }
-
-    .site-brand-subtitle {
-      font-size: 0.78rem;
-      color: var(--muted);
-    }
-
-    .site-nav-links {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .site-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 38px;
-      padding: 0 14px;
-      border-radius: 10px;
-      text-decoration: none;
-      color: var(--text);
-      background: var(--panel-2);
-      border: 1px solid var(--line);
-      transition: 0.16s ease;
-    }
-
-    .site-link:hover {
-      transform: translateY(-1px);
-      background: var(--panel-3);
-      border-color: var(--line-strong);
-    }
-
-    .site-link.active {
-      background: linear-gradient(180deg, var(--accent), var(--accent-strong));
-      color: #08111f;
-      border-color: transparent;
-      font-weight: 700;
-    }
-
-    .hero-card {
-      border-radius: 22px;
-      border: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(20, 28, 51, 0.88), rgba(16, 23, 42, 0.88));
-      box-shadow: var(--shadow-md);
-      backdrop-filter: blur(14px);
-      padding: 26px;
-      margin-bottom: 18px;
-    }
-
-    .hero-title {
-      font-size: 2rem;
-      font-weight: 800;
-      margin-bottom: 10px;
-    }
-
-    .hero-text {
-      color: var(--muted);
-      line-height: 1.6;
-      max-width: 720px;
-    }
-
-    .blog-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
-    }
-
-    .blog-card {
-      border-radius: 20px;
-      border: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(20, 28, 51, 0.88), rgba(16, 23, 42, 0.88));
-      box-shadow: var(--shadow-md);
-      backdrop-filter: blur(14px);
-      padding: 20px;
-    }
-
-    .blog-meta {
-      font-size: 0.75rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 10px;
-    }
-
-    .blog-title {
-      font-size: 1.1rem;
-      font-weight: 700;
-      margin-bottom: 10px;
-    }
-
-    .blog-text {
-      color: var(--muted);
-      line-height: 1.55;
-      margin-bottom: 16px;
-    }
-
-    .blog-read {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 38px;
-      padding: 0 14px;
-      border-radius: 10px;
-      text-decoration: none;
-      color: #08111f;
-      background: linear-gradient(180deg, var(--accent), var(--accent-strong));
-      font-weight: 700;
-      border: 1px solid transparent;
-    }
-
-    @media (max-width: 700px) {
-      .site-shell {
-        padding: 10px;
-      }
-
-      .site-nav {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-
-      .hero-title {
-        font-size: 1.5rem;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="/static/css/nova-blog.css">
 </head>
 <body>
-  <div class="site-shell">
-    <div class="site-container">
-      <nav class="site-nav">
-        <div class="site-brand">
-          <div class="site-brand-title">Nova</div>
-          <div class="site-brand-subtitle">AI + blog under one roof</div>
+  <div class="blog-shell">
+    <header class="blog-topbar">
+      <div class="blog-topbar-left">
+        <a class="blog-brand" href="/">
+          <span class="blog-brand-badge">N</span>
+          <span class="blog-brand-text">
+            <span class="blog-brand-title">Nova</span>
+            <span class="blog-brand-subtitle">Blog</span>
+          </span>
+        </a>
+      </div>
+
+      <div class="blog-topbar-right">
+        <a class="blog-topbar-btn" href="/">Back to Nova</a>
+      </div>
+    </header>
+
+    <main class="blog-main">
+      <section class="blog-hero">
+        <div class="blog-hero-copy">
+          <div class="blog-eyebrow">Nova Journal</div>
+          <h1>Thoughts, build notes, and lessons from the road.</h1>
+          <p>
+            This is the content side of Nova. Use it for updates, ideas, product notes,
+            learning breakdowns, and your story.
+          </p>
         </div>
 
-        <div class="site-nav-links">
-          <a href="/" class="site-link">Chat</a>
-          <a href="/blog" class="site-link active">Blog</a>
-        </div>
-      </nav>
-
-      <section class="hero-card">
-        <div class="hero-title">Nova Blog</div>
-        <div class="hero-text">
-          Build updates, product thoughts, your journey, and future roadmap posts all live here.
-          This makes Nova feel like a real product, not just a chat page.
+        <div class="blog-hero-card">
+          <div class="blog-hero-card-label">Current Focus</div>
+          <div class="blog-hero-card-title">Version 1 is live</div>
+          <div class="blog-hero-card-text">
+            Desktop polished. Mobile shell built. Memory and sessions wired.
+            Next phase: content and intelligence.
+          </div>
         </div>
       </section>
 
-      <section class="blog-grid">
-        <article class="blog-card">
-          <div class="blog-meta">Launch Post</div>
-          <div class="blog-title">Building Nova V1</div>
-          <div class="blog-text">
-            The first real version of Nova. What got built, what survived, and what comes next.
+      <section class="blog-toolbar">
+        <div class="blog-search-wrap">
+          <input id="blogSearchInput" class="blog-search-input" type="text" placeholder="Search posts...">
+        </div>
+
+        <div class="blog-filter-wrap">
+          <button class="blog-filter-btn active" data-filter="all" type="button">All</button>
+          <button class="blog-filter-btn" data-filter="build" type="button">Build</button>
+          <button class="blog-filter-btn" data-filter="mindset" type="button">Mindset</button>
+          <button class="blog-filter-btn" data-filter="learning" type="button">Learning</button>
+        </div>
+      </section>
+
+      <section class="blog-grid" id="blogGrid">
+        <article class="blog-card featured" data-category="build">
+          <div class="blog-card-meta">
+            <span class="blog-card-tag">Build</span>
+            <span class="blog-card-date">March 21, 2026</span>
           </div>
-          <a class="blog-read" href="/blog/first-post">Read Post</a>
+          <h2 class="blog-card-title">Nova v1: from rough idea to working app</h2>
+          <p class="blog-card-excerpt">
+            Version 1 became real: sessions, memory, uploads, mobile shell, desktop polish,
+            and a real UI that finally feels like a product instead of a test bench.
+          </p>
+          <button class="blog-read-btn" type="button" data-post="v1-launch">Read post</button>
+        </article>
+
+        <article class="blog-card" data-category="mindset">
+          <div class="blog-card-meta">
+            <span class="blog-card-tag">Mindset</span>
+            <span class="blog-card-date">March 21, 2026</span>
+          </div>
+          <h2 class="blog-card-title">Why momentum matters more than perfection</h2>
+          <p class="blog-card-excerpt">
+            A clean move forward beats getting trapped trying to make every screen perfect
+            before the product even exists.
+          </p>
+          <button class="blog-read-btn" type="button" data-post="momentum">Read post</button>
+        </article>
+
+        <article class="blog-card" data-category="learning">
+          <div class="blog-card-meta">
+            <span class="blog-card-tag">Learning</span>
+            <span class="blog-card-date">March 21, 2026</span>
+          </div>
+          <h2 class="blog-card-title">Building while learning: the fast way to level up</h2>
+          <p class="blog-card-excerpt">
+            There is a difference between reading about app building and actually surviving
+            the friction of making one work.
+          </p>
+          <button class="blog-read-btn" type="button" data-post="building-while-learning">Read post</button>
+        </article>
+
+        <article class="blog-card" data-category="build">
+          <div class="blog-card-meta">
+            <span class="blog-card-tag">Build</span>
+            <span class="blog-card-date">March 21, 2026</span>
+          </div>
+          <h2 class="blog-card-title">Desktop and mobile should feel related, not identical</h2>
+          <p class="blog-card-excerpt">
+            Mobile is not just a squeezed desktop screen. It needs its own shell, spacing,
+            controls, and flow.
+          </p>
+          <button class="blog-read-btn" type="button" data-post="desktop-vs-mobile">Read post</button>
+        </article>
+
+        <article class="blog-card" data-category="mindset">
+          <div class="blog-card-meta">
+            <span class="blog-card-tag">Mindset</span>
+            <span class="blog-card-date">March 21, 2026</span>
+          </div>
+          <h2 class="blog-card-title">Why I want Nova to be more than a basic chatbot</h2>
+          <p class="blog-card-excerpt">
+            The goal is not to clone what already exists. The goal is to build something
+            with identity, usefulness, and a real point of view.
+          </p>
+          <button class="blog-read-btn" type="button" data-post="more-than-chatbot">Read post</button>
+        </article>
+
+        <article class="blog-card" data-category="learning">
+          <div class="blog-card-meta">
+            <span class="blog-card-tag">Learning</span>
+            <span class="blog-card-date">March 21, 2026</span>
+          </div>
+          <h2 class="blog-card-title">What shipping version 1 actually teaches you</h2>
+          <p class="blog-card-excerpt">
+            Real lessons do not come from tutorials alone. They come from breakage, fixes,
+            backups, decisions, and pushing through.
+          </p>
+          <button class="blog-read-btn" type="button" data-post="what-v1-teaches">Read post</button>
         </article>
       </section>
+    </main>
+  </div>
+
+  <div id="blogPostModal" class="blog-modal hidden" aria-hidden="true">
+    <div class="blog-modal-backdrop" data-close-modal="true"></div>
+
+    <div class="blog-modal-panel">
+      <div class="blog-modal-header">
+        <div>
+          <div id="blogModalTag" class="blog-modal-tag">Post</div>
+          <h2 id="blogModalTitle" class="blog-modal-title">Blog post</h2>
+        </div>
+
+        <button id="closeBlogModalBtn" class="blog-close-btn" type="button" aria-label="Close post">✕</button>
+      </div>
+
+      <div id="blogModalBody" class="blog-modal-body"></div>
     </div>
   </div>
+
+  <script src="/static/js/nova-blog.js"></script>
 </body>
 </html>

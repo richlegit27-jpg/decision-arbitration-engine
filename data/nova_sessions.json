@@ -1,5 +1,95 @@
 [
   {
+    "session_id": "5cd00626-8848-4f12-baac-f547fcd1ee98",
+    "title": "hi Copy",
+    "messages": [
+      {
+        "id": "54ffc40a-cb47-4681-9628-8321110a01c6",
+        "role": "user",
+        "content": "hi",
+        "timestamp": 1774165006,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "7b325682-990a-4a8d-ab20-7307e53dac4b",
+        "role": "assistant",
+        "content": "Hello! How can I assist you today?",
+        "timestamp": 1774165007,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 1,
+          "memory_preview": [
+            "Preference: hihi"
+          ],
+          "timestamp": 1774165006
+        }
+      }
+    ],
+    "message_count": 2,
+    "created_at": 1774165043,
+    "updated_at": 1774165043
+  },
+  {
+    "session_id": "5bba8eeb-a019-4764-9c13-2ca89ef32329",
+    "title": "hi",
+    "messages": [
+      {
+        "id": "54ffc40a-cb47-4681-9628-8321110a01c6",
+        "role": "user",
+        "content": "hi",
+        "timestamp": 1774165006,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "7b325682-990a-4a8d-ab20-7307e53dac4b",
+        "role": "assistant",
+        "content": "Hello! How can I assist you today?",
+        "timestamp": 1774165007,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 1,
+          "memory_preview": [
+            "Preference: hihi"
+          ],
+          "timestamp": 1774165006
+        }
+      }
+    ],
+    "message_count": 2,
+    "created_at": 1774164616,
+    "updated_at": 1774165007
+  },
+  {
+    "session_id": "9626e55f-fd96-459f-b463-b1d94342a48f",
+    "title": "New Chat",
+    "messages": [],
+    "message_count": 0,
+    "created_at": 1774164572,
+    "updated_at": 1774164572
+  },
+  {
+    "session_id": "ed30643f-6ec8-4d6c-b282-60e683cdb87a",
+    "title": "New Chat",
+    "messages": [],
+    "message_count": 0,
+    "created_at": 1774164571,
+    "updated_at": 1774164571
+  },
+  {
+    "session_id": "098209f6-d715-42ba-8a64-0f1b9b7d0f07",
+    "title": "New Chat",
+    "messages": [],
+    "message_count": 0,
+    "created_at": 1774164531,
+    "updated_at": 1774164531
+  },
+  {
     "session_id": "7b484edc-5067-47d7-9089-dcc04cabf0e8",
     "title": "hi",
     "messages": [
@@ -16,11 +106,47 @@
         "content": "Hello! How can I assist you today?",
         "timestamp": 1774161063,
         "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "42eb0f31-1cb8-416b-b262-234cca5ad310",
+        "role": "user",
+        "content": "hi",
+        "timestamp": 1774162677,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "5a5b1b5c-c2d6-44c2-b9d7-b41dcf4bca0e",
+        "role": "assistant",
+        "content": "Hi again! What can I do for you?",
+        "timestamp": 1774162678,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "94555846-63ce-4374-a9c6-5c878635fa2e",
+        "role": "user",
+        "content": "hi",
+        "timestamp": 1774164523,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "df4e5c9f-f7ed-403a-9b71-ceceb5fbdfbd",
+        "role": "assistant",
+        "content": "Hi! How can I help you today?",
+        "timestamp": 1774164525,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 0,
+          "memory_preview": [],
+          "timestamp": 1774164523
+        }
       }
     ],
-    "message_count": 2,
+    "message_count": 6,
     "created_at": 1774135959,
-    "updated_at": 1774161063
+    "updated_at": 1774164525
   },
   {
     "session_id": "a4e023e5-a38b-4846-99a0-89a8a728a51e",

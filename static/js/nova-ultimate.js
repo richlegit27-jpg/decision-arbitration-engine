@@ -26,6 +26,7 @@
     isSending: false,
     attachedFiles: [],
     lastUserMessage: "",
+    lastRouter: null,
   };
 
   function byId(id) {
@@ -291,6 +292,47 @@
     }
   }
 
+  function buildRouterBadgeHtml(router) {
+    if (!router) return "";
+
+    const mode = safeText(router.mode || "general");
+    const intent = safeText(router.intent || "chat");
+    const memoryHits = Number.isFinite(router.memory_hits) ? router.memory_hits : Number(router.memory_hits || 0);
+
+    return `
+      <div class="router-badge">
+        <span class="router-badge-pill rb-mode" data-mode="${escapeHtml(mode)}">${escapeHtml(mode)}</span>
+        <span class="router-badge-pill rb-intent">${escapeHtml(intent)}</span>
+        <span class="router-badge-pill rb-memory">mem:${escapeHtml(memoryHits)}</span>
+      </div>
+    `;
+  }
+
+  function updateRouterDebug(router) {
+    state.lastRouter = router || null;
+
+    const content = byId("routerContent");
+    if (!content || !router) return;
+
+    const preview = Array.isArray(router.memory_preview) ? router.memory_preview : [];
+    const previewHtml = preview.length
+      ? `<ul class="router-debug-list">${preview
+          .map((item) => `<li>${escapeHtml(item)}</li>`)
+          .join("")}</ul>`
+      : `<div class="router-debug-empty">—</div>`;
+
+    const timeText = router.timestamp ? formatTime(router.timestamp) : "—";
+
+    content.innerHTML = `
+      <div class="router-debug-row"><strong>Mode:</strong> ${escapeHtml(router.mode || "general")}</div>
+      <div class="router-debug-row"><strong>Intent:</strong> ${escapeHtml(router.intent || "chat")}</div>
+      <div class="router-debug-row"><strong>Reason:</strong> ${escapeHtml(router.reason || "auto")}</div>
+      <div class="router-debug-row"><strong>Memory Hits:</strong> ${escapeHtml(router.memory_hits ?? 0)}</div>
+      <div class="router-debug-row"><strong>Time:</strong> ${escapeHtml(timeText)}</div>
+      <div class="router-debug-row"><strong>Memory Used:</strong>${previewHtml}</div>
+    `;
+  }
+
   function renderSessions() {
     const list =
       byId("sessionList") ||
@@ -383,10 +425,12 @@
         const content = escapeHtml(msg.content || "").replace(/\n/g, "<br>");
         const time = formatTime(msg.timestamp || nowUnix());
         const isAssistant = role === "assistant";
+        const routerBadge = isAssistant ? buildRouterBadgeHtml(msg.router || null) : "";
 
         return `
           <article class="chat-message ${escapeHtml(role)}">
             <div class="chat-message-role">${escapeHtml(role)}</div>
+            ${routerBadge}
             <div class="chat-message-content">${content || "&nbsp;"}</div>
             <div class="chat-message-footer">
               <div class="chat-message-time">${escapeHtml(time)}</div>
@@ -430,16 +474,25 @@
       });
     });
 
+    const lastAssistant = [...state.messages]
+      .reverse()
+      .find((msg) => safeText(msg.role).toLowerCase() === "assistant" && msg.router);
+
+    if (lastAssistant?.router) {
+      updateRouterDebug(lastAssistant.router);
+    }
+
     updateLastUserMessage();
     updateSessionBadge();
     scrollChatToBottom();
   }
 
-  function addLocalMessage(role, content) {
+  function addLocalMessage(role, content, router = null) {
     state.messages.push({
       role: safeText(role || "assistant"),
       content: String(content ?? ""),
       timestamp: nowUnix(),
+      router,
     });
     renderMessages();
   }
@@ -492,6 +545,32 @@
   async function addMemory(kind, value) {
     await apiPost(API.addMemory, { kind, value });
     await loadMemory();
+  }
+
+  function parseSSEBlock(block) {
+    const lines = String(block || "").split("\n");
+    let eventName = "message";
+    const dataLines = [];
+
+    for (const line of lines) {
+      if (line.startsWith("event:")) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).trim());
+      }
+    }
+
+    let data = null;
+    const rawData = dataLines.join("\n");
+    if (rawData) {
+      try {
+        data = JSON.parse(rawData);
+      } catch {
+        data = rawData;
+      }
+    }
+
+    return { event: eventName, data };
   }
 
   async function streamSend(content, attachedFilesOverride = null) {
@@ -551,11 +630,40 @@
       if (res.body && typeof res.body.getReader === "function") {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
+        let buffer = "";
+        let streamRouter = null;
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          decoder.decode(value, { stream: true });
+
+          buffer += decoder.decode(value, { stream: true });
+
+          let separatorIndex;
+          while ((separatorIndex = buffer.indexOf("\n\n")) !== -1) {
+            const rawBlock = buffer.slice(0, separatorIndex).trim();
+            buffer = buffer.slice(separatorIndex + 2);
+
+            if (!rawBlock) continue;
+
+            const parsed = parseSSEBlock(rawBlock);
+            const eventName = parsed.event;
+            const data = parsed.data || {};
+
+            if (eventName === "start") {
+              if (data.router) {
+                streamRouter = data.router;
+                updateRouterDebug(streamRouter);
+              }
+            } else if (eventName === "done") {
+              if (data.router) {
+                streamRouter = data.router;
+                updateRouterDebug(streamRouter);
+              }
+            } else if (eventName === "error") {
+              throw new Error(data.message || "Stream failed");
+            }
+          }
         }
       } else {
         try {
@@ -576,7 +684,14 @@
       setStatus("Ready");
     } catch (err) {
       console.error(err);
-      addLocalMessage("assistant", "Something went wrong sending that message.");
+      addLocalMessage("assistant", "Something went wrong sending that message.", {
+        mode: "general",
+        intent: "error",
+        reason: "frontend exception",
+        memory_hits: 0,
+        memory_preview: [],
+        timestamp: nowUnix(),
+      });
       setStatus("Send failed");
     } finally {
       setSendingState(false);
