@@ -1,233 +1,142 @@
 [
   {
-    "session_id": "5cd00626-8848-4f12-baac-f547fcd1ee98",
-    "title": "hi Copy",
-    "messages": [
-      {
-        "id": "54ffc40a-cb47-4681-9628-8321110a01c6",
-        "role": "user",
-        "content": "hi",
-        "timestamp": 1774165006,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "7b325682-990a-4a8d-ab20-7307e53dac4b",
-        "role": "assistant",
-        "content": "Hello! How can I assist you today?",
-        "timestamp": 1774165007,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 1,
-          "memory_preview": [
-            "Preference: hihi"
-          ],
-          "timestamp": 1774165006
-        }
-      },
-      {
-        "id": "62c48381-8efa-43c2-8bcd-1b29ddc508c6",
-        "role": "user",
-        "content": "tell me a bad ass joke",
-        "timestamp": 1774165370,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "b42e7e6f-b3de-48f1-b66d-1843eee3153a",
-        "role": "assistant",
-        "content": "Sure! Here's a badass joke for you:\n\nWhy don’t sharks attack lawyers?  \nProfessional courtesy.",
-        "timestamp": 1774165371,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 1,
-          "memory_preview": [
-            "Preference: hihi"
-          ],
-          "timestamp": 1774165370
-        }
-      },
-      {
-        "id": "2013c645-6df5-4059-9b6d-f214f129286c",
-        "role": "user",
-        "content": "that was a gay joke",
-        "timestamp": 1774165399,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "1340c00f-691d-4bd0-9bef-46f12018141a",
-        "role": "assistant",
-        "content": "I aim to keep humor respectful and inclusive. Here's a different badass joke for you:\n\nWhy did the scarecrow become a successful motivational speaker?  \nBecause he was outstanding in his field.",
-        "timestamp": 1774165400,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 1,
-          "memory_preview": [
-            "Preference: hihi"
-          ],
-          "timestamp": 1774165399
-        }
-      },
-      {
-        "id": "5f35b55c-45ff-4f05-945e-3f4ac5e88d6f",
-        "role": "user",
-        "content": "don't say offensive things",
-        "timestamp": 1774165438,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "5ee05df8-b966-4d7d-a534-7d048e1c5a92",
-        "role": "assistant",
-        "content": "Understood! I'll keep everything respectful. Would you like to hear another joke or need help with something else?",
-        "timestamp": 1774165439,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 2,
-          "memory_preview": [
-            "Preference: don't be offensive",
-            "Preference: hihi"
-          ],
-          "timestamp": 1774165438
-        }
-      },
-      {
-        "id": "70610ce3-c061-4118-bc2d-be6b7e595f1a",
-        "role": "user",
-        "content": "don't say offensive things",
-        "timestamp": 1774165445,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "15a1d98b-93ad-4bfa-b248-462db588f99b",
-        "role": "assistant",
-        "content": "Absolutely, I will keep all responses respectful and non-offensive. How can I assist you further?",
-        "timestamp": 1774165446,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 2,
-          "memory_preview": [
-            "Preference: don't be offensive",
-            "Preference: hihi"
-          ],
-          "timestamp": 1774165445
-        }
-      },
-      {
-        "id": "ca0a8eff-ef46-4ed0-882f-d41011fb3d2c",
-        "role": "user",
-        "content": "who is vinny smith",
-        "timestamp": 1774165493,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "80736fbc-911f-4da4-b493-5a00bdd1b4a7",
-        "role": "assistant",
-        "content": "Vinny Smith is a businessman known primarily as the co-founder of Quest Software, a company specializing in IT management software. He has also been involved in various technology ventures and investments. If you need more detailed or specific information, please let me know.",
-        "timestamp": 1774165497,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 2,
-          "memory_preview": [
-            "Preference: don't be offensive",
-            "Preference: hihi"
-          ],
-          "timestamp": 1774165493
-        }
-      },
-      {
-        "id": "5a7851f2-3ebb-4bd8-a0c1-968fe5a03699",
-        "role": "user",
-        "content": "what does it mean to be still tippin",
-        "timestamp": 1774165687,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "2d93336c-066a-4266-9b13-3676fb789c06",
-        "role": "assistant",
-        "content": "\"Still Tippin'\" is a phrase popularized by the 2004 hip-hop song \"Still Tippin'\" by Mike Jones. In this context, \"tippin'\" refers to driving slowly and smoothly, often showing off a customized car, especially with rims that tilt or \"tippin'.\" More broadly, it conveys a laid-back, confident attitude.",
-        "timestamp": 1774165689,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 2,
-          "memory_preview": [
-            "Preference: don't be offensive",
-            "Preference: hihi"
-          ],
-          "timestamp": 1774165687
-        }
-      }
-    ],
-    "message_count": 14,
-    "created_at": 1774165043,
-    "updated_at": 1774165689
-  },
-  {
-    "session_id": "5bba8eeb-a019-4764-9c13-2ca89ef32329",
-    "title": "hi",
-    "messages": [
-      {
-        "id": "54ffc40a-cb47-4681-9628-8321110a01c6",
-        "role": "user",
-        "content": "hi",
-        "timestamp": 1774165006,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "7b325682-990a-4a8d-ab20-7307e53dac4b",
-        "role": "assistant",
-        "content": "Hello! How can I assist you today?",
-        "timestamp": 1774165007,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 1,
-          "memory_preview": [
-            "Preference: hihi"
-          ],
-          "timestamp": 1774165006
-        }
-      }
-    ],
-    "message_count": 2,
-    "created_at": 1774164616,
-    "updated_at": 1774165007
-  },
-  {
-    "session_id": "9626e55f-fd96-459f-b463-b1d94342a48f",
-    "title": "New Chat",
-    "messages": [],
-    "message_count": 0,
-    "created_at": 1774164572,
-    "updated_at": 1774164572
-  },
-  {
     "session_id": "ed30643f-6ec8-4d6c-b282-60e683cdb87a",
-    "title": "New Chat",
-    "messages": [],
-    "message_count": 0,
+    "title": "what was the prequel to the joker",
+    "messages": [
+      {
+        "id": "db8c542b-02ce-4f3c-a9bc-e43964bc1fc1",
+        "role": "user",
+        "content": "what was the prequel to the joker",
+        "timestamp": 1774178131,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "7e57c28f-1d8a-4ca5-809b-d2c3637bfdfa",
+        "role": "assistant",
+        "content": "The prequel to the movie *Joker* (2019) does not officially exist. *Joker* is a standalone origin story for the character Arthur Fleck/Joker, not part of a series with a prequel film.",
+        "timestamp": 1774178133,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 3,
+          "memory_preview": [
+            "Name: my name is richard",
+            "Preference: don't be offensive",
+            "Preference: hihi"
+          ],
+          "timestamp": 1774178131
+        }
+      },
+      {
+        "id": "e036984e-608e-4eea-99d9-14b7c443a13e",
+        "role": "user",
+        "content": "what was the one after",
+        "timestamp": 1774178149,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "c8ece82f-9173-4494-8fa5-ed5e999dc84e",
+        "role": "assistant",
+        "content": "There is no official sequel to *Joker* (2019) released yet. However, a sequel titled *Joker: Folie à Deux* is announced and planned for release, continuing the story from the first film.",
+        "timestamp": 1774178150,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 3,
+          "memory_preview": [
+            "Name: my name is richard",
+            "Preference: don't be offensive",
+            "Preference: hihi"
+          ],
+          "timestamp": 1774178149
+        }
+      },
+      {
+        "id": "ae3a085a-13c5-44dc-8c81-e2dad681b53f",
+        "role": "user",
+        "content": "how many modern joker movies were there",
+        "timestamp": 1774178169,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "27fd4837-9be7-4254-9fea-a08adec11e4c",
+        "role": "assistant",
+        "content": "There have been three major modern Joker movies featuring different portrayals of the character:\n\n1. *Joker* (2019) – Joaquin Phoenix\n2. *Suicide Squad* (2016) – Jared Leto (includes Joker as a character)\n3. *Zack Snyder's Justice League* (2021) – Jared Leto (brief appearance)\n\nNote: The 2019 *Joker* film is a standalone origin story, while the others are part of the DC Extended Universe.",
+        "timestamp": 1774178171,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 3,
+          "memory_preview": [
+            "Name: my name is richard",
+            "Preference: don't be offensive",
+            "Preference: hihi"
+          ],
+          "timestamp": 1774178169
+        }
+      },
+      {
+        "id": "77663df9-e25b-4dc4-9245-5a35015e7fbc",
+        "role": "user",
+        "content": "there is a 2024 joker movie",
+        "timestamp": 1774178361,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "15fbd7a9-a99b-467b-b5bd-dbe0cd5d16f7",
+        "role": "assistant",
+        "content": "Yes, you are correct. The upcoming Joker movie titled *Joker: Folie à Deux* is scheduled for release in 2024. This film is the official sequel to the 2019 *Joker* movie starring Joaquin Phoenix.",
+        "timestamp": 1774178363,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 3,
+          "memory_preview": [
+            "Name: my name is richard",
+            "Preference: don't be offensive",
+            "Preference: hihi"
+          ],
+          "timestamp": 1774178361
+        }
+      },
+      {
+        "id": "f857530a-73e8-4368-ac3f-dd43c653c530",
+        "role": "user",
+        "content": "why did you lie to me then",
+        "timestamp": 1774178386,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "11f7f9df-e1dc-4e55-a04f-22fa1fefa554",
+        "role": "assistant",
+        "content": "I did not intend to lie. Initially, I stated there was no released sequel yet, which was accurate at that time. When you mentioned a 2024 Joker movie, I confirmed the announced *Joker: Folie à Deux* sequel scheduled for 2024. If my earlier response caused confusion, I apologize. My goal is to provide accurate, up-to-date information based on what is known.",
+        "timestamp": 1774178388,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "analysis",
+          "intent": "analysis",
+          "reason": "matched analysis keywords",
+          "memory_hits": 3,
+          "memory_preview": [
+            "Name: my name is richard",
+            "Preference: don't be offensive",
+            "Preference: hihi"
+          ],
+          "timestamp": 1774178386
+        }
+      }
+    ],
+    "message_count": 10,
     "created_at": 1774164571,
-    "updated_at": 1774164571
+    "updated_at": 1774178388
   },
   {
     "session_id": "098209f6-d715-42ba-8a64-0f1b9b7d0f07",
@@ -295,13 +204,5 @@
     "message_count": 6,
     "created_at": 1774135959,
     "updated_at": 1774164525
-  },
-  {
-    "session_id": "a4e023e5-a38b-4846-99a0-89a8a728a51e",
-    "title": "New Chat",
-    "messages": [],
-    "message_count": 0,
-    "created_at": 1774135954,
-    "updated_at": 1774135954
   }
 ]

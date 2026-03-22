@@ -2,24 +2,22 @@
   "use strict";
 
   if (window.__novaBrainRouterPanelLoaded) {
-    console.warn("Nova brain router panel already loaded.");
+    console.warn("nova-brain-router-panel.js already loaded");
     return;
   }
   window.__novaBrainRouterPanelLoaded = true;
 
-  const PANEL_ID = "novaBrainRouterPanel";
-  const TOGGLE_ID = "brainRouterToggleBtn";
-  const STORAGE_KEY_OPEN = "nova_brain_router_open";
-  const STORAGE_KEY_PIN = "nova_brain_router_pin";
-  const POLL_MS = 2200;
+  const ROUTER_CONTAINER_ID = "routerContent";
 
   const state = {
-    isOpen: localStorage.getItem(STORAGE_KEY_OPEN) === "1",
-    isPinned: localStorage.getItem(STORAGE_KEY_PIN) === "1",
-    lastHash: "",
-    lastPayload: null,
-    pollTimer: null
+    lastSignature: "",
+    startedAt: Date.now(),
+    pollTimer: null,
   };
+
+  function getRouterContainer() {
+    return document.getElementById(ROUTER_CONTAINER_ID);
+  }
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -30,659 +28,305 @@
       .replace(/'/g, "&#39;");
   }
 
-  function shortJson(value) {
-    try {
-      return JSON.stringify(value ?? {}, null, 2);
-    } catch {
-      return String(value ?? "");
-    }
+  function toTitleCase(value) {
+    const text = String(value || "").trim();
+    if (!text) return "—";
+    return text.charAt(0).toUpperCase() + text.slice(1);
   }
 
   function safeText(value, fallback = "—") {
-    if (value == null) return fallback;
+    if (value === null || value === undefined) return fallback;
     const text = String(value).trim();
     return text || fallback;
   }
 
-  function normalizeList(value) {
-    if (Array.isArray(value)) return value;
-    if (value == null) return [];
-    if (typeof value === "string") {
-      return value
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean);
-    }
-    if (typeof value === "object") {
-      return Object.entries(value).map(([k, v]) => `${k}: ${typeof v === "string" ? v : shortJson(v)}`);
-    }
-    return [String(value)];
+  function normalizeArray(value) {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (typeof value === "string" && value.trim()) return [value.trim()];
+    return [];
   }
 
-  function firstDefined(...values) {
-    for (const value of values) {
-      if (value !== undefined && value !== null) return value;
-    }
-    return null;
-  }
-
-  function routeFromMessage(message) {
-    if (!message || typeof message !== "object") return null;
-
-    const meta = firstDefined(
-      message.route_meta,
-      message.routeMeta,
-      message.router_meta,
-      message.routerMeta,
-      message.meta?.route,
-      message.meta?.router,
-      message.metadata?.route,
-      message.metadata?.router,
-      message.debug?.route,
-      message.debug?.router
-    );
-
-    const mode = firstDefined(
-      meta?.mode,
-      meta?.intent,
-      meta?.route,
-      meta?.selected_mode,
-      meta?.selectedMode,
-      message.mode,
-      message.intent,
-      message.route
-    );
-
-    const reasons = firstDefined(
-      meta?.reasons,
-      meta?.why,
-      meta?.reason,
-      meta?.decision_reasons,
-      meta?.decisionReasons,
-      meta?.notes,
-      meta?.analysis
-    );
-
-    const pulledMemory = firstDefined(
-      meta?.memory,
-      meta?.memory_hits,
-      meta?.memoryHits,
-      meta?.memory_used,
-      meta?.memoryUsed,
-      meta?.selected_memory,
-      meta?.selectedMemory,
-      meta?.context,
-      meta?.retrieved_context,
-      meta?.retrievedContext
-    );
-
-    const model = firstDefined(
-      meta?.model,
-      meta?.selected_model,
-      meta?.selectedModel,
-      message.model
-    );
-
-    const latencyMs = firstDefined(
-      meta?.latency_ms,
-      meta?.latencyMs,
-      meta?.duration_ms,
-      meta?.durationMs,
-      meta?.timing?.latency_ms,
-      meta?.timing?.latencyMs
-    );
-
-    const confidence = firstDefined(
-      meta?.confidence,
-      meta?.score,
-      meta?.route_score,
-      meta?.routeScore
-    );
-
-    const promptTokens = firstDefined(
-      meta?.usage?.prompt_tokens,
-      meta?.usage?.promptTokens,
-      meta?.prompt_tokens,
-      meta?.promptTokens
-    );
-
-    const completionTokens = firstDefined(
-      meta?.usage?.completion_tokens,
-      meta?.usage?.completionTokens,
-      meta?.completion_tokens,
-      meta?.completionTokens
-    );
-
-    const totalTokens = firstDefined(
-      meta?.usage?.total_tokens,
-      meta?.usage?.totalTokens,
-      meta?.total_tokens,
-      meta?.totalTokens
-    );
-
-    if (
-      mode == null &&
-      reasons == null &&
-      pulledMemory == null &&
-      model == null &&
-      latencyMs == null &&
-      confidence == null &&
-      meta == null
-    ) {
+  function pickRouterMeta(payload) {
+    if (!payload || typeof payload !== "object") {
       return null;
     }
 
-    return {
-      mode: safeText(mode),
-      reasons: normalizeList(reasons),
-      memory: normalizeList(pulledMemory),
-      model: safeText(model),
-      latencyMs: latencyMs == null ? "—" : String(latencyMs),
-      confidence: confidence == null ? "—" : String(confidence),
-      promptTokens: promptTokens == null ? "—" : String(promptTokens),
-      completionTokens: completionTokens == null ? "—" : String(completionTokens),
-      totalTokens: totalTokens == null ? "—" : String(totalTokens),
-      raw: meta ?? message
-    };
-  }
+    const direct =
+      payload.router ||
+      payload.route ||
+      payload.routing ||
+      payload.route_meta ||
+      payload.router_meta ||
+      payload.debug?.router ||
+      payload.debug?.route ||
+      payload.meta?.router ||
+      payload.meta?.route ||
+      null;
 
-  function findLatestAssistantRoutePayload(data) {
-    if (!data) return null;
-
-    const messageBuckets = [
-      data.messages,
-      data.chat,
-      data.items,
-      data.history,
-      data.session?.messages,
-      data.current_session?.messages,
-      data.currentSession?.messages
-    ];
-
-    for (const bucket of messageBuckets) {
-      if (!Array.isArray(bucket)) continue;
-      for (let i = bucket.length - 1; i >= 0; i -= 1) {
-        const message = bucket[i];
-        const role = String(
-          firstDefined(message?.role, message?.sender, message?.type, "")
-        ).toLowerCase();
-
-        if (role && !["assistant", "nova", "bot"].includes(role)) continue;
-
-        const extracted = routeFromMessage(message);
-        if (extracted) return extracted;
-      }
+    if (direct && typeof direct === "object") {
+      return direct;
     }
 
-    const directPayloads = [
-      data.route_meta,
-      data.routeMeta,
-      data.router_meta,
-      data.routerMeta,
-      data.debug?.route,
-      data.debug?.router
-    ];
+    const hasFlatRouterFields =
+      payload.mode ||
+      payload.intent ||
+      payload.reason ||
+      payload.memory_hits ||
+      payload.memory_used ||
+      payload.route_time_ms;
 
-    for (const maybe of directPayloads) {
-      const extracted = routeFromMessage({ route_meta: maybe });
-      if (extracted) return extracted;
+    if (hasFlatRouterFields) {
+      return payload;
     }
 
     return null;
   }
 
-  function hashPayload(payload) {
-    return shortJson(payload);
+  function numberOrNull(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
   }
 
-  function ensureStyles() {
-    if (document.getElementById("novaBrainRouterPanelStyles")) return;
-
-    const style = document.createElement("style");
-    style.id = "novaBrainRouterPanelStyles";
-    style.textContent = `
-      #${TOGGLE_ID} {
-        border: 1px solid rgba(164,185,255,0.18);
-        background: rgba(20, 31, 58, 0.92);
-        color: #ecf2ff;
-        border-radius: 12px;
-        padding: 10px 14px;
-        cursor: pointer;
-        font: inherit;
-        transition: transform .14s ease, border-color .14s ease, background .14s ease;
-      }
-      #${TOGGLE_ID}:hover {
-        transform: translateY(-1px);
-        border-color: rgba(122,156,255,0.38);
-        background: rgba(28, 43, 78, 0.96);
-      }
-      #${PANEL_ID} {
-        position: fixed;
-        right: 18px;
-        bottom: 18px;
-        width: min(420px, calc(100vw - 20px));
-        max-height: min(72vh, 760px);
-        display: none;
-        flex-direction: column;
-        z-index: 9999;
-        border-radius: 20px;
-        overflow: hidden;
-        border: 1px solid rgba(164,185,255,0.16);
-        background: rgba(9, 15, 30, 0.97);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        box-shadow: 0 20px 70px rgba(0,0,0,.45);
-        color: #ecf2ff;
-      }
-      #${PANEL_ID}.open {
-        display: flex;
-      }
-      #${PANEL_ID} .nrp-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        padding: 14px 16px;
-        border-bottom: 1px solid rgba(164,185,255,0.12);
-        background: linear-gradient(180deg, rgba(22,33,59,0.98), rgba(12,20,38,0.98));
-      }
-      #${PANEL_ID} .nrp-title-wrap {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-      #${PANEL_ID} .nrp-title {
-        font-size: 15px;
-        font-weight: 700;
-        letter-spacing: .02em;
-      }
-      #${PANEL_ID} .nrp-subtitle {
-        color: #97a8cf;
-        font-size: 12px;
-      }
-      #${PANEL_ID} .nrp-actions {
-        display: flex;
-        gap: 8px;
-      }
-      #${PANEL_ID} .nrp-btn {
-        border: 1px solid rgba(164,185,255,0.18);
-        background: rgba(24, 35, 63, 0.94);
-        color: #ecf2ff;
-        border-radius: 10px;
-        padding: 8px 10px;
-        cursor: pointer;
-        font: inherit;
-      }
-      #${PANEL_ID} .nrp-btn:hover {
-        border-color: rgba(122,156,255,0.38);
-        background: rgba(34, 49, 86, 0.98);
-      }
-      #${PANEL_ID} .nrp-body {
-        padding: 14px;
-        overflow: auto;
-      }
-      #${PANEL_ID} .nrp-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        margin-bottom: 12px;
-      }
-      #${PANEL_ID} .nrp-card {
-        background: rgba(19, 28, 49, 0.96);
-        border: 1px solid rgba(164,185,255,0.12);
-        border-radius: 14px;
-        padding: 12px;
-      }
-      #${PANEL_ID} .nrp-label {
-        font-size: 11px;
-        color: #97a8cf;
-        text-transform: uppercase;
-        letter-spacing: .08em;
-        margin-bottom: 6px;
-      }
-      #${PANEL_ID} .nrp-value {
-        font-size: 14px;
-        color: #ecf2ff;
-        font-weight: 600;
-        line-height: 1.35;
-        word-break: break-word;
-      }
-      #${PANEL_ID} .nrp-section {
-        margin-top: 12px;
-      }
-      #${PANEL_ID} .nrp-section:first-child {
-        margin-top: 0;
-      }
-      #${PANEL_ID} .nrp-section-title {
-        font-size: 12px;
-        color: #97a8cf;
-        text-transform: uppercase;
-        letter-spacing: .08em;
-        margin-bottom: 8px;
-      }
-      #${PANEL_ID} .nrp-list {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-      #${PANEL_ID} .nrp-pill,
-      #${PANEL_ID} .nrp-list-item {
-        border: 1px solid rgba(164,185,255,0.12);
-        background: rgba(20, 31, 58, 0.92);
-        border-radius: 12px;
-        padding: 10px 12px;
-        font-size: 13px;
-        line-height: 1.45;
-      }
-      #${PANEL_ID} pre {
-        margin: 0;
-        white-space: pre-wrap;
-        word-break: break-word;
-        font-family: Consolas, "SFMono-Regular", Menlo, monospace;
-        font-size: 12px;
-        line-height: 1.45;
-        color: #d7e3ff;
-      }
-      #${PANEL_ID} .nrp-empty {
-        padding: 18px;
-        text-align: center;
-        color: #97a8cf;
-        border: 1px dashed rgba(164,185,255,0.16);
-        border-radius: 14px;
-        background: rgba(18,27,50,0.72);
-      }
-
-      body.nova-brain-router-pinned #${PANEL_ID} {
-        display: flex;
-      }
-
-      @media (max-width: 760px) {
-        #${PANEL_ID} {
-          left: 10px;
-          right: 10px;
-          bottom: 10px;
-          width: auto;
-          max-height: 78vh;
-          border-radius: 18px;
-        }
-        #${PANEL_ID} .nrp-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-    `;
-    document.head.appendChild(style);
+  function formatMs(value) {
+    const ms = numberOrNull(value);
+    if (ms === null) return "—";
+    if (ms < 1000) return `${Math.round(ms)} ms`;
+    return `${(ms / 1000).toFixed(2)} s`;
   }
 
-  function ensurePanel() {
-    let panel = document.getElementById(PANEL_ID);
-    if (panel) return panel;
+  function getMemoryHits(meta) {
+    const candidates = [
+      meta.memory_hits,
+      meta.memoryHits,
+      meta.memory_hit_count,
+      meta.memoryHitCount,
+      meta.memory_count,
+      meta.memoryCount,
+    ];
 
-    panel = document.createElement("aside");
-    panel.id = PANEL_ID;
-    panel.setAttribute("aria-label", "Brain Router Panel");
-    panel.innerHTML = `
-      <div class="nrp-head">
-        <div class="nrp-title-wrap">
-          <div class="nrp-title">Brain Router</div>
-          <div class="nrp-subtitle">Nova decision trace</div>
-        </div>
-        <div class="nrp-actions">
-          <button type="button" class="nrp-btn" data-action="refresh">Refresh</button>
-          <button type="button" class="nrp-btn" data-action="pin">Pin</button>
-          <button type="button" class="nrp-btn" data-action="close">Close</button>
-        </div>
-      </div>
-      <div class="nrp-body">
-        <div class="nrp-empty">Waiting for router data...</div>
-      </div>
-    `;
-    document.body.appendChild(panel);
-
-    panel.addEventListener("click", async (event) => {
-      const btn = event.target.closest("[data-action]");
-      if (!btn) return;
-
-      const action = btn.getAttribute("data-action");
-      if (action === "close") {
-        setOpen(false);
-      } else if (action === "pin") {
-        state.isPinned = !state.isPinned;
-        localStorage.setItem(STORAGE_KEY_PIN, state.isPinned ? "1" : "0");
-        document.body.classList.toggle("nova-brain-router-pinned", state.isPinned);
-        syncPanelUi();
-      } else if (action === "refresh") {
-        await refreshPanel(true);
-      }
-    });
-
-    return panel;
-  }
-
-  function ensureToggleButton() {
-    let btn = document.getElementById(TOGGLE_ID);
-    if (btn) return btn;
-
-    btn = document.createElement("button");
-    btn.id = TOGGLE_ID;
-    btn.type = "button";
-    btn.textContent = "Brain";
-    btn.title = "Open Brain Router Panel";
-
-    const topbar =
-      document.querySelector(".topbar-actions") ||
-      document.querySelector(".topbar-right") ||
-      document.querySelector(".main-topbar .topbar-controls") ||
-      document.querySelector(".main-topbar") ||
-      document.querySelector(".topbar");
-
-    if (topbar) {
-      topbar.appendChild(btn);
-    } else {
-      btn.style.position = "fixed";
-      btn.style.right = "18px";
-      btn.style.top = "18px";
-      btn.style.zIndex = "9998";
-      document.body.appendChild(btn);
+    for (const value of candidates) {
+      const num = numberOrNull(value);
+      if (num !== null) return String(num);
     }
 
-    btn.addEventListener("click", () => {
-      setOpen(!state.isOpen);
-    });
+    const used = getMemoryUsed(meta);
+    if (used.length) return String(used.length);
 
-    return btn;
+    return "0";
   }
 
-  function setOpen(next) {
-    state.isOpen = !!next;
-    localStorage.setItem(STORAGE_KEY_OPEN, state.isOpen ? "1" : "0");
-    syncPanelUi();
-  }
+  function getMemoryUsed(meta) {
+    const candidates = [
+      meta.memory_used,
+      meta.memoryUsed,
+      meta.memories_used,
+      meta.memoriesUsed,
+      meta.memory,
+      meta.memories,
+      meta.context_used,
+      meta.contextUsed,
+    ];
 
-  function syncPanelUi() {
-    const panel = ensurePanel();
-    panel.classList.toggle("open", state.isOpen || state.isPinned);
-    document.body.classList.toggle("nova-brain-router-pinned", state.isPinned);
-
-    const pinBtn = panel.querySelector('[data-action="pin"]');
-    if (pinBtn) {
-      pinBtn.textContent = state.isPinned ? "Unpin" : "Pin";
+    for (const value of candidates) {
+      const arr = normalizeArray(value);
+      if (arr.length) return arr;
     }
+
+    return [];
   }
 
-  function renderPayload(payload) {
-    const panel = ensurePanel();
-    const body = panel.querySelector(".nrp-body");
-    if (!body) return;
+  function getReason(meta) {
+    return (
+      meta.reason ||
+      meta.route_reason ||
+      meta.routeReason ||
+      meta.explanation ||
+      meta.why ||
+      "—"
+    );
+  }
 
-    if (!payload) {
-      body.innerHTML = `<div class="nrp-empty">No router metadata found yet.</div>`;
+  function getMode(meta) {
+    return (
+      meta.mode ||
+      meta.route_mode ||
+      meta.routeMode ||
+      meta.type ||
+      "—"
+    );
+  }
+
+  function getIntent(meta) {
+    return (
+      meta.intent ||
+      meta.route_intent ||
+      meta.routeIntent ||
+      meta.task ||
+      "—"
+    );
+  }
+
+  function getTime(meta) {
+    return (
+      meta.route_time_ms ??
+      meta.routeTimeMs ??
+      meta.routing_time_ms ??
+      meta.routingTimeMs ??
+      meta.time_ms ??
+      meta.timeMs ??
+      null
+    );
+  }
+
+  function buildMemoryUsedHtml(memoryUsed) {
+    if (!memoryUsed.length) {
+      return `<div class="router-debug-empty">—</div>`;
+    }
+
+    return `
+      <div class="router-memory-list">
+        ${memoryUsed
+          .map(
+            (item) =>
+              `<div class="router-memory-item">${escapeHtml(String(item))}</div>`
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
+  function renderRouter(meta) {
+    const container = getRouterContainer();
+    if (!container) return;
+
+    if (!meta) {
+      container.innerHTML = `
+        <div class="router-debug-row"><strong>Mode:</strong> —</div>
+        <div class="router-debug-row"><strong>Intent:</strong> —</div>
+        <div class="router-debug-row"><strong>Reason:</strong> —</div>
+        <div class="router-debug-row"><strong>Memory Hits:</strong> —</div>
+        <div class="router-debug-row"><strong>Time:</strong> —</div>
+        <div class="router-debug-row"><strong>Memory Used:</strong><div class="router-debug-empty">—</div></div>
+      `;
       return;
     }
 
-    const reasons = payload.reasons.length
-      ? payload.reasons.map((item) => `<div class="nrp-list-item">${escapeHtml(item)}</div>`).join("")
-      : `<div class="nrp-list-item">No reasons found.</div>`;
+    const mode = toTitleCase(getMode(meta));
+    const intent = safeText(getIntent(meta));
+    const reason = safeText(getReason(meta));
+    const memoryHits = getMemoryHits(meta);
+    const time = formatMs(getTime(meta));
+    const memoryUsed = getMemoryUsed(meta);
 
-    const memory = payload.memory.length
-      ? payload.memory.map((item) => `<div class="nrp-list-item">${escapeHtml(item)}</div>`).join("")
-      : `<div class="nrp-list-item">No memory pulled.</div>`;
-
-    body.innerHTML = `
-      <div class="nrp-grid">
-        <div class="nrp-card">
-          <div class="nrp-label">Mode</div>
-          <div class="nrp-value">${escapeHtml(payload.mode)}</div>
-        </div>
-        <div class="nrp-card">
-          <div class="nrp-label">Model</div>
-          <div class="nrp-value">${escapeHtml(payload.model)}</div>
-        </div>
-        <div class="nrp-card">
-          <div class="nrp-label">Latency</div>
-          <div class="nrp-value">${escapeHtml(payload.latencyMs)} ms</div>
-        </div>
-        <div class="nrp-card">
-          <div class="nrp-label">Confidence</div>
-          <div class="nrp-value">${escapeHtml(payload.confidence)}</div>
-        </div>
-        <div class="nrp-card">
-          <div class="nrp-label">Prompt Tokens</div>
-          <div class="nrp-value">${escapeHtml(payload.promptTokens)}</div>
-        </div>
-        <div class="nrp-card">
-          <div class="nrp-label">Completion Tokens</div>
-          <div class="nrp-value">${escapeHtml(payload.completionTokens)}</div>
-        </div>
-      </div>
-
-      <div class="nrp-section">
-        <div class="nrp-section-title">Why this route</div>
-        <div class="nrp-list">${reasons}</div>
-      </div>
-
-      <div class="nrp-section">
-        <div class="nrp-section-title">Memory pulled</div>
-        <div class="nrp-list">${memory}</div>
-      </div>
-
-      <div class="nrp-section">
-        <div class="nrp-section-title">Raw route metadata</div>
-        <div class="nrp-card"><pre>${escapeHtml(shortJson(payload.raw))}</pre></div>
+    container.innerHTML = `
+      <div class="router-debug-row"><strong>Mode:</strong> ${escapeHtml(mode)}</div>
+      <div class="router-debug-row"><strong>Intent:</strong> ${escapeHtml(intent)}</div>
+      <div class="router-debug-row"><strong>Reason:</strong> ${escapeHtml(reason)}</div>
+      <div class="router-debug-row"><strong>Memory Hits:</strong> ${escapeHtml(memoryHits)}</div>
+      <div class="router-debug-row"><strong>Time:</strong> ${escapeHtml(time)}</div>
+      <div class="router-debug-row">
+        <strong>Memory Used:</strong>
+        ${buildMemoryUsedHtml(memoryUsed)}
       </div>
     `;
   }
 
-  async function fetchStatePayload() {
-    const urls = ["/api/state", "/api/chat/state", "/api/debug/state"];
+  function signatureForMeta(meta) {
+    try {
+      return JSON.stringify({
+        mode: getMode(meta),
+        intent: getIntent(meta),
+        reason: getReason(meta),
+        memoryHits: getMemoryHits(meta),
+        memoryUsed: getMemoryUsed(meta),
+        time: getTime(meta),
+      });
+    } catch {
+      return String(Date.now());
+    }
+  }
 
-    for (const url of urls) {
-      try {
-        const response = await fetch(url, { cache: "no-store" });
-        if (!response.ok) continue;
-        const data = await response.json();
-        if (data) return data;
-      } catch {
-        // keep trying
+  function applyRouterMeta(meta) {
+    if (!meta) return;
+
+    const sig = signatureForMeta(meta);
+    if (sig === state.lastSignature) return;
+
+    state.lastSignature = sig;
+    window.__novaLastRouterMeta = meta;
+    renderRouter(meta);
+  }
+
+  function tryReadFromWindowState() {
+    const candidates = [
+      window.__novaLastRouterMeta,
+      window.__novaRouterMeta,
+      window.__lastRouterMeta,
+      window.__routerMeta,
+      window.NOVA_LAST_ROUTER_META,
+    ];
+
+    for (const item of candidates) {
+      if (item && typeof item === "object") {
+        applyRouterMeta(item);
+        return true;
       }
     }
 
-    return null;
+    return false;
   }
 
-  function scanWindowForPayload() {
-    const sources = [
-      window.__NOVA_STATE__,
+  function tryReadFromAppState() {
+    const candidates = [
+      window.novaState,
       window.__novaState,
-      window.NOVA_STATE,
-      window.__NOVA_DEBUG__,
-      window.__novaDebug
+      window.appState,
+      window.__appState,
     ];
 
-    for (const source of sources) {
-      const extracted = findLatestAssistantRoutePayload(source);
-      if (extracted) return extracted;
-    }
+    for (const stateObj of candidates) {
+      if (!stateObj || typeof stateObj !== "object") continue;
 
-    return null;
-  }
-
-  function scanDomForPayload() {
-    const selectors = [
-      "[data-route-meta]",
-      "[data-router-meta]",
-      ".message.assistant[data-route-meta]",
-      ".message.bot[data-route-meta]",
-      ".chat-message.assistant[data-route-meta]"
-    ];
-
-    for (const selector of selectors) {
-      const nodes = Array.from(document.querySelectorAll(selector));
-      for (let i = nodes.length - 1; i >= 0; i -= 1) {
-        const node = nodes[i];
-        const raw =
-          node.getAttribute("data-route-meta") ||
-          node.getAttribute("data-router-meta");
-
-        if (!raw) continue;
-
-        try {
-          const parsed = JSON.parse(raw);
-          const extracted = routeFromMessage({ route_meta: parsed });
-          if (extracted) return extracted;
-        } catch {
-          // ignore bad json
-        }
+      const meta = pickRouterMeta(stateObj);
+      if (meta) {
+        applyRouterMeta(meta);
+        return true;
       }
     }
 
-    return null;
+    return false;
   }
 
-  async function getBestPayload() {
-    const windowPayload = scanWindowForPayload();
-    if (windowPayload) return windowPayload;
+  async function tryReadFromApiState() {
+    try {
+      const response = await fetch("/api/state", {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      });
 
-    const domPayload = scanDomForPayload();
-    if (domPayload) return domPayload;
+      if (!response.ok) return false;
 
-    const data = await fetchStatePayload();
-    return findLatestAssistantRoutePayload(data);
-  }
+      const payload = await response.json();
+      const meta = pickRouterMeta(payload);
+      if (!meta) return false;
 
-  async function refreshPanel(forceOpenOnFirstData = false) {
-    const payload = await getBestPayload();
-    const hash = hashPayload(payload);
-
-    if (hash !== state.lastHash) {
-      state.lastHash = hash;
-      state.lastPayload = payload;
-      renderPayload(payload);
-
-      if (payload && forceOpenOnFirstData && !state.isPinned) {
-        setOpen(true);
-      }
-    } else if (state.lastPayload) {
-      renderPayload(state.lastPayload);
+      applyRouterMeta(meta);
+      return true;
+    } catch {
+      return false;
     }
   }
 
-  function startPolling() {
-    stopPolling();
-    state.pollTimer = window.setInterval(() => {
-      refreshPanel(false);
-    }, POLL_MS);
-  }
-
-  function stopPolling() {
-    if (state.pollTimer) {
-      clearInterval(state.pollTimer);
-      state.pollTimer = null;
-    }
-  }
-
-  function hookFetchForRefresh() {
-    if (window.__novaBrainRouterFetchHooked) return;
-    window.__novaBrainRouterFetchHooked = true;
+  function installFetchTap() {
+    if (window.__novaBrainFetchTapInstalled) return;
+    window.__novaBrainFetchTapInstalled = true;
 
     const originalFetch = window.fetch;
     if (typeof originalFetch !== "function") return;
@@ -691,35 +335,181 @@
       const response = await originalFetch.apply(this, args);
 
       try {
-        const url = String(args?.[0] ?? "");
-        if (
+        const url = typeof args[0] === "string"
+          ? args[0]
+          : args[0]?.url || "";
+
+        const shouldInspect =
           url.includes("/api/chat") ||
+          url.includes("/api/state") ||
           url.includes("/api/message") ||
-          url.includes("/api/ask") ||
-          url.includes("/api/state")
-        ) {
-          setTimeout(() => refreshPanel(false), 200);
-          setTimeout(() => refreshPanel(false), 900);
+          url.includes("/chat");
+
+        if (!shouldInspect) {
+          return response;
         }
-      } catch {
-        // ignore
+
+        const cloned = response.clone();
+        const contentType = cloned.headers.get("content-type") || "";
+
+        if (contentType.includes("application/json")) {
+          const data = await cloned.json();
+          const meta = pickRouterMeta(data);
+          if (meta) applyRouterMeta(meta);
+        } else if (
+          contentType.includes("text/plain") ||
+          contentType.includes("text/event-stream")
+        ) {
+          const text = await cloned.text();
+          const meta = extractRouterMetaFromText(text);
+          if (meta) applyRouterMeta(meta);
+        }
+      } catch (error) {
+        console.debug("Brain router panel fetch tap skipped:", error);
       }
 
       return response;
     };
   }
 
-  function init() {
-    ensureStyles();
-    ensurePanel();
-    ensureToggleButton();
-    syncPanelUi();
-    hookFetchForRefresh();
-    startPolling();
-    refreshPanel(false);
+  function extractRouterMetaFromText(text) {
+    if (!text || typeof text !== "string") return null;
 
-    window.addEventListener("beforeunload", stopPolling);
-    console.log("Nova brain router panel loaded.");
+    const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+      const line = lines[i];
+
+      if (line.startsWith("data:")) {
+        const raw = line.slice(5).trim();
+        if (!raw || raw === "[DONE]") continue;
+
+        try {
+          const parsed = JSON.parse(raw);
+          const meta = pickRouterMeta(parsed);
+          if (meta) return meta;
+        } catch {
+          // ignore bad chunk
+        }
+      } else {
+        try {
+          const parsed = JSON.parse(line);
+          const meta = pickRouterMeta(parsed);
+          if (meta) return meta;
+        } catch {
+          // ignore bad chunk
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function installXhrTap() {
+    if (window.__novaBrainXhrTapInstalled) return;
+    window.__novaBrainXhrTapInstalled = true;
+
+    const OriginalXHR = window.XMLHttpRequest;
+    if (!OriginalXHR) return;
+
+    const originalOpen = OriginalXHR.prototype.open;
+    const originalSend = OriginalXHR.prototype.send;
+
+    OriginalXHR.prototype.open = function (method, url, ...rest) {
+      this.__novaUrl = url;
+      return originalOpen.call(this, method, url, ...rest);
+    };
+
+    OriginalXHR.prototype.send = function (...args) {
+      this.addEventListener("load", function () {
+        try {
+          const url = String(this.__novaUrl || "");
+          if (
+            !url.includes("/api/chat") &&
+            !url.includes("/api/state") &&
+            !url.includes("/api/message") &&
+            !url.includes("/chat")
+          ) {
+            return;
+          }
+
+          const contentType = this.getResponseHeader("content-type") || "";
+          if (!this.responseText) return;
+
+          if (
+            contentType.includes("application/json") ||
+            contentType.includes("text/plain") ||
+            contentType.includes("text/event-stream")
+          ) {
+            const meta =
+              extractRouterMetaFromText(this.responseText) ||
+              pickRouterMeta(JSON.parseSafe?.(this.responseText));
+
+            if (meta) applyRouterMeta(meta);
+          }
+        } catch (error) {
+          console.debug("Brain router panel xhr tap skipped:", error);
+        }
+      });
+
+      return originalSend.apply(this, args);
+    };
+  }
+
+  function installJsonParseSafe() {
+    if (JSON.parseSafe) return;
+    JSON.parseSafe = function (value) {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return null;
+      }
+    };
+  }
+
+  function startPollingFallback() {
+    if (state.pollTimer) return;
+
+    state.pollTimer = setInterval(async () => {
+      const gotWindow = tryReadFromWindowState();
+      const gotApp = tryReadFromAppState();
+
+      if (gotWindow || gotApp) return;
+      await tryReadFromApiState();
+    }, 1500);
+  }
+
+  function init() {
+    installJsonParseSafe();
+    installFetchTap();
+    installXhrTap();
+    renderRouter(window.__novaLastRouterMeta || null);
+
+    const gotWindow = tryReadFromWindowState();
+    const gotApp = tryReadFromAppState();
+
+    if (!gotWindow && !gotApp) {
+      tryReadFromApiState();
+    }
+
+    startPollingFallback();
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        tryReadFromWindowState();
+        tryReadFromAppState();
+        tryReadFromApiState();
+      }
+    });
+
+    window.addEventListener("nova:router-meta", (event) => {
+      const meta = event?.detail;
+      if (meta && typeof meta === "object") {
+        applyRouterMeta(meta);
+      }
+    });
+
+    console.log("Nova brain router panel loaded");
   }
 
   if (document.readyState === "loading") {

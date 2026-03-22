@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "id": "cd0acf9a-4bd5-4a32-a346-5a38274685ec",
+      "kind": "name",
+      "value": "my name is richard",
+      "source": "manual",
+      "created_at": 1774174691,
+      "updated_at": 1774174691
+    },
+    {
       "id": "63d41ef6-4c97-47f2-98e8-9bffd7984fd6",
       "kind": "preference",
       "value": "don't be offensive",
