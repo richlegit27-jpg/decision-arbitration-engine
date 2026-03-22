@@ -603,10 +603,6 @@ input:disabled {
   cursor: not-allowed;
 }
 
-#mobileSidebarBtn {
-  display: inline-flex;
-}
-
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: minmax(0, 1fr);
@@ -1558,3 +1554,9 @@ input:disabled {
     gap: 6px !important;
   }
 }
+
+#mobileSidebarBtn {
+  display: inline-flex;
+}
+
+notepad C:\Users\Owner\nova\static\css\nova-style.css
