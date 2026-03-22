@@ -5,11 +5,14 @@
       "plan": "free",
       "daily": {
         "2026-03-21": {
-          "messages": 3
+          "messages": 4
+        },
+        "2026-03-22": {
+          "messages": 2
         }
       },
       "created_at": 1774128979,
-      "updated_at": 1774161063
+      "updated_at": 1774165043
     }
   }
 }
