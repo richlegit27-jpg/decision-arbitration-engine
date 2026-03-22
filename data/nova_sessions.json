@@ -26,11 +26,159 @@
           ],
           "timestamp": 1774165006
         }
+      },
+      {
+        "id": "62c48381-8efa-43c2-8bcd-1b29ddc508c6",
+        "role": "user",
+        "content": "tell me a bad ass joke",
+        "timestamp": 1774165370,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "b42e7e6f-b3de-48f1-b66d-1843eee3153a",
+        "role": "assistant",
+        "content": "Sure! Here's a badass joke for you:\n\nWhy don’t sharks attack lawyers?  \nProfessional courtesy.",
+        "timestamp": 1774165371,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 1,
+          "memory_preview": [
+            "Preference: hihi"
+          ],
+          "timestamp": 1774165370
+        }
+      },
+      {
+        "id": "2013c645-6df5-4059-9b6d-f214f129286c",
+        "role": "user",
+        "content": "that was a gay joke",
+        "timestamp": 1774165399,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "1340c00f-691d-4bd0-9bef-46f12018141a",
+        "role": "assistant",
+        "content": "I aim to keep humor respectful and inclusive. Here's a different badass joke for you:\n\nWhy did the scarecrow become a successful motivational speaker?  \nBecause he was outstanding in his field.",
+        "timestamp": 1774165400,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 1,
+          "memory_preview": [
+            "Preference: hihi"
+          ],
+          "timestamp": 1774165399
+        }
+      },
+      {
+        "id": "5f35b55c-45ff-4f05-945e-3f4ac5e88d6f",
+        "role": "user",
+        "content": "don't say offensive things",
+        "timestamp": 1774165438,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "5ee05df8-b966-4d7d-a534-7d048e1c5a92",
+        "role": "assistant",
+        "content": "Understood! I'll keep everything respectful. Would you like to hear another joke or need help with something else?",
+        "timestamp": 1774165439,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 2,
+          "memory_preview": [
+            "Preference: don't be offensive",
+            "Preference: hihi"
+          ],
+          "timestamp": 1774165438
+        }
+      },
+      {
+        "id": "70610ce3-c061-4118-bc2d-be6b7e595f1a",
+        "role": "user",
+        "content": "don't say offensive things",
+        "timestamp": 1774165445,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "15a1d98b-93ad-4bfa-b248-462db588f99b",
+        "role": "assistant",
+        "content": "Absolutely, I will keep all responses respectful and non-offensive. How can I assist you further?",
+        "timestamp": 1774165446,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 2,
+          "memory_preview": [
+            "Preference: don't be offensive",
+            "Preference: hihi"
+          ],
+          "timestamp": 1774165445
+        }
+      },
+      {
+        "id": "ca0a8eff-ef46-4ed0-882f-d41011fb3d2c",
+        "role": "user",
+        "content": "who is vinny smith",
+        "timestamp": 1774165493,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "80736fbc-911f-4da4-b493-5a00bdd1b4a7",
+        "role": "assistant",
+        "content": "Vinny Smith is a businessman known primarily as the co-founder of Quest Software, a company specializing in IT management software. He has also been involved in various technology ventures and investments. If you need more detailed or specific information, please let me know.",
+        "timestamp": 1774165497,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 2,
+          "memory_preview": [
+            "Preference: don't be offensive",
+            "Preference: hihi"
+          ],
+          "timestamp": 1774165493
+        }
+      },
+      {
+        "id": "5a7851f2-3ebb-4bd8-a0c1-968fe5a03699",
+        "role": "user",
+        "content": "what does it mean to be still tippin",
+        "timestamp": 1774165687,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "2d93336c-066a-4266-9b13-3676fb789c06",
+        "role": "assistant",
+        "content": "\"Still Tippin'\" is a phrase popularized by the 2004 hip-hop song \"Still Tippin'\" by Mike Jones. In this context, \"tippin'\" refers to driving slowly and smoothly, often showing off a customized car, especially with rims that tilt or \"tippin'.\" More broadly, it conveys a laid-back, confident attitude.",
+        "timestamp": 1774165689,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 2,
+          "memory_preview": [
+            "Preference: don't be offensive",
+            "Preference: hihi"
+          ],
+          "timestamp": 1774165687
+        }
       }
     ],
-    "message_count": 2,
+    "message_count": 14,
     "created_at": 1774165043,
-    "updated_at": 1774165043
+    "updated_at": 1774165689
   },
   {
     "session_id": "5bba8eeb-a019-4764-9c13-2ca89ef32329",
