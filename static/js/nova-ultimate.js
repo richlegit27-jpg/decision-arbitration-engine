@@ -10,7 +10,8 @@
     getChat: (sessionId) => `/api/chat/${encodeURIComponent(sessionId)}`,
     stream: "/api/chat/stream",
     memory: "/api/memory",
-    addMemory: "/api/memory/add",
+    addMemory: "/api/memory",
+    deleteMemory: "/api/memory/delete",
     upload: "/api/upload",
   };
 
@@ -154,7 +155,7 @@
       let msg = `POST failed: ${url}`;
       try {
         const data = await res.json();
-        msg = data.detail || data.message || msg;
+        msg = data.detail || data.message || data.error || msg;
       } catch {}
       throw new Error(msg);
     }
@@ -281,7 +282,7 @@
     const subtitleEl = byId("chatSubtitle") || byId("sessionSubtitle");
 
     const currentSession = state.sessions.find(
-      (item) => item.session_id === state.activeSessionId
+      (item) => item.id === state.activeSessionId || item.session_id === state.activeSessionId
     );
 
     if (titleEl) titleEl.textContent = currentSession?.title || "Nova";
@@ -316,14 +317,19 @@
     const content = byId("routerContent");
     if (!content || !router) return;
 
-    const preview = Array.isArray(router.memory_preview) ? router.memory_preview : [];
+    const preview = Array.isArray(router.memory_preview)
+      ? router.memory_preview
+      : Array.isArray(router.memory_used)
+      ? router.memory_used
+      : [];
+
     const previewHtml = preview.length
       ? `<ul class="router-debug-list">${preview
           .map((item) => `<li>${escapeHtml(item)}</li>`)
           .join("")}</ul>`
       : `<div class="router-debug-empty">—</div>`;
 
-    const timeText = router.timestamp ? formatTime(router.timestamp) : "—";
+    const timeText = router.timestamp ? formatTime(router.timestamp / 1000 || router.timestamp) : "—";
 
     content.innerHTML = `
       <div class="router-debug-row"><strong>Mode:</strong> ${escapeHtml(router.mode || "general")}</div>
@@ -350,12 +356,14 @@
 
     list.innerHTML = state.sessions
       .map((session) => {
-        const isActive = session.session_id === state.activeSessionId;
+        const sessionId = session.id || session.session_id || "";
+        const isActive = sessionId === state.activeSessionId;
+
         return `
           <button
             class="session-item ${isActive ? "active" : ""}"
             type="button"
-            data-session-id="${escapeHtml(session.session_id)}"
+            data-session-id="${escapeHtml(sessionId)}"
           >
             <div class="session-item-title">${escapeHtml(session.title || "New Chat")}</div>
             <div class="session-item-meta">${escapeHtml(String(session.message_count || 0))} messages</div>
@@ -392,12 +400,26 @@
 
     list.innerHTML = state.memoryItems
       .map((item) => `
-        <div class="memory-item">
-          <div class="memory-item-kind">${escapeHtml(item.kind || "memory")}</div>
-          <div class="memory-item-value">${escapeHtml(item.value || "")}</div>
-          <div class="memory-item-meta">${escapeHtml(
-            formatTime(item.updated_at || item.created_at || nowUnix())
-          )}</div>
+        <div class="memory-item" data-memory-id="${escapeHtml(item.id || "")}">
+          <div class="memory-item-main">
+            <div class="memory-item-kind">${escapeHtml(item.kind || "memory")}</div>
+            <div class="memory-item-value">${escapeHtml(item.value || "")}</div>
+            <div class="memory-item-meta">${escapeHtml(
+              formatTime(item.updated_at || item.created_at || nowUnix())
+            )}</div>
+          </div>
+
+          <div class="memory-item-actions">
+            <button
+              class="memory-delete-btn"
+              type="button"
+              data-memory-delete="${escapeHtml(item.id || "")}"
+              title="Delete memory"
+              aria-label="Delete memory"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       `)
       .join("");
@@ -425,9 +447,11 @@
       .map((msg, index) => {
         const role = safeText(msg.role || "assistant").toLowerCase();
         const content = escapeHtml(msg.content || "").replace(/\n/g, "<br>");
-        const time = formatTime(msg.timestamp || nowUnix());
+        const time = formatTime(msg.timestamp || msg.created_at || nowUnix());
         const isAssistant = role === "assistant";
-        const routerBadge = isAssistant ? buildRouterBadgeHtml(msg.router || null) : "";
+        const routerBadge = isAssistant
+          ? buildRouterBadgeHtml(msg.router || msg.router_meta || null)
+          : "";
 
         return `
           <article class="chat-message ${escapeHtml(role)}">
@@ -478,10 +502,10 @@
 
     const lastAssistant = [...state.messages]
       .reverse()
-      .find((msg) => safeText(msg.role).toLowerCase() === "assistant" && msg.router);
+      .find((msg) => safeText(msg.role).toLowerCase() === "assistant" && (msg.router || msg.router_meta));
 
-    if (lastAssistant?.router) {
-      updateRouterDebug(lastAssistant.router);
+    if (lastAssistant?.router || lastAssistant?.router_meta) {
+      updateRouterDebug(lastAssistant.router || lastAssistant.router_meta);
     }
 
     updateLastUserMessage();
@@ -503,13 +527,20 @@
     const data = await apiGet(API.state);
     state.sessions = Array.isArray(data.sessions) ? data.sessions : [];
 
+    const currentSessionId = data.current_session_id || null;
+
     if (state.activeSessionId) {
-      const exists = state.sessions.some((s) => s.session_id === state.activeSessionId);
+      const exists = state.sessions.some(
+        (s) => (s.id || s.session_id) === state.activeSessionId
+      );
       if (!exists) {
-        state.activeSessionId = state.sessions[0]?.session_id || null;
+        state.activeSessionId =
+          state.sessions[0]?.id || state.sessions[0]?.session_id || currentSessionId || null;
       }
     } else if (state.sessions.length) {
-      state.activeSessionId = state.sessions[0].session_id;
+      state.activeSessionId = state.sessions[0].id || state.sessions[0].session_id || currentSessionId;
+    } else {
+      state.activeSessionId = currentSessionId;
     }
 
     renderSessions();
@@ -520,7 +551,7 @@
     if (!sessionId) return;
 
     const data = await apiGet(API.getChat(sessionId));
-    state.activeSessionId = data.session_id || sessionId;
+    state.activeSessionId = data.session?.id || data.session_id || sessionId;
     state.messages = Array.isArray(data.messages) ? data.messages : [];
     renderMessages();
     renderSessions();
@@ -528,7 +559,11 @@
 
   async function loadMemory() {
     const data = await apiGet(API.memory);
-    state.memoryItems = Array.isArray(data.items) ? data.items : [];
+    state.memoryItems = Array.isArray(data.memory)
+      ? data.memory
+      : Array.isArray(data.items)
+      ? data.items
+      : [];
     renderMemory();
   }
 
@@ -536,8 +571,10 @@
     const data = await apiPost(API.newSession, {});
     await loadState();
 
-    if (data.session_id) {
-      await loadSession(data.session_id);
+    const newId = data.session?.id || data.session_id || null;
+
+    if (newId) {
+      await loadSession(newId);
     } else {
       state.messages = [];
       renderMessages();
@@ -546,6 +583,11 @@
 
   async function addMemory(kind, value) {
     await apiPost(API.addMemory, { kind, value });
+    await loadMemory();
+  }
+
+  async function deleteMemory(id) {
+    await apiPost(API.deleteMemory, { id });
     await loadMemory();
   }
 
@@ -755,34 +797,56 @@
     if (!button) return null;
 
     const id = safeText(button.id).toLowerCase();
-    const action = safeText(button.getAttribute("data-action")).toLowerCase();
     const controls = safeText(button.getAttribute("aria-controls")).toLowerCase();
+    const action = safeText(button.getAttribute("data-action")).toLowerCase();
     const label = safeText(button.getAttribute("aria-label")).toLowerCase();
     const title = safeText(button.getAttribute("title")).toLowerCase();
     const text = safeText(button.textContent).toLowerCase();
-    const nameBlob = [id, action, controls, label, title, text].join(" ");
 
+    const blob = [id, controls, action, label, title, text].join(" ");
+
+    const explicitSidebarIds = new Set([
+      "togglesidebar",
+      "mobilesidebarbtn",
+      "opensidebarbtn",
+      "sidebartoggle"
+    ]);
+
+    const explicitMemoryIds = new Set([
+      "togglememory",
+      "togglememorypanel",
+      "mobilememorybtn",
+      "openmemorybtn",
+      "memorytoggle"
+    ]);
+
+    if (explicitSidebarIds.has(id)) return "sidebar";
+    if (explicitMemoryIds.has(id)) return "memory";
+
+    if (controls === "sidebar") return "sidebar";
+    if (controls === "memorypanel") return "memory";
+
+    if (action === "toggle-sidebar") return "sidebar";
+    if (action === "toggle-memory") return "memory";
+
+    /* relaxed memory detection (FIX OPEN BUTTON) */
     if (
-      nameBlob.includes("memory") ||
-      nameBlob.includes("right") ||
-      controls.includes("memorypanel")
+      blob.includes("memory") ||
+      button.closest("#memoryPanel") ||
+      button.closest(".topbar-right")
     ) {
       return "memory";
     }
 
+    /* relaxed sidebar detection */
     if (
-      nameBlob.includes("sidebar") ||
-      nameBlob.includes("left") ||
-      nameBlob.includes("menu") ||
-      nameBlob.includes("panel")
+      blob.includes("sidebar") ||
+      blob.includes("menu") ||
+      button.closest("#sidebar") ||
+      button.closest(".topbar-left")
     ) {
       return "sidebar";
     }
-
-    if (button.closest(".topbar-left")) return "sidebar";
-    if (button.closest(".topbar-right")) return "memory";
-    if (button.closest(".left-sidebar")) return "sidebar";
-    if (button.closest(".memory-panel")) return "memory";
 
     return null;
   }
@@ -802,11 +866,11 @@
         const role = resolveToggleRole(button);
         if (!role) return;
 
-        if (role === "sidebar") {
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation?.();
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation?.();
 
+        if (role === "sidebar") {
           if (document.body.classList.contains("mobile-left-open")) {
             closeMobilePanels();
           } else {
@@ -816,10 +880,6 @@
         }
 
         if (role === "memory") {
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation?.();
-
           if (document.body.classList.contains("mobile-right-open")) {
             closeMobilePanels();
           } else {
@@ -925,6 +985,32 @@
       } catch (err) {
         console.error(err);
         setStatus("Save failed");
+      }
+    });
+
+    document.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-memory-delete]");
+      if (!btn) return;
+
+      const id = btn.getAttribute("data-memory-delete");
+      if (!id) return;
+
+      const ok = window.confirm("Delete this memory?");
+      if (!ok) return;
+
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "...";
+
+      try {
+        await deleteMemory(id);
+        setStatus("Memory deleted");
+      } catch (err) {
+        console.error(err);
+        btn.disabled = false;
+        btn.textContent = originalText;
+        setStatus("Delete failed");
+        alert("Delete failed");
       }
     });
   }
