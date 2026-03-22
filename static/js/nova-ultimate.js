@@ -13,6 +13,9 @@
     addMemory: "/api/memory",
     deleteMemory: "/api/memory/delete",
     upload: "/api/upload",
+    deleteSession: "/api/session/delete",
+    renameSession: "/api/session/rename",
+    duplicateSession: "/api/session/duplicate",
   };
 
   const DEFAULT_MODEL = "gpt-4.1-mini";
@@ -75,6 +78,11 @@
       byId("chatStatus") ||
       byId("mobileModelStatus");
     if (el) el.textContent = safeText(text || "Ready");
+  }
+
+  function setMemoryStatus(text) {
+    const el = byId("memoryStatusText");
+    if (el) el.textContent = safeText(text || "Memory panel ready.");
   }
 
   function autosizeInput() {
@@ -329,7 +337,7 @@
           .join("")}</ul>`
       : `<div class="router-debug-empty">—</div>`;
 
-    const timeText = router.timestamp ? formatTime(router.timestamp / 1000 || router.timestamp) : "—";
+    const timeText = router.timestamp ? formatTime(router.timestamp) : "—";
 
     content.innerHTML = `
       <div class="router-debug-row"><strong>Mode:</strong> ${escapeHtml(router.mode || "general")}</div>
@@ -389,12 +397,27 @@
     });
   }
 
+  function syncMemoryEmptyState() {
+    const emptyEl = byId("memoryEmpty");
+    const list = byId("memoryList");
+    if (!list) return;
+
+    const hasItems = state.memoryItems.length > 0;
+
+    if (emptyEl) {
+      emptyEl.style.display = hasItems ? "none" : "";
+    }
+
+    list.style.display = hasItems ? "" : "";
+  }
+
   function renderMemory() {
     const list = byId("memoryList");
     if (!list) return;
 
     if (!state.memoryItems.length) {
       list.innerHTML = `<div class="memory-empty">No saved memory yet.</div>`;
+      syncMemoryEmptyState();
       return;
     }
 
@@ -423,6 +446,8 @@
         </div>
       `)
       .join("");
+
+    syncMemoryEmptyState();
   }
 
   function renderMessages() {
@@ -526,6 +551,12 @@
   async function loadState() {
     const data = await apiGet(API.state);
     state.sessions = Array.isArray(data.sessions) ? data.sessions : [];
+    state.currentModel = safeText(data.model || state.currentModel || DEFAULT_MODEL);
+
+    const modelSelect = byId("modelSelect");
+    if (modelSelect && state.currentModel) {
+      modelSelect.value = state.currentModel;
+    }
 
     const currentSessionId = data.current_session_id || null;
 
@@ -565,6 +596,7 @@
       ? data.items
       : [];
     renderMemory();
+    setMemoryStatus(`Loaded ${state.memoryItems.length} memory item${state.memoryItems.length === 1 ? "" : "s"}.`);
   }
 
   async function createNewSession() {
@@ -589,6 +621,53 @@
   async function deleteMemory(id) {
     await apiPost(API.deleteMemory, { id });
     await loadMemory();
+  }
+
+  async function deleteCurrentSession() {
+    if (!state.activeSessionId) return;
+    await apiPost(API.deleteSession, { session_id: state.activeSessionId });
+    await loadState();
+
+    if (state.activeSessionId) {
+      await loadSession(state.activeSessionId);
+    } else if (state.sessions.length) {
+      await loadSession(state.sessions[0].id || state.sessions[0].session_id);
+    } else {
+      state.messages = [];
+      renderMessages();
+    }
+  }
+
+  async function renameCurrentSession() {
+    if (!state.activeSessionId) return;
+    const currentSession = state.sessions.find(
+      (item) => (item.id || item.session_id) === state.activeSessionId
+    );
+    const currentTitle = currentSession?.title || "New Chat";
+    const nextTitle = window.prompt("Rename chat:", currentTitle);
+    if (!safeText(nextTitle)) return;
+
+    await apiPost(API.renameSession, {
+      session_id: state.activeSessionId,
+      title: nextTitle,
+    });
+
+    await loadState();
+    await loadSession(state.activeSessionId);
+  }
+
+  async function duplicateCurrentSession() {
+    if (!state.activeSessionId) return;
+    const data = await apiPost(API.duplicateSession, {
+      session_id: state.activeSessionId,
+    });
+
+    await loadState();
+
+    const newId = data.session?.id || data.session_id || null;
+    if (newId) {
+      await loadSession(newId);
+    }
   }
 
   function parseSSEBlock(block) {
@@ -675,7 +754,6 @@
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        let streamRouter = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -694,15 +772,9 @@
             const eventName = parsed.event;
             const data = parsed.data || {};
 
-            if (eventName === "start") {
+            if (eventName === "start" || eventName === "done") {
               if (data.router) {
-                streamRouter = data.router;
-                updateRouterDebug(streamRouter);
-              }
-            } else if (eventName === "done") {
-              if (data.router) {
-                streamRouter = data.router;
-                updateRouterDebug(streamRouter);
+                updateRouterDebug(data.router);
               }
             } else if (eventName === "error") {
               throw new Error(data.message || "Stream failed");
@@ -817,7 +889,9 @@
       "togglememorypanel",
       "mobilememorybtn",
       "openmemorybtn",
-      "memorytoggle"
+      "memorytoggle",
+      "memorytogglebtntop",
+      "closememorybtn"
     ]);
 
     if (explicitSidebarIds.has(id)) return "sidebar";
@@ -829,24 +903,16 @@
     if (action === "toggle-sidebar") return "sidebar";
     if (action === "toggle-memory") return "memory";
 
-    /* relaxed memory detection (FIX OPEN BUTTON) */
-    if (
-      blob.includes("memory") ||
-      button.closest("#memoryPanel") ||
-      button.closest(".topbar-right")
-    ) {
-      return "memory";
-    }
+    const looksLikeMemoryToggle =
+      blob.includes("memory") &&
+      (blob.includes("toggle") || blob.includes("open") || blob.includes("close") || blob.includes("panel"));
 
-    /* relaxed sidebar detection */
-    if (
-      blob.includes("sidebar") ||
-      blob.includes("menu") ||
-      button.closest("#sidebar") ||
-      button.closest(".topbar-left")
-    ) {
-      return "sidebar";
-    }
+    const looksLikeSidebarToggle =
+      (blob.includes("sidebar") || blob.includes("menu")) &&
+      (blob.includes("toggle") || blob.includes("open") || blob.includes("close") || blob.includes("panel"));
+
+    if (looksLikeMemoryToggle) return "memory";
+    if (looksLikeSidebarToggle) return "sidebar";
 
     return null;
   }
@@ -932,8 +998,52 @@
       }
     });
 
+    byId("deleteSessionBtn")?.addEventListener("click", async () => {
+      if (!state.activeSessionId) return;
+      const ok = window.confirm("Delete this chat?");
+      if (!ok) return;
+
+      try {
+        setStatus("Deleting chat...");
+        await deleteCurrentSession();
+        setStatus("Ready");
+      } catch (err) {
+        console.error(err);
+        setStatus("Delete failed");
+      }
+    });
+
+    byId("renameSessionBtn")?.addEventListener("click", async () => {
+      if (!state.activeSessionId) return;
+      try {
+        setStatus("Renaming chat...");
+        await renameCurrentSession();
+        setStatus("Ready");
+      } catch (err) {
+        console.error(err);
+        setStatus("Rename failed");
+      }
+    });
+
+    byId("duplicateSessionBtn")?.addEventListener("click", async () => {
+      if (!state.activeSessionId) return;
+      try {
+        setStatus("Duplicating chat...");
+        await duplicateCurrentSession();
+        setStatus("Ready");
+      } catch (err) {
+        console.error(err);
+        setStatus("Duplicate failed");
+      }
+    });
+
     byId("sendBtn")?.addEventListener("click", sendMessage);
     byId("regenerateBtn")?.addEventListener("click", regenerateLastReply);
+
+    byId("modelSelect")?.addEventListener("change", (event) => {
+      state.currentModel = safeText(event.target.value || DEFAULT_MODEL);
+      setStatus(`Model: ${state.currentModel}`);
+    });
 
     byId("messageInput")?.addEventListener("input", autosizeInput);
 
@@ -979,12 +1089,26 @@
 
       try {
         setStatus("Saving memory...");
+        setMemoryStatus("Saving memory...");
         await addMemory(kind, value);
         if (valueEl) valueEl.value = "";
         setStatus("Ready");
+        setMemoryStatus("Memory saved.");
       } catch (err) {
         console.error(err);
         setStatus("Save failed");
+        setMemoryStatus("Memory save failed.");
+      }
+    });
+
+    byId("refreshMemoryBtn")?.addEventListener("click", async () => {
+      try {
+        setMemoryStatus("Refreshing...");
+        await loadMemory();
+        setMemoryStatus("Memory refreshed.");
+      } catch (err) {
+        console.error(err);
+        setMemoryStatus("Memory refresh failed.");
       }
     });
 
@@ -1003,13 +1127,16 @@
       btn.textContent = "...";
 
       try {
+        setMemoryStatus("Deleting memory...");
         await deleteMemory(id);
         setStatus("Memory deleted");
+        setMemoryStatus("Memory deleted.");
       } catch (err) {
         console.error(err);
         btn.disabled = false;
         btn.textContent = originalText;
         setStatus("Delete failed");
+        setMemoryStatus("Delete failed.");
         alert("Delete failed");
       }
     });
@@ -1019,6 +1146,7 @@
     bindEvents();
     initPanelFix();
     setStatus("Loading...");
+    setMemoryStatus("Loading memory...");
 
     await loadState();
 
@@ -1033,12 +1161,14 @@
     autosizeInput();
     setSendingState(false);
     setStatus("Ready");
+    setMemoryStatus("Memory panel ready.");
   }
 
   document.addEventListener("DOMContentLoaded", () => {
     bootstrap().catch((err) => {
       console.error("Desktop bootstrap failed:", err);
       setStatus("Bootstrap failed");
+      setMemoryStatus("Bootstrap failed.");
       setSendingState(false);
     });
   });

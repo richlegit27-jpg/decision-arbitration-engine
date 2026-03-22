@@ -132,11 +132,115 @@
           ],
           "timestamp": 1774178386
         }
+      },
+      {
+        "id": "c00d4cdc-9d73-4490-af0d-0dd4a7a31ea3",
+        "role": "user",
+        "content": "who is bonnie blue",
+        "timestamp": 1774179135,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "30b08a40-89d8-4856-893a-4e12e102a0c3",
+        "role": "assistant",
+        "content": "Bonnie Blue can refer to different things depending on the context:\n\n1. **Bonnie Blue Flag** – A historical flag associated with the Confederate States during the American Civil War.\n2. **Bonnie Blue Butler** – A fictional character, the daughter of Scarlett O'Hara and Rhett Butler in the novel and film *Gone with the Wind*.\n3. It could also be a nickname or name used in other media or contexts.\n\nIf you specify the context, I can provide a more precise answer.",
+        "timestamp": 1774179137,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 3,
+          "memory_preview": [
+            "Name: my name is richard",
+            "Preference: don't be offensive",
+            "Preference: hihi"
+          ],
+          "timestamp": 1774179135
+        }
+      },
+      {
+        "id": "366d3ef1-eb5b-4a47-87b9-0b3638d5dbc2",
+        "role": "user",
+        "content": "who is bonnie blue",
+        "timestamp": 1774179153,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "74de27dc-8bee-4e64-8710-e68d7c2d8afa",
+        "role": "assistant",
+        "content": "\"Bonnie Blue\" most commonly refers to **Bonnie Blue Butler**, a fictional character from *Gone with the Wind*. She is the daughter of Scarlett O'Hara and Rhett Butler in the novel and film adaptation. If you mean a different \"Bonnie Blue,\" please specify the context.",
+        "timestamp": 1774179155,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 3,
+          "memory_preview": [
+            "Name: my name is richard",
+            "Preference: don't be offensive",
+            "Preference: hihi"
+          ],
+          "timestamp": 1774179153
+        }
+      },
+      {
+        "id": "2981fa37-7593-436a-954b-d0a632ec8f0a",
+        "role": "user",
+        "content": "is she not a adult content creator?",
+        "timestamp": 1774179178,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "619ba5b4-afec-44e5-8c7c-9de119911015",
+        "role": "assistant",
+        "content": "Yes, there is an adult content creator known as Bonnie Blue. She is popular on platforms like OnlyFans and social media, where she shares adult-oriented content. This is a different and unrelated use of the name compared to the fictional character from *Gone with the Wind*.",
+        "timestamp": 1774179180,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "question",
+          "reason": "question fallback",
+          "memory_hits": 3,
+          "memory_preview": [
+            "Name: my name is richard",
+            "Preference: don't be offensive",
+            "Preference: hihi"
+          ],
+          "timestamp": 1774179178
+        }
+      },
+      {
+        "id": "cdcfcf64-b102-4b6f-ba49-d883199e696a",
+        "role": "user",
+        "content": "is she not a adult content creator?",
+        "timestamp": 1774179832,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "0b881d28-8843-4dcb-9589-1724d6b45f19",
+        "role": "assistant",
+        "content": "Yes, Bonnie Blue is also the name of an adult content creator known for sharing content on platforms like OnlyFans and social media.",
+        "timestamp": 1774179833,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "question",
+          "reason": "question fallback",
+          "memory_hits": 3,
+          "memory_preview": [
+            "Name: my name is richard",
+            "Preference: don't be offensive",
+            "Preference: hihi"
+          ],
+          "timestamp": 1774179832
+        }
       }
     ],
-    "message_count": 10,
+    "message_count": 18,
     "created_at": 1774164571,
-    "updated_at": 1774178388
+    "updated_at": 1774179833
   },
   {
     "session_id": "098209f6-d715-42ba-8a64-0f1b9b7d0f07",
