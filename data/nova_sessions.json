@@ -1,11 +1,26 @@
 [
   {
     "session_id": "7b484edc-5067-47d7-9089-dcc04cabf0e8",
-    "title": "New Chat Copy",
-    "messages": [],
-    "message_count": 0,
+    "title": "hi",
+    "messages": [
+      {
+        "id": "76fb16b1-6dde-4797-b53b-60cad1c66e9e",
+        "role": "user",
+        "content": "hi",
+        "timestamp": 1774161062,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "46c1db40-ef0a-4054-9f37-d840585581be",
+        "role": "assistant",
+        "content": "Hello! How can I assist you today?",
+        "timestamp": 1774161063,
+        "model": "gpt-4.1-mini"
+      }
+    ],
+    "message_count": 2,
     "created_at": 1774135959,
-    "updated_at": 1774135959
+    "updated_at": 1774161063
   },
   {
     "session_id": "a4e023e5-a38b-4846-99a0-89a8a728a51e",

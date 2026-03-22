@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Nova Mobile</title>
+  <link rel="stylesheet" href="/static/css/nova-mobile-app.css">
+</head>
+<body>
+  <div class="mobile-shell">
+    <header class="mobile-topbar">
+      <button id="mobileMenuBtn" class="mobile-icon-btn" type="button" aria-label="Open menu">☰</button>
+
+      <div class="mobile-brand">
+        <div id="mobileChatTitle" class="mobile-title">Nova</div>
+        <div id="mobileChatSubtitle" class="mobile-subtitle">Mobile</div>
+      </div>
+
+      <button id="mobileMemoryBtn" class="mobile-icon-btn" type="button" aria-label="Open memory">Memory</button>
+    </header>
+
+    <main class="mobile-main">
+      <section class="mobile-chat">
+        <div id="mobileChatMessages" class="mobile-chat-messages">
+          <div class="mobile-empty-state">
+            <div class="mobile-empty-card">
+              <div class="mobile-empty-title">Nova Mobile is ready</div>
+              <div class="mobile-empty-subtitle">Clean chat for phone. Menu and Memory open as full-screen views.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mobile-composer">
+        <div class="mobile-composer-box">
+          <div id="mobileAttachedFiles" class="mobile-attachments-bar"></div>
+
+          <div class="mobile-composer-row">
+            <button id="mobileAttachBtn" class="mobile-action-btn" type="button">+</button>
+
+            <textarea
+              id="mobileMessageInput"
+              class="mobile-message-input"
+              rows="1"
+              placeholder="Message Nova..."
+              aria-label="Message Nova"
+            ></textarea>
+
+            <button id="mobileSendBtn" class="mobile-send-btn" type="button">Send</button>
+          </div>
+
+          <div class="mobile-composer-footer">
+            <div id="mobileModelStatus">Model ready</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- FULLSCREEN MENU -->
+  <section id="mobileMenuScreen" class="mobile-screen hidden" aria-hidden="true">
+    <div class="mobile-screen-header">
+      <div class="mobile-screen-title">Menu</div>
+      <button id="closeMobileMenuBtn" class="mobile-icon-btn" type="button">✕</button>
+    </div>
+
+    <div class="mobile-screen-body">
+      <div class="mobile-section">
+        <div class="mobile-section-title">Chats</div>
+        <button id="mobileNewSessionBtn" class="mobile-block-btn" type="button">New Chat</button>
+        <div id="mobileSessionList" class="mobile-session-list"></div>
+      </div>
+
+      <div class="mobile-section">
+        <div class="mobile-section-title">Appearance</div>
+        <button id="mobileThemeToggleBtn" class="mobile-block-btn" type="button">Theme</button>
+        <button id="mobileBackgroundBtn" class="mobile-block-btn" type="button">Background</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- FULLSCREEN MEMORY -->
+  <section id="mobileMemoryScreen" class="mobile-screen hidden" aria-hidden="true">
+    <div class="mobile-screen-header">
+      <div class="mobile-screen-title">Memory</div>
+      <button id="closeMobileMemoryBtn" class="mobile-icon-btn" type="button">✕</button>
+    </div>
+
+    <div class="mobile-screen-body">
+      <div class="mobile-section">
+        <div class="mobile-section-title">Status</div>
+        <div id="mobileMemoryStatus" class="mobile-card">Memory panel ready.</div>
+      </div>
+
+      <div class="mobile-section">
+        <div class="mobile-section-title">Add Memory</div>
+        <form id="mobileMemoryForm" class="mobile-memory-form">
+          <select id="mobileMemoryKind" class="mobile-input">
+            <option value="preference">preference</option>
+            <option value="goal">goal</option>
+            <option value="project">project</option>
+            <option value="name">name</option>
+            <option value="memory">memory</option>
+          </select>
+
+          <textarea
+            id="mobileMemoryValue"
+            class="mobile-input mobile-memory-textarea"
+            rows="3"
+            placeholder="Add something Nova should remember..."
+          ></textarea>
+
+          <button type="submit" class="mobile-send-btn">Save Memory</button>
+        </form>
+      </div>
+
+      <div class="mobile-section">
+        <div class="mobile-section-title">Items</div>
+        <div id="mobileMemoryList" class="mobile-memory-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <input id="mobileFileInput" type="file" multiple class="hidden">
+
+  <script src="/static/js/nova-mobile-app.js"></script>
+</body>
+</html>
