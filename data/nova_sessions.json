@@ -236,11 +236,33 @@
           ],
           "timestamp": 1774179832
         }
+      },
+      {
+        "id": "bb812c0c-1c11-4817-a027-118359038a63",
+        "role": "user",
+        "content": "hi",
+        "timestamp": 1774181690,
+        "model": "gpt-4.1-mini"
+      },
+      {
+        "id": "38a24e06-6400-49bf-b355-f9180aa3fa37",
+        "role": "assistant",
+        "content": "Hello! How can I assist you today?",
+        "timestamp": 1774181692,
+        "model": "gpt-4.1-mini",
+        "router": {
+          "mode": "general",
+          "intent": "chat",
+          "reason": "default",
+          "memory_hits": 0,
+          "memory_preview": [],
+          "timestamp": 1774181690
+        }
       }
     ],
-    "message_count": 18,
+    "message_count": 20,
     "created_at": 1774164571,
-    "updated_at": 1774179833
+    "updated_at": 1774181692
   },
   {
     "session_id": "098209f6-d715-42ba-8a64-0f1b9b7d0f07",
