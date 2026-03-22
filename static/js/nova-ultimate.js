@@ -297,7 +297,9 @@
 
     const mode = safeText(router.mode || "general");
     const intent = safeText(router.intent || "chat");
-    const memoryHits = Number.isFinite(router.memory_hits) ? router.memory_hits : Number(router.memory_hits || 0);
+    const memoryHits = Number.isFinite(router.memory_hits)
+      ? router.memory_hits
+      : Number(router.memory_hits || 0);
 
     return `
       <div class="router-badge">
@@ -718,6 +720,144 @@
     await streamSend(content, []);
   }
 
+  function isMobilePanel() {
+    return window.innerWidth <= 980;
+  }
+
+  function setPanelBodyState(isOpen) {
+    document.body.classList.toggle("panel-open", Boolean(isOpen));
+  }
+
+  function closeMobilePanels() {
+    document.body.classList.remove("mobile-left-open", "mobile-right-open");
+    setPanelBodyState(false);
+  }
+
+  function openLeftMobile() {
+    document.body.classList.remove("mobile-right-open");
+    document.body.classList.add("mobile-left-open");
+    setPanelBodyState(true);
+  }
+
+  function openRightMobile() {
+    document.body.classList.remove("mobile-left-open");
+    document.body.classList.add("mobile-right-open");
+    setPanelBodyState(true);
+  }
+
+  function syncPanelMode() {
+    if (!isMobilePanel()) {
+      closeMobilePanels();
+    }
+  }
+
+  function resolveToggleRole(button) {
+    if (!button) return null;
+
+    const id = safeText(button.id).toLowerCase();
+    const action = safeText(button.getAttribute("data-action")).toLowerCase();
+    const controls = safeText(button.getAttribute("aria-controls")).toLowerCase();
+    const label = safeText(button.getAttribute("aria-label")).toLowerCase();
+    const title = safeText(button.getAttribute("title")).toLowerCase();
+    const text = safeText(button.textContent).toLowerCase();
+    const nameBlob = [id, action, controls, label, title, text].join(" ");
+
+    if (
+      nameBlob.includes("memory") ||
+      nameBlob.includes("right") ||
+      controls.includes("memorypanel")
+    ) {
+      return "memory";
+    }
+
+    if (
+      nameBlob.includes("sidebar") ||
+      nameBlob.includes("left") ||
+      nameBlob.includes("menu") ||
+      nameBlob.includes("panel")
+    ) {
+      return "sidebar";
+    }
+
+    if (button.closest(".topbar-left")) return "sidebar";
+    if (button.closest(".topbar-right")) return "memory";
+    if (button.closest(".left-sidebar")) return "sidebar";
+    if (button.closest(".memory-panel")) return "memory";
+
+    return null;
+  }
+
+  function initPanelFix() {
+    const sidebar = byId("sidebar");
+    const memoryPanel = byId("memoryPanel");
+
+    document.addEventListener(
+      "click",
+      (e) => {
+        if (!isMobilePanel()) return;
+
+        const button = e.target.closest("button, [role='button']");
+        if (!button) return;
+
+        const role = resolveToggleRole(button);
+        if (!role) return;
+
+        if (role === "sidebar") {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation?.();
+
+          if (document.body.classList.contains("mobile-left-open")) {
+            closeMobilePanels();
+          } else {
+            openLeftMobile();
+          }
+          return;
+        }
+
+        if (role === "memory") {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation?.();
+
+          if (document.body.classList.contains("mobile-right-open")) {
+            closeMobilePanels();
+          } else {
+            openRightMobile();
+          }
+        }
+      },
+      true
+    );
+
+    document.addEventListener("click", (e) => {
+      if (!isMobilePanel()) return;
+
+      const target = e.target;
+      const insideSidebar = sidebar?.contains(target);
+      const insideMemory = memoryPanel?.contains(target);
+      const clickedButton = target.closest("button, [role='button']");
+      const role = resolveToggleRole(clickedButton);
+
+      if (insideSidebar || insideMemory || role === "sidebar" || role === "memory") {
+        return;
+      }
+
+      closeMobilePanels();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeMobilePanels();
+      }
+    });
+
+    window.addEventListener("resize", syncPanelMode);
+    window.addEventListener("orientationchange", syncPanelMode);
+
+    syncPanelMode();
+  }
+
   function bindEvents() {
     ensureDesktopActionButtons();
 
@@ -791,6 +931,7 @@
 
   async function bootstrap() {
     bindEvents();
+    initPanelFix();
     setStatus("Loading...");
 
     await loadState();

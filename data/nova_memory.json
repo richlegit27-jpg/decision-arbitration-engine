@@ -1,6 +1,14 @@
 {
   "items": [
     {
+      "id": "63d41ef6-4c97-47f2-98e8-9bffd7984fd6",
+      "kind": "preference",
+      "value": "don't be offensive",
+      "source": "manual",
+      "created_at": 1774165428,
+      "updated_at": 1774165428
+    },
+    {
       "id": "058f220c-bb42-4b64-b712-6c542a3604c3",
       "kind": "preference",
       "value": "hihi",

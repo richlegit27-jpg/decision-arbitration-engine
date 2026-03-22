@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Nova</title>
   <link rel="stylesheet" href="/static/css/nova-style.css?v=phase3sync1">
+  <link rel="stylesheet" href="/static/css/nova-polish.css?v=phase3polish1">
 </head>
 <body>
   <div id="appShell" class="app-shell">
@@ -158,6 +159,18 @@
           <div id="memoryStatusText" class="memory-card-text">Memory panel ready.</div>
         </section>
 
+        <section class="memory-card panel-section router-debug-card">
+          <div class="memory-card-title">Brain Router</div>
+          <div id="routerContent" class="router-debug-content">
+            <div class="router-debug-row"><strong>Mode:</strong> —</div>
+            <div class="router-debug-row"><strong>Intent:</strong> —</div>
+            <div class="router-debug-row"><strong>Reason:</strong> —</div>
+            <div class="router-debug-row"><strong>Memory Hits:</strong> —</div>
+            <div class="router-debug-row"><strong>Time:</strong> —</div>
+            <div class="router-debug-row"><strong>Memory Used:</strong><div class="router-debug-empty">—</div></div>
+          </div>
+        </section>
+
         <section class="memory-card">
           <div class="memory-card-title">Add Memory</div>
 
@@ -221,5 +234,7 @@
 
   <script src="/static/js/nova-ultimate.js?v=phase3sync1"></script>
   <script src="/static/js/nova-phase3-repair.js?v=phase3repair1"></script>
+  <script src="/static/js/nova-polish.js?v=phase3polish1"></script>
+  <script src="/static/js/nova-brain-router-panel.js?v=phase3brain1"></script>
 </body>
 </html>

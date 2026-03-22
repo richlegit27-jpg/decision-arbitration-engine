@@ -44,54 +44,84 @@
     if (els.memoryStatusText) els.memoryStatusText.textContent = text;
   }
 
-  function setSidebarOpen(open) {
+  function closeSidebar() {
     if (!els.sidebar) return;
 
     if (isMobile()) {
-      els.sidebar.setAttribute("aria-hidden", open ? "false" : "true");
-      return;
+      els.sidebar.setAttribute("aria-hidden", "true");
+    } else {
+      BODY.classList.add("sidebar-collapsed");
+      els.sidebar.setAttribute("aria-hidden", "false");
     }
-
-    BODY.classList.toggle("sidebar-collapsed", !open);
-    els.sidebar.setAttribute("aria-hidden", "false");
   }
 
-  function setMemoryOpen(open) {
+  function openSidebar() {
+    if (!els.sidebar) return;
+
+    if (isMobile()) {
+      els.sidebar.setAttribute("aria-hidden", "false");
+      if (els.memoryPanel) els.memoryPanel.setAttribute("aria-hidden", "true");
+    } else {
+      BODY.classList.remove("sidebar-collapsed");
+      els.sidebar.setAttribute("aria-hidden", "false");
+    }
+  }
+
+  function closeMemory() {
     if (!els.memoryPanel) return;
 
     if (isMobile()) {
-      els.memoryPanel.setAttribute("aria-hidden", open ? "false" : "true");
-      return;
+      els.memoryPanel.setAttribute("aria-hidden", "true");
+    } else {
+      BODY.classList.add("memory-collapsed");
+      els.memoryPanel.setAttribute("aria-hidden", "false");
     }
+  }
 
-    BODY.classList.toggle("memory-collapsed", !open);
-    els.memoryPanel.setAttribute("aria-hidden", "false");
+  function openMemory() {
+    if (!els.memoryPanel) return;
+
+    if (isMobile()) {
+      els.memoryPanel.setAttribute("aria-hidden", "false");
+      if (els.sidebar) els.sidebar.setAttribute("aria-hidden", "true");
+    } else {
+      BODY.classList.remove("memory-collapsed");
+      els.memoryPanel.setAttribute("aria-hidden", "false");
+    }
   }
 
   function toggleSidebar() {
     if (!els.sidebar) return;
 
     if (isMobile()) {
-      const open = els.sidebar.getAttribute("aria-hidden") !== "false";
-      setSidebarOpen(open);
+      const isOpen = els.sidebar.getAttribute("aria-hidden") === "false";
+      if (isOpen) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
       return;
     }
 
-    const collapsed = BODY.classList.contains("sidebar-collapsed");
-    setSidebarOpen(collapsed);
+    BODY.classList.toggle("sidebar-collapsed");
+    els.sidebar.setAttribute("aria-hidden", "false");
   }
 
   function toggleMemory() {
     if (!els.memoryPanel) return;
 
     if (isMobile()) {
-      const open = els.memoryPanel.getAttribute("aria-hidden") !== "false";
-      setMemoryOpen(open);
+      const isOpen = els.memoryPanel.getAttribute("aria-hidden") === "false";
+      if (isOpen) {
+        closeMemory();
+      } else {
+        openMemory();
+      }
       return;
     }
 
-    const collapsed = BODY.classList.contains("memory-collapsed");
-    setMemoryOpen(collapsed);
+    BODY.classList.toggle("memory-collapsed");
+    els.memoryPanel.setAttribute("aria-hidden", "false");
   }
 
   function getSessionItems() {
@@ -335,16 +365,35 @@
       markActiveSession(item);
 
       if (isMobile()) {
-        setSidebarOpen(false);
+        closeSidebar();
       }
     });
   }
 
   function wirePanelButtons() {
-    els.toggleSidebar?.addEventListener("click", toggleSidebar);
-    els.mobileSidebarBtn?.addEventListener("click", toggleSidebar);
-    els.memoryToggleBtnTop?.addEventListener("click", toggleMemory);
-    els.closeMemoryBtn?.addEventListener("click", toggleMemory);
+    els.toggleSidebar?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleSidebar();
+    });
+
+    els.mobileSidebarBtn?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleSidebar();
+    });
+
+    els.memoryToggleBtnTop?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleMemory();
+    });
+
+    els.closeMemoryBtn?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMemory();
+    });
   }
 
   function wireActionButtons() {
@@ -378,7 +427,7 @@
         !clickedInsideSidebar &&
         !clickedSidebarToggle
       ) {
-        els.sidebar.setAttribute("aria-hidden", "true");
+        closeSidebar();
       }
 
       if (
@@ -387,7 +436,7 @@
         !clickedInsideMemory &&
         !clickedMemoryToggle
       ) {
-        els.memoryPanel.setAttribute("aria-hidden", "true");
+        closeMemory();
       }
     });
   }
@@ -395,8 +444,8 @@
   function wireResize() {
     window.addEventListener("resize", () => {
       if (isMobile()) {
-        els.sidebar?.setAttribute("aria-hidden", "true");
-        els.memoryPanel?.setAttribute("aria-hidden", "true");
+        closeSidebar();
+        closeMemory();
       } else {
         els.sidebar?.setAttribute("aria-hidden", "false");
         els.memoryPanel?.setAttribute("aria-hidden", "false");
