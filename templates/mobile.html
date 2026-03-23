@@ -4,168 +4,177 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Nova Mobile</title>
-
-  <link rel="stylesheet" href="/static/css/nova-mobile-app.css?v=phase4mobileux1">
-  <link rel="stylesheet" href="/static/css/nova-router-control.css?v=phase4mobileux1">
+  <meta name="theme-color" content="#08101f">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="stylesheet" href="/static/css/nova-mobile-app.css?v=mobile_deep_fix_final_1">
 </head>
 <body>
-  <div id="mobileApp" class="mobile-app-shell">
-    <div id="panelBackdrop" class="mobile-panel-backdrop" hidden></div>
-
-    <aside id="mobileSidebar" class="mobile-sidebar" aria-hidden="true">
+  <div id="mobileApp" class="mobile-app">
+    <aside id="mobileSidebar" class="mobile-panel mobile-panel-left" aria-hidden="true">
       <div class="mobile-panel-header">
         <div class="mobile-panel-title-wrap">
           <div class="mobile-panel-title">Chats</div>
-          <div class="mobile-panel-subtitle">Sessions and controls</div>
+          <div id="statusText" class="mobile-panel-subtitle">Ready</div>
         </div>
-        <button id="closeLeftPanelBtn" type="button" class="mobile-panel-close" aria-label="Close left panel">×</button>
+        <button id="closeLeftPanelBtn" class="icon-btn" type="button" aria-label="Close chats">✕</button>
       </div>
 
       <div class="mobile-panel-body">
-        <div class="mobile-action-stack">
-          <button id="newSessionBtn" type="button" class="mobile-action-btn">New Chat</button>
+        <div class="mobile-panel-actions">
+          <button id="newSessionBtn" class="toolbar-btn primary" type="button">New Chat</button>
         </div>
 
-        <div id="sessionList" class="mobile-session-list"></div>
+        <div class="mobile-section">
+          <div class="section-kicker">Sessions</div>
+          <div id="sessionList" class="session-list"></div>
+        </div>
       </div>
     </aside>
 
     <main class="mobile-main">
       <header class="mobile-topbar">
-        <button id="openLeftPanelBtn" type="button" class="mobile-topbar-btn" aria-label="Open chats">☰</button>
+        <button id="openLeftPanelBtn" class="icon-btn" type="button" aria-label="Open chats">☰</button>
 
         <div class="mobile-topbar-center">
           <div class="mobile-brand">Nova</div>
           <div id="activeSessionMeta" class="mobile-subtitle">Mobile assistant</div>
         </div>
 
-        <button id="openRightPanelBtn" type="button" class="mobile-topbar-btn" aria-label="Open memory">Memory</button>
+        <button id="openRightPanelBtn" class="icon-btn" type="button" aria-label="Open memory">✦</button>
       </header>
 
-      <section id="chatScroll" class="mobile-chat-scroll">
-        <div id="welcomeState" class="mobile-welcome">
-          <div class="mobile-welcome-card">
-            <div class="mobile-welcome-title">Nova is ready</div>
-            <div class="mobile-welcome-text">Ask something to start the conversation.</div>
+      <section id="chatScroll" class="mobile-chat-scroll" aria-label="Conversation">
+        <div id="welcomeState" class="welcome-state">
+          <div class="welcome-card">
+            <div class="welcome-title">Nova Mobile</div>
+            <div class="welcome-copy">
+              Stable mobile shell with chats on the left, memory on the right, and conversation in the center.
+            </div>
           </div>
         </div>
 
-        <div id="messageList" class="mobile-message-list"></div>
+        <div id="messageList" class="message-list"></div>
       </section>
 
-      <section class="mobile-composer-wrap">
-        <div id="attachedFilesBar" class="mobile-attached-files" hidden></div>
+      <section class="mobile-composer-shell">
+        <div id="attachedFilesBar" class="attached-files-bar" hidden></div>
 
-        <form id="composerForm" class="mobile-composer-form">
-          <button id="attachBtn" type="button" class="mobile-composer-icon" aria-label="Attach file">+</button>
+        <form id="composerForm" class="composer-form">
+          <div class="composer-row">
+            <button id="attachBtn" class="composer-icon-btn" type="button" aria-label="Attach files">＋</button>
+            <button id="voiceBtn" class="composer-icon-btn" type="button" aria-label="Voice input">🎤</button>
 
-          <textarea
-            id="messageInput"
-            class="mobile-message-input"
-            rows="1"
-            placeholder="Message Nova..."
-            aria-label="Message Nova"
-          ></textarea>
+            <textarea
+              id="messageInput"
+              class="composer-input"
+              rows="1"
+              placeholder="Message Nova..."
+              autocomplete="off"
+              autocapitalize="sentences"
+              spellcheck="true"
+            ></textarea>
 
-          <div class="mobile-composer-actions">
-            <button id="regenerateBtn" type="button" class="mobile-regen-btn" aria-label="Regenerate last reply" title="Regenerate last reply">↻</button>
-            <button id="sendBtn" type="submit" class="mobile-send-btn" aria-label="Send message">Send</button>
+            <button id="sendBtn" class="send-btn" type="submit">Send</button>
           </div>
-        </form>
 
-        <div class="mobile-composer-footer">
-          <div id="statusText" class="mobile-status-text">Ready</div>
-          <div id="composerStatus" class="mobile-composer-status">Ready</div>
-        </div>
+          <div class="composer-footer">
+            <div id="composerStatus" class="composer-status">Ready</div>
+            <div class="composer-hint">Enter to send · Shift+Enter for newline</div>
+          </div>
+
+          <input id="fileInput" type="file" multiple hidden>
+        </form>
       </section>
     </main>
 
-    <aside id="mobileMemoryPanel" class="mobile-memory-panel" aria-hidden="true">
+    <aside id="mobileMemoryPanel" class="mobile-panel mobile-panel-right" aria-hidden="true">
       <div class="mobile-panel-header">
         <div class="mobile-panel-title-wrap">
           <div class="mobile-panel-title">Memory</div>
-          <div class="mobile-panel-subtitle">Saved notes and context</div>
+          <div id="memoryStatus" class="mobile-panel-subtitle">Ready</div>
         </div>
-        <button id="closeRightPanelBtn" type="button" class="mobile-panel-close" aria-label="Close right panel">×</button>
+        <button id="closeRightPanelBtn" class="icon-btn" type="button" aria-label="Close memory">✕</button>
       </div>
 
       <div class="mobile-panel-body">
-        <section class="mobile-memory-section">
-          <div class="mobile-memory-section-title">Status</div>
-          <div id="memoryStatus" class="mobile-memory-status">Ready</div>
-        </section>
+        <div class="mobile-panel-actions">
+          <button id="refreshMemoryBtn" class="toolbar-btn" type="button">Refresh</button>
+        </div>
 
-        <section class="mobile-memory-section">
-          <div class="mobile-memory-section-title">Add Memory</div>
+        <div class="mobile-section">
+          <div class="section-kicker">Add memory</div>
 
-          <form id="memoryForm" class="mobile-memory-form">
-            <label class="mobile-memory-label" for="memoryKind">Type</label>
-            <select id="memoryKind" class="mobile-memory-input" name="memoryKind">
-              <option value="preference">preference</option>
-              <option value="goal">goal</option>
-              <option value="project">project</option>
-              <option value="name">name</option>
+          <form id="memoryForm" class="memory-form">
+            <label class="field-label" for="memoryKind">Type</label>
+            <select id="memoryKind" class="field-input">
               <option value="memory">memory</option>
+              <option value="preference">preference</option>
+              <option value="project">project</option>
+              <option value="plan">plan</option>
+              <option value="writing">writing</option>
             </select>
 
-            <label class="mobile-memory-label" for="memoryValue">Value</label>
+            <label class="field-label" for="memoryValue">Value</label>
             <textarea
               id="memoryValue"
-              class="mobile-memory-input mobile-memory-textarea"
-              name="memoryValue"
-              rows="3"
-              placeholder="Add something Nova should remember..."
+              class="field-input field-textarea"
+              rows="4"
+              placeholder="Save something Nova should remember..."
             ></textarea>
 
-            <div class="mobile-memory-actions">
-              <button type="submit" class="mobile-memory-btn">Save</button>
-              <button id="refreshMemoryBtn" type="button" class="mobile-memory-btn secondary">Refresh</button>
+            <div class="memory-actions">
+              <button id="saveMemoryBtn" class="toolbar-btn primary" type="submit">Save</button>
             </div>
           </form>
-        </section>
+        </div>
 
-        <section class="mobile-memory-section">
-          <div class="mobile-memory-section-title">Items</div>
-          <div id="memoryList" class="mobile-memory-list"></div>
-        </section>
+        <div class="mobile-section">
+          <div class="section-kicker">Saved memory</div>
+          <div id="memoryList" class="memory-list"></div>
+        </div>
       </div>
     </aside>
+
+    <button id="panelBackdrop" class="panel-backdrop" type="button" aria-label="Close panels" hidden></button>
   </div>
 
-  <template id="messageItemTemplate">
-    <article class="mobile-message-item">
-      <div class="message-role"></div>
-      <div class="message-content"></div>
-    </article>
-  </template>
-
   <template id="sessionItemTemplate">
-    <article class="mobile-session-item">
-      <button type="button" class="session-main">
+    <article class="session-item">
+      <button class="session-main" type="button">
         <div class="session-title"></div>
         <div class="session-meta"></div>
       </button>
 
-      <div class="mobile-session-actions">
-        <button type="button" class="session-pin">Pin</button>
-        <button type="button" class="session-rename">Rename</button>
-        <button type="button" class="session-duplicate">Duplicate</button>
-        <button type="button" class="session-delete">Delete</button>
+      <div class="session-actions">
+        <button class="session-action session-pin" type="button">Pin</button>
+        <button class="session-action session-rename" type="button">Rename</button>
+        <button class="session-action session-duplicate" type="button">Duplicate</button>
+        <button class="session-action session-delete danger" type="button">Delete</button>
+      </div>
+    </article>
+  </template>
+
+  <template id="messageItemTemplate">
+    <article class="message-row">
+      <div class="message-bubble">
+        <div class="message-role"></div>
+        <div class="message-content"></div>
       </div>
     </article>
   </template>
 
   <template id="memoryItemTemplate">
-    <article class="mobile-memory-item">
-      <div class="memory-kind"></div>
+    <article class="memory-item">
+      <div class="memory-item-top">
+        <div class="memory-kind"></div>
+        <button class="memory-delete-btn danger" type="button" aria-label="Delete memory">✕</button>
+      </div>
       <div class="memory-value"></div>
-      <button type="button" class="memory-delete-btn">Delete</button>
     </article>
   </template>
 
-  <input id="fileInput" type="file" multiple hidden>
-
-  <script src="/static/js/nova-mobile-app.js?v=phase4mobileux1" defer></script>
-  <script src="/static/js/nova-brain-router-panel.js?v=phase4mobileux1" defer></script>
+  <script src="/static/js/nova-mobile-app.js?v=mobile_deep_fix_final_1"></script>
 </body>
 </html>

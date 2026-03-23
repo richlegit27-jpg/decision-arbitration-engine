@@ -31,7 +31,6 @@
       streamController: null,
       streamAssistantIndex: -1,
       panelLocked: false,
-      lastUserMessage: "",
     },
   };
 
@@ -219,49 +218,7 @@
         message.response ??
         ""
       ),
-      router_meta: message.router_meta || message.router || null,
-      created_at: message.created_at || null,
-      streaming: !!message.streaming,
     };
-  }
-
-  function updateLastUserMessage() {
-    const last = [...app.state.messages]
-      .reverse()
-      .find((msg) => safeText(msg.role).toLowerCase() === "user" && safeText(msg.content));
-
-    app.state.lastUserMessage = last ? safeText(last.content) : "";
-
-    const btn = byId("regenerateBtn");
-    if (btn) {
-      btn.disabled = app.state.isSending || !app.state.lastUserMessage;
-      btn.classList.toggle("is-disabled", btn.disabled);
-    }
-  }
-
-  function setSendingState(flag) {
-    app.state.isSending = !!flag;
-
-    const sendBtn = byId("sendBtn");
-    const regenBtn = byId("regenerateBtn");
-    const attachBtn = byId("attachBtn");
-    const newSessionBtn = byId("newSessionBtn");
-    const input = byId("messageInput");
-
-    if (sendBtn) {
-      sendBtn.disabled = app.state.isSending;
-      sendBtn.classList.toggle("is-loading", app.state.isSending);
-    }
-
-    if (regenBtn) {
-      regenBtn.disabled = app.state.isSending || !app.state.lastUserMessage;
-      regenBtn.classList.toggle("is-loading", app.state.isSending);
-      regenBtn.classList.toggle("is-disabled", regenBtn.disabled);
-    }
-
-    if (attachBtn) attachBtn.disabled = app.state.isSending;
-    if (newSessionBtn) newSessionBtn.disabled = app.state.isSending;
-    if (input) input.disabled = app.state.isSending;
   }
 
   function renderAttachedFiles() {
@@ -294,22 +251,16 @@
       const content = node.querySelector(".message-content");
 
       node.classList.add(message.role === "user" ? "user" : "assistant");
-      if (message.streaming) {
-        node.classList.add("streaming");
-      }
-
       if (role) role.textContent = message.role === "user" ? "You" : "Nova";
 
       if (content) {
         const text = extractText(message.content);
-        const cursor = message.streaming ? `<span class="nova-stream-cursor" aria-hidden="true">▍</span>` : "";
-        content.innerHTML = escapeHtml(text).replace(/\n/g, "<br>") + cursor;
+        content.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
       }
 
       root.appendChild(node);
     }
 
-    updateLastUserMessage();
     scheduleScrollToBottom();
   }
 
@@ -429,22 +380,18 @@
     }
   }
 
-  function pushMessage(role, content = "", extras = {}) {
+  function pushMessage(role, content = "") {
     app.state.messages.push({
       role: role === "user" ? "user" : "assistant",
       content: extractText(content),
-      ...extras,
     });
     renderMessages();
     return app.state.messages.length - 1;
   }
 
-  function updateMessageAt(index, content, extras = null) {
+  function updateMessageAt(index, content) {
     if (index < 0 || index >= app.state.messages.length) return;
     app.state.messages[index].content = extractText(content);
-    if (extras && typeof extras === "object") {
-      Object.assign(app.state.messages[index], extras);
-    }
     renderMessages();
   }
 
@@ -458,8 +405,8 @@
   async function loadState() {
     const data = await fetchJson(API.state);
     app.state.sessions = Array.isArray(data.sessions) ? data.sessions : [];
-    app.state.activeSessionId = data.active_session_id || data.current_session_id || app.state.activeSessionId || null;
-    app.state.currentModel = data.current_model || app.state.currentModel || "gpt-4.1-mini";
+    app.state.activeSessionId = data.active_session_id || app.state.activeSessionId || null;
+    app.state.currentModel = data.current_model || "gpt-4.1-mini";
     renderSessions();
   }
 
@@ -467,7 +414,7 @@
     if (!sessionId) return;
 
     const data = await fetchJson(API.getChat(sessionId));
-    app.state.activeSessionId = data.session_id || data.session?.id || sessionId;
+    app.state.activeSessionId = data.session_id || sessionId;
     app.state.messages = Array.isArray(data.messages) ? data.messages.map(normalizeMessage) : [];
     renderMessages();
 
@@ -526,7 +473,6 @@
       uploaded.push({
         id: data.id,
         name: data.name,
-        size: data.size || file.size || 0,
       });
     }
 
@@ -581,13 +527,10 @@
     app.state.streamController = null;
     app.state.streamAssistantIndex = -1;
     app.state.isSending = false;
-    setSendingState(false);
   }
 
-  async function streamSend(messageText, options = {}) {
+  async function streamSend(messageText) {
     const sessionId = await ensureActiveSession();
-
-    const suppressLocalUser = !!options.suppressLocalUser;
 
     const response = await fetch(API.stream, {
       method: "POST",
@@ -618,11 +561,7 @@
     const decoder = new TextDecoder("utf-8");
     const streamState = { buffer: "" };
 
-    if (!suppressLocalUser) {
-      pushMessage("user", messageText);
-    }
-
-    const assistantIndex = pushMessage("assistant", "", { streaming: true, router_meta: null });
+    const assistantIndex = pushMessage("assistant", "");
     app.state.streamAssistantIndex = assistantIndex;
 
     let done = false;
@@ -655,15 +594,6 @@
             if (payload?.session_id) {
               app.state.activeSessionId = payload.session_id;
             }
-
-            if (payload?.router_meta) {
-              window.__novaLastRouterMeta = payload.router_meta;
-              window.dispatchEvent(
-                new CustomEvent("nova:router-meta", { detail: payload.router_meta })
-              );
-              app.state.messages[assistantIndex].router_meta = payload.router_meta;
-            }
-
             continue;
           }
 
@@ -685,18 +615,7 @@
               ""
             );
 
-            updateMessageAt(assistantIndex, finalText, {
-              streaming: false,
-              router_meta: payload?.router_meta || app.state.messages[assistantIndex]?.router_meta || null,
-            });
-
-            if (payload?.router_meta) {
-              window.__novaLastRouterMeta = payload.router_meta;
-              window.dispatchEvent(
-                new CustomEvent("nova:router-meta", { detail: payload.router_meta })
-              );
-            }
-
+            updateMessageAt(assistantIndex, finalText);
             done = true;
             break;
           }
@@ -728,20 +647,12 @@
       }
 
       if (!safeText(app.state.messages[assistantIndex]?.content)) {
-        updateMessageAt(assistantIndex, "No response received.", { streaming: false });
-      } else {
-        updateMessageAt(
-          assistantIndex,
-          app.state.messages[assistantIndex]?.content || "",
-          { streaming: false }
-        );
+        updateMessageAt(assistantIndex, "No response received.");
       }
     } catch (error) {
       const current = extractText(app.state.messages[assistantIndex]?.content || "");
       if (!current.trim()) {
-        updateMessageAt(assistantIndex, "Send failed.", { streaming: false });
-      } else {
-        updateMessageAt(assistantIndex, current, { streaming: false });
+        updateMessageAt(assistantIndex, "Send failed.");
       }
       throw error;
     } finally {
@@ -760,8 +671,10 @@
     const text = safeText(input?.value);
     if (!text) return;
 
-    setSendingState(true);
+    app.state.isSending = true;
     app.state.streamController = new AbortController();
+
+    pushMessage("user", text);
 
     if (input) {
       input.value = "";
@@ -791,34 +704,8 @@
       console.error(error);
       setStatus(error?.message ? `Send failed: ${error.message}` : "Send failed");
     } finally {
+      app.state.isSending = false;
       app.state.streamController = null;
-      setSendingState(false);
-    }
-  }
-
-  async function regenerateLastReply() {
-    if (app.state.isSending) return;
-    if (!app.state.lastUserMessage) return;
-
-    setSendingState(true);
-    app.state.streamController = new AbortController();
-    setStatus("Regenerating...");
-
-    try {
-      await streamSend(app.state.lastUserMessage, { suppressLocalUser: false });
-      await loadState();
-      if (app.state.activeSessionId) {
-        const session = app.state.sessions.find((item) => item.id === app.state.activeSessionId);
-        setActiveSessionMeta(session?.title || "Mobile assistant");
-      }
-      setStatus("Ready");
-      scheduleScrollToBottom(true);
-    } catch (error) {
-      console.error(error);
-      setStatus(error?.message ? `Regenerate failed: ${error.message}` : "Regenerate failed");
-    } finally {
-      app.state.streamController = null;
-      setSendingState(false);
     }
   }
 
@@ -861,7 +748,6 @@
     byId("refreshMemoryBtn")?.addEventListener("click", loadMemory);
     byId("composerForm")?.addEventListener("submit", handleSend);
     byId("memoryForm")?.addEventListener("submit", handleSaveMemory);
-    byId("regenerateBtn")?.addEventListener("click", regenerateLastReply);
 
     byId("attachBtn")?.addEventListener("click", () => {
       byId("fileInput")?.click();
@@ -952,7 +838,6 @@
 
       autoResizeTextarea(byId("messageInput"));
       renderAttachedFiles();
-      setSendingState(false);
       setStatus("Ready");
       setMemoryStatus("Ready");
       scheduleScrollToBottom(true);
@@ -960,7 +845,6 @@
       console.error(error);
       setStatus("Bootstrap failed");
       setMemoryStatus("Bootstrap failed");
-      setSendingState(false);
     } finally {
       app.state.isBootstrapping = false;
     }
@@ -976,6 +860,5 @@
     openLeftPanel,
     openRightPanel,
     abortActiveStream,
-    regenerateLastReply,
   };
 })();
