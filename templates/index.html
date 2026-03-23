@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Nova</title>
-  <link rel="stylesheet" href="/static/css/nova-style.css?v=phase3sync1">
-  <link rel="stylesheet" href="/static/css/nova-polish.css?v=phase3polish1">
-  <link rel="stylesheet" href="/static/css/nova-router-control.css?v=phase4router1">
+
+  <link rel="stylesheet" href="/static/css/nova-style.css?v=phase4stable1">
+  <link rel="stylesheet" href="/static/css/nova-polish.css?v=phase4stable1">
+  <link rel="stylesheet" href="/static/css/nova-router-control.css?v=phase4stable1">
 </head>
 <body>
   <div id="appShell" class="app-shell">
-    <!-- LEFT SIDEBAR -->
     <aside id="sidebar" class="left-sidebar" aria-hidden="false">
       <div class="sidebar-header">
         <button id="toggleSidebar" class="rail-toggle" type="button" aria-label="Toggle sidebar" title="Toggle sidebar">
@@ -60,7 +60,6 @@
       </div>
     </aside>
 
-    <!-- MAIN PANEL -->
     <main id="mainPanel" class="main-panel">
       <header class="main-topbar">
         <div class="topbar-left">
@@ -141,7 +140,6 @@
       </section>
     </main>
 
-    <!-- RIGHT / MEMORY PANEL -->
     <aside id="memoryPanel" class="memory-panel" aria-hidden="false">
       <div class="memory-header">
         <div class="memory-title-wrap">
@@ -214,7 +212,6 @@
     </aside>
   </div>
 
-  <!-- ROUTER CONTROL MOUNT -->
   <div id="novaRouterControl" class="nova-router-control" data-open="false" data-intent="idle" aria-live="polite">
     <button
       id="novaRouterControlToggle"
@@ -225,7 +222,6 @@
       data-router-toggle
     >
       <span id="novaRouterIntentPill" class="nova-router-pill" data-router-pill>idle</span>
-
       <span class="nova-router-toggle-label">
         <span class="nova-router-toggle-title">Router Control</span>
         <span class="nova-router-toggle-subtitle">Inspect route + memory</span>
@@ -350,18 +346,14 @@
       const sidebar = document.getElementById("sidebar");
       const memoryPanel = document.getElementById("memoryPanel");
 
-      if (sidebar) {
-        sidebar.setAttribute("aria-hidden", "true");
-      }
-      if (memoryPanel) {
-        memoryPanel.setAttribute("aria-hidden", "true");
-      }
+      if (sidebar) sidebar.setAttribute("aria-hidden", "true");
+      if (memoryPanel) memoryPanel.setAttribute("aria-hidden", "true");
     })();
   </script>
 
-  <script src="/static/js/nova-ultimate.js?v=phase3sync1"></script>
-  <script src="/static/js/nova-phase3-repair.js?v=phase3repair1"></script>
-  <script src="/static/js/nova-polish.js?v=phase3polish1"></script>
-  <script src="/static/js/nova-brain-router-panel.js?v=phase4brain1"></script>
+  <script src="/static/js/nova-ultimate.js?v=phase4stable1" defer></script>
+  <script src="/static/js/nova-phase3-repair.js?v=phase4stable1" defer></script>
+  <script src="/static/js/nova-polish.js?v=phase4stable1" defer></script>
+  <script src="/static/js/nova-brain-router-panel.js?v=phase4stable1" defer></script>
 </body>
 </html>
