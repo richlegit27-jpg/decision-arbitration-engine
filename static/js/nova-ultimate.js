@@ -456,12 +456,16 @@
         const routerBadge = isAssistant
           ? buildRouterBadgeHtml(msg.router || msg.router_meta || null)
           : "";
+        const cursorHtml =
+          isAssistant && msg.streaming
+            ? `<span class="nova-stream-cursor" aria-hidden="true">▍</span>`
+            : "";
 
         return `
           <article class="chat-message ${escapeHtml(role)}">
             <div class="chat-message-role">${escapeHtml(role)}</div>
             ${routerBadge}
-            <div class="chat-message-content">${content || "&nbsp;"}</div>
+            <div class="chat-message-content">${content || "&nbsp;"}${cursorHtml}</div>
             <div class="chat-message-footer">
               <div class="chat-message-time">${escapeHtml(time)}</div>
               ${
@@ -654,8 +658,32 @@
         content: "",
         timestamp: nowUnix(),
         router: null,
+        streaming: true,
       };
       state.messages.push(assistantStreamMessage);
+
+      let finalContent = "";
+      let streamRouter = null;
+      let pendingDelta = "";
+      let renderScheduled = false;
+
+      function flushPendingDelta() {
+        if (!pendingDelta) return;
+        finalContent += pendingDelta;
+        assistantStreamMessage.content = finalContent;
+        pendingDelta = "";
+      }
+
+      function scheduleRender() {
+        if (renderScheduled) return;
+        renderScheduled = true;
+        requestAnimationFrame(() => {
+          renderScheduled = false;
+          flushPendingDelta();
+          renderMessages();
+        });
+      }
+
       renderMessages();
 
       if (input && attachedFilesOverride === null && !suppressLocalUser) {
@@ -694,8 +722,6 @@
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        let finalContent = "";
-        let streamRouter = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -709,66 +735,80 @@
             buffer = buffer.slice(separatorIndex + 2);
 
             if (!rawBlock) continue;
+            if (rawBlock === "data: [DONE]") continue;
 
-            const parsed = parseSSEBlock(rawBlock);
-            const eventName = parsed.event;
+            let parsed;
+            try {
+              parsed = parseSSEBlock(rawBlock);
+            } catch (err) {
+              console.warn("Failed to parse SSE block:", rawBlock, err);
+              continue;
+            }
+
             const data = parsed.data || {};
+            const type = data.type || parsed.event || "";
 
-            if (eventName === "start") {
+            if (type === "meta") {
               if (data.router || data.router_meta) {
                 streamRouter = data.router || data.router_meta;
                 assistantStreamMessage.router = streamRouter;
                 updateRouterDebug(streamRouter);
-                renderMessages();
+                scheduleRender();
               }
-            } else if (eventName === "delta" || eventName === "token" || eventName === "message") {
-              if (typeof data.content === "string") {
-                finalContent += data.content;
-                assistantStreamMessage.content = finalContent;
-                renderMessages();
-              } else if (data.message && typeof data.message.content === "string") {
+            }
+
+            else if (type === "delta") {
+              if (typeof data.content === "string" && data.content) {
+                pendingDelta += data.content;
+                scheduleRender();
+              }
+            }
+
+            else if (type === "done") {
+              flushPendingDelta();
+
+              if (data.message && typeof data.message.content === "string") {
                 assistantStreamMessage.content = data.message.content;
-                finalContent = assistantStreamMessage.content;
-                renderMessages();
+                finalContent = data.message.content;
+              } else if (typeof data.content === "string" && !assistantStreamMessage.content) {
+                assistantStreamMessage.content = data.content;
+                finalContent = data.content;
               }
 
               if (data.router || data.router_meta) {
                 streamRouter = data.router || data.router_meta;
                 assistantStreamMessage.router = streamRouter;
                 updateRouterDebug(streamRouter);
-                renderMessages();
               }
 
               if (data.session_id) {
                 state.activeSessionId = data.session_id;
               }
-            } else if (eventName === "done") {
-              if (typeof data.content === "string" && !assistantStreamMessage.content) {
-                assistantStreamMessage.content = data.content;
-              }
 
-              if (data.message && typeof data.message.content === "string") {
-                assistantStreamMessage.content = data.message.content;
-              }
-
-              if (data.router || data.router_meta) {
-                streamRouter = data.router || data.router_meta;
-                assistantStreamMessage.router = streamRouter;
-                updateRouterDebug(streamRouter);
-              }
-
+              assistantStreamMessage.streaming = false;
               renderMessages();
-            } else if (eventName === "error") {
+            }
+
+            else if (type === "error") {
               throw new Error(data.message || data.error || "Stream failed");
             }
           }
         }
+
+        flushPendingDelta();
       } else {
         const text = await res.text();
         const fallbackText = safeText(text) || "No response.";
         assistantStreamMessage.content = fallbackText;
+        assistantStreamMessage.streaming = false;
         renderMessages();
       }
+
+      if (streamRouter) {
+        assistantStreamMessage.router = streamRouter;
+      }
+
+      assistantStreamMessage.streaming = false;
 
       if (attachedFilesOverride === null) {
         state.attachedFiles = [];
@@ -785,7 +825,8 @@
       console.error(err);
 
       if (assistantStreamMessage) {
-        assistantStreamMessage.content = `Error: ${err.message || err}`;
+        assistantStreamMessage.streaming = false;
+        assistantStreamMessage.content = assistantStreamMessage.content || `Error: ${err.message || err}`;
         assistantStreamMessage.router = {
           mode: "general",
           intent: "error",

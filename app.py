@@ -523,31 +523,123 @@ def api_chat_stream():
     if request.method == "OPTIONS":
         return ("", 204)
 
-    response = api_chat()
+    data = safe_json()
 
-    try:
-        data = response.get_json()
-    except Exception:
-        data = {"ok": False, "error": "Invalid response"}
+    session_id = str(data.get("session_id") or "").strip()
+    user_message = normalize_text(str(data.get("message") or ""))
+
+    if not user_message:
+        return jsonify({"ok": False, "error": "Message is required."}), 400
+
+    session = find_session(session_id) if session_id else None
+    if not session:
+        session = make_session()
+
+    memory_items = load_memory()
+    raw_meta = route_message(user_message, memory_items)
+    router_meta = normalize_router_meta(raw_meta)
+    set_last_router_meta(router_meta, source="stream_route")
+
+    user_entry = {
+        "id": str(uuid.uuid4()),
+        "role": "user",
+        "content": user_message,
+        "created_at": now_ts(),
+    }
+    session.setdefault("messages", []).append(user_entry)
+
+    model_messages = [
+        {"role": m["role"], "content": m["content"]}
+        for m in session["messages"][-16:]
+        if m.get("role") in {"user", "assistant"}
+    ]
+
+    def sse(payload: Dict[str, Any]) -> str:
+        return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
     def generate():
+        full_text = ""
         try:
-            msg = data.get("message", {}) or {}
-            content = msg.get("content", "")
-            router_meta = data.get("router_meta") or data.get("router") or {}
+            yield sse({"type": "meta", "router_meta": router_meta})
 
-            yield f"data: {json.dumps({'content': content})}\n\n"
-            yield f"data: {json.dumps({'router_meta': router_meta})}\n\n"
+            if not client:
+                fallback = (
+                    "[Nova offline fallback]\n\n"
+                    f"Mode: {router_meta.get('mode')}\n"
+                    f"Intent: {router_meta.get('intent')}\n"
+                    "No OPENAI_API_KEY found, so this is a local fallback response."
+                )
+                full_text = fallback
+                yield sse({"type": "delta", "content": fallback})
+            else:
+                response = client.chat.completions.create(
+                    model=OPENAI_MODEL,
+                    temperature=0.3,
+                    stream=True,
+                    messages=[
+                        {"role": "system", "content": build_system_prompt(router_meta, memory_items)},
+                        *model_messages,
+                    ],
+                )
+
+                for chunk in response:
+                    try:
+                        delta = chunk.choices[0].delta.content or ""
+                    except Exception:
+                        delta = ""
+
+                    if not delta:
+                        continue
+
+                    full_text += delta
+                    yield sse({"type": "delta", "content": delta})
+
+            assistant_entry = {
+                "id": str(uuid.uuid4()),
+                "role": "assistant",
+                "content": full_text,
+                "created_at": now_ts(),
+                "router_meta": router_meta,
+            }
+            session["messages"].append(assistant_entry)
+
+            if session.get("title", "New Chat") == "New Chat":
+                session["title"] = summarize_text(user_message)
+
+            session["updated_at"] = now_ts()
+            session["router_meta"] = router_meta
+
+            save_session(session)
+            set_last_router_meta(router_meta, source="stream_saved")
+
+            usage = load_usage()
+            usage["last_chat_at"] = now_ts()
+            usage["last_mode"] = router_meta.get("mode")
+            usage["last_intent"] = router_meta.get("intent")
+            usage["chat_count"] = int(usage.get("chat_count", 0)) + 1
+            save_usage(usage)
+
+            yield sse(
+                {
+                    "type": "done",
+                    "message": assistant_entry,
+                    "router_meta": router_meta,
+                    "session": session_summary(session),
+                    "session_id": session["id"],
+                }
+            )
             yield "data: [DONE]\n\n"
+
         except Exception as exc:
-            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+            yield sse({"type": "error", "error": str(exc)})
 
     return Response(
         stream_with_context(generate()),
         mimetype="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
         },
     )
 
