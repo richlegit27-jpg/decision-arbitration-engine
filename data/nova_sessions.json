@@ -3,148 +3,28 @@
   "current_model": "gpt-4.1-mini",
   "sessions": [
     {
-      "id": "b42051e1-fd78-4565-bf00-5ee2548ab958",
-      "title": "hi",
-      "created_at": 1774243158.6037934,
-      "updated_at": 1774265262.1797287,
-      "pinned": true,
+      "id": "dfc13361-39e3-47b7-9544-a13446dae53d",
+      "title": "What am i planning",
+      "created_at": 1774269720.8341672,
+      "updated_at": 1774269762.7684886,
+      "pinned": false,
       "messages": [
         {
-          "id": "0bd44125-5ba6-4fb9-8c8a-d296514863eb",
+          "id": "745f3e60-e09c-4d2f-9d8e-a3709bb92fbd",
           "role": "user",
-          "content": "hi",
-          "created_at": 1774255732.7074876
+          "content": "What am i planning",
+          "created_at": 1774269760.7054722
         },
         {
-          "id": "5edf1c14-940e-4e47-a25a-6d3393e57bc3",
+          "id": "d4a5cb28-af86-40cc-9644-81153aa3c24e",
           "role": "assistant",
-          "content": "Hi — how can I help?",
-          "created_at": 1774255734.773443,
+          "content": "You’re planning to **go to the gym**.",
+          "created_at": 1774269762.768473,
           "router_meta": {
-            "mode": "general",
-            "intent": "conversation",
-            "reason": "Defaulted to general conversation.",
-            "memory_hits": 0,
-            "memory_used": [],
-            "route_time_ms": 1,
-            "timestamp": 1774255732707,
-            "source": "route_message",
-            "updated_at": "2026-03-23 01:48:52",
-            "model": "gpt-5.4"
-          }
-        },
-        {
-          "id": "b045d904-98e8-4657-8542-5cea348bbb53",
-          "role": "user",
-          "content": "what is camp x ray about",
-          "created_at": 1774256713.8385322
-        },
-        {
-          "id": "0689872a-a451-440b-9d97-6d8304cd46b6",
-          "role": "assistant",
-          "content": "*Camp X-Ray* is a 2014 drama about a young U.S. Army guard, Amy Cole, who is assigned to Guantánamo Bay. There, she develops an unexpected connection with one of the detainees, Ali Amir, and the film focuses on their conversations, the harsh routines of the prison, and the moral tension around detention and dehumanization.\n\nIn short: it’s about friendship, power, and the human side of Guantánamo.\n\nIf you want, I can also give:\n- a spoiler-free review\n- a full plot summary\n- whether it’s based on a true story",
-          "created_at": 1774256717.5609684,
-          "router_meta": {
-            "mode": "general",
-            "intent": "conversation",
-            "reason": "Defaulted to general conversation.",
-            "memory_hits": 0,
-            "memory_used": [],
-            "route_time_ms": 1,
-            "timestamp": 1774256713838,
-            "source": "route_message",
-            "updated_at": "2026-03-23 02:05:13",
-            "model": "gpt-5.4"
-          }
-        },
-        {
-          "id": "95429443-f8b0-41b1-a2bc-06823a53d685",
-          "role": "user",
-          "content": "what is camp x ray about",
-          "created_at": 1774256739.4792604
-        },
-        {
-          "id": "55c33381-2292-47aa-a305-a26b1dd1a081",
-          "role": "assistant",
-          "content": "*Camp X-Ray* is a drama set at Guantánamo Bay. It follows a young Army guard, Amy Cole, who becomes disillusioned with the prison’s harsh environment and forms an unusual bond with a detainee named Ali. The movie is about their relationship, the psychological strain of the camp, and the moral questions surrounding imprisonment and dehumanization.\n\nIf you want, I can give you:\n- a very short summary\n- a spoiler-filled plot recap\n- whether it’s worth watching",
-          "created_at": 1774256742.2218952,
-          "router_meta": {
-            "mode": "general",
-            "intent": "conversation",
-            "reason": "Defaulted to general conversation.",
-            "memory_hits": 0,
-            "memory_used": [],
-            "route_time_ms": 1,
-            "timestamp": 1774256739479,
-            "source": "route_message",
-            "updated_at": "2026-03-23 02:05:39",
-            "model": "gpt-5.4"
-          }
-        },
-        {
-          "id": "881ec05f-cb40-4a67-850e-58dd5ff81910",
-          "role": "user",
-          "content": "what year did it come out",
-          "created_at": 1774256877.9187937
-        },
-        {
-          "id": "a7c23a36-ea51-4fc5-b2b9-6b51f102cbda",
-          "role": "assistant",
-          "content": "*Camp X-Ray* came out in **2014**.",
-          "created_at": 1774256879.7204738,
-          "router_meta": {
-            "mode": "general",
-            "intent": "conversation",
-            "reason": "Defaulted to general conversation.",
-            "memory_hits": 0,
-            "memory_used": [],
-            "route_time_ms": 1,
-            "timestamp": 1774256877918,
-            "source": "route_message",
-            "updated_at": "2026-03-23 02:07:57",
-            "model": "gpt-5.4"
-          }
-        },
-        {
-          "id": "5f61f5c1-1a52-47d7-bade-2f8e67ce3e9d",
-          "role": "user",
-          "content": "was that the story where the soldiers raped inmates in jail and it was all over the news",
-          "created_at": 1774257056.3510282
-        },
-        {
-          "id": "c00b93a3-54a1-4c3a-9886-2fdc3c9fe62d",
-          "role": "assistant",
-          "content": "You’re probably thinking of **Abu Ghraib**, not *Camp X-Ray*.\n\n- **Abu Ghraib** was the Iraqi prison where U.S. personnel abused and humiliated detainees, and the scandal was widely reported in the news in the early 2000s.\n- **Camp X-Ray** is a **fictional drama** set at **Guantánamo Bay**, focused on a guard and a detainee. It deals with mistreatment and dehumanization, but it is **not** the Abu Ghraib scandal story.\n\nIf you want, I can explain the difference between **Camp X-Ray, Guantánamo, and Abu Ghraib** in a quick comparison.",
-          "created_at": 1774257059.7830591,
-          "router_meta": {
-            "mode": "writing",
-            "intent": "draft_or_rewrite",
-            "reason": "Detected writing-oriented language.",
-            "memory_hits": 0,
-            "memory_used": [],
-            "route_time_ms": 1,
-            "timestamp": 1774257056350,
-            "source": "route_message",
-            "updated_at": "2026-03-23 02:10:56",
-            "model": "gpt-5.4"
-          }
-        },
-        {
-          "id": "1fdf1b25-dd9e-474e-8380-0ff85e27ec03",
-          "role": "user",
-          "content": "where is guantanamo bay",
-          "created_at": 1774260614.1578746
-        },
-        {
-          "id": "bdc25c03-be54-46d8-b054-e4d6a527e82c",
-          "role": "assistant",
-          "content": "Guantánamo Bay is in **southeastern Cuba**.\n\nMore specifically:\n- It’s a **bay on the coast of Cuba**\n- The **U.S. Naval Base at Guantánamo Bay** is located there\n- It’s often called **Gitmo**\n\nIf you want, I can also explain **why the U.S. has a base in Cuba**.",
-          "created_at": 1774260617.0324686,
-          "router_meta": {
-            "mode": "general",
-            "intent": "conversation",
+            "mode": "planning",
+            "intent": "project_planning",
             "confidence": null,
-            "reason": "Defaulted to general conversation.",
+            "reason": "Detected planning / roadmap language.",
             "memory_used": false,
             "memory_count": 0,
             "memory_items": [],
@@ -152,16 +32,16 @@
             "model": "gpt-5.4",
             "provider": "openai",
             "source": "route_message",
-            "timestamp": 1774260614157,
-            "updated_at": "2026-03-23 03:10:14"
+            "timestamp": 1774269760705,
+            "updated_at": "2026-03-23 05:42:40"
           }
         }
       ],
       "router_meta": {
-        "mode": "general",
-        "intent": "conversation",
+        "mode": "planning",
+        "intent": "project_planning",
         "confidence": null,
-        "reason": "Defaulted to general conversation.",
+        "reason": "Detected planning / roadmap language.",
         "memory_used": false,
         "memory_count": 0,
         "memory_items": [],
@@ -169,51 +49,28 @@
         "model": "gpt-5.4",
         "provider": "openai",
         "source": "route_message",
-        "timestamp": 1774260614157,
-        "updated_at": "2026-03-23 03:10:14"
+        "timestamp": 1774269760705,
+        "updated_at": "2026-03-23 05:42:40"
       }
     },
     {
-      "id": "63e4848e-92ab-461e-a571-c0d2969d5085",
-      "title": "New Chat",
-      "created_at": 1774265292.6717432,
-      "updated_at": 1774265292.6717432,
-      "pinned": false,
-      "messages": [],
-      "router_meta": {
-        "mode": "general",
-        "intent": "idle",
-        "confidence": null,
-        "reason": "No user message yet.",
-        "memory_used": false,
-        "memory_count": 0,
-        "memory_items": [],
-        "route_time_ms": 0,
-        "model": "gpt-5.4",
-        "provider": "openai",
-        "source": "session_create",
-        "timestamp": 1774265292671,
-        "updated_at": "2026-03-23 04:28:12"
-      }
-    },
-    {
-      "id": "fd9d552d-de6a-4ca2-8486-0bd972aaa9f7",
+      "id": "193b5b8a-c8a9-441b-aff2-0f8c15595424",
       "title": "Yo",
-      "created_at": 1774265293.0129082,
-      "updated_at": 1774265294.9120312,
+      "created_at": 1774270416.7942917,
+      "updated_at": 1774270432.9817507,
       "pinned": false,
       "messages": [
         {
-          "id": "16f27ba1-6677-4f57-b77a-f5f95afd79e0",
+          "id": "6f8588f8-d747-44a0-bfba-beeb298c249d",
           "role": "user",
           "content": "Yo",
-          "created_at": 1774265293.0133429
+          "created_at": 1774270431.1336143
         },
         {
-          "id": "c8396a26-cb4c-4ac9-a9b4-e07a4d4a66ee",
+          "id": "748ae657-9931-48ee-8012-3f6d7c503687",
           "role": "assistant",
           "content": "Yo — what’s up?",
-          "created_at": 1774265294.9120202,
+          "created_at": 1774270432.9817386,
           "router_meta": {
             "mode": "general",
             "intent": "conversation",
@@ -226,8 +83,8 @@
             "model": "gpt-5.4",
             "provider": "openai",
             "source": "route_message",
-            "timestamp": 1774265293013,
-            "updated_at": "2026-03-23 04:28:13"
+            "timestamp": 1774270431133,
+            "updated_at": "2026-03-23 05:53:51"
           }
         }
       ],
@@ -243,51 +100,28 @@
         "model": "gpt-5.4",
         "provider": "openai",
         "source": "route_message",
-        "timestamp": 1774265293013,
-        "updated_at": "2026-03-23 04:28:13"
+        "timestamp": 1774270431133,
+        "updated_at": "2026-03-23 05:53:51"
       }
     },
     {
-      "id": "fcc4cf2b-4b96-4c20-a119-fdcc269c4581",
-      "title": "New Chat",
-      "created_at": 1774265623.8941047,
-      "updated_at": 1774265623.8941047,
-      "pinned": false,
-      "messages": [],
-      "router_meta": {
-        "mode": "general",
-        "intent": "idle",
-        "confidence": null,
-        "reason": "No user message yet.",
-        "memory_used": false,
-        "memory_count": 0,
-        "memory_items": [],
-        "route_time_ms": 0,
-        "model": "gpt-5.4",
-        "provider": "openai",
-        "source": "session_create",
-        "timestamp": 1774265623894,
-        "updated_at": "2026-03-23 04:33:43"
-      }
-    },
-    {
-      "id": "fb0600ee-db37-4dfd-a2f0-4ef7a85f4d78",
-      "title": "Sup",
-      "created_at": 1774265624.249607,
-      "updated_at": 1774265625.7820146,
+      "id": "84b7f364-bb00-48e1-8441-e3983e53a192",
+      "title": "can you tell me the news for today",
+      "created_at": 1774271390.8282237,
+      "updated_at": 1774271395.5595884,
       "pinned": false,
       "messages": [
         {
-          "id": "7e04407d-18da-4f10-bee6-efeacaf96e96",
+          "id": "29c4d88a-d575-4abc-9cb1-50fda6baf88b",
           "role": "user",
-          "content": "Sup",
-          "created_at": 1774265624.2500482
+          "content": "can you tell me the news for today",
+          "created_at": 1774271390.8288522
         },
         {
-          "id": "5f71b6ca-475f-401d-9099-ed9fb59ab631",
+          "id": "e35582bd-ec86-47fd-9cdd-feabeb851b49",
           "role": "assistant",
-          "content": "Hey — what’s up?",
-          "created_at": 1774265625.7819903,
+          "content": "I can, but I don’t have live news access in this chat.\n\nIf you want, I can still help in a few useful ways:\n\n1. **Give you a quick news summary** if you paste headlines or links\n2. **Summarize today’s major topics** by category:\n   - World\n   - U.S.\n   - Business\n   - Tech\n   - Science\n   - Sports\n   - Entertainment\n3. **Help you find reliable sources** for live updates\n4. **Create a personalized briefing** if you tell me your country and interests\n\nIf you want live news right now, check:\n- Reuters\n- AP News\n- BBC News\n- NPR\n- Al Jazeera\n- Your local major newspaper or TV station\n\nIf you want, reply with:\n- **“Give me a general news briefing”**\n- **“Tech news only”**\n- **“U.S. headlines”**\n- **your country/region**\n\nand I’ll format it like a morning briefing.",
+          "created_at": 1774271395.5595744,
           "router_meta": {
             "mode": "general",
             "intent": "conversation",
@@ -300,8 +134,8 @@
             "model": "gpt-5.4",
             "provider": "openai",
             "source": "route_message",
-            "timestamp": 1774265624250,
-            "updated_at": "2026-03-23 04:33:44"
+            "timestamp": 1774271390828,
+            "updated_at": "2026-03-23 06:09:50"
           }
         }
       ],
@@ -317,8 +151,8 @@
         "model": "gpt-5.4",
         "provider": "openai",
         "source": "route_message",
-        "timestamp": 1774265624250,
-        "updated_at": "2026-03-23 04:33:44"
+        "timestamp": 1774271390828,
+        "updated_at": "2026-03-23 06:09:50"
       }
     }
   ],
