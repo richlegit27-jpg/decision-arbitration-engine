@@ -1007,8 +1007,8 @@ def serve_static(filename: str) -> Any:
     return send_from_directory(STATIC_DIR, filename)
 
 APP_HOST = "0.0.0.0"
-APP_PORT = 5001
-APP_DEBUG = True
+APP_PORT = int(os.getenv("PORT", "5001"))
+APP_DEBUG = False
 
 if __name__ == "__main__":
     print(f"Nova running on http://{APP_HOST}:{APP_PORT}")
