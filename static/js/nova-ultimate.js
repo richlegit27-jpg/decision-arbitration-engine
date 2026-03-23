@@ -134,6 +134,7 @@
   async function apiGet(url) {
     const res = await fetch(url, {
       method: "GET",
+      credentials: "include",
       headers: { Accept: "application/json" },
     });
 
@@ -147,6 +148,7 @@
   async function apiPost(url, payload) {
     const res = await fetch(url, {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
@@ -177,6 +179,7 @@
 
     const res = await fetch(API.upload, {
       method: "POST",
+      credentials: "include",
       body: formData,
     });
 
@@ -721,6 +724,7 @@
 
       const res = await fetch(API.stream, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Accept: "text/event-stream, application/json, text/plain, */*",
@@ -783,9 +787,7 @@
               if (data.session_id) {
                 state.activeSessionId = data.session_id;
               }
-            }
-
-            else if (type === "delta") {
+            } else if (type === "delta") {
               const delta =
                 typeof data.delta === "string"
                   ? data.delta
@@ -797,9 +799,7 @@
 
               pendingDelta += delta;
               scheduleRender();
-            }
-
-            else if (type === "done") {
+            } else if (type === "done") {
               flushPendingDelta();
 
               const final =
@@ -830,9 +830,7 @@
 
               assistantStreamMessage.streaming = false;
               renderMessages();
-            }
-
-            else if (type === "error") {
+            } else if (type === "error") {
               throw new Error(data.message || data.error || "Stream failed");
             }
           }

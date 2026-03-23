@@ -137,6 +137,7 @@
   async function fetchJson(url, options = {}) {
     const response = await fetch(url, {
       method: options.method || "GET",
+      credentials: "include",
       headers: {
         ...(options.body ? { "Content-Type": "application/json" } : {}),
         ...(options.headers || {}),
@@ -462,6 +463,7 @@
 
       const response = await fetch(API.upload, {
         method: "POST",
+        credentials: "include",
         body: form,
       });
 
@@ -534,6 +536,7 @@
 
     const response = await fetch(API.stream, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         session_id: sessionId,
