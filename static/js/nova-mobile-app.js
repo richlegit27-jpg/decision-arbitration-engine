@@ -1,13 +1,20 @@
 (() => {
   "use strict";
 
+  if (window.__novaMobileAppLoaded) return;
+  window.__novaMobileAppLoaded = true;
+
   const API = {
     state: "/api/state",
     getChat: (sessionId) => `/api/chat/${encodeURIComponent(sessionId)}`,
     memory: "/api/memory",
-    addMemory: "/api/memory/add",
+    memoryDelete: "/api/memory/delete",
     newSession: "/api/session/new",
-    stream: "/api/chat/stream",
+    deleteSession: "/api/session/delete",
+    renameSession: "/api/session/rename",
+    duplicateSession: "/api/session/duplicate",
+    pinSession: "/api/session/pin",
+    send: "/api/chat/send",
     upload: "/api/upload",
   };
 
@@ -18,8 +25,8 @@
       memoryItems: [],
       activeSessionId: null,
       currentModel: "gpt-4.1-mini",
-      isSending: false,
       attachedFiles: [],
+      isSending: false,
     },
   };
 
@@ -37,395 +44,445 @@
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
-  }
-
-  function nowUnix() {
-    return Math.floor(Date.now() / 1000);
-  }
-
-  function formatTime(ts) {
-    if (!ts) return "";
-    try {
-      return new Date(Number(ts) * 1000).toLocaleString();
-    } catch {
-      return "";
-    }
-  }
-
-  async function apiGet(url) {
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    });
-    if (!res.ok) throw new Error(`GET failed: ${url}`);
-    return res.json();
-  }
-
-  async function apiPost(url, payload) {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload || {}),
-    });
-
-    if (!res.ok) {
-      let msg = `POST failed: ${url}`;
-      try {
-        const data = await res.json();
-        msg = data.detail || data.message || msg;
-      } catch {}
-      throw new Error(msg);
-    }
-
-    return res.json();
-  }
-
-  async function uploadFiles(files) {
-    const list = Array.isArray(files) ? files : [];
-    if (!list.length) return [];
-
-    const formData = new FormData();
-    for (const file of list) {
-      formData.append("files", file);
-    }
-
-    const res = await fetch(API.upload, {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!res.ok) {
-      throw new Error("Upload failed");
-    }
-
-    const data = await res.json();
-    return Array.isArray(data.files) ? data.files : [];
+      .replaceAll("'", "&#039;");
   }
 
   function setStatus(text) {
-    const el = byId("mobileModelStatus");
-    if (el) el.textContent = safeText(text || "Model ready");
+    const el = byId("statusText");
+    const composer = byId("composerStatus");
+    if (el) el.textContent = text;
+    if (composer) composer.textContent = text;
   }
 
-  function updateHeader() {
-    const titleEl = byId("mobileChatTitle");
-    const subtitleEl = byId("mobileChatSubtitle");
-    const currentSession = app.state.sessions.find(
-      (s) => s.session_id === app.state.activeSessionId
-    );
+  function setMemoryStatus(text) {
+    const el = byId("memoryStatus");
+    if (el) el.textContent = text;
+  }
 
-    if (titleEl) titleEl.textContent = currentSession?.title || "Nova";
+  function setActiveSessionMeta(text) {
+    const el = byId("activeSessionMeta");
+    if (el) el.textContent = text;
+  }
 
-    if (subtitleEl) {
-      subtitleEl.textContent = app.state.isSending
-        ? "Thinking..."
-        : `${app.state.messages.length || 0} messages`;
+  function autoResizeTextarea(el) {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }
+
+  function scrollToBottom() {
+    const el = byId("chatScroll");
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function closePanels() {
+    document.body.classList.remove("mobile-left-open", "mobile-right-open", "panel-open");
+    const backdrop = byId("panelBackdrop");
+    if (backdrop) backdrop.hidden = true;
+    byId("mobileSidebar")?.setAttribute("aria-hidden", "true");
+    byId("mobileMemoryPanel")?.setAttribute("aria-hidden", "true");
+  }
+
+  function openLeftPanel() {
+    document.body.classList.remove("mobile-right-open");
+    document.body.classList.add("mobile-left-open", "panel-open");
+    const backdrop = byId("panelBackdrop");
+    if (backdrop) backdrop.hidden = false;
+    byId("mobileSidebar")?.setAttribute("aria-hidden", "false");
+    byId("mobileMemoryPanel")?.setAttribute("aria-hidden", "true");
+  }
+
+  function openRightPanel() {
+    document.body.classList.remove("mobile-left-open");
+    document.body.classList.add("mobile-right-open", "panel-open");
+    const backdrop = byId("panelBackdrop");
+    if (backdrop) backdrop.hidden = false;
+    byId("mobileSidebar")?.setAttribute("aria-hidden", "true");
+    byId("mobileMemoryPanel")?.setAttribute("aria-hidden", "false");
+  }
+
+  async function fetchJson(url, options = {}) {
+    const response = await fetch(url, {
+      method: options.method || "GET",
+      headers: {
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers || {}),
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data?.error || "Request failed");
     }
-  }
 
-  function openScreen(screenId) {
-    const el = byId(screenId);
-    if (!el) return;
-    el.classList.remove("hidden");
-    el.setAttribute("aria-hidden", "false");
-  }
-
-  function closeScreen(screenId) {
-    const el = byId(screenId);
-    if (!el) return;
-    el.classList.add("hidden");
-    el.setAttribute("aria-hidden", "true");
-  }
-
-  function autosizeInput() {
-    const input = byId("mobileMessageInput");
-    if (!input) return;
-    input.style.height = "auto";
-    input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
+    return data;
   }
 
   function renderAttachedFiles() {
-    const bar = byId("mobileAttachedFiles");
+    const bar = byId("attachedFilesBar");
     if (!bar) return;
 
-    bar.innerHTML = "";
     if (!app.state.attachedFiles.length) {
-      bar.classList.remove("has-files");
+      bar.hidden = true;
+      bar.textContent = "";
       return;
     }
 
-    bar.classList.add("has-files");
-
-    app.state.attachedFiles.forEach((file, index) => {
-      const chip = document.createElement("div");
-      chip.className = "mobile-file-chip";
-      chip.innerHTML = `
-        <span>${escapeHtml(file.name)} (${Math.max(1, Math.round(file.size / 1024))} KB)</span>
-        <button type="button" data-file-index="${index}">✕</button>
-      `;
-      bar.appendChild(chip);
-    });
-
-    bar.querySelectorAll("[data-file-index]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const index = Number(btn.getAttribute("data-file-index"));
-        app.state.attachedFiles.splice(index, 1);
-        renderAttachedFiles();
-      });
-    });
+    bar.hidden = false;
+    bar.textContent = `Attached: ${app.state.attachedFiles.map((f) => f.name).join(", ")}`;
   }
 
   function renderMessages() {
-    const container = byId("mobileChatMessages");
-    if (!container) return;
+    const root = byId("messageList");
+    const tpl = byId("messageItemTemplate");
+    const welcome = byId("welcomeState");
+    if (!root || !tpl) return;
 
-    if (!app.state.messages.length) {
-      container.innerHTML = `
-        <div class="mobile-empty-state">
-          <div class="mobile-empty-card">
-            <div class="mobile-empty-title">Nova Mobile is ready</div>
-            <div class="mobile-empty-subtitle">Start a new message.</div>
-          </div>
-        </div>
-      `;
-      updateHeader();
-      return;
+    root.innerHTML = "";
+    if (welcome) welcome.hidden = app.state.messages.length > 0;
+
+    for (const message of app.state.messages) {
+      const node = tpl.content.firstElementChild.cloneNode(true);
+      const role = node.querySelector(".message-role");
+      const content = node.querySelector(".message-content");
+
+      node.classList.add(message.role === "user" ? "user" : "assistant");
+      if (role) role.textContent = message.role === "user" ? "You" : "Nova";
+      if (content) content.innerHTML = escapeHtml(message.content || "").replace(/\n/g, "<br>");
+
+      root.appendChild(node);
     }
 
-    container.innerHTML = app.state.messages.map((msg) => `
-      <div class="mobile-message ${escapeHtml(msg.role || "assistant")}">
-        <div class="mobile-message-role">${escapeHtml(msg.role || "assistant")}</div>
-        <div>${escapeHtml(msg.content || "").replace(/\n/g, "<br>")}</div>
-        <div class="mobile-message-time">${escapeHtml(formatTime(msg.timestamp || nowUnix()))}</div>
-      </div>
-    `).join("");
-
-    container.scrollTop = container.scrollHeight;
-    updateHeader();
+    requestAnimationFrame(scrollToBottom);
   }
 
   function renderSessions() {
-    const list = byId("mobileSessionList");
-    if (!list) return;
+    const root = byId("sessionList");
+    const tpl = byId("sessionItemTemplate");
+    if (!root || !tpl) return;
 
-    if (!app.state.sessions.length) {
-      list.innerHTML = `<div class="mobile-card">No chats yet.</div>`;
-      return;
-    }
+    root.innerHTML = "";
 
-    list.innerHTML = app.state.sessions.map((session) => `
-      <button class="mobile-session-item" data-session-id="${escapeHtml(session.session_id)}" type="button">
-        <div class="mobile-session-title">${escapeHtml(session.title || "New Chat")}</div>
-        <div class="mobile-session-meta">${escapeHtml(String(session.message_count || 0))} messages</div>
-      </button>
-    `).join("");
-
-    list.querySelectorAll("[data-session-id]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const sessionId = btn.getAttribute("data-session-id");
-        await loadSession(sessionId);
-        closeScreen("mobileMenuScreen");
-      });
+    const sessions = [...app.state.sessions].sort((a, b) => {
+      if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+      return String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
     });
+
+    for (const session of sessions) {
+      const node = tpl.content.firstElementChild.cloneNode(true);
+
+      const main = node.querySelector(".session-main");
+      const title = node.querySelector(".session-title");
+      const meta = node.querySelector(".session-meta");
+      const pinBtn = node.querySelector(".session-pin");
+      const renameBtn = node.querySelector(".session-rename");
+      const duplicateBtn = node.querySelector(".session-duplicate");
+      const deleteBtn = node.querySelector(".session-delete");
+
+      if (title) title.textContent = safeText(session.title) || "New Chat";
+      if (meta) meta.textContent = `${session.pinned ? "Pinned · " : ""}${session.message_count || 0} msgs`;
+
+      main?.addEventListener("click", async () => {
+        app.state.activeSessionId = session.id;
+        await loadChat(session.id);
+        closePanels();
+      });
+
+      pinBtn?.addEventListener("click", async () => {
+        await fetchJson(API.pinSession, {
+          method: "POST",
+          body: {
+            session_id: session.id,
+            pinned: !session.pinned,
+          },
+        });
+        await bootstrap();
+      });
+
+      renameBtn?.addEventListener("click", async () => {
+        const nextTitle = window.prompt("Rename session", session.title || "New Chat");
+        if (!safeText(nextTitle)) return;
+
+        await fetchJson(API.renameSession, {
+          method: "POST",
+          body: {
+            session_id: session.id,
+            title: nextTitle,
+          },
+        });
+
+        await bootstrap();
+      });
+
+      duplicateBtn?.addEventListener("click", async () => {
+        await fetchJson(API.duplicateSession, {
+          method: "POST",
+          body: { session_id: session.id },
+        });
+        await bootstrap();
+        closePanels();
+      });
+
+      deleteBtn?.addEventListener("click", async () => {
+        const ok = window.confirm(`Delete "${session.title || "New Chat"}"?`);
+        if (!ok) return;
+
+        await fetchJson(API.deleteSession, {
+          method: "POST",
+          body: { session_id: session.id },
+        });
+
+        await bootstrap();
+      });
+
+      root.appendChild(node);
+    }
   }
 
   function renderMemory() {
-    const list = byId("mobileMemoryList");
-    const status = byId("mobileMemoryStatus");
-    if (!list) return;
+    const root = byId("memoryList");
+    const tpl = byId("memoryItemTemplate");
+    if (!root || !tpl) return;
 
-    if (status) {
-      status.textContent = app.state.memoryItems.length
-        ? `${app.state.memoryItems.length} memory item(s)`
-        : "No saved memory yet.";
+    root.innerHTML = "";
+
+    for (const item of app.state.memoryItems) {
+      const node = tpl.content.firstElementChild.cloneNode(true);
+      const kind = node.querySelector(".memory-kind");
+      const value = node.querySelector(".memory-value");
+      const deleteBtn = node.querySelector(".memory-delete-btn");
+
+      if (kind) kind.textContent = safeText(item.kind) || "memory";
+      if (value) value.textContent = safeText(item.value);
+
+      deleteBtn?.addEventListener("click", async () => {
+        await fetchJson(API.memoryDelete, {
+          method: "POST",
+          body: { id: item.id },
+        });
+        await loadMemory();
+      });
+
+      root.appendChild(node);
     }
-
-    if (!app.state.memoryItems.length) {
-      list.innerHTML = `<div class="mobile-card">No saved memory yet.</div>`;
-      return;
-    }
-
-    list.innerHTML = app.state.memoryItems.map((item) => `
-      <div class="mobile-memory-item">
-        <div class="mobile-memory-kind">${escapeHtml(item.kind || "memory")}</div>
-        <div class="mobile-memory-value">${escapeHtml(item.value || "")}</div>
-        <div class="mobile-memory-meta">${escapeHtml(formatTime(item.updated_at || item.created_at || nowUnix()))}</div>
-      </div>
-    `).join("");
   }
 
   async function loadState() {
-    const data = await apiGet(API.state);
+    const data = await fetchJson(API.state);
     app.state.sessions = Array.isArray(data.sessions) ? data.sessions : [];
-
-    if (!app.state.activeSessionId && app.state.sessions.length) {
-      app.state.activeSessionId = app.state.sessions[0].session_id;
-    }
-
+    app.state.activeSessionId = data.active_session_id || null;
+    app.state.currentModel = data.current_model || "gpt-4.1-mini";
     renderSessions();
-    updateHeader();
   }
 
-  async function loadSession(sessionId) {
+  async function loadChat(sessionId) {
     if (!sessionId) return;
-    const data = await apiGet(API.getChat(sessionId));
-    app.state.activeSessionId = data.session_id;
+
+    const data = await fetchJson(API.getChat(sessionId));
+    app.state.activeSessionId = data.session_id || sessionId;
     app.state.messages = Array.isArray(data.messages) ? data.messages : [];
     renderMessages();
-    renderSessions();
+
+    const session = app.state.sessions.find((item) => item.id === app.state.activeSessionId);
+    setActiveSessionMeta(session?.title || "Mobile assistant");
   }
 
   async function loadMemory() {
-    const data = await apiGet(API.memory);
-    app.state.memoryItems = Array.isArray(data.items) ? data.items : [];
+    const data = await fetchJson(API.memory);
+    app.state.memoryItems = Array.isArray(data.memory) ? data.memory : [];
     renderMemory();
   }
 
-  async function createNewSession() {
-    const data = await apiPost(API.newSession, {});
-    await loadState();
-    if (data.session_id) {
-      await loadSession(data.session_id);
-    }
+  async function createSession() {
+    const data = await fetchJson(API.newSession, {
+      method: "POST",
+      body: { model: app.state.currentModel },
+    });
+
+    app.state.activeSessionId = data.active_session_id || data.session_id || null;
+    await bootstrap();
+    closePanels();
   }
 
-  async function addMemory(kind, value) {
-    await apiPost(API.addMemory, { kind, value });
-    await loadMemory();
-  }
+  async function uploadFiles(fileList) {
+    const uploaded = [];
 
-  async function sendMessage() {
-    const input = byId("mobileMessageInput");
-    if (!input || app.state.isSending) return;
+    for (const file of Array.from(fileList || [])) {
+      const form = new FormData();
+      form.append("file", file);
 
-    const content = safeText(input.value);
-    const hasFiles = app.state.attachedFiles.length > 0;
-
-    if (!content && !hasFiles) return;
-
-    if (!app.state.activeSessionId) {
-      await createNewSession();
-    }
-
-    app.state.isSending = true;
-    setStatus("Responding...");
-    updateHeader();
-
-    try {
-      let uploadedFiles = [];
-
-      if (hasFiles) {
-        setStatus("Uploading...");
-        uploadedFiles = await uploadFiles(app.state.attachedFiles);
-      }
-
-      const model = app.state.currentModel || "gpt-4.1-mini";
-
-      const res = await fetch(API.stream, {
+      const response = await fetch(API.upload, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: app.state.activeSessionId,
-          content,
-          model,
-          uploaded_files: uploadedFiles,
-        }),
+        body: form,
       });
 
-      if (!res.ok) {
-        throw new Error("Send failed");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || `Upload failed for ${file.name}`);
       }
 
-      input.value = "";
+      uploaded.push({
+        id: data.id,
+        name: data.name,
+      });
+    }
+
+    app.state.attachedFiles = uploaded;
+    renderAttachedFiles();
+  }
+
+  async function handleSend(event) {
+    event?.preventDefault?.();
+    if (app.state.isSending) return;
+
+    const input = byId("messageInput");
+    const text = safeText(input?.value);
+    if (!text) return;
+
+    app.state.isSending = true;
+    setStatus("Sending...");
+
+    try {
+      await fetchJson(API.send, {
+        method: "POST",
+        body: {
+          session_id: app.state.activeSessionId,
+          message: text,
+          model: app.state.currentModel,
+          files: app.state.attachedFiles,
+        },
+      });
+
+      if (input) {
+        input.value = "";
+        autoResizeTextarea(input);
+      }
+
       app.state.attachedFiles = [];
-      autosizeInput();
       renderAttachedFiles();
 
       await loadState();
-      await loadSession(app.state.activeSessionId);
-      await loadMemory();
+      if (app.state.activeSessionId) {
+        await loadChat(app.state.activeSessionId);
+      }
 
-      setStatus("Model ready");
-    } catch (err) {
-      console.error(err);
+      setStatus("Ready");
+    } catch (error) {
+      console.error(error);
       setStatus("Send failed");
     } finally {
       app.state.isSending = false;
-      updateHeader();
+    }
+  }
+
+  async function handleSaveMemory(event) {
+    event?.preventDefault?.();
+
+    const kind = safeText(byId("memoryKind")?.value || "memory");
+    const valueEl = byId("memoryValue");
+    const value = safeText(valueEl?.value || "");
+
+    if (!value) {
+      setMemoryStatus("Enter a memory value first.");
+      return;
+    }
+
+    try {
+      setMemoryStatus("Saving...");
+      await fetchJson(API.memory, {
+        method: "POST",
+        body: { kind, value },
+      });
+
+      if (valueEl) valueEl.value = "";
+      setMemoryStatus("Saved");
+      await loadMemory();
+    } catch (error) {
+      console.error(error);
+      setMemoryStatus("Save failed");
     }
   }
 
   function bindEvents() {
-    byId("mobileMenuBtn")?.addEventListener("click", () => openScreen("mobileMenuScreen"));
-    byId("closeMobileMenuBtn")?.addEventListener("click", () => closeScreen("mobileMenuScreen"));
+    byId("openLeftPanelBtn")?.addEventListener("click", openLeftPanel);
+    byId("openRightPanelBtn")?.addEventListener("click", openRightPanel);
+    byId("closeLeftPanelBtn")?.addEventListener("click", closePanels);
+    byId("closeRightPanelBtn")?.addEventListener("click", closePanels);
+    byId("panelBackdrop")?.addEventListener("click", closePanels);
 
-    byId("mobileMemoryBtn")?.addEventListener("click", async () => {
-      await loadMemory();
-      openScreen("mobileMemoryScreen");
-    });
-    byId("closeMobileMemoryBtn")?.addEventListener("click", () => closeScreen("mobileMemoryScreen"));
+    byId("newSessionBtn")?.addEventListener("click", createSession);
+    byId("refreshMemoryBtn")?.addEventListener("click", loadMemory);
+    byId("composerForm")?.addEventListener("submit", handleSend);
+    byId("memoryForm")?.addEventListener("submit", handleSaveMemory);
 
-    byId("mobileNewSessionBtn")?.addEventListener("click", async () => {
-      await createNewSession();
-      closeScreen("mobileMenuScreen");
-    });
-
-    byId("mobileRefreshSessionsBtn")?.addEventListener("click", loadState);
-    byId("mobileRefreshMemoryBtn")?.addEventListener("click", loadMemory);
-
-    byId("mobileAttachBtn")?.addEventListener("click", () => {
-      byId("mobileFileInput")?.click();
+    byId("attachBtn")?.addEventListener("click", () => {
+      byId("fileInput")?.click();
     });
 
-    byId("mobileFileInput")?.addEventListener("change", (event) => {
-      const files = Array.from(event.target.files || []);
-      app.state.attachedFiles = files;
-      renderAttachedFiles();
-    });
-
-    byId("mobileSendBtn")?.addEventListener("click", sendMessage);
-
-    byId("mobileMessageInput")?.addEventListener("input", autosizeInput);
-
-    byId("mobileMessageInput")?.addEventListener("keydown", async (event) => {
-      if (event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
-        await sendMessage();
+    byId("fileInput")?.addEventListener("change", async (event) => {
+      try {
+        await uploadFiles(event.target.files);
+        event.target.value = "";
+      } catch (error) {
+        console.error(error);
+        setStatus("Upload failed");
       }
     });
 
-    byId("mobileMemoryForm")?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const kind = safeText(byId("mobileMemoryKind")?.value || "memory");
-      const value = safeText(byId("mobileMemoryValue")?.value || "");
-      if (!value) return;
-      await addMemory(kind, value);
-      byId("mobileMemoryValue").value = "";
+    byId("messageInput")?.addEventListener("input", (event) => {
+      autoResizeTextarea(event.currentTarget);
+    });
+
+    byId("messageInput")?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        handleSend(event);
+      }
+    });
+
+    window.addEventListener("orientationchange", () => {
+      setTimeout(() => {
+        closePanels();
+        autoResizeTextarea(byId("messageInput"));
+        scrollToBottom();
+      }, 80);
+    });
+
+    window.addEventListener("resize", () => {
+      autoResizeTextarea(byId("messageInput"));
     });
   }
 
   async function bootstrap() {
-    bindEvents();
-    setStatus("Loading...");
-    await loadState();
+    try {
+      setStatus("Loading...");
+      setMemoryStatus("Loading...");
 
-    if (app.state.activeSessionId) {
-      await loadSession(app.state.activeSessionId);
-    } else {
-      renderMessages();
+      await loadState();
+
+      if (app.state.activeSessionId) {
+        await loadChat(app.state.activeSessionId);
+      } else {
+        app.state.messages = [];
+        renderMessages();
+        setActiveSessionMeta("Mobile assistant");
+      }
+
+      await loadMemory();
+
+      autoResizeTextarea(byId("messageInput"));
+      setStatus("Ready");
+      setMemoryStatus("Ready");
+    } catch (error) {
+      console.error(error);
+      setStatus("Bootstrap failed");
+      setMemoryStatus("Bootstrap failed");
     }
-
-    await loadMemory();
-    renderAttachedFiles();
-    autosizeInput();
-    setStatus("Model ready");
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    bootstrap().catch((err) => {
-      console.error("Mobile bootstrap failed:", err);
-      setStatus("Bootstrap failed");
-    });
-  });
+  bindEvents();
+  bootstrap();
 })();
