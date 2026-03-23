@@ -4,19 +4,143 @@
   "sessions": [
     {
       "id": "b42051e1-fd78-4565-bf00-5ee2548ab958",
-      "title": "New Chat",
+      "title": "hi",
       "created_at": 1774243158.6037934,
-      "updated_at": 1774243158.6037934,
+      "updated_at": 1774257059.783061,
       "pinned": false,
-      "messages": [],
+      "messages": [
+        {
+          "id": "0bd44125-5ba6-4fb9-8c8a-d296514863eb",
+          "role": "user",
+          "content": "hi",
+          "created_at": 1774255732.7074876
+        },
+        {
+          "id": "5edf1c14-940e-4e47-a25a-6d3393e57bc3",
+          "role": "assistant",
+          "content": "Hi — how can I help?",
+          "created_at": 1774255734.773443,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "reason": "Defaulted to general conversation.",
+            "memory_hits": 0,
+            "memory_used": [],
+            "route_time_ms": 1,
+            "timestamp": 1774255732707,
+            "source": "route_message",
+            "updated_at": "2026-03-23 01:48:52",
+            "model": "gpt-5.4"
+          }
+        },
+        {
+          "id": "b045d904-98e8-4657-8542-5cea348bbb53",
+          "role": "user",
+          "content": "what is camp x ray about",
+          "created_at": 1774256713.8385322
+        },
+        {
+          "id": "0689872a-a451-440b-9d97-6d8304cd46b6",
+          "role": "assistant",
+          "content": "*Camp X-Ray* is a 2014 drama about a young U.S. Army guard, Amy Cole, who is assigned to Guantánamo Bay. There, she develops an unexpected connection with one of the detainees, Ali Amir, and the film focuses on their conversations, the harsh routines of the prison, and the moral tension around detention and dehumanization.\n\nIn short: it’s about friendship, power, and the human side of Guantánamo.\n\nIf you want, I can also give:\n- a spoiler-free review\n- a full plot summary\n- whether it’s based on a true story",
+          "created_at": 1774256717.5609684,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "reason": "Defaulted to general conversation.",
+            "memory_hits": 0,
+            "memory_used": [],
+            "route_time_ms": 1,
+            "timestamp": 1774256713838,
+            "source": "route_message",
+            "updated_at": "2026-03-23 02:05:13",
+            "model": "gpt-5.4"
+          }
+        },
+        {
+          "id": "95429443-f8b0-41b1-a2bc-06823a53d685",
+          "role": "user",
+          "content": "what is camp x ray about",
+          "created_at": 1774256739.4792604
+        },
+        {
+          "id": "55c33381-2292-47aa-a305-a26b1dd1a081",
+          "role": "assistant",
+          "content": "*Camp X-Ray* is a drama set at Guantánamo Bay. It follows a young Army guard, Amy Cole, who becomes disillusioned with the prison’s harsh environment and forms an unusual bond with a detainee named Ali. The movie is about their relationship, the psychological strain of the camp, and the moral questions surrounding imprisonment and dehumanization.\n\nIf you want, I can give you:\n- a very short summary\n- a spoiler-filled plot recap\n- whether it’s worth watching",
+          "created_at": 1774256742.2218952,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "reason": "Defaulted to general conversation.",
+            "memory_hits": 0,
+            "memory_used": [],
+            "route_time_ms": 1,
+            "timestamp": 1774256739479,
+            "source": "route_message",
+            "updated_at": "2026-03-23 02:05:39",
+            "model": "gpt-5.4"
+          }
+        },
+        {
+          "id": "881ec05f-cb40-4a67-850e-58dd5ff81910",
+          "role": "user",
+          "content": "what year did it come out",
+          "created_at": 1774256877.9187937
+        },
+        {
+          "id": "a7c23a36-ea51-4fc5-b2b9-6b51f102cbda",
+          "role": "assistant",
+          "content": "*Camp X-Ray* came out in **2014**.",
+          "created_at": 1774256879.7204738,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "reason": "Defaulted to general conversation.",
+            "memory_hits": 0,
+            "memory_used": [],
+            "route_time_ms": 1,
+            "timestamp": 1774256877918,
+            "source": "route_message",
+            "updated_at": "2026-03-23 02:07:57",
+            "model": "gpt-5.4"
+          }
+        },
+        {
+          "id": "5f61f5c1-1a52-47d7-bade-2f8e67ce3e9d",
+          "role": "user",
+          "content": "was that the story where the soldiers raped inmates in jail and it was all over the news",
+          "created_at": 1774257056.3510282
+        },
+        {
+          "id": "c00b93a3-54a1-4c3a-9886-2fdc3c9fe62d",
+          "role": "assistant",
+          "content": "You’re probably thinking of **Abu Ghraib**, not *Camp X-Ray*.\n\n- **Abu Ghraib** was the Iraqi prison where U.S. personnel abused and humiliated detainees, and the scandal was widely reported in the news in the early 2000s.\n- **Camp X-Ray** is a **fictional drama** set at **Guantánamo Bay**, focused on a guard and a detainee. It deals with mistreatment and dehumanization, but it is **not** the Abu Ghraib scandal story.\n\nIf you want, I can explain the difference between **Camp X-Ray, Guantánamo, and Abu Ghraib** in a quick comparison.",
+          "created_at": 1774257059.7830591,
+          "router_meta": {
+            "mode": "writing",
+            "intent": "draft_or_rewrite",
+            "reason": "Detected writing-oriented language.",
+            "memory_hits": 0,
+            "memory_used": [],
+            "route_time_ms": 1,
+            "timestamp": 1774257056350,
+            "source": "route_message",
+            "updated_at": "2026-03-23 02:10:56",
+            "model": "gpt-5.4"
+          }
+        }
+      ],
       "router_meta": {
-        "mode": "general",
-        "intent": "idle",
-        "reason": "No user message yet.",
+        "mode": "writing",
+        "intent": "draft_or_rewrite",
+        "reason": "Detected writing-oriented language.",
         "memory_hits": 0,
         "memory_used": [],
-        "route_time_ms": 0,
-        "timestamp": 1774243158603
+        "route_time_ms": 1,
+        "timestamp": 1774257056350,
+        "source": "route_message",
+        "updated_at": "2026-03-23 02:10:56",
+        "model": "gpt-5.4"
       }
     },
     {

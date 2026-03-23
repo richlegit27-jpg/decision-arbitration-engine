@@ -6,6 +6,7 @@
   <title>Nova</title>
   <link rel="stylesheet" href="/static/css/nova-style.css?v=phase3sync1">
   <link rel="stylesheet" href="/static/css/nova-polish.css?v=phase3polish1">
+  <link rel="stylesheet" href="/static/css/nova-router-control.css?v=phase4router1">
 </head>
 <body>
   <div id="appShell" class="app-shell">
@@ -213,6 +214,132 @@
     </aside>
   </div>
 
+  <!-- ROUTER CONTROL MOUNT -->
+  <div id="novaRouterControl" class="nova-router-control" data-open="false" data-intent="idle" aria-live="polite">
+    <button
+      id="novaRouterControlToggle"
+      class="nova-router-toggle"
+      type="button"
+      aria-label="Toggle router control panel"
+      aria-expanded="false"
+      data-router-toggle
+    >
+      <span id="novaRouterIntentPill" class="nova-router-pill" data-router-pill>idle</span>
+
+      <span class="nova-router-toggle-label">
+        <span class="nova-router-toggle-title">Router Control</span>
+        <span class="nova-router-toggle-subtitle">Inspect route + memory</span>
+      </span>
+    </button>
+
+    <section id="novaRouterControlBody" class="nova-router-panel" data-router-body hidden>
+      <div class="nova-router-shell">
+        <div class="nova-router-header">
+          <div class="nova-router-title-wrap">
+            <div class="nova-router-title">Nova Router Control</div>
+            <div class="nova-router-subtitle">Live view of intent, model, memory, and route metadata</div>
+          </div>
+
+          <div class="nova-router-header-actions">
+            <button
+              id="novaRouterControlRefresh"
+              class="nova-router-action"
+              type="button"
+              data-router-refresh
+            >
+              Refresh
+            </button>
+            <button
+              id="novaRouterControlClose"
+              class="nova-router-icon-btn"
+              type="button"
+              aria-label="Close router control"
+              title="Close router control"
+              data-router-close
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <div class="nova-router-toolbar">
+          <div id="novaRouterControlStatus" class="nova-router-status" data-router-status>
+            Waiting for router meta
+          </div>
+        </div>
+
+        <div class="nova-router-body">
+          <div class="nova-router-grid">
+            <div class="nova-router-card">
+              <div class="nova-router-label">Intent</div>
+              <div id="novaRouterIntent" class="nova-router-value" data-router-intent>—</div>
+            </div>
+
+            <div class="nova-router-card">
+              <div class="nova-router-label">Model</div>
+              <div id="novaRouterModel" class="nova-router-value" data-router-model>—</div>
+            </div>
+
+            <div class="nova-router-card">
+              <div class="nova-router-label">Confidence</div>
+              <div id="novaRouterConfidence" class="nova-router-value" data-router-confidence>—</div>
+            </div>
+
+            <div class="nova-router-card">
+              <div class="nova-router-label">Route Time</div>
+              <div id="novaRouterTime" class="nova-router-value" data-router-time>—</div>
+            </div>
+          </div>
+
+          <div class="nova-router-wide-card">
+            <div class="nova-router-label">Reason</div>
+            <div id="novaRouterReason" class="nova-router-value is-reason" data-router-reason>
+              No router meta yet.
+            </div>
+          </div>
+
+          <div class="nova-router-grid">
+            <div class="nova-router-card">
+              <div class="nova-router-label">Memory Count</div>
+              <div id="novaRouterMemoryCount" class="nova-router-value" data-router-memory-count>0</div>
+            </div>
+
+            <div class="nova-router-card">
+              <div class="nova-router-label">Source Count</div>
+              <div id="novaRouterSourceCount" class="nova-router-value" data-router-source-count>0</div>
+            </div>
+          </div>
+
+          <div class="nova-router-stack">
+            <div class="nova-router-wide-card">
+              <div class="nova-router-section-title">Memory Used</div>
+              <div id="novaRouterMemoryList" class="nova-router-list" data-router-memory-list>
+                <div class="nova-router-empty">No memory used.</div>
+              </div>
+            </div>
+
+            <div class="nova-router-wide-card">
+              <div class="nova-router-section-title">Sources Used</div>
+              <div id="novaRouterSourceList" class="nova-router-list" data-router-source-list>
+                <div class="nova-router-empty">No sources used.</div>
+              </div>
+            </div>
+
+            <div class="nova-router-wide-card">
+              <div class="nova-router-section-title">Raw Router Meta</div>
+              <pre id="novaRouterRaw" class="nova-router-pre" data-router-raw>{}</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="nova-router-footer">
+          <div class="nova-router-footer-note">Live router debug state</div>
+          <div id="novaRouterTimestamp" class="nova-router-footer-time" data-router-timestamp>—</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <input id="fileInput" type="file" multiple class="hidden">
 
   <script>
@@ -235,6 +362,6 @@
   <script src="/static/js/nova-ultimate.js?v=phase3sync1"></script>
   <script src="/static/js/nova-phase3-repair.js?v=phase3repair1"></script>
   <script src="/static/js/nova-polish.js?v=phase3polish1"></script>
-  <script src="/static/js/nova-brain-router-panel.js?v=phase3brain1"></script>
+  <script src="/static/js/nova-brain-router-panel.js?v=phase4brain1"></script>
 </body>
 </html>

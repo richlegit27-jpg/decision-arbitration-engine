@@ -1,332 +1,393 @@
 (() => {
   "use strict";
 
-  if (window.__novaBrainRouterPanelLoaded) {
-    console.warn("nova-brain-router-panel.js already loaded");
-    return;
-  }
+  if (window.__novaBrainRouterPanelLoaded) return;
   window.__novaBrainRouterPanelLoaded = true;
 
-  const ROUTER_CONTAINER_ID = "routerContent";
+  const PANEL_ID = "novaRouterPanel";
+  const STYLE_HOOK = "nova-router-panel-ready";
+  const STORAGE_KEY_VISIBLE = "nova.router.panel.visible";
+  const STORAGE_KEY_COLLAPSED = "nova.router.panel.collapsed";
 
-  const state = {
-    lastSignature: "",
-    startedAt: Date.now(),
-    pollTimer: null,
+  const DEFAULT_META = {
+    intent: "general",
+    route: "general",
+    mode: "general",
+    confidence: null,
+    memory_used: null,
+    memory_count: null,
+    model: null,
+    provider: null,
+    source: "idle",
+    timestamp: null,
   };
 
-  function getRouterContainer() {
-    return document.getElementById(ROUTER_CONTAINER_ID);
+  let panel = null;
+  let body = null;
+  let valueRoute = null;
+  let valueIntent = null;
+  let valueConfidence = null;
+  let valueMemory = null;
+  let valueModel = null;
+  let valueSource = null;
+  let toggleBtn = null;
+  let hideBtn = null;
+
+  let state = {
+    visible: readBool(STORAGE_KEY_VISIBLE, true),
+    collapsed: readBool(STORAGE_KEY_COLLAPSED, false),
+    meta: { ...DEFAULT_META },
+  };
+
+  function readBool(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw === null) return fallback;
+      return raw === "1";
+    } catch {
+      return fallback;
+    }
   }
 
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
-  function toTitleCase(value) {
-    const text = String(value || "").trim();
-    if (!text) return "—";
-    return text.charAt(0).toUpperCase() + text.slice(1);
+  function writeBool(key, value) {
+    try {
+      localStorage.setItem(key, value ? "1" : "0");
+    } catch {}
   }
 
   function safeText(value, fallback = "—") {
-    if (value === null || value === undefined) return fallback;
-    const text = String(value).trim();
+    const text = String(value ?? "").trim();
     return text || fallback;
   }
 
-  function normalizeArray(value) {
-    if (Array.isArray(value)) return value.filter(Boolean);
-    if (typeof value === "string" && value.trim()) return [value.trim()];
-    return [];
+  function clampConfidence(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const num = Number(value);
+    if (!Number.isFinite(num)) return null;
+    if (num <= 1) return `${Math.round(num * 100)}%`;
+    return `${Math.round(num)}%`;
   }
 
-  function pickRouterMeta(payload) {
-    if (!payload || typeof payload !== "object") {
-      return null;
+  function boolish(value) {
+    if (value === true) return "yes";
+    if (value === false) return "no";
+    return null;
+  }
+
+  function normalizeMeta(input) {
+    const raw = input && typeof input === "object" ? input : {};
+    const route = raw.route || raw.mode || raw.intent || DEFAULT_META.route;
+    const intent = raw.intent || raw.route || raw.mode || DEFAULT_META.intent;
+
+    let memoryValue = null;
+    if (typeof raw.memory_count !== "undefined" && raw.memory_count !== null) {
+      memoryValue = String(raw.memory_count);
+    } else if (typeof raw.memory_used !== "undefined") {
+      memoryValue = boolish(raw.memory_used);
+    } else if (typeof raw.memory !== "undefined") {
+      memoryValue = boolish(raw.memory);
     }
 
-    const direct =
-      payload.router ||
-      payload.route ||
-      payload.routing ||
-      payload.route_meta ||
-      payload.router_meta ||
-      payload.debug?.router ||
-      payload.debug?.route ||
-      payload.meta?.router ||
-      payload.meta?.route ||
+    const modelValue =
+      raw.model ||
+      raw.model_name ||
+      raw.selected_model ||
+      raw.provider_model ||
       null;
 
-    if (direct && typeof direct === "object") {
-      return direct;
+    const providerValue = raw.provider || raw.vendor || null;
+    const sourceValue =
+      raw.source ||
+      raw.origin ||
+      raw.from ||
+      (raw.debug ? "debug" : null) ||
+      "live";
+
+    return {
+      route: safeText(route),
+      intent: safeText(intent),
+      mode: safeText(raw.mode || route),
+      confidence: clampConfidence(raw.confidence),
+      memory_used:
+        typeof raw.memory_used !== "undefined" ? raw.memory_used : raw.memory,
+      memory_count:
+        typeof raw.memory_count !== "undefined" ? raw.memory_count : null,
+      memory_display: memoryValue,
+      model: modelValue ? safeText(modelValue) : null,
+      provider: providerValue ? safeText(providerValue) : null,
+      source: safeText(sourceValue),
+      timestamp: raw.timestamp || raw.ts || Date.now(),
+    };
+  }
+
+  function modeClass(value) {
+    const key = String(value || "general").toLowerCase();
+    if (["coding", "planning", "writing", "analysis", "general"].includes(key)) {
+      return key;
     }
-
-    const hasFlatRouterFields =
-      payload.mode ||
-      payload.intent ||
-      payload.reason ||
-      payload.memory_hits ||
-      payload.memory_used ||
-      payload.route_time_ms;
-
-    if (hasFlatRouterFields) {
-      return payload;
-    }
-
-    return null;
+    return "general";
   }
 
-  function numberOrNull(value) {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string" && value.trim() !== "") {
-      const parsed = Number(value);
-      if (Number.isFinite(parsed)) return parsed;
-    }
-    return null;
-  }
+  function ensurePanel() {
+    if (panel && document.body.contains(panel)) return panel;
 
-  function formatMs(value) {
-    const ms = numberOrNull(value);
-    if (ms === null) return "—";
-    if (ms < 1000) return `${Math.round(ms)} ms`;
-    return `${(ms / 1000).toFixed(2)} s`;
-  }
+    panel = document.createElement("section");
+    panel.id = PANEL_ID;
+    panel.className = "nova-router-panel";
+    panel.setAttribute("aria-live", "polite");
+    panel.setAttribute("aria-label", "Nova router panel");
 
-  function getMemoryHits(meta) {
-    const candidates = [
-      meta.memory_hits,
-      meta.memoryHits,
-      meta.memory_hit_count,
-      meta.memoryHitCount,
-      meta.memory_count,
-      meta.memoryCount,
-    ];
+    panel.innerHTML = `
+      <div class="nova-router-header">
+        <div class="nova-router-title">Router Debug</div>
+        <div class="nova-router-header-actions">
+          <button
+            type="button"
+            class="nova-router-toggle"
+            id="novaRouterToggle"
+            aria-label="Collapse router panel"
+            title="Collapse"
+          >–</button>
+          <button
+            type="button"
+            class="nova-router-toggle"
+            id="novaRouterHide"
+            aria-label="Hide router panel"
+            title="Hide"
+          >×</button>
+        </div>
+      </div>
 
-    for (const value of candidates) {
-      const num = numberOrNull(value);
-      if (num !== null) return String(num);
-    }
+      <div class="nova-router-body" id="novaRouterBody">
+        <div class="nova-router-row">
+          <span class="nova-router-label">Route</span>
+          <span class="nova-router-value">
+            <span class="nova-router-badge general" id="novaRouterValueRoute">general</span>
+          </span>
+        </div>
 
-    const used = getMemoryUsed(meta);
-    if (used.length) return String(used.length);
+        <div class="nova-router-row">
+          <span class="nova-router-label">Intent</span>
+          <span class="nova-router-value" id="novaRouterValueIntent">general</span>
+        </div>
 
-    return "0";
-  }
+        <div class="nova-router-row">
+          <span class="nova-router-label">Confidence</span>
+          <span class="nova-router-value" id="novaRouterValueConfidence">—</span>
+        </div>
 
-  function getMemoryUsed(meta) {
-    const candidates = [
-      meta.memory_used,
-      meta.memoryUsed,
-      meta.memories_used,
-      meta.memoriesUsed,
-      meta.memory,
-      meta.memories,
-      meta.context_used,
-      meta.contextUsed,
-    ];
+        <div class="nova-router-row">
+          <span class="nova-router-label">Memory</span>
+          <span class="nova-router-value" id="novaRouterValueMemory">—</span>
+        </div>
 
-    for (const value of candidates) {
-      const arr = normalizeArray(value);
-      if (arr.length) return arr;
-    }
+        <div class="nova-router-row">
+          <span class="nova-router-label">Model</span>
+          <span class="nova-router-value" id="novaRouterValueModel">—</span>
+        </div>
 
-    return [];
-  }
+        <div class="nova-router-row">
+          <span class="nova-router-label">Source</span>
+          <span class="nova-router-value" id="novaRouterValueSource">idle</span>
+        </div>
+      </div>
 
-  function getReason(meta) {
-    return (
-      meta.reason ||
-      meta.route_reason ||
-      meta.routeReason ||
-      meta.explanation ||
-      meta.why ||
-      "—"
-    );
-  }
-
-  function getMode(meta) {
-    return (
-      meta.mode ||
-      meta.route_mode ||
-      meta.routeMode ||
-      meta.type ||
-      "—"
-    );
-  }
-
-  function getIntent(meta) {
-    return (
-      meta.intent ||
-      meta.route_intent ||
-      meta.routeIntent ||
-      meta.task ||
-      "—"
-    );
-  }
-
-  function getTime(meta) {
-    return (
-      meta.route_time_ms ??
-      meta.routeTimeMs ??
-      meta.routing_time_ms ??
-      meta.routingTimeMs ??
-      meta.time_ms ??
-      meta.timeMs ??
-      null
-    );
-  }
-
-  function buildMemoryUsedHtml(memoryUsed) {
-    if (!memoryUsed.length) {
-      return `<div class="router-debug-empty">—</div>`;
-    }
-
-    return `
-      <div class="router-memory-list">
-        ${memoryUsed
-          .map(
-            (item) =>
-              `<div class="router-memory-item">${escapeHtml(String(item))}</div>`
-          )
-          .join("")}
+      <div class="nova-router-footer">
+        <button type="button" class="nova-router-btn" id="novaRouterShowBtn">show</button>
+        <button type="button" class="nova-router-btn" id="novaRouterResetBtn">reset</button>
       </div>
     `;
+
+    document.body.appendChild(panel);
+
+    body = panel.querySelector("#novaRouterBody");
+    valueRoute = panel.querySelector("#novaRouterValueRoute");
+    valueIntent = panel.querySelector("#novaRouterValueIntent");
+    valueConfidence = panel.querySelector("#novaRouterValueConfidence");
+    valueMemory = panel.querySelector("#novaRouterValueMemory");
+    valueModel = panel.querySelector("#novaRouterValueModel");
+    valueSource = panel.querySelector("#novaRouterValueSource");
+    toggleBtn = panel.querySelector("#novaRouterToggle");
+    hideBtn = panel.querySelector("#novaRouterHide");
+
+    const showBtn = panel.querySelector("#novaRouterShowBtn");
+    const resetBtn = panel.querySelector("#novaRouterResetBtn");
+
+    toggleBtn?.addEventListener("click", toggleCollapsed);
+    hideBtn?.addEventListener("click", hidePanel);
+    showBtn?.addEventListener("click", showPanel);
+    resetBtn?.addEventListener("click", resetPanel);
+
+    panel.addEventListener("dblclick", () => {
+      if (!state.visible) showPanel();
+    });
+
+    document.documentElement.classList.add(STYLE_HOOK);
+
+    syncPanelState();
+    renderMeta(state.meta);
+
+    return panel;
   }
 
-  function renderRouter(meta) {
-    const container = getRouterContainer();
-    if (!container) return;
+  function syncPanelState() {
+    if (!panel) return;
 
-    if (!meta) {
-      container.innerHTML = `
-        <div class="router-debug-row"><strong>Mode:</strong> —</div>
-        <div class="router-debug-row"><strong>Intent:</strong> —</div>
-        <div class="router-debug-row"><strong>Reason:</strong> —</div>
-        <div class="router-debug-row"><strong>Memory Hits:</strong> —</div>
-        <div class="router-debug-row"><strong>Time:</strong> —</div>
-        <div class="router-debug-row"><strong>Memory Used:</strong><div class="router-debug-empty">—</div></div>
-      `;
-      return;
+    panel.classList.toggle("hidden", !state.visible);
+    panel.classList.toggle("is-collapsed", !!state.collapsed);
+
+    if (body) {
+      body.style.display = state.collapsed ? "none" : "";
     }
 
-    const mode = toTitleCase(getMode(meta));
-    const intent = safeText(getIntent(meta));
-    const reason = safeText(getReason(meta));
-    const memoryHits = getMemoryHits(meta);
-    const time = formatMs(getTime(meta));
-    const memoryUsed = getMemoryUsed(meta);
+    const footer = panel.querySelector(".nova-router-footer");
+    if (footer) {
+      footer.style.display = state.collapsed ? "none" : "";
+    }
 
-    container.innerHTML = `
-      <div class="router-debug-row"><strong>Mode:</strong> ${escapeHtml(mode)}</div>
-      <div class="router-debug-row"><strong>Intent:</strong> ${escapeHtml(intent)}</div>
-      <div class="router-debug-row"><strong>Reason:</strong> ${escapeHtml(reason)}</div>
-      <div class="router-debug-row"><strong>Memory Hits:</strong> ${escapeHtml(memoryHits)}</div>
-      <div class="router-debug-row"><strong>Time:</strong> ${escapeHtml(time)}</div>
-      <div class="router-debug-row">
-        <strong>Memory Used:</strong>
-        ${buildMemoryUsedHtml(memoryUsed)}
-      </div>
-    `;
+    if (toggleBtn) {
+      toggleBtn.textContent = state.collapsed ? "+" : "–";
+      toggleBtn.setAttribute(
+        "aria-label",
+        state.collapsed ? "Expand router panel" : "Collapse router panel"
+      );
+      toggleBtn.title = state.collapsed ? "Expand" : "Collapse";
+    }
   }
 
-  function signatureForMeta(meta) {
-    try {
-      return JSON.stringify({
-        mode: getMode(meta),
-        intent: getIntent(meta),
-        reason: getReason(meta),
-        memoryHits: getMemoryHits(meta),
-        memoryUsed: getMemoryUsed(meta),
-        time: getTime(meta),
-      });
-    } catch {
-      return String(Date.now());
+  function renderMeta(metaInput) {
+    const meta = normalizeMeta(metaInput);
+    state.meta = meta;
+
+    if (!panel) ensurePanel();
+
+    if (valueRoute) {
+      valueRoute.textContent = safeText(meta.route);
+      valueRoute.className = `nova-router-badge ${modeClass(meta.route)}`;
     }
+
+    if (valueIntent) {
+      valueIntent.textContent = safeText(meta.intent);
+    }
+
+    if (valueConfidence) {
+      valueConfidence.textContent = meta.confidence || "—";
+    }
+
+    if (valueMemory) {
+      const memoryText =
+        meta.memory_display ??
+        (meta.memory_count !== null ? String(meta.memory_count) : "—");
+      valueMemory.textContent = memoryText;
+    }
+
+    if (valueModel) {
+      valueModel.textContent = meta.provider
+        ? `${safeText(meta.provider)} / ${safeText(meta.model)}`
+        : safeText(meta.model);
+    }
+
+    if (valueSource) {
+      valueSource.textContent = safeText(meta.source);
+    }
+
+    window.__novaLastRouterMeta = meta;
   }
 
   function applyRouterMeta(meta) {
-    if (!meta) return;
-
-    const sig = signatureForMeta(meta);
-    if (sig === state.lastSignature) return;
-
-    state.lastSignature = sig;
-    window.__novaLastRouterMeta = meta;
-    renderRouter(meta);
+    renderMeta(meta);
+    if (!state.visible) {
+      state.visible = true;
+      writeBool(STORAGE_KEY_VISIBLE, true);
+      syncPanelState();
+    }
   }
 
-  function tryReadFromWindowState() {
-    const candidates = [
-      window.__novaLastRouterMeta,
-      window.__novaRouterMeta,
-      window.__lastRouterMeta,
-      window.__routerMeta,
-      window.NOVA_LAST_ROUTER_META,
-    ];
+  function toggleCollapsed() {
+    state.collapsed = !state.collapsed;
+    writeBool(STORAGE_KEY_COLLAPSED, state.collapsed);
+    syncPanelState();
+  }
 
-    for (const item of candidates) {
-      if (item && typeof item === "object") {
-        applyRouterMeta(item);
-        return true;
-      }
+  function hidePanel() {
+    state.visible = false;
+    writeBool(STORAGE_KEY_VISIBLE, false);
+    syncPanelState();
+  }
+
+  function showPanel() {
+    state.visible = true;
+    writeBool(STORAGE_KEY_VISIBLE, true);
+    syncPanelState();
+  }
+
+  function resetPanel() {
+    state.meta = { ...DEFAULT_META, source: "reset" };
+    state.visible = true;
+    state.collapsed = false;
+    writeBool(STORAGE_KEY_VISIBLE, true);
+    writeBool(STORAGE_KEY_COLLAPSED, false);
+    syncPanelState();
+    renderMeta(state.meta);
+  }
+
+  function tryReadWindowMeta() {
+    const meta = window.__novaLastRouterMeta || window.__novaRouterMeta || null;
+    if (meta && typeof meta === "object") {
+      applyRouterMeta(meta);
+      return true;
     }
-
     return false;
   }
 
-  function tryReadFromAppState() {
-    const candidates = [
-      window.novaState,
-      window.__novaState,
-      window.appState,
-      window.__appState,
-    ];
+  function tryReadAppMeta() {
+    const app = window.novaApp || window.__novaApp || null;
+    const meta =
+      app?.routerMeta ||
+      app?.state?.routerMeta ||
+      app?.state?.lastRouterMeta ||
+      null;
 
-    for (const stateObj of candidates) {
-      if (!stateObj || typeof stateObj !== "object") continue;
+    if (meta && typeof meta === "object") {
+      applyRouterMeta(meta);
+      return true;
+    }
+    return false;
+  }
 
-      const meta = pickRouterMeta(stateObj);
-      if (meta) {
+  async function tryReadApiMeta() {
+    try {
+      const res = await fetch("/api/state", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+      });
+
+      if (!res.ok) return false;
+
+      const data = await res.json();
+      const meta =
+        data?.router_meta ||
+        data?.routerMeta ||
+        data?.last_router_meta ||
+        data?.lastRouterMeta ||
+        null;
+
+      if (meta && typeof meta === "object") {
         applyRouterMeta(meta);
         return true;
       }
-    }
-
+    } catch {}
     return false;
   }
 
-  async function tryReadFromApiState() {
-    try {
-      const response = await fetch("/api/state", {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
-        cache: "no-store",
-      });
-
-      if (!response.ok) return false;
-
-      const payload = await response.json();
-      const meta = pickRouterMeta(payload);
-      if (!meta) return false;
-
-      applyRouterMeta(meta);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  function installFetchTap() {
-    if (window.__novaBrainFetchTapInstalled) return;
-    window.__novaBrainFetchTapInstalled = true;
+  function patchFetch() {
+    if (window.__novaRouterFetchPatched) return;
+    window.__novaRouterFetchPatched = true;
 
     const originalFetch = window.fetch;
     if (typeof originalFetch !== "function") return;
@@ -335,220 +396,155 @@
       const response = await originalFetch.apply(this, args);
 
       try {
-        const url = typeof args[0] === "string"
-          ? args[0]
-          : args[0]?.url || "";
-
-        const shouldInspect =
-          url.includes("/api/chat") ||
-          url.includes("/api/state") ||
-          url.includes("/api/message") ||
-          url.includes("/chat");
-
-        if (!shouldInspect) {
-          return response;
-        }
-
         const cloned = response.clone();
-        const contentType = cloned.headers.get("content-type") || "";
+        const url =
+          typeof args[0] === "string"
+            ? args[0]
+            : args[0]?.url || response.url || "";
 
-        if (contentType.includes("application/json")) {
-          const data = await cloned.json();
-          const meta = pickRouterMeta(data);
-          if (meta) applyRouterMeta(meta);
-        } else if (
-          contentType.includes("text/plain") ||
-          contentType.includes("text/event-stream")
+        if (
+          url.includes("/api/chat") ||
+          url.includes("/api/send") ||
+          url.includes("/api/state")
         ) {
-          const text = await cloned.text();
-          const meta = extractRouterMetaFromText(text);
-          if (meta) applyRouterMeta(meta);
+          cloned
+            .json()
+            .then((data) => {
+              const meta =
+                data?.router_meta ||
+                data?.routerMeta ||
+                data?.last_router_meta ||
+                data?.lastRouterMeta ||
+                data?.meta?.router ||
+                null;
+
+              if (meta && typeof meta === "object") {
+                applyRouterMeta(meta);
+              }
+            })
+            .catch(() => {});
         }
-      } catch (error) {
-        console.debug("Brain router panel fetch tap skipped:", error);
-      }
+      } catch {}
 
       return response;
     };
   }
 
-  function extractRouterMetaFromText(text) {
-    if (!text || typeof text !== "string") return null;
+  function patchXhr() {
+    if (window.__novaRouterXhrPatched) return;
+    window.__novaRouterXhrPatched = true;
 
-    const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const OriginalOpen = XMLHttpRequest.prototype.open;
+    const OriginalSend = XMLHttpRequest.prototype.send;
 
-    for (let i = lines.length - 1; i >= 0; i -= 1) {
-      const line = lines[i];
-
-      if (line.startsWith("data:")) {
-        const raw = line.slice(5).trim();
-        if (!raw || raw === "[DONE]") continue;
-
-        try {
-          const parsed = JSON.parse(raw);
-          const meta = pickRouterMeta(parsed);
-          if (meta) return meta;
-        } catch {
-          // ignore bad chunk
-        }
-      } else {
-        try {
-          const parsed = JSON.parse(line);
-          const meta = pickRouterMeta(parsed);
-          if (meta) return meta;
-        } catch {
-          // ignore bad chunk
-        }
-      }
-    }
-
-    return null;
-  }
-
-  function installXhrTap() {
-    if (window.__novaBrainXhrTapInstalled) return;
-    window.__novaBrainXhrTapInstalled = true;
-
-    const OriginalXHR = window.XMLHttpRequest;
-    if (!OriginalXHR) return;
-
-    const originalOpen = OriginalXHR.prototype.open;
-    const originalSend = OriginalXHR.prototype.send;
-
-    OriginalXHR.prototype.open = function (method, url, ...rest) {
-      this.__novaUrl = url;
-      return originalOpen.call(this, method, url, ...rest);
+    XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+      this.__novaUrl = String(url || "");
+      return OriginalOpen.call(this, method, url, ...rest);
     };
 
-    OriginalXHR.prototype.send = function (...args) {
+    XMLHttpRequest.prototype.send = function (...args) {
       this.addEventListener("load", function () {
         try {
-          const url = String(this.__novaUrl || "");
+          const url = this.__novaUrl || "";
           if (
             !url.includes("/api/chat") &&
-            !url.includes("/api/state") &&
-            !url.includes("/api/message") &&
-            !url.includes("/chat")
+            !url.includes("/api/send") &&
+            !url.includes("/api/state")
           ) {
             return;
           }
 
-          const contentType = this.getResponseHeader("content-type") || "";
-          if (!this.responseText) return;
+          const data = JSON.parse(this.responseText || "{}");
+          const meta =
+            data?.router_meta ||
+            data?.routerMeta ||
+            data?.last_router_meta ||
+            data?.lastRouterMeta ||
+            data?.meta?.router ||
+            null;
 
-          if (
-            contentType.includes("application/json") ||
-            contentType.includes("text/plain") ||
-            contentType.includes("text/event-stream")
-          ) {
-            const meta =
-              extractRouterMetaFromText(this.responseText) ||
-              pickRouterMeta(JSON.parseSafe?.(this.responseText));
-
-            if (meta) applyRouterMeta(meta);
+          if (meta && typeof meta === "object") {
+            applyRouterMeta(meta);
           }
-        } catch (error) {
-          console.debug("Brain router panel xhr tap skipped:", error);
-        }
+        } catch {}
       });
 
-      return originalSend.apply(this, args);
-    };
-  }
-
-  function installJsonParseSafe() {
-    if (JSON.parseSafe) return;
-    JSON.parseSafe = function (value) {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return null;
-      }
+      return OriginalSend.apply(this, args);
     };
   }
 
   function startPollingFallback() {
-    if (state.pollTimer) return;
+    let attempts = 0;
+    const maxAttempts = 20;
 
-    state.pollTimer = setInterval(async () => {
-      const gotWindow = tryReadFromWindowState();
-      const gotApp = tryReadFromAppState();
+    const tick = async () => {
+      attempts += 1;
 
-      if (gotWindow || gotApp) return;
-      await tryReadFromApiState();
-    }, 1500);
+      const gotWindow = tryReadWindowMeta();
+      const gotApp = tryReadAppMeta();
+
+      if (!gotWindow && !gotApp) {
+        await tryReadApiMeta();
+      }
+
+      if (attempts >= maxAttempts) {
+        clearInterval(timer);
+      }
+    };
+
+    const timer = window.setInterval(tick, 2500);
+    tick();
   }
 
-  function init() {
-    installJsonParseSafe();
-    installFetchTap();
-    installXhrTap();
-    renderRouter(window.__novaLastRouterMeta || null);
+  function bindEvents() {
+    window.addEventListener("nova:router-meta", (event) => {
+      const meta = event?.detail;
+      if (meta && typeof meta === "object") {
+        applyRouterMeta(meta);
+      }
+    });
 
-    const gotWindow = tryReadFromWindowState();
-    const gotApp = tryReadFromAppState();
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "F8") {
+        event.preventDefault();
+        state.visible ? hidePanel() : showPanel();
+      }
 
-    if (!gotWindow && !gotApp) {
-      tryReadFromApiState();
-    }
-
-    startPollingFallback();
+      if (event.key === "F9") {
+        event.preventDefault();
+        toggleCollapsed();
+      }
+    });
 
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) {
-        tryReadFromWindowState();
-        tryReadFromAppState();
-        tryReadFromApiState();
+        tryReadWindowMeta();
+        tryReadAppMeta();
+        tryReadApiMeta();
       }
     });
+  }
 
-    window.addEventListener("nova:router-meta", (event) => {
-      const meta = event?.detail;
-      if (meta && typeof meta === "object") {
-        applyRouterMeta(meta);
-      }
-    });
+  function bootstrap() {
+    ensurePanel();
+    patchFetch();
+    patchXhr();
+    bindEvents();
 
+    const gotWindow = tryReadWindowMeta();
+    const gotApp = tryReadAppMeta();
+
+    if (!gotWindow && !gotApp) {
+      tryReadApiMeta();
+    }
+
+    startPollingFallback();
     console.log("Nova brain router panel loaded");
-
-    window.addEventListener("nova:router-meta", (event) => {
-      const meta = event?.detail;
-      if (meta && typeof meta === "object") {
-        applyRouterMeta(meta);
-      }
-    });
-
-    console.log("Nova brain router panel loaded");
-
-    // ===== DEBUG CLICK HOOK (FIXED) =====
-    document.addEventListener("click", (event) => {
-      const target = event.target;
-
-      console.log("RAW CLICK:", {
-        tag: target?.tagName,
-        id: target?.id,
-        className: target?.className,
-        text: (target?.textContent || "").trim().slice(0, 60)
-      });
-
-      const clickable = event.target.closest(
-        "button, [role='button'], .btn, .mini-btn, div, span"
-      );
-
-      if (!clickable) return;
-
-      console.log("CLICKABLE:", {
-        tag: clickable.tagName,
-        id: clickable.id || null,
-        className: clickable.className || null,
-        text: (clickable.textContent || "").trim()
-      });
-    });
-  } // ✅ THIS LINE WAS MISSING (closes init)
+  }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init, { once: true });
+    document.addEventListener("DOMContentLoaded", bootstrap, { once: true });
   } else {
-    init();
+    bootstrap();
   }
 })();

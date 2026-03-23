@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import datetime
 import json
 import os
 import re
@@ -9,9 +10,8 @@ import uuid
 from threading import Lock
 from typing import Any, Dict, List, Optional
 
-from flask import Flask, Response, jsonify, render_template, request, send_from_directory
+from flask import Flask, Response, jsonify, render_template, request, send_from_directory, stream_with_context
 from openai import OpenAI
-
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -34,6 +34,19 @@ app.config["JSON_SORT_KEYS"] = False
 
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 io_lock = Lock()
+
+LAST_ROUTER_META: Dict[str, Any] = {
+    "mode": "general",
+    "intent": "idle",
+    "reason": "No user message yet.",
+    "memory_hits": 0,
+    "memory_used": [],
+    "route_time_ms": 0,
+    "timestamp": int(time.time() * 1000),
+    "source": "startup",
+    "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    "model": OPENAI_MODEL,
+}
 
 
 def now_ts() -> float:
@@ -105,8 +118,33 @@ def save_usage(data: Dict[str, Any]) -> None:
         write_json_file(USAGE_FILE, data)
 
 
+def set_last_router_meta(router_meta: Optional[Dict[str, Any]] = None, source: str = "server") -> Dict[str, Any]:
+    global LAST_ROUTER_META
+
+    meta = dict(router_meta or {})
+    meta["source"] = str(meta.get("source") or source).strip()
+    meta["updated_at"] = str(meta.get("updated_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")).strip()
+    meta["model"] = str(meta.get("model") or OPENAI_MODEL).strip()
+
+    LAST_ROUTER_META = meta
+    return LAST_ROUTER_META
+
+
 def make_session(title: str = "New Chat") -> Dict[str, Any]:
     ts = now_ts()
+    initial_router_meta = {
+        "mode": "general",
+        "intent": "idle",
+        "reason": "No user message yet.",
+        "memory_hits": 0,
+        "memory_used": [],
+        "route_time_ms": 0,
+        "timestamp": now_ms(),
+        "source": "session_create",
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "model": OPENAI_MODEL,
+    }
+
     return {
         "id": str(uuid.uuid4()),
         "title": title,
@@ -114,15 +152,7 @@ def make_session(title: str = "New Chat") -> Dict[str, Any]:
         "updated_at": ts,
         "pinned": False,
         "messages": [],
-        "router_meta": {
-            "mode": "general",
-            "intent": "idle",
-            "reason": "No user message yet.",
-            "memory_hits": 0,
-            "memory_used": [],
-            "route_time_ms": 0,
-            "timestamp": now_ms(),
-        },
+        "router_meta": initial_router_meta,
     }
 
 
@@ -134,9 +164,11 @@ def get_or_create_default_session() -> Dict[str, Any]:
         session = make_session("New Chat")
         sessions.append(session)
         save_sessions(payload)
+        set_last_router_meta(session.get("router_meta", {}), source="default_session_create")
         return session
 
     sessions.sort(key=lambda s: (not bool(s.get("pinned")), -(s.get("updated_at") or 0)))
+    set_last_router_meta(sessions[0].get("router_meta", {}), source="default_session_pick")
     return sessions[0]
 
 
@@ -242,6 +274,9 @@ def route_message(user_text: str, memory_items: List[Dict[str, Any]]) -> Dict[st
         "memory_used": memory_used,
         "route_time_ms": max(1, now_ms() - started),
         "timestamp": now_ms(),
+        "source": "route_message",
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "model": OPENAI_MODEL,
     }
 
 
@@ -331,6 +366,7 @@ def api_state() -> Any:
     sessions = payload["sessions"]
     if not sessions:
         current = get_or_create_default_session()
+        sessions = load_sessions()["sessions"]
     else:
         current = sessions[0]
 
@@ -338,6 +374,8 @@ def api_state() -> Any:
     current = find_session(current_id) or current
 
     memory_items = load_memory()
+    current_router = current.get("router_meta", {}) or LAST_ROUTER_META
+    set_last_router_meta(current_router, source="api_state")
 
     return jsonify(
         {
@@ -346,7 +384,10 @@ def api_state() -> Any:
             "current_session_id": current.get("id"),
             "sessions": [session_summary(s) for s in sessions],
             "memory": memory_items,
-            "router": current.get("router_meta", {}),
+            "router": current_router,
+            "route_meta": current_router,
+            "router_meta": LAST_ROUTER_META,
+            "last_router_meta": LAST_ROUTER_META,
         }
     )
 
@@ -357,12 +398,18 @@ def api_get_chat(session_id: str) -> Any:
     if not session:
         return jsonify({"ok": False, "error": "Session not found."}), 404
 
+    router_meta = session.get("router_meta", {}) or LAST_ROUTER_META
+    set_last_router_meta(router_meta, source="api_get_chat")
+
     return jsonify(
         {
             "ok": True,
             "session": session_summary(session),
             "messages": session.get("messages", []),
-            "router": session.get("router_meta", {}),
+            "router": router_meta,
+            "route_meta": router_meta,
+            "router_meta": router_meta,
+            "last_router_meta": LAST_ROUTER_META,
         }
     )
 
@@ -383,6 +430,7 @@ def api_chat() -> Any:
 
     memory_items = load_memory()
     router_meta = route_message(user_message, memory_items)
+    set_last_router_meta(router_meta, source="api_chat_route")
 
     user_entry = {
         "id": str(uuid.uuid4()),
@@ -419,6 +467,7 @@ def api_chat() -> Any:
     session["router_meta"] = router_meta
 
     save_session(session)
+    set_last_router_meta(router_meta, source="api_chat_saved")
 
     usage = load_usage()
     usage["last_chat_at"] = now_ts()
@@ -435,8 +484,45 @@ def api_chat() -> Any:
             "router": router_meta,
             "route_meta": router_meta,
             "router_meta": router_meta,
+            "last_router_meta": LAST_ROUTER_META,
             "session": session_summary(session),
         }
+    )
+
+
+@app.route("/api/chat/stream", methods=["POST", "OPTIONS"])
+def api_chat_stream():
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    response = api_chat()
+
+    try:
+        data = response.get_json()
+    except Exception:
+        data = {"ok": False, "error": "Invalid response"}
+
+    def generate():
+        try:
+            msg = data.get("message", {})
+            content = msg.get("content", "")
+
+            payload = json.dumps({
+                "content": content
+            })
+
+            yield f"data: {payload}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
     )
 
 
@@ -446,7 +532,17 @@ def api_session_new() -> Any:
     title = normalize_text(str(data.get("title") or "New Chat"))
     session = make_session(title=title)
     save_session(session)
-    return jsonify({"ok": True, "session": session_summary(session), "router": session["router_meta"]})
+    set_last_router_meta(session.get("router_meta", {}), source="api_session_new")
+    return jsonify(
+        {
+            "ok": True,
+            "session": session_summary(session),
+            "router": session["router_meta"],
+            "route_meta": session["router_meta"],
+            "router_meta": session["router_meta"],
+            "last_router_meta": LAST_ROUTER_META,
+        }
+    )
 
 
 @app.post("/api/session/delete")
@@ -466,7 +562,17 @@ def api_session_delete() -> Any:
         payload["sessions"].append(make_session())
 
     save_sessions(payload)
-    return jsonify({"ok": True, "sessions": [session_summary(s) for s in payload["sessions"]]})
+    remaining_router = payload["sessions"][0].get("router_meta", {}) if payload["sessions"] else LAST_ROUTER_META
+    set_last_router_meta(remaining_router, source="api_session_delete")
+
+    return jsonify(
+        {
+            "ok": True,
+            "sessions": [session_summary(s) for s in payload["sessions"]],
+            "router_meta": LAST_ROUTER_META,
+            "last_router_meta": LAST_ROUTER_META,
+        }
+    )
 
 
 @app.post("/api/session/rename")
@@ -486,7 +592,17 @@ def api_session_rename() -> Any:
     session["updated_at"] = now_ts()
     save_session(session)
 
-    return jsonify({"ok": True, "session": session_summary(session)})
+    router_meta = session.get("router_meta", {}) or LAST_ROUTER_META
+    set_last_router_meta(router_meta, source="api_session_rename")
+
+    return jsonify(
+        {
+            "ok": True,
+            "session": session_summary(session),
+            "router_meta": router_meta,
+            "last_router_meta": LAST_ROUTER_META,
+        }
+    )
 
 
 @app.post("/api/session/duplicate")
@@ -508,7 +624,17 @@ def api_session_duplicate() -> Any:
         message["id"] = str(uuid.uuid4())
 
     save_session(clone)
-    return jsonify({"ok": True, "session": session_summary(clone)})
+    router_meta = clone.get("router_meta", {}) or LAST_ROUTER_META
+    set_last_router_meta(router_meta, source="api_session_duplicate")
+
+    return jsonify(
+        {
+            "ok": True,
+            "session": session_summary(clone),
+            "router_meta": router_meta,
+            "last_router_meta": LAST_ROUTER_META,
+        }
+    )
 
 
 @app.post("/api/session/pin")
@@ -525,7 +651,17 @@ def api_session_pin() -> Any:
     session["updated_at"] = now_ts()
     save_session(session)
 
-    return jsonify({"ok": True, "session": session_summary(session)})
+    router_meta = session.get("router_meta", {}) or LAST_ROUTER_META
+    set_last_router_meta(router_meta, source="api_session_pin")
+
+    return jsonify(
+        {
+            "ok": True,
+            "session": session_summary(session),
+            "router_meta": router_meta,
+            "last_router_meta": LAST_ROUTER_META,
+        }
+    )
 
 
 @app.post("/api/session/export")
@@ -537,12 +673,29 @@ def api_session_export() -> Any:
     if not session:
         return jsonify({"ok": False, "error": "Session not found."}), 404
 
-    return jsonify({"ok": True, "session": session})
+    router_meta = session.get("router_meta", {}) or LAST_ROUTER_META
+    set_last_router_meta(router_meta, source="api_session_export")
+
+    return jsonify(
+        {
+            "ok": True,
+            "session": session,
+            "router_meta": router_meta,
+            "last_router_meta": LAST_ROUTER_META,
+        }
+    )
 
 
 @app.get("/api/memory")
 def api_memory_get() -> Any:
-    return jsonify({"ok": True, "memory": load_memory()})
+    return jsonify(
+        {
+            "ok": True,
+            "memory": load_memory(),
+            "router_meta": LAST_ROUTER_META,
+            "last_router_meta": LAST_ROUTER_META,
+        }
+    )
 
 
 @app.post("/api/memory")
@@ -564,7 +717,15 @@ def api_memory_add() -> Any:
     items.insert(0, entry)
     save_memory(items)
 
-    return jsonify({"ok": True, "item": entry, "memory": items})
+    return jsonify(
+        {
+            "ok": True,
+            "item": entry,
+            "memory": items,
+            "router_meta": LAST_ROUTER_META,
+            "last_router_meta": LAST_ROUTER_META,
+        }
+    )
 
 
 @app.post("/api/memory/delete")
@@ -581,7 +742,14 @@ def api_memory_delete() -> Any:
         return jsonify({"ok": False, "error": "Memory item not found."}), 404
 
     save_memory(items)
-    return jsonify({"ok": True, "memory": items})
+    return jsonify(
+        {
+            "ok": True,
+            "memory": items,
+            "router_meta": LAST_ROUTER_META,
+            "last_router_meta": LAST_ROUTER_META,
+        }
+    )
 
 
 @app.get("/favicon.ico")

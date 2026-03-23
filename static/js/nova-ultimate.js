@@ -62,7 +62,9 @@
   function formatTime(ts) {
     if (!ts) return "";
     try {
-      return new Date(Number(ts) * 1000).toLocaleString();
+      const num = Number(ts);
+      const ms = num > 9999999999 ? num : num * 1000;
+      return new Date(ms).toLocaleString();
     } catch {
       return "";
     }
@@ -94,6 +96,7 @@
     const last = [...state.messages]
       .reverse()
       .find((msg) => safeText(msg.role).toLowerCase() === "user" && safeText(msg.content));
+
     state.lastUserMessage = last ? String(last.content || "") : "";
 
     const regenBtn = byId("regenerateBtn");
@@ -329,7 +332,8 @@
           .join("")}</ul>`
       : `<div class="router-debug-empty">—</div>`;
 
-    const timeText = router.timestamp ? formatTime(router.timestamp / 1000 || router.timestamp) : "—";
+    const ts = Number(router.timestamp || 0);
+    const timeText = ts ? formatTime(ts) : "—";
 
     content.innerHTML = `
       <div class="router-debug-row"><strong>Mode:</strong> ${escapeHtml(router.mode || "general")}</div>
@@ -617,7 +621,7 @@
     return { event: eventName, data };
   }
 
-  async function streamSend(content, attachedFilesOverride = null) {
+  async function streamSend(content, attachedFilesOverride = null, options = {}) {
     const input = byId("messageInput");
     const normalizedContent = safeText(content);
     const pendingFiles = Array.isArray(attachedFilesOverride)
@@ -630,17 +634,31 @@
       await createNewSession();
     }
 
+    const suppressLocalUser = Boolean(options.suppressLocalUser);
+    let assistantStreamMessage = null;
+
     setSendingState(true);
     setStatus("Responding...");
 
     try {
-      if (normalizedContent) {
-        addLocalMessage("user", normalizedContent);
-      } else if (pendingFiles.length) {
-        addLocalMessage("user", `[Uploaded ${pendingFiles.length} file(s)]`);
+      if (!suppressLocalUser) {
+        if (normalizedContent) {
+          addLocalMessage("user", normalizedContent);
+        } else if (pendingFiles.length) {
+          addLocalMessage("user", `[Uploaded ${pendingFiles.length} file(s)]`);
+        }
       }
 
-      if (input && attachedFilesOverride === null) {
+      assistantStreamMessage = {
+        role: "assistant",
+        content: "",
+        timestamp: nowUnix(),
+        router: null,
+      };
+      state.messages.push(assistantStreamMessage);
+      renderMessages();
+
+      if (input && attachedFilesOverride === null && !suppressLocalUser) {
         input.value = "";
         autosizeInput();
       }
@@ -657,24 +675,26 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json, text/plain, */*",
+          Accept: "text/event-stream, application/json, text/plain, */*",
         },
         body: JSON.stringify({
           session_id: state.activeSessionId,
           content: normalizedContent,
+          message: normalizedContent,
           model,
           uploaded_files: uploadedFiles,
         }),
       });
 
       if (!res.ok) {
-        throw new Error("Send failed");
+        throw new Error(`Send failed (${res.status})`);
       }
 
       if (res.body && typeof res.body.getReader === "function") {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        let finalContent = "";
         let streamRouter = null;
 
         while (true) {
@@ -695,24 +715,59 @@
             const data = parsed.data || {};
 
             if (eventName === "start") {
-              if (data.router) {
-                streamRouter = data.router;
+              if (data.router || data.router_meta) {
+                streamRouter = data.router || data.router_meta;
+                assistantStreamMessage.router = streamRouter;
                 updateRouterDebug(streamRouter);
+                renderMessages();
+              }
+            } else if (eventName === "delta" || eventName === "token" || eventName === "message") {
+              if (typeof data.content === "string") {
+                finalContent += data.content;
+                assistantStreamMessage.content = finalContent;
+                renderMessages();
+              } else if (data.message && typeof data.message.content === "string") {
+                assistantStreamMessage.content = data.message.content;
+                finalContent = assistantStreamMessage.content;
+                renderMessages();
+              }
+
+              if (data.router || data.router_meta) {
+                streamRouter = data.router || data.router_meta;
+                assistantStreamMessage.router = streamRouter;
+                updateRouterDebug(streamRouter);
+                renderMessages();
+              }
+
+              if (data.session_id) {
+                state.activeSessionId = data.session_id;
               }
             } else if (eventName === "done") {
-              if (data.router) {
-                streamRouter = data.router;
+              if (typeof data.content === "string" && !assistantStreamMessage.content) {
+                assistantStreamMessage.content = data.content;
+              }
+
+              if (data.message && typeof data.message.content === "string") {
+                assistantStreamMessage.content = data.message.content;
+              }
+
+              if (data.router || data.router_meta) {
+                streamRouter = data.router || data.router_meta;
+                assistantStreamMessage.router = streamRouter;
                 updateRouterDebug(streamRouter);
               }
+
+              renderMessages();
             } else if (eventName === "error") {
-              throw new Error(data.message || "Stream failed");
+              throw new Error(data.message || data.error || "Stream failed");
             }
           }
         }
       } else {
-        try {
-          await res.text();
-        } catch {}
+        const text = await res.text();
+        const fallbackText = safeText(text) || "No response.";
+        assistantStreamMessage.content = fallbackText;
+        renderMessages();
       }
 
       if (attachedFilesOverride === null) {
@@ -728,14 +783,29 @@
       setStatus("Ready");
     } catch (err) {
       console.error(err);
-      addLocalMessage("assistant", "Something went wrong sending that message.", {
-        mode: "general",
-        intent: "error",
-        reason: "frontend exception",
-        memory_hits: 0,
-        memory_preview: [],
-        timestamp: nowUnix(),
-      });
+
+      if (assistantStreamMessage) {
+        assistantStreamMessage.content = `Error: ${err.message || err}`;
+        assistantStreamMessage.router = {
+          mode: "general",
+          intent: "error",
+          reason: "frontend exception",
+          memory_hits: 0,
+          memory_preview: [],
+          timestamp: nowUnix(),
+        };
+        renderMessages();
+      } else {
+        addLocalMessage("assistant", "Something went wrong sending that message.", {
+          mode: "general",
+          intent: "error",
+          reason: "frontend exception",
+          memory_hits: 0,
+          memory_preview: [],
+          timestamp: nowUnix(),
+        });
+      }
+
       setStatus("Send failed");
     } finally {
       setSendingState(false);
@@ -744,30 +814,23 @@
   }
 
   async function sendMessage() {
-    if (state.isSending) return;
     const input = byId("messageInput");
-    if (!input) return;
-    await streamSend(input.value, null);
+    const text = safeText(input?.value || "");
+    if ((!text && !state.attachedFiles.length) || state.isSending) return;
+    await streamSend(text);
   }
 
   async function regenerateLastReply() {
-    if (state.isSending) return;
-
-    const content = safeText(state.lastUserMessage);
-    if (!content) {
-      setStatus("Nothing to regenerate");
-      return;
-    }
-
-    await streamSend(content, []);
-  }
-
-  function isMobilePanel() {
-    return window.innerWidth <= 980;
+    if (!state.lastUserMessage || state.isSending) return;
+    await streamSend(state.lastUserMessage, [], { suppressLocalUser: false });
   }
 
   function setPanelBodyState(isOpen) {
     document.body.classList.toggle("panel-open", Boolean(isOpen));
+  }
+
+  function isMobilePanel() {
+    return window.matchMedia("(max-width: 980px)").matches;
   }
 
   function closeMobilePanels() {
@@ -829,7 +892,6 @@
     if (action === "toggle-sidebar") return "sidebar";
     if (action === "toggle-memory") return "memory";
 
-    /* relaxed memory detection (FIX OPEN BUTTON) */
     if (
       blob.includes("memory") ||
       button.closest("#memoryPanel") ||
@@ -838,7 +900,6 @@
       return "memory";
     }
 
-    /* relaxed sidebar detection */
     if (
       blob.includes("sidebar") ||
       blob.includes("menu") ||
@@ -1057,7 +1118,6 @@ function logRouteMetaSafe(meta) {
   });
 }
 
-// patch sendMessage if it exists
 if (window.NovaCore && window.NovaCore.sendMessage) {
   const originalSend = window.NovaCore.sendMessage;
 

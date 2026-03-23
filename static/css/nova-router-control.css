@@ -1,0 +1,212 @@
+/* ================================
+   NOVA ROUTER CONTROL (PHASE 4 POLISH)
+   ================================ */
+
+:root {
+  --router-bg: rgba(18, 27, 50, 0.92);
+  --router-border: rgba(164, 185, 255, 0.18);
+  --router-text: #e8eeff;
+  --router-muted: #8fa2d6;
+  --router-accent: #5a84ff;
+  --router-accent-soft: rgba(90, 132, 255, 0.18);
+  --router-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+/* ================================
+   PANEL CONTAINER
+   ================================ */
+
+.nova-router-panel {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 260px;
+  max-width: calc(100vw - 32px);
+
+  background: var(--router-bg);
+  border: 1px solid var(--router-border);
+  border-radius: 16px;
+
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+
+  box-shadow: var(--router-shadow);
+  z-index: 9999;
+
+  overflow: hidden;
+  font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+
+  transform: translateY(0);
+  opacity: 1;
+  transition: all 0.25s ease;
+}
+
+/* hidden state */
+.nova-router-panel.hidden {
+  transform: translateY(20px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ================================
+   HEADER
+   ================================ */
+
+.nova-router-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+
+  color: var(--router-text);
+  border-bottom: 1px solid var(--router-border);
+}
+
+.nova-router-title {
+  opacity: 0.85;
+}
+
+/* toggle button */
+.nova-router-toggle {
+  background: transparent;
+  border: none;
+  color: var(--router-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.nova-router-toggle:hover {
+  background: var(--router-accent-soft);
+  color: var(--router-text);
+}
+
+/* ================================
+   BODY
+   ================================ */
+
+.nova-router-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* each row */
+.nova-router-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* label */
+.nova-router-label {
+  color: var(--router-muted);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+
+/* value */
+.nova-router-value {
+  color: var(--router-text);
+  font-weight: 600;
+  text-align: right;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ================================
+   MODE BADGES
+   ================================ */
+
+.nova-router-badge {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+/* modes */
+.nova-router-badge.general {
+  background: rgba(120, 140, 255, 0.15);
+  color: #aabaff;
+}
+
+.nova-router-badge.coding {
+  background: rgba(90, 200, 140, 0.15);
+  color: #6fffb0;
+}
+
+.nova-router-badge.analysis {
+  background: rgba(255, 180, 90, 0.15);
+  color: #ffc078;
+}
+
+.nova-router-badge.writing {
+  background: rgba(200, 120, 255, 0.15);
+  color: #d5a6ff;
+}
+
+.nova-router-badge.planning {
+  background: rgba(90, 180, 255, 0.15);
+  color: #8fd3ff;
+}
+
+/* ================================
+   FOOTER / ACTIONS
+   ================================ */
+
+.nova-router-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+
+  padding: 8px 10px;
+  border-top: 1px solid var(--router-border);
+}
+
+/* buttons */
+.nova-router-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--router-border);
+  color: var(--router-muted);
+
+  font-size: 11px;
+  padding: 6px 8px;
+  border-radius: 8px;
+
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nova-router-btn:hover {
+  background: var(--router-accent-soft);
+  color: var(--router-text);
+  border-color: var(--router-accent);
+}
+
+/* ================================
+   MOBILE SAFETY
+   ================================ */
+
+@media (max-width: 640px) {
+  .nova-router-panel {
+    bottom: 12px;
+    right: 12px;
+    width: calc(100vw - 24px);
+  }
+}
