@@ -7,20 +7,9 @@ import re
 import time
 import uuid
 from threading import Lock
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-from flask import (
-    Flask,
-    Response,
-    jsonify,
-    redirect,
-    render_template,
-    request,
-    send_from_directory,
-    session,
-    stream_with_context,
-    url_for,
-)
+from flask import Flask, Response, jsonify, render_template, request, send_from_directory
 from openai import OpenAI
 
 
@@ -28,10 +17,8 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 TEMPLATES_DIR = BASE_DIR / "templates"
 DATA_DIR = BASE_DIR / "data"
-UPLOAD_DIR = DATA_DIR / "uploads"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 SESSIONS_FILE = DATA_DIR / "nova_sessions.json"
 MEMORY_FILE = DATA_DIR / "nova_memory.json"
@@ -42,821 +29,571 @@ OPENAI_MODEL = (os.getenv("OPENAI_MODEL") or "gpt-4.1-mini").strip()
 APP_HOST = (os.getenv("APP_HOST") or "127.0.0.1").strip()
 APP_PORT = int((os.getenv("APP_PORT") or "5001").strip())
 
-APP_PASSWORD = (os.getenv("NOVA_APP_PASSWORD") or "").strip()
-FLASK_SECRET_KEY = (os.getenv("FLASK_SECRET_KEY") or "nova-local-dev-secret").strip()
+app = Flask(__name__, static_folder=str(STATIC_DIR), template_folder=str(TEMPLATES_DIR))
+app.config["JSON_SORT_KEYS"] = False
 
-MAX_MEMORY_USED = 6
-MAX_SESSION_PREVIEW = 60
-MAX_MODEL_MESSAGES = 20
-MAX_UPLOAD_FILES = 10
-
-app = Flask(
-    __name__,
-    static_folder=str(STATIC_DIR),
-    template_folder=str(TEMPLATES_DIR),
-)
-app.secret_key = FLASK_SECRET_KEY
-
-data_lock = Lock()
-
-client: Optional[OpenAI] = None
-if OPENAI_API_KEY:
-    client = OpenAI(api_key=OPENAI_API_KEY)
+client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+io_lock = Lock()
 
 
-def now_ts() -> int:
-    return int(time.time())
+def now_ts() -> float:
+    return time.time()
 
 
-def safe_text(value: Any) -> str:
-    return str(value or "").strip()
+def now_ms() -> int:
+    return int(time.time() * 1000)
 
 
-def slugify_title(value: str) -> str:
-    text = safe_text(value)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text[:80] if text else "New Chat"
+def iso_now() -> str:
+    return time.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def ensure_file(path: Path, fallback: Any) -> None:
-    if not path.exists():
-        path.write_text(json.dumps(fallback, indent=2), encoding="utf-8")
-
-
-def load_json(path: Path, fallback: Any) -> Any:
-    ensure_file(path, fallback)
+def read_json_file(path: Path, default: Any) -> Any:
     try:
+        if not path.exists():
+            return default
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
-        return fallback
+        return default
 
 
-def save_json(path: Path, value: Any) -> None:
-    path.write_text(json.dumps(value, indent=2, ensure_ascii=False), encoding="utf-8")
+def write_json_file(path: Path, payload: Any) -> None:
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
 
 
-def sse_event(event_name: str, data: Dict[str, Any]) -> str:
-    return f"event: {event_name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+def ensure_sessions_shape(data: Any) -> Dict[str, Any]:
+    if isinstance(data, dict) and "sessions" in data and isinstance(data["sessions"], list):
+        return data
+
+    if isinstance(data, list):
+        return {"sessions": data}
+
+    return {"sessions": []}
 
 
-def require_login() -> bool:
-    if not APP_PASSWORD:
-        return True
-    return bool(session.get("nova_logged_in"))
+def load_sessions() -> Dict[str, Any]:
+    with io_lock:
+        return ensure_sessions_shape(read_json_file(SESSIONS_FILE, {"sessions": []}))
 
 
-def memory_file_default() -> Dict[str, Any]:
-    return {"memory": []}
+def save_sessions(data: Dict[str, Any]) -> None:
+    with io_lock:
+        write_json_file(SESSIONS_FILE, ensure_sessions_shape(data))
 
 
-def sessions_file_default() -> Dict[str, Any]:
-    return {
-        "current_session_id": None,
-        "sessions": []
-    }
+def load_memory() -> List[Dict[str, Any]]:
+    with io_lock:
+        data = read_json_file(MEMORY_FILE, [])
+        return data if isinstance(data, list) else []
 
 
-def usage_file_default() -> Dict[str, Any]:
-    return {
-        "total_requests": 0,
-        "total_sessions": 0,
-        "last_request_at": None,
-    }
+def save_memory(items: List[Dict[str, Any]]) -> None:
+    with io_lock:
+        write_json_file(MEMORY_FILE, items)
 
 
-def read_sessions_store() -> Dict[str, Any]:
-    return load_json(SESSIONS_FILE, sessions_file_default())
+def load_usage() -> Dict[str, Any]:
+    with io_lock:
+        data = read_json_file(USAGE_FILE, {})
+        return data if isinstance(data, dict) else {}
 
 
-def write_sessions_store(store: Dict[str, Any]) -> None:
-    save_json(SESSIONS_FILE, store)
+def save_usage(data: Dict[str, Any]) -> None:
+    with io_lock:
+        write_json_file(USAGE_FILE, data)
 
 
-def read_memory_store() -> Dict[str, Any]:
-    return load_json(MEMORY_FILE, memory_file_default())
-
-
-def write_memory_store(store: Dict[str, Any]) -> None:
-    save_json(MEMORY_FILE, store)
-
-
-def read_usage_store() -> Dict[str, Any]:
-    return load_json(USAGE_FILE, usage_file_default())
-
-
-def write_usage_store(store: Dict[str, Any]) -> None:
-    save_json(USAGE_FILE, store)
-
-
-def bump_usage() -> None:
-    with data_lock:
-        usage = read_usage_store()
-        usage["total_requests"] = int(usage.get("total_requests") or 0) + 1
-        usage["last_request_at"] = now_ts()
-        write_usage_store(usage)
-
-
-def list_sessions() -> List[Dict[str, Any]]:
-    store = read_sessions_store()
-    sessions = store.get("sessions") or []
-    sessions.sort(key=lambda x: int(x.get("updated_at") or 0), reverse=True)
-    return sessions
-
-
-def get_current_session_id() -> Optional[str]:
-    store = read_sessions_store()
-    return store.get("current_session_id")
-
-
-def set_current_session_id(session_id: Optional[str]) -> None:
-    with data_lock:
-        store = read_sessions_store()
-        store["current_session_id"] = session_id
-        write_sessions_store(store)
-
-
-def make_session_title_from_message(content: str) -> str:
-    text = safe_text(content)
-    if not text:
-        return "New Chat"
-    title = re.sub(r"\s+", " ", text).strip()
-    return title[:48]
-
-
-def build_session_summary(session_obj: Dict[str, Any]) -> Dict[str, Any]:
-    messages = session_obj.get("messages") or []
-    return {
-        "id": session_obj.get("id"),
-        "title": session_obj.get("title") or "New Chat",
-        "message_count": len(messages),
-        "created_at": session_obj.get("created_at"),
-        "updated_at": session_obj.get("updated_at"),
-    }
-
-
-def create_session(title: str = "New Chat") -> Dict[str, Any]:
+def make_session(title: str = "New Chat") -> Dict[str, Any]:
     ts = now_ts()
-    session_obj = {
+    return {
         "id": str(uuid.uuid4()),
-        "title": slugify_title(title),
-        "messages": [],
+        "title": title,
         "created_at": ts,
         "updated_at": ts,
+        "pinned": False,
+        "messages": [],
+        "router_meta": {
+            "mode": "general",
+            "intent": "idle",
+            "reason": "No user message yet.",
+            "memory_hits": 0,
+            "memory_used": [],
+            "route_time_ms": 0,
+            "timestamp": now_ms(),
+        },
     }
 
-    with data_lock:
-        store = read_sessions_store()
-        sessions = store.get("sessions") or []
-        sessions.insert(0, session_obj)
-        store["sessions"] = sessions
-        store["current_session_id"] = session_obj["id"]
-        write_sessions_store(store)
 
-        usage = read_usage_store()
-        usage["total_sessions"] = int(usage.get("total_sessions") or 0) + 1
-        write_usage_store(usage)
+def get_or_create_default_session() -> Dict[str, Any]:
+    payload = load_sessions()
+    sessions = payload["sessions"]
 
-    return session_obj
+    if not sessions:
+        session = make_session("New Chat")
+        sessions.append(session)
+        save_sessions(payload)
+        return session
+
+    sessions.sort(key=lambda s: (not bool(s.get("pinned")), -(s.get("updated_at") or 0)))
+    return sessions[0]
 
 
 def find_session(session_id: str) -> Optional[Dict[str, Any]]:
-    store = read_sessions_store()
-    for item in store.get("sessions") or []:
-        if item.get("id") == session_id:
-            return item
+    payload = load_sessions()
+    for session in payload["sessions"]:
+        if session.get("id") == session_id:
+            return session
     return None
 
 
-def update_session(session_id: str, updater) -> Optional[Dict[str, Any]]:
-    with data_lock:
-        store = read_sessions_store()
-        sessions = store.get("sessions") or []
-        found = None
+def save_session(updated_session: Dict[str, Any]) -> None:
+    payload = load_sessions()
+    found = False
+    for i, session in enumerate(payload["sessions"]):
+        if session.get("id") == updated_session.get("id"):
+            payload["sessions"][i] = updated_session
+            found = True
+            break
 
-        for index, item in enumerate(sessions):
-            if item.get("id") == session_id:
-                found = dict(item)
-                updater(found)
-                found["updated_at"] = now_ts()
-                sessions[index] = found
-                break
+    if not found:
+        payload["sessions"].append(updated_session)
 
-        if found is None:
-            return None
-
-        sessions.sort(key=lambda x: int(x.get("updated_at") or 0), reverse=True)
-        store["sessions"] = sessions
-        if not store.get("current_session_id"):
-            store["current_session_id"] = session_id
-        write_sessions_store(store)
-        return found
+    save_sessions(payload)
 
 
-def add_message_to_session(session_id: str, role: str, content: str, router: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-    def _updater(session_obj: Dict[str, Any]) -> None:
-        session_obj.setdefault("messages", []).append({
-            "id": str(uuid.uuid4()),
-            "role": safe_text(role or "assistant"),
-            "content": str(content or ""),
-            "timestamp": now_ts(),
-            "router": router or None,
-        })
-
-        if len(session_obj["messages"]) == 1 and safe_text(content):
-            session_obj["title"] = make_session_title_from_message(content)
-
-    return update_session(session_id, _updater)
+def summarize_text(text: str, max_len: int = 80) -> str:
+    text = re.sub(r"\s+", " ", (text or "").strip())
+    if not text:
+        return "New Chat"
+    return text[:max_len].strip()
 
 
-def get_memory_items() -> List[Dict[str, Any]]:
-    store = read_memory_store()
-    items = store.get("memory") or []
-    items.sort(key=lambda x: int(x.get("updated_at") or x.get("created_at") or 0), reverse=True)
-    return items
+def normalize_text(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").strip())
 
 
-def add_memory_item(kind: str, value: str) -> Dict[str, Any]:
-    ts = now_ts()
-    item = {
-        "id": str(uuid.uuid4()),
-        "kind": safe_text(kind or "memory") or "memory",
-        "value": safe_text(value),
-        "created_at": ts,
-        "updated_at": ts,
-    }
-
-    with data_lock:
-        store = read_memory_store()
-        items = store.get("memory") or []
-
-        dedupe_key = item["value"].strip().lower()
-        existing_index = None
-        for idx, existing in enumerate(items):
-            if safe_text(existing.get("value")).strip().lower() == dedupe_key:
-                existing_index = idx
-                break
-
-        if existing_index is not None:
-            items[existing_index]["kind"] = item["kind"]
-            items[existing_index]["value"] = item["value"]
-            items[existing_index]["updated_at"] = ts
-            item = items[existing_index]
-        else:
-            items.insert(0, item)
-
-        store["memory"] = items
-        write_memory_store(store)
-
-    return item
-
-
-def delete_memory_item(memory_id: str) -> bool:
-    with data_lock:
-        store = read_memory_store()
-        items = store.get("memory") or []
-        before = len(items)
-        items = [x for x in items if x.get("id") != memory_id]
-        store["memory"] = items
-        write_memory_store(store)
-        return len(items) != before
-
-
-def guess_route(content: str, memory_items: List[Dict[str, Any]]) -> Dict[str, Any]:
-    text = safe_text(content).lower()
+def route_message(user_text: str, memory_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    started = now_ms()
+    text = normalize_text(user_text)
+    lowered = text.lower()
 
     mode = "general"
-    intent = "chat"
-    reason = "default"
+    intent = "conversation"
+    reason = "Defaulted to general conversation."
+    memory_used: List[str] = []
 
-    coding_words = [
-        "code", "bug", "fix", "javascript", "python", "flask", "html",
-        "css", "json", "api", "smff", "full file", "app.py", ".js", ".css", ".html"
+    coding_terms = [
+        "code", "bug", "fix", "app.py", "javascript", "python", "flask",
+        "html", "css", "smff", "file", "router", "panel", "backend",
+        "frontend", "script", "function", "json", "api"
     ]
-    planning_words = ["plan", "roadmap", "steps", "checklist", "strategy", "next"]
-    writing_words = ["write", "rewrite", "email", "story", "book", "blog", "caption"]
-    analysis_words = ["analyze", "why", "debug", "issue", "problem", "compare", "review"]
+    planning_terms = [
+        "plan", "roadmap", "next", "steps", "phase", "version", "launch", "strategy"
+    ]
+    writing_terms = [
+        "write", "rewrite", "email", "book", "blog", "post", "caption", "story"
+    ]
+    analysis_terms = [
+        "analyze", "compare", "why", "reason", "breakdown", "audit", "review"
+    ]
 
-    if any(word in text for word in coding_words):
+    if any(term in lowered for term in coding_terms):
         mode = "coding"
-        intent = "build"
-        reason = "matched coding keywords"
-    elif any(word in text for word in planning_words):
+        intent = "build_or_fix_code"
+        reason = "Detected coding and app-building language in the request."
+    elif any(term in lowered for term in planning_terms):
         mode = "planning"
-        intent = "organize"
-        reason = "matched planning keywords"
-    elif any(word in text for word in writing_words):
+        intent = "project_planning"
+        reason = "Detected planning / roadmap language."
+    elif any(term in lowered for term in writing_terms):
         mode = "writing"
-        intent = "compose"
-        reason = "matched writing keywords"
-    elif any(word in text for word in analysis_words):
+        intent = "draft_or_rewrite"
+        reason = "Detected writing-oriented language."
+    elif any(term in lowered for term in analysis_terms):
         mode = "analysis"
-        intent = "analyze"
-        reason = "matched analysis keywords"
+        intent = "inspect_or_explain"
+        reason = "Detected analysis / explanation language."
 
-    memory_hits: List[str] = []
-    lowered = text
+    significant_words = {
+        word for word in re.findall(r"[a-zA-Z0-9_\-]{3,}", lowered)
+        if word not in {"the", "and", "for", "with", "that", "this", "you", "your", "are", "was"}
+    }
 
     for item in memory_items:
-        val = safe_text(item.get("value"))
-        if not val:
+        kind = str(item.get("kind", "")).strip()
+        value = normalize_text(str(item.get("value", "")))
+        blob = f"{kind} {value}".lower()
+        if not value:
             continue
 
-        words = [w for w in re.split(r"[\s,.;:!?()\[\]{}]+", val.lower()) if len(w) >= 4]
-        if not words:
-            continue
+        matched = any(word in blob for word in significant_words)
+        if matched:
+            memory_used.append(value)
 
-        overlap = sum(1 for w in set(words[:8]) if w in lowered)
-        if overlap > 0:
-            memory_hits.append(val)
-
-        if len(memory_hits) >= MAX_MEMORY_USED:
-            break
+    memory_used = memory_used[:6]
 
     return {
         "mode": mode,
         "intent": intent,
         "reason": reason,
-        "memory_hits": len(memory_hits),
-        "memory_preview": memory_hits[:MAX_MEMORY_USED],
-        "timestamp": now_ts(),
+        "memory_hits": len(memory_used),
+        "memory_used": memory_used,
+        "route_time_ms": max(1, now_ms() - started),
+        "timestamp": now_ms(),
     }
 
 
-def build_messages_for_model(
-    session_messages: List[Dict[str, Any]],
-    user_content: str,
-    uploaded_files: List[Dict[str, Any]],
-    router: Dict[str, Any],
-) -> List[Dict[str, str]]:
-    system_parts: List[str] = [
-        "You are Nova, a direct, fast, highly useful AI assistant.",
-        "Be concise, solution-first, and practical.",
-        "When the user asks for code, prefer full-file style.",
-        f"Current route mode: {router.get('mode', 'general')}.",
-        f"Current route intent: {router.get('intent', 'chat')}.",
-    ]
+def build_system_prompt(router_meta: Dict[str, Any], memory_items: List[Dict[str, Any]]) -> str:
+    memory_lines = []
+    for item in memory_items[:12]:
+        kind = item.get("kind", "memory")
+        value = item.get("value", "")
+        if value:
+            memory_lines.append(f"- {kind}: {value}")
 
-    memory_preview = router.get("memory_preview") or []
-    if memory_preview:
-        system_parts.append("Relevant memory:\n- " + "\n- ".join(memory_preview))
+    memory_block = "\n".join(memory_lines) if memory_lines else "- none"
 
-    if uploaded_files:
-        file_lines = []
-        for file_info in uploaded_files[:MAX_UPLOAD_FILES]:
-            name = safe_text(file_info.get("name"))
-            path = safe_text(file_info.get("path"))
-            snippet = safe_text(file_info.get("text_snippet"))
-            file_lines.append(f"File: {name}\nPath: {path}\nSnippet:\n{snippet[:4000]}")
-        system_parts.append("Uploaded file context:\n\n" + "\n\n".join(file_lines))
+    return f"""
+You are Nova, a direct, helpful AI assistant.
 
-    trimmed_history = session_messages[-MAX_MODEL_MESSAGES:]
-    messages: List[Dict[str, str]] = [{"role": "system", "content": "\n\n".join(system_parts)}]
+Current route:
+- mode: {router_meta.get("mode", "general")}
+- intent: {router_meta.get("intent", "conversation")}
+- reason: {router_meta.get("reason", "")}
 
-    for msg in trimmed_history:
-        role = safe_text(msg.get("role")).lower()
-        if role not in {"user", "assistant", "system"}:
-            continue
-        content = str(msg.get("content") or "")
-        if content:
-            messages.append({"role": role, "content": content})
+Relevant memory:
+{memory_block}
 
-    messages.append({"role": "user", "content": user_content})
-    return messages
+Behavior:
+- be direct
+- be practical
+- prefer solution-first responses
+- when user asks for SMFF, provide a full file
+- keep coding answers concrete
+""".strip()
 
 
-def fallback_response(user_content: str, router: Dict[str, Any]) -> str:
-    mode = router.get("mode") or "general"
-    if mode == "coding":
+def chat_with_model(messages: List[Dict[str, str]], router_meta: Dict[str, Any], memory_items: List[Dict[str, Any]]) -> str:
+    if not client:
         return (
-            "Nova backend is running, but no OpenAI API key is configured.\n\n"
-            "Set OPENAI_API_KEY in your environment to enable model responses.\n\n"
-            "Your routing, session storage, memory, uploads, and streaming are still working."
+            "[Nova offline fallback]\n\n"
+            f"Mode: {router_meta.get('mode')}\n"
+            f"Intent: {router_meta.get('intent')}\n"
+            "No OPENAI_API_KEY found, so this is a local fallback response."
         )
-    return (
-        "Nova backend is running, but no OpenAI API key is configured. "
-        "Set OPENAI_API_KEY to enable model responses."
-    )
 
+    system_prompt = build_system_prompt(router_meta, memory_items)
 
-def stream_model_text(messages: List[Dict[str, str]]) -> Tuple[str, List[str]]:
-    if client is None:
-        text = fallback_response(messages[-1]["content"], {"mode": "general"})
-        return text, [text]
-
-    collected_chunks: List[str] = []
-    full_text_parts: List[str] = []
-
-    stream = client.chat.completions.create(
+    response = client.chat.completions.create(
         model=OPENAI_MODEL,
-        messages=messages,
-        temperature=0.4,
-        stream=True,
+        temperature=0.3,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            *messages,
+        ],
     )
-
-    for chunk in stream:
-        try:
-            delta = chunk.choices[0].delta
-            piece = getattr(delta, "content", None)
-        except Exception:
-            piece = None
-
-        if not piece:
-            continue
-
-        full_text_parts.append(piece)
-        collected_chunks.append(piece)
-
-    return "".join(full_text_parts), collected_chunks
+    return (response.choices[0].message.content or "").strip()
 
 
-def normalize_uploaded_files(raw_files: Any) -> List[Dict[str, Any]]:
-    output: List[Dict[str, Any]] = []
-    for item in raw_files or []:
-        if not isinstance(item, dict):
-            continue
-
-        path_value = safe_text(item.get("path"))
-        file_path = Path(path_value) if path_value else None
-
-        snippet = ""
-        if file_path and file_path.exists() and file_path.is_file():
-            try:
-                snippet = file_path.read_text(encoding="utf-8", errors="ignore")[:12000]
-            except Exception:
-                snippet = ""
-
-        output.append({
-            "name": safe_text(item.get("name")),
-            "size": item.get("size") or 0,
-            "path": path_value,
-            "text_snippet": snippet,
-        })
-
-    return output
-
-
-def public_session_payload(session_obj: Dict[str, Any]) -> Dict[str, Any]:
-    messages = session_obj.get("messages") or []
+def session_summary(session: Dict[str, Any]) -> Dict[str, Any]:
     return {
-        "session": build_session_summary(session_obj),
-        "session_id": session_obj.get("id"),
-        "messages": messages,
+        "id": session.get("id"),
+        "title": session.get("title", "New Chat"),
+        "created_at": session.get("created_at"),
+        "updated_at": session.get("updated_at"),
+        "pinned": bool(session.get("pinned")),
+        "message_count": len(session.get("messages", [])),
     }
 
 
-@app.before_request
-def auth_gate():
-    allowed = {
-        "login",
-        "logout",
-        "static",
-    }
-
-    if request.endpoint in allowed:
-        return None
-
-    if request.path.startswith("/static/"):
-        return None
-
-    if require_login():
-        return None
-
-    if request.path.startswith("/api/"):
-        return jsonify({"error": "Unauthorized"}), 401
-
-    return redirect(url_for("login", next=request.path))
-
-
-@app.get("/login")
-def login():
-    if require_login():
-        return redirect(url_for("home"))
-    return render_template("login.html", next=request.args.get("next", "/"))
-
-
-@app.post("/login")
-def login_post():
-    if not APP_PASSWORD:
-        return redirect(url_for("home"))
-
-    password = safe_text(request.form.get("password"))
-    next_url = safe_text(request.form.get("next")) or "/"
-
-    if password == APP_PASSWORD:
-        session["nova_logged_in"] = True
-        return redirect(next_url)
-
-    return render_template("login.html", error="Wrong password", next=next_url), 401
-
-
-@app.get("/logout")
-def logout():
-    session.pop("nova_logged_in", None)
-    return redirect(url_for("login"))
+def safe_json() -> Dict[str, Any]:
+    try:
+        return request.get_json(force=True, silent=True) or {}
+    except Exception:
+        return {}
 
 
 @app.get("/")
-def home():
+def index() -> Any:
     return render_template("index.html")
 
 
+@app.get("/health")
+def health() -> Any:
+    return jsonify({"ok": True, "time": iso_now()})
+
+
 @app.get("/api/state")
-def api_state():
-    sessions = [build_session_summary(s) for s in list_sessions()]
-    current_session_id = get_current_session_id()
+def api_state() -> Any:
+    payload = load_sessions()
+    sessions = payload["sessions"]
+    if not sessions:
+        current = get_or_create_default_session()
+    else:
+        current = sessions[0]
 
-    if not current_session_id and sessions:
-        current_session_id = sessions[0]["id"]
-        set_current_session_id(current_session_id)
+    current_id = request.args.get("session_id") or current.get("id")
+    current = find_session(current_id) or current
 
-    return jsonify({
-        "sessions": sessions,
-        "current_session_id": current_session_id,
-        "model": OPENAI_MODEL,
-    })
+    memory_items = load_memory()
 
-
-@app.post("/api/session/new")
-def api_new_session():
-    session_obj = create_session("New Chat")
-    return jsonify({
-        "session": build_session_summary(session_obj),
-        "session_id": session_obj["id"],
-    })
-
-
-@app.get("/api/chat/<session_id>")
-def api_get_chat(session_id: str):
-    session_obj = find_session(session_id)
-    if not session_obj:
-        return jsonify({"error": "Session not found"}), 404
-
-    set_current_session_id(session_id)
-    return jsonify(public_session_payload(session_obj))
-
-
-@app.post("/api/session/delete")
-def api_delete_session():
-    payload = request.get_json(silent=True) or {}
-    session_id = safe_text(payload.get("session_id") or payload.get("id"))
-    if not session_id:
-        return jsonify({"error": "Missing session_id"}), 400
-
-    with data_lock:
-        store = read_sessions_store()
-        sessions = store.get("sessions") or []
-        before = len(sessions)
-        sessions = [s for s in sessions if s.get("id") != session_id]
-        if len(sessions) == before:
-            return jsonify({"error": "Session not found"}), 404
-
-        store["sessions"] = sessions
-        current_id = store.get("current_session_id")
-        if current_id == session_id:
-            store["current_session_id"] = sessions[0]["id"] if sessions else None
-        write_sessions_store(store)
-
-    return jsonify({
-        "ok": True,
-        "current_session_id": get_current_session_id(),
-    })
-
-
-@app.post("/api/session/rename")
-def api_rename_session():
-    payload = request.get_json(silent=True) or {}
-    session_id = safe_text(payload.get("session_id") or payload.get("id"))
-    title = slugify_title(payload.get("title"))
-
-    if not session_id:
-        return jsonify({"error": "Missing session_id"}), 400
-
-    updated = update_session(session_id, lambda s: s.update({"title": title or "New Chat"}))
-    if not updated:
-        return jsonify({"error": "Session not found"}), 404
-
-    return jsonify({
-        "ok": True,
-        "session": build_session_summary(updated),
-    })
-
-
-@app.post("/api/session/duplicate")
-def api_duplicate_session():
-    payload = request.get_json(silent=True) or {}
-    session_id = safe_text(payload.get("session_id") or payload.get("id"))
-    if not session_id:
-        return jsonify({"error": "Missing session_id"}), 400
-
-    original = find_session(session_id)
-    if not original:
-        return jsonify({"error": "Session not found"}), 404
-
-    ts = now_ts()
-    duplicated = {
-        "id": str(uuid.uuid4()),
-        "title": f"{safe_text(original.get('title') or 'New Chat')} Copy",
-        "messages": list(original.get("messages") or []),
-        "created_at": ts,
-        "updated_at": ts,
-    }
-
-    with data_lock:
-        store = read_sessions_store()
-        sessions = store.get("sessions") or []
-        sessions.insert(0, duplicated)
-        store["sessions"] = sessions
-        store["current_session_id"] = duplicated["id"]
-        write_sessions_store(store)
-
-    return jsonify({
-        "ok": True,
-        "session": build_session_summary(duplicated),
-        "session_id": duplicated["id"],
-    })
-
-
-@app.get("/api/memory")
-def api_get_memory():
-    return jsonify({"memory": get_memory_items()})
-
-
-@app.post("/api/memory")
-def api_add_memory():
-    payload = request.get_json(silent=True) or {}
-    kind = safe_text(payload.get("kind") or "memory")
-    value = safe_text(payload.get("value"))
-
-    if not value:
-        return jsonify({"error": "Missing memory value"}), 400
-
-    item = add_memory_item(kind, value)
-    return jsonify({"ok": True, "item": item, "memory": get_memory_items()})
-
-
-@app.post("/api/memory/delete")
-def api_delete_memory():
-    payload = request.get_json(silent=True) or {}
-    memory_id = safe_text(payload.get("id"))
-    if not memory_id:
-        return jsonify({"error": "Missing memory id"}), 400
-
-    ok = delete_memory_item(memory_id)
-    if not ok:
-        return jsonify({"error": "Memory not found"}), 404
-
-    return jsonify({"ok": True, "memory": get_memory_items()})
-
-
-@app.post("/api/upload")
-def api_upload():
-    files = request.files.getlist("files")
-    if not files:
-        return jsonify({"files": []})
-
-    uploaded: List[Dict[str, Any]] = []
-
-    for file_storage in files[:MAX_UPLOAD_FILES]:
-        original_name = safe_text(file_storage.filename) or "upload.bin"
-        ext = Path(original_name).suffix
-        saved_name = f"{uuid.uuid4().hex}{ext}"
-        save_path = UPLOAD_DIR / saved_name
-        file_storage.save(save_path)
-
-        uploaded.append({
-            "name": original_name,
-            "size": save_path.stat().st_size if save_path.exists() else 0,
-            "path": str(save_path),
-        })
-
-    return jsonify({"files": uploaded})
-
-
-@app.post("/api/chat/stream")
-def api_chat_stream():
-    payload = request.get_json(silent=True) or {}
-    session_id = safe_text(payload.get("session_id"))
-    content = str(payload.get("content") or "")
-    model = safe_text(payload.get("model") or OPENAI_MODEL)
-    uploaded_files = normalize_uploaded_files(payload.get("uploaded_files") or [])
-
-    if not session_id:
-        created = create_session("New Chat")
-        session_id = created["id"]
-
-    session_obj = find_session(session_id)
-    if not session_obj:
-        session_obj = create_session("New Chat")
-        session_id = session_obj["id"]
-
-    if not safe_text(content) and not uploaded_files:
-        return jsonify({"error": "Missing content"}), 400
-
-    set_current_session_id(session_id)
-    bump_usage()
-
-    memory_items = get_memory_items()
-    router = guess_route(content, memory_items)
-
-    def generate():
-        user_label = content if safe_text(content) else f"[Uploaded {len(uploaded_files)} file(s)]"
-        add_message_to_session(session_id, "user", user_label)
-
-        yield sse_event("start", {
+    return jsonify(
+        {
             "ok": True,
-            "session_id": session_id,
-            "router": router,
-            "model": model,
-        })
-
-        try:
-            fresh_session = find_session(session_id) or {}
-            session_messages = list(fresh_session.get("messages") or [])
-
-            model_messages = build_messages_for_model(
-                session_messages=session_messages[:-1],
-                user_content=content if safe_text(content) else user_label,
-                uploaded_files=uploaded_files,
-                router=router,
-            )
-
-            if client is None:
-                final_text = fallback_response(content, router)
-                yield sse_event("token", {"delta": final_text})
-            else:
-                stream = client.chat.completions.create(
-                    model=model or OPENAI_MODEL,
-                    messages=model_messages,
-                    temperature=0.4,
-                    stream=True,
-                )
-
-                final_parts: List[str] = []
-                for chunk in stream:
-                    try:
-                        delta = chunk.choices[0].delta
-                        piece = getattr(delta, "content", None)
-                    except Exception:
-                        piece = None
-
-                    if not piece:
-                        continue
-
-                    final_parts.append(piece)
-                    yield sse_event("token", {"delta": piece})
-
-                final_text = "".join(final_parts).strip()
-
-                if not final_text:
-                    final_text = "I’m here."
-
-            add_message_to_session(session_id, "assistant", final_text, router=router)
-
-            yield sse_event("done", {
-                "ok": True,
-                "session_id": session_id,
-                "router": router,
-                "message": final_text,
-            })
-
-        except Exception as exc:
-            error_text = f"{type(exc).__name__}: {exc}"
-            add_message_to_session(
-                session_id,
-                "assistant",
-                "Something went wrong while generating that response.",
-                router={
-                    "mode": "general",
-                    "intent": "error",
-                    "reason": error_text,
-                    "memory_hits": 0,
-                    "memory_preview": [],
-                    "timestamp": now_ts(),
-                },
-            )
-            yield sse_event("error", {
-                "ok": False,
-                "message": error_text,
-            })
-
-    return Response(
-        stream_with_context(generate()),
-        mimetype="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        },
+            "model": OPENAI_MODEL,
+            "current_session_id": current.get("id"),
+            "sessions": [session_summary(s) for s in sessions],
+            "memory": memory_items,
+            "router": current.get("router_meta", {}),
+        }
     )
 
 
-@app.get("/uploads/<path:filename>")
-def uploaded_file(filename: str):
-    return send_from_directory(UPLOAD_DIR, filename)
+@app.get("/api/chat/<session_id>")
+def api_get_chat(session_id: str) -> Any:
+    session = find_session(session_id)
+    if not session:
+        return jsonify({"ok": False, "error": "Session not found."}), 404
+
+    return jsonify(
+        {
+            "ok": True,
+            "session": session_summary(session),
+            "messages": session.get("messages", []),
+            "router": session.get("router_meta", {}),
+        }
+    )
+
+
+@app.post("/api/chat")
+def api_chat() -> Any:
+    data = safe_json()
+
+    session_id = str(data.get("session_id") or "").strip()
+    user_message = normalize_text(str(data.get("message") or ""))
+
+    if not user_message:
+        return jsonify({"ok": False, "error": "Message is required."}), 400
+
+    session = find_session(session_id) if session_id else None
+    if not session:
+        session = make_session()
+
+    memory_items = load_memory()
+    router_meta = route_message(user_message, memory_items)
+
+    user_entry = {
+        "id": str(uuid.uuid4()),
+        "role": "user",
+        "content": user_message,
+        "created_at": now_ts(),
+    }
+    session.setdefault("messages", []).append(user_entry)
+
+    model_messages = [
+        {"role": m["role"], "content": m["content"]}
+        for m in session["messages"][-16:]
+        if m.get("role") in {"user", "assistant"}
+    ]
+
+    try:
+        assistant_text = chat_with_model(model_messages, router_meta, memory_items)
+    except Exception as exc:
+        assistant_text = f"Nova hit an error talking to the model: {exc}"
+
+    assistant_entry = {
+        "id": str(uuid.uuid4()),
+        "role": "assistant",
+        "content": assistant_text,
+        "created_at": now_ts(),
+        "router_meta": router_meta,
+    }
+    session["messages"].append(assistant_entry)
+
+    if session.get("title", "New Chat") == "New Chat":
+        session["title"] = summarize_text(user_message)
+
+    session["updated_at"] = now_ts()
+    session["router_meta"] = router_meta
+
+    save_session(session)
+
+    usage = load_usage()
+    usage["last_chat_at"] = now_ts()
+    usage["last_mode"] = router_meta.get("mode")
+    usage["last_intent"] = router_meta.get("intent")
+    usage["chat_count"] = int(usage.get("chat_count", 0)) + 1
+    save_usage(usage)
+
+    return jsonify(
+        {
+            "ok": True,
+            "session_id": session["id"],
+            "message": assistant_entry,
+            "router": router_meta,
+            "route_meta": router_meta,
+            "router_meta": router_meta,
+            "session": session_summary(session),
+        }
+    )
+
+
+@app.post("/api/session/new")
+def api_session_new() -> Any:
+    data = safe_json()
+    title = normalize_text(str(data.get("title") or "New Chat"))
+    session = make_session(title=title)
+    save_session(session)
+    return jsonify({"ok": True, "session": session_summary(session), "router": session["router_meta"]})
+
+
+@app.post("/api/session/delete")
+def api_session_delete() -> Any:
+    data = safe_json()
+    session_id = str(data.get("session_id") or "").strip()
+
+    payload = load_sessions()
+    before = len(payload["sessions"])
+    payload["sessions"] = [s for s in payload["sessions"] if s.get("id") != session_id]
+    after = len(payload["sessions"])
+
+    if before == after:
+        return jsonify({"ok": False, "error": "Session not found."}), 404
+
+    if not payload["sessions"]:
+        payload["sessions"].append(make_session())
+
+    save_sessions(payload)
+    return jsonify({"ok": True, "sessions": [session_summary(s) for s in payload["sessions"]]})
+
+
+@app.post("/api/session/rename")
+def api_session_rename() -> Any:
+    data = safe_json()
+    session_id = str(data.get("session_id") or "").strip()
+    title = normalize_text(str(data.get("title") or ""))
+
+    if not title:
+        return jsonify({"ok": False, "error": "Title is required."}), 400
+
+    session = find_session(session_id)
+    if not session:
+        return jsonify({"ok": False, "error": "Session not found."}), 404
+
+    session["title"] = title
+    session["updated_at"] = now_ts()
+    save_session(session)
+
+    return jsonify({"ok": True, "session": session_summary(session)})
+
+
+@app.post("/api/session/duplicate")
+def api_session_duplicate() -> Any:
+    data = safe_json()
+    session_id = str(data.get("session_id") or "").strip()
+
+    session = find_session(session_id)
+    if not session:
+        return jsonify({"ok": False, "error": "Session not found."}), 404
+
+    clone = json.loads(json.dumps(session))
+    clone["id"] = str(uuid.uuid4())
+    clone["title"] = f"{session.get('title', 'Chat')} Copy"
+    clone["created_at"] = now_ts()
+    clone["updated_at"] = now_ts()
+
+    for message in clone.get("messages", []):
+        message["id"] = str(uuid.uuid4())
+
+    save_session(clone)
+    return jsonify({"ok": True, "session": session_summary(clone)})
+
+
+@app.post("/api/session/pin")
+def api_session_pin() -> Any:
+    data = safe_json()
+    session_id = str(data.get("session_id") or "").strip()
+    pinned = bool(data.get("pinned", True))
+
+    session = find_session(session_id)
+    if not session:
+        return jsonify({"ok": False, "error": "Session not found."}), 404
+
+    session["pinned"] = pinned
+    session["updated_at"] = now_ts()
+    save_session(session)
+
+    return jsonify({"ok": True, "session": session_summary(session)})
+
+
+@app.post("/api/session/export")
+def api_session_export() -> Any:
+    data = safe_json()
+    session_id = str(data.get("session_id") or "").strip()
+
+    session = find_session(session_id)
+    if not session:
+        return jsonify({"ok": False, "error": "Session not found."}), 404
+
+    return jsonify({"ok": True, "session": session})
+
+
+@app.get("/api/memory")
+def api_memory_get() -> Any:
+    return jsonify({"ok": True, "memory": load_memory()})
+
+
+@app.post("/api/memory")
+def api_memory_add() -> Any:
+    data = safe_json()
+    kind = normalize_text(str(data.get("kind") or "memory")).lower()
+    value = normalize_text(str(data.get("value") or ""))
+
+    if not value:
+        return jsonify({"ok": False, "error": "Memory value is required."}), 400
+
+    items = load_memory()
+    entry = {
+        "id": str(uuid.uuid4()),
+        "kind": kind,
+        "value": value,
+        "created_at": now_ts(),
+    }
+    items.insert(0, entry)
+    save_memory(items)
+
+    return jsonify({"ok": True, "item": entry, "memory": items})
+
+
+@app.post("/api/memory/delete")
+def api_memory_delete() -> Any:
+    data = safe_json()
+    memory_id = str(data.get("id") or "").strip()
+
+    items = load_memory()
+    before = len(items)
+    items = [m for m in items if m.get("id") != memory_id]
+    after = len(items)
+
+    if before == after:
+        return jsonify({"ok": False, "error": "Memory item not found."}), 404
+
+    save_memory(items)
+    return jsonify({"ok": True, "memory": items})
+
+
+@app.get("/favicon.ico")
+def favicon() -> Any:
+    return ("", 204)
+
+
+@app.get("/static/<path:filename>")
+def serve_static(filename: str) -> Any:
+    return send_from_directory(STATIC_DIR, filename)
 
 
 if __name__ == "__main__":
-    ensure_file(SESSIONS_FILE, sessions_file_default())
-    ensure_file(MEMORY_FILE, memory_file_default())
-    ensure_file(USAGE_FILE, usage_file_default())
+    print(f"Nova running on http://{APP_HOST}:{APP_PORT}")
     app.run(host=APP_HOST, port=APP_PORT, debug=True)
