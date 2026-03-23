@@ -7,18 +7,30 @@ import os
 import re
 import time
 import uuid
+
 from threading import Lock
 from typing import Any, Dict, List, Optional
 
-from flask import Flask, Response, jsonify, render_template, request, send_from_directory, stream_with_context
+from flask import (
+    Flask,
+    Response,
+    jsonify,
+    render_template,
+    request,
+    send_from_directory,
+    stream_with_context,
+)
 from openai import OpenAI
+from werkzeug.utils import secure_filename
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 TEMPLATES_DIR = BASE_DIR / "templates"
 DATA_DIR = BASE_DIR / "data"
+UPLOAD_DIR = DATA_DIR / "uploads"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 SESSIONS_FILE = DATA_DIR / "nova_sessions.json"
 MEMORY_FILE = DATA_DIR / "nova_memory.json"
@@ -29,8 +41,20 @@ OPENAI_MODEL = (os.getenv("OPENAI_MODEL") or "gpt-4.1-mini").strip()
 APP_HOST = (os.getenv("APP_HOST") or "127.0.0.1").strip()
 APP_PORT = int((os.getenv("APP_PORT") or "5001").strip())
 
+
+def env_flag(name: str, default: bool = False) -> bool:
+    raw = (os.getenv(name) or "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on"}
+
+
+APP_DEBUG = env_flag("APP_DEBUG", default=False)
+MAX_UPLOAD_MB = int((os.getenv("MAX_UPLOAD_MB") or "25").strip())
+
 app = Flask(__name__, static_folder=str(STATIC_DIR), template_folder=str(TEMPLATES_DIR))
 app.config["JSON_SORT_KEYS"] = False
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 io_lock = Lock()
@@ -252,16 +276,16 @@ def route_message(user_text: str, memory_items: List[Dict[str, Any]]) -> Dict[st
     coding_terms = [
         "code", "bug", "fix", "app.py", "javascript", "python", "flask",
         "html", "css", "smff", "file", "router", "panel", "backend",
-        "frontend", "script", "function", "json", "api"
+        "frontend", "script", "function", "json", "api",
     ]
     planning_terms = [
-        "plan", "roadmap", "next", "steps", "phase", "version", "launch", "strategy"
+        "plan", "roadmap", "next", "steps", "phase", "version", "launch", "strategy",
     ]
     writing_terms = [
-        "write", "rewrite", "email", "book", "blog", "post", "caption", "story"
+        "write", "rewrite", "email", "book", "blog", "post", "caption", "story",
     ]
     analysis_terms = [
-        "analyze", "compare", "why", "reason", "breakdown", "audit", "review"
+        "analyze", "compare", "why", "reason", "breakdown", "audit", "review",
     ]
 
     if any(term in lowered for term in coding_terms):
@@ -282,7 +306,8 @@ def route_message(user_text: str, memory_items: List[Dict[str, Any]]) -> Dict[st
         reason = "Detected analysis / explanation language."
 
     significant_words = {
-        word for word in re.findall(r"[a-zA-Z0-9_\-]{3,}", lowered)
+        word
+        for word in re.findall(r"[a-zA-Z0-9_\-]{3,}", lowered)
         if word not in {"the", "and", "for", "with", "that", "this", "you", "your", "are", "was"}
     }
 
@@ -383,13 +408,30 @@ def safe_json() -> Dict[str, Any]:
         return {}
 
 
+@app.after_request
+def apply_response_headers(response: Response) -> Response:
+    path = request.path or ""
+
+    if path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+
+    if path in {"/", "/mobile"}:
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+
+    return response
+
+
 @app.get("/")
 def index() -> Any:
     return render_template("index.html")
 
+
 @app.get("/mobile")
 def mobile() -> Any:
     return render_template("mobile.html")
+
 
 @app.get("/health")
 def health() -> Any:
@@ -400,10 +442,12 @@ def health() -> Any:
 def api_state() -> Any:
     payload = load_sessions()
     sessions = payload["sessions"]
+
     if not sessions:
         current = get_or_create_default_session()
         sessions = load_sessions()["sessions"]
     else:
+        sessions.sort(key=lambda s: (not bool(s.get("pinned")), -(s.get("updated_at") or 0)))
         current = sessions[0]
 
     current_id = request.args.get("session_id") or current.get("id")
@@ -417,7 +461,9 @@ def api_state() -> Any:
         {
             "ok": True,
             "model": OPENAI_MODEL,
+            "current_model": OPENAI_MODEL,
             "current_session_id": current.get("id"),
+            "active_session_id": current.get("id"),
             "sessions": [session_summary(s) for s in sessions],
             "memory": memory_items,
             "router_meta": current_router,
@@ -439,6 +485,7 @@ def api_get_chat(session_id: str) -> Any:
         {
             "ok": True,
             "session": session_summary(session),
+            "session_id": session.get("id"),
             "messages": session.get("messages", []),
             "router_meta": router_meta,
             "last_router_meta": LAST_ROUTER_META,
@@ -451,7 +498,7 @@ def api_chat() -> Any:
     data = safe_json()
 
     session_id = str(data.get("session_id") or "").strip()
-    user_message = normalize_text(str(data.get("message") or ""))
+    user_message = normalize_text(str(data.get("message") or data.get("content") or ""))
 
     if not user_message:
         return jsonify({"ok": False, "error": "Message is required."}), 400
@@ -513,6 +560,7 @@ def api_chat() -> Any:
         {
             "ok": True,
             "session_id": session["id"],
+            "active_session_id": session["id"],
             "message": assistant_entry,
             "router_meta": router_meta,
             "last_router_meta": LAST_ROUTER_META,
@@ -529,7 +577,7 @@ def api_chat_stream():
     data = safe_json()
 
     session_id = str(data.get("session_id") or "").strip()
-    user_message = normalize_text(str(data.get("message") or ""))
+    user_message = normalize_text(str(data.get("message") or data.get("content") or ""))
 
     if not user_message:
         return jsonify({"ok": False, "error": "Message is required."}), 400
@@ -562,18 +610,32 @@ def api_chat_stream():
 
     def generate():
         full_text = ""
+
         try:
-            yield sse({"type": "meta", "router_meta": router_meta})
+            yield sse(
+                {
+                    "type": "meta",
+                    "router_meta": router_meta,
+                    "session_id": session["id"],
+                }
+            )
 
             if not client:
                 fallback = (
                     "[Nova offline fallback]\n\n"
                     f"Mode: {router_meta.get('mode')}\n"
                     f"Intent: {router_meta.get('intent')}\n"
-                    "No OPENAI_API_KEY found, so this is a local fallback response."
+                    "No OPENAI_API_KEY found."
                 )
                 full_text = fallback
-                yield sse({"type": "delta", "content": fallback})
+
+                yield sse(
+                    {
+                        "type": "delta",
+                        "delta": fallback,
+                        "session_id": session["id"],
+                    }
+                )
             else:
                 response = client.chat.completions.create(
                     model=OPENAI_MODEL,
@@ -595,7 +657,14 @@ def api_chat_stream():
                         continue
 
                     full_text += delta
-                    yield sse({"type": "delta", "content": delta})
+
+                    yield sse(
+                        {
+                            "type": "delta",
+                            "delta": delta,
+                            "session_id": session["id"],
+                        }
+                    )
 
             assistant_entry = {
                 "id": str(uuid.uuid4()),
@@ -625,7 +694,7 @@ def api_chat_stream():
             yield sse(
                 {
                     "type": "done",
-                    "message": assistant_entry,
+                    "response": full_text,
                     "router_meta": router_meta,
                     "session": session_summary(session),
                     "session_id": session["id"],
@@ -634,7 +703,14 @@ def api_chat_stream():
             yield "data: [DONE]\n\n"
 
         except Exception as exc:
-            yield sse({"type": "error", "error": str(exc)})
+            yield sse(
+                {
+                    "type": "error",
+                    "error": str(exc),
+                    "session_id": session["id"],
+                }
+            )
+            yield "data: [DONE]\n\n"
 
     return Response(
         stream_with_context(generate()),
@@ -644,6 +720,52 @@ def api_chat_stream():
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
         },
+    )
+
+
+@app.post("/api/upload")
+def api_upload() -> Any:
+    incoming_files = request.files.getlist("files")
+    if not incoming_files:
+        single = request.files.get("file")
+        if single:
+            incoming_files = [single]
+
+    if not incoming_files:
+        return jsonify({"ok": False, "error": "No files uploaded."}), 400
+
+    saved_files: List[Dict[str, Any]] = []
+
+    for incoming in incoming_files:
+        original_name = secure_filename(incoming.filename or "")
+        if not original_name:
+            continue
+
+        file_id = str(uuid.uuid4())
+        stored_name = f"{file_id}_{original_name}"
+        target_path = UPLOAD_DIR / stored_name
+        incoming.save(target_path)
+
+        saved_files.append(
+            {
+                "id": file_id,
+                "name": original_name,
+                "stored_name": stored_name,
+                "size": target_path.stat().st_size,
+                "created_at": now_ts(),
+            }
+        )
+
+    if not saved_files:
+        return jsonify({"ok": False, "error": "No valid files uploaded."}), 400
+
+    return jsonify(
+        {
+            "ok": True,
+            "files": saved_files,
+            "router_meta": LAST_ROUTER_META,
+            "last_router_meta": LAST_ROUTER_META,
+        }
     )
 
 
@@ -658,6 +780,8 @@ def api_session_new() -> Any:
         {
             "ok": True,
             "session": session_summary(session),
+            "session_id": session["id"],
+            "active_session_id": session["id"],
             "router_meta": session["router_meta"],
             "last_router_meta": LAST_ROUTER_META,
         }
@@ -884,8 +1008,5 @@ def serve_static(filename: str) -> Any:
 
 
 if __name__ == "__main__":
-    APP_HOST = "0.0.0.0"
-    APP_PORT = 5001
-
     print(f"Nova running on http://{APP_HOST}:{APP_PORT}")
-    app.run(host=APP_HOST, port=APP_PORT, debug=True)
+    app.run(host=APP_HOST, port=APP_PORT, debug=APP_DEBUG)

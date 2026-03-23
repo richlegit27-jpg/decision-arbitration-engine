@@ -304,12 +304,15 @@
     const memoryHits = Number.isFinite(router.memory_hits)
       ? router.memory_hits
       : Number(router.memory_hits || 0);
+    const normalizedMemoryCount = Number.isFinite(router.memory_count)
+      ? router.memory_count
+      : Number(router.memory_count || memoryHits || 0);
 
     return `
       <div class="router-badge">
         <span class="router-badge-pill rb-mode" data-mode="${escapeHtml(mode)}">${escapeHtml(mode)}</span>
         <span class="router-badge-pill rb-intent">${escapeHtml(intent)}</span>
-        <span class="router-badge-pill rb-memory">mem:${escapeHtml(memoryHits)}</span>
+        <span class="router-badge-pill rb-memory">mem:${escapeHtml(normalizedMemoryCount)}</span>
       </div>
     `;
   }
@@ -322,6 +325,8 @@
 
     const preview = Array.isArray(router.memory_preview)
       ? router.memory_preview
+      : Array.isArray(router.memory_items)
+      ? router.memory_items
       : Array.isArray(router.memory_used)
       ? router.memory_used
       : [];
@@ -334,12 +339,15 @@
 
     const ts = Number(router.timestamp || 0);
     const timeText = ts ? formatTime(ts) : "—";
+    const memoryHits = Number.isFinite(router.memory_hits)
+      ? router.memory_hits
+      : Number(router.memory_count || 0);
 
     content.innerHTML = `
       <div class="router-debug-row"><strong>Mode:</strong> ${escapeHtml(router.mode || "general")}</div>
       <div class="router-debug-row"><strong>Intent:</strong> ${escapeHtml(router.intent || "chat")}</div>
       <div class="router-debug-row"><strong>Reason:</strong> ${escapeHtml(router.reason || "auto")}</div>
-      <div class="router-debug-row"><strong>Memory Hits:</strong> ${escapeHtml(router.memory_hits ?? 0)}</div>
+      <div class="router-debug-row"><strong>Memory Hits:</strong> ${escapeHtml(memoryHits ?? 0)}</div>
       <div class="router-debug-row"><strong>Time:</strong> ${escapeHtml(timeText)}</div>
       <div class="router-debug-row"><strong>Memory Used:</strong>${previewHtml}</div>
     `;
@@ -551,6 +559,11 @@
       state.activeSessionId = currentSessionId;
     }
 
+    if (data.router_meta) {
+      state.lastRouter = data.router_meta;
+      window.__novaLastRouterMeta = data.router_meta;
+    }
+
     renderSessions();
     updateSessionBadge();
   }
@@ -561,6 +574,13 @@
     const data = await apiGet(API.getChat(sessionId));
     state.activeSessionId = data.session?.id || data.session_id || sessionId;
     state.messages = Array.isArray(data.messages) ? data.messages : [];
+
+    if (data.router_meta) {
+      state.lastRouter = data.router_meta;
+      window.__novaLastRouterMeta = data.router_meta;
+      window.dispatchEvent(new CustomEvent("nova:router-meta", { detail: data.router_meta }));
+    }
+
     renderMessages();
     renderSessions();
   }
@@ -752,32 +772,55 @@
               if (data.router || data.router_meta) {
                 streamRouter = data.router || data.router_meta;
                 assistantStreamMessage.router = streamRouter;
+                window.__novaLastRouterMeta = streamRouter;
+                window.dispatchEvent(
+                  new CustomEvent("nova:router-meta", { detail: streamRouter })
+                );
                 updateRouterDebug(streamRouter);
                 scheduleRender();
+              }
+
+              if (data.session_id) {
+                state.activeSessionId = data.session_id;
               }
             }
 
             else if (type === "delta") {
-              if (typeof data.content === "string" && data.content) {
-                pendingDelta += data.content;
-                scheduleRender();
-              }
+              const delta =
+                typeof data.delta === "string"
+                  ? data.delta
+                  : typeof data.content === "string"
+                  ? data.content
+                  : "";
+
+              if (!delta) continue;
+
+              pendingDelta += delta;
+              scheduleRender();
             }
 
             else if (type === "done") {
               flushPendingDelta();
 
-              if (data.message && typeof data.message.content === "string") {
-                assistantStreamMessage.content = data.message.content;
-                finalContent = data.message.content;
-              } else if (typeof data.content === "string" && !assistantStreamMessage.content) {
-                assistantStreamMessage.content = data.content;
-                finalContent = data.content;
-              }
+              const final =
+                typeof data.response === "string"
+                  ? data.response
+                  : typeof data.message?.content === "string"
+                  ? data.message.content
+                  : typeof data.content === "string"
+                  ? data.content
+                  : finalContent;
+
+              assistantStreamMessage.content = final || assistantStreamMessage.content;
+              finalContent = assistantStreamMessage.content;
 
               if (data.router || data.router_meta) {
                 streamRouter = data.router || data.router_meta;
                 assistantStreamMessage.router = streamRouter;
+                window.__novaLastRouterMeta = streamRouter;
+                window.dispatchEvent(
+                  new CustomEvent("nova:router-meta", { detail: streamRouter })
+                );
                 updateRouterDebug(streamRouter);
               }
 
@@ -832,6 +875,7 @@
           intent: "error",
           reason: "frontend exception",
           memory_hits: 0,
+          memory_count: 0,
           memory_preview: [],
           timestamp: nowUnix(),
         };
@@ -842,6 +886,7 @@
           intent: "error",
           reason: "frontend exception",
           memory_hits: 0,
+          memory_count: 0,
           memory_preview: [],
           timestamp: nowUnix(),
         });
