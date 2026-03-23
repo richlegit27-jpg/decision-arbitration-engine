@@ -500,3 +500,16 @@ body.mobile-right-open .mobile-panel-right {
 [hidden] {
   display: none !important;
 }
+
+#regenerateBtn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  margin-right: 6px;
+  border-radius: 10px;
+  background: #1a2440;
+  color: white;
+  font-size: 18px;
+}
