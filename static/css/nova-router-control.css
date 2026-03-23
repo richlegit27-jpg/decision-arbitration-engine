@@ -1,212 +1,272 @@
-/* ================================
-   NOVA ROUTER CONTROL (PHASE 4 POLISH)
-   ================================ */
-
 :root {
-  --router-bg: rgba(18, 27, 50, 0.92);
-  --router-border: rgba(164, 185, 255, 0.18);
-  --router-text: #e8eeff;
-  --router-muted: #8fa2d6;
-  --router-accent: #5a84ff;
-  --router-accent-soft: rgba(90, 132, 255, 0.18);
-  --router-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --nova-router-z: 9999;
+  --nova-router-bg: rgba(10, 15, 28, 0.98);
+  --nova-router-bg-soft: rgba(255, 255, 255, 0.04);
+  --nova-router-line: rgba(255, 255, 255, 0.12);
+  --nova-router-line-soft: rgba(255, 255, 255, 0.08);
+  --nova-router-text: #eef3ff;
+  --nova-router-text-soft: rgba(238, 243, 255, 0.72);
+  --nova-router-shadow: 0 18px 45px rgba(0, 0, 0, 0.36);
+  --nova-router-radius: 18px;
+  --nova-router-radius-sm: 12px;
+  --nova-router-toggle-bg: rgba(15, 20, 35, 0.96);
+  --nova-router-dot: #72f1a6;
 }
-
-/* ================================
-   PANEL CONTAINER
-   ================================ */
 
 .nova-router-panel {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 260px;
-  max-width: calc(100vw - 32px);
-
-  background: var(--router-bg);
-  border: 1px solid var(--router-border);
-  border-radius: 16px;
-
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-
-  box-shadow: var(--router-shadow);
-  z-index: 9999;
-
-  overflow: hidden;
-  font-family: system-ui, -apple-system, Segoe UI, sans-serif;
-
-  transform: translateY(0);
-  opacity: 1;
-  transition: all 0.25s ease;
-}
-
-/* hidden state */
-.nova-router-panel.hidden {
-  transform: translateY(20px);
-  opacity: 0;
+  right: 14px;
+  bottom: 14px;
+  z-index: var(--nova-router-z);
+  font-family: Arial, sans-serif;
   pointer-events: none;
 }
 
-/* ================================
-   HEADER
-   ================================ */
+.nova-router-panel * {
+  box-sizing: border-box;
+}
 
-.nova-router-header {
-  display: flex;
+.nova-router-panel-toggle,
+.nova-router-panel-shell {
+  pointer-events: auto;
+}
+
+.nova-router-panel-toggle {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-
-  padding: 10px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-
-  color: var(--router-text);
-  border-bottom: 1px solid var(--router-border);
-}
-
-.nova-router-title {
-  opacity: 0.85;
-}
-
-/* toggle button */
-.nova-router-toggle {
-  background: transparent;
-  border: none;
-  color: var(--router-muted);
-  font-size: 14px;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.nova-router-toggle:hover {
-  background: var(--router-accent-soft);
-  color: var(--router-text);
-}
-
-/* ================================
-   BODY
-   ================================ */
-
-.nova-router-body {
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
+  justify-content: center;
   gap: 8px;
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid var(--nova-router-line);
+  border-radius: 999px;
+  background: var(--nova-router-toggle-bg);
+  color: var(--nova-router-text);
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* each row */
-.nova-router-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-
-  font-size: 12px;
-  line-height: 1.4;
+.nova-router-panel-toggle:active {
+  transform: translateY(1px);
 }
 
-/* label */
-.nova-router-label {
-  color: var(--router-muted);
-  text-transform: uppercase;
-  font-size: 10px;
-  letter-spacing: 0.05em;
+.nova-router-panel-toggle-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--nova-router-dot);
+  flex: 0 0 auto;
 }
 
-/* value */
-.nova-router-value {
-  color: var(--router-text);
-  font-weight: 600;
-  text-align: right;
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.nova-router-panel-toggle-text {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
-/* ================================
-   MODE BADGES
-   ================================ */
-
-.nova-router-badge {
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
+.nova-router-panel-shell {
+  display: none;
+  width: min(360px, calc(100vw - 28px));
+  margin-top: 10px;
+  border: 1px solid var(--nova-router-line);
+  border-radius: var(--nova-router-radius);
+  overflow: hidden;
+  background: var(--nova-router-bg);
+  color: var(--nova-router-text);
+  box-shadow: var(--nova-router-shadow);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
-/* modes */
-.nova-router-badge.general {
-  background: rgba(120, 140, 255, 0.15);
-  color: #aabaff;
+.nova-router-panel.open .nova-router-panel-shell {
+  display: block;
 }
 
-.nova-router-badge.coding {
-  background: rgba(90, 200, 140, 0.15);
-  color: #6fffb0;
-}
-
-.nova-router-badge.analysis {
-  background: rgba(255, 180, 90, 0.15);
-  color: #ffc078;
-}
-
-.nova-router-badge.writing {
-  background: rgba(200, 120, 255, 0.15);
-  color: #d5a6ff;
-}
-
-.nova-router-badge.planning {
-  background: rgba(90, 180, 255, 0.15);
-  color: #8fd3ff;
-}
-
-/* ================================
-   FOOTER / ACTIONS
-   ================================ */
-
-.nova-router-footer {
+.nova-router-panel-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 6px;
-
-  padding: 8px 10px;
-  border-top: 1px solid var(--router-border);
+  gap: 12px;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--nova-router-line-soft);
 }
 
-/* buttons */
-.nova-router-btn {
-  flex: 1;
-  background: transparent;
-  border: 1px solid var(--router-border);
-  color: var(--router-muted);
+.nova-router-panel-title-wrap {
+  min-width: 0;
+  flex: 1 1 auto;
+}
 
-  font-size: 11px;
-  padding: 6px 8px;
-  border-radius: 8px;
+.nova-router-panel-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+}
 
+.nova-router-panel-subtitle {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--nova-router-text-soft);
+  word-break: break-word;
+}
+
+.nova-router-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.nova-router-panel-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--nova-router-line);
+  border-radius: 10px;
+  background: var(--nova-router-bg-soft);
+  color: var(--nova-router-text);
   cursor: pointer;
-  transition: all 0.2s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.nova-router-btn:hover {
-  background: var(--router-accent-soft);
-  color: var(--router-text);
-  border-color: var(--router-accent);
+.nova-router-panel-action:active {
+  transform: translateY(1px);
 }
 
-/* ================================
-   MOBILE SAFETY
-   ================================ */
+.nova-router-panel-content {
+  padding: 14px;
+  max-height: min(72vh, 560px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
 
-@media (max-width: 640px) {
+.nova-router-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.nova-router-card {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--nova-router-line-soft);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.nova-router-card-wide {
+  grid-column: 1 / -1;
+}
+
+.nova-router-label {
+  margin-bottom: 6px;
+  font-size: 11px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--nova-router-text-soft);
+}
+
+.nova-router-value {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--nova-router-text);
+  word-break: break-word;
+}
+
+.nova-router-raw-wrap {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--nova-router-line-soft);
+}
+
+.nova-router-raw-wrap summary {
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--nova-router-text-soft);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nova-router-raw {
+  margin: 10px 0 0;
+  padding: 10px;
+  border-radius: var(--nova-router-radius-sm);
+  background: var(--nova-router-bg-soft);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--nova-router-text);
+}
+
+.nova-router-panel.mobile {
+  right: 10px;
+  left: 10px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+}
+
+.nova-router-panel.mobile .nova-router-panel-toggle {
+  width: 100%;
+}
+
+.nova-router-panel.mobile .nova-router-panel-shell {
+  width: 100%;
+  max-height: min(70vh, 520px);
+}
+
+.nova-router-panel.mobile.open .nova-router-panel-shell {
+  display: block;
+}
+
+.nova-router-panel-lock,
+.nova-router-panel-lock body {
+  overflow: hidden !important;
+}
+
+@media (max-width: 900px) {
+  .nova-router-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
   .nova-router-panel {
-    bottom: 12px;
-    right: 12px;
-    width: calc(100vw - 24px);
+    right: 10px;
+    left: 10px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+  }
+
+  .nova-router-panel-shell {
+    width: 100%;
+  }
+
+  .nova-router-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nova-router-card-wide {
+    grid-column: auto;
+  }
+
+  .nova-router-panel-content {
+    max-height: 58vh;
+  }
+
+  .nova-router-panel-toggle {
+    width: 100%;
   }
 }

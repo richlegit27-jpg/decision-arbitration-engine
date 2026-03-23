@@ -6,8 +6,8 @@
       "id": "b42051e1-fd78-4565-bf00-5ee2548ab958",
       "title": "hi",
       "created_at": 1774243158.6037934,
-      "updated_at": 1774260617.0324705,
-      "pinned": false,
+      "updated_at": 1774265262.1797287,
+      "pinned": true,
       "messages": [
         {
           "id": "0bd44125-5ba6-4fb9-8c8a-d296514863eb",
@@ -174,20 +174,151 @@
       }
     },
     {
-      "id": "649c8631-7683-49bf-8cdc-5379f0fbec66",
+      "id": "63e4848e-92ab-461e-a571-c0d2969d5085",
       "title": "New Chat",
-      "created_at": 1774243526.3959394,
-      "updated_at": 1774243526.3959394,
+      "created_at": 1774265292.6717432,
+      "updated_at": 1774265292.6717432,
       "pinned": false,
       "messages": [],
       "router_meta": {
         "mode": "general",
         "intent": "idle",
+        "confidence": null,
         "reason": "No user message yet.",
-        "memory_hits": 0,
-        "memory_used": [],
+        "memory_used": false,
+        "memory_count": 0,
+        "memory_items": [],
         "route_time_ms": 0,
-        "timestamp": 1774243526395
+        "model": "gpt-5.4",
+        "provider": "openai",
+        "source": "session_create",
+        "timestamp": 1774265292671,
+        "updated_at": "2026-03-23 04:28:12"
+      }
+    },
+    {
+      "id": "fd9d552d-de6a-4ca2-8486-0bd972aaa9f7",
+      "title": "Yo",
+      "created_at": 1774265293.0129082,
+      "updated_at": 1774265294.9120312,
+      "pinned": false,
+      "messages": [
+        {
+          "id": "16f27ba1-6677-4f57-b77a-f5f95afd79e0",
+          "role": "user",
+          "content": "Yo",
+          "created_at": 1774265293.0133429
+        },
+        {
+          "id": "c8396a26-cb4c-4ac9-a9b4-e07a4d4a66ee",
+          "role": "assistant",
+          "content": "Yo — what’s up?",
+          "created_at": 1774265294.9120202,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774265293013,
+            "updated_at": "2026-03-23 04:28:13"
+          }
+        }
+      ],
+      "router_meta": {
+        "mode": "general",
+        "intent": "conversation",
+        "confidence": null,
+        "reason": "Defaulted to general conversation.",
+        "memory_used": false,
+        "memory_count": 0,
+        "memory_items": [],
+        "route_time_ms": 1,
+        "model": "gpt-5.4",
+        "provider": "openai",
+        "source": "route_message",
+        "timestamp": 1774265293013,
+        "updated_at": "2026-03-23 04:28:13"
+      }
+    },
+    {
+      "id": "fcc4cf2b-4b96-4c20-a119-fdcc269c4581",
+      "title": "New Chat",
+      "created_at": 1774265623.8941047,
+      "updated_at": 1774265623.8941047,
+      "pinned": false,
+      "messages": [],
+      "router_meta": {
+        "mode": "general",
+        "intent": "idle",
+        "confidence": null,
+        "reason": "No user message yet.",
+        "memory_used": false,
+        "memory_count": 0,
+        "memory_items": [],
+        "route_time_ms": 0,
+        "model": "gpt-5.4",
+        "provider": "openai",
+        "source": "session_create",
+        "timestamp": 1774265623894,
+        "updated_at": "2026-03-23 04:33:43"
+      }
+    },
+    {
+      "id": "fb0600ee-db37-4dfd-a2f0-4ef7a85f4d78",
+      "title": "Sup",
+      "created_at": 1774265624.249607,
+      "updated_at": 1774265625.7820146,
+      "pinned": false,
+      "messages": [
+        {
+          "id": "7e04407d-18da-4f10-bee6-efeacaf96e96",
+          "role": "user",
+          "content": "Sup",
+          "created_at": 1774265624.2500482
+        },
+        {
+          "id": "5f71b6ca-475f-401d-9099-ed9fb59ab631",
+          "role": "assistant",
+          "content": "Hey — what’s up?",
+          "created_at": 1774265625.7819903,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774265624250,
+            "updated_at": "2026-03-23 04:33:44"
+          }
+        }
+      ],
+      "router_meta": {
+        "mode": "general",
+        "intent": "conversation",
+        "confidence": null,
+        "reason": "Defaulted to general conversation.",
+        "memory_used": false,
+        "memory_count": 0,
+        "memory_items": [],
+        "route_time_ms": 1,
+        "model": "gpt-5.4",
+        "provider": "openai",
+        "source": "route_message",
+        "timestamp": 1774265624250,
+        "updated_at": "2026-03-23 04:33:44"
       }
     }
   ],

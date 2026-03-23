@@ -1,393 +1,376 @@
 (() => {
   "use strict";
 
-  if (window.__novaBrainRouterPanelLoaded) return;
-  window.__novaBrainRouterPanelLoaded = true;
+  if (window.__novaRouterPanelLoaded) return;
+  window.__novaRouterPanelLoaded = true;
 
   const PANEL_ID = "novaRouterPanel";
-  const STYLE_HOOK = "nova-router-panel-ready";
-  const STORAGE_KEY_VISIBLE = "nova.router.panel.visible";
-  const STORAGE_KEY_COLLAPSED = "nova.router.panel.collapsed";
+  const MOBILE_BREAKPOINT = 900;
+  const POLL_MS = 3500;
 
-  const DEFAULT_META = {
-    intent: "general",
-    route: "general",
-    mode: "general",
-    confidence: null,
-    memory_used: null,
-    memory_count: null,
-    model: null,
-    provider: null,
-    source: "idle",
-    timestamp: null,
+  const state = {
+    panel: null,
+    body: null,
+    meta: null,
+    pollTimer: null,
+    isOpen: false,
+    isCompact: false,
+    isMobile: false,
+    initialized: false,
   };
 
-  let panel = null;
-  let body = null;
-  let valueRoute = null;
-  let valueIntent = null;
-  let valueConfidence = null;
-  let valueMemory = null;
-  let valueModel = null;
-  let valueSource = null;
-  let toggleBtn = null;
-  let hideBtn = null;
-
-  let state = {
-    visible: readBool(STORAGE_KEY_VISIBLE, true),
-    collapsed: readBool(STORAGE_KEY_COLLAPSED, false),
-    meta: { ...DEFAULT_META },
-  };
-
-  function readBool(key, fallback) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw === null) return fallback;
-      return raw === "1";
-    } catch {
-      return fallback;
-    }
+  function safeText(value) {
+    if (value == null) return "";
+    return String(value).trim();
   }
 
-  function writeBool(key, value) {
-    try {
-      localStorage.setItem(key, value ? "1" : "0");
-    } catch {}
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
   }
 
-  function safeText(value, fallback = "—") {
-    const text = String(value ?? "").trim();
-    return text || fallback;
+  function byId(id) {
+    return document.getElementById(id);
   }
 
-  function clampConfidence(value) {
-    if (value === null || value === undefined || value === "") return null;
-    const num = Number(value);
-    if (!Number.isFinite(num)) return null;
+  function readViewportWidth() {
+    return window.visualViewport?.width || window.innerWidth || document.documentElement.clientWidth || 0;
+  }
+
+  function isMobileViewport() {
+    return readViewportWidth() <= MOBILE_BREAKPOINT;
+  }
+
+  function normalizeMeta(meta) {
+    if (!meta || typeof meta !== "object") return null;
+
+    return {
+      mode: safeText(meta.mode || meta.route || meta.intent_mode || "unknown"),
+      intent: safeText(meta.intent || meta.task || "unknown"),
+      model: safeText(meta.model || meta.selected_model || "unknown"),
+      confidence: meta.confidence == null ? "" : String(meta.confidence),
+      source: safeText(meta.source || meta.router_source || "server"),
+      memory_used: !!meta.memory_used,
+      memory_count: Number.isFinite(Number(meta.memory_count)) ? Number(meta.memory_count) : 0,
+      raw: meta,
+    };
+  }
+
+  function formatConfidence(value) {
+    const raw = safeText(value);
+    if (!raw) return "—";
+
+    const num = Number(raw);
+    if (!Number.isFinite(num)) return raw;
+
     if (num <= 1) return `${Math.round(num * 100)}%`;
     return `${Math.round(num)}%`;
   }
 
-  function boolish(value) {
-    if (value === true) return "yes";
-    if (value === false) return "no";
-    return null;
-  }
-
-  function normalizeMeta(input) {
-    const raw = input && typeof input === "object" ? input : {};
-    const route = raw.route || raw.mode || raw.intent || DEFAULT_META.route;
-    const intent = raw.intent || raw.route || raw.mode || DEFAULT_META.intent;
-
-    let memoryValue = null;
-    if (typeof raw.memory_count !== "undefined" && raw.memory_count !== null) {
-      memoryValue = String(raw.memory_count);
-    } else if (typeof raw.memory_used !== "undefined") {
-      memoryValue = boolish(raw.memory_used);
-    } else if (typeof raw.memory !== "undefined") {
-      memoryValue = boolish(raw.memory);
-    }
-
-    const modelValue =
-      raw.model ||
-      raw.model_name ||
-      raw.selected_model ||
-      raw.provider_model ||
-      null;
-
-    const providerValue = raw.provider || raw.vendor || null;
-    const sourceValue =
-      raw.source ||
-      raw.origin ||
-      raw.from ||
-      (raw.debug ? "debug" : null) ||
-      "live";
-
-    return {
-      route: safeText(route),
-      intent: safeText(intent),
-      mode: safeText(raw.mode || route),
-      confidence: clampConfidence(raw.confidence),
-      memory_used:
-        typeof raw.memory_used !== "undefined" ? raw.memory_used : raw.memory,
-      memory_count:
-        typeof raw.memory_count !== "undefined" ? raw.memory_count : null,
-      memory_display: memoryValue,
-      model: modelValue ? safeText(modelValue) : null,
-      provider: providerValue ? safeText(providerValue) : null,
-      source: safeText(sourceValue),
-      timestamp: raw.timestamp || raw.ts || Date.now(),
-    };
-  }
-
-  function modeClass(value) {
-    const key = String(value || "general").toLowerCase();
-    if (["coding", "planning", "writing", "analysis", "general"].includes(key)) {
-      return key;
-    }
-    return "general";
-  }
-
   function ensurePanel() {
-    if (panel && document.body.contains(panel)) return panel;
+    if (state.panel && document.body.contains(state.panel)) {
+      return state.panel;
+    }
 
-    panel = document.createElement("section");
+    const panel = document.createElement("aside");
     panel.id = PANEL_ID;
     panel.className = "nova-router-panel";
-    panel.setAttribute("aria-live", "polite");
-    panel.setAttribute("aria-label", "Nova router panel");
+    panel.setAttribute("aria-hidden", "true");
 
     panel.innerHTML = `
-      <div class="nova-router-header">
-        <div class="nova-router-title">Router Debug</div>
-        <div class="nova-router-header-actions">
-          <button
-            type="button"
-            class="nova-router-toggle"
-            id="novaRouterToggle"
-            aria-label="Collapse router panel"
-            title="Collapse"
-          >–</button>
-          <button
-            type="button"
-            class="nova-router-toggle"
-            id="novaRouterHide"
-            aria-label="Hide router panel"
-            title="Hide"
-          >×</button>
-        </div>
-      </div>
+      <button type="button" class="nova-router-panel-toggle" id="novaRouterPanelToggle" aria-expanded="false" aria-controls="${PANEL_ID}">
+        <span class="nova-router-panel-toggle-dot"></span>
+        <span class="nova-router-panel-toggle-text">Router</span>
+      </button>
 
-      <div class="nova-router-body" id="novaRouterBody">
-        <div class="nova-router-row">
-          <span class="nova-router-label">Route</span>
-          <span class="nova-router-value">
-            <span class="nova-router-badge general" id="novaRouterValueRoute">general</span>
-          </span>
+      <div class="nova-router-panel-shell">
+        <div class="nova-router-panel-header">
+          <div class="nova-router-panel-title-wrap">
+            <div class="nova-router-panel-title">Router Debug</div>
+            <div class="nova-router-panel-subtitle" id="novaRouterPanelSubtitle">Waiting for data</div>
+          </div>
+
+          <div class="nova-router-panel-actions">
+            <button type="button" class="nova-router-panel-action" id="novaRouterPanelRefresh" title="Refresh">↻</button>
+            <button type="button" class="nova-router-panel-action" id="novaRouterPanelClose" title="Close">✕</button>
+          </div>
         </div>
 
-        <div class="nova-router-row">
-          <span class="nova-router-label">Intent</span>
-          <span class="nova-router-value" id="novaRouterValueIntent">general</span>
-        </div>
+        <div class="nova-router-panel-content">
+          <div class="nova-router-grid">
+            <div class="nova-router-card">
+              <div class="nova-router-label">Mode</div>
+              <div class="nova-router-value" id="novaRouterMode">—</div>
+            </div>
 
-        <div class="nova-router-row">
-          <span class="nova-router-label">Confidence</span>
-          <span class="nova-router-value" id="novaRouterValueConfidence">—</span>
-        </div>
+            <div class="nova-router-card">
+              <div class="nova-router-label">Intent</div>
+              <div class="nova-router-value" id="novaRouterIntent">—</div>
+            </div>
 
-        <div class="nova-router-row">
-          <span class="nova-router-label">Memory</span>
-          <span class="nova-router-value" id="novaRouterValueMemory">—</span>
-        </div>
+            <div class="nova-router-card">
+              <div class="nova-router-label">Model</div>
+              <div class="nova-router-value" id="novaRouterModel">—</div>
+            </div>
 
-        <div class="nova-router-row">
-          <span class="nova-router-label">Model</span>
-          <span class="nova-router-value" id="novaRouterValueModel">—</span>
-        </div>
+            <div class="nova-router-card">
+              <div class="nova-router-label">Confidence</div>
+              <div class="nova-router-value" id="novaRouterConfidence">—</div>
+            </div>
 
-        <div class="nova-router-row">
-          <span class="nova-router-label">Source</span>
-          <span class="nova-router-value" id="novaRouterValueSource">idle</span>
-        </div>
-      </div>
+            <div class="nova-router-card">
+              <div class="nova-router-label">Memory Used</div>
+              <div class="nova-router-value" id="novaRouterMemoryUsed">—</div>
+            </div>
 
-      <div class="nova-router-footer">
-        <button type="button" class="nova-router-btn" id="novaRouterShowBtn">show</button>
-        <button type="button" class="nova-router-btn" id="novaRouterResetBtn">reset</button>
+            <div class="nova-router-card">
+              <div class="nova-router-label">Memory Count</div>
+              <div class="nova-router-value" id="novaRouterMemoryCount">—</div>
+            </div>
+
+            <div class="nova-router-card nova-router-card-wide">
+              <div class="nova-router-label">Source</div>
+              <div class="nova-router-value" id="novaRouterSource">—</div>
+            </div>
+          </div>
+
+          <details class="nova-router-raw-wrap">
+            <summary>Raw router meta</summary>
+            <pre class="nova-router-raw" id="novaRouterRaw">{}</pre>
+          </details>
+        </div>
       </div>
     `;
 
     document.body.appendChild(panel);
+    state.panel = panel;
+    state.body = document.body;
 
-    body = panel.querySelector("#novaRouterBody");
-    valueRoute = panel.querySelector("#novaRouterValueRoute");
-    valueIntent = panel.querySelector("#novaRouterValueIntent");
-    valueConfidence = panel.querySelector("#novaRouterValueConfidence");
-    valueMemory = panel.querySelector("#novaRouterValueMemory");
-    valueModel = panel.querySelector("#novaRouterValueModel");
-    valueSource = panel.querySelector("#novaRouterValueSource");
-    toggleBtn = panel.querySelector("#novaRouterToggle");
-    hideBtn = panel.querySelector("#novaRouterHide");
-
-    const showBtn = panel.querySelector("#novaRouterShowBtn");
-    const resetBtn = panel.querySelector("#novaRouterResetBtn");
-
-    toggleBtn?.addEventListener("click", toggleCollapsed);
-    hideBtn?.addEventListener("click", hidePanel);
-    showBtn?.addEventListener("click", showPanel);
-    resetBtn?.addEventListener("click", resetPanel);
-
-    panel.addEventListener("dblclick", () => {
-      if (!state.visible) showPanel();
-    });
-
-    document.documentElement.classList.add(STYLE_HOOK);
-
-    syncPanelState();
-    renderMeta(state.meta);
-
+    bindPanelEvents();
+    applyViewportMode();
     return panel;
   }
 
-  function syncPanelState() {
-    if (!panel) return;
+  function bindPanelEvents() {
+    const toggle = byId("novaRouterPanelToggle");
+    const close = byId("novaRouterPanelClose");
+    const refresh = byId("novaRouterPanelRefresh");
 
-    panel.classList.toggle("hidden", !state.visible);
-    panel.classList.toggle("is-collapsed", !!state.collapsed);
+    toggle?.addEventListener("click", () => {
+      state.isOpen ? closePanel() : openPanel();
+    });
 
-    if (body) {
-      body.style.display = state.collapsed ? "none" : "";
+    close?.addEventListener("click", () => {
+      closePanel();
+    });
+
+    refresh?.addEventListener("click", async () => {
+      await tryReadFromApiState(true);
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && state.isOpen) {
+        closePanel();
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!state.isMobile || !state.isOpen || !state.panel) return;
+
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+
+      const toggleBtn = byId("novaRouterPanelToggle");
+      if (state.panel.contains(target)) return;
+      if (toggleBtn?.contains(target)) return;
+
+      closePanel();
+    });
+
+    window.addEventListener("resize", handleViewportChange);
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", handleViewportChange);
     }
 
-    const footer = panel.querySelector(".nova-router-footer");
-    if (footer) {
-      footer.style.display = state.collapsed ? "none" : "";
-    }
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        handleViewportChange();
+        tryReadFromWindowState();
+        tryReadFromAppState();
+        tryReadFromApiState();
+      }
+    });
 
-    if (toggleBtn) {
-      toggleBtn.textContent = state.collapsed ? "+" : "–";
-      toggleBtn.setAttribute(
-        "aria-label",
-        state.collapsed ? "Expand router panel" : "Collapse router panel"
-      );
-      toggleBtn.title = state.collapsed ? "Expand" : "Collapse";
+    window.addEventListener("orientationchange", () => {
+      setTimeout(() => {
+        handleViewportChange();
+      }, 120);
+    });
+  }
+
+  function handleViewportChange() {
+    applyViewportMode();
+
+    if (state.isMobile && state.isOpen) {
+      lockBodyScroll(true);
+    } else {
+      lockBodyScroll(false);
     }
   }
 
-  function renderMeta(metaInput) {
-    const meta = normalizeMeta(metaInput);
-    state.meta = meta;
+  function applyViewportMode() {
+    state.isMobile = isMobileViewport();
 
-    if (!panel) ensurePanel();
+    if (!state.panel) return;
 
-    if (valueRoute) {
-      valueRoute.textContent = safeText(meta.route);
-      valueRoute.className = `nova-router-badge ${modeClass(meta.route)}`;
-    }
+    state.panel.classList.toggle("mobile", state.isMobile);
+    state.panel.classList.toggle("desktop", !state.isMobile);
 
-    if (valueIntent) {
-      valueIntent.textContent = safeText(meta.intent);
-    }
-
-    if (valueConfidence) {
-      valueConfidence.textContent = meta.confidence || "—";
-    }
-
-    if (valueMemory) {
-      const memoryText =
-        meta.memory_display ??
-        (meta.memory_count !== null ? String(meta.memory_count) : "—");
-      valueMemory.textContent = memoryText;
-    }
-
-    if (valueModel) {
-      valueModel.textContent = meta.provider
-        ? `${safeText(meta.provider)} / ${safeText(meta.model)}`
-        : safeText(meta.model);
-    }
-
-    if (valueSource) {
-      valueSource.textContent = safeText(meta.source);
-    }
-
-    window.__novaLastRouterMeta = meta;
-  }
-
-  function applyRouterMeta(meta) {
-    renderMeta(meta);
-    if (!state.visible) {
-      state.visible = true;
-      writeBool(STORAGE_KEY_VISIBLE, true);
-      syncPanelState();
+    if (state.isMobile) {
+      state.isCompact = true;
+      state.panel.classList.add("compact");
+    } else {
+      state.panel.classList.remove("compact");
     }
   }
 
-  function toggleCollapsed() {
-    state.collapsed = !state.collapsed;
-    writeBool(STORAGE_KEY_COLLAPSED, state.collapsed);
-    syncPanelState();
+  function lockBodyScroll(lock) {
+    document.documentElement.classList.toggle("nova-router-panel-lock", !!lock);
+    document.body.classList.toggle("nova-router-panel-lock", !!lock);
   }
 
-  function hidePanel() {
-    state.visible = false;
-    writeBool(STORAGE_KEY_VISIBLE, false);
-    syncPanelState();
+  function openPanel() {
+    ensurePanel();
+    state.isOpen = true;
+
+    state.panel.classList.add("open");
+    state.panel.setAttribute("aria-hidden", "false");
+    byId("novaRouterPanelToggle")?.setAttribute("aria-expanded", "true");
+
+    if (state.isMobile) {
+      lockBodyScroll(true);
+    }
   }
 
-  function showPanel() {
-    state.visible = true;
-    writeBool(STORAGE_KEY_VISIBLE, true);
-    syncPanelState();
+  function closePanel() {
+    if (!state.panel) return;
+
+    state.isOpen = false;
+    state.panel.classList.remove("open");
+    state.panel.setAttribute("aria-hidden", "true");
+    byId("novaRouterPanelToggle")?.setAttribute("aria-expanded", "false");
+    lockBodyScroll(false);
   }
 
-  function resetPanel() {
-    state.meta = { ...DEFAULT_META, source: "reset" };
-    state.visible = true;
-    state.collapsed = false;
-    writeBool(STORAGE_KEY_VISIBLE, true);
-    writeBool(STORAGE_KEY_COLLAPSED, false);
-    syncPanelState();
-    renderMeta(state.meta);
+  function renderRouter(meta) {
+    ensurePanel();
+
+    const normalized = normalizeMeta(meta);
+    state.meta = normalized;
+
+    byId("novaRouterMode").textContent = normalized?.mode || "—";
+    byId("novaRouterIntent").textContent = normalized?.intent || "—";
+    byId("novaRouterModel").textContent = normalized?.model || "—";
+    byId("novaRouterConfidence").textContent = normalized ? formatConfidence(normalized.confidence) : "—";
+    byId("novaRouterMemoryUsed").textContent = normalized ? (normalized.memory_used ? "yes" : "no") : "—";
+    byId("novaRouterMemoryCount").textContent = normalized ? String(normalized.memory_count) : "—";
+    byId("novaRouterSource").textContent = normalized?.source || "—";
+
+    const subtitle = byId("novaRouterPanelSubtitle");
+    if (subtitle) {
+      subtitle.textContent = normalized
+        ? `${normalized.mode || "unknown"} · ${normalized.intent || "unknown"}`
+        : "Waiting for data";
+    }
+
+    const raw = byId("novaRouterRaw");
+    if (raw) {
+      raw.textContent = normalized?.raw ? JSON.stringify(normalized.raw, null, 2) : "{}";
+    }
+
+    window.__novaLastRouterMeta = normalized?.raw || null;
   }
 
-  function tryReadWindowMeta() {
-    const meta = window.__novaLastRouterMeta || window.__novaRouterMeta || null;
-    if (meta && typeof meta === "object") {
-      applyRouterMeta(meta);
+  function tryReadFromWindowState() {
+    const meta = window.__novaLastRouterMeta || window.__lastRouterMeta || window.__routerMeta || null;
+    if (meta) {
+      renderRouter(meta);
       return true;
     }
     return false;
   }
 
-  function tryReadAppMeta() {
-    const app = window.novaApp || window.__novaApp || null;
+  function tryReadFromAppState() {
+    const app = window.__novaApp || window.novaApp || null;
     const meta =
+      app?.state?.router_meta ||
+      app?.router_meta ||
       app?.routerMeta ||
-      app?.state?.routerMeta ||
-      app?.state?.lastRouterMeta ||
       null;
 
-    if (meta && typeof meta === "object") {
-      applyRouterMeta(meta);
+    if (meta) {
+      renderRouter(meta);
       return true;
     }
+
     return false;
   }
 
-  async function tryReadApiMeta() {
+  async function tryReadFromApiState(force = false) {
+    if (!force && document.hidden) return false;
+
     try {
-      const res = await fetch("/api/state", {
+      const response = await fetch("/api/state", {
         method: "GET",
-        credentials: "same-origin",
+        headers: { "Accept": "application/json" },
         cache: "no-store",
-        headers: {
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-        },
       });
 
-      if (!res.ok) return false;
+      if (!response.ok) return false;
 
-      const data = await res.json();
+      const data = await response.json().catch(() => null);
       const meta =
         data?.router_meta ||
-        data?.routerMeta ||
+        data?.router ||
+        data?.state?.router_meta ||
         data?.last_router_meta ||
-        data?.lastRouterMeta ||
         null;
 
-      if (meta && typeof meta === "object") {
-        applyRouterMeta(meta);
+      if (meta) {
+        renderRouter(meta);
         return true;
       }
-    } catch {}
+    } catch (_) {}
+
     return false;
   }
 
-  function patchFetch() {
-    if (window.__novaRouterFetchPatched) return;
-    window.__novaRouterFetchPatched = true;
+  function startPollingFallback() {
+    stopPollingFallback();
+
+    state.pollTimer = window.setInterval(() => {
+      if (document.hidden) return;
+      if (tryReadFromWindowState()) return;
+      if (tryReadFromAppState()) return;
+      tryReadFromApiState();
+    }, POLL_MS);
+  }
+
+  function stopPollingFallback() {
+    if (state.pollTimer) {
+      clearInterval(state.pollTimer);
+      state.pollTimer = null;
+    }
+  }
+
+  function installFetchTap() {
+    if (window.__novaRouterFetchTapInstalled) return;
+    window.__novaRouterFetchTapInstalled = true;
 
     const originalFetch = window.fetch;
     if (typeof originalFetch !== "function") return;
@@ -396,155 +379,311 @@
       const response = await originalFetch.apply(this, args);
 
       try {
-        const cloned = response.clone();
-        const url =
-          typeof args[0] === "string"
-            ? args[0]
-            : args[0]?.url || response.url || "";
-
-        if (
-          url.includes("/api/chat") ||
-          url.includes("/api/send") ||
-          url.includes("/api/state")
-        ) {
-          cloned
-            .json()
-            .then((data) => {
-              const meta =
-                data?.router_meta ||
-                data?.routerMeta ||
-                data?.last_router_meta ||
-                data?.lastRouterMeta ||
-                data?.meta?.router ||
-                null;
-
-              if (meta && typeof meta === "object") {
-                applyRouterMeta(meta);
-              }
-            })
-            .catch(() => {});
+        const url = String(args?.[0]?.url || args?.[0] || "");
+        if (!url.includes("/api/chat") && !url.includes("/api/state")) {
+          return response;
         }
-      } catch {}
+
+        const clone = response.clone();
+        const contentType = clone.headers.get("content-type") || "";
+
+        if (contentType.includes("application/json")) {
+          const data = await clone.json().catch(() => null);
+          const meta =
+            data?.router_meta ||
+            data?.router ||
+            data?.state?.router_meta ||
+            data?.last_router_meta ||
+            null;
+
+          if (meta) {
+            renderRouter(meta);
+          }
+        }
+      } catch (_) {}
 
       return response;
     };
   }
 
-  function patchXhr() {
-    if (window.__novaRouterXhrPatched) return;
-    window.__novaRouterXhrPatched = true;
+  function installXhrTap() {
+    if (window.__novaRouterXhrTapInstalled) return;
+    window.__novaRouterXhrTapInstalled = true;
 
-    const OriginalOpen = XMLHttpRequest.prototype.open;
-    const OriginalSend = XMLHttpRequest.prototype.send;
+    const OriginalXHR = window.XMLHttpRequest;
+    if (!OriginalXHR) return;
 
-    XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-      this.__novaUrl = String(url || "");
-      return OriginalOpen.call(this, method, url, ...rest);
-    };
+    function WrappedXHR() {
+      const xhr = new OriginalXHR();
+      let requestUrl = "";
 
-    XMLHttpRequest.prototype.send = function (...args) {
-      this.addEventListener("load", function () {
+      const open = xhr.open;
+      xhr.open = function (method, url, ...rest) {
+        requestUrl = String(url || "");
+        return open.call(this, method, url, ...rest);
+      };
+
+      xhr.addEventListener("load", () => {
         try {
-          const url = this.__novaUrl || "";
-          if (
-            !url.includes("/api/chat") &&
-            !url.includes("/api/send") &&
-            !url.includes("/api/state")
-          ) {
+          if (!requestUrl.includes("/api/chat") && !requestUrl.includes("/api/state")) {
             return;
           }
 
-          const data = JSON.parse(this.responseText || "{}");
+          const contentType = xhr.getResponseHeader("content-type") || "";
+          if (!contentType.includes("application/json")) return;
+
+          const data = JSON.parse(xhr.responseText || "{}");
           const meta =
             data?.router_meta ||
-            data?.routerMeta ||
+            data?.router ||
+            data?.state?.router_meta ||
             data?.last_router_meta ||
-            data?.lastRouterMeta ||
-            data?.meta?.router ||
             null;
 
-          if (meta && typeof meta === "object") {
-            applyRouterMeta(meta);
+          if (meta) {
+            renderRouter(meta);
           }
-        } catch {}
+        } catch (_) {}
       });
 
-      return OriginalSend.apply(this, args);
-    };
+      return xhr;
+    }
+
+    window.XMLHttpRequest = WrappedXHR;
   }
 
-  function startPollingFallback() {
-    let attempts = 0;
-    const maxAttempts = 20;
-
-    const tick = async () => {
-      attempts += 1;
-
-      const gotWindow = tryReadWindowMeta();
-      const gotApp = tryReadAppMeta();
-
-      if (!gotWindow && !gotApp) {
-        await tryReadApiMeta();
-      }
-
-      if (attempts >= maxAttempts) {
-        clearInterval(timer);
-      }
-    };
-
-    const timer = window.setInterval(tick, 2500);
-    tick();
-  }
-
-  function bindEvents() {
+  function installEventHooks() {
     window.addEventListener("nova:router-meta", (event) => {
       const meta = event?.detail;
       if (meta && typeof meta === "object") {
-        applyRouterMeta(meta);
-      }
-    });
-
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "F8") {
-        event.preventDefault();
-        state.visible ? hidePanel() : showPanel();
-      }
-
-      if (event.key === "F9") {
-        event.preventDefault();
-        toggleCollapsed();
-      }
-    });
-
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) {
-        tryReadWindowMeta();
-        tryReadAppMeta();
-        tryReadApiMeta();
+        renderRouter(meta);
       }
     });
   }
 
-  function bootstrap() {
+  function installStyles() {
+    if (byId("novaRouterPanelInlineStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "novaRouterPanelInlineStyles";
+    style.textContent = `
+      .nova-router-panel {
+        position: fixed;
+        right: 14px;
+        bottom: 14px;
+        z-index: 9999;
+        font-family: Arial, sans-serif;
+      }
+
+      .nova-router-panel-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(15, 20, 35, 0.96);
+        color: #eef3ff;
+        border-radius: 999px;
+        padding: 10px 14px;
+        cursor: pointer;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      }
+
+      .nova-router-panel-toggle-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: #72f1a6;
+        flex: 0 0 auto;
+      }
+
+      .nova-router-panel-shell {
+        display: none;
+        width: min(360px, calc(100vw - 28px));
+        margin-top: 10px;
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(10, 15, 28, 0.98);
+        color: #eef3ff;
+        box-shadow: 0 18px 45px rgba(0,0,0,0.36);
+      }
+
+      .nova-router-panel.open .nova-router-panel-shell {
+        display: block;
+      }
+
+      .nova-router-panel-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        padding: 14px 14px 10px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+      }
+
+      .nova-router-panel-title {
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .nova-router-panel-subtitle {
+        margin-top: 4px;
+        font-size: 12px;
+        opacity: 0.72;
+      }
+
+      .nova-router-panel-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .nova-router-panel-action {
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(255,255,255,0.04);
+        color: #eef3ff;
+        border-radius: 10px;
+        min-width: 34px;
+        height: 34px;
+        cursor: pointer;
+      }
+
+      .nova-router-panel-content {
+        padding: 14px;
+        max-height: min(72vh, 560px);
+        overflow: auto;
+      }
+
+      .nova-router-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .nova-router-card {
+        border: 1px solid rgba(255,255,255,0.08);
+        background: rgba(255,255,255,0.03);
+        border-radius: 14px;
+        padding: 10px 11px;
+        min-width: 0;
+      }
+
+      .nova-router-card-wide {
+        grid-column: 1 / -1;
+      }
+
+      .nova-router-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        opacity: 0.68;
+        margin-bottom: 6px;
+      }
+
+      .nova-router-value {
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.35;
+        word-break: break-word;
+      }
+
+      .nova-router-raw-wrap {
+        margin-top: 12px;
+        border-top: 1px solid rgba(255,255,255,0.08);
+        padding-top: 12px;
+      }
+
+      .nova-router-raw-wrap summary {
+        cursor: pointer;
+        font-size: 12px;
+        opacity: 0.8;
+      }
+
+      .nova-router-raw {
+        margin: 10px 0 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 11px;
+        line-height: 1.45;
+        background: rgba(255,255,255,0.04);
+        border-radius: 12px;
+        padding: 10px;
+        overflow: auto;
+      }
+
+      .nova-router-panel.mobile {
+        right: 10px;
+        left: 10px;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+      }
+
+      .nova-router-panel.mobile .nova-router-panel-toggle {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .nova-router-panel.mobile .nova-router-panel-shell {
+        width: 100%;
+        max-height: min(70vh, 520px);
+      }
+
+      .nova-router-panel.mobile.open .nova-router-panel-shell {
+        display: block;
+      }
+
+      .nova-router-panel-lock,
+      .nova-router-panel-lock body {
+        overflow: hidden !important;
+      }
+
+      @media (max-width: 900px) {
+        .nova-router-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .nova-router-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .nova-router-card-wide {
+          grid-column: auto;
+        }
+
+        .nova-router-panel-content {
+          max-height: 58vh;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function init() {
+    if (state.initialized) return;
+    state.initialized = true;
+
+    installStyles();
     ensurePanel();
-    patchFetch();
-    patchXhr();
-    bindEvents();
+    installFetchTap();
+    installXhrTap();
+    installEventHooks();
 
-    const gotWindow = tryReadWindowMeta();
-    const gotApp = tryReadAppMeta();
-
-    if (!gotWindow && !gotApp) {
-      tryReadApiMeta();
-    }
-
+    tryReadFromWindowState();
+    tryReadFromAppState();
+    tryReadFromApiState();
     startPollingFallback();
+
     console.log("Nova brain router panel loaded");
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bootstrap, { once: true });
-  } else {
-    bootstrap();
-  }
+  init();
+
+  window.__novaRouterPanel = {
+    open: openPanel,
+    close: closePanel,
+    render: renderRouter,
+    refresh: tryReadFromApiState,
+    state,
+  };
 })();
