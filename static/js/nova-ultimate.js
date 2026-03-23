@@ -1043,3 +1043,33 @@
     });
   });
 })();
+
+// ===== SAFE ROUTER DEBUG (NON-DESTRUCTIVE) =====
+
+function logRouteMetaSafe(meta) {
+  if (!meta) return;
+
+  console.log("ROUTER DEBUG:", {
+    route: meta.route || meta.intent,
+    reason: meta.reason,
+    memory: meta.memory_scope || meta.memory,
+    model: meta.model
+  });
+}
+
+// patch sendMessage if it exists
+if (window.NovaCore && window.NovaCore.sendMessage) {
+  const originalSend = window.NovaCore.sendMessage;
+
+  window.NovaCore.sendMessage = async function (message, handlers = {}) {
+    const wrappedHandlers = {
+      ...handlers,
+      onMeta(meta) {
+        logRouteMetaSafe(meta);
+        if (handlers.onMeta) handlers.onMeta(meta);
+      }
+    };
+
+    return originalSend.call(this, message, wrappedHandlers);
+  };
+}

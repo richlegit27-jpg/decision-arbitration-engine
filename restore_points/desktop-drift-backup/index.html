@@ -1,0 +1,149 @@
+﻿<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nova</title>
+  <link rel="stylesheet" href="/static/css/nova-style.css?v=desktopalign1">
+  <link rel="stylesheet" href="/static/css/nova-router-control.css?v=desktopalign1">
+</head>
+<body class="left-open right-open">
+  <div id="appShell" class="app-shell">
+    <!-- LEFT SIDEBAR -->
+    <aside id="leftSidebar" class="left-sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Chats</div>
+        <button id="newChatBtn" class="btn btn-primary" type="button">New</button>
+      </div>
+
+      <div class="sidebar-toolbar">
+        <button id="showLeftBtnInline" class="btn btn-ghost" type="button">Toggle Sidebar</button>
+      </div>
+
+      <div id="sessionList" class="session-list"></div>
+    </aside>
+
+    <!-- MAIN -->
+    <section class="main-panel">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="showLeftBtn" class="btn btn-ghost" type="button">Chats</button>
+          <div class="brand">Nova</div>
+        </div>
+
+        <div class="topbar-center">
+          <select id="modelSelect" class="select">
+            <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+            <option value="gpt-4.1">gpt-4.1</option>
+            <option value="gpt-5">gpt-5</option>
+          </select>
+        </div>
+
+        <div class="topbar-right">
+          <button id="routerDebugBtn" class="btn btn-ghost" type="button">Router Debug</button>
+          <button id="routerToolsBtn" class="btn btn-ghost" type="button">Router Tools</button>
+          <button id="showRightBtn" class="btn btn-ghost" type="button">Memory</button>
+        </div>
+      </header>
+
+      <main class="chat-panel">
+        <div id="chatMessages" class="chat-messages"></div>
+      </main>
+
+      <footer class="composer-wrap">
+        <form id="composerForm" class="composer-form">
+          <textarea
+            id="messageInput"
+            class="composer-input"
+            rows="1"
+            placeholder="Message Nova..."
+          ></textarea>
+          <button id="sendBtn" class="btn btn-primary send-btn" type="submit">Send</button>
+        </form>
+        <div id="statusBar" class="status-bar">Ready</div>
+      </footer>
+    </section>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside id="rightSidebar" class="right-sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Memory</div>
+        <button id="showRightBtnInline" class="btn btn-ghost" type="button">Toggle Memory</button>
+      </div>
+
+      <form id="memoryForm" class="memory-form">
+        <div class="field">
+          <label for="memoryKind">Kind</label>
+          <select id="memoryKind" class="select">
+            <option value="preference">preference</option>
+            <option value="memory">memory</option>
+            <option value="fact">fact</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="memoryValue">Value</label>
+          <textarea
+            id="memoryValue"
+            class="memory-input"
+            rows="3"
+            placeholder="Save something important..."
+          ></textarea>
+        </div>
+
+        <div class="memory-actions">
+          <button class="btn btn-primary" type="submit">Save</button>
+          <button id="refreshMemoryBtn" class="btn btn-ghost" type="button">Refresh</button>
+        </div>
+
+        <div id="memoryStatus" class="memory-status">Ready</div>
+      </form>
+
+      <div id="memoryList" class="memory-list"></div>
+    </aside>
+  </div>
+
+  <!-- ROUTER DEBUG -->
+  <section id="routerDebugPanel" class="router-panel hidden" aria-hidden="true">
+    <div class="router-panel-head">
+      <div class="router-panel-title">Router Debug</div>
+      <button id="closeRouterDebugBtn" class="btn btn-ghost" type="button">Close</button>
+    </div>
+    <div id="routerDebugBody" class="router-panel-body">
+      <div class="router-debug-row">
+        <span>Route</span>
+        <strong id="routerRouteValue">—</strong>
+      </div>
+      <div class="router-debug-row">
+        <span>Reason</span>
+        <strong id="routerReasonValue">—</strong>
+      </div>
+      <div class="router-debug-row">
+        <span>Memory</span>
+        <strong id="routerMemoryValue">—</strong>
+      </div>
+      <div class="router-debug-row">
+        <span>Model</span>
+        <strong id="routerModelValue">—</strong>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROUTER TOOLS -->
+  <section id="routerToolsPanel" class="router-panel hidden" aria-hidden="true">
+    <div class="router-panel-head">
+      <div class="router-panel-title">Router Tools</div>
+      <button id="closeRouterToolsBtn" class="btn btn-ghost" type="button">Close</button>
+    </div>
+    <div class="router-panel-body">
+      <div class="router-tool-card">Intent-aware routing</div>
+      <div class="router-tool-card">Scoped memory loading</div>
+      <div class="router-tool-card">Route metadata</div>
+    </div>
+  </section>
+
+  <script src="/static/js/nova-core.js?v=desktopalign1"></script>
+  <script src="/static/js/nova-ultimate.js?v=desktopalign1"></script>
+  <script src="/static/js/nova-router-control.js?v=desktopalign1"></script>
+</body>
+</html>

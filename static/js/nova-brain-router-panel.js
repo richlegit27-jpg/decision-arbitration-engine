@@ -510,6 +510,28 @@
     });
 
     console.log("Nova brain router panel loaded");
+
+    window.addEventListener("nova:router-meta", (event) => {
+      const meta = event?.detail;
+      if (meta && typeof meta === "object") {
+        applyRouterMeta(meta);
+      }
+    });
+
+    console.log("Nova brain router panel loaded");
+
+    // ===== DEBUG CLICK HOOK =====
+    document.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) return;
+
+      console.log("BUTTON CLICK:", {
+        id: button.id || null,
+        className: button.className || null,
+        text: (button.textContent || "").trim(),
+        dataRouterDebug: button.getAttribute("data-router-debug")
+      });
+    });
   }
 
   if (document.readyState === "loading") {

@@ -1,0 +1,99 @@
+NOVA FINAL BEHAVIOR AUDIT CHECKLIST
+
+PHASE 1 — CORE LOAD
+[ ] App opens without console errors
+[ ] Main layout loads
+[ ] Left sidebar visible on desktop
+[ ] Memory panel visible or correctly collapsible on desktop
+[ ] Chat area loads
+[ ] Composer loads
+[ ] No white dropdown/background glitches
+[ ] No broken spacing on first load
+
+PHASE 2 — CHAT FLOW
+[ ] New Chat creates a chat
+[ ] New chat becomes active
+[ ] Rename chat works
+[ ] Delete chat works
+[ ] Clear chat works
+[ ] Export chat works
+[ ] Switching chats works
+[ ] Active chat title updates correctly
+[ ] Active chat meta/message count updates correctly
+
+PHASE 3 — MESSAGE FLOW
+[ ] Type into message box normally
+[ ] Input grows correctly
+[ ] Enter sends message
+[ ] Shift+Enter makes new line
+[ ] Send button sends message
+[ ] User message appears instantly
+[ ] Assistant reply appears correctly
+[ ] No fake duplicate reply
+[ ] No stuck loading state
+[ ] Stop button does not break UI
+[ ] Chat scrolls to latest correctly
+[ ] Copy button works
+[ ] Copy feedback appears correctly
+
+PHASE 4 — ATTACHMENTS
+[ ] Attach button opens file picker
+[ ] Selected files show in attachment bar
+[ ] Remove file button works
+[ ] Removing one file does not break others
+[ ] Sending with attachment does not break UI
+
+PHASE 5 — MEMORY PANEL
+[ ] Memory top button opens panel
+[ ] Close memory button closes panel
+[ ] Memory panel does not open wrong side
+[ ] Memory panel does not instantly re-close
+[ ] Save memory works
+[ ] Saved memory appears in list
+[ ] Refresh memory works
+[ ] Delete memory button visible
+[ ] Delete memory works
+[ ] Memory empty state shows correctly when empty
+[ ] Memory status text updates correctly
+
+PHASE 6 — MOBILE RESPONSIVE
+[ ] Open app on small screen
+[ ] Main chat fits screen
+[ ] Sidebar button opens LEFT panel
+[ ] Memory button opens RIGHT panel
+[ ] Left panel does not open right side
+[ ] Right panel does not open left side
+[ ] Tapping outside closes panel
+[ ] Escape closes panel on desktop keyboard
+[ ] Composer remains usable on small screen
+[ ] Message input is not too cramped
+[ ] No panel overlap corruption
+[ ] No weird scaling/squeezing
+[ ] Overlay appears when panel opens
+[ ] Overlay disappears when panel closes
+
+PHASE 7 — VISUAL POLISH
+[ ] Buttons look consistent
+[ ] Hover states feel clean
+[ ] No white flashes
+[ ] Memory delete X is always visible
+[ ] Dropdowns stay dark
+[ ] Chat bubbles look balanced
+[ ] Message spacing looks good
+[ ] Composer spacing looks good
+[ ] Memory spacing looks good
+[ ] Scrollbars look okay
+[ ] No random inline-style ugliness left
+
+PHASE 8 — FINAL SHIP CHECK
+[ ] Refresh page and state still works
+[ ] Active chat restore works
+[ ] No duplicate event behavior
+[ ] No dead buttons
+[ ] No obvious broken routes
+[ ] No major mobile regressions
+[ ] No major desktop regressions
+
+RESULT
+[ ] V1 READY
+[ ] NEEDS 1 MORE PASS

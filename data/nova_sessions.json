@@ -1,334 +1,41 @@
-[
-  {
-    "session_id": "ed30643f-6ec8-4d6c-b282-60e683cdb87a",
-    "title": "what was the prequel to the joker",
-    "messages": [
-      {
-        "id": "db8c542b-02ce-4f3c-a9bc-e43964bc1fc1",
-        "role": "user",
-        "content": "what was the prequel to the joker",
-        "timestamp": 1774178131,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "7e57c28f-1d8a-4ca5-809b-d2c3637bfdfa",
-        "role": "assistant",
-        "content": "The prequel to the movie *Joker* (2019) does not officially exist. *Joker* is a standalone origin story for the character Arthur Fleck/Joker, not part of a series with a prequel film.",
-        "timestamp": 1774178133,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 3,
-          "memory_preview": [
-            "Name: my name is richard",
-            "Preference: don't be offensive",
-            "Preference: hihi"
-          ],
-          "timestamp": 1774178131
-        }
-      },
-      {
-        "id": "e036984e-608e-4eea-99d9-14b7c443a13e",
-        "role": "user",
-        "content": "what was the one after",
-        "timestamp": 1774178149,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "c8ece82f-9173-4494-8fa5-ed5e999dc84e",
-        "role": "assistant",
-        "content": "There is no official sequel to *Joker* (2019) released yet. However, a sequel titled *Joker: Folie à Deux* is announced and planned for release, continuing the story from the first film.",
-        "timestamp": 1774178150,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 3,
-          "memory_preview": [
-            "Name: my name is richard",
-            "Preference: don't be offensive",
-            "Preference: hihi"
-          ],
-          "timestamp": 1774178149
-        }
-      },
-      {
-        "id": "ae3a085a-13c5-44dc-8c81-e2dad681b53f",
-        "role": "user",
-        "content": "how many modern joker movies were there",
-        "timestamp": 1774178169,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "27fd4837-9be7-4254-9fea-a08adec11e4c",
-        "role": "assistant",
-        "content": "There have been three major modern Joker movies featuring different portrayals of the character:\n\n1. *Joker* (2019) – Joaquin Phoenix\n2. *Suicide Squad* (2016) – Jared Leto (includes Joker as a character)\n3. *Zack Snyder's Justice League* (2021) – Jared Leto (brief appearance)\n\nNote: The 2019 *Joker* film is a standalone origin story, while the others are part of the DC Extended Universe.",
-        "timestamp": 1774178171,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 3,
-          "memory_preview": [
-            "Name: my name is richard",
-            "Preference: don't be offensive",
-            "Preference: hihi"
-          ],
-          "timestamp": 1774178169
-        }
-      },
-      {
-        "id": "77663df9-e25b-4dc4-9245-5a35015e7fbc",
-        "role": "user",
-        "content": "there is a 2024 joker movie",
-        "timestamp": 1774178361,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "15fbd7a9-a99b-467b-b5bd-dbe0cd5d16f7",
-        "role": "assistant",
-        "content": "Yes, you are correct. The upcoming Joker movie titled *Joker: Folie à Deux* is scheduled for release in 2024. This film is the official sequel to the 2019 *Joker* movie starring Joaquin Phoenix.",
-        "timestamp": 1774178363,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 3,
-          "memory_preview": [
-            "Name: my name is richard",
-            "Preference: don't be offensive",
-            "Preference: hihi"
-          ],
-          "timestamp": 1774178361
-        }
-      },
-      {
-        "id": "f857530a-73e8-4368-ac3f-dd43c653c530",
-        "role": "user",
-        "content": "why did you lie to me then",
-        "timestamp": 1774178386,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "11f7f9df-e1dc-4e55-a04f-22fa1fefa554",
-        "role": "assistant",
-        "content": "I did not intend to lie. Initially, I stated there was no released sequel yet, which was accurate at that time. When you mentioned a 2024 Joker movie, I confirmed the announced *Joker: Folie à Deux* sequel scheduled for 2024. If my earlier response caused confusion, I apologize. My goal is to provide accurate, up-to-date information based on what is known.",
-        "timestamp": 1774178388,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "analysis",
-          "intent": "analysis",
-          "reason": "matched analysis keywords",
-          "memory_hits": 3,
-          "memory_preview": [
-            "Name: my name is richard",
-            "Preference: don't be offensive",
-            "Preference: hihi"
-          ],
-          "timestamp": 1774178386
-        }
-      },
-      {
-        "id": "c00d4cdc-9d73-4490-af0d-0dd4a7a31ea3",
-        "role": "user",
-        "content": "who is bonnie blue",
-        "timestamp": 1774179135,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "30b08a40-89d8-4856-893a-4e12e102a0c3",
-        "role": "assistant",
-        "content": "Bonnie Blue can refer to different things depending on the context:\n\n1. **Bonnie Blue Flag** – A historical flag associated with the Confederate States during the American Civil War.\n2. **Bonnie Blue Butler** – A fictional character, the daughter of Scarlett O'Hara and Rhett Butler in the novel and film *Gone with the Wind*.\n3. It could also be a nickname or name used in other media or contexts.\n\nIf you specify the context, I can provide a more precise answer.",
-        "timestamp": 1774179137,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 3,
-          "memory_preview": [
-            "Name: my name is richard",
-            "Preference: don't be offensive",
-            "Preference: hihi"
-          ],
-          "timestamp": 1774179135
-        }
-      },
-      {
-        "id": "366d3ef1-eb5b-4a47-87b9-0b3638d5dbc2",
-        "role": "user",
-        "content": "who is bonnie blue",
-        "timestamp": 1774179153,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "74de27dc-8bee-4e64-8710-e68d7c2d8afa",
-        "role": "assistant",
-        "content": "\"Bonnie Blue\" most commonly refers to **Bonnie Blue Butler**, a fictional character from *Gone with the Wind*. She is the daughter of Scarlett O'Hara and Rhett Butler in the novel and film adaptation. If you mean a different \"Bonnie Blue,\" please specify the context.",
-        "timestamp": 1774179155,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 3,
-          "memory_preview": [
-            "Name: my name is richard",
-            "Preference: don't be offensive",
-            "Preference: hihi"
-          ],
-          "timestamp": 1774179153
-        }
-      },
-      {
-        "id": "2981fa37-7593-436a-954b-d0a632ec8f0a",
-        "role": "user",
-        "content": "is she not a adult content creator?",
-        "timestamp": 1774179178,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "619ba5b4-afec-44e5-8c7c-9de119911015",
-        "role": "assistant",
-        "content": "Yes, there is an adult content creator known as Bonnie Blue. She is popular on platforms like OnlyFans and social media, where she shares adult-oriented content. This is a different and unrelated use of the name compared to the fictional character from *Gone with the Wind*.",
-        "timestamp": 1774179180,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "question",
-          "reason": "question fallback",
-          "memory_hits": 3,
-          "memory_preview": [
-            "Name: my name is richard",
-            "Preference: don't be offensive",
-            "Preference: hihi"
-          ],
-          "timestamp": 1774179178
-        }
-      },
-      {
-        "id": "cdcfcf64-b102-4b6f-ba49-d883199e696a",
-        "role": "user",
-        "content": "is she not a adult content creator?",
-        "timestamp": 1774179832,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "0b881d28-8843-4dcb-9589-1724d6b45f19",
-        "role": "assistant",
-        "content": "Yes, Bonnie Blue is also the name of an adult content creator known for sharing content on platforms like OnlyFans and social media.",
-        "timestamp": 1774179833,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "question",
-          "reason": "question fallback",
-          "memory_hits": 3,
-          "memory_preview": [
-            "Name: my name is richard",
-            "Preference: don't be offensive",
-            "Preference: hihi"
-          ],
-          "timestamp": 1774179832
-        }
-      },
-      {
-        "id": "bb812c0c-1c11-4817-a027-118359038a63",
-        "role": "user",
-        "content": "hi",
-        "timestamp": 1774181690,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "38a24e06-6400-49bf-b355-f9180aa3fa37",
-        "role": "assistant",
-        "content": "Hello! How can I assist you today?",
-        "timestamp": 1774181692,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 0,
-          "memory_preview": [],
-          "timestamp": 1774181690
-        }
+{
+  "active_session_id": null,
+  "current_model": "gpt-4.1-mini",
+  "sessions": [
+    {
+      "id": "b42051e1-fd78-4565-bf00-5ee2548ab958",
+      "title": "New Chat",
+      "created_at": 1774243158.6037934,
+      "updated_at": 1774243158.6037934,
+      "pinned": false,
+      "messages": [],
+      "router_meta": {
+        "mode": "general",
+        "intent": "idle",
+        "reason": "No user message yet.",
+        "memory_hits": 0,
+        "memory_used": [],
+        "route_time_ms": 0,
+        "timestamp": 1774243158603
       }
-    ],
-    "message_count": 20,
-    "created_at": 1774164571,
-    "updated_at": 1774181692
-  },
-  {
-    "session_id": "098209f6-d715-42ba-8a64-0f1b9b7d0f07",
-    "title": "New Chat",
-    "messages": [],
-    "message_count": 0,
-    "created_at": 1774164531,
-    "updated_at": 1774164531
-  },
-  {
-    "session_id": "7b484edc-5067-47d7-9089-dcc04cabf0e8",
-    "title": "hi",
-    "messages": [
-      {
-        "id": "76fb16b1-6dde-4797-b53b-60cad1c66e9e",
-        "role": "user",
-        "content": "hi",
-        "timestamp": 1774161062,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "46c1db40-ef0a-4054-9f37-d840585581be",
-        "role": "assistant",
-        "content": "Hello! How can I assist you today?",
-        "timestamp": 1774161063,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "42eb0f31-1cb8-416b-b262-234cca5ad310",
-        "role": "user",
-        "content": "hi",
-        "timestamp": 1774162677,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "5a5b1b5c-c2d6-44c2-b9d7-b41dcf4bca0e",
-        "role": "assistant",
-        "content": "Hi again! What can I do for you?",
-        "timestamp": 1774162678,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "94555846-63ce-4374-a9c6-5c878635fa2e",
-        "role": "user",
-        "content": "hi",
-        "timestamp": 1774164523,
-        "model": "gpt-4.1-mini"
-      },
-      {
-        "id": "df4e5c9f-f7ed-403a-9b71-ceceb5fbdfbd",
-        "role": "assistant",
-        "content": "Hi! How can I help you today?",
-        "timestamp": 1774164525,
-        "model": "gpt-4.1-mini",
-        "router": {
-          "mode": "general",
-          "intent": "chat",
-          "reason": "default",
-          "memory_hits": 0,
-          "memory_preview": [],
-          "timestamp": 1774164523
-        }
+    },
+    {
+      "id": "649c8631-7683-49bf-8cdc-5379f0fbec66",
+      "title": "New Chat",
+      "created_at": 1774243526.3959394,
+      "updated_at": 1774243526.3959394,
+      "pinned": false,
+      "messages": [],
+      "router_meta": {
+        "mode": "general",
+        "intent": "idle",
+        "reason": "No user message yet.",
+        "memory_hits": 0,
+        "memory_used": [],
+        "route_time_ms": 0,
+        "timestamp": 1774243526395
       }
-    ],
-    "message_count": 6,
-    "created_at": 1774135959,
-    "updated_at": 1774164525
-  }
-]
+    }
+  ],
+  "route_meta": {}
+}

@@ -4,15 +4,19 @@
       "profile_id": "local",
       "plan": "free",
       "daily": {
-        "2026-03-21": {
-          "messages": 4
-        },
         "2026-03-22": {
-          "messages": 18
+          "messages": 11
         }
       },
-      "created_at": 1774128979,
-      "updated_at": 1774181692
+      "created_at": 1774182606,
+      "updated_at": 1774187605
     }
-  }
+  },
+  "total_sessions": 9,
+  "total_requests": 5,
+  "last_request_at": 1774210244,
+  "requests": 12,
+  "tokens_in": 0,
+  "tokens_out": 0,
+  "updated_at": "2026-03-22T23:21:36Z"
 }
