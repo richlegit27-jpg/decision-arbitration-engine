@@ -10,7 +10,8 @@
     getChat: (sessionId) => `/api/chat/${encodeURIComponent(sessionId)}`,
     stream: "/api/chat/stream",
     memory: "/api/memory",
-    addMemory: "/api/memory/add",
+    addMemory: "/api/memory",
+    deleteMemory: "/api/memory/delete",
     upload: "/api/upload",
   };
 
@@ -26,6 +27,7 @@
     isSending: false,
     attachedFiles: [],
     lastUserMessage: "",
+    lastRouter: null,
   };
 
   function byId(id) {
@@ -60,7 +62,9 @@
   function formatTime(ts) {
     if (!ts) return "";
     try {
-      return new Date(Number(ts) * 1000).toLocaleString();
+      const num = Number(ts);
+      const ms = num > 9999999999 ? num : num * 1000;
+      return new Date(ms).toLocaleString();
     } catch {
       return "";
     }
@@ -92,6 +96,7 @@
     const last = [...state.messages]
       .reverse()
       .find((msg) => safeText(msg.role).toLowerCase() === "user" && safeText(msg.content));
+
     state.lastUserMessage = last ? String(last.content || "") : "";
 
     const regenBtn = byId("regenerateBtn");
@@ -130,6 +135,7 @@
     const res = await fetch(url, {
       method: "GET",
       headers: { Accept: "application/json" },
+      cache: "no-store",
     });
 
     if (!res.ok) {
@@ -153,7 +159,7 @@
       let msg = `POST failed: ${url}`;
       try {
         const data = await res.json();
-        msg = data.detail || data.message || msg;
+        msg = data.detail || data.message || data.error || msg;
       } catch {}
       throw new Error(msg);
     }
@@ -280,7 +286,7 @@
     const subtitleEl = byId("chatSubtitle") || byId("sessionSubtitle");
 
     const currentSession = state.sessions.find(
-      (item) => item.session_id === state.activeSessionId
+      (item) => item.id === state.activeSessionId || item.session_id === state.activeSessionId
     );
 
     if (titleEl) titleEl.textContent = currentSession?.title || "Nova";
@@ -289,6 +295,63 @@
         ? "Thinking..."
         : `${state.messages.length || 0} messages`;
     }
+  }
+
+  function buildRouterBadgeHtml(router) {
+    if (!router) return "";
+
+    const mode = safeText(router.mode || "general");
+    const intent = safeText(router.intent || "chat");
+    const memoryHits = Number.isFinite(router.memory_hits)
+      ? router.memory_hits
+      : Number(router.memory_hits || 0);
+    const normalizedMemoryCount = Number.isFinite(router.memory_count)
+      ? router.memory_count
+      : Number(router.memory_count || memoryHits || 0);
+
+    return `
+      <div class="router-badge">
+        <span class="router-badge-pill rb-mode" data-mode="${escapeHtml(mode)}">${escapeHtml(mode)}</span>
+        <span class="router-badge-pill rb-intent">${escapeHtml(intent)}</span>
+        <span class="router-badge-pill rb-memory">mem:${escapeHtml(normalizedMemoryCount)}</span>
+      </div>
+    `;
+  }
+
+  function updateRouterDebug(router) {
+    state.lastRouter = router || null;
+
+    const content = byId("routerContent");
+    if (!content || !router) return;
+
+    const preview = Array.isArray(router.memory_preview)
+      ? router.memory_preview
+      : Array.isArray(router.memory_items)
+      ? router.memory_items
+      : Array.isArray(router.memory_used)
+      ? router.memory_used
+      : [];
+
+    const previewHtml = preview.length
+      ? `<ul class="router-debug-list">${preview
+          .map((item) => `<li>${escapeHtml(item)}</li>`)
+          .join("")}</ul>`
+      : `<div class="router-debug-empty">—</div>`;
+
+    const ts = Number(router.timestamp || 0);
+    const timeText = ts ? formatTime(ts) : "—";
+    const memoryHits = Number.isFinite(router.memory_hits)
+      ? router.memory_hits
+      : Number(router.memory_count || 0);
+
+    content.innerHTML = `
+      <div class="router-debug-row"><strong>Mode:</strong> ${escapeHtml(router.mode || "general")}</div>
+      <div class="router-debug-row"><strong>Intent:</strong> ${escapeHtml(router.intent || "chat")}</div>
+      <div class="router-debug-row"><strong>Reason:</strong> ${escapeHtml(router.reason || "auto")}</div>
+      <div class="router-debug-row"><strong>Memory Hits:</strong> ${escapeHtml(memoryHits ?? 0)}</div>
+      <div class="router-debug-row"><strong>Time:</strong> ${escapeHtml(timeText)}</div>
+      <div class="router-debug-row"><strong>Memory Used:</strong>${previewHtml}</div>
+    `;
   }
 
   function renderSessions() {
@@ -306,12 +369,14 @@
 
     list.innerHTML = state.sessions
       .map((session) => {
-        const isActive = session.session_id === state.activeSessionId;
+        const sessionId = session.id || session.session_id || "";
+        const isActive = sessionId === state.activeSessionId;
+
         return `
           <button
             class="session-item ${isActive ? "active" : ""}"
             type="button"
-            data-session-id="${escapeHtml(session.session_id)}"
+            data-session-id="${escapeHtml(sessionId)}"
           >
             <div class="session-item-title">${escapeHtml(session.title || "New Chat")}</div>
             <div class="session-item-meta">${escapeHtml(String(session.message_count || 0))} messages</div>
@@ -348,12 +413,26 @@
 
     list.innerHTML = state.memoryItems
       .map((item) => `
-        <div class="memory-item">
-          <div class="memory-item-kind">${escapeHtml(item.kind || "memory")}</div>
-          <div class="memory-item-value">${escapeHtml(item.value || "")}</div>
-          <div class="memory-item-meta">${escapeHtml(
-            formatTime(item.updated_at || item.created_at || nowUnix())
-          )}</div>
+        <div class="memory-item" data-memory-id="${escapeHtml(item.id || "")}">
+          <div class="memory-item-main">
+            <div class="memory-item-kind">${escapeHtml(item.kind || "memory")}</div>
+            <div class="memory-item-value">${escapeHtml(item.value || "")}</div>
+            <div class="memory-item-meta">${escapeHtml(
+              formatTime(item.updated_at || item.created_at || nowUnix())
+            )}</div>
+          </div>
+
+          <div class="memory-item-actions">
+            <button
+              class="memory-delete-btn"
+              type="button"
+              data-memory-delete="${escapeHtml(item.id || "")}"
+              title="Delete memory"
+              aria-label="Delete memory"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       `)
       .join("");
@@ -381,13 +460,21 @@
       .map((msg, index) => {
         const role = safeText(msg.role || "assistant").toLowerCase();
         const content = escapeHtml(msg.content || "").replace(/\n/g, "<br>");
-        const time = formatTime(msg.timestamp || nowUnix());
+        const time = formatTime(msg.timestamp || msg.created_at || nowUnix());
         const isAssistant = role === "assistant";
+        const routerBadge = isAssistant
+          ? buildRouterBadgeHtml(msg.router || msg.router_meta || null)
+          : "";
+        const cursorHtml =
+          isAssistant && msg.streaming
+            ? `<span class="nova-stream-cursor" aria-hidden="true">▍</span>`
+            : "";
 
         return `
           <article class="chat-message ${escapeHtml(role)}">
             <div class="chat-message-role">${escapeHtml(role)}</div>
-            <div class="chat-message-content">${content || "&nbsp;"}</div>
+            ${routerBadge}
+            <div class="chat-message-content">${content || "&nbsp;"}${cursorHtml}</div>
             <div class="chat-message-footer">
               <div class="chat-message-time">${escapeHtml(time)}</div>
               ${
@@ -430,16 +517,25 @@
       });
     });
 
+    const lastAssistant = [...state.messages]
+      .reverse()
+      .find((msg) => safeText(msg.role).toLowerCase() === "assistant" && (msg.router || msg.router_meta));
+
+    if (lastAssistant?.router || lastAssistant?.router_meta) {
+      updateRouterDebug(lastAssistant.router || lastAssistant.router_meta);
+    }
+
     updateLastUserMessage();
     updateSessionBadge();
     scrollChatToBottom();
   }
 
-  function addLocalMessage(role, content) {
+  function addLocalMessage(role, content, router = null) {
     state.messages.push({
       role: safeText(role || "assistant"),
       content: String(content ?? ""),
       timestamp: nowUnix(),
+      router,
     });
     renderMessages();
   }
@@ -448,13 +544,25 @@
     const data = await apiGet(API.state);
     state.sessions = Array.isArray(data.sessions) ? data.sessions : [];
 
+    const currentSessionId = data.current_session_id || null;
+
     if (state.activeSessionId) {
-      const exists = state.sessions.some((s) => s.session_id === state.activeSessionId);
+      const exists = state.sessions.some(
+        (s) => (s.id || s.session_id) === state.activeSessionId
+      );
       if (!exists) {
-        state.activeSessionId = state.sessions[0]?.session_id || null;
+        state.activeSessionId =
+          state.sessions[0]?.id || state.sessions[0]?.session_id || currentSessionId || null;
       }
     } else if (state.sessions.length) {
-      state.activeSessionId = state.sessions[0].session_id;
+      state.activeSessionId = state.sessions[0].id || state.sessions[0].session_id || currentSessionId;
+    } else {
+      state.activeSessionId = currentSessionId;
+    }
+
+    if (data.router_meta) {
+      state.lastRouter = data.router_meta;
+      window.__novaLastRouterMeta = data.router_meta;
     }
 
     renderSessions();
@@ -465,15 +573,26 @@
     if (!sessionId) return;
 
     const data = await apiGet(API.getChat(sessionId));
-    state.activeSessionId = data.session_id || sessionId;
+    state.activeSessionId = data.session?.id || data.session_id || sessionId;
     state.messages = Array.isArray(data.messages) ? data.messages : [];
+
+    if (data.router_meta) {
+      state.lastRouter = data.router_meta;
+      window.__novaLastRouterMeta = data.router_meta;
+      window.dispatchEvent(new CustomEvent("nova:router-meta", { detail: data.router_meta }));
+    }
+
     renderMessages();
     renderSessions();
   }
 
   async function loadMemory() {
     const data = await apiGet(API.memory);
-    state.memoryItems = Array.isArray(data.items) ? data.items : [];
+    state.memoryItems = Array.isArray(data.memory)
+      ? data.memory
+      : Array.isArray(data.items)
+      ? data.items
+      : [];
     renderMemory();
   }
 
@@ -481,8 +600,10 @@
     const data = await apiPost(API.newSession, {});
     await loadState();
 
-    if (data.session_id) {
-      await loadSession(data.session_id);
+    const newId = data.session?.id || data.session_id || null;
+
+    if (newId) {
+      await loadSession(newId);
     } else {
       state.messages = [];
       renderMessages();
@@ -494,7 +615,41 @@
     await loadMemory();
   }
 
-  async function streamSend(content, attachedFilesOverride = null) {
+  async function deleteMemory(id) {
+    await apiPost(API.deleteMemory, { id });
+    await loadMemory();
+  }
+
+  function parseSSEBlock(block) {
+    const lines = String(block || "").split(/\r?\n/);
+    let eventName = "message";
+    const dataLines = [];
+
+    for (const line of lines) {
+      if (line.startsWith("event:")) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).trim());
+      }
+    }
+
+    const rawData = dataLines.join("\n").trim();
+    if (!rawData) {
+      return { event: eventName, data: {} };
+    }
+
+    if (rawData === "[DONE]") {
+      return { event: eventName, data: { type: "done_marker" } };
+    }
+
+    try {
+      return { event: eventName, data: JSON.parse(rawData) };
+    } catch {
+      return { event: eventName, data: { raw: rawData } };
+    }
+  }
+
+  async function streamSend(content, attachedFilesOverride = null, options = {}) {
     const input = byId("messageInput");
     const normalizedContent = safeText(content);
     const pendingFiles = Array.isArray(attachedFilesOverride)
@@ -507,25 +662,159 @@
       await createNewSession();
     }
 
+    const suppressLocalUser = Boolean(options.suppressLocalUser);
+    let assistantStreamMessage = null;
+    let uploadedFiles = [];
+    const activeSessionIdBeforeSend = state.activeSessionId;
+
     setSendingState(true);
     setStatus("Responding...");
 
     try {
-      if (normalizedContent) {
-        addLocalMessage("user", normalizedContent);
-      } else if (pendingFiles.length) {
-        addLocalMessage("user", `[Uploaded ${pendingFiles.length} file(s)]`);
+      if (!suppressLocalUser) {
+        if (normalizedContent) {
+          addLocalMessage("user", normalizedContent);
+        } else if (pendingFiles.length) {
+          addLocalMessage("user", `[Uploaded ${pendingFiles.length} file(s)]`);
+        }
       }
 
-      if (input && attachedFilesOverride === null) {
+      assistantStreamMessage = {
+        role: "assistant",
+        content: "",
+        timestamp: nowUnix(),
+        router: null,
+        streaming: true,
+      };
+      state.messages.push(assistantStreamMessage);
+
+      let finalContent = "";
+      let streamRouter = null;
+      let pendingDelta = "";
+      let renderScheduled = false;
+      let streamFinished = false;
+
+      function flushPendingDelta() {
+        if (!pendingDelta) return;
+        finalContent += pendingDelta;
+        assistantStreamMessage.content = finalContent;
+        pendingDelta = "";
+      }
+
+      function scheduleRender() {
+        if (renderScheduled) return;
+        renderScheduled = true;
+        requestAnimationFrame(() => {
+          renderScheduled = false;
+          flushPendingDelta();
+          renderMessages();
+        });
+      }
+
+      function applyRouter(router) {
+        if (!router) return;
+        streamRouter = router;
+        assistantStreamMessage.router = router;
+        state.lastRouter = router;
+        window.__novaLastRouterMeta = router;
+        window.dispatchEvent(new CustomEvent("nova:router-meta", { detail: router }));
+        updateRouterDebug(router);
+      }
+
+      function finalizeAssistant(finalText = "") {
+        flushPendingDelta();
+
+        if (typeof finalText === "string" && finalText) {
+          assistantStreamMessage.content = finalText;
+          finalContent = finalText;
+        } else {
+          assistantStreamMessage.content = assistantStreamMessage.content || finalContent || "";
+          finalContent = assistantStreamMessage.content;
+        }
+
+        if (streamRouter) {
+          assistantStreamMessage.router = streamRouter;
+        }
+
+        assistantStreamMessage.streaming = false;
+        streamFinished = true;
+        renderMessages();
+      }
+
+      function handlePayload(data, fallbackEvent = "") {
+        const payload = data && typeof data === "object" ? data : {};
+        const type = payload.type || fallbackEvent || "";
+
+        if (!type || type === "done_marker") {
+          return;
+        }
+
+        if (type === "meta") {
+          if (payload.router || payload.router_meta) {
+            applyRouter(payload.router || payload.router_meta);
+            scheduleRender();
+          }
+
+          if (payload.session_id) {
+            state.activeSessionId = payload.session_id;
+          }
+
+          return;
+        }
+
+        if (type === "delta") {
+          const delta =
+            typeof payload.delta === "string"
+              ? payload.delta
+              : typeof payload.content === "string"
+              ? payload.content
+              : "";
+
+          if (!delta) return;
+
+          pendingDelta += delta;
+          scheduleRender();
+          return;
+        }
+
+        if (type === "done") {
+          const final =
+            typeof payload.response === "string"
+              ? payload.response
+              : typeof payload.message?.content === "string"
+              ? payload.message.content
+              : typeof payload.content === "string"
+              ? payload.content
+              : finalContent;
+
+          if (payload.router || payload.router_meta) {
+            applyRouter(payload.router || payload.router_meta);
+          }
+
+          if (payload.session_id) {
+            state.activeSessionId = payload.session_id;
+          }
+
+          finalizeAssistant(final || assistantStreamMessage.content || finalContent);
+          return;
+        }
+
+        if (type === "error") {
+          throw new Error(payload.message || payload.error || "Stream failed");
+        }
+      }
+
+      renderMessages();
+
+      if (input && attachedFilesOverride === null && !suppressLocalUser) {
         input.value = "";
         autosizeInput();
       }
 
-      let uploadedFiles = [];
       if (pendingFiles.length) {
         setStatus("Uploading...");
         uploadedFiles = await uploadFiles(pendingFiles);
+        setStatus("Responding...");
       }
 
       const model = safeText(state.currentModel) || DEFAULT_MODEL;
@@ -534,33 +823,71 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json, text/plain, */*",
+          Accept: "text/event-stream, application/json, text/plain, */*",
         },
         body: JSON.stringify({
           session_id: state.activeSessionId,
           content: normalizedContent,
+          message: normalizedContent,
           model,
           uploaded_files: uploadedFiles,
         }),
       });
 
       if (!res.ok) {
-        throw new Error("Send failed");
+        throw new Error(`Send failed (${res.status})`);
       }
 
-      if (res.body && typeof res.body.getReader === "function") {
+      if (!res.body || typeof res.body.getReader !== "function") {
+        const text = await res.text();
+        finalizeAssistant(safeText(text) || "No response.");
+      } else {
         const reader = res.body.getReader();
-        const decoder = new TextDecoder();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
 
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
-          decoder.decode(value, { stream: true });
+
+          if (done) {
+            buffer += decoder.decode();
+            break;
+          }
+
+          buffer += decoder.decode(value || new Uint8Array(), { stream: true });
+
+          let separatorIndex;
+          while ((separatorIndex = buffer.indexOf("\n\n")) !== -1) {
+            const rawBlock = buffer.slice(0, separatorIndex).trim();
+            buffer = buffer.slice(separatorIndex + 2);
+
+            if (!rawBlock || rawBlock === "data: [DONE]") continue;
+
+            let parsed;
+            try {
+              parsed = parseSSEBlock(rawBlock);
+            } catch (err) {
+              console.warn("Failed to parse SSE block:", rawBlock, err);
+              continue;
+            }
+
+            handlePayload(parsed.data || {}, parsed.event || "");
+          }
         }
-      } else {
-        try {
-          await res.text();
-        } catch {}
+
+        const trailing = buffer.trim();
+        if (trailing && trailing !== "data: [DONE]") {
+          try {
+            const parsed = parseSSEBlock(trailing);
+            handlePayload(parsed.data || {}, parsed.event || "");
+          } catch (err) {
+            console.warn("Trailing SSE parse failed:", err);
+          }
+        }
+
+        if (!streamFinished) {
+          finalizeAssistant(assistantStreamMessage.content || finalContent || "");
+        }
       }
 
       if (attachedFilesOverride === null) {
@@ -571,36 +898,226 @@
       }
 
       await loadState();
-      await loadSession(state.activeSessionId);
+      if (state.activeSessionId || activeSessionIdBeforeSend) {
+        await loadSession(state.activeSessionId || activeSessionIdBeforeSend);
+      }
       await loadMemory();
+      renderMessages();
+      renderSessions();
+      renderMemory();
       setStatus("Ready");
     } catch (err) {
       console.error(err);
-      addLocalMessage("assistant", "Something went wrong sending that message.");
+
+      if (assistantStreamMessage) {
+        assistantStreamMessage.streaming = false;
+        assistantStreamMessage.content =
+          assistantStreamMessage.content || `Error: ${err.message || err}`;
+        assistantStreamMessage.router = {
+          mode: "general",
+          intent: "error",
+          reason: "frontend exception",
+          memory_hits: 0,
+          memory_count: 0,
+          memory_preview: [],
+          timestamp: nowUnix(),
+        };
+        renderMessages();
+      } else {
+        addLocalMessage("assistant", "Something went wrong sending that message.", {
+          mode: "general",
+          intent: "error",
+          reason: "frontend exception",
+          memory_hits: 0,
+          memory_count: 0,
+          memory_preview: [],
+          timestamp: nowUnix(),
+        });
+      }
+
+      try {
+        await loadState();
+        if (state.activeSessionId || activeSessionIdBeforeSend) {
+          await loadSession(state.activeSessionId || activeSessionIdBeforeSend);
+        }
+      } catch (_) {}
+
       setStatus("Send failed");
     } finally {
       setSendingState(false);
       renderMessages();
+      autosizeInput();
+      scrollChatToBottom();
+      if (safeText((byId("modelStatus") || {}).textContent).toLowerCase() === "responding...") {
+        setStatus("Ready");
+      }
     }
   }
 
   async function sendMessage() {
-    if (state.isSending) return;
     const input = byId("messageInput");
-    if (!input) return;
-    await streamSend(input.value, null);
+    const text = safeText(input?.value || "");
+    if ((!text && !state.attachedFiles.length) || state.isSending) return;
+    await streamSend(text);
   }
 
   async function regenerateLastReply() {
-    if (state.isSending) return;
+    if (!state.lastUserMessage || state.isSending) return;
+    await streamSend(state.lastUserMessage, [], { suppressLocalUser: false });
+  }
 
-    const content = safeText(state.lastUserMessage);
-    if (!content) {
-      setStatus("Nothing to regenerate");
-      return;
+  function setPanelBodyState(isOpen) {
+    document.body.classList.toggle("panel-open", Boolean(isOpen));
+  }
+
+  function isMobilePanel() {
+    return window.matchMedia("(max-width: 980px)").matches;
+  }
+
+  function closeMobilePanels() {
+    document.body.classList.remove("mobile-left-open", "mobile-right-open");
+    setPanelBodyState(false);
+  }
+
+  function openLeftMobile() {
+    document.body.classList.remove("mobile-right-open");
+    document.body.classList.add("mobile-left-open");
+    setPanelBodyState(true);
+  }
+
+  function openRightMobile() {
+    document.body.classList.remove("mobile-left-open");
+    document.body.classList.add("mobile-right-open");
+    setPanelBodyState(true);
+  }
+
+  function syncPanelMode() {
+    if (!isMobilePanel()) {
+      closeMobilePanels();
+    }
+  }
+
+  function resolveToggleRole(button) {
+    if (!button) return null;
+
+    const id = safeText(button.id).toLowerCase();
+    const controls = safeText(button.getAttribute("aria-controls")).toLowerCase();
+    const action = safeText(button.getAttribute("data-action")).toLowerCase();
+    const label = safeText(button.getAttribute("aria-label")).toLowerCase();
+    const title = safeText(button.getAttribute("title")).toLowerCase();
+    const text = safeText(button.textContent).toLowerCase();
+
+    const blob = [id, controls, action, label, title, text].join(" ");
+
+    const explicitSidebarIds = new Set([
+      "togglesidebar",
+      "mobilesidebarbtn",
+      "opensidebarbtn",
+      "sidebartoggle"
+    ]);
+
+    const explicitMemoryIds = new Set([
+      "togglememory",
+      "togglememorypanel",
+      "mobilememorybtn",
+      "openmemorybtn",
+      "memorytoggle"
+    ]);
+
+    if (explicitSidebarIds.has(id)) return "sidebar";
+    if (explicitMemoryIds.has(id)) return "memory";
+
+    if (controls === "sidebar") return "sidebar";
+    if (controls === "memorypanel") return "memory";
+
+    if (action === "toggle-sidebar") return "sidebar";
+    if (action === "toggle-memory") return "memory";
+
+    if (
+      blob.includes("memory") ||
+      button.closest("#memoryPanel") ||
+      button.closest(".topbar-right")
+    ) {
+      return "memory";
     }
 
-    await streamSend(content, []);
+    if (
+      blob.includes("sidebar") ||
+      blob.includes("menu") ||
+      button.closest("#sidebar") ||
+      button.closest(".topbar-left")
+    ) {
+      return "sidebar";
+    }
+
+    return null;
+  }
+
+  function initPanelFix() {
+    const sidebar = byId("sidebar");
+    const memoryPanel = byId("memoryPanel");
+
+    document.addEventListener(
+      "click",
+      (e) => {
+        if (!isMobilePanel()) return;
+
+        const button = e.target.closest("button, [role='button']");
+        if (!button) return;
+
+        const role = resolveToggleRole(button);
+        if (!role) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation?.();
+
+        if (role === "sidebar") {
+          if (document.body.classList.contains("mobile-left-open")) {
+            closeMobilePanels();
+          } else {
+            openLeftMobile();
+          }
+          return;
+        }
+
+        if (role === "memory") {
+          if (document.body.classList.contains("mobile-right-open")) {
+            closeMobilePanels();
+          } else {
+            openRightMobile();
+          }
+        }
+      },
+      true
+    );
+
+    document.addEventListener("click", (e) => {
+      if (!isMobilePanel()) return;
+
+      const target = e.target;
+      const insideSidebar = sidebar?.contains(target);
+      const insideMemory = memoryPanel?.contains(target);
+      const clickedButton = target.closest("button, [role='button']");
+      const role = resolveToggleRole(clickedButton);
+
+      if (insideSidebar || insideMemory || role === "sidebar" || role === "memory") {
+        return;
+      }
+
+      closeMobilePanels();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeMobilePanels();
+      }
+    });
+
+    window.addEventListener("resize", syncPanelMode);
+    window.addEventListener("orientationchange", syncPanelMode);
+
+    syncPanelMode();
   }
 
   function bindEvents() {
@@ -672,10 +1189,37 @@
         setStatus("Save failed");
       }
     });
+
+    document.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-memory-delete]");
+      if (!btn) return;
+
+      const id = btn.getAttribute("data-memory-delete");
+      if (!id) return;
+
+      const ok = window.confirm("Delete this memory?");
+      if (!ok) return;
+
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "...";
+
+      try {
+        await deleteMemory(id);
+        setStatus("Memory deleted");
+      } catch (err) {
+        console.error(err);
+        btn.disabled = false;
+        btn.textContent = originalText;
+        setStatus("Delete failed");
+        alert("Delete failed");
+      }
+    });
   }
 
   async function bootstrap() {
     bindEvents();
+    initPanelFix();
     setStatus("Loading...");
 
     await loadState();
@@ -701,3 +1245,32 @@
     });
   });
 })();
+
+// ===== SAFE ROUTER DEBUG (NON-DESTRUCTIVE) =====
+
+function logRouteMetaSafe(meta) {
+  if (!meta) return;
+
+  console.log("ROUTER DEBUG:", {
+    route: meta.route || meta.intent,
+    reason: meta.reason,
+    memory: meta.memory_scope || meta.memory,
+    model: meta.model
+  });
+}
+
+if (window.NovaCore && window.NovaCore.sendMessage) {
+  const originalSend = window.NovaCore.sendMessage;
+
+  window.NovaCore.sendMessage = async function (message, handlers = {}) {
+    const wrappedHandlers = {
+      ...handlers,
+      onMeta(meta) {
+        logRouteMetaSafe(meta);
+        if (handlers.onMeta) handlers.onMeta(meta);
+      }
+    };
+
+    return originalSend.call(this, message, wrappedHandlers);
+  };
+}

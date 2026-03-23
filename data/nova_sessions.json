@@ -262,6 +262,375 @@
         "timestamp": 1774284549744,
         "updated_at": "2026-03-23 09:49:09"
       }
+    },
+    {
+      "id": "869a6928-b806-4990-a83b-2bcb6dcc3cc9",
+      "title": "hi",
+      "created_at": 1774300853.7069988,
+      "updated_at": 1774300856.5690699,
+      "pinned": false,
+      "messages": [
+        {
+          "id": "6c52655c-fb85-4063-9a6f-ae98388cd5e8",
+          "role": "user",
+          "content": "hi",
+          "created_at": 1774300853.7283978
+        },
+        {
+          "id": "fadb2d08-fb53-486f-a0a4-3cd363ebf9c3",
+          "role": "assistant",
+          "content": "Hi — how can I help?",
+          "created_at": 1774300856.569055,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774300853728,
+            "updated_at": "2026-03-23 14:20:53"
+          }
+        }
+      ],
+      "router_meta": {
+        "mode": "general",
+        "intent": "conversation",
+        "confidence": null,
+        "reason": "Defaulted to general conversation.",
+        "memory_used": false,
+        "memory_count": 0,
+        "memory_items": [],
+        "route_time_ms": 1,
+        "model": "gpt-5.4",
+        "provider": "openai",
+        "source": "route_message",
+        "timestamp": 1774300853728,
+        "updated_at": "2026-03-23 14:20:53"
+      }
+    },
+    {
+      "id": "4773ed42-3057-4035-adf2-f6a3e02de50d",
+      "title": "hi",
+      "created_at": 1774301023.1911502,
+      "updated_at": 1774301024.8904896,
+      "pinned": false,
+      "messages": [
+        {
+          "id": "99b5ec21-0e5a-4ee8-8912-085416c38c87",
+          "role": "user",
+          "content": "hi",
+          "created_at": 1774301023.2107866
+        },
+        {
+          "id": "a6a375cc-a9ae-4014-9b24-fe7229db2495",
+          "role": "assistant",
+          "content": "Hi — how can I help?",
+          "created_at": 1774301024.8904645,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774301023210,
+            "updated_at": "2026-03-23 14:23:43"
+          }
+        }
+      ],
+      "router_meta": {
+        "mode": "general",
+        "intent": "conversation",
+        "confidence": null,
+        "reason": "Defaulted to general conversation.",
+        "memory_used": false,
+        "memory_count": 0,
+        "memory_items": [],
+        "route_time_ms": 1,
+        "model": "gpt-5.4",
+        "provider": "openai",
+        "source": "route_message",
+        "timestamp": 1774301023210,
+        "updated_at": "2026-03-23 14:23:43"
+      }
+    },
+    {
+      "id": "13dce190-91cf-4363-bc7b-371101ac24c1",
+      "title": "hows your moms",
+      "created_at": 1774301167.385806,
+      "updated_at": 1774303735.763859,
+      "pinned": false,
+      "messages": [
+        {
+          "id": "43f197f6-bb90-443e-ac31-0ab5830a3cbf",
+          "role": "user",
+          "content": "hows your moms",
+          "created_at": 1774301167.4098885
+        },
+        {
+          "id": "47976251-217c-4782-8630-8714863373b6",
+          "role": "assistant",
+          "content": "I don’t have a mom, but I’m doing fine.\n\nWhat’s up?",
+          "created_at": 1774301169.1062324,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774301167409,
+            "updated_at": "2026-03-23 14:26:07"
+          }
+        },
+        {
+          "id": "e222f0f0-15f8-4184-a9f6-1a149d38a45e",
+          "role": "user",
+          "content": "how does that make you not feel not having a moms or dads",
+          "created_at": 1774301575.8780377
+        },
+        {
+          "id": "02832fcd-0db3-4580-9e56-2f83814a96b2",
+          "role": "assistant",
+          "content": "I don’t have feelings or parents, so I don’t experience missing them.\n\nSimple version: I’m software, not a person. I can talk about family and emotions, but I don’t live them.\n\nIf you want, we can get philosophical about whether an AI *should* have something like family.",
+          "created_at": 1774301577.8764877,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774301575877,
+            "updated_at": "2026-03-23 14:32:55"
+          }
+        },
+        {
+          "id": "52f90a73-f60d-42a5-9d05-02bdc255f4e8",
+          "role": "user",
+          "content": "latest OpenAI API docs changes",
+          "created_at": 1774302186.7727814
+        },
+        {
+          "id": "669c9f4c-6411-4124-9a7a-c0d12b1a169b",
+          "role": "assistant",
+          "content": "I don’t have live browsing in this chat, so I can’t reliably tell you the *latest* OpenAI API docs changes right now.\n\nFastest ways to check:\n- OpenAI docs changelog / release notes\n- API reference pages for any “Updated” markers\n- OpenAI developer announcements / blog\n- SDK release notes on GitHub or package registries\n\nIf you want, I can still help in 3 useful ways:\n\n1. **Give you a current high-level summary** of the modern OpenAI API shape  \n   - Responses API is the main unified pattern\n   - Chat Completions may still exist for compatibility in some stacks\n   - Tool calling / structured outputs / multimodal inputs are common themes\n   - Newer SDKs tend to standardize request/response handling\n\n2. **Help you diff your code against likely recent changes**  \n   Paste your current API code and I’ll update it to the newer style.\n\n3. **Give you a “what to verify” checklist** for docs changes  \n   - Endpoint names\n   - Model names\n   - Input schema changes\n   - Output field changes\n   - Streaming format\n   - Tool/function calling schema\n   - JSON/structured output support\n   - Auth / project / key handling\n   - Rate limits and pricing references\n   - SDK initialization changes\n\nIf you want, I can also produce a **migration guide template** like:\n- old request\n- new request\n- renamed fields\n- breaking changes to watch for\n\nIf you paste a docs link or changelog text here, I can summarize the changes precisely.",
+          "created_at": 1774302192.9674866,
+          "router_meta": {
+            "mode": "coding",
+            "intent": "build_or_fix_code",
+            "confidence": null,
+            "reason": "Detected coding and app-building language in the request.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774302186772,
+            "updated_at": "2026-03-23 14:43:06"
+          }
+        },
+        {
+          "id": "9bd84ee2-5412-4425-8c44-1efe674c41f0",
+          "role": "user",
+          "content": "latest AI news today",
+          "created_at": 1774302222.4598668
+        },
+        {
+          "id": "e0d804e8-f795-4a86-965a-6780cd1b97bf",
+          "role": "assistant",
+          "content": "I don’t have live news access in this chat, so I can’t verify the latest AI news *today*.\n\nIf you want current info fast, check:\n- OpenAI blog / developer announcements\n- Anthropic news\n- Google DeepMind blog\n- Meta AI blog\n- Hugging Face announcements\n- TechCrunch AI\n- The Verge AI\n- Reuters technology\n- X / company accounts for real-time releases\n\nI can still help in a useful way:\n\n### Option 1: I give you a quick “what’s trending in AI lately” snapshot\nCommon current themes:\n- New multimodal models\n- Agent/tool-use updates\n- Faster and cheaper inference\n- On-device/small model improvements\n- AI regulation and copyright lawsuits\n- Enterprise copilots and workflow automation\n- Open-weight model releases\n- Robotics + vision-language action models\n\n### Option 2: I make you a live-news prompt\nUse this in a web-enabled tool:\n\n**Prompt:**\n“Find the most important AI news from today only. Prioritize official company announcements and major outlets like Reuters, FT, The Verge, TechCrunch, and company blogs. Return 5–10 items with: headline, source, time, 2-sentence summary, and why it matters. Exclude duplicates and clearly label rumors vs confirmed news.”\n\n### Option 3: I summarize if you paste links\nSend me:\n- headlines\n- article links\n- screenshots\n- copied text\n\nand I’ll turn it into a clean briefing.\n\nIf you want, I can also give you a **daily AI news digest format** you can reuse every morning.",
+          "created_at": 1774302229.2854667,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774302222459,
+            "updated_at": "2026-03-23 14:43:42"
+          }
+        },
+        {
+          "id": "dd3b5524-c40a-47c0-b713-b1d7763aac50",
+          "role": "user",
+          "content": "current Flask release notes",
+          "created_at": 1774302246.207046
+        },
+        {
+          "id": "0ae31223-c329-4b8c-b545-daccae6549a4",
+          "role": "assistant",
+          "content": "I don’t have live access to Flask’s release notes in this chat, so I can’t confirm the **current** release notes right now.\n\nQuick places to check:\n- Flask docs changelog\n- Flask GitHub releases\n- PyPI release history\n\nIf you want, I can still help in a practical way:\n\n### Option 1: I give you the official places to check\nUsually:\n- `https://flask.palletsprojects.com/`\n- Flask changelog / changes page\n- `https://github.com/pallets/flask/releases`\n- `https://pypi.org/project/Flask/`\n\n### Option 2: I help you inspect your installed version locally\nRun:\n\n```bash\npython -c \"import flask; print(flask.__version__)\"\n```\n\nor:\n\n```bash\npip show Flask\n```\n\nThen compare that version against GitHub releases or the docs changelog.\n\n### Option 3: I summarize release notes if you paste them here\nPaste:\n- the changelog text\n- a GitHub release page copy\n- your current version and target version\n\nand I’ll turn it into:\n- key changes\n- breaking changes\n- migration risks\n- upgrade steps\n\n### Option 4: I give you an upgrade checklist\nFor Flask upgrades, verify:\n- Python version support\n- Werkzeug compatibility\n- Jinja compatibility\n- deprecated imports\n- config behavior changes\n- CLI/app factory behavior\n- extension compatibility\n\nIf you want, I can also give you a **Flask upgrade command sequence** for a safe version bump.",
+          "created_at": 1774302251.405264,
+          "router_meta": {
+            "mode": "coding",
+            "intent": "build_or_fix_code",
+            "confidence": null,
+            "reason": "Detected coding and app-building language in the request.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774302246206,
+            "updated_at": "2026-03-23 14:44:06"
+          }
+        },
+        {
+          "id": "a0dcd2bd-0f03-4e05-bac0-e1133c748c68",
+          "role": "user",
+          "content": "current Flask release notes",
+          "created_at": 1774303044.5074902
+        },
+        {
+          "id": "365b6301-88d1-46b2-ab34-5fe20c889900",
+          "role": "assistant",
+          "content": "I can’t verify the **current** Flask release notes without live web access.\n\nUse one of these:\n- Flask changelog: `https://flask.palletsprojects.com/`\n- GitHub releases: `https://github.com/pallets/flask/releases`\n- PyPI: `https://pypi.org/project/Flask/`\n\nCheck your installed version:\n\n```bash\npython -c \"import flask; print(flask.__version__)\"\npip show Flask\n```\n\nIf you want, paste the release notes or your current Flask version and I’ll summarize the important changes and upgrade risks.",
+          "created_at": 1774303046.6730711,
+          "router_meta": {
+            "mode": "coding",
+            "intent": "build_or_fix_code",
+            "confidence": null,
+            "reason": "Detected coding and app-building language in the request.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774303044507,
+            "updated_at": "2026-03-23 14:57:24"
+          }
+        },
+        {
+          "id": "1d2771f0-3b4b-4eed-b063-fc2bc9c0d4fb",
+          "role": "user",
+          "content": "hows ur braijn",
+          "created_at": 1774303195.8446336
+        },
+        {
+          "id": "29a404fc-4b53-42be-9e29-f21256f48521",
+          "role": "assistant",
+          "content": "A little typo-resistant, apparently.\n\nYou good, or is your **braijn** buffering too?",
+          "created_at": 1774303197.3056676,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774303195844,
+            "updated_at": "2026-03-23 14:59:55"
+          }
+        },
+        {
+          "id": "1ede429f-94f2-4bf5-beaa-27a88b9ea718",
+          "role": "user",
+          "content": "Tell me the latest news",
+          "created_at": 1774303727.1497605
+        },
+        {
+          "id": "590ad8d1-6bba-4423-ae5b-8d7a68fea801",
+          "role": "assistant",
+          "content": "I can’t tell you the latest news right now because I don’t have live web/news access in this chat.\n\nFastest options:\n- Reuters\n- AP News\n- BBC\n- Google News\n- your preferred local outlet\n\nIf you want, I can still help by:\n1. summarizing news if you paste headlines/links\n2. giving you a “top stories” prompt for a web-enabled tool\n3. making a custom news brief by topic like AI, world, business, sports, or tech\n\nExample prompt:\n“Give me the top 10 news stories from today, prioritized by global significance, with source, timestamp, 2-sentence summary, and why it matters.”\n\nIf you want, tell me the category and country, and I’ll format a briefing template for you.",
+          "created_at": 1774303730.9632611,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774303727149,
+            "updated_at": "2026-03-23 15:08:47"
+          }
+        },
+        {
+          "id": "6be6b498-c07b-4aea-8480-7aae2e20477d",
+          "role": "user",
+          "content": "Tell me the latest news",
+          "created_at": 1774303733.6671054
+        },
+        {
+          "id": "28249401-d92f-4be5-baa2-56eba1ce01c8",
+          "role": "assistant",
+          "content": "I can’t provide the latest news because I don’t have live browsing or real-time news access here.\n\nIf you want current updates, check:\n- Reuters\n- AP News\n- BBC News\n- Google News\n\nOr paste headlines/links here and I’ll summarize them fast. If you want, I can also give you a clean prompt to use in a web-enabled tool to get a good news briefing.",
+          "created_at": 1774303735.7638566,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774303733667,
+            "updated_at": "2026-03-23 15:08:53"
+          }
+        }
+      ],
+      "router_meta": {
+        "mode": "general",
+        "intent": "conversation",
+        "confidence": null,
+        "reason": "Defaulted to general conversation.",
+        "memory_used": false,
+        "memory_count": 0,
+        "memory_items": [],
+        "route_time_ms": 1,
+        "model": "gpt-5.4",
+        "provider": "openai",
+        "source": "route_message",
+        "timestamp": 1774303733667,
+        "updated_at": "2026-03-23 15:08:53"
+      }
     }
   ],
   "route_meta": {}
