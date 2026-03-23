@@ -19,8 +19,8 @@
   "tokens_in": 0,
   "tokens_out": 0,
   "updated_at": "2026-03-22T23:21:36Z",
-  "last_chat_at": 1774257059.7885716,
-  "last_mode": "writing",
-  "last_intent": "draft_or_rewrite",
-  "chat_count": 5
+  "last_chat_at": 1774260617.0378926,
+  "last_mode": "general",
+  "last_intent": "conversation",
+  "chat_count": 6
 }

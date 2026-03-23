@@ -6,7 +6,7 @@
       "id": "b42051e1-fd78-4565-bf00-5ee2548ab958",
       "title": "hi",
       "created_at": 1774243158.6037934,
-      "updated_at": 1774257059.783061,
+      "updated_at": 1774260617.0324705,
       "pinned": false,
       "messages": [
         {
@@ -128,19 +128,49 @@
             "updated_at": "2026-03-23 02:10:56",
             "model": "gpt-5.4"
           }
+        },
+        {
+          "id": "1fdf1b25-dd9e-474e-8380-0ff85e27ec03",
+          "role": "user",
+          "content": "where is guantanamo bay",
+          "created_at": 1774260614.1578746
+        },
+        {
+          "id": "bdc25c03-be54-46d8-b054-e4d6a527e82c",
+          "role": "assistant",
+          "content": "Guantánamo Bay is in **southeastern Cuba**.\n\nMore specifically:\n- It’s a **bay on the coast of Cuba**\n- The **U.S. Naval Base at Guantánamo Bay** is located there\n- It’s often called **Gitmo**\n\nIf you want, I can also explain **why the U.S. has a base in Cuba**.",
+          "created_at": 1774260617.0324686,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774260614157,
+            "updated_at": "2026-03-23 03:10:14"
+          }
         }
       ],
       "router_meta": {
-        "mode": "writing",
-        "intent": "draft_or_rewrite",
-        "reason": "Detected writing-oriented language.",
-        "memory_hits": 0,
-        "memory_used": [],
+        "mode": "general",
+        "intent": "conversation",
+        "confidence": null,
+        "reason": "Defaulted to general conversation.",
+        "memory_used": false,
+        "memory_count": 0,
+        "memory_items": [],
         "route_time_ms": 1,
-        "timestamp": 1774257056350,
+        "model": "gpt-5.4",
+        "provider": "openai",
         "source": "route_message",
-        "updated_at": "2026-03-23 02:10:56",
-        "model": "gpt-5.4"
+        "timestamp": 1774260614157,
+        "updated_at": "2026-03-23 03:10:14"
       }
     },
     {
