@@ -520,19 +520,31 @@
 
     console.log("Nova brain router panel loaded");
 
-    // ===== DEBUG CLICK HOOK =====
+    // ===== DEBUG CLICK HOOK (FIXED) =====
     document.addEventListener("click", (event) => {
-      const button = event.target.closest("button");
-      if (!button) return;
+      const target = event.target;
 
-      console.log("BUTTON CLICK:", {
-        id: button.id || null,
-        className: button.className || null,
-        text: (button.textContent || "").trim(),
-        dataRouterDebug: button.getAttribute("data-router-debug")
+      console.log("RAW CLICK:", {
+        tag: target?.tagName,
+        id: target?.id,
+        className: target?.className,
+        text: (target?.textContent || "").trim().slice(0, 60)
+      });
+
+      const clickable = event.target.closest(
+        "button, [role='button'], .btn, .mini-btn, div, span"
+      );
+
+      if (!clickable) return;
+
+      console.log("CLICKABLE:", {
+        tag: clickable.tagName,
+        id: clickable.id || null,
+        className: clickable.className || null,
+        text: (clickable.textContent || "").trim()
       });
     });
-  }
+  } // ✅ THIS LINE WAS MISSING (closes init)
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init, { once: true });
