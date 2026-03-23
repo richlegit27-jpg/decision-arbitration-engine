@@ -387,6 +387,9 @@ def safe_json() -> Dict[str, Any]:
 def index() -> Any:
     return render_template("index.html")
 
+@app.get("/mobile")
+def mobile() -> Any:
+    return render_template("mobile.html")
 
 @app.get("/health")
 def health() -> Any:
@@ -881,5 +884,8 @@ def serve_static(filename: str) -> Any:
 
 
 if __name__ == "__main__":
+    APP_HOST = "0.0.0.0"
+    APP_PORT = 5001
+
     print(f"Nova running on http://{APP_HOST}:{APP_PORT}")
     app.run(host=APP_HOST, port=APP_PORT, debug=True)
