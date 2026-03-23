@@ -27,6 +27,9 @@
   --sidebar-width: 300px;
   --memory-width: 320px;
   --header-height: 74px;
+  --desktop-chat-max: 820px;
+  --desktop-message-max: 780px;
+  --desktop-fab-clearance: 118px;
 }
 
 * {
@@ -295,13 +298,15 @@ button:disabled {
 
 .sidebar-content::-webkit-scrollbar,
 .memory-body::-webkit-scrollbar,
-.chat-messages::-webkit-scrollbar {
+.chat-messages::-webkit-scrollbar,
+#chatMessages::-webkit-scrollbar {
   width: 10px;
 }
 
 .sidebar-content::-webkit-scrollbar-thumb,
 .memory-body::-webkit-scrollbar-thumb,
-.chat-messages::-webkit-scrollbar-thumb {
+.chat-messages::-webkit-scrollbar-thumb,
+#chatMessages::-webkit-scrollbar-thumb {
   background: rgba(140, 164, 230, 0.24);
   border-radius: 999px;
 }
@@ -459,7 +464,7 @@ button:disabled {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 20px 20px 18px;
+  padding: 22px 24px 20px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -467,13 +472,19 @@ button:disabled {
   scrollbar-color: rgba(140, 164, 230, 0.24) transparent;
 }
 
+.chat-messages > *,
+#chatMessages > * {
+  width: 100%;
+}
+
 .message,
 .chat-message,
 .msg {
-  max-width: min(780px, 84%);
+  width: fit-content;
+  max-width: min(var(--desktop-message-max), 84%);
   border-radius: 18px;
   border: 1px solid var(--line);
-  padding: 12px 14px 11px;
+  padding: 13px 15px 12px;
   box-shadow: var(--shadow-md);
   backdrop-filter: blur(8px);
 }
@@ -509,6 +520,8 @@ button:disabled {
   color: inherit;
   white-space: normal;
   word-break: break-word;
+  overflow-wrap: anywhere;
+  font-size: 14px;
 }
 
 .chat-message-footer {
@@ -557,9 +570,23 @@ button:disabled {
   background: rgba(255, 255, 255, 0.12);
 }
 
+.nova-stream-cursor {
+  display: inline-block;
+  margin-left: 2px;
+  font-weight: 700;
+  opacity: 0.92;
+  animation: novaCursorBlink 0.92s steps(1) infinite;
+}
+
+@keyframes novaCursorBlink {
+  0%, 48% { opacity: 1; }
+  49%, 100% { opacity: 0.18; }
+}
+
 /* ===== EMPTY STATE ===== */
 
-.empty-state {
+.empty-state,
+.chat-empty-state {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -567,7 +594,8 @@ button:disabled {
   padding: 30px 18px;
 }
 
-.empty-card {
+.empty-card,
+.chat-empty-card {
   width: min(480px, 100%);
   padding: 26px 24px;
   border-radius: 22px;
@@ -577,14 +605,16 @@ button:disabled {
   text-align: center;
 }
 
-.empty-title {
+.empty-title,
+.chat-empty-title {
   font-size: 22px;
   font-weight: 800;
   color: var(--text);
   margin-bottom: 8px;
 }
 
-.empty-subtitle {
+.empty-subtitle,
+.chat-empty-subtitle {
   font-size: 13px;
   color: var(--muted);
 }
@@ -601,6 +631,8 @@ button:disabled {
 }
 
 .composer-box {
+  max-width: calc(var(--desktop-chat-max) + 90px);
+  margin: 0 auto;
   border: 1px solid var(--line);
   border-radius: 20px;
   background: linear-gradient(180deg, rgba(24, 35, 63, 0.98) 0%, rgba(16, 24, 43, 0.99) 100%);
@@ -651,7 +683,8 @@ button:disabled {
 }
 
 .composer-left,
-.composer-right {
+.composer-right,
+.composer-actions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -697,6 +730,18 @@ textarea.message-input {
   padding: 0;
   font-size: 22px;
   line-height: 1;
+}
+
+#regenerateBtn,
+.nova-action-btn.secondary {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--line);
+  color: var(--text-soft);
+}
+
+#regenerateBtn:hover,
+.nova-action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.09);
 }
 
 .composer-footer {
@@ -773,11 +818,31 @@ textarea.message-input {
 }
 
 .memory-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(29, 42, 74, 0.86) 0%, rgba(20, 30, 55, 0.98) 100%);
   box-shadow: var(--shadow-sm);
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+}
+
+.memory-item:hover {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+.memory-item.is-deleting {
+  opacity: 0.55;
+}
+
+.memory-item-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .memory-item-kind {
@@ -793,11 +858,21 @@ textarea.message-input {
   color: var(--text-soft);
   line-height: 1.5;
   margin-bottom: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .memory-item-meta {
   font-size: 11px;
   color: var(--muted);
+}
+
+.memory-item-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 /* ===== FORMS ===== */
@@ -853,7 +928,8 @@ body.memory-collapsed .memory-panel {
 /* ===== SENDING ===== */
 
 body.is-sending #sendBtn,
-body.is-sending #stopBtn {
+body.is-sending #stopBtn,
+body.is-sending #regenerateBtn {
   opacity: 0.82;
 }
 
@@ -875,7 +951,8 @@ body.is-sending #memoryStatusText {
   opacity: 0.92;
 }
 
-.router-badge span {
+.router-badge span,
+.router-badge-pill {
   display: inline-flex;
   align-items: center;
   min-height: 20px;
@@ -917,6 +994,428 @@ body.is-sending #memoryStatusText {
 
 .rb-mode[data-mode="general"] {
   color: #cfd8ff;
+}
+
+/* ===== SOURCES INSIDE MESSAGE ===== */
+
+.message-sources {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.message-sources-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.78;
+  margin-bottom: 8px;
+}
+
+.message-sources-list {
+  display: grid;
+  gap: 8px;
+}
+
+.message-source-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+}
+
+.message-source-card:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(120, 170, 255, 0.38);
+}
+
+.message-source-title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-bottom: 4px;
+}
+
+.message-source-snippet {
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.82;
+}
+
+/* ===== BRAIN ROUTER PANEL ===== */
+
+.router-debug-card {
+  margin-bottom: 14px;
+}
+
+.router-debug-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.router-debug-row {
+  font-size: 12px;
+  color: var(--text-soft);
+  line-height: 1.5;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(
+    180deg,
+    rgba(29, 42, 74, 0.72) 0%,
+    rgba(20, 30, 55, 0.92) 100%
+  );
+  box-shadow: var(--shadow-sm);
+}
+
+.router-debug-row strong {
+  color: var(--text);
+  margin-right: 6px;
+}
+
+.router-debug-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--text-soft);
+}
+
+.router-debug-list li {
+  margin: 4px 0;
+}
+
+.router-debug-empty {
+  margin-top: 8px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ===== MEMORY DELETE ===== */
+
+.memory-delete-btn,
+.delete-memory {
+  color: #ff9aa5;
+  border: 1px solid rgba(255, 107, 122, 0.3);
+  background: rgba(255, 107, 122, 0.08);
+  transition: all 0.15s ease;
+}
+
+.memory-delete-btn:hover,
+.delete-memory:hover {
+  color: #fff;
+  background: rgba(255, 107, 122, 0.25);
+  border-color: rgba(255, 107, 122, 0.5);
+}
+
+.memory-dropdown,
+.memory-item-menu,
+.memory-dropdown-menu {
+  background: rgba(10, 15, 25, 0.95) !important;
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(10px);
+}
+
+.memory-dropdown .delete-memory,
+.memory-item-menu .delete-memory {
+  color: #ffb3bb;
+}
+
+.memory-dropdown .delete-memory:hover,
+.memory-item-menu .delete-memory:hover {
+  background: rgba(255, 107, 122, 0.2);
+  color: #fff;
+}
+
+#memoryList .memory-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+#memoryList .memory-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+#memoryList .memory-item-kind {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9fb3ff;
+  margin-bottom: 6px;
+}
+
+#memoryList .memory-item-value {
+  font-size: 14px;
+  line-height: 1.45;
+  color: #ecf2ff;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  margin-bottom: 8px;
+}
+
+#memoryList .memory-item-meta {
+  font-size: 12px;
+  color: rgba(220, 228, 255, 0.62);
+}
+
+#memoryList .memory-item-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+#memoryList .memory-delete-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 34px !important;
+  min-width: 34px !important;
+  height: 34px !important;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 107, 122, 0.28) !important;
+  border-radius: 10px !important;
+  background: rgba(255, 107, 122, 0.12) !important;
+  color: #ffd7dd !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+#memoryList .memory-delete-btn:hover {
+  background: rgba(255, 107, 122, 0.24) !important;
+  border-color: rgba(255, 107, 122, 0.48) !important;
+  color: #ffffff !important;
+}
+
+#memoryList .memory-delete-btn:empty::before {
+  content: "✕";
+}
+
+#memoryForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+#memoryForm .input-wrap,
+#memoryForm .select-wrap,
+#memoryForm .memory-field,
+#memoryForm .memory-input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+#memoryKind,
+#memoryValue,
+#memoryForm input,
+#memoryForm select,
+#memoryForm textarea {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 12px !important;
+  background: rgba(10, 16, 28, 0.88) !important;
+  color: #ecf2ff !important;
+  padding: 12px 14px !important;
+  outline: none;
+  box-shadow: none;
+}
+
+#memoryValue,
+#memoryForm textarea {
+  min-height: 110px !important;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+#memoryKind,
+#memoryForm select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: rgba(10, 16, 28, 0.88) !important;
+  color: #ecf2ff !important;
+}
+
+#memoryKind option,
+#memoryForm select option {
+  background: #101a31 !important;
+  color: #ecf2ff !important;
+}
+
+#memoryKind:focus,
+#memoryValue:focus,
+#memoryForm input:focus,
+#memoryForm select:focus,
+#memoryForm textarea:focus {
+  border-color: rgba(122, 156, 255, 0.42) !important;
+  box-shadow: 0 0 0 3px rgba(90, 132, 255, 0.14) !important;
+}
+
+#memoryValue::placeholder,
+#memoryForm input::placeholder,
+#memoryForm textarea::placeholder {
+  color: rgba(220, 228, 255, 0.42) !important;
+}
+
+#memoryList .memory-empty {
+  padding: 14px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  color: rgba(220, 228, 255, 0.62);
+  text-align: center;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ===== DESKTOP PARITY POLISH ===== */
+
+@media (min-width: 981px) {
+  .chat-messages,
+  #chatMessages {
+    padding-left: clamp(22px, 2.8vw, 34px);
+    padding-right: clamp(22px, 2.8vw, 34px);
+    padding-bottom: calc(18px + var(--desktop-fab-clearance));
+  }
+
+  .chat-message,
+  .message,
+  .msg {
+    border-radius: 20px;
+  }
+
+  .chat-message.assistant,
+  .message.assistant,
+  .msg.assistant {
+    margin-right: auto;
+  }
+
+  .chat-message.user,
+  .message.user,
+  .msg.user {
+    margin-left: auto;
+  }
+
+  .chat-message-content {
+    font-size: 14px;
+    line-height: 1.62;
+  }
+
+  .chat-message-footer {
+    margin-top: 12px;
+  }
+
+  .chat-message-action-btn {
+    min-height: 32px;
+    padding: 0 12px;
+  }
+
+  .composer-wrap {
+    padding-left: clamp(18px, 2.6vw, 28px);
+    padding-right: clamp(18px, 2.6vw, 28px);
+  }
+
+  .composer-box {
+    border-radius: 22px;
+    padding: 12px 12px 11px;
+  }
+
+  .composer-row {
+    align-items: stretch;
+  }
+
+  .composer-left,
+  .composer-right,
+  .composer-actions {
+    align-self: flex-end;
+  }
+
+  .message-input,
+  #messageInput,
+  textarea.message-input {
+    min-height: 54px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  #sendBtn,
+  #regenerateBtn,
+  .attach-btn,
+  .voice-btn,
+  .stop-btn {
+    min-height: 44px;
+  }
+
+  .topbar-left,
+  .topbar-right {
+    gap: 12px;
+  }
+
+  .session-item {
+    border-radius: 16px;
+  }
+
+  .router-debug-card,
+  .memory-card,
+  .panel-section,
+  .sidebar-section {
+    border-radius: 18px;
+  }
+
+  #novaSourcesFab,
+  #novaRouterFab,
+  .nova-sources-fab,
+  .nova-router-fab {
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32);
+  }
+
+  #novaRouterFab,
+  .nova-router-fab {
+    bottom: 76px !important;
+  }
+
+  #novaSourcesFab,
+  .nova-sources-fab {
+    bottom: 18px !important;
+  }
+
+  #novaSourcesDrawer,
+  .nova-sources-drawer {
+    bottom: 74px !important;
+  }
+
+  #novaRouterPanel,
+  .nova-router-panel {
+    bottom: 128px !important;
+  }
 }
 
 /* ===== RESPONSIVE ===== */
@@ -1103,7 +1602,7 @@ body.is-sending #memoryStatusText {
     pointer-events: auto;
   }
 
-  body.mobile-left-open .left-sidebar * ,
+  body.mobile-left-open .left-sidebar *,
   body.mobile-right-open .memory-panel * {
     -webkit-tap-highlight-color: transparent;
   }
@@ -1185,10 +1684,9 @@ body.is-sending #memoryStatusText {
   }
 }
 
-/* ===== PANEL OPEN STATE (THIS WAS MISSING) ===== */
+/* ===== PANEL OPEN STATE ===== */
 
 @media (max-width: 980px) {
-
   body.panel-open::before {
     content: "";
     position: fixed;
@@ -1216,383 +1714,4 @@ body.is-sending #memoryStatusText {
     transform: translateX(0);
     z-index: 60;
   }
-
-} 
-
-/* ===== BRAIN ROUTER PANEL ===== */
-
-.router-debug-card {
-  margin-bottom: 14px;
-}
-
-.router-debug-content {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.router-debug-row {
-  font-size: 12px;
-  color: var(--text-soft);
-  line-height: 1.5;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: linear-gradient(
-    180deg,
-    rgba(29, 42, 74, 0.72) 0%,
-    rgba(20, 30, 55, 0.92) 100%
-  );
-  box-shadow: var(--shadow-sm);
-}
-
-.router-debug-row strong {
-  color: var(--text);
-  margin-right: 6px;
-}
-
-.router-debug-list {
-  margin: 8px 0 0;
-  padding-left: 18px;
-  color: var(--text-soft);
-}
-
-.router-debug-list li {
-  margin: 4px 0;
-}
-
-.router-debug-empty {
-  margin-top: 8px;
-  color: var(--muted);
-  font-style: italic;
-}
-
-@media (max-width: 980px) {
-  .router-debug-row {
-    font-size: 11px;
-    padding: 9px 10px;
-  }
-}
-
-/* =========================
-   MEMORY DELETE (SAFE PATCH)
-   ========================= */
-
-/* delete button inside memory item */
-.memory-delete-btn,
-.delete-memory {
-  color: #ff9aa5;
-  border: 1px solid rgba(255, 107, 122, 0.3);
-  background: rgba(255, 107, 122, 0.08);
-  transition: all 0.15s ease;
-}
-
-.memory-delete-btn:hover,
-.delete-memory:hover {
-  color: #fff;
-  background: rgba(255, 107, 122, 0.25);
-  border-color: rgba(255, 107, 122, 0.5);
-}
-
-/* dropdown fix (keeps dark theme) */
-.memory-dropdown,
-.memory-item-menu,
-.memory-dropdown-menu {
-  background: rgba(10, 15, 25, 0.95) !important;
-  border: 1px solid rgba(255,255,255,0.08);
-  backdrop-filter: blur(10px);
-}
-
-/* delete inside dropdown */
-.memory-dropdown .delete-memory,
-.memory-item-menu .delete-memory {
-  color: #ffb3bb;
-}
-
-.memory-dropdown .delete-memory:hover,
-.memory-item-menu .delete-memory:hover {
-  background: rgba(255, 107, 122, 0.2);
-  color: #fff;
-}
-
-/* =========================
-   MEMORY POLISH
-   ========================= */
-
-.memory-item {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 12px 12px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.035);
-  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
-}
-
-.memory-item + .memory-item {
-  margin-top: 10px;
-}
-
-.memory-item:hover {
-  background: rgba(255, 255, 255, 0.055);
-  border-color: rgba(255, 255, 255, 0.14);
-  transform: translateY(-1px);
-}
-
-.memory-item.is-deleting {
-  opacity: 0.55;
-}
-
-.memory-item-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.memory-item-kind {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #9fb3ff;
-  margin-bottom: 6px;
-}
-
-.memory-item-value {
-  color: #ecf2ff;
-  font-size: 14px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-word;
-  margin-bottom: 8px;
-}
-
-.memory-item-meta {
-  font-size: 12px;
-  color: rgba(220, 228, 255, 0.58);
-}
-
-.memory-item-actions {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  flex-shrink: 0;
-}
-
-.memory-delete-btn {
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(255, 120, 120, 0.18);
-  border-radius: 10px;
-  background: rgba(255, 90, 90, 0.06);
-  color: #ff9ca8;
-  font-size: 16px;
-  line-height: 1;
-  opacity: 0.82;
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
-}
-
-.memory-item:hover .memory-delete-btn {
-  opacity: 1;
-}
-
-.memory-delete-btn:hover {
-  background: rgba(255, 90, 90, 0.16);
-  border-color: rgba(255, 120, 120, 0.36);
-  color: #ffd7dd;
-  transform: scale(1.03);
-}
-
-.memory-delete-btn:active {
-  transform: scale(0.96);
-}
-
-.memory-delete-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.memory-empty {
-  padding: 14px;
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  color: rgba(220, 228, 255, 0.62);
-  text-align: center;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-/* =========================
-   MEMORY HARD FIX
-   ========================= */
-
-/* memory list item layout */
-#memoryList .memory-item {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  padding: 12px 14px;
-  margin-bottom: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-#memoryList .memory-item-main {
-  flex: 1;
-  min-width: 0;
-}
-
-#memoryList .memory-item-kind {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #9fb3ff;
-  margin-bottom: 6px;
-}
-
-#memoryList .memory-item-value {
-  font-size: 14px;
-  line-height: 1.45;
-  color: #ecf2ff;
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  margin-bottom: 8px;
-}
-
-#memoryList .memory-item-meta {
-  font-size: 12px;
-  color: rgba(220, 228, 255, 0.62);
-}
-
-/* force delete button visible */
-#memoryList .memory-item-actions {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  flex-shrink: 0;
-}
-
-#memoryList .memory-delete-btn {
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  width: 34px !important;
-  min-width: 34px !important;
-  height: 34px !important;
-  padding: 0 !important;
-  border: 1px solid rgba(255, 107, 122, 0.28) !important;
-  border-radius: 10px !important;
-  background: rgba(255, 107, 122, 0.12) !important;
-  color: #ffd7dd !important;
-  font-size: 18px !important;
-  font-weight: 700 !important;
-  line-height: 1 !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  appearance: none;
-  -webkit-appearance: none;
-}
-
-#memoryList .memory-delete-btn:hover {
-  background: rgba(255, 107, 122, 0.24) !important;
-  border-color: rgba(255, 107, 122, 0.48) !important;
-  color: #ffffff !important;
-}
-
-#memoryList .memory-delete-btn:empty::before {
-  content: "✕";
-}
-
-/* memory form full width */
-#memoryForm {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-}
-
-#memoryForm .input-wrap,
-#memoryForm .select-wrap,
-#memoryForm .memory-field,
-#memoryForm .memory-input-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-}
-
-#memoryKind,
-#memoryValue,
-#memoryForm input,
-#memoryForm select,
-#memoryForm textarea {
-  display: block;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  box-sizing: border-box;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 12px !important;
-  background: rgba(10, 16, 28, 0.88) !important;
-  color: #ecf2ff !important;
-  padding: 12px 14px !important;
-  outline: none;
-  box-shadow: none;
-}
-
-#memoryValue,
-#memoryForm textarea {
-  min-height: 110px !important;
-  resize: vertical;
-  line-height: 1.45;
-}
-
-/* dropdown background fix */
-#memoryKind,
-#memoryForm select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-color: rgba(10, 16, 28, 0.88) !important;
-  color: #ecf2ff !important;
-}
-
-#memoryKind option,
-#memoryForm select option {
-  background: #101a31 !important;
-  color: #ecf2ff !important;
-}
-
-/* focus polish */
-#memoryKind:focus,
-#memoryValue:focus,
-#memoryForm input:focus,
-#memoryForm select:focus,
-#memoryForm textarea:focus {
-  border-color: rgba(122, 156, 255, 0.42) !important;
-  box-shadow: 0 0 0 3px rgba(90, 132, 255, 0.14) !important;
-}
-
-/* placeholder visibility */
-#memoryValue::placeholder,
-#memoryForm input::placeholder,
-#memoryForm textarea::placeholder {
-  color: rgba(220, 228, 255, 0.42) !important;
-}
-
-/* empty state */
-#memoryList .memory-empty {
-  padding: 14px;
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  color: rgba(220, 228, 255, 0.62);
-  text-align: center;
-  background: rgba(255, 255, 255, 0.02);
 }

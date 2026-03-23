@@ -433,6 +433,7 @@
       content,
       time,
       text: "",
+      done: false,
     };
 
     return app.state.currentAssistantBubble;
@@ -453,9 +454,22 @@
     scrollMessagesToBottom("smooth");
   }
 
+  function finalizeStreamingAssistantBubble(finalText = "") {
+    if (!app.state.currentAssistantBubble) return;
+
+    const bubble = app.state.currentAssistantBubble;
+    if (finalText) {
+      bubble.text = String(finalText);
+      bubble.content.innerHTML = escapeHtml(bubble.text).replace(/\n/g, "<br>");
+    }
+
+    bubble.done = true;
+    bubble.time.textContent = formatTime(nowUnix());
+  }
+
   function finishStreamingAssistantBubble() {
     if (!app.state.currentAssistantBubble) return;
-    app.state.currentAssistantBubble.time.textContent = formatTime(nowUnix());
+    finalizeStreamingAssistantBubble(app.state.currentAssistantBubble.text || "");
     app.state.currentAssistantBubble = null;
   }
 
@@ -822,6 +836,31 @@
     await sendMessage({ overrideContent: matchedUserText, isRegenerate: true });
   }
 
+  function parseSSEBlock(rawBlock) {
+    const lines = String(rawBlock || "").split(/\r?\n/);
+    let event = "";
+    const dataLines = [];
+
+    for (const line of lines) {
+      if (line.startsWith("event:")) {
+        event = line.slice(6).trim();
+        continue;
+      }
+      if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).trim());
+      }
+    }
+
+    const payloadText = dataLines.join("\n").trim();
+    let data = {};
+
+    if (payloadText && payloadText !== "[DONE]") {
+      data = JSON.parse(payloadText);
+    }
+
+    return { event, data };
+  }
+
   async function sendMessage(options = {}) {
     const input = byId("mobileMessageInput");
     if (!input || app.state.isSending) return;
@@ -844,6 +883,9 @@
 
     const userText = content;
     const activeSessionIdBeforeSend = app.state.activeSessionId;
+
+    let localAssistantText = "";
+    let streamFinished = false;
 
     try {
       let uploadedFiles = [];
@@ -877,91 +919,179 @@
 
       const res = await fetch(API.stream, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream, application/json, text/plain, */*",
+        },
         body: JSON.stringify({
           session_id: activeSessionIdBeforeSend,
           content: userText,
+          message: userText,
           model: app.state.currentModel,
           uploaded_files: uploadedFiles,
         }),
       });
 
-      if (!res.ok || !res.body) {
-        throw new Error("Send failed");
+      if (!res.ok) {
+        throw new Error(`Send failed (${res.status})`);
       }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder("utf-8");
-      let buffer = "";
-      let done = false;
+      if (!res.body || typeof res.body.getReader !== "function") {
+        const fallbackText = safeText(await res.text()) || "No response.";
+        localAssistantText = fallbackText;
+        finalizeStreamingAssistantBubble(localAssistantText);
+        finishStreamingAssistantBubble();
+        streamFinished = true;
+      } else {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
 
-      while (!done) {
-        const result = await reader.read();
-        done = result.done;
-
-        buffer += decoder.decode(result.value || new Uint8Array(), {
-          stream: !done,
-        });
-
-        let boundaryIndex;
-        while ((boundaryIndex = buffer.indexOf("\n\n")) !== -1) {
-          const chunk = buffer.slice(0, boundaryIndex).trim();
-          buffer = buffer.slice(boundaryIndex + 2);
-
-          if (!chunk.startsWith("data:")) continue;
-
-          const payloadText = chunk.replace(/^data:\s*/, "").trim();
-
-          if (!payloadText || payloadText === "[DONE]") {
-            continue;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            buffer += decoder.decode();
+            break;
           }
 
-          let payload;
+          buffer += decoder.decode(value || new Uint8Array(), { stream: true });
+
+          let separatorIndex;
+          while ((separatorIndex = buffer.indexOf("\n\n")) !== -1) {
+            const rawBlock = buffer.slice(0, separatorIndex).trim();
+            buffer = buffer.slice(separatorIndex + 2);
+
+            if (!rawBlock) continue;
+            if (rawBlock === "data: [DONE]") continue;
+
+            let parsed;
+            try {
+              parsed = parseSSEBlock(rawBlock);
+            } catch (err) {
+              console.warn("Failed to parse SSE block:", rawBlock, err);
+              continue;
+            }
+
+            const data = parsed.data || {};
+            const type = data.type || parsed.event || "";
+
+            if (type === "meta") {
+              if (data.session_id) {
+                app.state.activeSessionId = data.session_id;
+              }
+              continue;
+            }
+
+            if (type === "delta") {
+              const delta =
+                typeof data.delta === "string"
+                  ? data.delta
+                  : typeof data.content === "string"
+                  ? data.content
+                  : "";
+
+              if (!delta) continue;
+
+              localAssistantText += delta;
+              appendStreamingDelta(delta);
+              continue;
+            }
+
+            if (type === "done") {
+              const finalText =
+                typeof data.response === "string"
+                  ? data.response
+                  : typeof data.message?.content === "string"
+                  ? data.message.content
+                  : typeof data.content === "string"
+                  ? data.content
+                  : localAssistantText;
+
+              if (data.session_id) {
+                app.state.activeSessionId = data.session_id;
+              }
+
+              localAssistantText = finalText || localAssistantText;
+              finalizeStreamingAssistantBubble(localAssistantText);
+              finishStreamingAssistantBubble();
+              streamFinished = true;
+              continue;
+            }
+
+            if (type === "error") {
+              throw new Error(data.error || data.message || "Stream failed");
+            }
+          }
+        }
+
+        const trailing = buffer.trim();
+        if (trailing && trailing !== "data: [DONE]") {
           try {
-            payload = JSON.parse(payloadText);
-          } catch {
-            continue;
-          }
+            const parsed = parseSSEBlock(trailing);
+            const data = parsed.data || {};
+            const type = data.type || parsed.event || "";
 
-          if (payload.type === "meta") {
-            if (payload.session_id) {
-              app.state.activeSessionId = payload.session_id;
+            if (type === "done") {
+              const finalText =
+                typeof data.response === "string"
+                  ? data.response
+                  : typeof data.message?.content === "string"
+                  ? data.message.content
+                  : typeof data.content === "string"
+                  ? data.content
+                  : localAssistantText;
+
+              if (data.session_id) {
+                app.state.activeSessionId = data.session_id;
+              }
+
+              localAssistantText = finalText || localAssistantText;
+              finalizeStreamingAssistantBubble(localAssistantText);
+              finishStreamingAssistantBubble();
+              streamFinished = true;
             }
-            continue;
+          } catch (err) {
+            console.warn("Trailing SSE parse failed:", err);
           }
+        }
 
-          if (payload.type === "delta") {
-            appendStreamingDelta(payload.delta || "");
-            continue;
-          }
-
-          if (payload.type === "done") {
-            if (payload.session_id) {
-              app.state.activeSessionId = payload.session_id;
-            }
-            finishStreamingAssistantBubble();
-          }
-
-          if (payload.type === "error") {
-            throw new Error(payload.error || "Stream failed");
-          }
+        if (!streamFinished) {
+          finalizeStreamingAssistantBubble(localAssistantText);
+          finishStreamingAssistantBubble();
         }
       }
 
       await loadState();
       await loadSession(app.state.activeSessionId || activeSessionIdBeforeSend);
       await loadMemory();
+      renderMessages();
+      renderSessions();
+      renderMemory();
 
       setStatus(isRegenerate ? "Regenerated" : "Model ready");
     } catch (err) {
       console.error(err);
+
+      if (app.state.currentAssistantBubble) {
+        const errorText =
+          localAssistantText ||
+          `Error: ${err?.message || String(err) || "Stream failed"}`;
+        finalizeStreamingAssistantBubble(errorText);
+        finishStreamingAssistantBubble();
+      }
+
+      await loadState().catch(() => {});
+      if (app.state.activeSessionId || activeSessionIdBeforeSend) {
+        await loadSession(app.state.activeSessionId || activeSessionIdBeforeSend).catch(() => {});
+      }
+
       setStatus("Send failed");
-      finishStreamingAssistantBubble();
     } finally {
       app.state.isSending = false;
       setSendDisabled(false);
       updateHeader();
       autosizeInput();
+      scrollMessagesToBottom("smooth");
     }
   }
 
