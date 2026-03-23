@@ -23,6 +23,8 @@ from flask import (
 )
 from openai import OpenAI
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
+
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -49,7 +51,7 @@ def env_flag(name: str, default: bool = False) -> bool:
 
 
 APP_HOST = "0.0.0.0"
-APP_PORT = int(os.getenv("PORT", os.getenv("APP_PORT", "5001")).strip())
+APP_PORT = int((os.getenv("PORT") or os.getenv("APP_PORT") or "5001").strip())
 APP_DEBUG = env_flag("APP_DEBUG", default=False)
 MAX_UPLOAD_MB = int((os.getenv("MAX_UPLOAD_MB") or "25").strip())
 
@@ -57,6 +59,8 @@ app = Flask(__name__, static_folder=str(STATIC_DIR), template_folder=str(TEMPLAT
 app.config["JSON_SORT_KEYS"] = False
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 app.config["PROPAGATE_EXCEPTIONS"] = True
+app.config["TEMPLATES_AUTO_RELOAD"] = APP_DEBUG
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 io_lock = Lock()
@@ -410,9 +414,17 @@ def safe_json() -> Dict[str, Any]:
         return {}
 
 
+@app.before_request
+def log_request_start() -> None:
+    app.logger.info("REQ %s %s", request.method, request.path)
+
+
 @app.after_request
 def apply_response_headers(response: Response) -> Response:
     path = request.path or ""
+
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
     if path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -425,6 +437,17 @@ def apply_response_headers(response: Response) -> Response:
     return response
 
 
+@app.errorhandler(413)
+def handle_file_too_large(_: Exception):
+    return jsonify(
+        {
+            "ok": False,
+            "error": f"Upload too large. Max upload size is {MAX_UPLOAD_MB} MB.",
+            "type": "RequestEntityTooLarge",
+        }
+    ), 413
+
+
 @app.errorhandler(Exception)
 def handle_unexpected_error(exc: Exception):
     trace = traceback.format_exc()
@@ -435,7 +458,7 @@ def handle_unexpected_error(exc: Exception):
             "error": str(exc),
             "type": exc.__class__.__name__,
             "path": request.path,
-            "trace": trace if APP_DEBUG else "See Render logs for traceback.",
+            "trace": trace if APP_DEBUG else "See server logs for traceback.",
         }
     ), 500
 
@@ -452,7 +475,16 @@ def mobile() -> Any:
 
 @app.get("/health")
 def health() -> Any:
-    return jsonify({"ok": True, "time": iso_now()})
+    return jsonify(
+        {
+            "ok": True,
+            "time": iso_now(),
+            "model": OPENAI_MODEL,
+            "openai_configured": bool(OPENAI_API_KEY),
+            "sessions_file": str(SESSIONS_FILE),
+            "memory_file": str(MEMORY_FILE),
+        }
+    )
 
 
 @app.get("/api/state")
@@ -546,6 +578,7 @@ def api_chat() -> Any:
     try:
         assistant_text = chat_with_model(model_messages, router_meta, memory_items)
     except Exception as exc:
+        app.logger.exception("Model call failed in /api/chat")
         assistant_text = f"Nova hit an error talking to the model: {exc}"
 
     assistant_entry = {
@@ -719,6 +752,9 @@ def api_chat_stream():
             )
             yield "data: [DONE]\n\n"
 
+        except GeneratorExit:
+            app.logger.info("Client disconnected from stream for session %s", session["id"])
+            raise
         except Exception as exc:
             app.logger.exception("Streaming failure for session %s", session["id"])
             yield sse(
@@ -1027,4 +1063,6 @@ def serve_static(filename: str) -> Any:
 
 if __name__ == "__main__":
     print(f"Nova running on http://{APP_HOST}:{APP_PORT}")
-    app.run(host=APP_HOST, port=APP_PORT, debug=APP_DEBUG)
+    print(f"OPENAI_MODEL={OPENAI_MODEL}")
+    print(f"OPENAI_API_KEY_SET={bool(OPENAI_API_KEY)}")
+    app.run(host=APP_HOST, port=APP_PORT, debug=APP_DEBUG, threaded=True)
