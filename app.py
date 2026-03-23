@@ -7,6 +7,7 @@ import os
 import re
 import time
 import uuid
+import traceback
 
 from threading import Lock
 from typing import Any, Dict, List, Optional
@@ -38,8 +39,6 @@ USAGE_FILE = DATA_DIR / "nova_usage.json"
 
 OPENAI_API_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
 OPENAI_MODEL = (os.getenv("OPENAI_MODEL") or "gpt-4.1-mini").strip()
-APP_HOST = (os.getenv("APP_HOST") or "127.0.0.1").strip()
-APP_PORT = int((os.getenv("APP_PORT") or "5001").strip())
 
 
 def env_flag(name: str, default: bool = False) -> bool:
@@ -49,12 +48,15 @@ def env_flag(name: str, default: bool = False) -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+APP_HOST = "0.0.0.0"
+APP_PORT = int(os.getenv("PORT", os.getenv("APP_PORT", "5001")).strip())
 APP_DEBUG = env_flag("APP_DEBUG", default=False)
 MAX_UPLOAD_MB = int((os.getenv("MAX_UPLOAD_MB") or "25").strip())
 
 app = Flask(__name__, static_folder=str(STATIC_DIR), template_folder=str(TEMPLATES_DIR))
 app.config["JSON_SORT_KEYS"] = False
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
+app.config["PROPAGATE_EXCEPTIONS"] = True
 
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 io_lock = Lock()
@@ -423,6 +425,21 @@ def apply_response_headers(response: Response) -> Response:
     return response
 
 
+@app.errorhandler(Exception)
+def handle_unexpected_error(exc: Exception):
+    trace = traceback.format_exc()
+    app.logger.exception("Unhandled exception on %s %s", request.method, request.path)
+    return jsonify(
+        {
+            "ok": False,
+            "error": str(exc),
+            "type": exc.__class__.__name__,
+            "path": request.path,
+            "trace": trace if APP_DEBUG else "See Render logs for traceback.",
+        }
+    ), 500
+
+
 @app.get("/")
 def index() -> Any:
     return render_template("index.html")
@@ -703,6 +720,7 @@ def api_chat_stream():
             yield "data: [DONE]\n\n"
 
         except Exception as exc:
+            app.logger.exception("Streaming failure for session %s", session["id"])
             yield sse(
                 {
                     "type": "error",
@@ -1006,9 +1024,6 @@ def favicon() -> Any:
 def serve_static(filename: str) -> Any:
     return send_from_directory(STATIC_DIR, filename)
 
-APP_HOST = "0.0.0.0"
-APP_PORT = int(os.getenv("PORT", "5001"))
-APP_DEBUG = False
 
 if __name__ == "__main__":
     print(f"Nova running on http://{APP_HOST}:{APP_PORT}")
