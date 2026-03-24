@@ -60,11 +60,32 @@
   }
 
   function formatTime(ts) {
-    if (!ts) return "";
+    if (ts === null || ts === undefined || ts === "") return "";
+
     try {
-      const num = Number(ts);
-      const ms = num > 9999999999 ? num : num * 1000;
-      return new Date(ms).toLocaleString();
+      if (typeof ts === "string") {
+        const trimmed = ts.trim();
+        if (!trimmed) return "";
+
+        const numeric = Number(trimmed);
+        if (!Number.isNaN(numeric)) {
+          const ms = numeric > 9999999999 ? numeric : numeric * 1000;
+          const date = new Date(ms);
+          return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
+        }
+
+        const isoDate = new Date(trimmed);
+        return Number.isNaN(isoDate.getTime()) ? "" : isoDate.toLocaleString();
+      }
+
+      if (typeof ts === "number") {
+        const ms = ts > 9999999999 ? ts : ts * 1000;
+        const date = new Date(ms);
+        return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
+      }
+
+      const fallback = new Date(ts);
+      return Number.isNaN(fallback.getTime()) ? "" : fallback.toLocaleString();
     } catch {
       return "";
     }
@@ -354,6 +375,61 @@
     `;
   }
 
+  function normalizeRouterMeta(payload) {
+    if (!payload || typeof payload !== "object") return null;
+
+    const raw =
+      (payload.router_meta && typeof payload.router_meta === "object" && payload.router_meta) ||
+      (payload.router && typeof payload.router === "object" && payload.router) ||
+      null;
+
+    if (!raw) return null;
+
+    return {
+      mode: raw.mode ?? "general",
+      intent: raw.intent ?? "conversation",
+      confidence: raw.confidence ?? null,
+      reason: raw.reason ?? "",
+      memory_used: raw.memory_used ?? false,
+      memory_count: Number(raw.memory_count ?? raw.memory_hits ?? 0),
+      memory_hits: Number(raw.memory_hits ?? raw.memory_count ?? 0),
+      memory_items: Array.isArray(raw.memory_items) ? raw.memory_items : [],
+      memory_preview: Array.isArray(raw.memory_preview)
+        ? raw.memory_preview
+        : Array.isArray(raw.memory_items)
+        ? raw.memory_items
+        : [],
+      model: raw.model ?? null,
+      provider: raw.provider ?? null,
+      route_time_ms: raw.route_time_ms ?? null,
+      source: raw.source ?? null,
+      timestamp: raw.timestamp ?? null,
+      updated_at: raw.updated_at ?? null,
+    };
+  }
+
+  function applyIncomingRouterMeta(payload) {
+    const meta = normalizeRouterMeta(payload);
+    if (!meta) return null;
+
+    state.lastRouter = meta;
+    window.__novaLastRouterMeta = meta;
+
+    try {
+      window.dispatchEvent(new CustomEvent("nova:router-meta", { detail: meta }));
+    } catch {}
+
+    updateRouterDebug(meta);
+
+    if (window.NovaRouterPanel && typeof window.NovaRouterPanel.applyRouterMeta === "function") {
+      try {
+        window.NovaRouterPanel.applyRouterMeta(meta);
+      } catch {}
+    }
+
+    return meta;
+  }
+
   function renderSessions() {
     const list =
       byId("sessionList") ||
@@ -560,9 +636,11 @@
       state.activeSessionId = currentSessionId;
     }
 
-    if (data.router_meta) {
-      state.lastRouter = data.router_meta;
-      window.__novaLastRouterMeta = data.router_meta;
+    if (data.router_meta || data.last_router_meta || data.router) {
+      applyIncomingRouterMeta({
+        router_meta: data.router_meta || data.last_router_meta || null,
+        router: data.router || null,
+      });
     }
 
     renderSessions();
@@ -574,12 +652,17 @@
 
     const data = await apiGet(API.getChat(sessionId));
     state.activeSessionId = data.session?.id || data.session_id || sessionId;
-    state.messages = Array.isArray(data.messages) ? data.messages : [];
+    state.messages = Array.isArray(data.messages)
+      ? data.messages
+      : Array.isArray(data.session?.messages)
+      ? data.session.messages
+      : [];
 
-    if (data.router_meta) {
-      state.lastRouter = data.router_meta;
-      window.__novaLastRouterMeta = data.router_meta;
-      window.dispatchEvent(new CustomEvent("nova:router-meta", { detail: data.router_meta }));
+    if (data.router_meta || data.last_router_meta || data.router) {
+      applyIncomingRouterMeta({
+        router_meta: data.router_meta || data.last_router_meta || null,
+        router: data.router || data.session?.router_meta || null,
+      });
     }
 
     renderMessages();
@@ -711,14 +794,12 @@
         });
       }
 
-      function applyRouter(router) {
-        if (!router) return;
-        streamRouter = router;
-        assistantStreamMessage.router = router;
-        state.lastRouter = router;
-        window.__novaLastRouterMeta = router;
-        window.dispatchEvent(new CustomEvent("nova:router-meta", { detail: router }));
-        updateRouterDebug(router);
+      function applyRouter(routerLike) {
+        const normalized = applyIncomingRouterMeta(routerLike);
+        if (!normalized) return;
+        streamRouter = normalized;
+        assistantStreamMessage.router = normalized;
+        scheduleRender();
       }
 
       function finalizeAssistant(finalText = "") {
@@ -743,31 +824,45 @@
 
       function handlePayload(data, fallbackEvent = "") {
         const payload = data && typeof data === "object" ? data : {};
-        const type = payload.type || fallbackEvent || "";
+        const dataType = safeText(payload.type).toLowerCase();
+        const eventType = safeText(fallbackEvent).toLowerCase();
+        const resolvedType = dataType || eventType;
 
-        if (!type || type === "done_marker") {
+        if (!resolvedType || resolvedType === "done_marker") {
           return;
         }
 
-        if (type === "meta") {
-          if (payload.router || payload.router_meta) {
-            applyRouter(payload.router || payload.router_meta);
-            scheduleRender();
-          }
+        if (
+          resolvedType === "meta" ||
+          resolvedType === "router" ||
+          payload.router ||
+          payload.router_meta
+        ) {
+          applyRouter(payload);
+        }
 
+        if (resolvedType === "start") {
           if (payload.session_id) {
             state.activeSessionId = payload.session_id;
           }
-
           return;
         }
 
-        if (type === "delta") {
+        if (resolvedType === "meta" || resolvedType === "router") {
+          if (payload.session_id) {
+            state.activeSessionId = payload.session_id;
+          }
+          return;
+        }
+
+        if (resolvedType === "delta") {
           const delta =
             typeof payload.delta === "string"
               ? payload.delta
               : typeof payload.content === "string"
               ? payload.content
+              : typeof payload.text === "string"
+              ? payload.text
               : "";
 
           if (!delta) return;
@@ -777,7 +872,7 @@
           return;
         }
 
-        if (type === "done") {
+        if (resolvedType === "done") {
           const final =
             typeof payload.response === "string"
               ? payload.response
@@ -787,10 +882,6 @@
               ? payload.content
               : finalContent;
 
-          if (payload.router || payload.router_meta) {
-            applyRouter(payload.router || payload.router_meta);
-          }
-
           if (payload.session_id) {
             state.activeSessionId = payload.session_id;
           }
@@ -799,7 +890,7 @@
           return;
         }
 
-        if (type === "error") {
+        if (resolvedType === "error") {
           throw new Error(payload.message || payload.error || "Stream failed");
         }
       }
@@ -922,9 +1013,10 @@
           memory_preview: [],
           timestamp: nowUnix(),
         };
+        applyIncomingRouterMeta({ router: assistantStreamMessage.router });
         renderMessages();
       } else {
-        addLocalMessage("assistant", "Something went wrong sending that message.", {
+        const errorRouter = {
           mode: "general",
           intent: "error",
           reason: "frontend exception",
@@ -932,7 +1024,9 @@
           memory_count: 0,
           memory_preview: [],
           timestamp: nowUnix(),
-        });
+        };
+        applyIncomingRouterMeta({ router: errorRouter });
+        addLocalMessage("assistant", "Something went wrong sending that message.", errorRouter);
       }
 
       try {

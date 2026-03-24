@@ -369,7 +369,7 @@
       "id": "13dce190-91cf-4363-bc7b-371101ac24c1",
       "title": "hows your moms",
       "created_at": 1774301167.385806,
-      "updated_at": 1774303735.763859,
+      "updated_at": 1774304897.3969507,
       "pinned": false,
       "messages": [
         {
@@ -614,6 +614,33 @@
             "timestamp": 1774303733667,
             "updated_at": "2026-03-23 15:08:53"
           }
+        },
+        {
+          "id": "b7bdeb5a-5710-4ecf-8d59-dd076d7614a1",
+          "role": "user",
+          "content": "Tell me the latest news",
+          "created_at": 1774304893.8957732
+        },
+        {
+          "id": "7b0bdd2d-42bb-4f0d-b846-893d7d157740",
+          "role": "assistant",
+          "content": "I don’t have live news access in this chat, so I can’t tell you the latest news right now.\n\nBest quick sources:\n- Reuters\n- AP\n- BBC\n- Google News\n\nIf you want, I can still help by:\n- summarizing articles you paste\n- creating a topic-specific briefing template\n- giving you a prompt for a web-enabled tool\n\nExample:\n“Find the top news from today, prioritize verified sources, and summarize each in 2 sentences with why it matters.”\n\nIf you want, I can make that prompt specific to world, US, tech, finance, sports, or AI.",
+          "created_at": 1774304897.3969486,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774304893895,
+            "updated_at": "2026-03-23 15:28:13"
+          }
         }
       ],
       "router_meta": {
@@ -628,8 +655,191 @@
         "model": "gpt-5.4",
         "provider": "openai",
         "source": "route_message",
-        "timestamp": 1774303733667,
-        "updated_at": "2026-03-23 15:08:53"
+        "timestamp": 1774304893895,
+        "updated_at": "2026-03-23 15:28:13"
+      }
+    },
+    {
+      "id": "7cea7b7d-4636-4f98-a3c7-4c0c36c21bed",
+      "title": "smff app.py stream router test",
+      "created_at": 1774304994.528994,
+      "updated_at": 1774304998.9280798,
+      "pinned": false,
+      "messages": [
+        {
+          "id": "a90d962c-31be-42ba-8e29-fc1292a0a12f",
+          "role": "user",
+          "content": "smff app.py stream router test",
+          "created_at": 1774304994.5292513
+        },
+        {
+          "id": "89634353-8fd4-43e0-9179-cc473f9cced4",
+          "role": "assistant",
+          "content": "```python\nfrom fastapi import FastAPI, APIRouter\nfrom fastapi.responses import StreamingResponse\nfrom fastapi.testclient import TestClient\nimport time\n\napp = FastAPI()\nrouter = APIRouter()\n\n\ndef event_stream():\n    for i in range(5):\n        yield f\"data: message {i}\\n\\n\"\n        time.sleep(0.01)\n\n\n@router.get(\"/stream\")\ndef stream():\n    return StreamingResponse(event_stream(), media_type=\"text/event-stream\")\n\n\napp.include_router(router)\n\n\ndef test_stream_route():\n    client = TestClient(app)\n    response = client.get(\"/stream\")\n    assert response.status_code == 200\n    assert response.headers[\"content-type\"].startswith(\"text/event-stream\")\n    assert \"data: message 0\" in response.text\n    assert \"data: message 4\" in response.text\n```",
+          "created_at": 1774304998.9280682,
+          "router_meta": {
+            "mode": "coding",
+            "intent": "build_or_fix_code",
+            "confidence": null,
+            "reason": "Detected coding and app-building language in the request.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774304994529,
+            "updated_at": "2026-03-23 15:29:54"
+          }
+        }
+      ],
+      "router_meta": {
+        "mode": "coding",
+        "intent": "build_or_fix_code",
+        "confidence": null,
+        "reason": "Detected coding and app-building language in the request.",
+        "memory_used": false,
+        "memory_count": 0,
+        "memory_items": [],
+        "route_time_ms": 1,
+        "model": "gpt-5.4",
+        "provider": "openai",
+        "source": "route_message",
+        "timestamp": 1774304994529,
+        "updated_at": "2026-03-23 15:29:54"
+      }
+    },
+    {
+      "id": "1566d7f8-dd38-4366-b1ef-9dc09343bab7",
+      "title": "smff app.py stream router test",
+      "created_at": 1774305088.3173285,
+      "updated_at": 1774305169.0709457,
+      "pinned": false,
+      "messages": [
+        {
+          "id": "ed917461-6d4e-409d-a275-43006921e5a8",
+          "role": "user",
+          "content": "smff app.py stream router test",
+          "created_at": 1774305088.31757
+        },
+        {
+          "id": "c915d5cc-8c21-46d5-a640-d14a697b2e34",
+          "role": "assistant",
+          "content": "```python\nfrom fastapi import FastAPI\nfrom fastapi.responses import StreamingResponse\nfrom fastapi.testclient import TestClient\nimport time\n\napp = FastAPI()\n\n\n@app.get(\"/stream\")\ndef stream():\n    def event_stream():\n        for i in range(5):\n            yield f\"chunk {i}\\n\"\n            time.sleep(0.01)\n\n    return StreamingResponse(event_stream(), media_type=\"text/plain\")\n\n\ndef test_stream_route():\n    client = TestClient(app)\n    response = client.get(\"/stream\")\n    assert response.status_code == 200\n    assert response.text == \"\".join(f\"chunk {i}\\n\" for i in range(5))\n```",
+          "created_at": 1774305091.6255627,
+          "router_meta": {
+            "mode": "coding",
+            "intent": "build_or_fix_code",
+            "confidence": null,
+            "reason": "Detected coding and app-building language in the request.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774305088317,
+            "updated_at": "2026-03-23 15:31:28"
+          }
+        },
+        {
+          "id": "b9e371de-db46-4110-91a7-bea4ca59ee6d",
+          "role": "user",
+          "content": "any news lately?",
+          "created_at": 1774305136.5846274
+        },
+        {
+          "id": "cc306b05-3437-4c4f-9fa3-888865400121",
+          "role": "assistant",
+          "content": "I don’t have live news access in this chat.\n\nIf you want, I can still help in a few ways:\n- summarize major recent topics if you tell me your region or topic\n- help you find the latest news quickly\n- analyze or explain a news article you paste here\n\nIf you want live updates, tell me:\n- country/region\n- topic: world, tech, markets, AI, sports, etc.\n\nAnd I’ll give you a focused rundown format to use.",
+          "created_at": 1774305139.1764593,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774305136584,
+            "updated_at": "2026-03-23 15:32:16"
+          }
+        },
+        {
+          "id": "b27185c5-de9b-4fea-983d-21d843e7d2f9",
+          "role": "user",
+          "content": "politics",
+          "created_at": 1774305150.3561828
+        },
+        {
+          "id": "0ff37e39-c22d-4700-a155-342506c57738",
+          "role": "assistant",
+          "content": "I can help, but I don’t have live news in this chat.\n\nIf you want current politics news, tell me:\n- country: US, UK, India, EU, etc.\n- level: national, international, elections, policy, courts\n\nFor example:\n- “US politics”\n- “UK election news”\n- “EU politics this week”\n\nThen I can give you:\n- a likely topic summary\n- key things to watch\n- a clean checklist of reliable sources to check right now\n\nIf you want, I can also give you a neutral “how to catch up on politics in 5 minutes” workflow.",
+          "created_at": 1774305153.2182226,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774305150356,
+            "updated_at": "2026-03-23 15:32:30"
+          }
+        },
+        {
+          "id": "7294e735-a53e-46fd-a36d-c4b7bd53df63",
+          "role": "user",
+          "content": "you have anything in the iran war",
+          "created_at": 1774305166.0484986
+        },
+        {
+          "id": "307a3510-7957-4b77-90b1-1e4a7109caed",
+          "role": "assistant",
+          "content": "I don’t have live updates, so I can’t confirm current developments in any Iran-related war or conflict.\n\nWhat I can do:\n- give neutral background on the Iran conflict you mean\n- explain the main actors, risks, and likely scenarios\n- help summarize a live article or post if you paste it here\n- help you verify whether a claim is credible\n\nIf you want current info fast, check:\n- Reuters\n- AP\n- BBC\n- Al Jazeera\n- Financial Times\n- your country’s foreign ministry or defense ministry statements\n\nIf you want, I can give you a concise backgrounder on:\n- Iran–Israel conflict\n- Iran and US tensions\n- proxy conflicts involving Iran\n- regional escalation risks\n\nJust say which one.",
+          "created_at": 1774305169.0709436,
+          "router_meta": {
+            "mode": "general",
+            "intent": "conversation",
+            "confidence": null,
+            "reason": "Defaulted to general conversation.",
+            "memory_used": false,
+            "memory_count": 0,
+            "memory_items": [],
+            "route_time_ms": 1,
+            "model": "gpt-5.4",
+            "provider": "openai",
+            "source": "route_message",
+            "timestamp": 1774305166048,
+            "updated_at": "2026-03-23 15:32:46"
+          }
+        }
+      ],
+      "router_meta": {
+        "mode": "general",
+        "intent": "conversation",
+        "confidence": null,
+        "reason": "Defaulted to general conversation.",
+        "memory_used": false,
+        "memory_count": 0,
+        "memory_items": [],
+        "route_time_ms": 1,
+        "model": "gpt-5.4",
+        "provider": "openai",
+        "source": "route_message",
+        "timestamp": 1774305166048,
+        "updated_at": "2026-03-23 15:32:46"
       }
     }
   ],
