@@ -154,6 +154,29 @@
         "timestamp": 1774271390828,
         "updated_at": "2026-03-23 06:09:50"
       }
+    },
+    {
+      "id": "2e9d07b4-2984-457b-8f41-0d3da9f1fdcb",
+      "title": "New Chat",
+      "created_at": 1774313580.7329423,
+      "updated_at": 1774313580.7329423,
+      "pinned": false,
+      "messages": [],
+      "router_meta": {
+        "mode": "general",
+        "intent": "idle",
+        "confidence": null,
+        "reason": "No user message yet.",
+        "memory_used": false,
+        "memory_count": 0,
+        "memory_items": [],
+        "route_time_ms": 0,
+        "model": "gpt-5.4",
+        "provider": "openai",
+        "source": "session_create",
+        "timestamp": 1774313580732,
+        "updated_at": "2026-03-23 17:53:00"
+      }
     }
   ],
   "route_meta": {}
