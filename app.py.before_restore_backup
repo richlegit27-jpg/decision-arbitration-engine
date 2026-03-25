@@ -1,0 +1,186 @@
+from __future__ import annotations
+
+import json
+import os
+import uuid
+from pathlib import Path
+from typing import Any, Dict, List
+
+from flask import Flask, jsonify, request, render_template, send_from_directory
+
+# =========================================================
+# PATHS
+# =========================================================
+
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+TEMPLATES_DIR = BASE_DIR / "templates"
+DATA_DIR = BASE_DIR / "data"
+
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+SESSIONS_FILE = DATA_DIR / "nova_sessions.json"
+
+# =========================================================
+# APP
+# =========================================================
+
+app = Flask(
+    __name__,
+    static_folder=str(STATIC_DIR),
+    template_folder=str(TEMPLATES_DIR),
+)
+
+# =========================================================
+# STATE
+# =========================================================
+
+sessions_store: List[Dict[str, Any]] = []
+
+# =========================================================
+# LOAD / SAVE
+# =========================================================
+
+def load_sessions():
+    global sessions_store
+    if SESSIONS_FILE.exists():
+        try:
+            data = json.loads(SESSIONS_FILE.read_text(encoding="utf-8"))
+            sessions_store = data.get("sessions", [])
+        except Exception:
+            sessions_store = []
+    else:
+        sessions_store = []
+
+def save_sessions():
+    try:
+        SESSIONS_FILE.write_text(
+            json.dumps({"sessions": sessions_store}, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except Exception as e:
+        print("❌ Failed saving sessions:", e)
+
+load_sessions()
+
+# =========================================================
+# ROUTES
+# =========================================================
+
+@app.get("/")
+def index():
+    return render_template("index.html")
+
+@app.get("/static/<path:filename>")
+def static_files(filename: str):
+    return send_from_directory(STATIC_DIR, filename)
+
+@app.get("/api/state")
+def api_state():
+    return jsonify({
+        "ok": True,
+        "sessions": sessions_store
+    })
+
+# =========================================================
+# SESSION HELPERS
+# =========================================================
+
+def get_session_id(payload: dict) -> str:
+    return str(
+        payload.get("session_id")
+        or payload.get("id")
+        or ""
+    ).strip()
+
+# =========================================================
+# SESSION ROUTES
+# =========================================================
+
+@app.post("/api/session/new")
+def api_session_new():
+    session_id = str(uuid.uuid4())
+
+    session = {
+        "id": session_id,
+        "title": "New Chat",
+        "messages": []
+    }
+
+    sessions_store.insert(0, session)
+    save_sessions()
+
+    return jsonify({
+        "ok": True,
+        "session": session,
+        "sessions": sessions_store
+    })
+
+
+@app.post("/api/session/delete")
+def api_session_delete():
+    payload = request.get_json(silent=True) or {}
+    session_id = get_session_id(payload)
+
+    if not session_id:
+        return jsonify({"ok": False, "error": "session_id required"}), 400
+
+    global sessions_store
+
+    before = len(sessions_store)
+
+    sessions_store = [
+        s for s in sessions_store
+        if str(s.get("id")) != session_id
+    ]
+
+    if len(sessions_store) == before:
+        return jsonify({"ok": False, "error": "not found"}), 404
+
+    save_sessions()
+
+    print(f"🗑️ Deleted session: {session_id}")
+
+    return jsonify({
+        "ok": True,
+        "deleted": session_id,
+        "sessions": sessions_store
+    })
+
+
+@app.post("/api/session/rename")
+def api_session_rename():
+    payload = request.get_json(silent=True) or {}
+
+    session_id = get_session_id(payload)
+    title = str(payload.get("title") or "").strip()
+
+    if not session_id:
+        return jsonify({"ok": False, "error": "session_id required"}), 400
+
+    if not title:
+        return jsonify({"ok": False, "error": "title required"}), 400
+
+    for s in sessions_store:
+        if str(s.get("id")) == session_id:
+            s["title"] = title
+            save_sessions()
+
+            print(f"✏️ Renamed: {session_id} -> {title}")
+
+            return jsonify({
+                "ok": True,
+                "session": s,
+                "sessions": sessions_store
+            })
+
+    return jsonify({"ok": False, "error": "not found"}), 404
+
+
+# =========================================================
+# RUN
+# =========================================================
+
+if __name__ == "__main__":
+    print("🚀 Nova running at http://127.0.0.1:5001")
+    app.run(host="0.0.0.0", port=5001, debug=True)

@@ -7,6 +7,10 @@
   const API = {
     state: "/api/state",
     newSession: "/api/session/new",
+    deleteSession: "/api/session/delete",
+    renameSession: "/api/session/rename",
+    duplicateSession: "/api/session/duplicate",
+    pinSession: "/api/session/pin",
     getChat: (sessionId) => `/api/chat/${encodeURIComponent(sessionId)}`,
     stream: "/api/chat/stream",
     memory: "/api/memory",
@@ -17,6 +21,10 @@
 
   const DEFAULT_MODEL = "gpt-4.1-mini";
   const MAX_INPUT_HEIGHT = 180;
+  const STORAGE = {
+    sidebarCollapsed: "nova_sidebar_collapsed",
+    memoryCollapsed: "nova_memory_collapsed",
+  };
 
   const state = {
     sessions: [],
@@ -29,6 +37,8 @@
     lastUserMessage: "",
     lastRouter: null,
     deletingMemoryIds: new Set(),
+    deletingSessionIds: new Set(),
+    renamingSessionIds: new Set(),
   };
 
   function byId(id) {
@@ -560,6 +570,106 @@
     document.head.appendChild(style);
   }
 
+  function isMobilePanel() {
+    return window.matchMedia("(max-width: 980px)").matches;
+  }
+
+  function persistPanelState() {
+    try {
+      localStorage.setItem(
+        STORAGE.sidebarCollapsed,
+        document.body.classList.contains("sidebar-collapsed") ? "1" : "0"
+      );
+      localStorage.setItem(
+        STORAGE.memoryCollapsed,
+        document.body.classList.contains("memory-collapsed") ? "1" : "0"
+      );
+    } catch {}
+  }
+
+  function restorePanelState() {
+    if (isMobilePanel()) {
+      document.body.classList.remove("sidebar-collapsed", "memory-collapsed");
+      return;
+    }
+
+    try {
+      const sidebarCollapsed = localStorage.getItem(STORAGE.sidebarCollapsed) === "1";
+      const memoryCollapsed = localStorage.getItem(STORAGE.memoryCollapsed) === "1";
+
+      document.body.classList.toggle("sidebar-collapsed", sidebarCollapsed);
+      document.body.classList.toggle("memory-collapsed", memoryCollapsed);
+    } catch {
+      document.body.classList.remove("sidebar-collapsed", "memory-collapsed");
+    }
+  }
+
+  function setDesktopSidebarCollapsed(collapsed) {
+    if (isMobilePanel()) return;
+    document.body.classList.toggle("sidebar-collapsed", Boolean(collapsed));
+    persistPanelState();
+  }
+
+  function setDesktopMemoryCollapsed(collapsed) {
+    if (isMobilePanel()) return;
+    document.body.classList.toggle("memory-collapsed", Boolean(collapsed));
+    persistPanelState();
+  }
+
+  function toggleDesktopSidebar() {
+    if (isMobilePanel()) return;
+    const next = !document.body.classList.contains("sidebar-collapsed");
+    setDesktopSidebarCollapsed(next);
+  }
+
+  function toggleDesktopMemory() {
+    if (isMobilePanel()) return;
+    const next = !document.body.classList.contains("memory-collapsed");
+    setDesktopMemoryCollapsed(next);
+  }
+
+  function ensureDesktopMemoryOpen() {
+    if (isMobilePanel()) return;
+    document.body.classList.remove("memory-collapsed");
+    persistPanelState();
+  }
+
+  function ensureDesktopSidebarOpen() {
+    if (isMobilePanel()) return;
+    document.body.classList.remove("sidebar-collapsed");
+    persistPanelState();
+  }
+
+  function setPanelBodyState(isOpen) {
+    document.body.classList.toggle("panel-open", Boolean(isOpen));
+  }
+
+  function closeMobilePanels() {
+    document.body.classList.remove("mobile-left-open", "mobile-right-open");
+    setPanelBodyState(false);
+  }
+
+  function openLeftMobile() {
+    document.body.classList.remove("mobile-right-open");
+    document.body.classList.add("mobile-left-open");
+    setPanelBodyState(true);
+  }
+
+  function openRightMobile() {
+    document.body.classList.remove("mobile-left-open");
+    document.body.classList.add("mobile-right-open");
+    setPanelBodyState(true);
+  }
+
+  function syncPanelMode() {
+    if (isMobilePanel()) {
+      document.body.classList.remove("sidebar-collapsed", "memory-collapsed");
+    } else {
+      closeMobilePanels();
+      restorePanelState();
+    }
+  }
+
   function renderAttachedFiles() {
     const bar = byId("attachedFilesBar") || byId("attachedFiles");
     if (!bar) return;
@@ -726,6 +836,36 @@
     return meta;
   }
 
+  function pulseElement(el) {
+    if (!el || typeof el.animate !== "function") return;
+    try {
+      el.animate(
+        [
+          { transform: "scale(1)", opacity: 1 },
+          { transform: "scale(1.015)", opacity: 1 },
+          { transform: "scale(1)", opacity: 1 },
+        ],
+        { duration: 240, easing: "ease-out" }
+      );
+    } catch {}
+  }
+
+  function animateSessionRemoval(el) {
+    if (!el || typeof el.animate !== "function") return Promise.resolve();
+    try {
+      const anim = el.animate(
+        [
+          { opacity: 1, transform: "translateX(0) scale(1)", height: `${el.offsetHeight}px` },
+          { opacity: 0, transform: "translateX(-10px) scale(0.98)", height: "0px", margin: "0px" },
+        ],
+        { duration: 220, easing: "ease" }
+      );
+      return anim.finished.catch(() => {});
+    } catch {
+      return Promise.resolve();
+    }
+  }
+
   function renderSessions() {
     const list =
       byId("sessionList") ||
@@ -734,21 +874,32 @@
 
     if (!list) return;
 
-    if (!state.sessions.length) {
+    const searchValue = safeText(byId("sessionSearchInput")?.value || "").toLowerCase();
+
+    const visibleSessions = state.sessions.filter((session) => {
+      if (!searchValue) return true;
+      const title = safeText(session.title || "New Chat").toLowerCase();
+      return title.includes(searchValue);
+    });
+
+    if (!visibleSessions.length) {
       list.innerHTML = `<div class="session-empty">No chats yet.</div>`;
       return;
     }
 
-    list.innerHTML = state.sessions
+    list.innerHTML = visibleSessions
       .map((session) => {
         const sessionId = session.id || session.session_id || "";
         const isActive = sessionId === state.activeSessionId;
+        const isDeleting = state.deletingSessionIds.has(sessionId);
+        const isRenaming = state.renamingSessionIds.has(sessionId);
 
         return `
           <button
-            class="session-item ${isActive ? "active" : ""}"
+            class="session-item ${isActive ? "active" : ""} ${isDeleting ? "is-deleting" : ""} ${isRenaming ? "is-renaming" : ""}"
             type="button"
             data-session-id="${escapeHtml(sessionId)}"
+            ${isDeleting ? "disabled" : ""}
           >
             <div class="session-item-title">${escapeHtml(session.title || "New Chat")}</div>
             <div class="session-item-meta">${escapeHtml(String(session.message_count || 0))} messages</div>
@@ -760,12 +911,13 @@
     qsa("[data-session-id]", list).forEach((btn) => {
       btn.addEventListener("click", async () => {
         const sessionId = btn.getAttribute("data-session-id");
-        if (!sessionId || sessionId === state.activeSessionId) return;
+        if (!sessionId || sessionId === state.activeSessionId || state.deletingSessionIds.has(sessionId)) return;
 
         try {
           setStatus("Loading chat...");
           await loadSession(sessionId);
           setStatus("Ready");
+          pulseElement(btn);
         } catch (err) {
           console.error(err);
           setStatus("Load failed");
@@ -1009,6 +1161,12 @@
       state.messages = [];
       renderMessages();
     }
+
+    if (isMobilePanel()) {
+      closeMobilePanels();
+    } else {
+      ensureDesktopSidebarOpen();
+    }
   }
 
   async function addMemory(kind, value) {
@@ -1018,6 +1176,19 @@
 
   async function deleteMemory(id) {
     await apiPost(API.deleteMemory, { id });
+  }
+
+  async function deleteSession(sessionId) {
+    return apiPost(API.deleteSession, { session_id: sessionId, id: sessionId });
+  }
+
+  async function renameSession(sessionId, title) {
+    return apiPost(API.renameSession, {
+      session_id: sessionId,
+      id: sessionId,
+      title,
+      name: title,
+    });
   }
 
   function parseSSEBlock(block) {
@@ -1404,37 +1575,6 @@
     await streamSend(state.lastUserMessage, [], { suppressLocalUser: false });
   }
 
-  function setPanelBodyState(isOpen) {
-    document.body.classList.toggle("panel-open", Boolean(isOpen));
-  }
-
-  function isMobilePanel() {
-    return window.matchMedia("(max-width: 980px)").matches;
-  }
-
-  function closeMobilePanels() {
-    document.body.classList.remove("mobile-left-open", "mobile-right-open");
-    setPanelBodyState(false);
-  }
-
-  function openLeftMobile() {
-    document.body.classList.remove("mobile-right-open");
-    document.body.classList.add("mobile-left-open");
-    setPanelBodyState(true);
-  }
-
-  function openRightMobile() {
-    document.body.classList.remove("mobile-left-open");
-    document.body.classList.add("mobile-right-open");
-    setPanelBodyState(true);
-  }
-
-  function syncPanelMode() {
-    if (!isMobilePanel()) {
-      closeMobilePanels();
-    }
-  }
-
   function resolveToggleRole(button) {
     if (!button) return null;
 
@@ -1459,6 +1599,8 @@
       "togglememorypanel",
       "mobilememorybtn",
       "openmemorybtn",
+      "memorytogglebtntop",
+      "closememorybtn",
       "memorytoggle",
     ]);
 
@@ -1494,6 +1636,59 @@
   function initPanelFix() {
     const sidebar = byId("sidebar");
     const memoryPanel = byId("memoryPanel");
+    const toggleSidebarBtn = byId("toggleSidebar");
+    const mobileSidebarBtn = byId("mobileSidebarBtn");
+    const memoryToggleBtn = byId("memoryToggleBtnTop");
+    const closeMemoryBtn = byId("closeMemoryBtn");
+
+    toggleSidebarBtn?.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (isMobilePanel()) {
+        if (document.body.classList.contains("mobile-left-open")) {
+          closeMobilePanels();
+        } else {
+          openLeftMobile();
+        }
+        return;
+      }
+      toggleDesktopSidebar();
+    });
+
+    mobileSidebarBtn?.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (isMobilePanel()) {
+        if (document.body.classList.contains("mobile-left-open")) {
+          closeMobilePanels();
+        } else {
+          openLeftMobile();
+        }
+        return;
+      }
+      ensureDesktopSidebarOpen();
+      pulseElement(sidebar);
+    });
+
+    memoryToggleBtn?.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (isMobilePanel()) {
+        if (document.body.classList.contains("mobile-right-open")) {
+          closeMobilePanels();
+        } else {
+          openRightMobile();
+        }
+        return;
+      }
+      toggleDesktopMemory();
+    });
+
+    closeMemoryBtn?.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (isMobilePanel()) {
+        closeMobilePanels();
+        return;
+      }
+      setDesktopMemoryCollapsed(true);
+    });
 
     document.addEventListener(
       "click",
@@ -1505,6 +1700,10 @@
 
         const role = resolveToggleRole(button);
         if (!role) return;
+
+        if (button === toggleSidebarBtn || button === mobileSidebarBtn || button === memoryToggleBtn || button === closeMemoryBtn) {
+          return;
+        }
 
         e.preventDefault();
         e.stopPropagation();
@@ -1548,7 +1747,11 @@
 
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
-        closeMobilePanels();
+        if (isMobilePanel()) {
+          closeMobilePanels();
+        } else {
+          setDesktopMemoryCollapsed(true);
+        }
       }
     });
 
@@ -1606,6 +1809,91 @@
     }
   }
 
+  async function handleDeleteSession() {
+    const sessionId = safeText(state.activeSessionId);
+    if (!sessionId || state.deletingSessionIds.has(sessionId)) return;
+
+    const session = state.sessions.find((s) => (s.id || s.session_id) === sessionId);
+    const label = session?.title || "this chat";
+
+    const ok = window.confirm(`Delete "${label}"?`);
+    if (!ok) return;
+
+    const listItem = qs(`[data-session-id="${CSS.escape(sessionId)}"]`);
+
+    state.deletingSessionIds.add(sessionId);
+    renderSessions();
+    setStatus("Deleting chat...");
+
+    try {
+      if (listItem) {
+        await animateSessionRemoval(listItem);
+      }
+
+      await deleteSession(sessionId);
+
+      const remaining = state.sessions.filter((s) => (s.id || s.session_id) !== sessionId);
+      const nextSessionId = remaining[0]?.id || remaining[0]?.session_id || null;
+
+      state.deletingSessionIds.delete(sessionId);
+
+      await loadState();
+
+      if (nextSessionId) {
+        await loadSession(nextSessionId);
+      } else {
+        state.activeSessionId = null;
+        state.messages = [];
+        renderMessages();
+      }
+
+      renderSessions();
+      setStatus("Chat deleted");
+    } catch (err) {
+      console.error(err);
+      state.deletingSessionIds.delete(sessionId);
+      renderSessions();
+      setStatus("Delete failed");
+    }
+  }
+
+  async function handleRenameSession() {
+    const sessionId = safeText(state.activeSessionId);
+    if (!sessionId || state.renamingSessionIds.has(sessionId)) return;
+
+    const session = state.sessions.find((s) => (s.id || s.session_id) === sessionId);
+    const currentTitle = safeText(session?.title || "New Chat");
+    const nextTitleRaw = window.prompt("Rename chat", currentTitle);
+    if (nextTitleRaw === null) return;
+
+    const nextTitle = safeText(nextTitleRaw);
+    if (!nextTitle || nextTitle === currentTitle) return;
+
+    const listItem = qs(`[data-session-id="${CSS.escape(sessionId)}"]`);
+
+    state.renamingSessionIds.add(sessionId);
+    renderSessions();
+    setStatus("Renaming chat...");
+
+    try {
+      await renameSession(sessionId, nextTitle);
+      await loadState();
+      await loadSession(sessionId);
+      state.renamingSessionIds.delete(sessionId);
+      renderSessions();
+
+      const freshItem = qs(`[data-session-id="${CSS.escape(sessionId)}"]`) || listItem;
+      pulseElement(freshItem);
+
+      setStatus("Chat renamed");
+    } catch (err) {
+      console.error(err);
+      state.renamingSessionIds.delete(sessionId);
+      renderSessions();
+      setStatus("Rename failed");
+    }
+  }
+
   function bindEvents() {
     ensureDesktopActionButtons();
 
@@ -1619,6 +1907,11 @@
         setStatus("Create failed");
       }
     });
+
+    byId("deleteSessionBtn")?.addEventListener("click", handleDeleteSession);
+    byId("renameSessionBtn")?.addEventListener("click", handleRenameSession);
+
+    byId("sessionSearchInput")?.addEventListener("input", renderSessions);
 
     byId("sendBtn")?.addEventListener("click", sendMessage);
     byId("regenerateBtn")?.addEventListener("click", regenerateLastReply);
@@ -1667,12 +1960,32 @@
 
       try {
         setStatus("Saving memory...");
+        ensureDesktopMemoryOpen();
         await addMemory(kind, value);
         if (valueEl) valueEl.value = "";
+        if (isMobilePanel()) {
+          openRightMobile();
+        } else {
+          ensureDesktopMemoryOpen();
+        }
         setStatus("Ready");
       } catch (err) {
         console.error(err);
         setStatus("Save failed");
+      }
+    });
+
+    byId("refreshMemoryBtn")?.addEventListener("click", async () => {
+      try {
+        ensureDesktopMemoryOpen();
+        await loadMemory();
+        if (isMobilePanel()) {
+          openRightMobile();
+        }
+        setStatus("Ready");
+      } catch (err) {
+        console.error(err);
+        setStatus("Refresh failed");
       }
     });
 
@@ -1690,6 +2003,7 @@
   async function bootstrap() {
     injectWebResultStyles();
     injectMemoryPolishStyles();
+    restorePanelState();
     bindEvents();
     initPanelFix();
     setStatus("Loading...");
