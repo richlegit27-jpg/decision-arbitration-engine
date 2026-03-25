@@ -6,7 +6,7 @@ import re
 import threading
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
@@ -37,6 +37,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 MEMORY_FILE = DATA_DIR / "memory.json"
 USERS_FILE = DATA_DIR / "users.json"
+SESSIONS_FILE = DATA_DIR / "sessions.json"
 
 app = Flask(__name__, template_folder=str(TEMPLATES_DIR), static_folder=str(STATIC_DIR))
 app.secret_key = os.getenv("SECRET_KEY", "dev-secret-change-me")
@@ -54,8 +55,6 @@ OPENAI_CLIENT = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 # =========================================================
 # STATE
 # =========================================================
-
-SESSIONS: dict[str, dict[str, Any]] = {}
 
 LAST_ROUTER_META: dict[str, Any] = {
     "mode": "general",
@@ -82,7 +81,7 @@ USERNAME_RE = re.compile(r"^[a-z0-9_-]{3,32}$")
 
 
 def now_iso() -> str:
-    return datetime.utcnow().isoformat() + "Z"
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def read_json_file(path: Path, default: Any) -> Any:
@@ -96,6 +95,10 @@ def read_json_file(path: Path, default: Any) -> Any:
 
 def write_json_file(path: Path, data: Any) -> None:
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def clean_text(value: Any) -> str:
+    return str(value or "").strip()
 
 
 # =========================================================
@@ -117,7 +120,7 @@ def save_users() -> None:
 
 
 def normalize_username(value: str) -> str:
-    return (value or "").strip().lower()
+    return clean_text(value).lower()
 
 
 def validate_username(username: str) -> str | None:
@@ -258,7 +261,7 @@ def get_user_memory_items(username: str) -> list[dict[str, Any]]:
 
 
 def extract_memory(text: str) -> dict[str, Any] | None:
-    raw = (text or "").strip()
+    raw = clean_text(text)
     lowered = raw.lower()
 
     triggers = [
@@ -274,13 +277,14 @@ def extract_memory(text: str) -> dict[str, Any] | None:
         return {
             "id": str(uuid.uuid4()),
             "value": raw[:200],
+            "kind": "memory",
             "created_at": now_iso(),
         }
     return None
 
 
 def get_relevant_memory(username: str, user_text: str) -> list[dict[str, Any]]:
-    text = (user_text or "").lower()
+    text = clean_text(user_text).lower()
     user_items = get_user_memory_items(username)
 
     scored: list[tuple[int, dict[str, Any]]] = []
@@ -296,11 +300,29 @@ def get_relevant_memory(username: str, user_text: str) -> list[dict[str, Any]]:
 
 
 # =========================================================
+# SESSIONS
+# =========================================================
+
+def load_sessions() -> dict[str, dict[str, Any]]:
+    raw = read_json_file(SESSIONS_FILE, {})
+    if isinstance(raw, dict):
+        return raw
+    return {}
+
+
+SESSIONS: dict[str, dict[str, Any]] = load_sessions()
+
+
+def save_sessions() -> None:
+    write_json_file(SESSIONS_FILE, SESSIONS)
+
+
+# =========================================================
 # HELPERS
 # =========================================================
 
 def ensure_session(session_id: str | None, username: str) -> str:
-    sid = (session_id or "").strip() or str(uuid.uuid4())
+    sid = clean_text(session_id) or str(uuid.uuid4())
     username = normalize_username(username)
 
     with STATE_LOCK:
@@ -320,6 +342,7 @@ def ensure_session(session_id: str | None, username: str) -> str:
                 "agent_last_run_at": None,
                 "agent_last_output": "",
             }
+            save_sessions()
         else:
             owner = normalize_username(str(SESSIONS[sid].get("user", "")))
             if owner != username:
@@ -350,24 +373,39 @@ def get_owned_session_or_404(session_id: str, username: str) -> tuple[dict[str, 
     return session_obj, None
 
 
-def add_message(session_id: str, role: str, content: str) -> dict[str, Any]:
-    msg = {
+def add_message(
+    session_id: str,
+    role: str,
+    content: str,
+    web_results: list[dict[str, Any]] | None = None,
+    web_provider: str = "",
+) -> dict[str, Any]:
+    message = {
         "id": str(uuid.uuid4()),
         "role": role,
         "content": content,
-        "created_at": now_iso(),
+        "timestamp": int(time.time()),
+        "web_results": web_results or [],
+        "web_provider": web_provider or "",
     }
 
     with STATE_LOCK:
-        SESSIONS[session_id]["messages"].append(msg)
-        SESSIONS[session_id]["updated_at"] = now_iso()
+        session_obj = SESSIONS.get(session_id)
+        if not session_obj:
+            raise KeyError(f"Session not found: {session_id}")
 
-        if role == "user":
-            cleaned = " ".join((content or "").strip().split())
-            if cleaned and SESSIONS[session_id].get("title") == "New Chat":
-                SESSIONS[session_id]["title"] = cleaned[:60]
+        session_obj.setdefault("messages", []).append(message)
+        session_obj["updated_at"] = now_iso()
 
-    return msg
+        if session_obj.get("title") in ("", "New Chat") and role == "user" and content.strip():
+            session_obj["title"] = content.strip()[:60]
+
+        if web_results is not None:
+            session_obj["last_web_results"] = web_results
+
+        save_sessions()
+
+    return message
 
 
 def json_request(url: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -402,6 +440,185 @@ def tavily(query: str) -> list[dict[str, Any]]:
     except Exception as exc:
         print("TAVILY ERROR:", exc)
         return []
+
+
+def wants_web_search(user_text: str) -> bool:
+    text = clean_text(user_text).lower()
+    if not text:
+        return False
+
+    # hard block: coding/debug/local project asks should not hit web
+    block_terms = {
+        "smff",
+        "app.py",
+        "traceback",
+        "stack trace",
+        "error:",
+        "fix this",
+        "bug",
+        "debug",
+        "refactor",
+        "function",
+        "class",
+        "javascript",
+        "python",
+        "flask",
+        "html",
+        "css",
+        "sql",
+        "powershell",
+        "terminal",
+        "render",
+        "ngrok",
+        "api route",
+        "endpoint",
+        "frontend",
+        "backend",
+        "nova",
+    }
+    if any(term in text for term in block_terms):
+        return False
+
+    # direct freshness / current-events intent
+    strong_fetch_terms = {
+        "latest",
+        "today",
+        "right now",
+        "current",
+        "currently",
+        "recent",
+        "recently",
+        "news",
+        "headline",
+        "headlines",
+        "update",
+        "updates",
+        "breaking",
+        "live",
+        "score",
+        "scores",
+        "record",
+        "standings",
+        "schedule",
+        "injury",
+        "price",
+        "stock",
+        "stocks",
+        "weather",
+        "forecast",
+        "election",
+        "poll",
+        "ceo",
+        "president",
+        "launch",
+        "release date",
+        "partnership",
+        "lawsuit",
+        "deal",
+    }
+    if any(term in text for term in strong_fetch_terms):
+        return True
+
+    # proper nouns / entities that often benefit from current web info
+    entity_terms = {
+        "openai",
+        "chatgpt",
+        "microsoft",
+        "google",
+        "anthropic",
+        "tesla",
+        "nasa",
+        "artemis",
+        "spacex",
+        "canucks",
+        "nhl",
+        "nba",
+        "nfl",
+        "mlb",
+        "bitcoin",
+        "ethereum",
+        "vancouver",
+        "canada election",
+        "u.s. agencies",
+    }
+    if any(term in text for term in entity_terms):
+        if any(word in text for word in ["latest", "current", "news", "today", "right now", "update", "updates", "record", "score", "standings"]):
+            return True
+
+    # question patterns that imply fresh facts
+    freshness_patterns = [
+        r"\bwhat('?s| is) happening\b",
+        r"\bwhat('?s| is) new\b",
+        r"\bwhat('?s| is) the latest\b",
+        r"\bhow is\b.*\bdoing\b",
+        r"\bwho is\b.*\bnow\b",
+        r"\bwhen is\b.*\blaunch\b",
+        r"\bwhen does\b.*\bstart\b",
+        r"\bwhat('?s| is) the .*record\b",
+        r"\bwhat('?s| is) the .*price\b",
+    ]
+    if any(re.search(pattern, text) for pattern in freshness_patterns):
+        return True
+
+    return False
+
+
+def search_web_for_query(user_text: str) -> tuple[list[dict[str, Any]], str]:
+    if not is_web():
+        return [], ""
+
+    queries: list[str] = []
+    base = clean_text(user_text)
+    lowered = base.lower()
+
+    queries.append(base)
+
+    if not any(token in lowered for token in ["latest", "today", "current", "right now", "recent", "news", "update"]):
+        queries.append(f"{base} latest")
+
+    results: list[dict[str, Any]] = []
+    provider = ""
+
+    for query in queries[:2]:
+        try:
+            items = tavily(query)
+        except Exception:
+            items = []
+        if items:
+            results.extend(items)
+            provider = "tavily"
+
+    seen: set[str] = set()
+    final_results: list[dict[str, Any]] = []
+
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+
+        url = clean_text(item.get("url"))
+        title = clean_text(item.get("title"))
+        snippet = clean_text(
+            item.get("snippet")
+            or item.get("content")
+            or item.get("body")
+            or item.get("text")
+            or item.get("description")
+        )
+
+        dedupe_key = (url or title or snippet).strip().lower()
+        if not dedupe_key or dedupe_key in seen:
+            continue
+
+        seen.add(dedupe_key)
+        final_results.append(
+            {
+                "title": title or (url or "Untitled source"),
+                "url": url,
+                "snippet": snippet[:500],
+            }
+        )
+
+    return final_results[:5], provider
 
 
 # =========================================================
@@ -490,60 +707,90 @@ def autonomous_loop_refine(user_text: str, base_answer: str, context: str = "") 
 # =========================================================
 
 def generate_reply(username: str, user_text: str, session_id: str) -> tuple[str, list[dict[str, Any]], str]:
-    text = (user_text or "").lower()
-
-    coding_block = any(x in text for x in ["smff", "app.py", "python", "fix", "traceback"])
-    allow_web = is_web() and not coding_block
-
-    results: list[dict[str, Any]] = []
+    final_results: list[dict[str, Any]] = []
     provider = ""
 
-    if allow_web:
-        for query in [user_text, f"{user_text} latest"]:
-            items = tavily(query)
-            if items:
-                results.extend(items)
-                provider = "tavily"
-
-    seen: set[str] = set()
-    final_results: list[dict[str, Any]] = []
-    for item in results:
-        url = str(item.get("url", "")).strip()
-        if not url or url in seen:
-            continue
-        seen.add(url)
-        final_results.append(item)
-
-    final_results = final_results[:5]
+    if wants_web_search(user_text):
+        final_results, provider = search_web_for_query(user_text)
 
     with STATE_LOCK:
-        SESSIONS[session_id]["last_web_results"] = final_results
+        if session_id in SESSIONS:
+            SESSIONS[session_id]["last_web_results"] = final_results
+            save_sessions()
 
     memory_items = get_relevant_memory(username, user_text)
-    memory_context = "\n".join(f"- {m.get('value', '')}" for m in memory_items if m.get("value"))
+    memory_context = "\n".join(
+        f"- {m.get('value', '')}" for m in memory_items if m.get("value")
+    ).strip()
 
     web_context = ""
     if final_results:
-        parts = []
+        parts: list[str] = []
         for idx, item in enumerate(final_results, start=1):
-            parts.append(f"[{idx}] {item.get('title', '')}")
-            parts.append(str(item.get("content", "") or ""))
-            parts.append(str(item.get("url", "") or ""))
-            parts.append("")
-        web_context = "\n".join(parts)
+            title = clean_text(item.get("title"))
+            url = clean_text(item.get("url"))
+            snippet = clean_text(item.get("snippet"))
 
-    context_parts = []
+            parts.append(f"[{idx}] {title}")
+            if url:
+                parts.append(f"URL: {url}")
+            if snippet:
+                parts.append(f"Snippet: {snippet}")
+            parts.append("")
+
+        web_context = "\n".join(parts).strip()
+
+    context_parts = [
+        "You are Nova, a direct, no-BS AI assistant.",
+        "You speak clearly, directly, and naturally.",
+        "You do not write like a news article.",
+        "You do not use citation numbering like [1] [2] in your final answer.",
+        "When web results exist, use them to improve accuracy, but rewrite naturally.",
+        "Keep answers tight, sharp, readable, and useful.",
+    ]
+
     if memory_context:
-        context_parts.append("User memory:\n" + memory_context)
+        context_parts.append("Relevant user memory:\n" + memory_context)
+
     if web_context:
-        context_parts.append("Web context:\n" + web_context)
+        context_parts.append(
+            "Use these web results when relevant. Prefer them over guessing.\n\n" + web_context
+        )
 
     context = "\n\n".join(context_parts).strip()
 
-    initial = call_model(user_text, context)
-    final = autonomous_loop_refine(user_text, initial, context)
+    try:
+        reply_text = clean_text(call_model(user_text, context))
+    except Exception as e:
+        if final_results:
+            bullets: list[str] = []
+            for item in final_results:
+                title = clean_text(item.get("title"))
+                snippet = clean_text(item.get("snippet"))
+                if title and snippet:
+                    bullets.append(f"- {title}: {snippet}")
+                elif title:
+                    bullets.append(f"- {title}")
 
-    return final, final_results, provider
+            reply_text = "Here are the strongest results I found:\n\n" + "\n".join(bullets[:5]).strip()
+        else:
+            reply_text = f"Error generating reply: {e}"
+
+    if not reply_text:
+        if final_results:
+            bullets = []
+            for item in final_results:
+                title = clean_text(item.get("title"))
+                snippet = clean_text(item.get("snippet"))
+                if title and snippet:
+                    bullets.append(f"- {title}: {snippet}")
+                elif title:
+                    bullets.append(f"- {title}")
+            reply_text = "Here are the strongest results I found:\n\n" + "\n".join(bullets[:5]).strip()
+        else:
+            reply_text = "I couldn't generate a response."
+
+    return reply_text, final_results, provider
 
 
 # =========================================================
@@ -596,16 +843,19 @@ def run_agent_step_for_session(session_id: str) -> str:
         goal = str(session_obj.get("agent_goal") or "").strip()
         if not goal:
             session_obj["agent_status"] = "idle"
+            save_sessions()
             return ""
 
         username = normalize_username(str(session_obj.get("user", "")))
         session_obj["agent_status"] = "running"
+        save_sessions()
 
     prompt = agent_brain_prompt(session_obj, username)
     if not prompt:
         with STATE_LOCK:
             if session_id in SESSIONS:
                 SESSIONS[session_id]["agent_status"] = "idle"
+                save_sessions()
         return ""
 
     try:
@@ -616,6 +866,7 @@ def run_agent_step_for_session(session_id: str) -> str:
                     SESSIONS[session_id]["agent_status"] = "idle"
                     SESSIONS[session_id]["agent_last_run_at"] = now_iso()
                     SESSIONS[session_id]["agent_last_output"] = ""
+                    save_sessions()
             return ""
 
         improved = autonomous_loop_refine(goal, draft, "")
@@ -626,6 +877,7 @@ def run_agent_step_for_session(session_id: str) -> str:
                 SESSIONS[session_id]["agent_status"] = "idle"
                 SESSIONS[session_id]["agent_last_run_at"] = now_iso()
                 SESSIONS[session_id]["agent_last_output"] = improved
+                save_sessions()
 
         return improved
     except Exception as exc:
@@ -636,6 +888,7 @@ def run_agent_step_for_session(session_id: str) -> str:
                 SESSIONS[session_id]["agent_status"] = "error"
                 SESSIONS[session_id]["agent_last_run_at"] = now_iso()
                 SESSIONS[session_id]["agent_last_output"] = f"Agent error: {exc}"
+                save_sessions()
         return ""
 
 
@@ -669,6 +922,7 @@ def ensure_agent_thread() -> None:
     thread = threading.Thread(target=background_agent_worker, daemon=True, name="nova-background-agent")
     thread.start()
     AGENT_STATE["thread_started"] = True
+
 
 # =========================================================
 # ROUTES
@@ -765,7 +1019,7 @@ def health():
 
 
 @app.route("/api/state")
-def state():
+def state_route():
     username = current_user() or ""
     sessions_for_user = get_user_sessions(username)
 
@@ -819,7 +1073,7 @@ def chat():
         save_memory()
 
     reply, results, provider = generate_reply(username, msg, session_id)
-    add_message(session_id, "assistant", reply)
+    add_message(session_id, "assistant", reply, web_results=results, web_provider=provider)
 
     return jsonify(
         {
@@ -852,20 +1106,28 @@ def stream():
 
     def gen():
         try:
-            yield "event: start\ndata: {}\n\n"
+            yield f"event: start\ndata: {json.dumps({'type': 'start', 'session_id': session_id})}\n\n"
 
             reply, results, provider = generate_reply(username, msg, session_id)
-            add_message(session_id, "assistant", reply)
+
+            add_message(
+                session_id,
+                "assistant",
+                reply,
+                web_results=results,
+                web_provider=provider,
+            )
 
             for i in range(0, len(reply), 3):
-                chunk = reply[i : i + 3]
-                yield f"event: delta\ndata: {json.dumps({'type': 'delta', 'delta': chunk})}\n\n"
+                chunk = reply[i:i + 3]
+                yield f"event: delta\ndata: {json.dumps({'type': 'delta', 'delta': chunk, 'session_id': session_id})}\n\n"
                 time.sleep(0.01)
 
-            yield f"event: done\ndata: {json.dumps({'type': 'done', 'content': reply, 'web_results': results, 'web_provider': provider})}\n\n"
+            yield f"event: done\ndata: {json.dumps({'type': 'done', 'content': reply, 'response': reply, 'session_id': session_id, 'web_results': results or [], 'web_provider': provider or ''})}\n\n"
+
         except Exception as exc:
-            yield f"event: error\ndata: {json.dumps({'type': 'error', 'error': str(exc)})}\n\n"
-            yield "event: done\ndata: {}\n\n"
+            yield f"event: error\ndata: {json.dumps({'type': 'error', 'error': str(exc), 'session_id': session_id})}\n\n"
+            yield f"event: done\ndata: {json.dumps({'type': 'done', 'content': '', 'response': '', 'session_id': session_id, 'web_results': [], 'web_provider': ''})}\n\n"
 
     return Response(
         stream_with_context(gen()),
@@ -878,10 +1140,62 @@ def stream():
     )
 
 
-@app.route("/api/memory")
+@app.route("/api/memory", methods=["GET"])
 def memory():
     username = current_user() or ""
     return jsonify({"ok": True, "memory": get_user_memory_items(username)})
+
+
+@app.route("/api/memory", methods=["POST"])
+def memory_add():
+    data = request.get_json(silent=True) or {}
+    username = current_user() or ""
+    value = str(data.get("value") or "").strip()
+    kind = str(data.get("kind") or "memory").strip()
+
+    if not value:
+        return jsonify({"ok": False, "error": "Missing memory value"}), 400
+
+    item = {
+        "id": str(uuid.uuid4()),
+        "user": username,
+        "kind": kind or "memory",
+        "value": value[:300],
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    }
+
+    with STATE_LOCK:
+        MEMORY_ITEMS.insert(0, item)
+        save_memory()
+
+    return jsonify({"ok": True, "item": item, "memory": get_user_memory_items(username)})
+
+
+@app.route("/api/memory/delete", methods=["POST"])
+def memory_delete():
+    data = request.get_json(silent=True) or {}
+    username = current_user() or ""
+    memory_id = str(data.get("id") or "").strip()
+
+    if not memory_id:
+        return jsonify({"ok": False, "error": "Missing memory id"}), 400
+
+    with STATE_LOCK:
+        before = len(MEMORY_ITEMS)
+        MEMORY_ITEMS[:] = [
+            item
+            for item in MEMORY_ITEMS
+            if not (
+                str(item.get("id", "")).strip() == memory_id
+                and normalize_username(str(item.get("user", ""))) == normalize_username(username)
+            )
+        ]
+        changed = len(MEMORY_ITEMS) != before
+        if changed:
+            save_memory()
+
+    return jsonify({"ok": True, "deleted": changed})
 
 
 @app.route("/api/session/new", methods=["POST"])
@@ -929,6 +1243,7 @@ def agent_session_config():
         SESSIONS[session_id]["agent_goal"] = goal
         SESSIONS[session_id]["agent_status"] = "idle"
         SESSIONS[session_id]["updated_at"] = now_iso()
+        save_sessions()
 
     return jsonify(
         {
