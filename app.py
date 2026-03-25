@@ -1,28 +1,57 @@
+# C:\Users\Owner\nova\app.py
+
 from __future__ import annotations
 
-import json
 import os
-import re
 import threading
 import time
 import uuid
 from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
-from urllib.request import Request, urlopen
 
 from flask import (
     Flask,
-    Response,
     jsonify,
     redirect,
     render_template,
     request,
-    session,
-    stream_with_context,
 )
+
 from openai import OpenAI
-from werkzeug.security import check_password_hash, generate_password_hash
+
+from auth_utils import (
+    DEV_BYPASS_AUTH,
+    authenticate_user,
+    create_user,
+    current_user,
+    login_user,
+    logout_user,
+    normalize_username,
+    protect_routes as auth_protect_routes,
+    require_page_auth,
+)
+from routes_agent import agent_bp
+from routes_chat import chat_bp
+from routes_memory import memory_bp
+from routes_sessions import sessions_bp
+from services_ai import (
+    autonomous_loop_refine as ai_autonomous_loop_refine,
+    call_model as ai_call_model,
+)
+from services_web import (
+    is_web as web_is_web,
+    search_web_for_query,
+    wants_web_search,
+)
+from storage import (
+    load_memory,
+    load_sessions,
+    load_users,
+    save_memory as storage_save_memory,
+    save_sessions as storage_save_sessions,
+    save_users as storage_save_users,
+)
 
 # =========================================================
 # PATHS
@@ -31,16 +60,13 @@ from werkzeug.security import check_password_hash, generate_password_hash
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
-DATA_DIR = BASE_DIR / "data"
-
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-MEMORY_FILE = DATA_DIR / "memory.json"
-USERS_FILE = DATA_DIR / "users.json"
-SESSIONS_FILE = DATA_DIR / "sessions.json"
 
 app = Flask(__name__, template_folder=str(TEMPLATES_DIR), static_folder=str(STATIC_DIR))
 app.secret_key = os.getenv("SECRET_KEY", "dev-secret-change-me")
+app.register_blueprint(sessions_bp)
+app.register_blueprint(memory_bp)
+app.register_blueprint(chat_bp)
+app.register_blueprint(agent_bp)
 
 # =========================================================
 # CONFIG
@@ -73,187 +99,46 @@ AGENT_STATE: dict[str, Any] = {
     "thread_started": False,
 }
 
+USERS: dict[str, dict[str, Any]] = load_users()
+MEMORY_ITEMS: list[dict[str, Any]] = load_memory()
+SESSIONS: dict[str, dict[str, Any]] = load_sessions()
+
 # =========================================================
 # UTILS
 # =========================================================
 
-USERNAME_RE = re.compile(r"^[a-z0-9_-]{3,32}$")
-
-
 def now_iso() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-
-def read_json_file(path: Path, default: Any) -> Any:
-    if not path.exists():
-        return default
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return default
-
-
-def write_json_file(path: Path, data: Any) -> None:
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 def clean_text(value: Any) -> str:
     return str(value or "").strip()
 
 
-# =========================================================
-# USERS / AUTH
-# =========================================================
-
-def load_users() -> dict[str, dict[str, Any]]:
-    raw = read_json_file(USERS_FILE, {})
-    if isinstance(raw, dict):
-        return raw
-    return {}
-
-
-USERS: dict[str, dict[str, Any]] = load_users()
-
-
 def save_users() -> None:
-    write_json_file(USERS_FILE, USERS)
-
-
-def normalize_username(value: str) -> str:
-    return clean_text(value).lower()
-
-
-def validate_username(username: str) -> str | None:
-    if not USERNAME_RE.fullmatch(username):
-        return "Username must be 3 to 32 chars using lowercase letters, numbers, underscore, or dash."
-    return None
-
-
-def validate_password(password: str) -> str | None:
-    if len(password or "") < 8:
-        return "Password must be at least 8 characters."
-    return None
-
-
-def create_user(username: str, password: str) -> tuple[bool, str]:
-    username = normalize_username(username)
-    err = validate_username(username)
-    if err:
-        return False, err
-
-    err = validate_password(password)
-    if err:
-        return False, err
-
-    with STATE_LOCK:
-        if username in USERS:
-            return False, "Username already exists."
-
-        USERS[username] = {
-            "username": username,
-            "password_hash": generate_password_hash(password),
-            "created_at": now_iso(),
-        }
-        save_users()
-
-    return True, "Account created."
-
-
-def authenticate_user(username: str, password: str) -> tuple[bool, str]:
-    username = normalize_username(username)
-    user = USERS.get(username)
-
-    if not user:
-        return False, "Invalid username or password."
-
-    try:
-        ok = check_password_hash(str(user.get("password_hash", "")), password or "")
-    except Exception:
-        ok = False
-
-    if not ok:
-        return False, "Invalid username or password."
-
-    return True, username
-
-
-def current_user() -> str | None:
-    value = session.get("username")
-    if isinstance(value, str) and value.strip():
-        return value.strip().lower()
-    return None
-
-
-def is_logged_in() -> bool:
-    user = current_user()
-    return bool(user and user in USERS)
-
-
-def login_user(username: str) -> None:
-    session["username"] = normalize_username(username)
-    session["logged_in"] = True
-
-
-def logout_user() -> None:
-    session.clear()
-
-
-def require_page_auth():
-    if not is_logged_in():
-        return redirect("/login")
-    return None
-
-
-@app.before_request
-def protect_routes():
-    public_paths = {
-        "/login",
-        "/logout",
-        "/api/auth/login",
-        "/api/auth/register",
-        "/api/auth/logout",
-        "/api/auth/me",
-        "/api/health",
-    }
-
-    path = request.path or "/"
-
-    if path.startswith("/static/"):
-        return None
-
-    if path in public_paths:
-        return None
-
-    if path == "/" or path == "/mobile":
-        if not is_logged_in():
-            return redirect("/login")
-        return None
-
-    if path.startswith("/api/"):
-        if not is_logged_in():
-            return jsonify({"ok": False, "error": "unauthorized"}), 401
-        return None
-
-    return None
-
-
-# =========================================================
-# MEMORY
-# =========================================================
-
-def load_memory() -> list[dict[str, Any]]:
-    raw = read_json_file(MEMORY_FILE, [])
-    if isinstance(raw, list):
-        return raw
-    return []
-
-
-MEMORY_ITEMS: list[dict[str, Any]] = load_memory()
+    storage_save_users(USERS)
 
 
 def save_memory() -> None:
-    write_json_file(MEMORY_FILE, MEMORY_ITEMS)
+    storage_save_memory(MEMORY_ITEMS)
 
+
+def save_sessions() -> None:
+    storage_save_sessions(SESSIONS)
+
+
+# =========================================================
+# AUTH WRAPPER
+# =========================================================
+
+@app.before_request
+def protect_routes():
+    return auth_protect_routes(USERS)
+
+
+# =========================================================
+# MEMORY HELPERS
+# =========================================================
 
 def get_user_memory_items(username: str) -> list[dict[str, Any]]:
     username = normalize_username(username)
@@ -279,6 +164,7 @@ def extract_memory(text: str) -> dict[str, Any] | None:
             "value": raw[:200],
             "kind": "memory",
             "created_at": now_iso(),
+            "updated_at": now_iso(),
         }
     return None
 
@@ -300,30 +186,12 @@ def get_relevant_memory(username: str, user_text: str) -> list[dict[str, Any]]:
 
 
 # =========================================================
-# SESSIONS
-# =========================================================
-
-def load_sessions() -> dict[str, dict[str, Any]]:
-    raw = read_json_file(SESSIONS_FILE, {})
-    if isinstance(raw, dict):
-        return raw
-    return {}
-
-
-SESSIONS: dict[str, dict[str, Any]] = load_sessions()
-
-
-def save_sessions() -> None:
-    write_json_file(SESSIONS_FILE, SESSIONS)
-
-
-# =========================================================
 # HELPERS
 # =========================================================
 
 def ensure_session(session_id: str | None, username: str) -> str:
     sid = clean_text(session_id) or str(uuid.uuid4())
-    username = normalize_username(username)
+    username = normalize_username(username or "dev")
 
     with STATE_LOCK:
         if sid not in SESSIONS:
@@ -341,20 +209,24 @@ def ensure_session(session_id: str | None, username: str) -> str:
                 "agent_status": "idle",
                 "agent_last_run_at": None,
                 "agent_last_output": "",
+                "pinned": False,
             }
             save_sessions()
         else:
             owner = normalize_username(str(SESSIONS[sid].get("user", "")))
-            if owner != username:
+            if owner != username and not DEV_BYPASS_AUTH:
                 raise PermissionError("Session does not belong to current user.")
 
     return sid
 
 
 def get_user_sessions(username: str) -> list[dict[str, Any]]:
-    username = normalize_username(username)
+    username = normalize_username(username or "dev")
     with STATE_LOCK:
-        items = [s for s in SESSIONS.values() if normalize_username(str(s.get("user", ""))) == username]
+        if DEV_BYPASS_AUTH and username == "dev":
+            items = list(SESSIONS.values())
+        else:
+            items = [s for s in SESSIONS.values() if normalize_username(str(s.get("user", ""))) == username]
     items.sort(key=lambda x: str(x.get("updated_at", "")), reverse=True)
     return items
 
@@ -366,8 +238,11 @@ def get_owned_session_or_404(session_id: str, username: str) -> tuple[dict[str, 
     if not session_obj:
         return None, (jsonify({"ok": False, "error": "Session not found"}), 404)
 
+    if DEV_BYPASS_AUTH:
+        return session_obj, None
+
     owner = normalize_username(str(session_obj.get("user", "")))
-    if owner != normalize_username(username):
+    if owner != normalize_username(username or ""):
         return None, (jsonify({"ok": False, "error": "Forbidden"}), 403)
 
     return session_obj, None
@@ -408,298 +283,30 @@ def add_message(
     return message
 
 
-def json_request(url: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-    data = json.dumps(payload).encode("utf-8") if payload else None
-    req = Request(url, data=data, headers={"Content-Type": "application/json"})
-    with urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode("utf-8"))
-
-
 # =========================================================
-# WEB SEARCH
+# WEB / MODEL WRAPPERS
 # =========================================================
 
 def is_web() -> bool:
-    return bool(TAVILY_API_KEY)
+    return web_is_web(TAVILY_API_KEY)
 
-
-def tavily(query: str) -> list[dict[str, Any]]:
-    if not TAVILY_API_KEY:
-        return []
-
-    try:
-        res = json_request(
-            "https://api.tavily.com/search",
-            payload={
-                "api_key": TAVILY_API_KEY,
-                "query": query,
-                "max_results": 5,
-            },
-        )
-        return list(res.get("results", []) or [])
-    except Exception as exc:
-        print("TAVILY ERROR:", exc)
-        return []
-
-
-def wants_web_search(user_text: str) -> bool:
-    text = clean_text(user_text).lower()
-    if not text:
-        return False
-
-    # hard block: coding/debug/local project asks should not hit web
-    block_terms = {
-        "smff",
-        "app.py",
-        "traceback",
-        "stack trace",
-        "error:",
-        "fix this",
-        "bug",
-        "debug",
-        "refactor",
-        "function",
-        "class",
-        "javascript",
-        "python",
-        "flask",
-        "html",
-        "css",
-        "sql",
-        "powershell",
-        "terminal",
-        "render",
-        "ngrok",
-        "api route",
-        "endpoint",
-        "frontend",
-        "backend",
-        "nova",
-    }
-    if any(term in text for term in block_terms):
-        return False
-
-    # direct freshness / current-events intent
-    strong_fetch_terms = {
-        "latest",
-        "today",
-        "right now",
-        "current",
-        "currently",
-        "recent",
-        "recently",
-        "news",
-        "headline",
-        "headlines",
-        "update",
-        "updates",
-        "breaking",
-        "live",
-        "score",
-        "scores",
-        "record",
-        "standings",
-        "schedule",
-        "injury",
-        "price",
-        "stock",
-        "stocks",
-        "weather",
-        "forecast",
-        "election",
-        "poll",
-        "ceo",
-        "president",
-        "launch",
-        "release date",
-        "partnership",
-        "lawsuit",
-        "deal",
-    }
-    if any(term in text for term in strong_fetch_terms):
-        return True
-
-    # proper nouns / entities that often benefit from current web info
-    entity_terms = {
-        "openai",
-        "chatgpt",
-        "microsoft",
-        "google",
-        "anthropic",
-        "tesla",
-        "nasa",
-        "artemis",
-        "spacex",
-        "canucks",
-        "nhl",
-        "nba",
-        "nfl",
-        "mlb",
-        "bitcoin",
-        "ethereum",
-        "vancouver",
-        "canada election",
-        "u.s. agencies",
-    }
-    if any(term in text for term in entity_terms):
-        if any(word in text for word in ["latest", "current", "news", "today", "right now", "update", "updates", "record", "score", "standings"]):
-            return True
-
-    # question patterns that imply fresh facts
-    freshness_patterns = [
-        r"\bwhat('?s| is) happening\b",
-        r"\bwhat('?s| is) new\b",
-        r"\bwhat('?s| is) the latest\b",
-        r"\bhow is\b.*\bdoing\b",
-        r"\bwho is\b.*\bnow\b",
-        r"\bwhen is\b.*\blaunch\b",
-        r"\bwhen does\b.*\bstart\b",
-        r"\bwhat('?s| is) the .*record\b",
-        r"\bwhat('?s| is) the .*price\b",
-    ]
-    if any(re.search(pattern, text) for pattern in freshness_patterns):
-        return True
-
-    return False
-
-
-def search_web_for_query(user_text: str) -> tuple[list[dict[str, Any]], str]:
-    if not is_web():
-        return [], ""
-
-    queries: list[str] = []
-    base = clean_text(user_text)
-    lowered = base.lower()
-
-    queries.append(base)
-
-    if not any(token in lowered for token in ["latest", "today", "current", "right now", "recent", "news", "update"]):
-        queries.append(f"{base} latest")
-
-    results: list[dict[str, Any]] = []
-    provider = ""
-
-    for query in queries[:2]:
-        try:
-            items = tavily(query)
-        except Exception:
-            items = []
-        if items:
-            results.extend(items)
-            provider = "tavily"
-
-    seen: set[str] = set()
-    final_results: list[dict[str, Any]] = []
-
-    for item in results:
-        if not isinstance(item, dict):
-            continue
-
-        url = clean_text(item.get("url"))
-        title = clean_text(item.get("title"))
-        snippet = clean_text(
-            item.get("snippet")
-            or item.get("content")
-            or item.get("body")
-            or item.get("text")
-            or item.get("description")
-        )
-
-        dedupe_key = (url or title or snippet).strip().lower()
-        if not dedupe_key or dedupe_key in seen:
-            continue
-
-        seen.add(dedupe_key)
-        final_results.append(
-            {
-                "title": title or (url or "Untitled source"),
-                "url": url,
-                "snippet": snippet[:500],
-            }
-        )
-
-    return final_results[:5], provider
-
-
-# =========================================================
-# MODEL
-# =========================================================
 
 def call_model(text: str, context: str = "") -> str:
-    if not OPENAI_CLIENT:
-        return "Missing OpenAI key."
-
-    final_input = f"{context}\n\n{text}" if context else text
-
-    response = OPENAI_CLIENT.responses.create(
-        model=DEFAULT_MODEL,
-        input=final_input,
+    return ai_call_model(
+        text=text,
+        context=context,
+        openai_client=OPENAI_CLIENT,
+        default_model=DEFAULT_MODEL,
     )
-
-    output_text = getattr(response, "output_text", None)
-    if isinstance(output_text, str) and output_text.strip():
-        return output_text.strip()
-
-    return "No response"
-
-
-def improve_answer(user_text: str, answer: str, context: str = "") -> str:
-    prompt = f"""
-Improve this answer.
-
-User:
-{user_text}
-
-Answer:
-{answer}
-
-Make it:
-- clearer
-- more accurate
-- more helpful
-- tighter
-
-Return only the improved answer.
-""".strip()
-
-    try:
-        improved = call_model(prompt, context)
-        return improved if improved else answer
-    except Exception:
-        return answer
-
-
-def score_answer(user_text: str, answer: str) -> float:
-    prompt = f"""
-Score this answer from 1 to 10.
-
-User:
-{user_text}
-
-Answer:
-{answer}
-
-Return only a number.
-""".strip()
-
-    try:
-        raw = call_model(prompt)
-        return float(raw.strip())
-    except Exception:
-        return 5.0
 
 
 def autonomous_loop_refine(user_text: str, base_answer: str, context: str = "") -> str:
-    best = base_answer
-
-    for _ in range(2):
-        improved = improve_answer(user_text, best, context)
-        old_score = score_answer(user_text, best)
-        new_score = score_answer(user_text, improved)
-        if new_score > old_score:
-            best = improved
-
-    return best
+    return ai_autonomous_loop_refine(
+        user_text=user_text,
+        base_answer=base_answer,
+        context=context,
+        call_model_func=call_model,
+    )
 
 
 # =========================================================
@@ -711,7 +318,7 @@ def generate_reply(username: str, user_text: str, session_id: str) -> tuple[str,
     provider = ""
 
     if wants_web_search(user_text):
-        final_results, provider = search_web_for_query(user_text)
+        final_results, provider = search_web_for_query(user_text, TAVILY_API_KEY)
 
     with STATE_LOCK:
         if session_id in SESSIONS:
@@ -794,7 +401,7 @@ def generate_reply(username: str, user_text: str, session_id: str) -> tuple[str,
 
 
 # =========================================================
-# BACKGROUND AGENT
+# BACKGROUND AGENT HELPERS
 # =========================================================
 
 def agent_brain_prompt(session_obj: dict[str, Any], username: str) -> str:
@@ -880,6 +487,7 @@ def run_agent_step_for_session(session_id: str) -> str:
                 save_sessions()
 
         return improved
+
     except Exception as exc:
         with STATE_LOCK:
             AGENT_STATE["last_error"] = str(exc)
@@ -925,12 +533,12 @@ def ensure_agent_thread() -> None:
 
 
 # =========================================================
-# ROUTES
+# CORE PAGE + AUTH ROUTES
 # =========================================================
 
 @app.route("/", endpoint="home_desktop")
 def home_desktop():
-    auth = require_page_auth()
+    auth = require_page_auth(USERS)
     if auth:
         return auth
     return render_template("index.html")
@@ -938,7 +546,7 @@ def home_desktop():
 
 @app.route("/mobile", endpoint="mobile_page")
 def mobile_page():
-    auth = require_page_auth()
+    auth = require_page_auth(USERS)
     if auth:
         return auth
     return render_template("mobile.html")
@@ -946,7 +554,9 @@ def mobile_page():
 
 @app.route("/login", methods=["GET"])
 def login_page():
-    if is_logged_in():
+    if DEV_BYPASS_AUTH:
+        return redirect("/")
+    if current_user():
         return redirect("/")
     return render_template("login.html", active_tab="login")
 
@@ -959,25 +569,36 @@ def logout_page():
 
 @app.route("/api/auth/register", methods=["POST"])
 def api_auth_register():
+    if DEV_BYPASS_AUTH:
+        username = normalize_username(str((request.get_json(silent=True) or {}).get("username") or "dev"))
+        login_user(username or "dev")
+        return jsonify({"ok": True, "username": current_user(), "redirect": "/"})
+
     data = request.get_json(silent=True) or {}
     username = normalize_username(str(data.get("username") or ""))
     password = str(data.get("password") or "")
 
-    ok, message = create_user(username, password)
+    ok, message = create_user(USERS, username, password, now_iso)
     if not ok:
         return jsonify({"ok": False, "error": message}), 400
 
+    save_users()
     login_user(username)
     return jsonify({"ok": True, "username": username, "redirect": "/"})
 
 
 @app.route("/api/auth/login", methods=["POST"])
 def api_auth_login():
+    if DEV_BYPASS_AUTH:
+        username = normalize_username(str((request.get_json(silent=True) or {}).get("username") or "dev"))
+        login_user(username or "dev")
+        return jsonify({"ok": True, "username": current_user(), "redirect": "/"})
+
     data = request.get_json(silent=True) or {}
     username = normalize_username(str(data.get("username") or ""))
     password = str(data.get("password") or "")
 
-    ok, result = authenticate_user(username, password)
+    ok, result = authenticate_user(USERS, username, password)
     if not ok:
         return jsonify({"ok": False, "error": result}), 401
 
@@ -997,8 +618,9 @@ def api_auth_me():
     return jsonify(
         {
             "ok": True,
-            "authenticated": is_logged_in(),
+            "authenticated": True if DEV_BYPASS_AUTH else bool(user and user in USERS),
             "username": user,
+            "dev_bypass_auth": DEV_BYPASS_AUTH,
         }
     )
 
@@ -1012,15 +634,16 @@ def health():
             "tavily_configured": bool(TAVILY_API_KEY),
             "web_search_configured": is_web(),
             "agent": AGENT_STATE,
-            "authenticated": is_logged_in(),
+            "authenticated": True if DEV_BYPASS_AUTH else bool((current_user() or "") in USERS),
             "username": current_user(),
+            "dev_bypass_auth": DEV_BYPASS_AUTH,
         }
     )
 
 
 @app.route("/api/state")
 def state_route():
-    username = current_user() or ""
+    username = current_user() or "dev"
     sessions_for_user = get_user_sessions(username)
 
     return jsonify(
@@ -1033,240 +656,7 @@ def state_route():
             "current_model": DEFAULT_MODEL,
             "agent": AGENT_STATE,
             "username": username,
-        }
-    )
-
-
-@app.route("/api/chat/<session_id>", methods=["GET"])
-def get_session(session_id: str):
-    username = current_user() or ""
-    session_obj, error = get_owned_session_or_404(session_id, username)
-    if error:
-        return error
-
-    return jsonify(
-        {
-            "ok": True,
-            "session": session_obj,
-            "messages": session_obj["messages"],
-            "router": session_obj.get("router_meta", LAST_ROUTER_META),
-            "router_meta": session_obj.get("router_meta", LAST_ROUTER_META),
-            "last_router_meta": session_obj.get("router_meta", LAST_ROUTER_META),
-        }
-    )
-
-
-@app.route("/api/chat", methods=["POST"])
-def chat():
-    data = request.get_json(silent=True) or {}
-    username = current_user() or ""
-
-    msg = data.get("message") or data.get("content") or ""
-    session_id = ensure_session(data.get("session_id"), username)
-
-    add_message(session_id, "user", msg)
-
-    mem = extract_memory(msg)
-    if mem:
-        mem["user"] = username
-        MEMORY_ITEMS.insert(0, mem)
-        save_memory()
-
-    reply, results, provider = generate_reply(username, msg, session_id)
-    add_message(session_id, "assistant", reply, web_results=results, web_provider=provider)
-
-    return jsonify(
-        {
-            "ok": True,
-            "reply": reply,
-            "web_results": results,
-            "web_provider": provider,
-            "session_id": session_id,
-            "messages": SESSIONS[session_id]["messages"],
-            "session": SESSIONS[session_id],
-        }
-    )
-
-
-@app.route("/api/chat/stream", methods=["POST"])
-def stream():
-    data = request.get_json(silent=True) or {}
-    username = current_user() or ""
-
-    msg = data.get("message") or data.get("content") or ""
-    session_id = ensure_session(data.get("session_id"), username)
-
-    add_message(session_id, "user", msg)
-
-    mem = extract_memory(msg)
-    if mem:
-        mem["user"] = username
-        MEMORY_ITEMS.insert(0, mem)
-        save_memory()
-
-    def gen():
-        try:
-            yield f"event: start\ndata: {json.dumps({'type': 'start', 'session_id': session_id})}\n\n"
-
-            reply, results, provider = generate_reply(username, msg, session_id)
-
-            add_message(
-                session_id,
-                "assistant",
-                reply,
-                web_results=results,
-                web_provider=provider,
-            )
-
-            for i in range(0, len(reply), 3):
-                chunk = reply[i:i + 3]
-                yield f"event: delta\ndata: {json.dumps({'type': 'delta', 'delta': chunk, 'session_id': session_id})}\n\n"
-                time.sleep(0.01)
-
-            yield f"event: done\ndata: {json.dumps({'type': 'done', 'content': reply, 'response': reply, 'session_id': session_id, 'web_results': results or [], 'web_provider': provider or ''})}\n\n"
-
-        except Exception as exc:
-            yield f"event: error\ndata: {json.dumps({'type': 'error', 'error': str(exc), 'session_id': session_id})}\n\n"
-            yield f"event: done\ndata: {json.dumps({'type': 'done', 'content': '', 'response': '', 'session_id': session_id, 'web_results': [], 'web_provider': ''})}\n\n"
-
-    return Response(
-        stream_with_context(gen()),
-        mimetype="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
-
-
-@app.route("/api/memory", methods=["GET"])
-def memory():
-    username = current_user() or ""
-    return jsonify({"ok": True, "memory": get_user_memory_items(username)})
-
-
-@app.route("/api/memory", methods=["POST"])
-def memory_add():
-    data = request.get_json(silent=True) or {}
-    username = current_user() or ""
-    value = str(data.get("value") or "").strip()
-    kind = str(data.get("kind") or "memory").strip()
-
-    if not value:
-        return jsonify({"ok": False, "error": "Missing memory value"}), 400
-
-    item = {
-        "id": str(uuid.uuid4()),
-        "user": username,
-        "kind": kind or "memory",
-        "value": value[:300],
-        "created_at": now_iso(),
-        "updated_at": now_iso(),
-    }
-
-    with STATE_LOCK:
-        MEMORY_ITEMS.insert(0, item)
-        save_memory()
-
-    return jsonify({"ok": True, "item": item, "memory": get_user_memory_items(username)})
-
-
-@app.route("/api/memory/delete", methods=["POST"])
-def memory_delete():
-    data = request.get_json(silent=True) or {}
-    username = current_user() or ""
-    memory_id = str(data.get("id") or "").strip()
-
-    if not memory_id:
-        return jsonify({"ok": False, "error": "Missing memory id"}), 400
-
-    with STATE_LOCK:
-        before = len(MEMORY_ITEMS)
-        MEMORY_ITEMS[:] = [
-            item
-            for item in MEMORY_ITEMS
-            if not (
-                str(item.get("id", "")).strip() == memory_id
-                and normalize_username(str(item.get("user", ""))) == normalize_username(username)
-            )
-        ]
-        changed = len(MEMORY_ITEMS) != before
-        if changed:
-            save_memory()
-
-    return jsonify({"ok": True, "deleted": changed})
-
-
-@app.route("/api/session/new", methods=["POST"])
-def new_session():
-    username = current_user() or ""
-    sid = str(uuid.uuid4())
-    ensure_session(sid, username)
-    return jsonify({"ok": True, "session_id": sid, "session": SESSIONS[sid]})
-
-
-@app.route("/api/agent/status", methods=["GET"])
-def agent_status():
-    return jsonify({"ok": True, "agent": AGENT_STATE})
-
-
-@app.route("/api/agent/start", methods=["POST"])
-def agent_start():
-    ensure_agent_thread()
-
-    data = request.get_json(silent=True) or {}
-    interval = int(data.get("interval_seconds") or AGENT_STATE.get("interval_seconds") or 20)
-    AGENT_STATE["interval_seconds"] = max(3, interval)
-    AGENT_STATE["enabled"] = True
-    AGENT_STATE["last_error"] = ""
-
-    return jsonify({"ok": True, "agent": AGENT_STATE})
-
-
-@app.route("/api/agent/stop", methods=["POST"])
-def agent_stop():
-    AGENT_STATE["enabled"] = False
-    return jsonify({"ok": True, "agent": AGENT_STATE})
-
-
-@app.route("/api/agent/session/config", methods=["POST"])
-def agent_session_config():
-    data = request.get_json(silent=True) or {}
-    username = current_user() or ""
-    session_id = ensure_session(data.get("session_id"), username)
-    enabled = bool(data.get("enabled", True))
-    goal = str(data.get("goal") or "").strip()
-
-    with STATE_LOCK:
-        SESSIONS[session_id]["agent_enabled"] = enabled
-        SESSIONS[session_id]["agent_goal"] = goal
-        SESSIONS[session_id]["agent_status"] = "idle"
-        SESSIONS[session_id]["updated_at"] = now_iso()
-        save_sessions()
-
-    return jsonify(
-        {
-            "ok": True,
-            "session_id": session_id,
-            "session": SESSIONS[session_id],
-        }
-    )
-
-
-@app.route("/api/agent/session/run_once", methods=["POST"])
-def agent_run_once():
-    data = request.get_json(silent=True) or {}
-    username = current_user() or ""
-    session_id = ensure_session(data.get("session_id"), username)
-    output = run_agent_step_for_session(session_id)
-
-    return jsonify(
-        {
-            "ok": True,
-            "session_id": session_id,
-            "output": output,
-            "session": SESSIONS[session_id],
+            "dev_bypass_auth": DEV_BYPASS_AUTH,
         }
     )
 
@@ -1280,4 +670,5 @@ if __name__ == "__main__":
     print("=== NOVA AUTH + AGENT ===")
     print("MODEL:", DEFAULT_MODEL)
     print("WEB:", is_web())
+    print("DEV_BYPASS_AUTH:", DEV_BYPASS_AUTH)
     app.run(host="0.0.0.0", port=5001, debug=True)

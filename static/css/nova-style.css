@@ -1715,3 +1715,67 @@ body.is-sending #memoryStatusText {
     z-index: 60;
   }
 }
+
+/* ===== SESSION ACTION POLISH ===== */
+
+.session-item {
+  transition:
+    transform 0.18s ease,
+    opacity 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+  transform-origin: center left;
+}
+
+.session-item.is-deleting {
+  opacity: 0.55;
+  pointer-events: none;
+  filter: saturate(0.75);
+}
+
+.session-item.is-renaming {
+  border-color: rgba(122, 156, 255, 0.52);
+  box-shadow:
+    0 0 0 1px rgba(122, 156, 255, 0.16),
+    0 12px 28px rgba(39, 61, 118, 0.28);
+}
+
+.left-sidebar,
+.memory-panel {
+  transition:
+    width 0.22s ease,
+    transform 0.22s ease,
+    opacity 0.18s ease,
+    box-shadow 0.22s ease;
+}
+
+.left-sidebar .sidebar-header,
+.memory-panel .memory-header {
+  transition: padding 0.18s ease, justify-content 0.18s ease;
+}
+
+.left-sidebar .sidebar-content,
+.memory-panel .memory-body {
+  transition: opacity 0.18s ease;
+}
+
+body.sidebar-collapsed .left-sidebar .sidebar-brand,
+body.memory-collapsed .memory-panel .memory-title-wrap {
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+body:not(.sidebar-collapsed) .left-sidebar .sidebar-brand,
+body:not(.memory-collapsed) .memory-panel .memory-title-wrap {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+#memoryPanel,
+#sidebar {
+  will-change: transform, width;
+}
