@@ -478,10 +478,13 @@ def ensure_agent_thread() -> None:
 # ROUTES
 # =========================================================
 
-@app.route("/")
-def index():
+@app.route("/", endpoint="home_mobile")
+def home_mobile():
     return render_template("mobile.html")
 
+@app.route("/mobile", endpoint="mobile_page")
+def mobile_page():
+    return render_template("mobile.html")
 
 @app.route("/api/health")
 def health():
