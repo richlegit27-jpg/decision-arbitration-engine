@@ -670,18 +670,23 @@ def ensure_agent_thread() -> None:
     thread.start()
     AGENT_STATE["thread_started"] = True
 
-
 # =========================================================
 # ROUTES
 # =========================================================
 
-@app.route("/", endpoint="home_mobile")
-def home_mobile():
-    return render_template("mobile.html")
+@app.route("/", endpoint="home_desktop")
+def home_desktop():
+    auth = require_page_auth()
+    if auth:
+        return auth
+    return render_template("index.html")
 
 
 @app.route("/mobile", endpoint="mobile_page")
 def mobile_page():
+    auth = require_page_auth()
+    if auth:
+        return auth
     return render_template("mobile.html")
 
 
