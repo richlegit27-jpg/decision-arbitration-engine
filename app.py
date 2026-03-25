@@ -480,7 +480,7 @@ def ensure_agent_thread() -> None:
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("mobile.html")
 
 
 @app.route("/api/health")
@@ -678,14 +678,6 @@ def agent_run_once():
             "session": SESSIONS[session_id],
         }
     )
-
-@app.route("/")
-def index():
-    return render_template("mobile.html")
-
-@app.route("/mobile")
-def mobile():
-    return render_template("mobile.html")
 
 
 # =========================================================
