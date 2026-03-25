@@ -683,6 +683,11 @@ def agent_run_once():
 def index():
     return render_template("mobile.html")
 
+@app.route("/mobile")
+def mobile():
+    return render_template("mobile.html")
+
+
 # =========================================================
 # MAIN
 # =========================================================
