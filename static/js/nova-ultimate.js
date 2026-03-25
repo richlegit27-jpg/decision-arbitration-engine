@@ -28,6 +28,7 @@
     attachedFiles: [],
     lastUserMessage: "",
     lastRouter: null,
+    deletingMemoryIds: new Set(),
   };
 
   function byId(id) {
@@ -289,22 +290,31 @@
     if (!results.length) return "";
 
     return `
-      <div class="nova-web-results">
-        <div class="nova-web-results-header">Web sources</div>
+      <section class="nova-web-results">
+        <div class="nova-web-results-header-row">
+          <div class="nova-web-results-header">Web sources</div>
+          <div class="nova-web-results-count">${results.length}</div>
+        </div>
+
         <div class="nova-web-results-list">
           ${results
             .map(
               (item) => `
             <article class="nova-web-card">
               <div class="nova-web-card-top">
+                <div class="nova-web-card-meta">
+                  <span class="nova-web-card-domain-pill">${escapeHtml(item.domain || "external source")}</span>
+                </div>
+
                 <div class="nova-web-card-title">${escapeHtml(item.title || "Untitled source")}</div>
-                <div class="nova-web-card-domain">${escapeHtml(item.domain || "external source")}</div>
               </div>
+
               ${
                 item.snippet
                   ? `<div class="nova-web-card-snippet">${escapeHtml(item.snippet)}</div>`
                   : `<div class="nova-web-card-snippet is-empty">No preview available.</div>`
               }
+
               ${
                 item.url
                   ? `
@@ -314,7 +324,10 @@
                         href="${escapeHtml(item.url)}"
                         target="_blank"
                         rel="noopener noreferrer"
-                      >Open</a>
+                      >
+                        <span>Open source</span>
+                        <span class="nova-web-open-arrow">↗</span>
+                      </a>
                     </div>
                   `
                   : ""
@@ -324,7 +337,7 @@
             )
             .join("")}
         </div>
-      </div>
+      </section>
     `;
   }
 
@@ -335,83 +348,213 @@
     style.id = "novaWebResultStyles";
     style.textContent = `
       .nova-web-results {
-        margin-top: 12px;
+        margin-top: 14px;
+        padding-top: 14px;
         border-top: 1px solid rgba(255,255,255,0.08);
-        padding-top: 12px;
+      }
+
+      .nova-web-results-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 12px;
       }
 
       .nova-web-results-header {
         font-size: 12px;
-        font-weight: 700;
-        opacity: 0.8;
-        margin-bottom: 10px;
+        font-weight: 800;
+        opacity: 0.82;
         text-transform: uppercase;
         letter-spacing: 0.08em;
       }
 
+      .nova-web-results-count {
+        min-width: 28px;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 800;
+        opacity: 0.78;
+        border: 1px solid rgba(255,255,255,0.10);
+        background: rgba(255,255,255,0.04);
+      }
+
       .nova-web-results-list {
         display: grid;
-        gap: 10px;
+        gap: 12px;
       }
 
       .nova-web-card {
+        position: relative;
         border: 1px solid rgba(255,255,255,0.10);
-        border-radius: 14px;
-        padding: 12px;
-        background: rgba(255,255,255,0.03);
-        backdrop-filter: blur(6px);
+        border-radius: 16px;
+        padding: 14px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.025));
+        backdrop-filter: blur(8px);
+        box-shadow:
+          0 8px 24px rgba(0,0,0,0.12),
+          inset 0 1px 0 rgba(255,255,255,0.03);
+        transition:
+          transform 0.18s ease,
+          border-color 0.18s ease,
+          background 0.18s ease,
+          box-shadow 0.18s ease;
+      }
+
+      .nova-web-card:hover {
+        transform: translateY(-1px);
+        border-color: rgba(255,255,255,0.16);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+        box-shadow:
+          0 12px 28px rgba(0,0,0,0.16),
+          inset 0 1px 0 rgba(255,255,255,0.04);
       }
 
       .nova-web-card-top {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+
+      .nova-web-card-meta {
         display: flex;
-        flex-direction: column;
-        gap: 4px;
-        margin-bottom: 8px;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .nova-web-card-domain-pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 0 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        border: 1px solid rgba(255,255,255,0.11);
+        background: rgba(255,255,255,0.05);
+        opacity: 0.84;
       }
 
       .nova-web-card-title {
-        font-size: 14px;
-        font-weight: 700;
-        line-height: 1.35;
-      }
-
-      .nova-web-card-domain {
-        font-size: 12px;
-        opacity: 0.7;
+        font-size: 15px;
+        font-weight: 800;
+        line-height: 1.38;
+        letter-spacing: -0.01em;
+        word-break: break-word;
       }
 
       .nova-web-card-snippet {
         font-size: 13px;
-        line-height: 1.5;
-        opacity: 0.92;
+        line-height: 1.58;
+        opacity: 0.93;
+        word-break: break-word;
       }
 
       .nova-web-card-snippet.is-empty {
-        font-size: 13px;
-        opacity: 0.65;
+        opacity: 0.62;
       }
 
       .nova-web-card-actions {
-        margin-top: 10px;
+        margin-top: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
       }
 
       .nova-web-open-link {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 34px;
+        gap: 8px;
+        min-height: 36px;
         padding: 0 12px;
-        border-radius: 10px;
+        border-radius: 11px;
         text-decoration: none;
-        font-size: 13px;
-        font-weight: 700;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.01em;
         border: 1px solid rgba(255,255,255,0.12);
         background: rgba(255,255,255,0.05);
         color: inherit;
+        transition:
+          background 0.18s ease,
+          border-color 0.18s ease,
+          transform 0.18s ease;
       }
 
       .nova-web-open-link:hover {
         background: rgba(255,255,255,0.09);
+        border-color: rgba(255,255,255,0.18);
+        transform: translateY(-1px);
+      }
+
+      .nova-web-open-arrow {
+        font-size: 13px;
+        opacity: 0.78;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function injectMemoryPolishStyles() {
+    if (byId("novaMemoryPolishStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "novaMemoryPolishStyles";
+    style.textContent = `
+      .memory-item {
+        display: flex;
+        align-items: stretch;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .memory-item.is-deleting {
+        opacity: 0.55;
+        transform: scale(0.995);
+        pointer-events: none;
+      }
+
+      .memory-item-main {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .memory-item-actions {
+        display: flex;
+        align-items: center;
+      }
+
+      .memory-delete-btn {
+        min-width: 88px;
+        height: 36px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(255,255,255,0.04);
+        color: inherit;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+      }
+
+      .memory-delete-btn:hover:not(:disabled) {
+        background: rgba(255,255,255,0.08);
+        border-color: rgba(255,255,255,0.18);
+      }
+
+      .memory-delete-btn:disabled {
+        opacity: 0.7;
+        cursor: default;
       }
     `;
     document.head.appendChild(style);
@@ -641,31 +784,35 @@
     }
 
     list.innerHTML = state.memoryItems
-      .map(
-        (item) => `
-        <div class="memory-item" data-memory-id="${escapeHtml(item.id || "")}">
-          <div class="memory-item-main">
-            <div class="memory-item-kind">${escapeHtml(item.kind || "memory")}</div>
-            <div class="memory-item-value">${escapeHtml(item.value || "")}</div>
-            <div class="memory-item-meta">${escapeHtml(
-              formatTime(item.updated_at || item.created_at || nowUnix())
-            )}</div>
-          </div>
+      .map((item) => {
+        const id = safeText(item.id || "");
+        const isDeleting = state.deletingMemoryIds.has(id);
 
-          <div class="memory-item-actions">
-            <button
-              class="memory-delete-btn"
-              type="button"
-              data-memory-delete="${escapeHtml(item.id || "")}"
-              title="Delete memory"
-              aria-label="Delete memory"
-            >
-              ✕
-            </button>
+        return `
+          <div class="memory-item ${isDeleting ? "is-deleting" : ""}" data-memory-id="${escapeHtml(id)}">
+            <div class="memory-item-main">
+              <div class="memory-item-kind">${escapeHtml(item.kind || "memory")}</div>
+              <div class="memory-item-value">${escapeHtml(item.value || "")}</div>
+              <div class="memory-item-meta">${escapeHtml(
+                formatTime(item.updated_at || item.created_at || nowUnix())
+              )}</div>
+            </div>
+
+            <div class="memory-item-actions">
+              <button
+                class="memory-delete-btn"
+                type="button"
+                data-memory-delete="${escapeHtml(id)}"
+                title="Delete memory"
+                aria-label="Delete memory"
+                ${isDeleting ? "disabled" : ""}
+              >
+                ${isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
           </div>
-        </div>
-      `
-      )
+        `;
+      })
       .join("");
   }
 
@@ -871,7 +1018,6 @@
 
   async function deleteMemory(id) {
     await apiPost(API.deleteMemory, { id });
-    await loadMemory();
   }
 
   function parseSSEBlock(block) {
@@ -1438,6 +1584,28 @@
     }
   }
 
+  async function handleMemoryDelete(id) {
+    const memoryId = safeText(id);
+    if (!memoryId || state.deletingMemoryIds.has(memoryId)) return;
+
+    state.deletingMemoryIds.add(memoryId);
+    renderMemory();
+    setStatus("Deleting memory...");
+
+    try {
+      await deleteMemory(memoryId);
+      state.memoryItems = state.memoryItems.filter((item) => safeText(item.id) !== memoryId);
+      state.deletingMemoryIds.delete(memoryId);
+      renderMemory();
+      setStatus("Memory deleted");
+    } catch (err) {
+      console.error(err);
+      state.deletingMemoryIds.delete(memoryId);
+      renderMemory();
+      setStatus("Delete failed");
+    }
+  }
+
   function bindEvents() {
     ensureDesktopActionButtons();
 
@@ -1515,28 +1683,13 @@
       const id = btn.getAttribute("data-memory-delete");
       if (!id) return;
 
-      const ok = window.confirm("Delete this memory?");
-      if (!ok) return;
-
-      const originalText = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = "...";
-
-      try {
-        await deleteMemory(id);
-        setStatus("Memory deleted");
-      } catch (err) {
-        console.error(err);
-        btn.disabled = false;
-        btn.textContent = originalText;
-        setStatus("Delete failed");
-        alert("Delete failed");
-      }
+      await handleMemoryDelete(id);
     });
   }
 
   async function bootstrap() {
     injectWebResultStyles();
+    injectMemoryPolishStyles();
     bindEvents();
     initPanelFix();
     setStatus("Loading...");
