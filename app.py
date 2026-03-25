@@ -679,6 +679,9 @@ def agent_run_once():
         }
     )
 
+@app.route("/")
+def index():
+    return render_template("mobile.html")
 
 # =========================================================
 # MAIN
