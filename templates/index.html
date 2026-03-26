@@ -1,115 +1,135 @@
-﻿<!DOCTYPE html>
-<html lang="en" data-theme="dark">
+﻿<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
   />
   <title>Nova</title>
 
-  <meta name="theme-color" content="#0f172a" />
-  <meta name="color-scheme" content="dark light" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-
-  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" />
-
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-base.css') }}?v=stabilize1" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-main.css') }}?v=stabilize1" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-sidebar.css') }}?v=stabilize1" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-memory.css') }}?v=stabilize1" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-composer.css') }}?v=stabilize1" />
+  <link rel="stylesheet" href="/static/css/nova-base.css" />
+  <link rel="stylesheet" href="/static/css/nova-main.css" />
+  <link rel="stylesheet" href="/static/css/nova-sidebar.css" />
+  <link rel="stylesheet" href="/static/css/nova-memory.css" />
+  <link rel="stylesheet" href="/static/css/nova-composer.css" />
 </head>
 <body>
-  <div id="nova-app" class="nova-app">
-    <aside id="sidebar" class="sidebar">
+  <div
+    id="novaApp"
+    class="nova-app sidebar-open memory-open"
+    data-nova-app="true"
+  >
+    <aside
+      id="leftSidebar"
+      class="sidebar is-open"
+      data-sidebar="true"
+      aria-hidden="false"
+    >
       <div class="sidebar-inner">
         <div class="sidebar-top">
-          <button
-            id="sidebarToggle"
-            class="icon-btn"
-            type="button"
-            aria-label="Toggle sidebar"
-            title="Toggle sidebar"
-          >
-            ☰
-          </button>
+          <div class="sidebar-top-title">
+            <h2 class="section-title">Sessions</h2>
+          </div>
 
+          <div class="sidebar-top-actions">
+            <button
+              id="closeSidebarBtn"
+              class="icon-btn desktop-panel-close"
+              type="button"
+              aria-label="Close sidebar"
+              title="Close sidebar"
+              data-action="close-sidebar"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
           <button
             id="newChatBtn"
             class="primary-btn"
             type="button"
           >
-            New Chat
+            New chat
           </button>
         </div>
 
-        <div class="sidebar-section">
-          <div class="section-title-row">
-            <h2 class="section-title">Chats</h2>
-          </div>
+        <div class="sidebar-section session-list-wrap">
           <div id="sessionList" class="session-list"></div>
         </div>
       </div>
     </aside>
 
-    <main class="main-shell">
+    <main id="mainShell" class="main-shell">
       <header class="main-topbar">
         <div class="topbar-left">
-          <button
-            id="mobileSidebarToggle"
-            class="icon-btn mobile-only"
-            type="button"
-            aria-label="Open sidebar"
-            title="Open sidebar"
-          >
-            ☰
-          </button>
-
           <div class="brand-wrap">
-            <div class="brand-title">Nova</div>
-            <div id="routerBadge" class="router-badge">Ready</div>
+            <button
+              id="toggleSidebarBtn"
+              class="icon-btn"
+              type="button"
+              aria-label="Toggle sidebar"
+              aria-expanded="true"
+              title="Toggle sidebar"
+              data-action="toggle-sidebar"
+            >
+              ☰
+            </button>
+
+            <div class="brand-block">
+              <div class="brand-title">Nova</div>
+            </div>
+
+            <div id="routerBadge" class="router-badge">ready</div>
           </div>
         </div>
 
         <div class="topbar-right">
-          <select id="modelSelect" class="model-select" aria-label="Model"></select>
-
           <button
-            id="themeToggle"
+            id="themeToggleBtn"
             class="icon-btn"
             type="button"
             aria-label="Toggle theme"
             title="Toggle theme"
           >
-            ◐
+            ☀
           </button>
 
+          <select id="modelSelect" class="model-select" aria-label="Model">
+            <option value="gpt-5.4">gpt-5.4</option>
+            <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+            <option value="gpt-4.1">gpt-4.1</option>
+            <option value="gpt-4o-mini">gpt-4o-mini</option>
+          </select>
+
           <button
-            id="memoryToggle"
+            id="toggleMemoryBtn"
             class="icon-btn"
             type="button"
             aria-label="Toggle memory panel"
+            aria-expanded="true"
             title="Toggle memory panel"
+            data-action="toggle-memory"
           >
-            ✦
+            ⟫
           </button>
         </div>
       </header>
 
-      <section id="chatView" class="chat-view">
+      <section class="chat-view">
         <div id="chatMessages" class="chat-messages">
           <div id="emptyState" class="empty-state">
             <div class="empty-state-card">
               <h1>Nova is ready</h1>
-              <p>Ask anything, attach files, use voice, and keep moving.</p>
+              <p>Ask anything, build something, or continue your latest session.</p>
             </div>
           </div>
         </div>
       </section>
 
-      <footer class="composer-shell">
+      <section class="composer-shell">
         <div id="attachmentBar" class="attachment-bar hidden"></div>
 
         <div class="composer-box">
@@ -133,47 +153,57 @@
             >
               🎤
             </button>
-
-            <button
-              id="regenerateBtn"
-              class="icon-btn"
-              type="button"
-              aria-label="Regenerate"
-              title="Regenerate"
-            >
-              ↻
-            </button>
           </div>
 
-          <label for="composerInput" class="sr-only">Message Nova</label>
+          <label class="sr-only" for="composerInput">Message</label>
           <textarea
             id="composerInput"
             class="composer-input"
-            rows="1"
             placeholder="Message Nova..."
+            rows="1"
             autocomplete="off"
+            spellcheck="true"
           ></textarea>
 
           <div class="composer-actions">
-            <input id="fileInput" type="file" multiple hidden />
-
             <button
               id="sendBtn"
               class="send-btn"
               type="button"
-              aria-label="Send message"
             >
               Send
             </button>
           </div>
         </div>
-      </footer>
+
+        <input id="fileInput" type="file" multiple class="hidden" />
+      </section>
     </main>
 
-    <aside id="memoryPanel" class="memory-panel">
+    <aside
+      id="memoryPanel"
+      class="memory-panel is-open"
+      data-memory-panel="true"
+      aria-hidden="false"
+    >
       <div class="memory-inner">
         <div class="memory-top">
-          <h2>Memory</h2>
+          <div class="memory-top-title">
+            <h2>Memory</h2>
+          </div>
+
+          <div class="memory-top-actions">
+            <button
+              id="closeMemoryBtn"
+              class="icon-btn desktop-panel-close"
+              type="button"
+              aria-label="Close memory panel"
+              title="Close memory panel"
+              data-action="close-memory"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <div class="memory-add-row">
@@ -184,7 +214,13 @@
             placeholder="Add memory..."
             autocomplete="off"
           />
-          <button id="memoryAddBtn" class="primary-btn" type="button">Add</button>
+          <button
+            id="addMemoryBtn"
+            class="primary-btn"
+            type="button"
+          >
+            Add
+          </button>
         </div>
 
         <div id="memoryList" class="memory-list"></div>
@@ -192,38 +228,14 @@
     </aside>
   </div>
 
-  <script>
-    window.Nova = window.Nova || {};
-    window.NovaConfig = {
-      appName: "Nova",
-      version: "stabilize1",
-      apiBase: ""
-    };
-
-    window.Nova.config = window.Nova.config || {};
-    window.Nova.config.appName = "Nova";
-    window.Nova.config.version = "stabilize1";
-    window.Nova.config.apiBase = "";
-    window.Nova.config.API = {
-      state: "/api/state",
-      getChat: function (sessionId) {
-        return "/api/chat/" + encodeURIComponent(sessionId);
-      },
-      stream: "/api/chat/stream",
-      memory: "/api/memory",
-      addMemory: "/api/memory/add",
-      deleteMemory: "/api/memory/delete",
-      newSession: "/api/session/new",
-      deleteSession: "/api/session/delete",
-      renameSession: "/api/session/rename",
-      duplicateSession: "/api/session/duplicate",
-      pinSession: "/api/session/pin",
-      upload: "/api/upload",
-      models: "/api/models",
-      health: "/api/health"
-    };
-  </script>
-
-  <script defer src="{{ url_for('static', filename='js/nova-ultimate.js') }}?v=stabilize1"></script>
+  <script src="/static/js/nova-dom.js"></script>
+  <script src="/static/js/nova-state.js"></script>
+  <script src="/static/js/nova-api.js"></script>
+  <script src="/static/js/nova-panels.js"></script>
+  <script src="/static/js/nova-render-sessions.js"></script>
+  <script src="/static/js/nova-render-messages.js"></script>
+  <script src="/static/js/nova-memory.js"></script>
+  <script src="/static/js/nova-chat-stream.js"></script>
+  <script src="/static/js/nova-render.js"></script>
 </body>
 </html>

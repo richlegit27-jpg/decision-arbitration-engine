@@ -1,214 +1,255 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
-  />
-  <title>Nova</title>
+(() => {
+  "use strict";
 
-  <link rel="stylesheet" href="/static/css/nova-base.css" />
-  <link rel="stylesheet" href="/static/css/nova-main.css" />
-  <link rel="stylesheet" href="/static/css/nova-sidebar.css" />
-  <link rel="stylesheet" href="/static/css/nova-memory.css" />
-  <link rel="stylesheet" href="/static/css/nova-composer.css" />
-</head>
-<body>
-  <div
-    id="novaApp"
-    class="nova-app sidebar-open memory-open"
-    data-nova-app="true"
-  >
-    <aside
-      id="leftSidebar"
-      class="sidebar is-open"
-      data-sidebar="true"
-      aria-hidden="false"
-    >
-      <div class="sidebar-inner">
-        <div class="sidebar-top">
-          <h2 class="section-title">Sessions</h2>
-          <button
-            id="closeSidebarBtn"
-            class="icon-btn mobile-only"
-            type="button"
-            aria-label="Close sidebar"
-            data-action="close-sidebar"
-          >
-            ✕
-          </button>
-        </div>
+  if (window.__novaPanelsLoaded) return;
+  window.__novaPanelsLoaded = true;
 
-        <div class="sidebar-section">
-          <button
-            id="newChatBtn"
-            class="primary-btn"
-            type="button"
-          >
-            New chat
-          </button>
-        </div>
+  const Nova = (window.Nova = window.Nova || {});
+  Nova.panels = Nova.panels || {};
 
-        <div class="sidebar-section">
-          <div id="sessionList" class="session-list"></div>
-        </div>
-      </div>
-    </aside>
+  const MOBILE_BREAKPOINT = 980;
 
-    <main class="main-shell">
-      <header class="main-topbar">
-        <div class="topbar-left">
-          <div class="brand-wrap">
-            <button
-              id="toggleSidebarBtn"
-              class="icon-btn"
-              type="button"
-              aria-label="Toggle sidebar"
-              aria-expanded="true"
-              data-action="toggle-sidebar"
-            >
-              ☰
-            </button>
+  function byId(id) {
+    return document.getElementById(id);
+  }
 
-            <div>
-              <div class="brand-title">Nova</div>
-            </div>
+  function isMobile() {
+    return window.innerWidth <= MOBILE_BREAKPOINT;
+  }
 
-            <div id="routerBadge" class="router-badge">ready</div>
-          </div>
-        </div>
+  function getEls() {
+    return {
+      app: byId("novaApp"),
+      leftSidebar: byId("leftSidebar"),
+      memoryPanel: byId("memoryPanel"),
+      toggleSidebarBtn: byId("toggleSidebarBtn"),
+      closeSidebarBtn: byId("closeSidebarBtn"),
+      toggleMemoryBtn: byId("toggleMemoryBtn"),
+      closeMemoryBtn: byId("closeMemoryBtn"),
+      mainShell: byId("mainShell"),
+    };
+  }
 
-        <div class="topbar-right">
-          <select id="modelSelect" class="model-select" aria-label="Model">
-            <option value="gpt-5.4">gpt-5.4</option>
-            <option value="gpt-4.1-mini">gpt-4.1-mini</option>
-            <option value="gpt-4.1">gpt-4.1</option>
-            <option value="gpt-4o-mini">gpt-4o-mini</option>
-          </select>
+  const panelState = {
+    sidebarOpen: true,
+    memoryOpen: true,
+    initialized: false,
+    lastMobile: null,
+  };
 
-          <button
-            id="toggleMemoryBtn"
-            class="icon-btn"
-            type="button"
-            aria-label="Toggle memory panel"
-            aria-expanded="true"
-            data-action="toggle-memory"
-          >
-            ⟫
-          </button>
-        </div>
-      </header>
+  function setBtnExpanded(btn, open) {
+    if (!btn) return;
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    btn.classList.toggle("is-active", !!open);
+  }
 
-      <section class="chat-view">
-        <div id="chatMessages" class="chat-messages">
-          <div id="emptyState" class="empty-state">
-            <div class="empty-state-card">
-              <h1>Nova is ready</h1>
-              <p>
-                Ask anything, build something, or continue your latest session.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+  function applySidebar(open) {
+    const { app, leftSidebar, toggleSidebarBtn } = getEls();
+    if (!app || !leftSidebar) return;
 
-      <section class="composer-shell">
-        <div id="attachmentBar" class="attachment-bar hidden"></div>
+    panelState.sidebarOpen = !!open;
 
-        <div class="composer-box">
-          <div class="composer-controls-row">
-            <button
-              id="attachBtn"
-              class="icon-btn"
-              type="button"
-              aria-label="Attach files"
-            >
-              ＋
-            </button>
+    app.classList.toggle("sidebar-open", !!open);
+    app.classList.toggle("sidebar-closed", !open);
 
-            <button
-              id="voiceBtn"
-              class="icon-btn"
-              type="button"
-              aria-label="Voice input"
-            >
-              🎤
-            </button>
-          </div>
+    leftSidebar.classList.toggle("is-open", !!open);
+    leftSidebar.classList.toggle("is-closed", !open);
+    leftSidebar.setAttribute("aria-hidden", open ? "false" : "true");
 
-          <label class="sr-only" for="composerInput">Message</label>
-          <textarea
-            id="composerInput"
-            class="composer-input"
-            placeholder="Message Nova..."
-            rows="1"
-          ></textarea>
+    setBtnExpanded(toggleSidebarBtn, !!open);
+  }
 
-          <div class="composer-actions">
-            <button
-              id="sendBtn"
-              class="send-btn"
-              type="button"
-            >
-              Send
-            </button>
-          </div>
-        </div>
+  function applyMemory(open) {
+    const { app, memoryPanel, toggleMemoryBtn } = getEls();
+    if (!app || !memoryPanel) return;
 
-        <input id="fileInput" type="file" multiple class="hidden" />
-      </section>
-    </main>
+    panelState.memoryOpen = !!open;
 
-    <aside
-      id="memoryPanel"
-      class="memory-panel is-open"
-      data-memory-panel="true"
-      aria-hidden="false"
-    >
-      <div class="memory-inner">
-        <div class="memory-top">
-          <h2>Memory</h2>
-          <button
-            id="closeMemoryBtn"
-            class="icon-btn mobile-only"
-            type="button"
-            aria-label="Close memory panel"
-            data-action="close-memory"
-          >
-            ✕
-          </button>
-        </div>
+    app.classList.toggle("memory-open", !!open);
+    app.classList.toggle("memory-closed", !open);
 
-        <div class="memory-add-row">
-          <input
-            id="memoryInput"
-            class="memory-input"
-            type="text"
-            placeholder="Add memory..."
-          />
-          <button
-            id="addMemoryBtn"
-            class="primary-btn"
-            type="button"
-          >
-            Add
-          </button>
-        </div>
+    memoryPanel.classList.toggle("is-open", !!open);
+    memoryPanel.classList.toggle("is-closed", !open);
+    memoryPanel.setAttribute("aria-hidden", open ? "false" : "true");
 
-        <div id="memoryList" class="memory-list"></div>
-      </div>
-    </aside>
-  </div>
+    setBtnExpanded(toggleMemoryBtn, !!open);
+  }
 
-  <script src="/static/js/nova-dom.js"></script>
-  <script src="/static/js/nova-state.js"></script>
-  <script src="/static/js/nova-api.js"></script>
-  <script src="/static/js/nova-panels.js"></script>
-  <script src="/static/js/nova-render-sessions.js"></script>
-  <script src="/static/js/nova-render-messages.js"></script>
-  <script src="/static/js/nova-memory.js"></script>
-  <script src="/static/js/nova-chat-stream.js"></script>
-  <script src="/static/js/nova-render.js"></script>
-</body>
-</html>
+  function syncFromDom() {
+    const { app, leftSidebar, memoryPanel } = getEls();
+    if (!app || !leftSidebar || !memoryPanel) return false;
+
+    const sidebarOpen =
+      leftSidebar.classList.contains("is-open") ||
+      app.classList.contains("sidebar-open") ||
+      (!leftSidebar.classList.contains("is-closed") &&
+        !app.classList.contains("sidebar-closed"));
+
+    const memoryOpen =
+      memoryPanel.classList.contains("is-open") ||
+      app.classList.contains("memory-open") ||
+      (!memoryPanel.classList.contains("is-closed") &&
+        !app.classList.contains("memory-closed"));
+
+    applySidebar(sidebarOpen);
+    applyMemory(memoryOpen);
+    return true;
+  }
+
+  function openSidebar() {
+    applySidebar(true);
+  }
+
+  function closeSidebar() {
+    applySidebar(false);
+  }
+
+  function toggleSidebar() {
+    applySidebar(!panelState.sidebarOpen);
+  }
+
+  function openMemory() {
+    applyMemory(true);
+  }
+
+  function closeMemory() {
+    applyMemory(false);
+  }
+
+  function toggleMemory() {
+    applyMemory(!panelState.memoryOpen);
+  }
+
+  function handleMainShellClick() {
+    if (!isMobile()) return;
+    closeSidebar();
+    closeMemory();
+  }
+
+  function handleEscape(event) {
+    if (event.key !== "Escape") return;
+    if (panelState.sidebarOpen) closeSidebar();
+    if (panelState.memoryOpen) closeMemory();
+  }
+
+  function recoverForViewport() {
+    const mobileNow = isMobile();
+    const firstRun = panelState.lastMobile === null;
+    const changed = panelState.lastMobile !== mobileNow;
+
+    panelState.lastMobile = mobileNow;
+
+    if (firstRun) {
+      if (mobileNow) {
+        applySidebar(false);
+        applyMemory(false);
+      } else {
+        syncFromDom();
+      }
+      return;
+    }
+
+    if (!changed) {
+      applySidebar(panelState.sidebarOpen);
+      applyMemory(panelState.memoryOpen);
+      return;
+    }
+
+    if (mobileNow) {
+      applySidebar(false);
+      applyMemory(false);
+      return;
+    }
+
+    applySidebar(panelState.sidebarOpen);
+    applyMemory(panelState.memoryOpen);
+  }
+
+  function bindClickOnce(el, handler) {
+    if (!el || el.__novaPanelBound) return;
+    el.__novaPanelBound = true;
+
+    el.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      handler();
+    });
+  }
+
+  function bindEvents() {
+    const {
+      toggleSidebarBtn,
+      closeSidebarBtn,
+      toggleMemoryBtn,
+      closeMemoryBtn,
+      mainShell,
+    } = getEls();
+
+    bindClickOnce(toggleSidebarBtn, toggleSidebar);
+    bindClickOnce(closeSidebarBtn, closeSidebar);
+    bindClickOnce(toggleMemoryBtn, toggleMemory);
+    bindClickOnce(closeMemoryBtn, closeMemory);
+
+    if (mainShell && !mainShell.__novaPanelShellBound) {
+      mainShell.__novaPanelShellBound = true;
+      mainShell.addEventListener("click", handleMainShellClick);
+    }
+
+    if (!window.__novaPanelsResizeBound) {
+      window.__novaPanelsResizeBound = true;
+      let timer = null;
+
+      window.addEventListener("resize", () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          recoverForViewport();
+        }, 90);
+      });
+    }
+
+    if (!window.__novaPanelsKeyBound) {
+      window.__novaPanelsKeyBound = true;
+      window.addEventListener("keydown", handleEscape);
+    }
+  }
+
+  function bootstrap() {
+    const { app, leftSidebar, memoryPanel } = getEls();
+    if (!app || !leftSidebar || !memoryPanel) {
+      console.warn("Nova panels: required elements missing.");
+      return false;
+    }
+
+    bindEvents();
+
+    if (!panelState.initialized) {
+      panelState.initialized = true;
+      syncFromDom();
+      recoverForViewport();
+    } else {
+      syncFromDom();
+    }
+
+    return true;
+  }
+
+  Nova.panels.bootstrap = bootstrap;
+  Nova.panels.sync = syncFromDom;
+  Nova.panels.openSidebar = openSidebar;
+  Nova.panels.closeSidebar = closeSidebar;
+  Nova.panels.toggleSidebar = toggleSidebar;
+  Nova.panels.openMemory = openMemory;
+  Nova.panels.closeMemory = closeMemory;
+  Nova.panels.toggleMemory = toggleMemory;
+  Nova.panels.getState = () => ({
+    sidebarOpen: !!panelState.sidebarOpen,
+    memoryOpen: !!panelState.memoryOpen,
+    mobile: isMobile(),
+  });
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootstrap, { once: true });
+  } else {
+    bootstrap();
+  }
+})();
