@@ -459,16 +459,8 @@
   }
 
   function syncArtifactsRail() {
-    if (Nova.render?.toggleArtifactsPanel) {
-      // no-op public api presence check
-    }
-
     if (typeof state.artifactsOpen !== "boolean") {
       state.artifactsOpen = true;
-    }
-
-    if (Nova.render && typeof Nova.render.refreshArtifacts === "function") {
-      // no-op
     }
 
     window.dispatchEvent(
@@ -551,6 +543,7 @@
   function finishRender() {
     renderArtifacts();
     bindActionButtons();
+    bindMessageSaveButtons(document);
   }
 
   async function refreshArtifacts() {
@@ -909,6 +902,7 @@
     artifactsApi.handleChatResponse = handleChatResponse;
     artifactsApi.handleStreamEvent = handleStreamEvent;
     artifactsApi.saveFromMessageElement = saveArtifactFromMessageElement;
+    artifactsApi.bindMessageSaveButtons = bindMessageSaveButtons;
     artifactsApi.open = openArtifactById;
     artifactsApi.close = closeArtifactViewer;
     artifactsApi.copy = copyArtifactById;

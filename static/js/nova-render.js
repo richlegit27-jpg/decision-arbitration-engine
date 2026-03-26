@@ -126,6 +126,10 @@
       state.theme = document.documentElement.getAttribute("data-theme") || "dark";
     }
     if (typeof state.isSending !== "boolean") state.isSending = false;
+    if (typeof state.lastPrompt !== "string") state.lastPrompt = "";
+    if (typeof state.route_mode !== "string") state.route_mode = state.routeMode || "manual";
+    if (typeof state.contract !== "string") state.contract = state.lastContract || "direct";
+    if (!state.pendingMessageId) state.pendingMessageId = "";
   }
 
   function persistUiState() {
@@ -336,6 +340,10 @@
     updateEmptyState();
     scrollChatToBottom(true);
 
+    if (Nova.artifacts?.bindMessageSaveButtons) {
+      Nova.artifacts.bindMessageSaveButtons(messages);
+    }
+
     return node;
   }
 
@@ -483,7 +491,7 @@
 
       button.addEventListener("click", async () => {
         const sessionId = button.dataset.sessionId || "";
-        if (!sessionId) return;
+        if (!sessionId || sessionId === state.currentSessionId) return;
 
         state.currentSessionId = sessionId;
         const session = state.sessions?.[sessionId];
@@ -532,6 +540,39 @@
     }
   }
 
+  function parseSseChunk(chunk) {
+    const lines = chunk.split("\n");
+    let eventName = "message";
+    const dataLines = [];
+
+    for (const line of lines) {
+      if (line.startsWith("event:")) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).trim());
+      }
+    }
+
+    const rawData = dataLines.join("\n");
+    const payload = safeJsonParse(rawData, rawData);
+
+    return {
+      eventName,
+      payload,
+    };
+  }
+
+  function dispatchStreamEvent(eventName, payload) {
+    window.dispatchEvent(
+      new CustomEvent("nova:stream-event", {
+        detail: {
+          event: eventName,
+          payload,
+        },
+      })
+    );
+  }
+
   async function sendMessage() {
     const { composerInput } = getEls();
     if (!composerInput || state.isSending) return;
@@ -546,6 +587,8 @@
     }
 
     const userPrompt = content;
+    state.lastPrompt = userPrompt;
+    state.pendingMessageId = `pending-${Date.now()}`;
 
     appendMessage("user", userPrompt);
     state.messages.push({ role: "user", content: userPrompt });
@@ -555,6 +598,7 @@
     setSending(true);
 
     let assistantText = "";
+    let finalPayload = null;
     const assistantNode = appendMessage("assistant", "");
     const assistantContentEl = assistantNode?.querySelector("[data-message-content]");
 
@@ -585,34 +629,15 @@
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-
         const chunks = buffer.split("\n\n");
         buffer = chunks.pop() || "";
 
         for (const chunk of chunks) {
-          const lines = chunk.split("\n");
-          let eventName = "message";
-          const dataLines = [];
+          const trimmed = chunk.trim();
+          if (!trimmed) continue;
 
-          for (const line of lines) {
-            if (line.startsWith("event:")) {
-              eventName = line.slice(6).trim();
-            } else if (line.startsWith("data:")) {
-              dataLines.push(line.slice(5).trim());
-            }
-          }
-
-          const rawData = dataLines.join("\n");
-          const payload = safeJsonParse(rawData, rawData);
-
-          window.dispatchEvent(
-            new CustomEvent("nova:stream-event", {
-              detail: {
-                event: eventName,
-                payload,
-              },
-            })
-          );
+          const { eventName, payload } = parseSseChunk(trimmed);
+          dispatchStreamEvent(eventName, payload);
 
           if (eventName === "delta") {
             const delta =
@@ -627,18 +652,24 @@
               }
               scrollChatToBottom();
             }
+            continue;
           }
 
-          if (eventName === "done" || eventName === "final") {
+          if (eventName === "done" || eventName === "final" || eventName === "result") {
             if (typeof payload === "object" && payload) {
+              finalPayload = payload;
+
               const finalText =
                 payload?.content ||
                 payload?.text ||
                 payload?.message ||
                 assistantText;
 
-              if (finalText && !assistantText) {
+              if (finalText) {
                 assistantText = String(finalText);
+                if (assistantContentEl) {
+                  assistantContentEl.textContent = assistantText;
+                }
               }
 
               if (Array.isArray(payload?.artifacts) && Nova.artifacts?.merge) {
@@ -651,6 +682,7 @@
                 })
               );
             }
+            continue;
           }
 
           if (eventName === "error") {
@@ -663,6 +695,49 @@
         }
       }
 
+      if (buffer.trim()) {
+        const { eventName, payload } = parseSseChunk(buffer.trim());
+        dispatchStreamEvent(eventName, payload);
+
+        if (eventName === "delta") {
+          const delta =
+            typeof payload === "string"
+              ? payload
+              : payload?.delta || payload?.content || payload?.text || "";
+
+          if (delta) {
+            assistantText += delta;
+          }
+        } else if (
+          (eventName === "done" || eventName === "final" || eventName === "result") &&
+          typeof payload === "object" &&
+          payload
+        ) {
+          finalPayload = payload;
+          const finalText =
+            payload?.content ||
+            payload?.text ||
+            payload?.message ||
+            assistantText;
+
+          if (finalText) {
+            assistantText = String(finalText);
+          }
+
+          window.dispatchEvent(
+            new CustomEvent("nova:chat-response", {
+              detail: payload,
+            })
+          );
+        } else if (eventName === "error") {
+          const message =
+            typeof payload === "string"
+              ? payload
+              : payload?.error || "Unknown stream error";
+          throw new Error(message);
+        }
+      }
+
       if (assistantContentEl) {
         assistantContentEl.textContent = assistantText || "(no response)";
       }
@@ -671,6 +746,17 @@
         role: "assistant",
         content: assistantText || "(no response)",
       });
+
+      if (!finalPayload) {
+        window.dispatchEvent(
+          new CustomEvent("nova:chat-response", {
+            detail: {
+              session_id: sessionId,
+              content: assistantText || "(no response)",
+            },
+          })
+        );
+      }
 
       scrollChatToBottom(true);
       updateEmptyState();
@@ -681,8 +767,19 @@
       if (assistantContentEl) {
         assistantContentEl.textContent = `Error: ${error.message || "send failed"}`;
       }
+
+      state.messages.push({
+        role: "assistant",
+        content: `Error: ${error.message || "send failed"}`,
+      });
+
+      updateEmptyState();
     } finally {
+      state.pendingMessageId = "";
       setSending(false);
+      if (Nova.artifacts?.render) {
+        Nova.artifacts.render();
+      }
     }
   }
 
