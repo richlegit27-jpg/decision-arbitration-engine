@@ -1,654 +1,951 @@
-(() => {
-  "use strict";
+:root {
+  --bg: #07111f;
+  --bg-2: #0b1730;
+  --panel: rgba(12, 20, 37, 0.94);
+  --panel-2: rgba(16, 27, 49, 0.97);
+  --panel-3: rgba(22, 36, 66, 0.98);
+  --text: #eef4ff;
+  --muted: #9cafcf;
+  --line: rgba(130, 158, 222, 0.14);
+  --line-strong: rgba(130, 158, 222, 0.24);
+  --accent: #6ea8ff;
+  --accent-2: #4f8fff;
+  --accent-soft: rgba(110, 168, 255, 0.16);
+  --danger: #ff6f91;
+  --danger-soft: rgba(255, 111, 145, 0.16);
+  --ok: #79e1b0;
+  --shadow-xl: 0 24px 80px rgba(0, 0, 0, 0.42);
+  --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.34);
+  --shadow-md: 0 12px 28px rgba(0, 0, 0, 0.26);
 
-  if (window.__novaChatStreamLoaded) return;
-  window.__novaChatStreamLoaded = true;
+  --sidebar-w: 310px;
+  --memory-w: 350px;
+  --topbar-h: 60px;
+  --composer-max: 980px;
+  --content-max: 1080px;
+  --bubble-max: 900px;
+}
 
-  const Nova = (window.Nova = window.Nova || {});
-  Nova.chat = Nova.chat || {};
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
 
-  const API = {
-    newSession: "/api/session/new",
-    stream: "/api/chat/stream",
-    state: "/api/state",
-  };
+html,
+body {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+}
 
-  function byId(id) {
-    return document.getElementById(id);
+html {
+  background:
+    radial-gradient(circle at top left, rgba(65, 116, 255, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(76, 160, 255, 0.14), transparent 24%),
+    linear-gradient(180deg, var(--bg-2), var(--bg));
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  background: transparent;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+  overflow: hidden;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+}
+
+.nova-app {
+  position: relative;
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(90, 140, 255, 0.12), transparent 0 28%),
+    radial-gradient(circle at 85% 20%, rgba(45, 118, 255, 0.09), transparent 0 24%),
+    linear-gradient(180deg, rgba(8, 13, 25, 0.7), rgba(6, 11, 21, 0.86));
+}
+
+.sidebar,
+.memory-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 40;
+  transition:
+    transform 0.24s ease,
+    opacity 0.2s ease,
+    visibility 0.2s ease;
+  will-change: transform;
+}
+
+.sidebar {
+  left: 0;
+  width: var(--sidebar-w);
+  max-width: calc(100vw - 18px);
+  border-right: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(18, 29, 52, 0.98), rgba(10, 17, 30, 0.98));
+  box-shadow: var(--shadow-lg);
+}
+
+.memory-panel {
+  right: 0;
+  width: var(--memory-w);
+  max-width: calc(100vw - 18px);
+  border-left: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(17, 27, 50, 0.98), rgba(9, 16, 30, 0.98));
+  box-shadow: var(--shadow-lg);
+}
+
+.sidebar.is-open,
+.memory-panel.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.sidebar.is-closed,
+.memory-panel.is-closed {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: none;
+}
+
+.sidebar.is-open {
+  transform: translateX(0);
+}
+
+.sidebar.is-closed {
+  transform: translateX(calc(-100% - 8px));
+}
+
+.memory-panel.is-open {
+  transform: translateX(0);
+}
+
+.memory-panel.is-closed {
+  transform: translateX(calc(100% + 8px));
+}
+
+.nova-app.sidebar-open .sidebar {
+  transform: translateX(0);
+}
+
+.nova-app.sidebar-closed .sidebar {
+  transform: translateX(calc(-100% - 8px));
+}
+
+.nova-app.memory-open .memory-panel {
+  transform: translateX(0);
+}
+
+.nova-app.memory-closed .memory-panel {
+  transform: translateX(calc(100% + 8px));
+}
+
+.sidebar-inner,
+.memory-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 14px;
+  gap: 12px;
+}
+
+.sidebar-top,
+.memory-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 46px;
+  padding: 4px 2px 8px;
+}
+
+.sidebar-top-title,
+.memory-top-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.sidebar-top-actions,
+.memory-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.section-title,
+.memory-top h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.session-list-wrap,
+.memory-list {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.main-shell {
+  position: relative;
+  z-index: 10;
+  display: grid;
+  grid-template-rows: var(--topbar-h) minmax(0, 1fr) auto;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  transition:
+    padding-left 0.24s ease,
+    padding-right 0.24s ease;
+}
+
+.nova-app.sidebar-open .main-shell {
+  padding-left: var(--sidebar-w);
+}
+
+.nova-app.memory-open .main-shell {
+  padding-right: var(--memory-w);
+}
+
+.main-topbar {
+  position: relative;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: var(--topbar-h);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(8, 14, 27, 0.72);
+  backdrop-filter: blur(18px);
+}
+
+.topbar-left,
+.topbar-right,
+.brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.topbar-right {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.brand-block {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.brand-title {
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--text);
+}
+
+.router-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: lowercase;
+}
+
+.chat-view {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  padding: 12px 14px 0;
+}
+
+.chat-messages {
+  width: 100%;
+  max-width: var(--content-max);
+  height: 100%;
+  margin: 0 auto;
+  padding: 4px 0 14px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+.chat-messages::-webkit-scrollbar,
+.session-list::-webkit-scrollbar,
+.memory-list::-webkit-scrollbar,
+textarea::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb,
+.session-list::-webkit-scrollbar-thumb,
+.memory-list::-webkit-scrollbar-thumb,
+textarea::-webkit-scrollbar-thumb {
+  background: rgba(130, 158, 222, 0.24);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.empty-state {
+  display: grid;
+  place-items: center;
+  min-height: calc(100% - 12px);
+  padding: 12px 0 22px;
+}
+
+.empty-state-card {
+  width: min(100%, 700px);
+  padding: 26px 20px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(18, 30, 55, 0.88), rgba(12, 20, 37, 0.92));
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+
+.empty-state-card h1 {
+  margin: 0 0 8px;
+  font-size: clamp(1.4rem, 2.2vw, 2.1rem);
+  line-height: 1.08;
+}
+
+.empty-state-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.composer-shell {
+  position: relative;
+  z-index: 20;
+  padding: 0 14px 14px;
+}
+
+.attachment-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: min(100%, var(--composer-max));
+  margin: 0 auto 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(15, 24, 43, 0.94);
+  box-shadow: var(--shadow-md);
+}
+
+.attachment-chip,
+.message-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgba(126, 157, 228, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.attachment-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-remove-btn {
+  min-width: 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.composer-box {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, var(--composer-max));
+  margin: 0 auto;
+  padding: 10px 12px;
+  border: 1px solid rgba(126, 157, 228, 0.2);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(19, 30, 56, 0.96), rgba(12, 20, 38, 0.98));
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.composer-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
+}
+
+.composer-input {
+  width: 100%;
+  min-height: 42px;
+  max-height: 160px;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 8px 2px;
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.composer-input::placeholder {
+  color: #8ea3cf;
+}
+
+.composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.icon-btn,
+.primary-btn,
+.send-btn,
+.model-select {
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease,
+    opacity 0.16s ease;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+}
+
+.icon-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.icon-btn.is-active {
+  border-color: rgba(110, 168, 255, 0.42);
+  background: var(--accent-soft);
+  color: #dbe9ff;
+}
+
+.danger-btn {
+  border-color: rgba(255, 111, 145, 0.18);
+  background: rgba(255, 111, 145, 0.08);
+  color: #ffd7e2;
+}
+
+.danger-btn:hover {
+  border-color: rgba(255, 111, 145, 0.3);
+  background: rgba(255, 111, 145, 0.14);
+}
+
+.primary-btn,
+.send-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  border: 1px solid rgba(96, 144, 255, 0.34);
+  border-radius: 12px;
+  padding: 0 14px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  color: white;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 10px 24px rgba(79, 143, 255, 0.24);
+}
+
+.primary-btn:hover,
+.send-btn:hover {
+  transform: translateY(-1px);
+}
+
+.send-btn:disabled,
+.primary-btn:disabled,
+.icon-btn:disabled,
+.model-select:disabled,
+textarea:disabled,
+input:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.model-select {
+  min-width: 140px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+  outline: 0;
+}
+
+.memory-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.memory-input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+  outline: 0;
+}
+
+.memory-input::placeholder {
+  color: #8ea3cf;
+}
+
+.session-list,
+.memory-list {
+  overflow: auto;
+}
+
+.session-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 8px;
+}
+
+.session-item.is-active {
+  border-color: rgba(110, 168, 255, 0.28);
+  background: rgba(110, 168, 255, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(110, 168, 255, 0.08);
+}
+
+.session-main-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 4px;
+}
+
+.session-title {
+  width: 100%;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-meta {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.session-actions,
+.memory-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.memory-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 8px;
+}
+
+.memory-item-text {
+  color: var(--text);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.message,
+.chat-message,
+.msg {
+  width: 100%;
+  max-width: var(--bubble-max);
+  margin: 0 0 12px;
+}
+
+.message.user,
+.chat-message.user,
+.msg.user {
+  margin-left: auto;
+}
+
+.message.assistant,
+.chat-message.assistant,
+.msg.assistant,
+.message.system,
+.chat-message.system,
+.msg.system {
+  margin-right: auto;
+}
+
+.message .bubble,
+.chat-message .bubble,
+.msg .bubble,
+.message-content,
+.message-body {
+  border-radius: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(17, 28, 51, 0.92), rgba(11, 18, 34, 0.96));
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+  line-height: 1.6;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.message.user .bubble,
+.chat-message.user .bubble,
+.msg.user .bubble,
+.message.user .message-content,
+.chat-message.user .message-content,
+.msg.user .message-content,
+.message.user .message-body,
+.chat-message.user .message-body,
+.msg.user .message-body {
+  background: linear-gradient(180deg, rgba(73, 121, 255, 0.28), rgba(31, 62, 140, 0.36));
+  border-color: rgba(109, 160, 255, 0.28);
+}
+
+.message-text p,
+.message-body p,
+.message-content p {
+  margin: 0 0 10px;
+}
+
+.message-text p:last-child,
+.message-body p:last-child,
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.message-body :not(pre) > code,
+.message-content :not(pre) > code {
+  display: inline-block;
+  padding: 2px 7px;
+  border: 1px solid rgba(135, 165, 235, 0.18);
+  border-radius: 8px;
+  background: rgba(6, 12, 24, 0.55);
+  color: #d8e6ff;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.92em;
+  line-height: 1.35;
+}
+
+.message-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(130, 158, 222, 0.12);
+}
+
+.message-role,
+.message-time {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.2;
+}
+
+.message-role {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.message-time {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.message-actions,
+.msg-actions,
+.chat-message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  padding-left: 4px;
+}
+
+.message-actions .icon-btn,
+.msg-actions .icon-btn,
+.chat-message-actions .icon-btn {
+  min-width: auto;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.message-actions .icon-btn:hover,
+.msg-actions .icon-btn:hover,
+.chat-message-actions .icon-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+@media (max-width: 1180px) {
+  :root {
+    --sidebar-w: 286px;
+    --memory-w: 320px;
+  }
+}
+
+@media (max-width: 980px) {
+  .sidebar,
+  .memory-panel {
+    top: 0;
+    bottom: 0;
+    max-width: min(88vw, 360px);
+    z-index: 60;
   }
 
-  function getStateBucket() {
-    Nova.state = Nova.state || {};
-    if (!Array.isArray(Nova.state.messages)) Nova.state.messages = [];
-    if (!Array.isArray(Nova.state.sessions)) Nova.state.sessions = [];
-    if (typeof Nova.state.activeSessionId !== "string") {
-      Nova.state.activeSessionId = "";
-    }
-    if (typeof Nova.state.isStreaming !== "boolean") {
-      Nova.state.isStreaming = false;
-    }
-    return Nova.state;
+  .main-shell,
+  .nova-app.sidebar-open .main-shell,
+  .nova-app.memory-open .main-shell {
+    padding-left: 0;
+    padding-right: 0;
   }
 
-  function getActiveModel() {
-    const modelSelect = byId("modelSelect");
-    const selected = modelSelect ? String(modelSelect.value || "").trim() : "";
-    return selected || "gpt-5.4";
+  .main-topbar {
+    padding: 10px 12px;
   }
 
-  function getComposer() {
-    return byId("composerInput");
+  .chat-view {
+    padding: 12px 12px 0;
   }
 
-  function getSendBtn() {
-    return byId("sendBtn");
+  .composer-shell {
+    padding: 0 12px 12px;
   }
 
-  function getMessagesApi() {
-    return Nova.messages && typeof Nova.messages === "object" ? Nova.messages : null;
+  .composer-box {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 18px;
   }
 
-  function getSessionsApi() {
-    return Nova.sessions && typeof Nova.sessions === "object" ? Nova.sessions : null;
+  .composer-controls-row,
+  .composer-actions {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 680px) {
+  .main-topbar {
+    height: auto;
+    min-height: var(--topbar-h);
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
   }
 
-  function makeId(prefix) {
-    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  .topbar-left,
+  .topbar-right,
+  .brand-wrap {
+    width: 100%;
   }
 
-  function resolveSessionId(payload) {
-    return String(
-      payload?.session_id ||
-      payload?.id ||
-      payload?.session?.id ||
-      payload?.data?.session_id ||
-      payload?.data?.id ||
-      ""
-    ).trim();
+  .topbar-right {
+    justify-content: flex-start;
   }
 
-  function resolveMessages(payload) {
-    const candidates = [
-      payload?.messages,
-      payload?.chat?.messages,
-      payload?.session?.messages,
-      payload?.data?.messages,
-      payload?.items,
-    ];
-
-    for (const value of candidates) {
-      if (Array.isArray(value)) return value;
-    }
-
-    return [];
+  .brand-wrap {
+    flex-wrap: wrap;
   }
 
-  function findSessionInState(sessionId) {
-    const state = getStateBucket();
-    return (state.sessions || []).find((item) => {
-      const id = String(item?.id || item?.session_id || item?.uuid || "").trim();
-      return id === String(sessionId || "").trim();
-    });
+  .router-badge {
+    min-height: 28px;
+    font-size: 0.75rem;
   }
 
-  async function parseJsonSafe(response) {
-    const text = await response.text();
-    try {
-      return text ? JSON.parse(text) : {};
-    } catch {
-      return {};
-    }
+  .empty-state-card {
+    padding: 22px 16px;
+    border-radius: 20px;
   }
 
-  async function apiGet(url) {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
-      credentials: "same-origin",
-    });
-
-    const data = await parseJsonSafe(response);
-    if (!response.ok) {
-      throw new Error(data.error || `GET failed: ${url}`);
-    }
-    return data;
+  .icon-btn,
+  .model-select,
+  .send-btn,
+  .primary-btn,
+  .memory-input {
+    min-height: 36px;
+    height: 36px;
   }
 
-  async function apiPost(url, payload) {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      credentials: "same-origin",
-      body: JSON.stringify(payload || {}),
-    });
-
-    const data = await parseJsonSafe(response);
-    if (!response.ok) {
-      throw new Error(data.error || `POST failed: ${url}`);
-    }
-    return data;
+  .composer-input {
+    min-height: 38px;
+    max-height: 130px;
+    font-size: 0.95rem;
   }
 
-  function setStreamingUi(isStreaming) {
-    const state = getStateBucket();
-    const sendBtn = getSendBtn();
-    const composer = getComposer();
-
-    state.isStreaming = !!isStreaming;
-
-    if (sendBtn) {
-      sendBtn.disabled = !!isStreaming;
-      sendBtn.textContent = isStreaming ? "Sending..." : "Send";
-    }
-
-    if (composer) {
-      composer.disabled = !!isStreaming;
-    }
+  .message .bubble,
+  .chat-message .bubble,
+  .msg .bubble,
+  .message-content,
+  .message-body {
+    padding: 12px 13px;
+    border-radius: 16px;
   }
 
-  function renderNow() {
-    const messagesApi = getMessagesApi();
-    if (messagesApi && typeof messagesApi.render === "function") {
-      messagesApi.render();
-    }
+  .message-actions .icon-btn,
+  .msg-actions .icon-btn,
+  .chat-message-actions .icon-btn {
+    height: 32px;
+    padding: 0 10px;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-height: 760px) {
+  :root {
+    --topbar-h: 54px;
   }
 
-  function scrollMessagesToBottom() {
-    const chatMessages = byId("chatMessages");
-    if (!chatMessages) return;
-
-    requestAnimationFrame(() => {
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    });
+  .main-topbar {
+    padding: 8px 12px;
   }
 
-  function upsertLocalUserMessage(text) {
-    const state = getStateBucket();
-    const message = {
-      id: makeId("user"),
-      role: "user",
-      content: String(text || ""),
-      created_at: new Date().toISOString(),
-    };
-
-    state.messages = Array.isArray(state.messages) ? state.messages : [];
-    state.messages.push(message);
-    renderNow();
-    scrollMessagesToBottom();
-
-    return message;
+  .chat-view {
+    padding-top: 10px;
   }
 
-  function addStreamingAssistantPlaceholder() {
-    const state = getStateBucket();
-    const assistant = {
-      id: makeId("assistant"),
-      role: "assistant",
-      content: "",
-      created_at: new Date().toISOString(),
-      _streaming: true,
-    };
-
-    state.messages = Array.isArray(state.messages) ? state.messages : [];
-    state.messages.push(assistant);
-    renderNow();
-    scrollMessagesToBottom();
-
-    return assistant;
+  .composer-shell {
+    padding-bottom: 10px;
   }
 
-  function removeStreamingAssistantIfEmpty(messageId) {
-    const state = getStateBucket();
-    state.messages = (state.messages || []).filter((item) => {
-      const id = String(item?.id || item?.message_id || "").trim();
-      const content = String(item?.content || item?.text || "").trim();
-      if (id !== String(messageId || "").trim()) return true;
-      return !!content;
-    });
-    renderNow();
+  .composer-box {
+    padding: 8px 10px;
+    border-radius: 16px;
   }
 
-  function updateAssistantStream(messageId, delta, mode = "append") {
-    const state = getStateBucket();
-    const messages = Array.isArray(state.messages) ? state.messages : [];
-    const target = messages.find((item) => String(item?.id || "").trim() === String(messageId || "").trim());
-    if (!target) return;
-
-    if (mode === "replace") {
-      target.content = String(delta || "");
-    } else {
-      target.content = String(target.content || "") + String(delta || "");
-    }
-
-    target.updated_at = new Date().toISOString();
-    renderNow();
-    scrollMessagesToBottom();
+  .icon-btn,
+  .model-select {
+    min-width: 34px;
+    height: 34px;
   }
 
-  function finalizeAssistantMessage(messageId, finalText = null) {
-    const state = getStateBucket();
-    const messages = Array.isArray(state.messages) ? state.messages : [];
-    const target = messages.find((item) => String(item?.id || "").trim() === String(messageId || "").trim());
-    if (!target) return;
-
-    if (typeof finalText === "string" && finalText.length) {
-      target.content = finalText;
-    }
-
-    delete target._streaming;
-    target.updated_at = new Date().toISOString();
-
-    renderNow();
-    scrollMessagesToBottom();
+  .primary-btn,
+  .send-btn {
+    min-height: 34px;
+    padding: 0 12px;
   }
 
-  function normalizeEventName(raw) {
-    const value = String(raw || "").trim().toLowerCase();
-    if (!value) return "message";
-    return value;
+  .composer-input {
+    min-height: 34px;
+    max-height: 110px;
+    padding: 6px 2px;
+    font-size: 0.94rem;
   }
-
-  function parseSseBuffer(buffer) {
-    const events = [];
-    const chunks = buffer.split(/\n\n/);
-    const remainder = chunks.pop() || "";
-
-    for (const chunk of chunks) {
-      const lines = chunk.split(/\n/);
-      let eventName = "message";
-      const dataLines = [];
-
-      for (const line of lines) {
-        if (line.startsWith("event:")) {
-          eventName = normalizeEventName(line.slice(6));
-        } else if (line.startsWith("data:")) {
-          dataLines.push(line.slice(5).trimStart());
-        }
-      }
-
-      const rawData = dataLines.join("\n");
-      let parsedData = rawData;
-
-      try {
-        parsedData = rawData ? JSON.parse(rawData) : {};
-      } catch {
-        parsedData = rawData;
-      }
-
-      events.push({
-        event: eventName,
-        data: parsedData,
-        raw: rawData,
-      });
-    }
-
-    return { events, remainder };
-  }
-
-  function extractDelta(payload) {
-    if (typeof payload === "string") return payload;
-
-    return String(
-      payload?.delta ??
-      payload?.content ??
-      payload?.text ??
-      payload?.token ??
-      payload?.message ??
-      payload?.data?.delta ??
-      payload?.data?.content ??
-      ""
-    );
-  }
-
-  function extractDoneText(payload) {
-    if (typeof payload === "string") return payload;
-
-    return String(
-      payload?.final ??
-      payload?.content ??
-      payload?.text ??
-      payload?.message ??
-      payload?.response ??
-      payload?.data?.final ??
-      payload?.data?.content ??
-      ""
-    );
-  }
-
-  async function ensureSession() {
-    const state = getStateBucket();
-    if (state.activeSessionId) {
-      return state.activeSessionId;
-    }
-
-    const created = await apiPost(API.newSession, {});
-    const sessionId = resolveSessionId(created);
-
-    if (!sessionId) {
-      throw new Error("Could not create session.");
-    }
-
-    state.activeSessionId = sessionId;
-
-    const sessionsApi = getSessionsApi();
-    if (sessionsApi && typeof sessionsApi.refresh === "function") {
-      try {
-        await sessionsApi.refresh();
-      } catch (error) {
-        console.error("Nova session refresh after create failed:", error);
-      }
-    }
-
-    return sessionId;
-  }
-
-  async function refreshStateSessions() {
-    const state = getStateBucket();
-
-    try {
-      const payload = await apiGet(API.state);
-      const sessions =
-        payload?.sessions ||
-        payload?.data?.sessions ||
-        payload?.items ||
-        payload?.data?.items ||
-        [];
-
-      if (Array.isArray(sessions)) {
-        state.sessions = sessions;
-      }
-    } catch (error) {
-      console.error("Nova state refresh failed:", error);
-    }
-  }
-
-  async function loadSession(sessionId) {
-    const id = String(sessionId || "").trim();
-    const state = getStateBucket();
-    state.activeSessionId = id;
-
-    const messagesApi = getMessagesApi();
-    if (messagesApi && typeof messagesApi.loadSession === "function") {
-      return messagesApi.loadSession(id);
-    }
-
-    return [];
-  }
-
-  function buildStreamPayload(options) {
-    const state = getStateBucket();
-    const prompt = String(options?.prompt || "").trim();
-    const sessionId = String(options?.sessionId || state.activeSessionId || "").trim();
-    const model = String(options?.model || getActiveModel()).trim();
-
-    const payload = {
-      session_id: sessionId,
-      content: prompt,
-      model,
-    };
-
-    if (options?.regenerate) {
-      payload.regenerate = true;
-      payload.prompt_override = prompt;
-      payload.promptOverride = prompt;
-    }
-
-    return payload;
-  }
-
-  async function streamRequest(payload, onEvent) {
-    const response = await fetch(API.stream, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream, application/json, text/plain",
-      },
-      credentials: "same-origin",
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      let errorMessage = `POST failed: ${API.stream}`;
-
-      try {
-        const parsed = text ? JSON.parse(text) : {};
-        errorMessage = parsed.error || errorMessage;
-      } catch {
-        if (text) errorMessage = text;
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    if (!response.body) {
-      throw new Error("Streaming response body missing.");
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      const parsed = parseSseBuffer(buffer);
-      buffer = parsed.remainder;
-
-      for (const entry of parsed.events) {
-        onEvent(entry);
-      }
-    }
-
-    buffer += decoder.decode();
-    if (buffer.trim()) {
-      const parsed = parseSseBuffer(buffer + "\n\n");
-      for (const entry of parsed.events) {
-        onEvent(entry);
-      }
-    }
-  }
-
-  async function sendMessage(options = {}) {
-    const state = getStateBucket();
-    if (state.isStreaming) return false;
-
-    const composer = getComposer();
-    const rawPrompt =
-      typeof options.promptOverride === "string"
-        ? options.promptOverride
-        : composer
-          ? String(composer.value || "")
-          : "";
-
-    const prompt = String(rawPrompt || "").trim();
-    if (!prompt) return false;
-
-    const isRegenerate = !!options.regenerate;
-    let sessionId = String(state.activeSessionId || "").trim();
-    let assistantPlaceholderId = "";
-    let sawAssistantContent = false;
-    let finalTextFromDone = "";
-
-    try {
-      setStreamingUi(true);
-
-      sessionId = await ensureSession();
-      state.activeSessionId = sessionId;
-
-      if (!isRegenerate) {
-        upsertLocalUserMessage(prompt);
-        if (composer) {
-          composer.value = "";
-          composer.style.height = "";
-        }
-      }
-
-      const assistantPlaceholder = addStreamingAssistantPlaceholder();
-      assistantPlaceholderId = assistantPlaceholder.id;
-
-      const payload = buildStreamPayload({
-        sessionId,
-        prompt,
-        model: options.model,
-        regenerate: isRegenerate,
-      });
-
-      await streamRequest(payload, (entry) => {
-        const eventName = normalizeEventName(entry.event);
-        const data = entry.data;
-
-        if (eventName === "start") {
-          const incomingSessionId = resolveSessionId(data);
-          if (incomingSessionId) {
-            state.activeSessionId = incomingSessionId;
-            sessionId = incomingSessionId;
-          }
-
-          const maybeMessages = resolveMessages(data);
-          if (maybeMessages.length) {
-            state.messages = maybeMessages;
-            renderNow();
-            scrollMessagesToBottom();
-          }
-          return;
-        }
-
-        if (eventName === "delta" || eventName === "message" || eventName === "token") {
-          const delta = extractDelta(data);
-          if (!delta) return;
-
-          sawAssistantContent = true;
-          updateAssistantStream(assistantPlaceholderId, delta, "append");
-          return;
-        }
-
-        if (eventName === "replace") {
-          const nextText = extractDelta(data);
-          sawAssistantContent = !!nextText;
-          updateAssistantStream(assistantPlaceholderId, nextText, "replace");
-          return;
-        }
-
-        if (eventName === "done") {
-          finalTextFromDone = extractDoneText(data) || finalTextFromDone;
-          return;
-        }
-
-        if (eventName === "error") {
-          const message =
-            typeof data === "string"
-              ? data
-              : String(data?.error || data?.message || "Streaming error.");
-          throw new Error(message);
-        }
-      });
-
-      if (assistantPlaceholderId) {
-        if (finalTextFromDone) {
-          finalizeAssistantMessage(assistantPlaceholderId, finalTextFromDone);
-        } else {
-          finalizeAssistantMessage(assistantPlaceholderId);
-        }
-
-        if (!sawAssistantContent && !finalTextFromDone) {
-          removeStreamingAssistantIfEmpty(assistantPlaceholderId);
-        }
-      }
-
-      const sessionsApi = getSessionsApi();
-      if (sessionsApi && typeof sessionsApi.refresh === "function") {
-        try {
-          await sessionsApi.refresh();
-        } catch (error) {
-          console.error("Nova sessions refresh after stream failed:", error);
-        }
-      } else {
-        await refreshStateSessions();
-      }
-
-      return true;
-    } catch (error) {
-      console.error("Nova stream send failed:", error);
-
-      if (assistantPlaceholderId) {
-        removeStreamingAssistantIfEmpty(assistantPlaceholderId);
-      }
-
-      const stateRef = getStateBucket();
-      stateRef.messages.push({
-        id: makeId("system"),
-        role: "system",
-        content: `Error: ${String(error?.message || error || "Request failed.")}`,
-        created_at: new Date().toISOString(),
-      });
-      renderNow();
-      scrollMessagesToBottom();
-
-      return false;
-    } finally {
-      setStreamingUi(false);
-    }
-  }
-
-  async function regenerateLast(prompt) {
-    const value = String(prompt || "").trim();
-    if (!value) return false;
-
-    return sendMessage({
-      regenerate: true,
-      promptOverride: value,
-    });
-  }
-
-  function bindComposerAutoSize() {
-    const composer = getComposer();
-    if (!composer || composer.__novaAutoSizeBound) return;
-
-    composer.__novaAutoSizeBound = true;
-
-    const resize = () => {
-      composer.style.height = "auto";
-      const next = Math.min(composer.scrollHeight, 160);
-      composer.style.height = `${Math.max(next, 42)}px`;
-    };
-
-    composer.addEventListener("input", resize);
-    window.addEventListener("resize", resize);
-    resize();
-  }
-
-  async function bootstrap() {
-    bindComposerAutoSize();
-    return true;
-  }
-
-  Nova.chat.sendMessage = sendMessage;
-  Nova.chat.regenerateLast = regenerateLast;
-  Nova.chat.loadSession = loadSession;
-  Nova.chat.bootstrap = bootstrap;
-
-  if (document.readyState === "loading") {
-    document.addEventListener(
-      "DOMContentLoaded",
-      () => {
-        bootstrap().catch((error) => {
-          console.error("Nova chat DOM bootstrap failed:", error);
-        });
-      },
-      { once: true }
-    );
-  } else {
-    bootstrap().catch((error) => {
-      console.error("Nova chat immediate bootstrap failed:", error);
-    });
-  }
-})();
+}
