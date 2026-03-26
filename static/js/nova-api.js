@@ -1,310 +1,542 @@
-// C:\Users\Owner\nova\static\js\nova-api.js
-
 (() => {
   "use strict";
 
-  window.Nova = window.Nova || {};
+  if (window.__novaApiLoaded) return;
+  window.__novaApiLoaded = true;
 
-  if (window.Nova.apiModuleLoaded) {
-    console.warn("nova-api.js already loaded");
-    return;
+  const Nova = (window.Nova = window.Nova || {});
+  Nova.api = Nova.api || {};
+
+  const api = Nova.api;
+
+  const DEFAULT_HEADERS = {
+    Accept: "application/json",
+  };
+
+  const ROUTES = {
+    state: "/api/state",
+    memory: "/api/memory",
+    addMemory: "/api/memory",
+    deleteMemory: "/api/memory/delete",
+    newSession: "/api/session/new",
+    renameSession: "/api/session/rename",
+    deleteSession: "/api/session/delete",
+    duplicateSession: "/api/session/duplicate",
+    pinSession: "/api/session/pin",
+    getChat(sessionId) {
+      return `/api/chat/${encodeURIComponent(sessionId)}`;
+    },
+    sendChat: "/api/chat/send",
+    streamChat: "/api/chat/stream",
+    upload: "/api/upload",
+    models: "/api/models",
+  };
+
+  function isObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
   }
-  window.Nova.apiModuleLoaded = true;
 
-  const apiPaths = window.Nova.apiPaths || {};
-
-  function normalizeErrorMessage(error, fallback = "Request failed") {
-    if (!error) return fallback;
-    if (typeof error === "string") return error;
-    if (error instanceof Error && error.message) return error.message;
-    if (typeof error.message === "string" && error.message.trim()) return error.message;
-    return fallback;
+  function safeString(value, fallback = "") {
+    if (typeof value === "string") return value;
+    if (value === null || value === undefined) return fallback;
+    return String(value);
   }
 
-  async function parseJsonResponse(response) {
-    const text = await response.text();
-    if (!text) return {};
+  function tryParseJson(text) {
+    if (!text || typeof text !== "string") return null;
+
     try {
       return JSON.parse(text);
     } catch (_error) {
-      return { raw: text };
+      return null;
     }
   }
 
-  async function ensureOk(response, label = "Request failed") {
-    const data = await parseJsonResponse(response);
+  async function readResponseBody(response) {
+    const contentType = safeString(response.headers.get("content-type")).toLowerCase();
 
-    if (!response.ok) {
-      const message =
-        (data && (data.error || data.message)) ||
-        `${label}: ${response.status} ${response.statusText}`;
-      throw new Error(message);
-    }
-
-    if (data && data.ok === false) {
-      throw new Error(data.error || data.message || label);
-    }
-
-    return data;
-  }
-
-  async function apiGet(url) {
-    const response = await window.fetch(url, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
-      credentials: "same-origin",
-    });
-
-    return ensureOk(response, `GET failed: ${url}`);
-  }
-
-  async function apiPost(url, body = {}) {
-    const response = await window.fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      credentials: "same-origin",
-      body: JSON.stringify(body || {}),
-    });
-
-    return ensureOk(response, `POST failed: ${url}`);
-  }
-
-  async function apiUpload(url, formData) {
-    const response = await window.fetch(url, {
-      method: "POST",
-      credentials: "same-origin",
-      body: formData,
-    });
-
-    return ensureOk(response, `UPLOAD failed: ${url}`);
-  }
-
-  function createSseParser({ onEvent, onError }) {
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    return {
-      push(chunk) {
-        buffer += decoder.decode(chunk, { stream: true });
-
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() || "";
-
-        for (const rawPart of parts) {
-          const lines = rawPart.split("\n");
-          let eventName = "message";
-          const dataLines = [];
-
-          for (const line of lines) {
-            if (line.startsWith("event:")) {
-              eventName = line.slice(6).trim();
-            } else if (line.startsWith("data:")) {
-              dataLines.push(line.slice(5).trimStart());
-            }
-          }
-
-          const rawData = dataLines.join("\n");
-          let parsed = rawData;
-
-          if (rawData) {
-            try {
-              parsed = JSON.parse(rawData);
-            } catch (_error) {
-              parsed = rawData;
-            }
-          }
-
-          try {
-            onEvent?.(eventName, parsed, rawPart);
-          } catch (error) {
-            onError?.(error);
-          }
-        }
-      },
-      flush() {
-        if (!buffer.trim()) return;
-        try {
-          onEvent?.("message", buffer.trim(), buffer.trim());
-        } catch (error) {
-          onError?.(error);
-        }
-        buffer = "";
-      },
-    };
-  }
-
-  async function streamJson(url, payload, handlers = {}) {
-    const controller = new AbortController();
-
-    const response = await window.fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
-      },
-      credentials: "same-origin",
-      body: JSON.stringify(payload || {}),
-      signal: controller.signal,
-    });
-
-    if (!response.ok || !response.body) {
-      const data = await parseJsonResponse(response);
-      const message =
-        (data && (data.error || data.message)) ||
-        `STREAM failed: ${url} ${response.status} ${response.statusText}`;
-      throw new Error(message);
-    }
-
-    const reader = response.body.getReader();
-    const parser = createSseParser({
-      onEvent: handlers.onEvent,
-      onError: handlers.onError,
-    });
-
-    async function pump() {
+    if (contentType.includes("application/json")) {
       try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          if (value) parser.push(value);
-        }
-        parser.flush();
-        handlers.onDone?.();
-      } catch (error) {
-        if (controller.signal.aborted) {
-          handlers.onAbort?.();
-          return;
-        }
-        handlers.onError?.(error);
-        throw error;
+        return await response.json();
+      } catch (_error) {
+        return null;
       }
     }
 
-    return {
-      controller,
-      done: pump(),
-      abort() {
-        controller.abort();
+    try {
+      const text = await response.text();
+      const parsed = tryParseJson(text);
+      return parsed !== null ? parsed : text;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function buildError(message, extra = {}) {
+    const error = new Error(message || "Request failed");
+    Object.assign(error, extra);
+    return error;
+  }
+
+  async function request(url, options = {}) {
+    const method = safeString(options.method || "GET").toUpperCase();
+    const headers = {
+      ...DEFAULT_HEADERS,
+      ...(isObject(options.headers) ? options.headers : {}),
+    };
+
+    const fetchOptions = {
+      method,
+      headers,
+      cache: "no-store",
+    };
+
+    if (options.signal) {
+      fetchOptions.signal = options.signal;
+    }
+
+    if (options.body !== undefined) {
+      fetchOptions.body = options.body;
+    }
+
+    let response;
+    try {
+      response = await fetch(url, fetchOptions);
+    } catch (error) {
+      throw buildError(`Network error: ${error?.message || "request failed"}`, {
+        cause: error,
+        url,
+        method,
+      });
+    }
+
+    const payload = await readResponseBody(response);
+
+    if (!response.ok) {
+      const payloadMessage =
+        (isObject(payload) && safeString(payload.error || payload.message).trim()) ||
+        (typeof payload === "string" ? payload.trim() : "");
+
+      throw buildError(
+        payloadMessage || `${method} failed: ${url}`,
+        {
+          status: response.status,
+          statusText: response.statusText,
+          url,
+          method,
+          payload,
+        }
+      );
+    }
+
+    return payload;
+  }
+
+  async function get(url, options = {}) {
+    return request(url, {
+      ...options,
+      method: "GET",
+    });
+  }
+
+  async function post(url, data = {}, options = {}) {
+    return request(url, {
+      ...options,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(isObject(options.headers) ? options.headers : {}),
       },
+      body: JSON.stringify(isObject(data) ? data : {}),
+    });
+  }
+
+  async function postForm(url, formData, options = {}) {
+    return request(url, {
+      ...options,
+      method: "POST",
+      body: formData,
+    });
+  }
+
+  function normalizeStatePayload(payload) {
+    if (!isObject(payload)) {
+      return {
+        ok: true,
+        sessions: [],
+        active_session_id: "",
+        default_model: "gpt-5.4",
+      };
+    }
+
+    return {
+      ok: payload.ok !== false,
+      sessions: Array.isArray(payload.sessions)
+        ? payload.sessions
+        : Array.isArray(payload.items)
+          ? payload.items
+          : Array.isArray(payload.data?.sessions)
+            ? payload.data.sessions
+            : [],
+      active_session_id: safeString(
+        payload.active_session_id ||
+          payload.activeSessionId ||
+          payload.session_id ||
+          payload.sessionId ||
+          ""
+      ),
+      default_model: safeString(
+        payload.default_model ||
+          payload.defaultModel ||
+          payload.model ||
+          payload.current_model ||
+          payload.currentModel ||
+          "gpt-5.4"
+      ),
+      raw: payload,
+    };
+  }
+
+  function normalizeMemoryPayload(payload) {
+    if (!isObject(payload)) {
+      return {
+        ok: true,
+        items: [],
+      };
+    }
+
+    return {
+      ok: payload.ok !== false,
+      items: Array.isArray(payload.items)
+        ? payload.items
+        : Array.isArray(payload.memory)
+          ? payload.memory
+          : Array.isArray(payload.data?.items)
+            ? payload.data.items
+            : [],
+      raw: payload,
+    };
+  }
+
+  function normalizeChatPayload(payload) {
+    if (!isObject(payload)) {
+      return {
+        ok: true,
+        session_id: "",
+        messages: [],
+        answer: typeof payload === "string" ? payload : "",
+      };
+    }
+
+    const messages = Array.isArray(payload.messages)
+      ? payload.messages
+      : Array.isArray(payload.items)
+        ? payload.items
+        : Array.isArray(payload.data?.messages)
+          ? payload.data.messages
+          : [];
+
+    return {
+      ok: payload.ok !== false,
+      session_id: safeString(
+        payload.session_id ||
+          payload.sessionId ||
+          payload.id ||
+          ""
+      ),
+      router: safeString(payload.router || payload.route || ""),
+      messages,
+      answer: safeString(payload.answer || payload.content || payload.message || ""),
+      raw: payload,
+    };
+  }
+
+  function normalizeModelsPayload(payload) {
+    if (!isObject(payload)) {
+      return {
+        ok: true,
+        models: ["gpt-5.4", "gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini"],
+        default_model: "gpt-5.4",
+      };
+    }
+
+    const models = Array.isArray(payload.models)
+      ? payload.models
+      : Array.isArray(payload.items)
+        ? payload.items
+        : [];
+
+    return {
+      ok: payload.ok !== false,
+      models,
+      default_model: safeString(
+        payload.default_model ||
+          payload.defaultModel ||
+          payload.model ||
+          "gpt-5.4"
+      ),
+      raw: payload,
+    };
+  }
+
+  function parseStreamEventBlock(block) {
+    const lines = safeString(block)
+      .split("\n")
+      .map((line) => line.replace(/\r/g, ""));
+
+    let eventName = "message";
+    const dataLines = [];
+
+    lines.forEach((line) => {
+      if (!line) return;
+
+      if (line.startsWith("event:")) {
+        eventName = line.slice(6).trim() || "message";
+        return;
+      }
+
+      if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).trim());
+      }
+    });
+
+    const dataText = dataLines.join("\n").trim();
+    const data = tryParseJson(dataText);
+
+    return {
+      event: eventName,
+      data: data !== null ? data : dataText,
+      raw: block,
     };
   }
 
   async function getState() {
-    return apiGet(apiPaths.state);
-  }
-
-  async function getHealth() {
-    return apiGet(apiPaths.health);
-  }
-
-  async function getModels() {
-    return apiGet(apiPaths.models);
+    const payload = await get(ROUTES.state);
+    return normalizeStatePayload(payload);
   }
 
   async function getMemory() {
-    return apiGet(apiPaths.memory);
+    const payload = await get(ROUTES.memory);
+    return normalizeMemoryPayload(payload);
   }
 
-  async function addMemory(payload) {
-    return apiPost(apiPaths.addMemory, payload);
+  async function addMemory(data = {}) {
+    const value = safeString(data.value || "").trim();
+    const kind = safeString(data.kind || "preference").trim() || "preference";
+
+    const payload = await post(ROUTES.addMemory, {
+      value,
+      kind,
+    });
+
+    return normalizeMemoryPayload(payload);
   }
 
-  async function deleteMemory(payload) {
-    return apiPost(apiPaths.deleteMemory, payload);
+  async function deleteMemory(memoryId) {
+    const payload = await post(ROUTES.deleteMemory, {
+      id: safeString(memoryId).trim(),
+    });
+
+    return normalizeMemoryPayload(payload);
   }
 
-  async function newSession(payload = {}) {
-    return apiPost(apiPaths.newSession, payload);
+  async function createSession(data = {}) {
+    const payload = await post(ROUTES.newSession, {
+      title: safeString(data.title || "").trim(),
+    });
+
+    return normalizeChatPayload(payload).raw || payload;
   }
 
-  async function renameSession(payload) {
-    return apiPost(apiPaths.renameSession, payload);
+  async function renameSession(sessionId, title) {
+    const payload = await post(ROUTES.renameSession, {
+      session_id: safeString(sessionId).trim(),
+      title: safeString(title).trim(),
+    });
+
+    return normalizeChatPayload(payload).raw || payload;
   }
 
-  async function deleteSession(payload) {
-    return apiPost(apiPaths.deleteSession, payload);
+  async function deleteSession(sessionId) {
+    const payload = await post(ROUTES.deleteSession, {
+      session_id: safeString(sessionId).trim(),
+    });
+
+    return normalizeChatPayload(payload).raw || payload;
   }
 
-  async function duplicateSession(payload) {
-    return apiPost(apiPaths.duplicateSession, payload);
+  async function duplicateSession(sessionId) {
+    const payload = await post(ROUTES.duplicateSession, {
+      session_id: safeString(sessionId).trim(),
+    });
+
+    return normalizeChatPayload(payload).raw || payload;
   }
 
-  async function pinSession(payload) {
-    return apiPost(apiPaths.pinSession, payload);
+  async function pinSession(sessionId, pinned = true) {
+    const payload = await post(ROUTES.pinSession, {
+      session_id: safeString(sessionId).trim(),
+      pinned: !!pinned,
+    });
+
+    return normalizeChatPayload(payload).raw || payload;
   }
 
   async function getChat(sessionId) {
-    return apiGet(apiPaths.getChat(sessionId));
+    const payload = await get(ROUTES.getChat(sessionId));
+    return normalizeChatPayload(payload);
   }
 
-  async function sendChat(payload) {
-    if (apiPaths.send) {
-      return apiPost(apiPaths.send, payload);
-    }
-    return apiPost(apiPaths.stream, payload);
+  async function sendChat(data = {}) {
+    const payload = await post(ROUTES.sendChat, {
+      content: safeString(data.content || "").trim(),
+      session_id: safeString(data.session_id || data.sessionId || "").trim(),
+      model: safeString(data.model || "").trim(),
+    });
+
+    return normalizeChatPayload(payload);
   }
 
-  async function startChatStream(payload, handlers = {}) {
-    return streamJson(apiPaths.stream, payload, handlers);
-  }
-
-  async function uploadFiles(files = []) {
+  async function uploadFiles(files) {
+    const fileList = Array.isArray(files) ? files : Array.from(files || []);
     const formData = new FormData();
-    for (const file of files) {
-      formData.append("files", file);
+
+    fileList.forEach((file) => {
+      if (file) {
+        formData.append("files", file);
+      }
+    });
+
+    return postForm(ROUTES.upload, formData);
+  }
+
+  async function getModels() {
+    const payload = await get(ROUTES.models);
+    return normalizeModelsPayload(payload);
+  }
+
+  async function streamChat(data = {}, handlers = {}) {
+    const response = await fetch(ROUTES.streamChat, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream, application/json, text/plain",
+      },
+      cache: "no-store",
+      body: JSON.stringify({
+        content: safeString(data.content || "").trim(),
+        session_id: safeString(data.session_id || data.sessionId || "").trim(),
+        model: safeString(data.model || "").trim(),
+      }),
+      signal: handlers.signal,
+    });
+
+    if (!response.ok) {
+      const payload = await readResponseBody(response);
+      const payloadMessage =
+        (isObject(payload) && safeString(payload.error || payload.message).trim()) ||
+        (typeof payload === "string" ? payload.trim() : "");
+
+      throw buildError(
+        payloadMessage || `POST failed: ${ROUTES.streamChat}`,
+        {
+          status: response.status,
+          statusText: response.statusText,
+          payload,
+        }
+      );
     }
-    return apiUpload(apiPaths.upload, formData);
+
+    if (!response.body) {
+      const payload = await readResponseBody(response);
+      return {
+        ok: true,
+        fallback: true,
+        payload,
+      };
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() || "";
+
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+
+        const parsed = parseStreamEventBlock(trimmed);
+        const eventName = safeString(parsed.event || "message");
+        const eventData = parsed.data;
+
+        if (eventName === "delta" && typeof handlers.onDelta === "function") {
+          handlers.onDelta(eventData, parsed);
+          continue;
+        }
+
+        if (eventName === "start" && typeof handlers.onStart === "function") {
+          handlers.onStart(eventData, parsed);
+          continue;
+        }
+
+        if (eventName === "done" && typeof handlers.onDone === "function") {
+          handlers.onDone(eventData, parsed);
+          continue;
+        }
+
+        if (eventName === "error" && typeof handlers.onError === "function") {
+          handlers.onError(eventData, parsed);
+          continue;
+        }
+
+        if (typeof handlers.onEvent === "function") {
+          handlers.onEvent(parsed);
+        }
+      }
+    }
+
+    if (buffer.trim()) {
+      const parsed = parseStreamEventBlock(buffer.trim());
+      if (typeof handlers.onEvent === "function") {
+        handlers.onEvent(parsed);
+      }
+    }
+
+    return {
+      ok: true,
+      streamed: true,
+    };
   }
 
-  async function getAuthMe() {
-    if (!apiPaths.authMe) return { ok: true, authenticated: false };
-    return apiGet(apiPaths.authMe);
-  }
-
-  async function login(payload) {
-    return apiPost(apiPaths.authLogin, payload);
-  }
-
-  async function register(payload) {
-    return apiPost(apiPaths.authRegister, payload);
-  }
-
-  async function logout() {
-    return apiPost(apiPaths.authLogout, {});
-  }
-
-  window.Nova.api = {
-    normalizeErrorMessage,
-    parseJsonResponse,
-    ensureOk,
-    apiGet,
-    apiPost,
-    apiUpload,
-    createSseParser,
-    streamJson,
-    getState,
-    getHealth,
-    getModels,
-    getMemory,
-    addMemory,
-    deleteMemory,
-    newSession,
-    renameSession,
-    deleteSession,
-    duplicateSession,
-    pinSession,
-    getChat,
-    sendChat,
-    startChatStream,
-    uploadFiles,
-    getAuthMe,
-    login,
-    register,
-    logout,
-  };
+  api.ROUTES = ROUTES;
+  api.request = request;
+  api.get = get;
+  api.post = post;
+  api.postForm = postForm;
+  api.getState = getState;
+  api.getMemory = getMemory;
+  api.addMemory = addMemory;
+  api.deleteMemory = deleteMemory;
+  api.createSession = createSession;
+  api.renameSession = renameSession;
+  api.deleteSession = deleteSession;
+  api.duplicateSession = duplicateSession;
+  api.pinSession = pinSession;
+  api.getChat = getChat;
+  api.sendChat = sendChat;
+  api.streamChat = streamChat;
+  api.uploadFiles = uploadFiles;
+  api.getModels = getModels;
+  api.normalizeStatePayload = normalizeStatePayload;
+  api.normalizeMemoryPayload = normalizeMemoryPayload;
+  api.normalizeChatPayload = normalizeChatPayload;
+  api.normalizeModelsPayload = normalizeModelsPayload;
 })();

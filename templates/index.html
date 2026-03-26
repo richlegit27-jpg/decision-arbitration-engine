@@ -10,16 +10,16 @@
 
   <meta name="theme-color" content="#0f172a" />
   <meta name="color-scheme" content="dark light" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
   <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" />
 
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-base.css') }}?v=loadorder1" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-main.css') }}?v=loadorder1" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-sidebar.css') }}?v=loadorder1" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-memory.css') }}?v=loadorder1" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-composer.css') }}?v=loadorder1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-base.css') }}?v=stabilize1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-main.css') }}?v=stabilize1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-sidebar.css') }}?v=stabilize1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-memory.css') }}?v=stabilize1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-composer.css') }}?v=stabilize1" />
 </head>
 <body>
   <div id="nova-app" class="nova-app">
@@ -196,30 +196,34 @@
     window.Nova = window.Nova || {};
     window.NovaConfig = {
       appName: "Nova",
-      version: "loadorder1",
-      apiBase: "",
+      version: "stabilize1",
+      apiBase: ""
+    };
+
+    window.Nova.config = window.Nova.config || {};
+    window.Nova.config.appName = "Nova";
+    window.Nova.config.version = "stabilize1";
+    window.Nova.config.apiBase = "";
+    window.Nova.config.API = {
+      state: "/api/state",
+      getChat: function (sessionId) {
+        return "/api/chat/" + encodeURIComponent(sessionId);
+      },
+      stream: "/api/chat/stream",
+      memory: "/api/memory",
+      addMemory: "/api/memory/add",
+      deleteMemory: "/api/memory/delete",
+      newSession: "/api/session/new",
+      deleteSession: "/api/session/delete",
+      renameSession: "/api/session/rename",
+      duplicateSession: "/api/session/duplicate",
+      pinSession: "/api/session/pin",
+      upload: "/api/upload",
+      models: "/api/models",
+      health: "/api/health"
     };
   </script>
 
-  <!-- core first -->
-  <script defer src="{{ url_for('static', filename='js/nova-ultimate.js') }}?v=loadorder1"></script>
-
-  <!-- split modules after core -->
-  <script defer src="{{ url_for('static', filename='js/nova-dom.js') }}?v=loadorder1"></script>
-  <script defer src="{{ url_for('static', filename='js/nova-state.js') }}?v=loadorder1"></script>
-  <script defer src="{{ url_for('static', filename='js/nova-api.js') }}?v=loadorder1"></script>
-  <script defer src="{{ url_for('static', filename='js/nova-sessions.js') }}?v=loadorder1"></script>
-  <script defer src="{{ url_for('static', filename='js/nova-memory.js') }}?v=loadorder1"></script>
-  <script defer src="{{ url_for('static', filename='js/nova-chat.js') }}?v=loadorder1"></script>
-  <script defer src="{{ url_for('static', filename='js/nova-panels.js') }}?v=loadorder1"></script>
-  <script defer src="{{ url_for('static', filename='js/nova-render-sessions.js') }}?v=loadorder1"></script>
-  <script defer src="{{ url_for('static', filename='js/nova-render-messages.js') }}?v=loadorder1"></script>
-  <script defer src="{{ url_for('static', filename='js/nova-render-memory.js') }}?v=loadorder1"></script>
-  <script defer src="{{ url_for('static', filename='js/nova-render.js') }}?v=loadorder1"></script>
-
-  <!-- optional extras last so they never block boot -->
-  <script defer src="{{ url_for('static', filename='js/nova-style-inject.js') }}?v=loadorder1"></script>
-  <script defer src="{{ url_for('static', filename='js/nova-router-control.js') }}?v=loadorder1"></script>
-  <script defer src="{{ url_for('static', filename='js/nova-sources-panel.js') }}?v=loadorder1"></script>
+  <script defer src="{{ url_for('static', filename='js/nova-ultimate.js') }}?v=stabilize1"></script>
 </body>
 </html>
