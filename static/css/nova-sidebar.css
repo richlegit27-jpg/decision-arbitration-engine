@@ -1,85 +1,98 @@
 .sidebar {
-  width: var(--sidebar-w);
-  min-width: var(--sidebar-w);
-  max-width: var(--sidebar-w);
-  background: var(--panel);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  flex-direction: column;
   overflow: hidden;
-  position: relative;
-  z-index: 20;
 }
 
-.sidebar-header {
-  padding: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.sidebar-header button {
+.sidebar-inner {
   width: 100%;
-  border: 0;
-  border-radius: 12px;
-  background: var(--accent);
-  color: white;
-  padding: 12px 14px;
-  font-weight: 700;
-  cursor: pointer;
+}
+
+.sidebar-top {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 2px;
+}
+
+.sidebar-top-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sidebar-top-actions {
+  flex: 0 0 auto;
+}
+
+.sidebar .section-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-section .primary-btn,
+#newChatBtn {
+  width: 100%;
+}
+
+.session-list-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
 }
 
 .session-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  padding-right: 4px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-.session-empty {
-  color: var(--muted);
-  padding: 12px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.session-card {
+.session-item {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  padding: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid transparent;
-  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  background: linear-gradient(180deg, rgba(20, 31, 55, 0.94), rgba(12, 20, 37, 0.98));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
 }
 
-.session-card:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.08);
+.session-item:hover {
+  transform: translateY(-1px);
+  border-color: var(--line-strong);
+  background: linear-gradient(180deg, rgba(24, 37, 66, 0.96), rgba(14, 23, 42, 0.99));
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
 }
 
-.session-card.active {
-  background: rgba(95, 147, 255, 0.14);
-  border-color: rgba(95, 147, 255, 0.45);
-}
-
-.session-card.pinned {
-  box-shadow: inset 0 0 0 1px rgba(255, 215, 100, 0.22);
+.session-item.is-active,
+.session-item.active,
+.session-item[aria-current="true"] {
+  border-color: rgba(110, 168, 255, 0.38);
+  background: linear-gradient(180deg, rgba(54, 92, 184, 0.26), rgba(21, 38, 82, 0.5));
+  box-shadow: 0 16px 30px rgba(33, 72, 170, 0.18);
 }
 
 .session-main {
   min-width: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .session-title {
-  font-size: 14px;
+  min-width: 0;
+  color: var(--text);
+  font-size: 0.95rem;
   font-weight: 700;
   line-height: 1.35;
   white-space: nowrap;
@@ -88,64 +101,45 @@
 }
 
 .session-meta {
-  margin-top: 4px;
-  font-size: 12px;
   color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .session-actions {
-  display: grid;
-  grid-template-columns: repeat(2, 34px);
+  display: flex;
+  align-items: center;
   gap: 6px;
-  align-content: start;
+  flex-shrink: 0;
 }
 
-.session-action {
+.session-actions .icon-btn {
+  min-width: 34px;
   width: 34px;
   height: 34px;
-  border: 0;
+  padding: 0;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--text);
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
-  transition: background 0.18s ease, transform 0.18s ease;
 }
 
-.session-action:hover {
-  background: rgba(255, 255, 255, 0.14);
-  transform: translateY(-1px);
+.session-empty {
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  text-align: center;
 }
 
-.session-action.delete:hover {
-  background: rgba(255, 90, 90, 0.2);
-}
-
-.session-action.pin:hover {
-  background: rgba(255, 215, 100, 0.18);
-}
-
-@media (max-width: 900px) {
+@media (max-width: 980px) {
   .sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: min(88vw, 320px);
-    min-width: min(88vw, 320px);
-    max-width: min(88vw, 320px);
-    transform: translateX(-100%);
-    transition: transform 0.22s ease;
-    z-index: 50;
-    box-shadow: 18px 0 48px rgba(0, 0, 0, 0.32);
+    width: min(88vw, 360px);
   }
 
-  .sidebar.mobile-open {
-    transform: translateX(0);
-  }
-
-  .sidebar.hidden {
-    display: flex !important;
+  .session-item {
+    padding: 11px;
+    border-radius: 14px;
   }
 }

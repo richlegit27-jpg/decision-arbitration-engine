@@ -1,11 +1,36 @@
 {
   "sessions": [
     {
-      "id": "3d3344b9-98cc-42e7-b430-f25d48efc537",
+      "id": "7d567ae5-95a2-45d3-b730-03468b941045",
       "title": "New Chat",
-      "created_at": "2026-03-26T02:39:45.393914+00:00",
-      "updated_at": "2026-03-26T02:39:45.393945+00:00",
-      "messages": []
+      "created_at": "2026-03-26T03:54:42.688567+00:00",
+      "updated_at": "2026-03-26T04:21:00.439089+00:00",
+      "messages": [
+        {
+          "id": "e4e9027c-f58b-4724-8137-14e366b43283",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-26T04:20:47.397676+00:00"
+        },
+        {
+          "id": "b848a5ed-214a-401a-9942-b82497c21b3d",
+          "role": "assistant",
+          "content": "Hi! How can I help?",
+          "created_at": "2026-03-26T04:20:49.040099+00:00"
+        },
+        {
+          "id": "41dd07dd-5f50-40f3-bba8-e44765a06254",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-26T04:20:58.998152+00:00"
+        },
+        {
+          "id": "96ccb17b-1d70-4d63-a93c-148cd41b30fb",
+          "role": "assistant",
+          "content": "Hello! What can I do for you today?",
+          "created_at": "2026-03-26T04:21:00.438586+00:00"
+        }
+      ]
     }
   ]
 }

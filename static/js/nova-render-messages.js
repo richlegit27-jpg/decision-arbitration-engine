@@ -6,43 +6,17 @@
 
   const Nova = (window.Nova = window.Nova || {});
   Nova.messages = Nova.messages || {};
-  Nova.state = Nova.state || {};
-  Nova.dom = Nova.dom || {};
-  Nova.render = Nova.render || {};
 
-  const messagesApi = Nova.messages;
-  const state = Nova.state;
-  const dom = Nova.dom;
-  const render = Nova.render;
+  const API = {
+    getChat: (sessionId) => `/api/chat/${encodeURIComponent(sessionId)}`,
+  };
 
-  const byId =
-    dom.byId ||
-    function byId(id) {
-      return document.getElementById(id);
-    };
-
-  function safeArray(value) {
-    return Array.isArray(value) ? value : [];
-  }
-
-  function safeString(value, fallback = "") {
-    if (typeof value === "string") return value;
-    if (value === null || value === undefined) return fallback;
-    return String(value);
-  }
-
-  function isFn(value) {
-    return typeof value === "function";
-  }
-
-  function ensureState() {
-    if (!Array.isArray(state.messages)) state.messages = [];
-    if (typeof state.lastUserMessage !== "string") state.lastUserMessage = "";
-    if (typeof state.isSending !== "boolean") state.isSending = false;
+  function byId(id) {
+    return document.getElementById(id);
   }
 
   function escapeHtml(value) {
-    return safeString(value)
+    return String(value ?? "")
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
@@ -50,276 +24,451 @@
       .replaceAll("'", "&#39;");
   }
 
-  function formatDate(value) {
-    const raw = safeString(value).trim();
+  async function parseJsonSafe(response) {
+    const text = await response.text();
+    try {
+      return text ? JSON.parse(text) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  async function apiGet(url) {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+      credentials: "same-origin",
+    });
+
+    const data = await parseJsonSafe(response);
+    if (!response.ok) {
+      throw new Error(data.error || `GET failed: ${url}`);
+    }
+    return data;
+  }
+
+  function getStateBucket() {
+    Nova.state = Nova.state || {};
+    if (!Array.isArray(Nova.state.messages)) {
+      Nova.state.messages = [];
+    }
+    if (typeof Nova.state.activeSessionId !== "string") {
+      Nova.state.activeSessionId = "";
+    }
+    return Nova.state;
+  }
+
+  function normalizeMessages(payload) {
+    const candidates = [
+      payload?.messages,
+      payload?.chat?.messages,
+      payload?.session?.messages,
+      payload?.data?.messages,
+      payload?.items,
+    ];
+
+    for (const value of candidates) {
+      if (Array.isArray(value)) return value;
+    }
+
+    return [];
+  }
+
+  function resolveRole(message) {
+    const raw = String(
+      message?.role ||
+      message?.sender ||
+      message?.type ||
+      "assistant"
+    ).toLowerCase().trim();
+
+    if (raw.includes("user")) return "user";
+    if (raw.includes("system")) return "system";
+    return "assistant";
+  }
+
+  function resolveText(message) {
+    const direct =
+      message?.content ??
+      message?.text ??
+      message?.message ??
+      message?.value ??
+      "";
+
+    if (typeof direct === "string") {
+      return direct;
+    }
+
+    if (Array.isArray(direct)) {
+      return direct
+        .map((part) => {
+          if (typeof part === "string") return part;
+          if (part && typeof part.text === "string") return part.text;
+          if (part && typeof part.content === "string") return part.content;
+          return "";
+        })
+        .join("\n")
+        .trim();
+    }
+
+    if (direct && typeof direct === "object") {
+      if (typeof direct.text === "string") return direct.text;
+      if (typeof direct.content === "string") return direct.content;
+    }
+
+    return String(direct || "").trim();
+  }
+
+  function resolveMessageId(message, index) {
+    return String(
+      message?.id ||
+      message?.message_id ||
+      message?.uuid ||
+      `msg-${index}`
+    ).trim();
+  }
+
+  function formatTimestamp(message) {
+    const raw = String(
+      message?.created_at ||
+      message?.updated_at ||
+      message?.timestamp ||
+      message?.time ||
+      ""
+    ).trim();
+
     if (!raw) return "";
 
     const date = new Date(raw);
     if (Number.isNaN(date.getTime())) return "";
 
-    try {
-      return date.toLocaleString([], {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
+    return date.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  function parseBlocks(text) {
+    const source = String(text || "");
+    const blocks = [];
+    const regex = /```([\w-]*)\n?([\s\S]*?)```/g;
+
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(source)) !== null) {
+      const before = source.slice(lastIndex, match.index);
+      if (before) {
+        blocks.push({ type: "text", value: before });
+      }
+
+      blocks.push({
+        type: "code",
+        language: String(match[1] || "").trim(),
+        value: String(match[2] || ""),
       });
-    } catch (_error) {
-      return "";
-    }
-  }
 
-  function roleLabel(role) {
-    const normalized = safeString(role || "assistant").trim().toLowerCase();
-    if (normalized === "user") return "You";
-    if (normalized === "system") return "System";
-    return "Nova";
-  }
-
-  function messageClass(role) {
-    const normalized = safeString(role || "assistant").trim().toLowerCase();
-    if (normalized === "user") return "message message-user";
-    if (normalized === "system") return "message message-system";
-    return "message message-assistant";
-  }
-
-  function getChatMessagesEl() {
-    return byId("chatMessages");
-  }
-
-  function getEmptyStateEl() {
-    return byId("emptyState");
-  }
-
-  function preserveEmptyState(container) {
-    const empty = getEmptyStateEl();
-    if (!container || !empty) return empty;
-
-    if (empty.parentElement === container) {
-      empty.remove();
+      lastIndex = regex.lastIndex;
     }
 
-    return empty;
+    const after = source.slice(lastIndex);
+    if (after) {
+      blocks.push({ type: "text", value: after });
+    }
+
+    return blocks.length ? blocks : [{ type: "text", value: source }];
   }
 
-  function splitIntoParagraphs(text) {
-    return safeString(text)
-      .replace(/\r\n/g, "\n")
-      .split("\n");
+  function renderInline(text) {
+    return escapeHtml(text).replace(/`([^`]+)`/g, "<code>$1</code>");
   }
 
-  function renderMessageBodyHtml(content) {
-    const lines = splitIntoParagraphs(content);
-    return lines
-      .map((line) => {
-        if (!line.trim()) {
-          return `<div class="message-line"><br></div>`;
-        }
-        return `<div class="message-line">${escapeHtml(line)}</div>`;
+  function renderTextBlock(text) {
+    const cleaned = String(text || "").replace(/\r\n/g, "\n");
+    const paragraphs = cleaned
+      .split(/\n{2,}/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    if (!paragraphs.length) {
+      return `<p></p>`;
+    }
+
+    return paragraphs
+      .map((paragraph) => {
+        const html = renderInline(paragraph).replace(/\n/g, "<br>");
+        return `<p>${html}</p>`;
       })
       .join("");
   }
 
-  async function copyText(text, button) {
-    const value = safeString(text);
-    if (!value.trim()) return;
+  function renderMessageBody(text) {
+    const blocks = parseBlocks(text);
 
-    const original = button ? button.textContent : "";
+    return blocks
+      .map((block) => {
+        if (block.type === "code") {
+          const lang = escapeHtml(block.language || "");
+          const code = escapeHtml(block.value || "");
+          const langTag = lang
+            ? `<div class="code-lang">${lang}</div>`
+            : "";
+          return `
+            <div class="message-code-block">
+              ${langTag}
+              <pre><code>${code}</code></pre>
+            </div>
+          `;
+        }
 
-    try {
-      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-        await navigator.clipboard.writeText(value);
-      } else {
-        const helper = document.createElement("textarea");
-        helper.value = value;
-        helper.setAttribute("readonly", "true");
-        helper.style.position = "fixed";
-        helper.style.opacity = "0";
-        helper.style.pointerEvents = "none";
-        document.body.appendChild(helper);
-        helper.focus();
-        helper.select();
-        document.execCommand("copy");
-        helper.remove();
-      }
-
-      if (button) {
-        button.textContent = "Copied";
-        window.setTimeout(() => {
-          button.textContent = original || "Copy";
-        }, 1200);
-      }
-    } catch (_error) {
-      if (button) {
-        button.textContent = "Copy failed";
-        window.setTimeout(() => {
-          button.textContent = original || "Copy";
-        }, 1200);
-      }
-    }
+        return renderTextBlock(block.value || "");
+      })
+      .join("");
   }
 
-  function getLastAssistantMessage() {
-    const list = safeArray(state.messages);
-    for (let i = list.length - 1; i >= 0; i -= 1) {
-      const item = list[i];
-      if (safeString(item?.role).toLowerCase() === "assistant") {
-        return item;
+  function getLatestUserMessageIndex(messages) {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (resolveRole(messages[i]) === "user") {
+        return i;
       }
     }
-    return null;
+    return -1;
   }
 
-  async function regenerateLastAssistantReply(button) {
-    if (state.isSending) return;
+  function renderEmptyState() {
+    const chatMessages = byId("chatMessages");
+    if (!chatMessages) return;
 
-    const lastUserMessage = safeString(state.lastUserMessage).trim();
-    if (!lastUserMessage) return;
-
-    const list = safeArray(state.messages).slice();
-
-    for (let i = list.length - 1; i >= 0; i -= 1) {
-      const role = safeString(list[i]?.role).toLowerCase();
-      if (role === "assistant" || role === "system") {
-        list.splice(i, 1);
-        break;
-      }
-    }
-
-    state.messages = list;
-
-    const original = button ? button.textContent : "";
-    if (button) {
-      button.disabled = true;
-      button.textContent = "Regenerating...";
-    }
-
-    try {
-      if (isFn(render.renderAll)) {
-        render.renderAll();
-      }
-
-      if (isFn(render.sendMessage)) {
-        await render.sendMessage({ regenerate: true, contentOverride: lastUserMessage });
-      }
-    } catch (_error) {
-      // render.sendMessage already handles UI/system error fallback
-    } finally {
-      if (button) {
-        button.disabled = false;
-        button.textContent = original || "Regenerate";
-      }
-    }
-  }
-
-  function createMessageArticle(message, index) {
-    const role = safeString(message?.role || "assistant").toLowerCase();
-    const content = safeString(message?.content || "");
-    const createdAt = safeString(message?.created_at || message?.createdAt || "");
-    const isAssistant = role === "assistant";
-    const article = document.createElement("article");
-
-    article.className = messageClass(role);
-    article.setAttribute("data-message-index", String(index));
-    article.setAttribute("data-message-role", role);
-
-    article.innerHTML = `
-      <div class="message-head">
-        <div class="message-role">${escapeHtml(roleLabel(role))}</div>
-        <div class="message-time">${escapeHtml(formatDate(createdAt))}</div>
-      </div>
-      <div class="message-body">
-        ${renderMessageBodyHtml(content)}
-      </div>
-      ${
-        isAssistant
-          ? `
-        <div class="message-actions">
-          <button
-            type="button"
-            class="message-action-btn"
-            data-message-action="copy"
-            data-message-index="${index}"
-          >
-            Copy
-          </button>
-          <button
-            type="button"
-            class="message-action-btn"
-            data-message-action="regenerate"
-            data-message-index="${index}"
-          >
-            Regenerate
-          </button>
+    chatMessages.innerHTML = `
+      <div id="emptyState" class="empty-state">
+        <div class="empty-state-card">
+          <h1>Nova is ready</h1>
+          <p>Ask anything, build something, or continue your latest session.</p>
         </div>
-      `
-          : ""
-      }
+      </div>
     `;
-
-    return article;
   }
 
-  function bindMessageActions(root) {
-    if (!root) return;
+  function render() {
+    const state = getStateBucket();
+    const chatMessages = byId("chatMessages");
+    if (!chatMessages) return;
 
-    root.querySelectorAll("[data-message-action='copy']").forEach((button) => {
-      if (button.dataset.novaBoundCopy === "true") return;
-      button.dataset.novaBoundCopy = "true";
-
-      button.addEventListener("click", async () => {
-        const index = Number(button.getAttribute("data-message-index"));
-        const item = safeArray(state.messages)[index];
-        await copyText(item?.content || "", button);
-      });
-    });
-
-    root.querySelectorAll("[data-message-action='regenerate']").forEach((button) => {
-      if (button.dataset.novaBoundRegenerate === "true") return;
-      button.dataset.novaBoundRegenerate = "true";
-
-      button.addEventListener("click", async () => {
-        const item = getLastAssistantMessage();
-        if (!item) return;
-        await regenerateLastAssistantReply(button);
-      });
-    });
-  }
-
-  function renderMessages() {
-    ensureState();
-
-    const container = getChatMessagesEl();
-    if (!container) return;
-
-    const emptyState = preserveEmptyState(container);
-    const list = safeArray(state.messages);
-
-    container.innerHTML = "";
-
-    if (!list.length) {
-      if (emptyState) {
-        emptyState.classList.remove("hidden");
-        container.appendChild(emptyState);
-      }
+    const messages = Array.isArray(state.messages) ? state.messages : [];
+    if (!messages.length) {
+      renderEmptyState();
       return;
     }
 
-    list.forEach((message, index) => {
-      const article = createMessageArticle(message, index);
-      container.appendChild(article);
+    const latestUserIndex = getLatestUserMessageIndex(messages);
+
+    chatMessages.innerHTML = messages
+      .map((message, index) => {
+        const role = resolveRole(message);
+        const text = resolveText(message);
+        const messageId = resolveMessageId(message, index);
+        const timestamp = formatTimestamp(message);
+        const showRegenerate = role === "user" && index === latestUserIndex;
+
+        return `
+          <article class="message ${escapeHtml(role)}" data-message-id="${escapeHtml(messageId)}">
+            <div class="bubble">
+              <div class="message-body">${renderMessageBody(text)}</div>
+              <div class="message-footer">
+                <div class="message-role">${escapeHtml(role)}</div>
+                ${timestamp ? `<div class="message-time">${escapeHtml(timestamp)}</div>` : ""}
+              </div>
+            </div>
+            <div class="message-actions">
+              <button
+                class="icon-btn"
+                type="button"
+                data-copy-message="${escapeHtml(messageId)}"
+                aria-label="Copy message"
+                title="Copy message"
+              >
+                Copy
+              </button>
+              ${
+                showRegenerate
+                  ? `
+                    <button
+                      class="icon-btn"
+                      type="button"
+                      data-regenerate-from="${escapeHtml(messageId)}"
+                      aria-label="Regenerate response"
+                      title="Regenerate response"
+                    >
+                      Regenerate
+                    </button>
+                  `
+                  : ""
+              }
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+
+    requestAnimationFrame(() => {
+      chatMessages.scrollTop = chatMessages.scrollHeight;
     });
-
-    bindMessageActions(container);
-
-    if (emptyState) {
-      emptyState.classList.add("hidden");
-    }
-
-    container.scrollTop = container.scrollHeight;
   }
 
-  messagesApi.renderMessages = renderMessages;
-  messagesApi.copyText = copyText;
-  messagesApi.regenerateLastAssistantReply = regenerateLastAssistantReply;
+  async function loadSession(sessionId) {
+    const id = String(sessionId || "").trim();
+    const state = getStateBucket();
+
+    if (!id) {
+      state.activeSessionId = "";
+      state.messages = [];
+      render();
+      return [];
+    }
+
+    const payload = await apiGet(API.getChat(id));
+    state.activeSessionId = id;
+    state.messages = normalizeMessages(payload);
+    render();
+    return state.messages;
+  }
+
+  async function refresh() {
+    const state = getStateBucket();
+    if (!state.activeSessionId) {
+      render();
+      return [];
+    }
+
+    return loadSession(state.activeSessionId);
+  }
+
+  async function copyMessage(messageId) {
+    const id = String(messageId || "").trim();
+    if (!id) return false;
+
+    const state = getStateBucket();
+    const messages = Array.isArray(state.messages) ? state.messages : [];
+    const found = messages.find((message, index) => resolveMessageId(message, index) === id);
+    if (!found) return false;
+
+    const text = resolveText(found);
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (error) {
+      console.error("Nova copy failed:", error);
+      return false;
+    }
+  }
+
+  async function regenerateFromMessage(messageId) {
+    const id = String(messageId || "").trim();
+    if (!id) return false;
+
+    const state = getStateBucket();
+    const messages = Array.isArray(state.messages) ? state.messages : [];
+    const targetIndex = messages.findIndex(
+      (message, index) => resolveMessageId(message, index) === id
+    );
+
+    if (targetIndex < 0) return false;
+
+    const targetMessage = messages[targetIndex];
+    const prompt = resolveText(targetMessage).trim();
+    if (!prompt) return false;
+
+    const composerInput = byId("composerInput");
+    if (composerInput) {
+      composerInput.value = prompt;
+      composerInput.focus();
+    }
+
+    if (Nova.chat && typeof Nova.chat.sendMessage === "function") {
+      await Nova.chat.sendMessage({ regenerate: true, promptOverride: prompt });
+      return true;
+    }
+
+    if (Nova.chat && typeof Nova.chat.regenerateLast === "function") {
+      await Nova.chat.regenerateLast(prompt);
+      return true;
+    }
+
+    console.warn("Nova regenerate: chat API not available.");
+    return false;
+  }
+
+  function bindEvents() {
+    const chatMessages = byId("chatMessages");
+    if (!chatMessages || chatMessages.__novaMessagesBound) return;
+
+    chatMessages.__novaMessagesBound = true;
+
+    chatMessages.addEventListener("click", async (event) => {
+      const copyBtn = event.target.closest("[data-copy-message]");
+      const regenBtn = event.target.closest("[data-regenerate-from]");
+
+      try {
+        if (copyBtn) {
+          event.preventDefault();
+          const ok = await copyMessage(copyBtn.getAttribute("data-copy-message"));
+          if (ok) {
+            const previous = copyBtn.textContent;
+            copyBtn.textContent = "Copied";
+            setTimeout(() => {
+              copyBtn.textContent = previous || "Copy";
+            }, 1100);
+          }
+          return;
+        }
+
+        if (regenBtn) {
+          event.preventDefault();
+          const previous = regenBtn.textContent;
+          regenBtn.textContent = "Working...";
+          regenBtn.disabled = true;
+
+          try {
+            await regenerateFromMessage(regenBtn.getAttribute("data-regenerate-from"));
+          } finally {
+            regenBtn.textContent = previous || "Regenerate";
+            regenBtn.disabled = false;
+          }
+        }
+      } catch (error) {
+        console.error("Nova message action failed:", error);
+      }
+    });
+  }
+
+  async function bootstrap() {
+    bindEvents();
+    render();
+    return true;
+  }
+
+  Nova.messages.render = render;
+  Nova.messages.refresh = refresh;
+  Nova.messages.loadSession = loadSession;
+  Nova.messages.copyMessage = copyMessage;
+  Nova.messages.regenerateFromMessage = regenerateFromMessage;
+  Nova.messages.bootstrap = bootstrap;
+
+  if (document.readyState === "loading") {
+    document.addEventListener(
+      "DOMContentLoaded",
+      () => {
+        bootstrap().catch((error) => {
+          console.error("Nova messages DOM bootstrap failed:", error);
+        });
+      },
+      { once: true }
+    );
+  } else {
+    bootstrap().catch((error) => {
+      console.error("Nova messages immediate bootstrap failed:", error);
+    });
+  }
 })();
