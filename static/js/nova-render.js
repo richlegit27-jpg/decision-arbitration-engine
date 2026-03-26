@@ -117,7 +117,10 @@
     if (typeof state.memoryOpen !== "boolean") state.memoryOpen = true;
     if (typeof state.artifactsOpen !== "boolean") state.artifactsOpen = true;
     if (!state.currentSessionId) state.currentSessionId = "";
-    if (!state.sessions || typeof state.sessions !== "object") state.sessions = {};
+    if (!state.sessions || typeof state.sessions !== "object" || Array.isArray(state.sessions)) {
+      state.sessions = {};
+    }
+    if (!Array.isArray(state.sessionList)) state.sessionList = [];
     if (!Array.isArray(state.messages)) state.messages = [];
     if (!state.theme) {
       state.theme = document.documentElement.getAttribute("data-theme") || "dark";
@@ -203,7 +206,6 @@
 
     if (panelName === "memory") {
       state.memoryOpen = isOpen;
-
       if (els.memoryPanel) {
         els.memoryPanel.classList.toggle("is-active", isOpen);
         els.memoryPanel.hidden = !isOpen;
@@ -212,12 +214,10 @@
 
     if (panelName === "artifacts") {
       state.artifactsOpen = isOpen;
-
       if (els.artifactsRoot) {
         els.artifactsRoot.classList.toggle("is-active", isOpen);
         els.artifactsRoot.hidden = !isOpen;
       }
-
       if (!isOpen) {
         closeArtifactViewer();
       }
@@ -232,7 +232,6 @@
       setPanelOpen("memory", !state.memoryOpen);
       return;
     }
-
     if (panelName === "artifacts") {
       setPanelOpen("artifacts", !state.artifactsOpen);
     }
@@ -248,7 +247,6 @@
   function autosizeComposer() {
     const { composerInput } = getEls();
     if (!composerInput) return;
-
     composerInput.style.height = "auto";
     composerInput.style.height = `${Math.min(Math.max(composerInput.scrollHeight, 52), 220)}px`;
   }
@@ -355,6 +353,29 @@
     }
   }
 
+  function normalizeSessionsShape(response) {
+    const sessionMap =
+      response?.sessions && !Array.isArray(response.sessions) && typeof response.sessions === "object"
+        ? response.sessions
+        : {};
+
+    const sessionList = Array.isArray(response?.session_list)
+      ? response.session_list
+      : Object.values(sessionMap);
+
+    state.sessions = sessionMap;
+    state.sessionList = sessionList;
+
+    if (!state.currentSessionId) {
+      const first = sessionList[0];
+      if (first?.id) {
+        state.currentSessionId = first.id;
+      }
+    }
+
+    return { sessionMap, sessionList };
+  }
+
   async function ensureSession() {
     if (state.currentSessionId) return state.currentSessionId;
 
@@ -365,6 +386,25 @@
         response?.id ||
         response?.session?.id ||
         "";
+
+      if (response?.session?.id) {
+        state.sessions[response.session.id] =
+          response.summary ||
+          {
+            id: response.session.id,
+            title: response.session.title || "New Chat",
+            created_at: response.session.created_at,
+            updated_at: response.session.updated_at,
+            pinned: !!response.session.pinned,
+            message_count: Array.isArray(response.session.messages) ? response.session.messages.length : 0,
+            preview: "",
+            last_route: {},
+          };
+
+        state.sessionList = Object.values(state.sessions).sort((a, b) =>
+          String(b?.updated_at || "").localeCompare(String(a?.updated_at || ""))
+        );
+      }
 
       if (sessionId) {
         state.currentSessionId = sessionId;
@@ -388,16 +428,10 @@
   async function loadState() {
     try {
       const response = await apiGet(API.state);
+      normalizeSessionsShape(response);
 
-      if (response?.sessions && typeof response.sessions === "object") {
-        state.sessions = response.sessions;
-      }
-
-      if (!state.currentSessionId) {
-        const keys = Object.keys(state.sessions || {});
-        if (keys.length) {
-          state.currentSessionId = keys[0];
-        }
+      if (response?.preferences?.ui?.theme) {
+        state.theme = response.preferences.ui.theme;
       }
 
       return response;
@@ -411,18 +445,18 @@
     const { sessionList } = getEls();
     if (!sessionList) return;
 
-    const sessions = state.sessions || {};
-    const entries = Object.entries(sessions);
+    const entries = Array.isArray(state.sessionList)
+      ? state.sessionList
+      : Object.values(state.sessions || {});
 
     if (!entries.length) {
-      sessionList.innerHTML = `
-        <div class="nova-session-empty">No sessions yet</div>
-      `;
+      sessionList.innerHTML = `<div class="nova-session-empty">No sessions yet</div>`;
       return;
     }
 
     sessionList.innerHTML = entries
-      .map(([id, session]) => {
+      .map((session) => {
+        const id = session?.id || "";
         const title =
           session?.title ||
           session?.name ||
@@ -488,6 +522,10 @@
       const messages = session?.messages || response?.messages || [];
       state.messages = Array.isArray(messages) ? messages : [];
       renderMessages(state.messages);
+
+      if (Array.isArray(response?.artifacts) && Nova.artifacts?.merge) {
+        Nova.artifacts.merge(response.artifacts);
+      }
     } catch (error) {
       console.warn("Nova loadSession failed:", error);
       renderMessages(state.messages || []);
@@ -601,6 +639,10 @@
 
               if (finalText && !assistantText) {
                 assistantText = String(finalText);
+              }
+
+              if (Array.isArray(payload?.artifacts) && Nova.artifacts?.merge) {
+                Nova.artifacts.merge(payload.artifacts);
               }
 
               window.dispatchEvent(
