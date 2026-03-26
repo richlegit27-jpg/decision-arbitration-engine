@@ -1,45 +1,71 @@
 :root {
-  --bg: #0b1020;
-  --panel: #141c33;
-  --panel-2: #18223d;
-  --panel-3: #1d2947;
-  --text: #ecf2ff;
-  --muted: #95a3c7;
-  --line: rgba(167, 184, 255, 0.12);
-  --line-strong: rgba(167, 184, 255, 0.24);
-  --accent: #79a8ff;
-  --accent-strong: #5f93ff;
-  --accent-soft: rgba(121, 168, 255, 0.16);
-  --danger-soft: rgba(255, 107, 129, 0.16);
-  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.35);
+  --bg: #0a0f1c;
+  --bg-elevated: #10182b;
+  --panel: #131d34;
+  --panel-2: #182440;
+  --panel-3: #223252;
+
+  --text: #f5f8ff;
+  --text-soft: #d9e4ff;
+  --muted: #9fb0d4;
+  --muted-2: #7f92bb;
+
+  --accent: #7aa2ff;
+  --accent-strong: #5f8fff;
+  --accent-soft: rgba(122, 162, 255, 0.18);
+
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --danger: #ff7b86;
+  --danger-soft: rgba(255, 123, 134, 0.18);
+
+  --warning: #ffd36a;
+  --warning-soft: rgba(255, 211, 106, 0.18);
+
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.38);
   --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.24);
-  --radius-xl: 20px;
-  --radius-lg: 16px;
-  --mobile-panel-width: min(88vw, 340px);
+  --shadow-sm: 0 8px 18px rgba(0, 0, 0, 0.16);
+
+  --radius-xl: 22px;
+  --radius-lg: 18px;
+  --radius-md: 14px;
+  --radius-sm: 12px;
 }
 
-* { box-sizing: border-box; min-width: 0; }
+* {
+  box-sizing: border-box;
+}
 
-html, body {
-  width: 100%;
+html,
+body {
   height: 100%;
-  margin: 0;
-  padding: 0;
 }
-
-html { color-scheme: dark; }
 
 body {
-  font-family: "Segoe UI", system-ui, sans-serif;
-  background:
-    radial-gradient(circle at top left, rgba(121,168,255,0.10), transparent 28%),
-    radial-gradient(circle at top right, rgba(121,168,255,0.06), transparent 24%),
-    linear-gradient(180deg, #0b1020 0%, #0a0f1d 100%);
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
   color: var(--text);
-  overflow: hidden;
 }
 
-button,input,textarea,select { font: inherit; }
-button { cursor:pointer; border:0; outline:none; }
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
 
-.hidden { display:none !important; }
+button {
+  outline: none;
+}
+
+input,
+select,
+textarea {
+  color: var(--text);
+}
+
+.hidden {
+  display: none !important;
+}

@@ -1,64 +1,178 @@
 (() => {
   "use strict";
 
-  if (window.__novaUltimateLoaded) return;
+  if (window.__novaUltimateLoaded) {
+    console.warn("Nova ultimate already loaded. Skipping duplicate boot.");
+    return;
+  }
   window.__novaUltimateLoaded = true;
+
+  const Nova = (window.Nova = window.Nova || {});
+  const NovaConfig = (window.NovaConfig = window.NovaConfig || {});
 
   const API = {
     state: "/api/state",
+    getChat: (sessionId) => `/api/chat/${encodeURIComponent(sessionId)}`,
+    stream: "/api/chat/stream",
+    memory: "/api/memory",
+    addMemory: "/api/memory/add",
+    deleteMemory: "/api/memory/delete",
     newSession: "/api/session/new",
     deleteSession: "/api/session/delete",
     renameSession: "/api/session/rename",
     duplicateSession: "/api/session/duplicate",
     pinSession: "/api/session/pin",
-    getChat: (sessionId) => `/api/chat/${encodeURIComponent(sessionId)}`,
-    stream: "/api/chat/stream",
-    memory: "/api/memory",
-    addMemory: "/api/memory",
-    deleteMemory: "/api/memory/delete",
     upload: "/api/upload",
+    models: "/api/models",
+    health: "/api/health",
   };
 
-  const DEFAULT_MODEL = "gpt-4.1-mini";
-  const MAX_INPUT_HEIGHT = 180;
   const STORAGE = {
-    sidebarCollapsed: "nova_sidebar_collapsed",
-    memoryCollapsed: "nova_memory_collapsed",
+    activeSessionId: "nova_active_session_id",
+    currentModel: "nova_selected_model",
+    sidebarOpen: "nova_sidebar_open",
+    memoryOpen: "nova_memory_open",
+    themeMode: "nova_theme_mode",
+    backgroundMode: "nova_background_mode",
+    pinnedSessionIds: "nova_pinned_session_ids",
   };
 
-  const state = {
-    sessions: [],
-    messages: [],
-    memoryItems: [],
-    activeSessionId: null,
-    currentModel: DEFAULT_MODEL,
-    isSending: false,
-    attachedFiles: [],
-    lastUserMessage: "",
-    lastRouter: null,
-    deletingMemoryIds: new Set(),
-    deletingSessionIds: new Set(),
-    renamingSessionIds: new Set(),
-  };
+  const DEFAULT_MODEL = "gpt-5.4";
+  const MAX_INPUT_HEIGHT = 220;
+
+  const state = (Nova.state = Nova.state || {});
+  const dom = (Nova.dom = Nova.dom || {});
+  const api = (Nova.api = Nova.api || {});
+  const sessions = (Nova.sessions = Nova.sessions || {});
+  const memory = (Nova.memory = Nova.memory || {});
+  const chat = (Nova.chat = Nova.chat || {});
+  const render = (Nova.render = Nova.render || {});
+  const panels = (Nova.panels = Nova.panels || {});
+  const util = (Nova.util = Nova.util || {});
+
+  if (!(state.sessions instanceof Array)) state.sessions = [];
+  if (!(state.messages instanceof Array)) state.messages = [];
+  if (!(state.memoryItems instanceof Array)) state.memoryItems = [];
+  if (!(state.attachedFiles instanceof Array)) state.attachedFiles = [];
+  if (!(state.pinnedSessionIds instanceof Set)) state.pinnedSessionIds = new Set();
+  if (!(state.deletingMemoryIds instanceof Set)) state.deletingMemoryIds = new Set();
+
+  state.activeSessionId = state.activeSessionId || null;
+  state.currentModel = state.currentModel || DEFAULT_MODEL;
+  state.lastUserMessage = state.lastUserMessage || "";
+  state.lastAssistantMessage = state.lastAssistantMessage || "";
+  state.lastRouter = state.lastRouter || null;
+  state.isSending = Boolean(state.isSending);
+  state.isBootstrapping = Boolean(state.isBootstrapping);
+  state.isBooted = Boolean(state.isBooted);
+  state.bootError = state.bootError || null;
+  state.sidebarOpen = state.sidebarOpen !== false;
+  state.memoryOpen = Boolean(state.memoryOpen);
+  state.themeMode = state.themeMode || "dark";
+  state.backgroundMode = state.backgroundMode || "default";
 
   function byId(id) {
     return document.getElementById(id);
   }
 
-  function qs(sel, root = document) {
-    return root.querySelector(sel);
+  function qs(selector, root = document) {
+    return root.querySelector(selector);
   }
 
-  function qsa(sel, root = document) {
-    return Array.from(root.querySelectorAll(sel));
+  function qsa(selector, root = document) {
+    return Array.from(root.querySelectorAll(selector));
   }
 
-  function safeText(value) {
-    return String(value ?? "").trim();
+  function safeInvoke(fn, fallback = null) {
+    try {
+      return typeof fn === "function" ? fn() : fallback;
+    } catch (error) {
+      console.error(error);
+      return fallback;
+    }
+  }
+
+  function noop() {}
+
+  function asArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function asString(value, fallback = "") {
+    return typeof value === "string" ? value : fallback;
+  }
+
+  function safeJsonParse(text, fallback = null) {
+    try {
+      return JSON.parse(text);
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function readStorage(key, fallback) {
+    try {
+      const value = window.localStorage.getItem(key);
+      return value == null ? fallback : value;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function writeStorage(key, value) {
+    try {
+      window.localStorage.setItem(key, value);
+    } catch (_) {}
+  }
+
+  function removeStorage(key) {
+    try {
+      window.localStorage.removeItem(key);
+    } catch (_) {}
+  }
+
+  function setText(node, value) {
+    if (node) node.textContent = value == null ? "" : String(value);
+  }
+
+  function setHtml(node, value) {
+    if (node) node.innerHTML = value == null ? "" : String(value);
+  }
+
+  function show(node) {
+    if (node) node.classList.remove("hidden");
+  }
+
+  function hide(node) {
+    if (node) node.classList.add("hidden");
+  }
+
+  function toggle(node, shouldShow) {
+    if (!node) return;
+    node.classList.toggle("hidden", !shouldShow);
+  }
+
+  function clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function nowIso() {
+    return new Date().toISOString();
+  }
+
+  function formatDateLoose(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    try {
+      return date.toLocaleString();
+    } catch (_) {
+      return "";
+    }
   }
 
   function escapeHtml(value) {
-    return String(value ?? "")
+    return String(value == null ? "" : value)
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
@@ -66,1968 +180,834 @@
       .replaceAll("'", "&#39;");
   }
 
-  function nowUnix() {
-    return Math.floor(Date.now() / 1000);
-  }
-
-  function formatTime(ts) {
-    if (ts === null || ts === undefined || ts === "") return "";
-
-    try {
-      if (typeof ts === "string") {
-        const trimmed = ts.trim();
-        if (!trimmed) return "";
-
-        const numeric = Number(trimmed);
-        if (!Number.isNaN(numeric)) {
-          const ms = numeric > 9999999999 ? numeric : numeric * 1000;
-          const date = new Date(ms);
-          return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
-        }
-
-        const isoDate = new Date(trimmed);
-        return Number.isNaN(isoDate.getTime()) ? "" : isoDate.toLocaleString();
-      }
-
-      if (typeof ts === "number") {
-        const ms = ts > 9999999999 ? ts : ts * 1000;
-        const date = new Date(ms);
-        return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
-      }
-
-      const fallback = new Date(ts);
-      return Number.isNaN(fallback.getTime()) ? "" : fallback.toLocaleString();
-    } catch {
-      return "";
+  function extractMessageText(message) {
+    if (!message) return "";
+    if (typeof message.content === "string") return message.content;
+    if (typeof message.text === "string") return message.text;
+    if (Array.isArray(message.content)) {
+      return message.content
+        .map((part) => {
+          if (typeof part === "string") return part;
+          if (part && typeof part.text === "string") return part.text;
+          if (part && typeof part.content === "string") return part.content;
+          return "";
+        })
+        .filter(Boolean)
+        .join("\n");
     }
+    return "";
   }
 
-  async function apiGet(url) {
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-      credentials: "same-origin",
-    });
-
-    if (!res.ok) {
-      let msg = `GET failed: ${url}`;
-      try {
-        const data = await res.json();
-        msg = data.detail || data.message || data.error || msg;
-      } catch {}
-      throw new Error(msg);
-    }
-
-    return res.json();
-  }
-
-  async function apiPost(url, payload) {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      credentials: "same-origin",
-      body: JSON.stringify(payload || {}),
-    });
-
-    if (!res.ok) {
-      let msg = `POST failed: ${url}`;
-      try {
-        const data = await res.json();
-        msg = data.detail || data.message || data.error || msg;
-      } catch {}
-      throw new Error(msg);
-    }
-
-    return res.json();
-  }
-
-  async function uploadFiles(files) {
-    const list = Array.isArray(files) ? files : [];
-    if (!list.length) return [];
-
-    const formData = new FormData();
-    for (const file of list) {
-      formData.append("files", file);
-    }
-
-    const res = await fetch(API.upload, {
-      method: "POST",
-      body: formData,
-      credentials: "same-origin",
-    });
-
-    if (!res.ok) {
-      throw new Error("Upload failed");
-    }
-
-    const data = await res.json();
-    return Array.isArray(data.files) ? data.files : [];
-  }
-
-  function setStatus(text) {
-    const el =
-      byId("statusText") ||
-      byId("modelStatus") ||
-      byId("chatStatus") ||
-      byId("mobileModelStatus");
-    if (el) el.textContent = safeText(text || "Ready");
-  }
-
-  function autosizeInput() {
-    const input = byId("messageInput");
+  function autosizeComposer() {
+    const input = dom.composerInput;
     if (!input) return;
     input.style.height = "auto";
-    input.style.height = `${Math.min(input.scrollHeight, MAX_INPUT_HEIGHT)}px`;
+    input.style.height = `${clamp(input.scrollHeight, 44, MAX_INPUT_HEIGHT)}px`;
   }
 
-  function scrollChatToBottom() {
-    const container = byId("chatMessages");
-    if (!container) return;
-    container.scrollTop = container.scrollHeight;
+  function persistUiState() {
+    writeStorage(STORAGE.activeSessionId, state.activeSessionId || "");
+    writeStorage(STORAGE.currentModel, state.currentModel || DEFAULT_MODEL);
+    writeStorage(STORAGE.sidebarOpen, state.sidebarOpen ? "1" : "0");
+    writeStorage(STORAGE.memoryOpen, state.memoryOpen ? "1" : "0");
+    writeStorage(STORAGE.themeMode, state.themeMode || "dark");
+    writeStorage(STORAGE.backgroundMode, state.backgroundMode || "default");
+    writeStorage(
+      STORAGE.pinnedSessionIds,
+      JSON.stringify(Array.from(state.pinnedSessionIds || []))
+    );
   }
 
-  function updateLastUserMessage() {
-    const last = [...state.messages]
-      .reverse()
-      .find((msg) => safeText(msg.role).toLowerCase() === "user" && safeText(msg.content));
+  function restoreUiState() {
+    state.activeSessionId = readStorage(STORAGE.activeSessionId, state.activeSessionId || "") || null;
+    state.currentModel = readStorage(STORAGE.currentModel, state.currentModel || DEFAULT_MODEL) || DEFAULT_MODEL;
+    state.sidebarOpen = readStorage(STORAGE.sidebarOpen, state.sidebarOpen ? "1" : "0") !== "0";
+    state.memoryOpen = readStorage(STORAGE.memoryOpen, state.memoryOpen ? "1" : "0") === "1";
+    state.themeMode = readStorage(STORAGE.themeMode, state.themeMode || "dark") || "dark";
+    state.backgroundMode = readStorage(STORAGE.backgroundMode, state.backgroundMode || "default") || "default";
 
-    state.lastUserMessage = last ? String(last.content || "") : "";
-
-    const regenBtn = byId("regenerateBtn");
-    if (regenBtn) {
-      regenBtn.disabled = state.isSending || !state.lastUserMessage;
-    }
+    const pinnedRaw = readStorage(STORAGE.pinnedSessionIds, "[]");
+    const pinned = safeJsonParse(pinnedRaw, []);
+    state.pinnedSessionIds = new Set(Array.isArray(pinned) ? pinned.filter(Boolean) : []);
   }
 
-  function setSendingState(isSending) {
-    state.isSending = Boolean(isSending);
+  function cacheDom() {
+    dom.root = byId("nova-app");
+    dom.sidebar = byId("sidebar");
+    dom.sidebarToggle = byId("sidebarToggle");
+    dom.mobileSidebarToggle = byId("mobileSidebarToggle");
+    dom.newChatBtn = byId("newChatBtn");
+    dom.sessionList = byId("sessionList");
 
-    const sendBtn = byId("sendBtn");
-    const regenBtn = byId("regenerateBtn");
-    const input = byId("messageInput");
-    const attachBtn = byId("attachBtn");
-    const newBtn = byId("newSessionBtn");
+    dom.chatView = byId("chatView");
+    dom.chatMessages = byId("chatMessages");
+    dom.emptyState = byId("emptyState");
+    dom.routerBadge = byId("routerBadge");
+    dom.modelSelect = byId("modelSelect");
 
-    if (sendBtn) {
-      sendBtn.disabled = state.isSending;
-      sendBtn.setAttribute("aria-busy", state.isSending ? "true" : "false");
-    }
+    dom.memoryPanel = byId("memoryPanel");
+    dom.memoryToggle = byId("memoryToggle");
+    dom.memoryInput = byId("memoryInput");
+    dom.memoryAddBtn = byId("memoryAddBtn");
+    dom.memoryList = byId("memoryList");
 
-    if (regenBtn) {
-      regenBtn.disabled = state.isSending || !state.lastUserMessage;
-      regenBtn.setAttribute("aria-busy", state.isSending ? "true" : "false");
-    }
+    dom.composerShell = qs(".composer-shell");
+    dom.composerBox = qs(".composer-box");
+    dom.composerInput = byId("composerInput");
+    dom.sendBtn = byId("sendBtn");
+    dom.attachBtn = byId("attachBtn");
+    dom.fileInput = byId("fileInput");
+    dom.attachmentBar = byId("attachmentBar");
+    dom.voiceBtn = byId("voiceBtn");
+    dom.regenerateBtn = byId("regenerateBtn");
+    dom.themeToggle = byId("themeToggle");
 
-    if (input) input.disabled = state.isSending;
-    if (attachBtn) attachBtn.disabled = state.isSending;
-    if (newBtn) newBtn.disabled = state.isSending;
-
-    document.body.classList.toggle("is-sending", state.isSending);
+    return dom;
   }
 
-  async function copyTextToClipboard(text) {
-    const value = String(text ?? "");
-    if (!value) return false;
-
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
-        return true;
-      }
-    } catch {}
-
-    try {
-      const temp = document.createElement("textarea");
-      temp.value = value;
-      temp.setAttribute("readonly", "readonly");
-      temp.style.position = "fixed";
-      temp.style.left = "-9999px";
-      document.body.appendChild(temp);
-      temp.focus();
-      temp.select();
-      const ok = document.execCommand("copy");
-      document.body.removeChild(temp);
-      return ok;
-    } catch {
+  function ensureShell() {
+    cacheDom();
+    if (!dom.root) {
+      console.warn("Nova bootstrap: #nova-app not found, standing by.");
       return false;
     }
+    return true;
   }
 
-  function normalizeWebResults(rawResults) {
-    const list = Array.isArray(rawResults) ? rawResults : [];
-    const seen = new Set();
-
-    return list
-      .map((item) => {
-        const url = safeText(item?.url || item?.link || item?.href);
-        const title = safeText(item?.title || item?.name || url || "Untitled source");
-        const snippet = safeText(
-          item?.snippet ||
-            item?.content ||
-            item?.body ||
-            item?.text ||
-            item?.description
-        );
-
-        let domain = "";
-        try {
-          domain = url ? new URL(url).hostname.replace(/^www\./i, "") : "";
-        } catch {
-          domain = "";
-        }
-
-        const dedupeKey = `${url}__${title}`.toLowerCase();
-        if (!url && !title && !snippet) return null;
-        if (seen.has(dedupeKey)) return null;
-        seen.add(dedupeKey);
-
-        return {
-          url,
-          title,
-          domain,
-          snippet: snippet.length > 220 ? `${snippet.slice(0, 217)}...` : snippet,
-        };
-      })
-      .filter(Boolean);
-  }
-
-  function renderWebResultsHtml(webResults) {
-    const results = normalizeWebResults(webResults);
-    if (!results.length) return "";
-
-    return `
-      <section class="nova-web-results">
-        <div class="nova-web-results-header-row">
-          <div class="nova-web-results-header">Web sources</div>
-          <div class="nova-web-results-count">${results.length}</div>
-        </div>
-
-        <div class="nova-web-results-list">
-          ${results
-            .map(
-              (item) => `
-            <article class="nova-web-card">
-              <div class="nova-web-card-top">
-                <div class="nova-web-card-meta">
-                  <span class="nova-web-card-domain-pill">${escapeHtml(item.domain || "external source")}</span>
-                </div>
-
-                <div class="nova-web-card-title">${escapeHtml(item.title || "Untitled source")}</div>
-              </div>
-
-              ${
-                item.snippet
-                  ? `<div class="nova-web-card-snippet">${escapeHtml(item.snippet)}</div>`
-                  : `<div class="nova-web-card-snippet is-empty">No preview available.</div>`
-              }
-
-              ${
-                item.url
-                  ? `
-                    <div class="nova-web-card-actions">
-                      <a
-                        class="nova-web-open-link"
-                        href="${escapeHtml(item.url)}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <span>Open source</span>
-                        <span class="nova-web-open-arrow">↗</span>
-                      </a>
-                    </div>
-                  `
-                  : ""
-              }
-            </article>
-          `
-            )
-            .join("")}
-        </div>
-      </section>
-    `;
-  }
-
-  function injectWebResultStyles() {
-    if (byId("novaWebResultStyles")) return;
-
-    const style = document.createElement("style");
-    style.id = "novaWebResultStyles";
-    style.textContent = `
-      .nova-web-results {
-        margin-top: 14px;
-        padding-top: 14px;
-        border-top: 1px solid rgba(255,255,255,0.08);
-      }
-
-      .nova-web-results-header-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        margin-bottom: 12px;
-      }
-
-      .nova-web-results-header {
-        font-size: 12px;
-        font-weight: 800;
-        opacity: 0.82;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }
-
-      .nova-web-results-count {
-        min-width: 28px;
-        height: 22px;
-        padding: 0 8px;
-        border-radius: 999px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        font-weight: 800;
-        opacity: 0.78;
-        border: 1px solid rgba(255,255,255,0.10);
-        background: rgba(255,255,255,0.04);
-      }
-
-      .nova-web-results-list {
-        display: grid;
-        gap: 12px;
-      }
-
-      .nova-web-card {
-        position: relative;
-        border: 1px solid rgba(255,255,255,0.10);
-        border-radius: 16px;
-        padding: 14px;
-        background:
-          linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.025));
-        backdrop-filter: blur(8px);
-        box-shadow:
-          0 8px 24px rgba(0,0,0,0.12),
-          inset 0 1px 0 rgba(255,255,255,0.03);
-        transition:
-          transform 0.18s ease,
-          border-color 0.18s ease,
-          background 0.18s ease,
-          box-shadow 0.18s ease;
-      }
-
-      .nova-web-card:hover {
-        transform: translateY(-1px);
-        border-color: rgba(255,255,255,0.16);
-        background:
-          linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
-        box-shadow:
-          0 12px 28px rgba(0,0,0,0.16),
-          inset 0 1px 0 rgba(255,255,255,0.04);
-      }
-
-      .nova-web-card-top {
-        display: grid;
-        gap: 8px;
-        margin-bottom: 10px;
-      }
-
-      .nova-web-card-meta {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-      }
-
-      .nova-web-card-domain-pill {
-        display: inline-flex;
-        align-items: center;
-        min-height: 24px;
-        padding: 0 9px;
-        border-radius: 999px;
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 0.02em;
-        border: 1px solid rgba(255,255,255,0.11);
-        background: rgba(255,255,255,0.05);
-        opacity: 0.84;
-      }
-
-      .nova-web-card-title {
-        font-size: 15px;
-        font-weight: 800;
-        line-height: 1.38;
-        letter-spacing: -0.01em;
-        word-break: break-word;
-      }
-
-      .nova-web-card-snippet {
-        font-size: 13px;
-        line-height: 1.58;
-        opacity: 0.93;
-        word-break: break-word;
-      }
-
-      .nova-web-card-snippet.is-empty {
-        opacity: 0.62;
-      }
-
-      .nova-web-card-actions {
-        margin-top: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: flex-start;
-      }
-
-      .nova-web-open-link {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        min-height: 36px;
-        padding: 0 12px;
-        border-radius: 11px;
-        text-decoration: none;
-        font-size: 12px;
-        font-weight: 800;
-        letter-spacing: 0.01em;
-        border: 1px solid rgba(255,255,255,0.12);
-        background: rgba(255,255,255,0.05);
-        color: inherit;
-        transition:
-          background 0.18s ease,
-          border-color 0.18s ease,
-          transform 0.18s ease;
-      }
-
-      .nova-web-open-link:hover {
-        background: rgba(255,255,255,0.09);
-        border-color: rgba(255,255,255,0.18);
-        transform: translateY(-1px);
-      }
-
-      .nova-web-open-arrow {
-        font-size: 13px;
-        opacity: 0.78;
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  function injectMemoryPolishStyles() {
-    if (byId("novaMemoryPolishStyles")) return;
-
-    const style = document.createElement("style");
-    style.id = "novaMemoryPolishStyles";
-    style.textContent = `
-      .memory-item {
-        display: flex;
-        align-items: stretch;
-        justify-content: space-between;
-        gap: 12px;
-      }
-
-      .memory-item.is-deleting {
-        opacity: 0.55;
-        transform: scale(0.995);
-        pointer-events: none;
-      }
-
-      .memory-item-main {
-        min-width: 0;
-        flex: 1;
-      }
-
-      .memory-item-actions {
-        display: flex;
-        align-items: center;
-      }
-
-      .memory-delete-btn {
-        min-width: 88px;
-        height: 36px;
-        border: 1px solid rgba(255,255,255,0.12);
-        background: rgba(255,255,255,0.04);
-        color: inherit;
-        border-radius: 10px;
-        font-size: 12px;
-        font-weight: 700;
-        cursor: pointer;
-        transition: background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
-      }
-
-      .memory-delete-btn:hover:not(:disabled) {
-        background: rgba(255,255,255,0.08);
-        border-color: rgba(255,255,255,0.18);
-      }
-
-      .memory-delete-btn:disabled {
-        opacity: 0.7;
-        cursor: default;
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  function isMobilePanel() {
-    return window.matchMedia("(max-width: 980px)").matches;
-  }
-
-  function persistPanelState() {
-    try {
-      localStorage.setItem(
-        STORAGE.sidebarCollapsed,
-        document.body.classList.contains("sidebar-collapsed") ? "1" : "0"
-      );
-      localStorage.setItem(
-        STORAGE.memoryCollapsed,
-        document.body.classList.contains("memory-collapsed") ? "1" : "0"
-      );
-    } catch {}
-  }
-
-  function restorePanelState() {
-    if (isMobilePanel()) {
-      document.body.classList.remove("sidebar-collapsed", "memory-collapsed");
-      return;
-    }
-
-    try {
-      const sidebarCollapsed = localStorage.getItem(STORAGE.sidebarCollapsed) === "1";
-      const memoryCollapsed = localStorage.getItem(STORAGE.memoryCollapsed) === "1";
-
-      document.body.classList.toggle("sidebar-collapsed", sidebarCollapsed);
-      document.body.classList.toggle("memory-collapsed", memoryCollapsed);
-    } catch {
-      document.body.classList.remove("sidebar-collapsed", "memory-collapsed");
-    }
-  }
-
-  function setDesktopSidebarCollapsed(collapsed) {
-    if (isMobilePanel()) return;
-    document.body.classList.toggle("sidebar-collapsed", Boolean(collapsed));
-    persistPanelState();
-  }
-
-  function setDesktopMemoryCollapsed(collapsed) {
-    if (isMobilePanel()) return;
-    document.body.classList.toggle("memory-collapsed", Boolean(collapsed));
-    persistPanelState();
-  }
-
-  function toggleDesktopSidebar() {
-    if (isMobilePanel()) return;
-    const next = !document.body.classList.contains("sidebar-collapsed");
-    setDesktopSidebarCollapsed(next);
-  }
-
-  function toggleDesktopMemory() {
-    if (isMobilePanel()) return;
-    const next = !document.body.classList.contains("memory-collapsed");
-    setDesktopMemoryCollapsed(next);
-  }
-
-  function ensureDesktopMemoryOpen() {
-    if (isMobilePanel()) return;
-    document.body.classList.remove("memory-collapsed");
-    persistPanelState();
-  }
-
-  function ensureDesktopSidebarOpen() {
-    if (isMobilePanel()) return;
-    document.body.classList.remove("sidebar-collapsed");
-    persistPanelState();
-  }
-
-  function setPanelBodyState(isOpen) {
-    document.body.classList.toggle("panel-open", Boolean(isOpen));
-  }
-
-  function closeMobilePanels() {
-    document.body.classList.remove("mobile-left-open", "mobile-right-open");
-    setPanelBodyState(false);
-  }
-
-  function openLeftMobile() {
-    document.body.classList.remove("mobile-right-open");
-    document.body.classList.add("mobile-left-open");
-    setPanelBodyState(true);
-  }
-
-  function openRightMobile() {
-    document.body.classList.remove("mobile-left-open");
-    document.body.classList.add("mobile-right-open");
-    setPanelBodyState(true);
-  }
-
-  function syncPanelMode() {
-    if (isMobilePanel()) {
-      document.body.classList.remove("sidebar-collapsed", "memory-collapsed");
-    } else {
-      closeMobilePanels();
-      restorePanelState();
-    }
-  }
-
-  function renderAttachedFiles() {
-    const bar = byId("attachedFilesBar") || byId("attachedFiles");
-    if (!bar) return;
-
-    bar.innerHTML = "";
-
-    if (!state.attachedFiles.length) {
-      bar.classList.remove("has-files");
-      return;
-    }
-
-    bar.classList.add("has-files");
-
-    state.attachedFiles.forEach((file, index) => {
-      const chip = document.createElement("div");
-      chip.className = "file-chip";
-      chip.innerHTML = `
-        <span>${escapeHtml(file.name)} (${Math.max(1, Math.round((Number(file.size) || 0) / 1024))} KB)</span>
-        <button type="button" data-file-index="${index}" aria-label="Remove file">✕</button>
-      `;
-      bar.appendChild(chip);
-    });
-
-    qsa("[data-file-index]", bar).forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const index = Number(btn.getAttribute("data-file-index"));
-        if (Number.isNaN(index)) return;
-        state.attachedFiles.splice(index, 1);
-        renderAttachedFiles();
-
-        const fileInput = byId("fileInput");
-        if (!state.attachedFiles.length && fileInput) {
-          fileInput.value = "";
-        }
-      });
-    });
-  }
-
-  function updateSessionBadge() {
-    const titleEl = byId("chatTitle") || byId("sessionTitle");
-    const subtitleEl = byId("chatSubtitle") || byId("sessionSubtitle");
-
-    const currentSession = state.sessions.find(
-      (item) => item.id === state.activeSessionId || item.session_id === state.activeSessionId
-    );
-
-    if (titleEl) titleEl.textContent = currentSession?.title || "Nova";
-    if (subtitleEl) {
-      subtitleEl.textContent = state.isSending
-        ? "Thinking..."
-        : `${state.messages.length || 0} messages`;
-    }
-  }
-
-  function buildRouterBadgeHtml(router) {
-    if (!router) return "";
-
-    const mode = safeText(router.mode || "general");
-    const intent = safeText(router.intent || "chat");
-    const memoryHits = Number.isFinite(router.memory_hits)
-      ? router.memory_hits
-      : Number(router.memory_hits || 0);
-    const normalizedMemoryCount = Number.isFinite(router.memory_count)
-      ? router.memory_count
-      : Number(router.memory_count || memoryHits || 0);
-
-    return `
-      <div class="router-badge">
-        <span class="router-badge-pill rb-mode" data-mode="${escapeHtml(mode)}">${escapeHtml(mode)}</span>
-        <span class="router-badge-pill rb-intent">${escapeHtml(intent)}</span>
-        <span class="router-badge-pill rb-memory">mem:${escapeHtml(normalizedMemoryCount)}</span>
-      </div>
-    `;
-  }
-
-  function updateRouterDebug(router) {
-    state.lastRouter = router || null;
-
-    const content = byId("routerContent");
-    if (!content || !router) return;
-
-    const preview = Array.isArray(router.memory_preview)
-      ? router.memory_preview
-      : Array.isArray(router.memory_items)
-      ? router.memory_items
-      : Array.isArray(router.memory_used)
-      ? router.memory_used
-      : [];
-
-    const previewHtml = preview.length
-      ? `<ul class="router-debug-list">${preview
-          .map((item) => `<li>${escapeHtml(item)}</li>`)
-          .join("")}</ul>`
-      : `<div class="router-debug-empty">—</div>`;
-
-    const ts = Number(router.timestamp || 0);
-    const timeText = ts ? formatTime(ts) : "—";
-    const memoryHits = Number.isFinite(router.memory_hits)
-      ? router.memory_hits
-      : Number(router.memory_count || 0);
-
-    content.innerHTML = `
-      <div class="router-debug-row"><strong>Mode:</strong> ${escapeHtml(router.mode || "general")}</div>
-      <div class="router-debug-row"><strong>Intent:</strong> ${escapeHtml(router.intent || "chat")}</div>
-      <div class="router-debug-row"><strong>Reason:</strong> ${escapeHtml(router.reason || "auto")}</div>
-      <div class="router-debug-row"><strong>Memory Hits:</strong> ${escapeHtml(memoryHits ?? 0)}</div>
-      <div class="router-debug-row"><strong>Time:</strong> ${escapeHtml(timeText)}</div>
-      <div class="router-debug-row"><strong>Memory Used:</strong>${previewHtml}</div>
-    `;
-  }
-
-  function normalizeRouterMeta(payload) {
-    if (!payload || typeof payload !== "object") return null;
-
-    const raw =
-      (payload.router_meta && typeof payload.router_meta === "object" && payload.router_meta) ||
-      (payload.router && typeof payload.router === "object" && payload.router) ||
-      null;
-
-    if (!raw) return null;
-
-    return {
-      mode: raw.mode ?? "general",
-      intent: raw.intent ?? "conversation",
-      confidence: raw.confidence ?? null,
-      reason: raw.reason ?? "",
-      memory_used: raw.memory_used ?? false,
-      memory_count: Number(raw.memory_count ?? raw.memory_hits ?? 0),
-      memory_hits: Number(raw.memory_hits ?? raw.memory_count ?? 0),
-      memory_items: Array.isArray(raw.memory_items) ? raw.memory_items : [],
-      memory_preview: Array.isArray(raw.memory_preview)
-        ? raw.memory_preview
-        : Array.isArray(raw.memory_items)
-        ? raw.memory_items
-        : [],
-      model: raw.model ?? null,
-      provider: raw.provider ?? null,
-      route_time_ms: raw.route_time_ms ?? null,
-      source: raw.source ?? null,
-      timestamp: raw.timestamp ?? null,
-      updated_at: raw.updated_at ?? null,
+  async function apiRequest(url, options = {}) {
+    const requestOptions = {
+      method: options.method || "GET",
+      headers: {
+        ...(options.headers || {}),
+      },
+      body: options.body,
+      credentials: options.credentials || "same-origin",
     };
-  }
 
-  function applyIncomingRouterMeta(payload) {
-    const meta = normalizeRouterMeta(payload);
-    if (!meta) return null;
-
-    state.lastRouter = meta;
-    window.__novaLastRouterMeta = meta;
-
-    try {
-      window.dispatchEvent(new CustomEvent("nova:router-meta", { detail: meta }));
-    } catch {}
-
-    updateRouterDebug(meta);
-
-    if (window.NovaRouterPanel && typeof window.NovaRouterPanel.applyRouterMeta === "function") {
-      try {
-        window.NovaRouterPanel.applyRouterMeta(meta);
-      } catch {}
+    if (requestOptions.body && !requestOptions.headers["Content-Type"] && !(requestOptions.body instanceof FormData)) {
+      requestOptions.headers["Content-Type"] = "application/json";
     }
 
-    return meta;
+    const response = await fetch(url, requestOptions);
+    const text = await response.text();
+    const data = text ? safeJsonParse(text, null) : null;
+
+    if (!response.ok) {
+      const errorMessage =
+        (data && (data.error || data.message)) ||
+        `Request failed: ${response.status} ${response.statusText}`;
+      throw new Error(errorMessage);
+    }
+
+    return data ?? { ok: true };
   }
 
-  function pulseElement(el) {
-    if (!el || typeof el.animate !== "function") return;
-    try {
-      el.animate(
-        [
-          { transform: "scale(1)", opacity: 1 },
-          { transform: "scale(1.015)", opacity: 1 },
-          { transform: "scale(1)", opacity: 1 },
-        ],
-        { duration: 240, easing: "ease-out" }
-      );
-    } catch {}
+  api.request = api.request || apiRequest;
+  api.get = api.get || ((url) => apiRequest(url));
+  api.post =
+    api.post ||
+    ((url, payload) =>
+      apiRequest(url, {
+        method: "POST",
+        body: JSON.stringify(payload || {}),
+      }));
+
+  function updateRouterBadge(text, tone) {
+    if (!dom.routerBadge) return;
+    setText(dom.routerBadge, text || "Ready");
+    dom.routerBadge.dataset.tone = tone || "neutral";
   }
 
-  function animateSessionRemoval(el) {
-    if (!el || typeof el.animate !== "function") return Promise.resolve();
-    try {
-      const anim = el.animate(
-        [
-          { opacity: 1, transform: "translateX(0) scale(1)", height: `${el.offsetHeight}px` },
-          { opacity: 0, transform: "translateX(-10px) scale(0.98)", height: "0px", margin: "0px" },
-        ],
-        { duration: 220, easing: "ease" }
-      );
-      return anim.finished.catch(() => {});
-    } catch {
-      return Promise.resolve();
+  function applyTheme() {
+    const theme = state.themeMode || "dark";
+    document.documentElement.setAttribute("data-theme", theme);
+    document.body.dataset.theme = theme;
+  }
+
+  function applyPanelState() {
+    if (dom.sidebar) {
+      dom.sidebar.classList.toggle("is-open", !!state.sidebarOpen);
+      dom.sidebar.classList.toggle("is-collapsed", !state.sidebarOpen);
+    }
+    if (dom.memoryPanel) {
+      dom.memoryPanel.classList.toggle("is-open", !!state.memoryOpen);
+    }
+    if (dom.root) {
+      dom.root.classList.toggle("sidebar-open", !!state.sidebarOpen);
+      dom.root.classList.toggle("memory-open", !!state.memoryOpen);
     }
   }
 
-  function renderSessions() {
-    const list =
-      byId("sessionList") ||
-      byId("sessionsList") ||
-      qs("[data-role='session-list']");
-
-    if (!list) return;
-
-    const searchValue = safeText(byId("sessionSearchInput")?.value || "").toLowerCase();
-
-    const visibleSessions = state.sessions.filter((session) => {
-      if (!searchValue) return true;
-      const title = safeText(session.title || "New Chat").toLowerCase();
-      return title.includes(searchValue);
-    });
-
-    if (!visibleSessions.length) {
-      list.innerHTML = `<div class="session-empty">No chats yet.</div>`;
+  function renderAttachmentBarFallback() {
+    if (!dom.attachmentBar) return;
+    const files = asArray(state.attachedFiles);
+    if (!files.length) {
+      setHtml(dom.attachmentBar, "");
+      hide(dom.attachmentBar);
       return;
     }
 
-    list.innerHTML = visibleSessions
-      .map((session) => {
-        const sessionId = session.id || session.session_id || "";
-        const isActive = sessionId === state.activeSessionId;
-        const isDeleting = state.deletingSessionIds.has(sessionId);
-        const isRenaming = state.renamingSessionIds.has(sessionId);
-
-        return `
-          <button
-            class="session-item ${isActive ? "active" : ""} ${isDeleting ? "is-deleting" : ""} ${isRenaming ? "is-renaming" : ""}"
-            type="button"
-            data-session-id="${escapeHtml(sessionId)}"
-            ${isDeleting ? "disabled" : ""}
-          >
-            <div class="session-item-title">${escapeHtml(session.title || "New Chat")}</div>
-            <div class="session-item-meta">${escapeHtml(String(session.message_count || 0))} messages</div>
-          </button>
-        `;
-      })
-      .join("");
-
-    qsa("[data-session-id]", list).forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const sessionId = btn.getAttribute("data-session-id");
-        if (!sessionId || sessionId === state.activeSessionId || state.deletingSessionIds.has(sessionId)) return;
-
-        try {
-          setStatus("Loading chat...");
-          await loadSession(sessionId);
-          setStatus("Ready");
-          pulseElement(btn);
-        } catch (err) {
-          console.error(err);
-          setStatus("Load failed");
-        }
-      });
-    });
+    show(dom.attachmentBar);
+    setHtml(
+      dom.attachmentBar,
+      files
+        .map((file, index) => {
+          const name = escapeHtml(file.name || file.filename || `file-${index + 1}`);
+          return `
+            <div class="attachment-chip" data-index="${index}">
+              <span class="attachment-chip-name">${name}</span>
+              <button class="attachment-chip-remove" type="button" data-remove-attachment="${index}">×</button>
+            </div>
+          `;
+        })
+        .join("")
+    );
   }
 
-  function renderMemory() {
-    const list = byId("memoryList");
-    if (!list) return;
+  function renderSessionsFallback() {
+    if (!dom.sessionList) return;
+    const sessionsList = asArray(state.sessions);
 
-    if (!state.memoryItems.length) {
-      list.innerHTML = `<div class="memory-empty">No saved memory yet.</div>`;
+    if (!sessionsList.length) {
+      setHtml(dom.sessionList, `<div class="empty-panel-note">No chats yet.</div>`);
       return;
     }
 
-    list.innerHTML = state.memoryItems
-      .map((item) => {
-        const id = safeText(item.id || "");
-        const isDeleting = state.deletingMemoryIds.has(id);
-
-        return `
-          <div class="memory-item ${isDeleting ? "is-deleting" : ""}" data-memory-id="${escapeHtml(id)}">
-            <div class="memory-item-main">
-              <div class="memory-item-kind">${escapeHtml(item.kind || "memory")}</div>
-              <div class="memory-item-value">${escapeHtml(item.value || "")}</div>
-              <div class="memory-item-meta">${escapeHtml(
-                formatTime(item.updated_at || item.created_at || nowUnix())
-              )}</div>
-            </div>
-
-            <div class="memory-item-actions">
-              <button
-                class="memory-delete-btn"
-                type="button"
-                data-memory-delete="${escapeHtml(id)}"
-                title="Delete memory"
-                aria-label="Delete memory"
-                ${isDeleting ? "disabled" : ""}
-              >
-                ${isDeleting ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        `;
-      })
-      .join("");
+    setHtml(
+      dom.sessionList,
+      sessionsList
+        .map((session) => {
+          const id = asString(session.id);
+          const title = escapeHtml(asString(session.title, "Untitled"));
+          const active = id && id === state.activeSessionId ? "is-active" : "";
+          return `
+            <button class="session-item ${active}" type="button" data-session-id="${escapeHtml(id)}">
+              <span class="session-item-title">${title}</span>
+            </button>
+          `;
+        })
+        .join("")
+    );
   }
 
-  function renderMessages() {
-    const container = byId("chatMessages");
-    if (!container) return;
+  function renderMessagesFallback() {
+    if (!dom.chatMessages) return;
+    const messages = asArray(state.messages);
 
-    if (!state.messages.length) {
-      container.innerHTML = `
-        <div class="chat-empty-state">
-          <div class="chat-empty-card">
-            <div class="chat-empty-title">Nova is ready</div>
-            <div class="chat-empty-subtitle">Start a new message.</div>
-          </div>
-        </div>
-      `;
-      updateLastUserMessage();
-      updateSessionBadge();
+    if (!messages.length) {
+      if (dom.emptyState) show(dom.emptyState);
       return;
     }
 
-    container.innerHTML = state.messages
-      .map((msg, index) => {
-        const role = safeText(msg.role || "assistant").toLowerCase();
-        const content = escapeHtml(msg.content || "").replace(/\n/g, "<br>");
-        const time = formatTime(msg.timestamp || msg.created_at || nowUnix());
-        const isAssistant = role === "assistant";
-        const routerBadge = isAssistant
-          ? buildRouterBadgeHtml(msg.router || msg.router_meta || null)
-          : "";
-        const cursorHtml =
-          isAssistant && msg.streaming
-            ? `<span class="nova-stream-cursor" aria-hidden="true">▍</span>`
-            : "";
-        const webResultsHtml =
-          isAssistant && !msg.streaming
-            ? renderWebResultsHtml(msg.web_results || msg.webResults || [])
-            : "";
+    if (dom.emptyState) hide(dom.emptyState);
 
+    const existingEmpty = dom.emptyState ? dom.emptyState.outerHTML : "";
+    const html = messages
+      .map((message) => {
+        const role = escapeHtml(asString(message.role, "assistant"));
+        const text = escapeHtml(extractMessageText(message));
         return `
-          <article class="chat-message ${escapeHtml(role)}">
-            <div class="chat-message-role">${escapeHtml(role)}</div>
-            ${routerBadge}
-            <div class="chat-message-content">${content || "&nbsp;"}${cursorHtml}</div>
-            ${webResultsHtml}
-            <div class="chat-message-footer">
-              <div class="chat-message-time">${escapeHtml(time)}</div>
-              ${
-                isAssistant
-                  ? `
-                <div class="chat-message-actions">
-                  <button
-                    type="button"
-                    class="chat-message-action-btn"
-                    data-copy-index="${index}"
-                    aria-label="Copy message"
-                  >
-                    Copy
-                  </button>
-                </div>
-              `
-                  : ""
-              }
-            </div>
+          <article class="message message-${role}">
+            <div class="message-role">${role}</div>
+            <div class="message-body"><pre>${text}</pre></div>
           </article>
         `;
       })
       .join("");
 
-    qsa("[data-copy-index]", container).forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const index = Number(btn.getAttribute("data-copy-index"));
-        if (Number.isNaN(index)) return;
-
-        const msg = state.messages[index];
-        if (!msg) return;
-
-        const original = btn.textContent;
-        const ok = await copyTextToClipboard(msg.content || "");
-        btn.textContent = ok ? "Copied" : "Failed";
-
-        setTimeout(() => {
-          btn.textContent = original || "Copy";
-        }, 1200);
-      });
-    });
-
-    const lastAssistant = [...state.messages]
-      .reverse()
-      .find(
-        (msg) => safeText(msg.role).toLowerCase() === "assistant" && (msg.router || msg.router_meta)
-      );
-
-    if (lastAssistant?.router || lastAssistant?.router_meta) {
-      updateRouterDebug(lastAssistant.router || lastAssistant.router_meta);
-    }
-
-    updateLastUserMessage();
-    updateSessionBadge();
-    scrollChatToBottom();
+    dom.chatMessages.innerHTML = existingEmpty + html;
+    dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
   }
 
-  function addLocalMessage(role, content, router = null, webResults = []) {
-    state.messages.push({
-      role: safeText(role || "assistant"),
-      content: String(content ?? ""),
-      timestamp: nowUnix(),
-      router,
-      web_results: Array.isArray(webResults) ? webResults : [],
-    });
-    renderMessages();
+  function renderMemoryFallback() {
+    if (!dom.memoryList) return;
+    const items = asArray(state.memoryItems);
+
+    if (!items.length) {
+      setHtml(dom.memoryList, `<div class="empty-panel-note">No memory saved yet.</div>`);
+      return;
+    }
+
+    setHtml(
+      dom.memoryList,
+      items
+        .map((item) => {
+          const id = escapeHtml(asString(item.id));
+          const kind = escapeHtml(asString(item.kind, "note"));
+          const value = escapeHtml(asString(item.value, ""));
+          return `
+            <div class="memory-card" data-memory-id="${id}">
+              <div class="memory-kind">${kind}</div>
+              <div class="memory-value">${value}</div>
+              <button class="memory-delete-btn" type="button" data-delete-memory="${id}">Delete</button>
+            </div>
+          `;
+        })
+        .join("")
+    );
+  }
+
+  function renderAll() {
+    safeInvoke(() => (typeof render.sessions === "function" ? render.sessions() : renderSessionsFallback()));
+    safeInvoke(() => (typeof render.messages === "function" ? render.messages() : renderMessagesFallback()));
+    safeInvoke(() => (typeof render.memory === "function" ? render.memory() : renderMemoryFallback()));
+    safeInvoke(() =>
+      typeof render.attachments === "function" ? render.attachments() : renderAttachmentBarFallback()
+    );
+    safeInvoke(applyTheme);
+    safeInvoke(applyPanelState);
+    safeInvoke(autosizeComposer);
+    safeInvoke(() => updateRouterBadge(state.lastRouter?.label || "Ready", state.lastRouter?.tone || "neutral"));
   }
 
   async function loadState() {
-    const data = await apiGet(API.state);
-    state.sessions = Array.isArray(data.sessions) ? data.sessions : [];
+    const data = await api.get(API.state);
+    state.sessions = asArray(data?.sessions);
+    state.memoryItems = asArray(data?.memory || data?.items);
+    state.currentModel = asString(data?.model, state.currentModel || DEFAULT_MODEL);
 
-    const currentSessionId = data.current_session_id || null;
-
-    if (state.activeSessionId) {
-      const exists = state.sessions.some(
-        (s) => (s.id || s.session_id) === state.activeSessionId
-      );
-      if (!exists) {
-        state.activeSessionId =
-          state.sessions[0]?.id || state.sessions[0]?.session_id || currentSessionId || null;
-      }
-    } else if (state.sessions.length) {
-      state.activeSessionId = state.sessions[0].id || state.sessions[0].session_id || currentSessionId;
-    } else {
-      state.activeSessionId = currentSessionId;
+    if (!state.activeSessionId) {
+      state.activeSessionId = asString(data?.active_session_id, "") || asString(state.sessions[0]?.id, "") || null;
     }
 
-    if (data.router_meta || data.last_router_meta || data.router) {
-      applyIncomingRouterMeta({
-        router_meta: data.router_meta || data.last_router_meta || null,
-        router: data.router || null,
-      });
-    }
-
-    renderSessions();
-    updateSessionBadge();
+    return data;
   }
 
   async function loadSession(sessionId) {
-    if (!sessionId) return;
-
-    const data = await apiGet(API.getChat(sessionId));
-    state.activeSessionId = data.session?.id || data.session_id || sessionId;
-
-    const incomingMessages = Array.isArray(data.messages)
-      ? data.messages
-      : Array.isArray(data.session?.messages)
-      ? data.session.messages
-      : [];
-
-    state.messages = incomingMessages.map((msg) => ({
-      ...msg,
-      web_results: Array.isArray(msg?.web_results || msg?.webResults)
-        ? msg.web_results || msg.webResults
-        : [],
-    }));
-
-    if (data.router_meta || data.last_router_meta || data.router) {
-      applyIncomingRouterMeta({
-        router_meta: data.router_meta || data.last_router_meta || null,
-        router: data.router || data.session?.router_meta || null,
-      });
-    }
-
-    renderMessages();
-    renderSessions();
-  }
-
-  async function loadMemory() {
-    const data = await apiGet(API.memory);
-    state.memoryItems = Array.isArray(data.memory)
-      ? data.memory
-      : Array.isArray(data.items)
-      ? data.items
-      : [];
-    renderMemory();
-  }
-
-  async function createNewSession() {
-    const data = await apiPost(API.newSession, {});
-    await loadState();
-
-    const newId = data.session?.id || data.session_id || null;
-
-    if (newId) {
-      await loadSession(newId);
-    } else {
+    const targetId = asString(sessionId || state.activeSessionId || "");
+    if (!targetId) {
       state.messages = [];
-      renderMessages();
+      renderAll();
+      return null;
     }
 
-    if (isMobilePanel()) {
-      closeMobilePanels();
+    const data = await api.get(API.getChat(targetId));
+    const session = data?.session || {};
+    state.activeSessionId = asString(session.id, targetId);
+    state.messages = asArray(session.messages);
+    state.lastUserMessage = "";
+    state.lastAssistantMessage = "";
+
+    for (let i = state.messages.length - 1; i >= 0; i -= 1) {
+      const msg = state.messages[i];
+      if (!state.lastAssistantMessage && msg?.role === "assistant") {
+        state.lastAssistantMessage = extractMessageText(msg);
+      }
+      if (!state.lastUserMessage && msg?.role === "user") {
+        state.lastUserMessage = extractMessageText(msg);
+      }
+      if (state.lastAssistantMessage && state.lastUserMessage) break;
+    }
+
+    renderAll();
+    persistUiState();
+    return session;
+  }
+
+  async function createSession() {
+    const data = await api.post(API.newSession, { title: "New Chat" });
+    const sessionId = asString(data?.session_id || data?.session?.id, "");
+    await loadState();
+    if (sessionId) {
+      state.activeSessionId = sessionId;
+      await loadSession(sessionId);
     } else {
-      ensureDesktopSidebarOpen();
+      renderAll();
     }
   }
 
-  async function addMemory(kind, value) {
-    await apiPost(API.addMemory, { kind, value });
-    await loadMemory();
-  }
+  async function addMemory() {
+    const value = asString(dom.memoryInput?.value, "").trim();
+    if (!value) return;
 
-  async function deleteMemory(id) {
-    await apiPost(API.deleteMemory, { id });
-  }
-
-  async function deleteSession(sessionId) {
-    return apiPost(API.deleteSession, { session_id: sessionId, id: sessionId });
-  }
-
-  async function renameSession(sessionId, title) {
-    return apiPost(API.renameSession, {
-      session_id: sessionId,
-      id: sessionId,
-      title,
-      name: title,
+    await api.post(API.addMemory, {
+      kind: "note",
+      value,
     });
+
+    if (dom.memoryInput) dom.memoryInput.value = "";
+    await refreshMemory();
   }
 
-  function parseSSEBlock(block) {
-    const lines = String(block || "").split(/\r?\n/);
-    let eventName = "message";
-    const dataLines = [];
+  async function deleteMemory(itemId) {
+    if (!itemId) return;
+    if (state.deletingMemoryIds.has(itemId)) return;
 
-    for (const line of lines) {
-      if (line.startsWith("event:")) {
-        eventName = line.slice(6).trim();
-      } else if (line.startsWith("data:")) {
-        dataLines.push(line.slice(5).trim());
-      }
-    }
-
-    const rawData = dataLines.join("\n").trim();
-    if (!rawData) {
-      return { event: eventName, data: {} };
-    }
-
-    if (rawData === "[DONE]") {
-      return { event: eventName, data: { type: "done_marker" } };
-    }
-
+    state.deletingMemoryIds.add(itemId);
     try {
-      return { event: eventName, data: JSON.parse(rawData) };
-    } catch {
-      return { event: eventName, data: { raw: rawData } };
-    }
-  }
-
-  async function streamSend(content, attachedFilesOverride = null, options = {}) {
-    const input = byId("messageInput");
-    const normalizedContent = safeText(content);
-    const pendingFiles = Array.isArray(attachedFilesOverride)
-      ? [...attachedFilesOverride]
-      : [...state.attachedFiles];
-
-    if (!normalizedContent && !pendingFiles.length) return;
-
-    if (!state.activeSessionId) {
-      await createNewSession();
-    }
-
-    const suppressLocalUser = Boolean(options.suppressLocalUser);
-    let assistantStreamMessage = null;
-    let uploadedFiles = [];
-    const activeSessionIdBeforeSend = state.activeSessionId;
-
-    setSendingState(true);
-    setStatus("Responding...");
-
-    try {
-      if (!suppressLocalUser) {
-        if (normalizedContent) {
-          addLocalMessage("user", normalizedContent);
-        } else if (pendingFiles.length) {
-          addLocalMessage("user", `[Uploaded ${pendingFiles.length} file(s)]`);
-        }
-      }
-
-      assistantStreamMessage = {
-        role: "assistant",
-        content: "",
-        timestamp: nowUnix(),
-        router: null,
-        web_results: [],
-        streaming: true,
-      };
-      state.messages.push(assistantStreamMessage);
-
-      let finalContent = "";
-      let streamRouter = null;
-      let pendingDelta = "";
-      let renderScheduled = false;
-      let streamFinished = false;
-
-      function flushPendingDelta() {
-        if (!pendingDelta) return;
-        finalContent += pendingDelta;
-        assistantStreamMessage.content = finalContent;
-        pendingDelta = "";
-      }
-
-      function scheduleRender() {
-        if (renderScheduled) return;
-        renderScheduled = true;
-        requestAnimationFrame(() => {
-          renderScheduled = false;
-          flushPendingDelta();
-          renderMessages();
-        });
-      }
-
-      function applyRouter(routerLike) {
-        const normalized = applyIncomingRouterMeta(routerLike);
-        if (!normalized) return;
-        streamRouter = normalized;
-        assistantStreamMessage.router = normalized;
-        scheduleRender();
-      }
-
-      function finalizeAssistant(finalText = "") {
-        flushPendingDelta();
-
-        if (typeof finalText === "string" && finalText) {
-          assistantStreamMessage.content = finalText;
-          finalContent = finalText;
-        } else {
-          assistantStreamMessage.content = assistantStreamMessage.content || finalContent || "";
-          finalContent = assistantStreamMessage.content;
-        }
-
-        if (streamRouter) {
-          assistantStreamMessage.router = streamRouter;
-        }
-
-        assistantStreamMessage.streaming = false;
-        streamFinished = true;
-        renderMessages();
-      }
-
-      function handlePayload(data, fallbackEvent = "") {
-        const payload = data && typeof data === "object" ? data : {};
-        const dataType = safeText(payload.type).toLowerCase();
-        const eventType = safeText(fallbackEvent).toLowerCase();
-        const resolvedType = dataType || eventType;
-
-        if (!resolvedType || resolvedType === "done_marker") {
-          return;
-        }
-
-        if (
-          resolvedType === "meta" ||
-          resolvedType === "router" ||
-          payload.router ||
-          payload.router_meta
-        ) {
-          applyRouter(payload);
-        }
-
-        if (resolvedType === "start") {
-          if (payload.session_id) {
-            state.activeSessionId = payload.session_id;
-          }
-          return;
-        }
-
-        if (resolvedType === "meta" || resolvedType === "router") {
-          if (payload.session_id) {
-            state.activeSessionId = payload.session_id;
-          }
-          return;
-        }
-
-        if (resolvedType === "delta") {
-          const delta =
-            typeof payload.delta === "string"
-              ? payload.delta
-              : typeof payload.content === "string"
-              ? payload.content
-              : typeof payload.text === "string"
-              ? payload.text
-              : "";
-
-          if (!delta) return;
-
-          pendingDelta += delta;
-          scheduleRender();
-          return;
-        }
-
-        if (resolvedType === "done") {
-          const final =
-            typeof payload.response === "string"
-              ? payload.response
-              : typeof payload.message?.content === "string"
-              ? payload.message.content
-              : typeof payload.content === "string"
-              ? payload.content
-              : finalContent;
-
-          if (payload.session_id) {
-            state.activeSessionId = payload.session_id;
-          }
-
-          assistantStreamMessage.web_results = Array.isArray(payload.web_results)
-            ? payload.web_results
-            : Array.isArray(payload.message?.web_results)
-            ? payload.message.web_results
-            : [];
-
-          finalizeAssistant(final || assistantStreamMessage.content || finalContent);
-          return;
-        }
-
-        if (resolvedType === "error") {
-          throw new Error(payload.message || payload.error || "Stream failed");
-        }
-      }
-
-      renderMessages();
-
-      if (input && attachedFilesOverride === null && !suppressLocalUser) {
-        input.value = "";
-        autosizeInput();
-      }
-
-      if (pendingFiles.length) {
-        setStatus("Uploading...");
-        uploadedFiles = await uploadFiles(pendingFiles);
-        setStatus("Responding...");
-      }
-
-      const model = safeText(state.currentModel) || DEFAULT_MODEL;
-
-      let res;
-      try {
-        res = await fetch(API.stream, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "text/event-stream, application/json, text/plain, */*",
-          },
-          credentials: "same-origin",
-          body: JSON.stringify({
-            session_id: state.activeSessionId,
-            content: normalizedContent,
-            message: normalizedContent,
-            model,
-            uploaded_files: uploadedFiles,
-          }),
-        });
-      } catch (err) {
-        console.error("STREAM FETCH FAILED:", err);
-        throw new Error(`Network error reaching ${API.stream}. Check backend, port, tunnel, or crashed route.`);
-      }
-
-      if (!res.ok) {
-        let details = "";
-        try {
-          details = await res.text();
-        } catch {}
-
-        console.error("STREAM HTTP ERROR:", res.status, details);
-
-        if (res.status === 401) {
-          throw new Error("Unauthorized. Log in to Nova again.");
-        }
-
-        throw new Error(
-          `Send failed (${res.status})${details ? `: ${details.slice(0, 300)}` : ""}`
-        );
-      }
-
-      if (!res.body || typeof res.body.getReader !== "function") {
-        const text = await res.text();
-        finalizeAssistant(safeText(text) || "No response.");
-      } else {
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-
-          if (done) {
-            buffer += decoder.decode();
-            break;
-          }
-
-          buffer += decoder.decode(value || new Uint8Array(), { stream: true });
-
-          let separatorIndex;
-          while ((separatorIndex = buffer.indexOf("\n\n")) !== -1) {
-            const rawBlock = buffer.slice(0, separatorIndex).trim();
-            buffer = buffer.slice(separatorIndex + 2);
-
-            if (!rawBlock || rawBlock === "data: [DONE]") continue;
-
-            let parsed;
-            try {
-              parsed = parseSSEBlock(rawBlock);
-            } catch (err) {
-              console.warn("Failed to parse SSE block:", rawBlock, err);
-              continue;
-            }
-
-            handlePayload(parsed.data || {}, parsed.event || "");
-          }
-        }
-
-        const trailing = buffer.trim();
-        if (trailing && trailing !== "data: [DONE]") {
-          try {
-            const parsed = parseSSEBlock(trailing);
-            handlePayload(parsed.data || {}, parsed.event || "");
-          } catch (err) {
-            console.warn("Trailing SSE parse failed:", err);
-          }
-        }
-
-        if (!streamFinished) {
-          finalizeAssistant(assistantStreamMessage.content || finalContent || "");
-        }
-      }
-
-      if (attachedFilesOverride === null) {
-        state.attachedFiles = [];
-        renderAttachedFiles();
-        const fileInput = byId("fileInput");
-        if (fileInput) fileInput.value = "";
-      }
-
-      await loadState();
-      if (state.activeSessionId || activeSessionIdBeforeSend) {
-        await loadSession(state.activeSessionId || activeSessionIdBeforeSend);
-      }
-      await loadMemory();
-      renderMessages();
-      renderSessions();
-      renderMemory();
-      setStatus("Ready");
-    } catch (err) {
-      console.error(err);
-
-      if (assistantStreamMessage) {
-        assistantStreamMessage.streaming = false;
-        assistantStreamMessage.content =
-          assistantStreamMessage.content || `Error: ${err.message || err}`;
-        assistantStreamMessage.router = {
-          mode: "general",
-          intent: "error",
-          reason: "frontend exception",
-          memory_hits: 0,
-          memory_count: 0,
-          memory_preview: [],
-          timestamp: nowUnix(),
-        };
-        applyIncomingRouterMeta({ router: assistantStreamMessage.router });
-        renderMessages();
-      } else {
-        const errorRouter = {
-          mode: "general",
-          intent: "error",
-          reason: "frontend exception",
-          memory_hits: 0,
-          memory_count: 0,
-          memory_preview: [],
-          timestamp: nowUnix(),
-        };
-        applyIncomingRouterMeta({ router: errorRouter });
-        addLocalMessage("assistant", "Something went wrong sending that message.", errorRouter);
-      }
-
-      try {
-        await loadState();
-        if (state.activeSessionId || activeSessionIdBeforeSend) {
-          await loadSession(state.activeSessionId || activeSessionIdBeforeSend);
-        }
-      } catch (_) {}
-
-      setStatus("Send failed");
+      await api.post(API.deleteMemory, { id: itemId });
+      await refreshMemory();
     } finally {
-      setSendingState(false);
-      renderMessages();
-      autosizeInput();
-      scrollChatToBottom();
-      if (safeText((byId("modelStatus") || {}).textContent).toLowerCase() === "responding...") {
-        setStatus("Ready");
-      }
+      state.deletingMemoryIds.delete(itemId);
     }
+  }
+
+  async function refreshMemory() {
+    const data = await api.get(API.memory);
+    state.memoryItems = asArray(data?.items || data?.memory);
+    renderAll();
+  }
+
+  function normalizeAttachedFiles(payload) {
+    return asArray(payload)
+      .map((item, index) => {
+        if (!item || typeof item !== "object") {
+          return {
+            id: `file-${Date.now()}-${index}`,
+            name: `file-${index + 1}`,
+          };
+        }
+        return {
+          id: item.id || `file-${Date.now()}-${index}`,
+          name: item.name || item.filename || `file-${index + 1}`,
+          filename: item.filename || item.name || `file-${index + 1}`,
+          type: item.type || item.mime_type || "",
+          size: Number(item.size || 0) || 0,
+          url: item.url || item.file_url || "",
+        };
+      })
+      .filter(Boolean);
   }
 
   async function sendMessage() {
-    const input = byId("messageInput");
-    const text = safeText(input?.value || "");
-    if ((!text && !state.attachedFiles.length) || state.isSending) return;
-    await streamSend(text);
+    if (state.isSending) return;
+
+    const content = asString(dom.composerInput?.value, "").trim();
+    const attachments = normalizeAttachedFiles(state.attachedFiles);
+
+    if (!content && !attachments.length) return;
+
+    state.isSending = true;
+    updateRouterBadge("Thinking...", "working");
+
+    try {
+      const activeId = state.activeSessionId || "";
+      const payload = {
+        session_id: activeId,
+        content,
+        attachments,
+        files: attachments,
+        model: state.currentModel || DEFAULT_MODEL,
+      };
+
+      state.lastUserMessage = content || state.lastUserMessage || "";
+
+      if (dom.composerInput) {
+        dom.composerInput.value = "";
+        autosizeComposer();
+      }
+
+      state.attachedFiles = [];
+      renderAll();
+
+      const response = await fetch(API.stream, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+        credentials: "same-origin",
+      });
+
+      if (!response.ok || !response.body) {
+        const text = await response.text().catch(() => "");
+        const data = safeJsonParse(text, null);
+        throw new Error((data && (data.error || data.message)) || "Stream request failed.");
+      }
+
+      let assistantText = "";
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      function ensureStreamingAssistantMessage() {
+        const last = state.messages[state.messages.length - 1];
+        if (last && last.role === "assistant" && last.__streaming) return last;
+
+        const msg = {
+          id: `assistant-stream-${Date.now()}`,
+          role: "assistant",
+          content: "",
+          created_at: nowIso(),
+          __streaming: true,
+        };
+        state.messages.push(msg);
+        return msg;
+      }
+
+      if (content || attachments.length) {
+        state.messages.push({
+          id: `user-local-${Date.now()}`,
+          role: "user",
+          content,
+          attachments,
+          created_at: nowIso(),
+        });
+        renderAll();
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+
+        for (const block of parts) {
+          const lines = block.split("\n");
+          let eventName = "message";
+          const dataLines = [];
+
+          for (const line of lines) {
+            if (line.startsWith("event:")) {
+              eventName = line.slice(6).trim();
+            } else if (line.startsWith("data:")) {
+              dataLines.push(line.slice(5).trim());
+            }
+          }
+
+          const joined = dataLines.join("\n");
+          const data = safeJsonParse(joined, {});
+
+          if (eventName === "start") {
+            if (data?.session_id) {
+              state.activeSessionId = data.session_id;
+            }
+          }
+
+          if (eventName === "delta") {
+            const delta = asString(data?.delta, "");
+            if (!delta) continue;
+
+            assistantText += delta;
+            const msg = ensureStreamingAssistantMessage();
+            msg.content = assistantText;
+            renderAll();
+          }
+
+          if (eventName === "done") {
+            assistantText = asString(data?.content, assistantText);
+            const last = state.messages[state.messages.length - 1];
+            if (last && last.role === "assistant") {
+              last.content = assistantText;
+              delete last.__streaming;
+            } else if (assistantText) {
+              state.messages.push({
+                id: `assistant-final-${Date.now()}`,
+                role: "assistant",
+                content: assistantText,
+                created_at: nowIso(),
+              });
+            }
+            state.lastAssistantMessage = assistantText || state.lastAssistantMessage || "";
+            renderAll();
+          }
+
+          if (eventName === "error") {
+            throw new Error(asString(data?.error, "Stream error."));
+          }
+        }
+      }
+
+      await loadState();
+      if (state.activeSessionId) {
+        await loadSession(state.activeSessionId);
+      }
+      updateRouterBadge("Ready", "success");
+    } catch (error) {
+      console.error("Nova send failed:", error);
+      updateRouterBadge("Error", "danger");
+
+      const message = error instanceof Error ? error.message : "Send failed.";
+      state.messages.push({
+        id: `system-error-${Date.now()}`,
+        role: "system",
+        content: message,
+        created_at: nowIso(),
+      });
+      renderAll();
+    } finally {
+      state.isSending = false;
+      persistUiState();
+    }
   }
 
-  async function regenerateLastReply() {
-    if (!state.lastUserMessage || state.isSending) return;
-    await streamSend(state.lastUserMessage, [], { suppressLocalUser: false });
-  }
+  async function regenerateLast() {
+    if (state.isSending) return;
+    const fallback = state.lastUserMessage || "";
+    if (!fallback) return;
 
-  function resolveToggleRole(button) {
-    if (!button) return null;
-
-    const id = safeText(button.id).toLowerCase();
-    const controls = safeText(button.getAttribute("aria-controls")).toLowerCase();
-    const action = safeText(button.getAttribute("data-action")).toLowerCase();
-    const label = safeText(button.getAttribute("aria-label")).toLowerCase();
-    const title = safeText(button.getAttribute("title")).toLowerCase();
-    const text = safeText(button.textContent).toLowerCase();
-
-    const blob = [id, controls, action, label, title, text].join(" ");
-
-    const explicitSidebarIds = new Set([
-      "togglesidebar",
-      "mobilesidebarbtn",
-      "opensidebarbtn",
-      "sidebartoggle",
-    ]);
-
-    const explicitMemoryIds = new Set([
-      "togglememory",
-      "togglememorypanel",
-      "mobilememorybtn",
-      "openmemorybtn",
-      "memorytogglebtntop",
-      "closememorybtn",
-      "memorytoggle",
-    ]);
-
-    if (explicitSidebarIds.has(id)) return "sidebar";
-    if (explicitMemoryIds.has(id)) return "memory";
-
-    if (controls === "sidebar") return "sidebar";
-    if (controls === "memorypanel") return "memory";
-
-    if (action === "toggle-sidebar") return "sidebar";
-    if (action === "toggle-memory") return "memory";
-
-    if (
-      blob.includes("memory") ||
-      button.closest("#memoryPanel") ||
-      button.closest(".topbar-right")
-    ) {
-      return "memory";
+    if (dom.composerInput) {
+      dom.composerInput.value = fallback;
+      autosizeComposer();
     }
 
-    if (
-      blob.includes("sidebar") ||
-      blob.includes("menu") ||
-      button.closest("#sidebar") ||
-      button.closest(".topbar-left")
-    ) {
-      return "sidebar";
-    }
-
-    return null;
+    await sendMessage();
   }
 
-  function initPanelFix() {
-    const sidebar = byId("sidebar");
-    const memoryPanel = byId("memoryPanel");
-    const toggleSidebarBtn = byId("toggleSidebar");
-    const mobileSidebarBtn = byId("mobileSidebarBtn");
-    const memoryToggleBtn = byId("memoryToggleBtnTop");
-    const closeMemoryBtn = byId("closeMemoryBtn");
-
-    toggleSidebarBtn?.addEventListener("click", (e) => {
-      e.preventDefault();
-      if (isMobilePanel()) {
-        if (document.body.classList.contains("mobile-left-open")) {
-          closeMobilePanels();
-        } else {
-          openLeftMobile();
+  function bindComposer() {
+    if (dom.composerInput) {
+      dom.composerInput.addEventListener("input", autosizeComposer);
+      dom.composerInput.addEventListener("keydown", async (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          await sendMessage();
         }
-        return;
-      }
-      toggleDesktopSidebar();
-    });
+      });
+    }
 
-    mobileSidebarBtn?.addEventListener("click", (e) => {
-      e.preventDefault();
-      if (isMobilePanel()) {
-        if (document.body.classList.contains("mobile-left-open")) {
-          closeMobilePanels();
-        } else {
-          openLeftMobile();
-        }
-        return;
-      }
-      ensureDesktopSidebarOpen();
-      pulseElement(sidebar);
-    });
+    if (dom.sendBtn) {
+      dom.sendBtn.addEventListener("click", sendMessage);
+    }
 
-    memoryToggleBtn?.addEventListener("click", (e) => {
-      e.preventDefault();
-      if (isMobilePanel()) {
-        if (document.body.classList.contains("mobile-right-open")) {
-          closeMobilePanels();
-        } else {
-          openRightMobile();
-        }
-        return;
-      }
-      toggleDesktopMemory();
-    });
+    if (dom.regenerateBtn) {
+      dom.regenerateBtn.addEventListener("click", regenerateLast);
+    }
 
-    closeMemoryBtn?.addEventListener("click", (e) => {
-      e.preventDefault();
-      if (isMobilePanel()) {
-        closeMobilePanels();
-        return;
-      }
-      setDesktopMemoryCollapsed(true);
-    });
+    if (dom.attachBtn && dom.fileInput) {
+      dom.attachBtn.addEventListener("click", () => dom.fileInput.click());
+      dom.fileInput.addEventListener("change", (event) => {
+        const files = Array.from(event.target.files || []).map((file, index) => ({
+          id: `picked-${Date.now()}-${index}`,
+          name: file.name,
+          filename: file.name,
+          type: file.type || "",
+          size: file.size || 0,
+        }));
+        state.attachedFiles = files;
+        renderAll();
+      });
+    }
 
-    document.addEventListener(
-      "click",
-      (e) => {
-        if (!isMobilePanel()) return;
-
-        const button = e.target.closest("button, [role='button']");
+    if (dom.attachmentBar) {
+      dom.attachmentBar.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-remove-attachment]");
         if (!button) return;
-
-        const role = resolveToggleRole(button);
-        if (!role) return;
-
-        if (button === toggleSidebarBtn || button === mobileSidebarBtn || button === memoryToggleBtn || button === closeMemoryBtn) {
-          return;
-        }
-
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation?.();
-
-        if (role === "sidebar") {
-          if (document.body.classList.contains("mobile-left-open")) {
-            closeMobilePanels();
-          } else {
-            openLeftMobile();
-          }
-          return;
-        }
-
-        if (role === "memory") {
-          if (document.body.classList.contains("mobile-right-open")) {
-            closeMobilePanels();
-          } else {
-            openRightMobile();
-          }
-        }
-      },
-      true
-    );
-
-    document.addEventListener("click", (e) => {
-      if (!isMobilePanel()) return;
-
-      const target = e.target;
-      const insideSidebar = sidebar?.contains(target);
-      const insideMemory = memoryPanel?.contains(target);
-      const clickedButton = target.closest("button, [role='button']");
-      const role = resolveToggleRole(clickedButton);
-
-      if (insideSidebar || insideMemory || role === "sidebar" || role === "memory") {
-        return;
-      }
-
-      closeMobilePanels();
-    });
-
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        if (isMobilePanel()) {
-          closeMobilePanels();
-        } else {
-          setDesktopMemoryCollapsed(true);
-        }
-      }
-    });
-
-    window.addEventListener("resize", syncPanelMode);
-    window.addEventListener("orientationchange", syncPanelMode);
-
-    syncPanelMode();
-  }
-
-  function ensureDesktopActionButtons() {
-    const composer =
-      byId("composerActions") ||
-      byId("chatComposerActions") ||
-      qs(".composer-actions") ||
-      qs(".input-actions") ||
-      byId("sendBtn")?.parentElement;
-
-    if (!composer) return;
-
-    if (!byId("regenerateBtn")) {
-      const regenBtn = document.createElement("button");
-      regenBtn.type = "button";
-      regenBtn.id = "regenerateBtn";
-      regenBtn.className = "nova-action-btn secondary";
-      regenBtn.textContent = "Regenerate";
-
-      const sendBtn = byId("sendBtn");
-      if (sendBtn && sendBtn.parentElement === composer) {
-        composer.insertBefore(regenBtn, sendBtn);
-      } else {
-        composer.appendChild(regenBtn);
-      }
+        const index = Number(button.getAttribute("data-remove-attachment"));
+        if (Number.isNaN(index)) return;
+        state.attachedFiles = state.attachedFiles.filter((_, i) => i !== index);
+        renderAll();
+      });
     }
   }
 
-  async function handleMemoryDelete(id) {
-    const memoryId = safeText(id);
-    if (!memoryId || state.deletingMemoryIds.has(memoryId)) return;
+  function bindPanels() {
+    if (dom.sidebarToggle) {
+      dom.sidebarToggle.addEventListener("click", () => {
+        state.sidebarOpen = !state.sidebarOpen;
+        applyPanelState();
+        persistUiState();
+      });
+    }
 
-    state.deletingMemoryIds.add(memoryId);
-    renderMemory();
-    setStatus("Deleting memory...");
+    if (dom.mobileSidebarToggle) {
+      dom.mobileSidebarToggle.addEventListener("click", () => {
+        state.sidebarOpen = !state.sidebarOpen;
+        applyPanelState();
+        persistUiState();
+      });
+    }
 
-    try {
-      await deleteMemory(memoryId);
-      state.memoryItems = state.memoryItems.filter((item) => safeText(item.id) !== memoryId);
-      state.deletingMemoryIds.delete(memoryId);
-      renderMemory();
-      setStatus("Memory deleted");
-    } catch (err) {
-      console.error(err);
-      state.deletingMemoryIds.delete(memoryId);
-      renderMemory();
-      setStatus("Delete failed");
+    if (dom.memoryToggle) {
+      dom.memoryToggle.addEventListener("click", () => {
+        state.memoryOpen = !state.memoryOpen;
+        applyPanelState();
+        persistUiState();
+      });
+    }
+
+    if (dom.themeToggle) {
+      dom.themeToggle.addEventListener("click", () => {
+        state.themeMode = state.themeMode === "light" ? "dark" : "light";
+        applyTheme();
+        persistUiState();
+      });
     }
   }
 
-  async function handleDeleteSession() {
-    const sessionId = safeText(state.activeSessionId);
-    if (!sessionId || state.deletingSessionIds.has(sessionId)) return;
+  function bindSessions() {
+    if (dom.newChatBtn) {
+      dom.newChatBtn.addEventListener("click", async () => {
+        await createSession();
+      });
+    }
 
-    const session = state.sessions.find((s) => (s.id || s.session_id) === sessionId);
-    const label = session?.title || "this chat";
-
-    const ok = window.confirm(`Delete "${label}"?`);
-    if (!ok) return;
-
-    const listItem = qs(`[data-session-id="${CSS.escape(sessionId)}"]`);
-
-    state.deletingSessionIds.add(sessionId);
-    renderSessions();
-    setStatus("Deleting chat...");
-
-    try {
-      if (listItem) {
-        await animateSessionRemoval(listItem);
-      }
-
-      await deleteSession(sessionId);
-
-      const remaining = state.sessions.filter((s) => (s.id || s.session_id) !== sessionId);
-      const nextSessionId = remaining[0]?.id || remaining[0]?.session_id || null;
-
-      state.deletingSessionIds.delete(sessionId);
-
-      await loadState();
-
-      if (nextSessionId) {
-        await loadSession(nextSessionId);
-      } else {
-        state.activeSessionId = null;
-        state.messages = [];
-        renderMessages();
-      }
-
-      renderSessions();
-      setStatus("Chat deleted");
-    } catch (err) {
-      console.error(err);
-      state.deletingSessionIds.delete(sessionId);
-      renderSessions();
-      setStatus("Delete failed");
+    if (dom.sessionList) {
+      dom.sessionList.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-session-id]");
+        if (!button) return;
+        const sessionId = asString(button.getAttribute("data-session-id"), "");
+        if (!sessionId) return;
+        await loadSession(sessionId);
+      });
     }
   }
 
-  async function handleRenameSession() {
-    const sessionId = safeText(state.activeSessionId);
-    if (!sessionId || state.renamingSessionIds.has(sessionId)) return;
-
-    const session = state.sessions.find((s) => (s.id || s.session_id) === sessionId);
-    const currentTitle = safeText(session?.title || "New Chat");
-    const nextTitleRaw = window.prompt("Rename chat", currentTitle);
-    if (nextTitleRaw === null) return;
-
-    const nextTitle = safeText(nextTitleRaw);
-    if (!nextTitle || nextTitle === currentTitle) return;
-
-    const listItem = qs(`[data-session-id="${CSS.escape(sessionId)}"]`);
-
-    state.renamingSessionIds.add(sessionId);
-    renderSessions();
-    setStatus("Renaming chat...");
-
-    try {
-      await renameSession(sessionId, nextTitle);
-      await loadState();
-      await loadSession(sessionId);
-      state.renamingSessionIds.delete(sessionId);
-      renderSessions();
-
-      const freshItem = qs(`[data-session-id="${CSS.escape(sessionId)}"]`) || listItem;
-      pulseElement(freshItem);
-
-      setStatus("Chat renamed");
-    } catch (err) {
-      console.error(err);
-      state.renamingSessionIds.delete(sessionId);
-      renderSessions();
-      setStatus("Rename failed");
+  function bindMemory() {
+    if (dom.memoryAddBtn) {
+      dom.memoryAddBtn.addEventListener("click", addMemory);
     }
-  }
 
-  function bindEvents() {
-    ensureDesktopActionButtons();
-
-    byId("newSessionBtn")?.addEventListener("click", async () => {
-      try {
-        setStatus("Creating chat...");
-        await createNewSession();
-        setStatus("Ready");
-      } catch (err) {
-        console.error(err);
-        setStatus("Create failed");
-      }
-    });
-
-    byId("deleteSessionBtn")?.addEventListener("click", handleDeleteSession);
-    byId("renameSessionBtn")?.addEventListener("click", handleRenameSession);
-
-    byId("sessionSearchInput")?.addEventListener("input", renderSessions);
-
-    byId("sendBtn")?.addEventListener("click", sendMessage);
-    byId("regenerateBtn")?.addEventListener("click", regenerateLastReply);
-
-    byId("messageInput")?.addEventListener("input", autosizeInput);
-
-    byId("messageInput")?.addEventListener("keydown", async (event) => {
-      if (event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
-        await sendMessage();
-      }
-    });
-
-    byId("attachBtn")?.addEventListener("click", () => {
-      if (state.isSending) return;
-      byId("fileInput")?.click();
-    });
-
-    byId("fileInput")?.addEventListener("change", (event) => {
-      const files = Array.from(event.target.files || []);
-      if (!files.length) return;
-
-      const existing = new Map(
-        state.attachedFiles.map((file) => [`${file.name}__${file.size}`, file])
-      );
-
-      for (const file of files) {
-        existing.set(`${file.name}__${file.size}`, file);
-      }
-
-      state.attachedFiles = Array.from(existing.values());
-      renderAttachedFiles();
-
-      const input = byId("fileInput");
-      if (input) input.value = "";
-    });
-
-    byId("memoryForm")?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-
-      const kind = safeText(byId("memoryKind")?.value || "memory");
-      const valueEl = byId("memoryValue");
-      const value = safeText(valueEl?.value || "");
-
-      if (!value) return;
-
-      try {
-        setStatus("Saving memory...");
-        ensureDesktopMemoryOpen();
-        await addMemory(kind, value);
-        if (valueEl) valueEl.value = "";
-        if (isMobilePanel()) {
-          openRightMobile();
-        } else {
-          ensureDesktopMemoryOpen();
+    if (dom.memoryInput) {
+      dom.memoryInput.addEventListener("keydown", async (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          await addMemory();
         }
-        setStatus("Ready");
-      } catch (err) {
-        console.error(err);
-        setStatus("Save failed");
+      });
+    }
+
+    if (dom.memoryList) {
+      dom.memoryList.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-delete-memory]");
+        if (!button) return;
+        const itemId = asString(button.getAttribute("data-delete-memory"), "");
+        if (!itemId) return;
+        await deleteMemory(itemId);
+      });
+    }
+  }
+
+  function bindGlobalDelegates() {
+    window.addEventListener("resize", () => {
+      safeInvoke(autosizeComposer);
+      if (window.innerWidth > 980 && !state.sidebarOpen) {
+        applyPanelState();
       }
     });
 
-    byId("refreshMemoryBtn")?.addEventListener("click", async () => {
-      try {
-        ensureDesktopMemoryOpen();
-        await loadMemory();
-        if (isMobilePanel()) {
-          openRightMobile();
-        }
-        setStatus("Ready");
-      } catch (err) {
-        console.error(err);
-        setStatus("Refresh failed");
+    document.addEventListener("click", (event) => {
+      if (window.innerWidth > 980) return;
+      const target = event.target;
+      if (!target) return;
+
+      const clickedSidebarToggle =
+        target.closest?.("#sidebarToggle") || target.closest?.("#mobileSidebarToggle");
+      const insideSidebar = target.closest?.("#sidebar");
+      if (!clickedSidebarToggle && !insideSidebar && state.sidebarOpen) {
+        state.sidebarOpen = false;
+        applyPanelState();
+        persistUiState();
       }
     });
+  }
 
-    document.addEventListener("click", async (e) => {
-      const btn = e.target.closest("[data-memory-delete]");
-      if (!btn) return;
+  function installFallbacks() {
+    dom.byId = dom.byId || byId;
+    dom.qs = dom.qs || qs;
+    dom.qsa = dom.qsa || qsa;
 
-      const id = btn.getAttribute("data-memory-delete");
-      if (!id) return;
+    util.safeJsonParse = util.safeJsonParse || safeJsonParse;
+    util.escapeHtml = util.escapeHtml || escapeHtml;
+    util.extractMessageText = util.extractMessageText || extractMessageText;
+    util.formatDateLoose = util.formatDateLoose || formatDateLoose;
+    util.autosizeComposer = util.autosizeComposer || autosizeComposer;
+    util.persistUiState = util.persistUiState || persistUiState;
+    util.restoreUiState = util.restoreUiState || restoreUiState;
 
-      await handleMemoryDelete(id);
-    });
+    sessions.load = sessions.load || loadSession;
+    sessions.create = sessions.create || createSession;
+
+    memory.refresh = memory.refresh || refreshMemory;
+    memory.add = memory.add || addMemory;
+    memory.remove = memory.remove || deleteMemory;
+
+    chat.send = chat.send || sendMessage;
+    chat.regenerate = chat.regenerate || regenerateLast;
+
+    render.all = render.all || renderAll;
+    render.sessions = render.sessions || renderSessionsFallback;
+    render.messages = render.messages || renderMessagesFallback;
+    render.memory = render.memory || renderMemoryFallback;
+    render.attachments = render.attachments || renderAttachmentBarFallback;
+
+    panels.apply = panels.apply || applyPanelState;
+    panels.theme = panels.theme || applyTheme;
   }
 
   async function bootstrap() {
-    injectWebResultStyles();
-    injectMemoryPolishStyles();
-    restorePanelState();
-    bindEvents();
-    initPanelFix();
-    setStatus("Loading...");
-
-    await loadState();
-
-    if (state.activeSessionId) {
-      await loadSession(state.activeSessionId);
-    } else {
-      renderMessages();
+    if (state.isBootstrapping) {
+      console.warn("Nova bootstrap already running.");
+      return;
     }
 
-    await loadMemory();
-    renderAttachedFiles();
-    autosizeInput();
-    setSendingState(false);
-    setStatus("Ready");
+    if (state.isBooted) {
+      console.warn("Nova already booted.");
+      return;
+    }
+
+    if (!ensureShell()) return;
+
+    state.isBootstrapping = true;
+    state.bootError = null;
+
+    try {
+      restoreUiState();
+      cacheDom();
+      installFallbacks();
+      applyTheme();
+      applyPanelState();
+      bindComposer();
+      bindPanels();
+      bindSessions();
+      bindMemory();
+      bindGlobalDelegates();
+      autosizeComposer();
+      updateRouterBadge("Loading...", "working");
+
+      await loadState();
+
+      if (dom.modelSelect) {
+        dom.modelSelect.innerHTML = "";
+        const current = state.currentModel || DEFAULT_MODEL;
+        const option = document.createElement("option");
+        option.value = current;
+        option.textContent = current;
+        dom.modelSelect.appendChild(option);
+        dom.modelSelect.value = current;
+        dom.modelSelect.addEventListener("change", () => {
+          state.currentModel = dom.modelSelect.value || DEFAULT_MODEL;
+          persistUiState();
+        });
+      }
+
+      if (state.activeSessionId) {
+        await loadSession(state.activeSessionId);
+      } else {
+        state.messages = [];
+        renderAll();
+      }
+
+      state.isBooted = true;
+      updateRouterBadge("Ready", "success");
+      console.log("Nova bootstrap complete.");
+    } catch (error) {
+      state.bootError = error instanceof Error ? error.message : "Bootstrap failed.";
+      console.error("Nova bootstrap failed:", error);
+      updateRouterBadge("Boot error", "danger");
+      renderAll();
+    } finally {
+      state.isBootstrapping = false;
+      persistUiState();
+    }
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    bootstrap().catch((err) => {
-      console.error("Desktop bootstrap failed:", err);
-      setStatus("Bootstrap failed");
-      setSendingState(false);
-    });
-  });
+  function waitForShellAndBootstrap() {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () => {
+        safeInvoke(() => bootstrap());
+      }, { once: true });
+      return;
+    }
+
+    safeInvoke(() => bootstrap());
+  }
+
+  Nova.API = API;
+  Nova.STORAGE = STORAGE;
+  Nova.bootstrap = bootstrap;
+  Nova.waitForShellAndBootstrap = waitForShellAndBootstrap;
+
+  waitForShellAndBootstrap();
 })();

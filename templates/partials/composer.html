@@ -1,0 +1,40 @@
+<section class="composer-wrap">
+  <div class="composer-box">
+    <div id="attachedFiles" class="attachments-bar"></div>
+
+    <div class="composer-row">
+      <div class="composer-left">
+        <button id="attachBtn" class="attach-btn" type="button" aria-label="Attach file" title="Attach file">
+          +
+        </button>
+      </div>
+
+      <div class="composer-center">
+        <textarea
+          id="messageInput"
+          class="message-input"
+          rows="1"
+          placeholder="Message Nova..."
+          aria-label="Message Nova"
+        ></textarea>
+      </div>
+
+      <div class="composer-right">
+        <button id="voiceBtn" class="voice-btn" type="button" aria-label="Voice input" title="Voice input">
+          Voice
+        </button>
+        <button id="sendBtn" class="send-btn" type="button" aria-label="Send message" title="Send message">
+          Send
+        </button>
+        <button id="stopBtn" class="stop-btn hidden" type="button" aria-label="Stop response" title="Stop response">
+          Stop
+        </button>
+      </div>
+    </div>
+
+    <div class="composer-footer">
+      <div id="composerHint" class="composer-hint">Enter to send · Shift+Enter for new line</div>
+      <div id="modelStatus" class="model-status">Model ready</div>
+    </div>
+  </div>
+</section>

@@ -1,228 +1,225 @@
-﻿<!doctype html>
+﻿<!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+  />
   <title>Nova</title>
-  <link rel="stylesheet" href="/static/css/nova-style.css?v=phase3mobile2">
-  <link rel="stylesheet" href="/static/css/nova-sources-panel.css?v=phase4sources1">
-  <link rel="stylesheet" href="/static/css/nova-router-control.css?v=phase4routerfinal1">
+
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" />
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-base.css') }}?v=loadorder1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-main.css') }}?v=loadorder1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-sidebar.css') }}?v=loadorder1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-memory.css') }}?v=loadorder1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nova-composer.css') }}?v=loadorder1" />
 </head>
 <body>
-  <div id="appShell" class="app-shell">
-    <!-- LEFT SIDEBAR -->
-    <aside id="sidebar" class="left-sidebar" aria-hidden="false">
-      <div class="sidebar-header">
-        <button id="toggleSidebar" class="rail-toggle" type="button" aria-label="Toggle sidebar" title="Toggle sidebar">
-          ☰
-        </button>
-
-        <div class="sidebar-brand">
-          <div class="brand-title">Nova</div>
-          <div class="brand-subtitle">Control Center</div>
-        </div>
-      </div>
-
-      <div class="sidebar-content">
-        <div class="sidebar-controls">
-          <button id="newSessionBtn" type="button">New</button>
-          <button id="deleteSessionBtn" type="button">Delete</button>
-          <button id="renameSessionBtn" type="button">Rename</button>
-          <button id="duplicateSessionBtn" type="button">Duplicate</button>
-          <button id="pinSessionBtn" type="button">Pin</button>
-          <button id="exportSessionBtn" type="button">Export</button>
-        </div>
-
-        <section class="sidebar-section">
-          <div class="sidebar-section-title">Appearance</div>
-          <div class="sidebar-actions">
-            <button id="themeToggleBtn" type="button">Theme</button>
-            <button id="backgroundBtn" type="button">Background</button>
-          </div>
-        </section>
-
-        <section class="sidebar-section">
-          <div class="sidebar-section-title">Chats</div>
-
-          <div class="session-search-wrap">
-            <input
-              id="sessionSearchInput"
-              class="session-search-input"
-              type="text"
-              placeholder="Search chats..."
-              aria-label="Search chats"
-              autocomplete="off"
-            >
-          </div>
-
-          <div id="sessionList" class="session-list"></div>
-        </section>
-      </div>
-    </aside>
-
-    <!-- MAIN PANEL -->
-    <main id="mainPanel" class="main-panel">
-      <header class="main-topbar">
-        <div class="topbar-left">
-          <button id="mobileSidebarBtn" class="icon-btn" type="button" aria-label="Open sidebar" title="Open sidebar">
+  <div id="nova-app" class="nova-app">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-inner">
+        <div class="sidebar-top">
+          <button
+            id="sidebarToggle"
+            class="icon-btn"
+            type="button"
+            aria-label="Toggle sidebar"
+            title="Toggle sidebar"
+          >
             ☰
+          </button>
+
+          <button
+            id="newChatBtn"
+            class="primary-btn"
+            type="button"
+          >
+            New Chat
           </button>
         </div>
 
-        <div class="topbar-center">
-          <div>
-            <div id="chatTitle" class="topbar-title">Nova</div>
-            <div id="chatSubtitle" class="topbar-subtitle">Ready</div>
+        <div class="sidebar-section">
+          <div class="section-title-row">
+            <h2 class="section-title">Chats</h2>
+          </div>
+          <div id="sessionList" class="session-list"></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-shell">
+      <header class="main-topbar">
+        <div class="topbar-left">
+          <button
+            id="mobileSidebarToggle"
+            class="icon-btn mobile-only"
+            type="button"
+            aria-label="Open sidebar"
+            title="Open sidebar"
+          >
+            ☰
+          </button>
+
+          <div class="brand-wrap">
+            <div class="brand-title">Nova</div>
+            <div id="routerBadge" class="router-badge">Ready</div>
           </div>
         </div>
 
         <div class="topbar-right">
-          <select id="modelSelect" class="topbar-chip" aria-label="Select model">
-            <option value="gpt-4.1-mini">gpt-4.1-mini</option>
-          </select>
-          <button id="memoryToggleBtnTop" class="icon-btn" type="button" aria-label="Toggle memory panel" title="Toggle memory panel">
-            Memory
+          <select id="modelSelect" class="model-select" aria-label="Model"></select>
+
+          <button
+            id="themeToggle"
+            class="icon-btn"
+            type="button"
+            aria-label="Toggle theme"
+            title="Toggle theme"
+          >
+            ◐
+          </button>
+
+          <button
+            id="memoryToggle"
+            class="icon-btn"
+            type="button"
+            aria-label="Toggle memory panel"
+            title="Toggle memory panel"
+          >
+            ✦
           </button>
         </div>
       </header>
 
-      <section class="chat-main">
+      <section id="chatView" class="chat-view">
         <div id="chatMessages" class="chat-messages">
-          <div class="empty-state">
-            <div class="empty-card">
-              <div class="empty-title">Nova is ready</div>
-              <div class="empty-subtitle">
-                Start a new message, use voice, or open memory.
-              </div>
+          <div id="emptyState" class="empty-state">
+            <div class="empty-state-card">
+              <h1>Nova is ready</h1>
+              <p>Ask anything, attach files, use voice, and keep moving.</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="composer-wrap">
+      <footer class="composer-shell">
+        <div id="attachmentBar" class="attachment-bar hidden"></div>
+
         <div class="composer-box">
-          <div id="attachedFiles" class="attachments-bar"></div>
+          <div class="composer-controls-row">
+            <button
+              id="attachBtn"
+              class="icon-btn"
+              type="button"
+              aria-label="Attach files"
+              title="Attach files"
+            >
+              ＋
+            </button>
 
-          <div class="composer-row">
-            <div class="composer-left">
-              <button id="attachBtn" class="attach-btn" type="button" aria-label="Attach file" title="Attach file">
-                +
-              </button>
-            </div>
+            <button
+              id="voiceBtn"
+              class="icon-btn"
+              type="button"
+              aria-label="Voice input"
+              title="Voice input"
+            >
+              🎤
+            </button>
 
-            <div class="composer-center">
-              <textarea
-                id="messageInput"
-                class="message-input"
-                rows="1"
-                placeholder="Message Nova..."
-                aria-label="Message Nova"
-              ></textarea>
-            </div>
-
-            <div class="composer-right">
-              <button id="voiceBtn" class="voice-btn" type="button" aria-label="Voice input" title="Voice input">
-                Voice
-              </button>
-              <button id="sendBtn" class="send-btn" type="button" aria-label="Send message" title="Send message">
-                Send
-              </button>
-              <button id="stopBtn" class="stop-btn hidden" type="button" aria-label="Stop response" title="Stop response">
-                Stop
-              </button>
-            </div>
+            <button
+              id="regenerateBtn"
+              class="icon-btn"
+              type="button"
+              aria-label="Regenerate"
+              title="Regenerate"
+            >
+              ↻
+            </button>
           </div>
 
-          <div class="composer-footer">
-            <div id="composerHint" class="composer-hint">Enter to send · Shift+Enter for new line</div>
-            <div id="modelStatus" class="model-status">Model ready</div>
+          <label for="composerInput" class="sr-only">Message Nova</label>
+          <textarea
+            id="composerInput"
+            class="composer-input"
+            rows="1"
+            placeholder="Message Nova..."
+            autocomplete="off"
+          ></textarea>
+
+          <div class="composer-actions">
+            <input id="fileInput" type="file" multiple hidden />
+
+            <button
+              id="sendBtn"
+              class="send-btn"
+              type="button"
+              aria-label="Send message"
+            >
+              Send
+            </button>
           </div>
         </div>
-      </section>
+      </footer>
     </main>
 
-    <!-- RIGHT / MEMORY PANEL -->
-    <aside id="memoryPanel" class="memory-panel" aria-hidden="false">
-      <div class="memory-header">
-        <div class="memory-title-wrap">
-          <div class="memory-title-main">Memory</div>
-          <div class="memory-title-sub">Saved notes and context</div>
+    <aside id="memoryPanel" class="memory-panel">
+      <div class="memory-inner">
+        <div class="memory-top">
+          <h2>Memory</h2>
         </div>
 
-        <button id="closeMemoryBtn" class="panel-toggle" type="button" aria-label="Close memory panel" title="Close memory panel">
-          ×
-        </button>
-      </div>
+        <div class="memory-add-row">
+          <input
+            id="memoryInput"
+            class="memory-input"
+            type="text"
+            placeholder="Add memory..."
+            autocomplete="off"
+          />
+          <button id="memoryAddBtn" class="primary-btn" type="button">Add</button>
+        </div>
 
-      <div class="memory-body">
-        <section class="memory-card">
-          <div class="memory-card-title">Status</div>
-          <div id="memoryStatusText" class="memory-card-text">Memory panel ready.</div>
-        </section>
-
-        <section class="memory-card">
-          <div class="memory-card-title">Add Memory</div>
-
-          <form id="memoryForm" class="memory-form">
-            <div class="memory-form-row">
-              <label class="memory-label" for="memoryKind">Type</label>
-              <select id="memoryKind" class="memory-input" name="memoryKind">
-                <option value="preference">preference</option>
-                <option value="goal">goal</option>
-                <option value="project">project</option>
-                <option value="name">name</option>
-                <option value="memory">memory</option>
-              </select>
-            </div>
-
-            <div class="memory-form-row">
-              <label class="memory-label" for="memoryValue">Value</label>
-              <textarea
-                id="memoryValue"
-                class="memory-input memory-textarea"
-                name="memoryValue"
-                rows="3"
-                placeholder="Add something Nova should remember..."
-              ></textarea>
-            </div>
-
-            <div class="memory-form-actions">
-              <button type="submit" class="memory-save-btn">Save</button>
-              <button id="refreshMemoryBtn" type="button" class="memory-refresh-btn">Refresh</button>
-            </div>
-          </form>
-        </section>
-
-        <section class="panel-section">
-          <div class="panel-section-title">Items</div>
-          <div id="memoryEmpty" class="memory-empty">No saved memory yet.</div>
-          <div id="memoryList" class="memory-list"></div>
-        </section>
+        <div id="memoryList" class="memory-list"></div>
       </div>
     </aside>
   </div>
 
-  <input id="fileInput" type="file" multiple class="hidden">
-
   <script>
-    (function () {
-      const isMobile = window.innerWidth <= 768;
-      if (!isMobile) return;
-
-      const sidebar = document.getElementById("sidebar");
-      const memoryPanel = document.getElementById("memoryPanel");
-
-      if (sidebar) {
-        sidebar.setAttribute("aria-hidden", "true");
-      }
-      if (memoryPanel) {
-        memoryPanel.setAttribute("aria-hidden", "true");
-      }
-    })();
+    window.Nova = window.Nova || {};
+    window.NovaConfig = {
+      appName: "Nova",
+      version: "loadorder1",
+      apiBase: "",
+    };
   </script>
-  
-  <script src="/static/js/nova-router-control.js?v=phase4routerfinal1"></script>
-  <script src="/static/js/nova-sources-panel.js?v=phase4sources1"></script>
-  <script src="/static/js/nova-ultimate.js?v=phase3mobile2"></script>
+
+  <!-- core first -->
+  <script defer src="{{ url_for('static', filename='js/nova-ultimate.js') }}?v=loadorder1"></script>
+
+  <!-- split modules after core -->
+  <script defer src="{{ url_for('static', filename='js/nova-dom.js') }}?v=loadorder1"></script>
+  <script defer src="{{ url_for('static', filename='js/nova-state.js') }}?v=loadorder1"></script>
+  <script defer src="{{ url_for('static', filename='js/nova-api.js') }}?v=loadorder1"></script>
+  <script defer src="{{ url_for('static', filename='js/nova-sessions.js') }}?v=loadorder1"></script>
+  <script defer src="{{ url_for('static', filename='js/nova-memory.js') }}?v=loadorder1"></script>
+  <script defer src="{{ url_for('static', filename='js/nova-chat.js') }}?v=loadorder1"></script>
+  <script defer src="{{ url_for('static', filename='js/nova-panels.js') }}?v=loadorder1"></script>
+  <script defer src="{{ url_for('static', filename='js/nova-render-sessions.js') }}?v=loadorder1"></script>
+  <script defer src="{{ url_for('static', filename='js/nova-render-messages.js') }}?v=loadorder1"></script>
+  <script defer src="{{ url_for('static', filename='js/nova-render-memory.js') }}?v=loadorder1"></script>
+  <script defer src="{{ url_for('static', filename='js/nova-render.js') }}?v=loadorder1"></script>
+
+  <!-- optional extras last so they never block boot -->
+  <script defer src="{{ url_for('static', filename='js/nova-style-inject.js') }}?v=loadorder1"></script>
+  <script defer src="{{ url_for('static', filename='js/nova-router-control.js') }}?v=loadorder1"></script>
+  <script defer src="{{ url_for('static', filename='js/nova-sources-panel.js') }}?v=loadorder1"></script>
 </body>
 </html>
