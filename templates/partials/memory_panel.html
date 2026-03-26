@@ -1,0 +1,58 @@
+<aside id="memoryPanel" class="memory-panel" aria-hidden="false">
+  <div class="memory-header">
+    <div class="memory-title-wrap">
+      <div class="memory-title-main">Memory</div>
+      <div class="memory-title-sub">Saved notes and context</div>
+    </div>
+
+    <button id="closeMemoryBtn" class="panel-toggle" type="button" aria-label="Close memory panel" title="Close memory panel">
+      ×
+    </button>
+  </div>
+
+  <div class="memory-body">
+    <section class="memory-card">
+      <div class="memory-card-title">Status</div>
+      <div id="memoryStatusText" class="memory-card-text">Memory panel ready.</div>
+    </section>
+
+    <section class="memory-card">
+      <div class="memory-card-title">Add Memory</div>
+
+      <form id="memoryForm" class="memory-form">
+        <div class="memory-form-row">
+          <label class="memory-label" for="memoryKind">Type</label>
+          <select id="memoryKind" class="memory-input" name="memoryKind">
+            <option value="preference">preference</option>
+            <option value="goal">goal</option>
+            <option value="project">project</option>
+            <option value="name">name</option>
+            <option value="memory">memory</option>
+          </select>
+        </div>
+
+        <div class="memory-form-row">
+          <label class="memory-label" for="memoryValue">Value</label>
+          <textarea
+            id="memoryValue"
+            class="memory-input memory-textarea"
+            name="memoryValue"
+            rows="3"
+            placeholder="Add something Nova should remember..."
+          ></textarea>
+        </div>
+
+        <div class="memory-form-actions">
+          <button type="submit" class="memory-save-btn">Save</button>
+          <button id="refreshMemoryBtn" type="button" class="memory-refresh-btn">Refresh</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel-section">
+      <div class="panel-section-title">Items</div>
+      <div id="memoryEmpty" class="memory-empty">No saved memory yet.</div>
+      <div id="memoryList" class="memory-list"></div>
+    </section>
+  </div>
+</aside>

@@ -1,0 +1,162 @@
+:root {
+  --bg: #0b1020;
+  --bg-elevated: #10182c;
+  --panel: #141c33;
+  --panel-2: #18223d;
+  --panel-3: #1d2947;
+  --text: #ecf2ff;
+  --muted: #95a3c7;
+  --line: rgba(167, 184, 255, 0.12);
+  --line-strong: rgba(167, 184, 255, 0.24);
+  --accent: #79a8ff;
+  --accent-strong: #5f93ff;
+  --accent-soft: rgba(121, 168, 255, 0.16);
+  --danger: #ff6b81;
+  --danger-soft: rgba(255, 107, 129, 0.16);
+  --success: #4dd4ac;
+  --warning: #ffd76f;
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.16);
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.24);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.35);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+}
+
+/* =========================
+   LIGHT MODE
+========================= */
+body.theme-light {
+  --bg: #f4f7ff;
+  --bg-elevated: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f7f9fe;
+  --panel-3: #eef3ff;
+  --text: #182033;
+  --muted: #6b7897;
+  --line: rgba(90, 110, 160, 0.14);
+  --line-strong: rgba(90, 110, 160, 0.24);
+  --accent: #4f7cff;
+  --accent-strong: #3f6df2;
+  --accent-soft: rgba(79, 124, 255, 0.12);
+  --danger-soft: rgba(255, 107, 129, 0.12);
+  --shadow-sm: 0 4px 10px rgba(29, 41, 71, 0.08);
+  --shadow-md: 0 10px 28px rgba(29, 41, 71, 0.12);
+  --shadow-lg: 0 18px 48px rgba(29, 41, 71, 0.18);
+}
+
+/* =========================
+   BACKGROUND MODES
+========================= */
+body.bg-default {
+  background:
+    radial-gradient(circle at top left, rgba(121, 168, 255, 0.08), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(93, 124, 255, 0.10), transparent 32%),
+    var(--bg);
+}
+
+body.bg-grid {
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+
+body.bg-dots {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+body.bg-glow {
+  background:
+    radial-gradient(circle at 15% 20%, rgba(121, 168, 255, 0.18), transparent 24%),
+    radial-gradient(circle at 85% 18%, rgba(77, 212, 172, 0.12), transparent 22%),
+    radial-gradient(circle at 50% 100%, rgba(95, 147, 255, 0.16), transparent 30%),
+    var(--bg);
+}
+
+body.bg-minimal {
+  background: var(--bg);
+}
+
+/* =========================
+   SURFACE POLISH
+========================= */
+.sidebar,
+.memory-panel,
+.main-topbar,
+.composer-wrap,
+.memory-card,
+.session-item,
+.chat-message,
+.message,
+.msg {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.sidebar,
+.memory-panel,
+.main-topbar {
+  box-shadow: var(--shadow-sm);
+}
+
+.composer-box,
+.memory-card,
+.session-item,
+.chat-message,
+.message,
+.msg {
+  box-shadow: var(--shadow-md);
+}
+
+/* =========================
+   PREMIUM LINES
+========================= */
+.sidebar,
+.memory-panel,
+.main-topbar,
+.composer-wrap {
+  border-color: var(--line);
+}
+
+.composer-box:focus-within {
+  border-color: var(--line-strong);
+  box-shadow:
+    0 0 0 3px var(--accent-soft),
+    var(--shadow-md);
+}
+
+/* =========================
+   BUTTON SYSTEM
+========================= */
+button,
+.sidebar-btn,
+.session-action-btn,
+.memory-action-btn,
+.composer-btn,
+.message-action {
+  font: inherit;
+}
+
+button:focus-visible,
+.sidebar-btn:focus-visible,
+.session-action-btn:focus-visible,
+.memory-action-btn:focus-visible,
+.composer-btn:focus-visible,
+.message-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* =========================
+   TEXT SELECTION
+========================= */
+::selection {
+  background: var(--accent-soft);
+  color: var(--text);
+}

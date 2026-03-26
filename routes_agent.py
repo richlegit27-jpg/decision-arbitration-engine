@@ -1,104 +1,76 @@
-# C:\Users\Owner\nova\routes_agent.py
-
 from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
+from auth_utils import DEV_BYPASS_AUTH, current_user, normalize_username
+from nova_context import (
+    AGENT_STATE,
+    SESSIONS,
+    STATE_LOCK,
+    ensure_agent_thread,
+    get_owned_session_or_404,
+    now_iso,
+    save_sessions,
+)
 
-agent_bp = Blueprint("agent_bp", __name__)
-
-
-def _get_ctx():
-    from app import (
-        AGENT_STATE,
-        SESSIONS,
-        STATE_LOCK,
-        current_user,
-        ensure_agent_thread,
-        ensure_session,
-        now_iso,
-        run_agent_step_for_session,
-        save_sessions,
-    )
-
-    return {
-        "AGENT_STATE": AGENT_STATE,
-        "SESSIONS": SESSIONS,
-        "STATE_LOCK": STATE_LOCK,
-        "current_user": current_user,
-        "ensure_agent_thread": ensure_agent_thread,
-        "ensure_session": ensure_session,
-        "now_iso": now_iso,
-        "run_agent_step_for_session": run_agent_step_for_session,
-        "save_sessions": save_sessions,
-    }
+agent_bp = Blueprint("agent", __name__, url_prefix="/api/agent")
 
 
-@agent_bp.route("/api/agent/status", methods=["GET"])
-def agent_status():
-    ctx = _get_ctx()
-    return jsonify({"ok": True, "agent": ctx["AGENT_STATE"]})
+def _username() -> str:
+    if DEV_BYPASS_AUTH:
+        return "dev"
+    return normalize_username(str(current_user().get("username", "") or ""))
 
 
-@agent_bp.route("/api/agent/start", methods=["POST"])
-def agent_start():
-    ctx = _get_ctx()
-    ctx["ensure_agent_thread"]()
+@agent_bp.get("/state")
+def get_agent_state():
+    return jsonify({"ok": True, "agent": AGENT_STATE})
 
+
+@agent_bp.post("/enable")
+def enable_agent():
     data = request.get_json(silent=True) or {}
-    interval = int(data.get("interval_seconds") or ctx["AGENT_STATE"].get("interval_seconds") or 20)
-    ctx["AGENT_STATE"]["interval_seconds"] = max(3, interval)
-    ctx["AGENT_STATE"]["enabled"] = True
-    ctx["AGENT_STATE"]["last_error"] = ""
+    session_id = str(data.get("session_id", "") or "").strip()
+    goal = str(data.get("goal", "") or "").strip()
+    username = _username()
 
-    return jsonify({"ok": True, "agent": ctx["AGENT_STATE"]})
+    if not session_id:
+        return jsonify({"ok": False, "error": "session_id is required"}), 400
+
+    session_obj, error = get_owned_session_or_404(session_id, username, jsonify)
+    if error:
+        return error
+
+    with STATE_LOCK:
+        session_obj["agent_enabled"] = True
+        session_obj["agent_goal"] = goal
+        session_obj["agent_status"] = "idle"
+        session_obj["updated_at"] = now_iso()
+        AGENT_STATE["enabled"] = True
+        save_sessions()
+
+    ensure_agent_thread()
+    return jsonify({"ok": True, "session": session_obj, "agent": AGENT_STATE})
 
 
-@agent_bp.route("/api/agent/stop", methods=["POST"])
-def agent_stop():
-    ctx = _get_ctx()
-    ctx["AGENT_STATE"]["enabled"] = False
-    return jsonify({"ok": True, "agent": ctx["AGENT_STATE"]})
-
-
-@agent_bp.route("/api/agent/session/config", methods=["POST"])
-def agent_session_config():
-    ctx = _get_ctx()
+@agent_bp.post("/disable")
+def disable_agent():
     data = request.get_json(silent=True) or {}
-    username = ctx["current_user"]() or "dev"
-    session_id = ctx["ensure_session"](data.get("session_id"), username)
-    enabled = bool(data.get("enabled", True))
-    goal = str(data.get("goal") or "").strip()
+    session_id = str(data.get("session_id", "") or "").strip()
+    username = _username()
 
-    with ctx["STATE_LOCK"]:
-        ctx["SESSIONS"][session_id]["agent_enabled"] = enabled
-        ctx["SESSIONS"][session_id]["agent_goal"] = goal
-        ctx["SESSIONS"][session_id]["agent_status"] = "idle"
-        ctx["SESSIONS"][session_id]["updated_at"] = ctx["now_iso"]()
-        ctx["save_sessions"]()
+    if not session_id:
+        return jsonify({"ok": False, "error": "session_id is required"}), 400
 
-    return jsonify(
-        {
-            "ok": True,
-            "session_id": session_id,
-            "session": ctx["SESSIONS"][session_id],
-        }
-    )
+    session_obj, error = get_owned_session_or_404(session_id, username, jsonify)
+    if error:
+        return error
 
+    with STATE_LOCK:
+        session_obj["agent_enabled"] = False
+        session_obj["agent_status"] = "idle"
+        session_obj["updated_at"] = now_iso()
+        AGENT_STATE["enabled"] = any(s.get("agent_enabled") for s in SESSIONS.values())
+        save_sessions()
 
-@agent_bp.route("/api/agent/session/run_once", methods=["POST"])
-def agent_run_once():
-    ctx = _get_ctx()
-    data = request.get_json(silent=True) or {}
-    username = ctx["current_user"]() or "dev"
-    session_id = ctx["ensure_session"](data.get("session_id"), username)
-    output = ctx["run_agent_step_for_session"](session_id)
-
-    return jsonify(
-        {
-            "ok": True,
-            "session_id": session_id,
-            "output": output,
-            "session": ctx["SESSIONS"][session_id],
-        }
-    )
+    return jsonify({"ok": True, "session": session_obj, "agent": AGENT_STATE})

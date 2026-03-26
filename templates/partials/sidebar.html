@@ -1,0 +1,48 @@
+<aside id="sidebar" class="left-sidebar" aria-hidden="false">
+  <div class="sidebar-header">
+    <button id="toggleSidebar" class="rail-toggle" type="button" aria-label="Toggle sidebar" title="Toggle sidebar">
+      ☰
+    </button>
+
+    <div class="sidebar-brand">
+      <div class="brand-title">Nova</div>
+      <div class="brand-subtitle">Control Center</div>
+    </div>
+  </div>
+
+  <div class="sidebar-content">
+    <div class="sidebar-controls">
+      <button id="newSessionBtn" type="button">New</button>
+      <button id="deleteSessionBtn" type="button">Delete</button>
+      <button id="renameSessionBtn" type="button">Rename</button>
+      <button id="duplicateSessionBtn" type="button">Duplicate</button>
+      <button id="pinSessionBtn" type="button">Pin</button>
+      <button id="exportSessionBtn" type="button">Export</button>
+    </div>
+
+    <section class="sidebar-section">
+      <div class="sidebar-section-title">Appearance</div>
+      <div class="sidebar-actions">
+        <button id="themeToggleBtn" type="button">Theme</button>
+        <button id="backgroundBtn" type="button">Background</button>
+      </div>
+    </section>
+
+    <section class="sidebar-section">
+      <div class="sidebar-section-title">Chats</div>
+
+      <div class="session-search-wrap">
+        <input
+          id="sessionSearchInput"
+          class="session-search-input"
+          type="text"
+          placeholder="Search chats..."
+          aria-label="Search chats"
+          autocomplete="off"
+        >
+      </div>
+
+      <div id="sessionList" class="session-list"></div>
+    </section>
+  </div>
+</aside>

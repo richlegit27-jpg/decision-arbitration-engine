@@ -1,113 +1,108 @@
-# C:\Users\Owner\nova\routes_memory.py
-
 from __future__ import annotations
+
+import uuid
 
 from flask import Blueprint, jsonify, request
 
+from auth_utils import DEV_BYPASS_AUTH, current_user, normalize_username
+from nova_context import (
+    MEMORY_ITEMS,
+    STATE_LOCK,
+    extract_memory,
+    get_user_memory_items,
+    now_iso,
+    save_memory,
+)
 
-memory_bp = Blueprint("memory_bp", __name__)
-
-
-def _get_ctx():
-    from app import (
-        DEV_BYPASS_AUTH,
-        MEMORY_ITEMS,
-        STATE_LOCK,
-        current_user,
-        get_user_memory_items,
-        normalize_username,
-        now_iso,
-        save_memory,
-    )
-
-    return {
-        "DEV_BYPASS_AUTH": DEV_BYPASS_AUTH,
-        "MEMORY_ITEMS": MEMORY_ITEMS,
-        "STATE_LOCK": STATE_LOCK,
-        "current_user": current_user,
-        "get_user_memory_items": get_user_memory_items,
-        "normalize_username": normalize_username,
-        "now_iso": now_iso,
-        "save_memory": save_memory,
-    }
+memory_bp = Blueprint("memory", __name__, url_prefix="/api/memory")
 
 
-@memory_bp.route("/api/memory", methods=["GET"])
-def memory():
-    ctx = _get_ctx()
-    username = ctx["current_user"]() or "dev"
-
-    if ctx["DEV_BYPASS_AUTH"] and ctx["normalize_username"](username) == "dev":
-        return jsonify({"ok": True, "memory": ctx["MEMORY_ITEMS"]})
-
-    return jsonify({"ok": True, "memory": ctx["get_user_memory_items"](username)})
+def _username() -> str:
+    if DEV_BYPASS_AUTH:
+        return "dev"
+    return normalize_username(str(current_user().get("username", "") or ""))
 
 
-@memory_bp.route("/api/memory", methods=["POST"])
-def memory_add():
-    import uuid
+@memory_bp.get("")
+def list_memory():
+    return jsonify({"ok": True, "items": get_user_memory_items(_username())})
 
-    ctx = _get_ctx()
+
+@memory_bp.post("")
+def add_memory_root():
     data = request.get_json(silent=True) or {}
-    username = ctx["current_user"]() or "dev"
-    value = str(data.get("value") or "").strip()
-    kind = str(data.get("kind") or "memory").strip()
+    username = _username()
+
+    kind = str(data.get("kind", "memory") or "memory").strip() or "memory"
+    value = str(data.get("value", "") or "").strip()
 
     if not value:
-        return jsonify({"ok": False, "error": "Missing memory value"}), 400
+        return jsonify({"ok": False, "error": "value is required"}), 400
 
     item = {
         "id": str(uuid.uuid4()),
-        "user": ctx["normalize_username"](username),
-        "kind": kind or "memory",
-        "value": value[:300],
-        "created_at": ctx["now_iso"](),
-        "updated_at": ctx["now_iso"](),
+        "user": username,
+        "kind": kind[:40],
+        "value": value[:500],
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
     }
 
-    with ctx["STATE_LOCK"]:
-        ctx["MEMORY_ITEMS"].insert(0, item)
-        ctx["save_memory"]()
+    with STATE_LOCK:
+        MEMORY_ITEMS.append(item)
+        save_memory()
 
-    if ctx["DEV_BYPASS_AUTH"] and ctx["normalize_username"](username) == "dev":
-        memory_payload = ctx["MEMORY_ITEMS"]
-    else:
-        memory_payload = ctx["get_user_memory_items"](username)
-
-    return jsonify({"ok": True, "item": item, "memory": memory_payload})
+    return jsonify({"ok": True, "item": item})
 
 
-@memory_bp.route("/api/memory/delete", methods=["POST"])
-def memory_delete():
-    ctx = _get_ctx()
+@memory_bp.post("/add")
+def add_memory_alias():
+    return add_memory_root()
+
+
+@memory_bp.post("/delete")
+def delete_memory():
     data = request.get_json(silent=True) or {}
-    username = ctx["current_user"]() or "dev"
-    memory_id = str(data.get("id") or "").strip()
+    item_id = str(data.get("id", "") or "").strip()
+    username = _username()
 
-    if not memory_id:
-        return jsonify({"ok": False, "error": "Missing memory id"}), 400
+    if not item_id:
+        return jsonify({"ok": False, "error": "id is required"}), 400
 
-    with ctx["STATE_LOCK"]:
-        before = len(ctx["MEMORY_ITEMS"])
+    with STATE_LOCK:
+        before = len(MEMORY_ITEMS)
+        MEMORY_ITEMS[:] = [
+            item
+            for item in MEMORY_ITEMS
+            if not (
+                str(item.get("id", "")) == item_id
+                and normalize_username(str(item.get("user", ""))) == username
+            )
+        ]
+        deleted = len(MEMORY_ITEMS) != before
+        if deleted:
+            save_memory()
 
-        if ctx["DEV_BYPASS_AUTH"] and ctx["normalize_username"](username) == "dev":
-            ctx["MEMORY_ITEMS"][:] = [
-                item
-                for item in ctx["MEMORY_ITEMS"]
-                if str(item.get("id", "")).strip() != memory_id
-            ]
-        else:
-            ctx["MEMORY_ITEMS"][:] = [
-                item
-                for item in ctx["MEMORY_ITEMS"]
-                if not (
-                    str(item.get("id", "")).strip() == memory_id
-                    and ctx["normalize_username"](str(item.get("user", ""))) == ctx["normalize_username"](username)
-                )
-            ]
+    return jsonify({"ok": True, "deleted": deleted})
 
-        changed = len(ctx["MEMORY_ITEMS"]) != before
-        if changed:
-            ctx["save_memory"]()
 
-    return jsonify({"ok": True, "deleted": changed})
+@memory_bp.post("/extract")
+def extract_memory_route():
+    data = request.get_json(silent=True) or {}
+    text = str(data.get("text", "") or "").strip()
+    username = _username()
+
+    if not text:
+        return jsonify({"ok": False, "error": "text is required"}), 400
+
+    item = extract_memory(text)
+    if not item:
+        return jsonify({"ok": True, "item": None})
+
+    item["user"] = username
+
+    with STATE_LOCK:
+        MEMORY_ITEMS.append(item)
+        save_memory()
+
+    return jsonify({"ok": True, "item": item})
