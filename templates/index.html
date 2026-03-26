@@ -1,241 +1,301 @@
-﻿<!doctype html>
-<html lang="en">
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
-  />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nova</title>
-
-  <link rel="stylesheet" href="/static/css/nova-base.css" />
-  <link rel="stylesheet" href="/static/css/nova-main.css" />
-  <link rel="stylesheet" href="/static/css/nova-sidebar.css" />
-  <link rel="stylesheet" href="/static/css/nova-memory.css" />
-  <link rel="stylesheet" href="/static/css/nova-composer.css" />
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=finalshelllock1" />
 </head>
 <body>
-  <div
-    id="novaApp"
-    class="nova-app sidebar-open memory-open"
-    data-nova-app="true"
-  >
-    <aside
-      id="leftSidebar"
-      class="sidebar is-open"
-      data-sidebar="true"
-      aria-hidden="false"
-    >
-      <div class="sidebar-inner">
-        <div class="sidebar-top">
-          <div class="sidebar-top-title">
-            <h2 class="section-title">Sessions</h2>
-          </div>
-
-          <div class="sidebar-top-actions">
-            <button
-              id="closeSidebarBtn"
-              class="icon-btn desktop-panel-close"
-              type="button"
-              aria-label="Close sidebar"
-              title="Close sidebar"
-              data-action="close-sidebar"
-            >
-              ✕
-            </button>
+  <div class="nova-app-shell" id="novaAppShell">
+    <aside class="nova-sidebar" id="novaSidebar">
+      <div class="nova-sidebar-top">
+        <div class="nova-brand">
+          <div class="nova-brand-mark">N</div>
+          <div class="nova-brand-copy">
+            <div class="nova-brand-title">Nova</div>
+            <div class="nova-brand-subtitle">Ultimate 2026</div>
           </div>
         </div>
 
-        <div class="sidebar-section">
-          <button
-            id="newChatBtn"
-            class="primary-btn"
-            type="button"
-          >
-            New chat
-          </button>
-        </div>
+        <button
+          type="button"
+          class="nova-icon-button nova-sidebar-toggle"
+          id="sidebarToggle"
+          aria-label="Toggle sidebar"
+          title="Toggle sidebar"
+        >
+          ☰
+        </button>
+      </div>
 
-        <div class="sidebar-section session-list-wrap">
-          <div id="sessionList" class="session-list"></div>
-        </div>
+      <div class="nova-sidebar-actions">
+        <button type="button" class="nova-primary-button" id="newChatBtn">
+          + New Chat
+        </button>
+      </div>
+
+      <div class="nova-sidebar-section">
+        <div class="nova-section-label">Sessions</div>
+        <div class="nova-session-list" id="sessionList"></div>
       </div>
     </aside>
 
-    <main id="mainShell" class="main-shell">
-      <header class="main-topbar">
-        <div class="topbar-left">
-          <div class="brand-wrap">
-            <button
-              id="toggleSidebarBtn"
-              class="icon-btn"
-              type="button"
-              aria-label="Toggle sidebar"
-              aria-expanded="true"
-              title="Toggle sidebar"
-              data-action="toggle-sidebar"
-            >
-              ☰
-            </button>
+    <main class="nova-main" id="novaMain">
+      <header class="nova-topbar">
+        <div class="nova-topbar-left">
+          <button
+            type="button"
+            class="nova-icon-button nova-mobile-sidebar-toggle"
+            id="mobileSidebarToggle"
+            aria-label="Open sidebar"
+            title="Open sidebar"
+          >
+            ☰
+          </button>
 
-            <div class="brand-block">
-              <div class="brand-title">Nova</div>
-            </div>
-
-            <div id="routerBadge" class="router-badge">ready</div>
+          <div class="nova-topbar-title-wrap">
+            <h1 class="nova-topbar-title">Nova</h1>
+            <div class="nova-topbar-subtitle" id="sessionTitle">Ready</div>
           </div>
         </div>
 
-        <div class="topbar-right">
+        <div class="nova-topbar-actions">
           <button
-            id="themeToggleBtn"
-            class="icon-btn"
             type="button"
+            class="nova-icon-button"
+            id="themeToggle"
+            title="Theme"
             aria-label="Toggle theme"
-            title="Toggle theme"
           >
-            ☀
+            ◐
           </button>
 
-          <select id="modelSelect" class="model-select" aria-label="Model">
-            <option value="gpt-5.4">gpt-5.4</option>
-            <option value="gpt-4.1-mini">gpt-4.1-mini</option>
-            <option value="gpt-4.1">gpt-4.1</option>
-            <option value="gpt-4o-mini">gpt-4o-mini</option>
-          </select>
+          <button
+            type="button"
+            class="nova-icon-button"
+            id="memoryPanelToggle"
+            title="Memory"
+            aria-label="Toggle memory panel"
+          >
+            🧠
+          </button>
 
           <button
-            id="toggleMemoryBtn"
-            class="icon-btn"
             type="button"
-            aria-label="Toggle memory panel"
-            aria-expanded="true"
-            title="Toggle memory panel"
-            data-action="toggle-memory"
+            class="nova-icon-button"
+            id="artifactsPanelToggle"
+            title="Artifacts"
+            aria-label="Toggle artifacts panel"
           >
-            ⟫
+            📄
           </button>
         </div>
       </header>
 
-      <section class="chat-view">
-        <div id="chatMessages" class="chat-messages">
-          <div id="emptyState" class="empty-state">
-            <div class="empty-state-card">
-              <h1>Nova is ready</h1>
-              <p>Ask anything, build something, or continue your latest session.</p>
-            </div>
+      <section class="nova-chat-stage">
+        <div class="nova-chat-scroll" id="chatScroll">
+          <div class="nova-empty-state" id="emptyState">
+            <div class="nova-empty-icon">✦</div>
+            <h2 class="nova-empty-title">Nova is ready</h2>
+            <p class="nova-empty-copy">
+              Ask anything, build something, or let Nova route the task.
+            </p>
           </div>
+
+          <div class="nova-message-list" id="messages"></div>
         </div>
-      </section>
 
-      <section class="composer-shell">
-        <div id="attachmentBar" class="attachment-bar hidden"></div>
+        <footer class="nova-composer-shell">
+          <div class="nova-attachments-bar" id="attachmentsBar" hidden></div>
 
-        <div class="composer-box">
-          <div class="composer-controls-row">
+          <div class="nova-composer">
             <button
-              id="attachBtn"
-              class="icon-btn"
               type="button"
-              aria-label="Attach files"
-              title="Attach files"
+              class="nova-composer-utility"
+              id="voiceBtn"
+              title="Voice"
+              aria-label="Voice"
+            >
+              🎙
+            </button>
+
+            <textarea
+              id="composerInput"
+              class="nova-composer-input"
+              placeholder="Message Nova..."
+              rows="1"
+            ></textarea>
+
+            <button
+              type="button"
+              class="nova-composer-utility"
+              id="attachBtn"
+              title="Attach"
+              aria-label="Attach"
             >
               ＋
             </button>
 
             <button
-              id="voiceBtn"
-              class="icon-btn"
               type="button"
-              aria-label="Voice input"
-              title="Voice input"
-            >
-              🎤
-            </button>
-          </div>
-
-          <label class="sr-only" for="composerInput">Message</label>
-          <textarea
-            id="composerInput"
-            class="composer-input"
-            placeholder="Message Nova..."
-            rows="1"
-            autocomplete="off"
-            spellcheck="true"
-          ></textarea>
-
-          <div class="composer-actions">
-            <button
+              class="nova-send-button"
               id="sendBtn"
-              class="send-btn"
-              type="button"
+              title="Send"
+              aria-label="Send"
             >
               Send
             </button>
           </div>
-        </div>
-
-        <input id="fileInput" type="file" multiple class="hidden" />
+        </footer>
       </section>
     </main>
 
-    <aside
-      id="memoryPanel"
-      class="memory-panel is-open"
-      data-memory-panel="true"
-      aria-hidden="false"
-    >
-      <div class="memory-inner">
-        <div class="memory-top">
-          <div class="memory-top-title">
-            <h2>Memory</h2>
+    <aside class="nova-right-rail" id="novaRightRail">
+      <div class="nova-side-panel is-active" id="memoryPanel">
+        <div class="nova-panel-head">
+          <div>
+            <div class="nova-panel-eyebrow">Memory</div>
+            <h3 class="nova-panel-title">Saved context</h3>
           </div>
 
-          <div class="memory-top-actions">
+          <button
+            type="button"
+            class="nova-icon-button"
+            id="memoryCloseBtn"
+            aria-label="Close memory panel"
+            title="Close memory panel"
+          >
+            ×
+          </button>
+        </div>
+
+        <div class="nova-panel-body">
+          <div class="nova-panel-tools">
+            <input
+              type="text"
+              id="memorySearch"
+              class="nova-search-input"
+              placeholder="Search memory"
+            />
+          </div>
+
+          <div class="nova-memory-list" id="memoryList"></div>
+        </div>
+      </div>
+
+      <div class="nova-side-panel is-active" id="novaArtifactsRoot" data-artifacts-root>
+        <div class="nova-panel-head nova-artifacts-panel-head">
+          <div>
+            <div class="nova-panel-eyebrow">Artifacts</div>
+            <h3 class="nova-panel-title">Saved outputs</h3>
+          </div>
+
+          <div class="nova-panel-head-actions">
+            <div class="nova-artifacts-count-wrap">
+              <span class="nova-panel-chip">Count</span>
+              <span
+                class="nova-panel-chip nova-panel-chip-strong"
+                id="novaArtifactsCount"
+                data-artifacts-count
+              >0</span>
+            </div>
+
             <button
-              id="closeMemoryBtn"
-              class="icon-btn desktop-panel-close"
               type="button"
-              aria-label="Close memory panel"
-              title="Close memory panel"
-              data-action="close-memory"
+              class="nova-icon-button"
+              id="artifactsCloseBtn"
+              aria-label="Close artifacts panel"
+              title="Close artifacts panel"
             >
-              ✕
+              ×
             </button>
           </div>
         </div>
 
-        <div class="memory-add-row">
-          <input
-            id="memoryInput"
-            class="memory-input"
-            type="text"
-            placeholder="Add memory..."
-            autocomplete="off"
-          />
-          <button
-            id="addMemoryBtn"
-            class="primary-btn"
-            type="button"
-          >
-            Add
-          </button>
-        </div>
+        <div class="nova-panel-body nova-artifacts-panel-body">
+          <div
+            class="nova-artifacts-status"
+            id="novaArtifactsStatus"
+            data-artifacts-status
+          ></div>
 
-        <div id="memoryList" class="memory-list"></div>
+          <div
+            class="nova-artifacts-empty"
+            id="novaArtifactsEmpty"
+            data-artifacts-empty
+          >
+            <div class="nova-artifacts-empty-icon">📄</div>
+            <div class="nova-artifacts-empty-title">No artifacts yet</div>
+            <div class="nova-artifacts-empty-copy">
+              Saved documents, code blocks, and routed outputs will show up here.
+            </div>
+          </div>
+
+          <div
+            class="nova-artifacts-list"
+            id="novaArtifactsList"
+            data-artifacts-list
+          ></div>
+
+          <div
+            class="nova-artifact-viewer"
+            id="novaArtifactViewer"
+            data-artifact-viewer
+            hidden
+          >
+            <div class="nova-artifact-viewer-head">
+              <div class="nova-artifact-viewer-head-copy">
+                <div
+                  class="nova-artifact-viewer-title"
+                  id="novaArtifactViewerTitle"
+                  data-artifact-viewer-title
+                >
+                  Artifact
+                </div>
+
+                <div class="nova-artifact-viewer-meta-row">
+                  <span
+                    class="nova-panel-chip"
+                    id="novaArtifactViewerType"
+                    data-artifact-viewer-type
+                  >
+                    document
+                  </span>
+
+                  <span
+                    class="nova-artifact-viewer-time"
+                    id="novaArtifactViewerTime"
+                    data-artifact-viewer-time
+                  ></span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                class="nova-icon-button"
+                id="artifactViewerCloseBtn"
+                aria-label="Close artifact viewer"
+                title="Close artifact viewer"
+              >
+                ×
+              </button>
+            </div>
+
+            <div class="nova-artifact-viewer-body">
+              <pre
+                class="nova-artifact-viewer-content"
+                id="novaArtifactViewerContent"
+                data-artifact-viewer-content
+              ></pre>
+            </div>
+          </div>
+        </div>
       </div>
     </aside>
   </div>
 
-  <script src="/static/js/nova-dom.js"></script>
-  <script src="/static/js/nova-state.js"></script>
-  <script src="/static/js/nova-api.js"></script>
-  <script src="/static/js/nova-panels.js"></script>
-  <script src="/static/js/nova-render-sessions.js"></script>
-  <script src="/static/js/nova-render-messages.js"></script>
-  <script src="/static/js/nova-memory.js"></script>
-  <script src="/static/js/nova-chat-stream.js"></script>
-  <script src="/static/js/nova-render.js"></script>
+  <script src="/static/js/nova-render.js?v=finalshelllock1"></script>
+  <script src="/static/js/nova-artifacts.js?v=finalshelllock1"></script>
 </body>
 </html>
