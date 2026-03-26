@@ -37,12 +37,26 @@
       return root.querySelector(selector);
     };
 
+  function qsa(selector, root = document) {
+    return Array.from(root.querySelectorAll(selector));
+  }
+
   function safeArray(value) {
     return Array.isArray(value) ? value : [];
   }
 
+  function safeString(value, fallback = "") {
+    if (typeof value === "string") return value;
+    if (value === null || value === undefined) return fallback;
+    return String(value);
+  }
+
   function isFn(value) {
     return typeof value === "function";
+  }
+
+  function isObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
   }
 
   function ensureState() {
@@ -59,11 +73,17 @@
     if (typeof state.memoryOpen !== "boolean") state.memoryOpen = true;
     if (typeof state.lastUserMessage !== "string") state.lastUserMessage = "";
     if (typeof state.lastRouter !== "string") state.lastRouter = "ready";
+    if (typeof state.theme !== "string" || !state.theme.trim()) {
+      state.theme = "dark";
+    }
   }
 
   function getEls() {
     return {
       app: byId("novaApp") || qs(".nova-app"),
+      body: document.body,
+      mainTopbar: qs(".main-topbar"),
+      topbarRight: qs(".topbar-right"),
       chatMessages: byId("chatMessages"),
       emptyState: byId("emptyState"),
       sessionList: byId("sessionList"),
@@ -80,14 +100,15 @@
       modelSelect: byId("modelSelect"),
       routerBadge: byId("routerBadge"),
       toggleSidebarBtn: byId("toggleSidebarBtn"),
-      toggleMemoryBtn: byId("toggleMemoryBtn"),
+      toggleMemoryBtn: byId("toggleMemoryBtn") || byId("openMemoryBtn"),
+      themeToggleBtn: byId("themeToggleBtn") || byId("toggleThemeBtn"),
     };
   }
 
   function setRouterBadge(text) {
     const els = getEls();
     if (!els.routerBadge) return;
-    els.routerBadge.textContent = (text || "ready").toString();
+    els.routerBadge.textContent = safeString(text || "ready");
   }
 
   function autosizeComposer() {
@@ -98,6 +119,15 @@
     input.style.height = "auto";
     const next = Math.min(Math.max(input.scrollHeight, 48), 220);
     input.style.height = `${next}px`;
+  }
+
+  function escapeHtml(value) {
+    return safeString(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
   }
 
   function syncComposerDisabledState() {
@@ -120,12 +150,14 @@
   function normalizeSession(raw) {
     if (!raw || typeof raw !== "object") return null;
 
-    const id = String(raw.id || raw.session_id || raw.sessionId || "").trim();
+    const id = safeString(raw.id || raw.session_id || raw.sessionId || "").trim();
     if (!id) return null;
 
-    const title = String(raw.title || raw.name || "New chat").trim() || "New chat";
-    const preview = String(raw.preview || raw.last_message || raw.lastMessage || "").trim();
-    const updatedAt = String(raw.updated_at || raw.updatedAt || raw.created_at || raw.createdAt || "").trim();
+    const title = safeString(raw.title || raw.name || "New chat").trim() || "New chat";
+    const preview = safeString(raw.preview || raw.last_message || raw.lastMessage || "").trim();
+    const updatedAt = safeString(
+      raw.updated_at || raw.updatedAt || raw.created_at || raw.createdAt || ""
+    ).trim();
     const pinned = !!(raw.pinned || raw.is_pinned || raw.isPinned);
 
     return {
@@ -140,9 +172,9 @@
   function normalizeMessage(raw) {
     if (!raw || typeof raw !== "object") return null;
 
-    const role = String(raw.role || "assistant").trim() || "assistant";
-    const content = String(raw.content || raw.text || "").trim();
-    const createdAt = String(raw.created_at || raw.createdAt || "").trim();
+    const role = safeString(raw.role || "assistant").trim() || "assistant";
+    const content = safeString(raw.content || raw.text || "");
+    const createdAt = safeString(raw.created_at || raw.createdAt || "").trim();
 
     return {
       role,
@@ -154,10 +186,10 @@
   function normalizeMemory(raw) {
     if (!raw || typeof raw !== "object") return null;
 
-    const id = String(raw.id || raw.memory_id || raw.memoryId || "").trim();
-    const kind = String(raw.kind || "memory").trim() || "memory";
-    const value = String(raw.value || raw.text || "").trim();
-    const createdAt = String(raw.created_at || raw.createdAt || "").trim();
+    const id = safeString(raw.id || raw.memory_id || raw.memoryId || "").trim();
+    const kind = safeString(raw.kind || "memory").trim() || "memory";
+    const value = safeString(raw.value || raw.text || "").trim();
+    const createdAt = safeString(raw.created_at || raw.createdAt || "").trim();
 
     if (!id || !value) return null;
 
@@ -185,15 +217,6 @@
     } catch (_error) {
       return "";
     }
-  }
-
-  function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
   }
 
   function renderSessionsFallback() {
@@ -255,7 +278,7 @@
     }
 
     safeArray(state.messages).forEach((message) => {
-      const role = message.role || "assistant";
+      const role = safeString(message.role || "assistant").trim().toLowerCase();
       const article = document.createElement("article");
       article.className = `message message-${role === "user" ? "user" : role === "system" ? "system" : "assistant"}`;
 
@@ -308,6 +331,8 @@
   }
 
   function renderAll() {
+    syncThemeButtonLabel();
+    ensureTopbarUtilityButtons();
     setRouterBadge(state.lastRouter || "ready");
 
     if (isFn(sessions.renderSessionList)) {
@@ -343,14 +368,6 @@
     syncComposerDisabledState();
     syncEmptyState();
     autosizeComposer();
-  }
-
-  async function safeJson(response) {
-    try {
-      return await response.json();
-    } catch (_error) {
-      return null;
-    }
   }
 
   async function fetchState() {
@@ -400,7 +417,7 @@
       .map(normalizeSession)
       .filter(Boolean);
 
-    if (sessionList.length) {
+    if (sessionList.length || Array.isArray(rawSessions)) {
       state.sessions = sessionList;
     }
 
@@ -412,7 +429,7 @@
       "";
 
     if (activeSessionId) {
-      state.activeSessionId = String(activeSessionId);
+      state.activeSessionId = safeString(activeSessionId);
     } else if (!state.activeSessionId && sessionList[0]?.id) {
       state.activeSessionId = sessionList[0].id;
     }
@@ -425,7 +442,7 @@
       "";
 
     if (model) {
-      state.currentModel = String(model);
+      state.currentModel = safeString(model);
     }
   }
 
@@ -476,7 +493,7 @@
     const payload = await fetchSession(sessionId);
     if (!payload) return;
 
-    state.activeSessionId = String(sessionId);
+    state.activeSessionId = safeString(sessionId);
     hydrateMessagesFromPayload(payload);
     renderAll();
 
@@ -492,7 +509,7 @@
 
     try {
       const payload = await api.createSession();
-      const newId = String(
+      const newId = safeString(
         payload?.session_id ||
         payload?.sessionId ||
         payload?.id ||
@@ -527,7 +544,7 @@
     const els = getEls();
     if (!els.memoryInput || !isFn(api.addMemory)) return;
 
-    const value = String(els.memoryInput.value || "").trim();
+    const value = safeString(els.memoryInput.value || "").trim();
     if (!value) return;
 
     els.memoryInput.disabled = true;
@@ -542,175 +559,6 @@
     } finally {
       els.memoryInput.disabled = false;
       if (els.addMemoryBtn) els.addMemoryBtn.disabled = false;
-    }
-  }
-
-  async function sendMessage() {
-    const els = getEls();
-    if (!els.composerInput) return;
-    if (state.isSending) return;
-
-    const content = String(els.composerInput.value || "").trim();
-    if (!content) return;
-
-    state.isSending = true;
-    state.lastUserMessage = content;
-    syncComposerDisabledState();
-
-    const optimisticUserMessage = {
-      role: "user",
-      content,
-      created_at: new Date().toISOString(),
-    };
-
-    state.messages = [...safeArray(state.messages), optimisticUserMessage];
-    els.composerInput.value = "";
-    autosizeComposer();
-    renderAll();
-
-    try {
-      if (isFn(chat.sendMessage)) {
-        await chat.sendMessage({
-          content,
-          sessionId: state.activeSessionId,
-          model: state.currentModel,
-        });
-      } else if (isFn(api.sendChat)) {
-        const payload = await api.sendChat({
-          content,
-          session_id: state.activeSessionId,
-          model: state.currentModel,
-        });
-
-        const returnedSessionId = String(
-          payload?.session_id ||
-          payload?.sessionId ||
-          state.activeSessionId ||
-          ""
-        ).trim();
-
-        if (returnedSessionId) {
-          state.activeSessionId = returnedSessionId;
-        }
-
-        if (payload?.router || payload?.route) {
-          state.lastRouter = String(payload.router || payload.route || "ready");
-        }
-
-        if (payload?.messages) {
-          hydrateMessagesFromPayload(payload);
-        } else if (payload?.answer || payload?.content) {
-          state.messages = [
-            ...safeArray(state.messages),
-            {
-              role: "assistant",
-              content: String(payload.answer || payload.content || ""),
-              created_at: new Date().toISOString(),
-            },
-          ];
-        }
-      }
-
-      await refreshSessions();
-
-      if (state.activeSessionId) {
-        const sessionPayload = await fetchSession(state.activeSessionId);
-        if (sessionPayload) {
-          hydrateMessagesFromPayload(sessionPayload);
-        }
-      }
-    } catch (_error) {
-      state.messages = [
-        ...safeArray(state.messages),
-        {
-          role: "system",
-          content: "Something went wrong sending that message.",
-          created_at: new Date().toISOString(),
-        },
-      ];
-    } finally {
-      state.isSending = false;
-      syncComposerDisabledState();
-      renderAll();
-    }
-  }
-
-  function bindComposer() {
-    const els = getEls();
-
-    if (els.composerInput && els.composerInput.dataset.novaBoundInput !== "true") {
-      els.composerInput.dataset.novaBoundInput = "true";
-
-      els.composerInput.addEventListener("input", autosizeComposer);
-
-      els.composerInput.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" && !event.shiftKey) {
-          event.preventDefault();
-          sendMessage();
-        }
-      });
-    }
-
-    if (els.sendBtn && els.sendBtn.dataset.novaBoundSend !== "true") {
-      els.sendBtn.dataset.novaBoundSend = "true";
-      els.sendBtn.addEventListener("click", sendMessage);
-    }
-  }
-
-  function bindSessionControls() {
-    const els = getEls();
-
-    if (els.newChatBtn && els.newChatBtn.dataset.novaBoundNewChat !== "true") {
-      els.newChatBtn.dataset.novaBoundNewChat = "true";
-      els.newChatBtn.addEventListener("click", createNewSession);
-    }
-
-    if (els.modelSelect && els.modelSelect.dataset.novaBoundModel !== "true") {
-      els.modelSelect.dataset.novaBoundModel = "true";
-
-      els.modelSelect.addEventListener("change", () => {
-        state.currentModel = String(els.modelSelect.value || "gpt-5.4");
-      });
-    }
-  }
-
-  function bindMemoryControls() {
-    const els = getEls();
-
-    if (els.addMemoryBtn && els.addMemoryBtn.dataset.novaBoundAddMemory !== "true") {
-      els.addMemoryBtn.dataset.novaBoundAddMemory = "true";
-      els.addMemoryBtn.addEventListener("click", addMemoryFromInput);
-    }
-
-    if (els.memoryInput && els.memoryInput.dataset.novaBoundMemoryInput !== "true") {
-      els.memoryInput.dataset.novaBoundMemoryInput = "true";
-
-      els.memoryInput.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          addMemoryFromInput();
-        }
-      });
-    }
-  }
-
-  function bindAttachmentControls() {
-    const els = getEls();
-    if (!els.attachBtn || !els.fileInput) return;
-
-    if (els.attachBtn.dataset.novaBoundAttach !== "true") {
-      els.attachBtn.dataset.novaBoundAttach = "true";
-      els.attachBtn.addEventListener("click", () => {
-        els.fileInput.click();
-      });
-    }
-
-    if (els.fileInput.dataset.novaBoundFileInput !== "true") {
-      els.fileInput.dataset.novaBoundFileInput = "true";
-      els.fileInput.addEventListener("change", () => {
-        state.attachedFiles = Array.from(els.fileInput.files || []);
-        renderAttachmentBar();
-      });
     }
   }
 
@@ -784,14 +632,314 @@
     els.modelSelect.value = model;
   }
 
+  function getPreferredTheme() {
+    try {
+      const stored = localStorage.getItem("nova-theme");
+      if (stored === "light" || stored === "dark") {
+        return stored;
+      }
+    } catch (_error) {
+      // no-op
+    }
+
+    if (document.body.getAttribute("data-theme") === "light") {
+      return "light";
+    }
+
+    return "dark";
+  }
+
+  function applyTheme(theme) {
+    const nextTheme = theme === "light" ? "light" : "dark";
+    state.theme = nextTheme;
+    document.body.setAttribute("data-theme", nextTheme);
+    document.documentElement.setAttribute("data-theme", nextTheme);
+
+    try {
+      localStorage.setItem("nova-theme", nextTheme);
+    } catch (_error) {
+      // no-op
+    }
+
+    syncThemeButtonLabel();
+  }
+
+  function toggleTheme() {
+    applyTheme(state.theme === "light" ? "dark" : "light");
+  }
+
+  function syncThemeButtonLabel() {
+    const els = getEls();
+    const button = els.themeToggleBtn;
+    if (!button) return;
+
+    const isLight = state.theme === "light";
+    button.setAttribute("aria-label", isLight ? "Switch to dark theme" : "Switch to light theme");
+    button.setAttribute("title", isLight ? "Dark mode" : "Light mode");
+    button.textContent = isLight ? "☾" : "☀";
+  }
+
+  function ensureTopbarUtilityButtons() {
+    const els = getEls();
+    const topbarRight = els.topbarRight;
+    if (!topbarRight) return;
+
+    if (!els.toggleMemoryBtn) {
+      const memoryBtn = document.createElement("button");
+      memoryBtn.id = "toggleMemoryBtn";
+      memoryBtn.className = "icon-btn";
+      memoryBtn.type = "button";
+      memoryBtn.setAttribute("aria-label", "Toggle memory panel");
+      memoryBtn.setAttribute("data-action", "toggle-memory");
+      memoryBtn.textContent = "⟫";
+      topbarRight.appendChild(memoryBtn);
+    }
+
+    if (!els.themeToggleBtn) {
+      const themeBtn = document.createElement("button");
+      themeBtn.id = "themeToggleBtn";
+      themeBtn.className = "icon-btn";
+      themeBtn.type = "button";
+      themeBtn.setAttribute("aria-label", "Toggle theme");
+      themeBtn.setAttribute("title", "Toggle theme");
+      themeBtn.textContent = "☀";
+      topbarRight.appendChild(themeBtn);
+    }
+  }
+
+  async function sendMessage(options = {}) {
+    const els = getEls();
+    if (!els.composerInput && !safeString(options.contentOverride).trim()) return;
+    if (state.isSending) return;
+
+    const overrideContent = safeString(options.contentOverride || "").trim();
+    const content = overrideContent || safeString(els.composerInput?.value || "").trim();
+    if (!content) return;
+
+    const shouldClearComposer = !overrideContent;
+
+    state.isSending = true;
+    state.lastUserMessage = content;
+    syncComposerDisabledState();
+
+    const optimisticUserMessage = {
+      role: "user",
+      content,
+      created_at: new Date().toISOString(),
+    };
+
+    if (!options.regenerate) {
+      state.messages = [...safeArray(state.messages), optimisticUserMessage];
+    }
+
+    if (shouldClearComposer && els.composerInput) {
+      els.composerInput.value = "";
+      autosizeComposer();
+    }
+
+    renderAll();
+
+    try {
+      if (isFn(chat.sendMessage)) {
+        await chat.sendMessage({
+          content,
+          sessionId: state.activeSessionId,
+          model: state.currentModel,
+          regenerate: !!options.regenerate,
+        });
+      } else if (isFn(api.sendChat)) {
+        const payload = await api.sendChat({
+          content,
+          session_id: state.activeSessionId,
+          model: state.currentModel,
+        });
+
+        const returnedSessionId = safeString(
+          payload?.session_id ||
+          payload?.sessionId ||
+          state.activeSessionId ||
+          ""
+        ).trim();
+
+        if (returnedSessionId) {
+          state.activeSessionId = returnedSessionId;
+        }
+
+        if (payload?.router || payload?.route) {
+          state.lastRouter = safeString(payload.router || payload.route || "ready");
+        }
+
+        if (payload?.messages) {
+          hydrateMessagesFromPayload(payload);
+        } else if (payload?.answer || payload?.content) {
+          state.messages = [
+            ...safeArray(state.messages),
+            {
+              role: "assistant",
+              content: safeString(payload.answer || payload.content || ""),
+              created_at: new Date().toISOString(),
+            },
+          ];
+        }
+      }
+
+      await refreshSessions();
+
+      if (state.activeSessionId) {
+        const sessionPayload = await fetchSession(state.activeSessionId);
+        if (sessionPayload) {
+          hydrateMessagesFromPayload(sessionPayload);
+        }
+      }
+    } catch (_error) {
+      state.messages = [
+        ...safeArray(state.messages),
+        {
+          role: "system",
+          content: "Something went wrong sending that message.",
+          created_at: new Date().toISOString(),
+        },
+      ];
+    } finally {
+      state.isSending = false;
+      syncComposerDisabledState();
+      renderAll();
+    }
+  }
+
+  function bindComposer() {
+    const els = getEls();
+
+    if (els.composerInput && els.composerInput.dataset.novaBoundInput !== "true") {
+      els.composerInput.dataset.novaBoundInput = "true";
+
+      els.composerInput.addEventListener("input", autosizeComposer);
+
+      els.composerInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          sendMessage();
+        }
+      });
+    }
+
+    if (els.sendBtn && els.sendBtn.dataset.novaBoundSend !== "true") {
+      els.sendBtn.dataset.novaBoundSend = "true";
+      els.sendBtn.addEventListener("click", () => sendMessage());
+    }
+  }
+
+  function bindSessionControls() {
+    const els = getEls();
+
+    if (els.newChatBtn && els.newChatBtn.dataset.novaBoundNewChat !== "true") {
+      els.newChatBtn.dataset.novaBoundNewChat = "true";
+      els.newChatBtn.addEventListener("click", createNewSession);
+    }
+
+    if (els.modelSelect && els.modelSelect.dataset.novaBoundModel !== "true") {
+      els.modelSelect.dataset.novaBoundModel = "true";
+
+      els.modelSelect.addEventListener("change", () => {
+        state.currentModel = safeString(els.modelSelect.value || "gpt-5.4");
+      });
+    }
+  }
+
+  function bindMemoryControls() {
+    const els = getEls();
+
+    if (els.addMemoryBtn && els.addMemoryBtn.dataset.novaBoundAddMemory !== "true") {
+      els.addMemoryBtn.dataset.novaBoundAddMemory = "true";
+      els.addMemoryBtn.addEventListener("click", addMemoryFromInput);
+    }
+
+    if (els.memoryInput && els.memoryInput.dataset.novaBoundMemoryInput !== "true") {
+      els.memoryInput.dataset.novaBoundMemoryInput = "true";
+
+      els.memoryInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          addMemoryFromInput();
+        }
+      });
+    }
+  }
+
+  function bindAttachmentControls() {
+    const els = getEls();
+    if (!els.attachBtn || !els.fileInput) return;
+
+    if (els.attachBtn.dataset.novaBoundAttach !== "true") {
+      els.attachBtn.dataset.novaBoundAttach = "true";
+      els.attachBtn.addEventListener("click", () => {
+        els.fileInput.click();
+      });
+    }
+
+    if (els.fileInput.dataset.novaBoundFileInput !== "true") {
+      els.fileInput.dataset.novaBoundFileInput = "true";
+      els.fileInput.addEventListener("change", () => {
+        state.attachedFiles = Array.from(els.fileInput.files || []);
+        renderAttachmentBar();
+      });
+    }
+  }
+
+  function bindThemeControl() {
+    const els = getEls();
+    if (!els.themeToggleBtn) return;
+
+    if (els.themeToggleBtn.dataset.novaBoundTheme !== "true") {
+      els.themeToggleBtn.dataset.novaBoundTheme = "true";
+      els.themeToggleBtn.addEventListener("click", toggleTheme);
+    }
+  }
+
+  function bindUtilityRecovery() {
+    const observerTarget = document.body;
+    if (!observerTarget || observerTarget.dataset.novaUtilityObserver === "true") return;
+    observerTarget.dataset.novaUtilityObserver = "true";
+
+    const observer = new MutationObserver(() => {
+      ensureTopbarUtilityButtons();
+      bindThemeControl();
+
+      const els = getEls();
+      if (els.toggleMemoryBtn && els.toggleMemoryBtn.dataset.novaPanelNudge !== "true") {
+        els.toggleMemoryBtn.dataset.novaPanelNudge = "true";
+
+        els.toggleMemoryBtn.addEventListener("click", () => {
+          window.setTimeout(() => {
+            if (isFn(panels.syncPanelState)) {
+              panels.syncPanelState();
+            }
+          }, 0);
+        });
+      }
+    });
+
+    observer.observe(observerTarget, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
   async function bootstrap() {
     ensureState();
+
+    ensureTopbarUtilityButtons();
+    state.theme = getPreferredTheme();
+    applyTheme(state.theme);
+
     setRouterBadge("loading");
 
     bindComposer();
     bindSessionControls();
     bindMemoryControls();
     bindAttachmentControls();
+    bindThemeControl();
+    bindUtilityRecovery();
 
     if (isFn(panels.init)) {
       try {
@@ -817,6 +965,9 @@
   render.refreshMemory = refreshMemory;
   render.sendMessage = sendMessage;
   render.autosizeComposer = autosizeComposer;
+  render.applyTheme = applyTheme;
+  render.toggleTheme = toggleTheme;
+  render.ensureTopbarUtilityButtons = ensureTopbarUtilityButtons;
 
   Nova.loadSession = loadSession;
   Nova.refreshSessions = refreshSessions;
