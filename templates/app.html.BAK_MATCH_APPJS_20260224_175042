@@ -1,0 +1,62 @@
+﻿<!doctype html>
+<html lang="en" translate="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Nova</title>
+
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
+  <style>
+    :root { color-scheme: dark; }
+    html,body{height:100%;margin:0;background:#0b0f14;color:#e9eef7;font-family:Segoe UI,system-ui,Arial}
+    .wrap{height:100%;display:flex;flex-direction:column;max-width:1100px;margin:0 auto;padding:12px;box-sizing:border-box;gap:10px}
+    .top{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid #1c2633;border-radius:12px;background:#0e141c}
+    .brand{font-weight:800;letter-spacing:.2px}
+    .meta{font-size:12px;color:#9fb0c9;display:flex;gap:8px;align-items:center}
+    .pill{padding:4px 10px;border:1px solid #223043;border-radius:999px;background:#0b1119}
+    .main{flex:1;display:flex;flex-direction:column;border:1px solid #1c2633;border-radius:12px;background:#0e141c;overflow:hidden}
+    #output{flex:1;overflow:auto;padding:12px}
+    .bar{display:flex;gap:8px;align-items:center;padding:10px;border-top:1px solid #1c2633;background:#0b1119}
+    #input{flex:1;min-height:46px;max-height:200px;resize:vertical;padding:10px 12px;border-radius:10px;border:1px solid #223043;background:#0e141c;color:#e9eef7;outline:none}
+    button{padding:10px 12px;border-radius:10px;border:1px solid #223043;background:#122031;color:#e9eef7;cursor:pointer}
+    button:hover{filter:brightness(1.08)}
+  </style>
+
+  <script>
+    // IMPORTANT: same-origin through the proxy
+    window.NOVA_API_BASE = "/api";
+  </script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">Nova</div>
+      <div class="meta">
+        <span class="pill" id="modePill">mode: ask</span>
+        <span class="pill">api: /api</span>
+      </div>
+    </div>
+
+    <div class="main">
+      <div id="output"></div>
+
+      <div class="bar">
+        <button id="btnAsk" title="Ask mode">Ask</button>
+        <button id="btnCmd" title="Command mode">Command</button>
+        <button id="btnDoctor" title="Doctor mode">Doctor</button>
+
+        <textarea id="input" placeholder="Type here… (Enter=send, Shift+Enter=newline)"></textarea>
+
+        <button id="btnSend">Send</button>
+        <button id="btnSend2" title="Alt send">Send+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOAD ONLY the real client -->
+  <script src="/static/app.js?v=REALCHAT_20260225"></script>
+</body>
+</html>

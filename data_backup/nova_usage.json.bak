@@ -1,0 +1,26 @@
+{
+  "profiles": {
+    "local": {
+      "profile_id": "local",
+      "plan": "free",
+      "daily": {
+        "2026-03-22": {
+          "messages": 11
+        }
+      },
+      "created_at": 1774182606,
+      "updated_at": 1774187605
+    }
+  },
+  "total_sessions": 9,
+  "total_requests": 5,
+  "last_request_at": 1774210244,
+  "requests": 12,
+  "tokens_in": 0,
+  "tokens_out": 0,
+  "updated_at": "2026-03-22T23:21:36Z",
+  "last_chat_at": 1774361465.1014504,
+  "last_mode": "general",
+  "last_intent": "conversation",
+  "chat_count": 22
+}
