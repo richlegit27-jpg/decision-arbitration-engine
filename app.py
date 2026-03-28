@@ -22,6 +22,8 @@ from flask import (
 )
 from openai import OpenAI
 
+from services.web_service import preview_first_url_from_text, summarize_web_result
+
 # =========================================================
 # PATHS / APP
 # =========================================================
@@ -981,6 +983,22 @@ def prepare_chat_run(
 
     messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
     messages.extend(recent_context_messages(session))
+
+    web_preview: Optional[Dict[str, Any]] = None
+    if WEB_ENABLED and "web" in decision.tools:
+        web_preview = preview_first_url_from_text(user_text)
+        if web_preview.get("ok"):
+            messages.append(
+                {
+                    "role": "system",
+                    "content": (
+                        "Fetched web preview context:\n"
+                        f"{summarize_web_result(web_preview)}\n\n"
+                        f"Extracted text:\n{clamp_text(web_preview.get('text', ''), 6000)}"
+                    ),
+                }
+            )
+
     messages.append({"role": "user", "content": user_text})
 
     return prefs, sessions_payload, decision, selected_memory, messages
@@ -1105,6 +1123,39 @@ def api_state() -> Any:
             "default_model": OPENAI_MODEL,
             "web_enabled": WEB_ENABLED,
             "artifacts": artifacts,
+        }
+    )
+
+
+# =========================================================
+# ROUTES - DEBUG / WEB
+# =========================================================
+
+
+@app.post("/api/debug/web_preview")
+def api_debug_web_preview() -> Any:
+    data = request.get_json(silent=True) or {}
+    text = clamp_text(data.get("text"), 4000)
+    timeout_raw = data.get("timeout", 12)
+
+    try:
+        timeout = int(timeout_raw)
+    except Exception:
+        timeout = 12
+
+    if not WEB_ENABLED:
+        return jsonify({"ok": False, "error": "web preview is disabled"}), 400
+
+    if not text:
+        return jsonify({"ok": False, "error": "text is required"}), 400
+
+    result = preview_first_url_from_text(text, timeout=timeout)
+
+    return jsonify(
+        {
+            "ok": bool(result.get("ok")),
+            "result": result,
+            "summary": summarize_web_result(result),
         }
     )
 
