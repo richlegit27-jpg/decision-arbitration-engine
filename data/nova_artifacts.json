@@ -1,5 +1,16 @@
 [
   {
+    "id": "c643ae74-eec3-4820-9d05-916a0bb2fe15",
+    "title": "final test",
+    "content": "artifact content",
+    "kind": "text",
+    "session_id": "c290bf8d-78d4-449a-951f-659af75e4333",
+    "created_at": "2026-03-28T09:53:59.507205+00:00",
+    "updated_at": "2026-03-28T09:53:59.507215+00:00",
+    "pinned": false,
+    "meta": {}
+  },
+  {
     "id": "db61b56f-b5a1-4b7c-b283-3ced87ba29d1",
     "title": "artifact test",
     "content": "hello artifact",
