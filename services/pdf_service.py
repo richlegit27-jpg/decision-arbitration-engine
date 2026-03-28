@@ -5,471 +5,288 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-
 # =========================================================
 # config
 # =========================================================
 
-MAX_PDF_TEXT_CHARS = 24000
-MAX_SUMMARY_CHARS = 1200
-MAX_PREVIEW_CHARS = 360
-MAX_PAGES_TO_READ = 40
-MAX_CHUNKS = 12
-CHUNK_SIZE = 1800
-CHUNK_OVERLAP = 180
+MAX_PAGES = 12
+MAX_CHARS_PER_PAGE = 5000
+MAX_TOTAL_RAW_CHARS = 30000
+MAX_SNIPPET_CHARS = 4000
+MAX_PROMPT_CHARS = 8000
+MAX_SUMMARY_CHARS = 600
 
+# =========================================================
+# optional imports
+# =========================================================
+
+_PDF_BACKEND = "none"
+
+try:
+    from pypdf import PdfReader  # type: ignore
+
+    _PDF_BACKEND = "pypdf"
+except Exception:
+    PdfReader = None  # type: ignore
 
 # =========================================================
 # helpers
 # =========================================================
 
-def clean_text(value: Any) -> str:
+
+def _clean_text(value: Any) -> str:
     if value is None:
         return ""
-    text = str(value).replace("\r\n", "\n").replace("\r", "\n").replace("\x00", "")
-    text = text.replace("\ufeff", "")
-    text = re.sub(r"[ \t]+", " ", text)
+    return str(value).replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _collapse_ws(value: Any) -> str:
+    return re.sub(r"\s+", " ", _clean_text(value)).strip()
+
+
+def _truncate(value: Any, limit: int) -> str:
+    text = _clean_text(value).strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit].rstrip() + "...(truncated)"
+
+
+def _coerce_dict(value: Any) -> Dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _file_exists(path_value: str) -> Optional[Path]:
+    path_value = _clean_text(path_value).strip()
+    if not path_value:
+        return None
+    path = Path(path_value)
+    if path.exists() and path.is_file():
+        return path
+    return None
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except Exception:
+        return default
+
+
+def _normalize_page_text(value: Any) -> str:
+    text = _clean_text(value)
+    text = text.replace("\x00", "")
+    text = re.sub(r"[ \t]+\n", "\n", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
 
-def truncate(text: str, limit: int) -> str:
-    text = clean_text(text)
-    if len(text) <= limit:
-        return text
-    return text[:limit].rstrip() + "…"
+def _estimate_words(text: str) -> int:
+    if not text.strip():
+        return 0
+    return len(re.findall(r"\b\w+\b", text))
 
 
-def safe_dict(value: Any) -> Dict[str, Any]:
-    return value if isinstance(value, dict) else {}
+def _build_snippet(page_blocks: List[str]) -> str:
+    joined = "\n\n".join(block for block in page_blocks if block.strip())
+    return _truncate(joined, MAX_SNIPPET_CHARS)
 
 
-def safe_list(value: Any) -> List[Any]:
-    return value if isinstance(value, list) else []
+def _build_prompt_text(name: str, page_blocks: List[str], page_count: int) -> str:
+    parts: List[str] = [f"Attached PDF: {name}", f"PDF page count: {page_count}"]
+    if page_blocks:
+        parts.append("Extracted PDF text preview:")
+        parts.append("\n\n".join(page_blocks))
+    return _truncate("\n".join(parts), MAX_PROMPT_CHARS)
 
 
-def compact_whitespace(text: str) -> str:
-    return re.sub(r"\s+", " ", clean_text(text)).strip()
-
-
-def summarize_text(text: str, limit: int = MAX_SUMMARY_CHARS) -> str:
-    text = clean_text(text)
-    if not text:
-        return ""
-
-    parts = re.split(r"(?<=[.!?])\s+|\n{2,}", text)
-    parts = [clean_text(x) for x in parts if clean_text(x)]
-
-    kept: List[str] = []
-    total = 0
-
-    for part in parts:
-        if total + len(part) > limit:
-            break
-        kept.append(part)
-        total += len(part) + 1
-        if len(kept) >= 6:
-            break
-
-    if not kept:
-        return truncate(text, limit)
-
-    return truncate(" ".join(kept), limit)
-
-
-def preview_text(text: str, limit: int = MAX_PREVIEW_CHARS) -> str:
-    return truncate(compact_whitespace(text), limit)
-
-
-def split_into_chunks(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[str]:
-    text = clean_text(text)
-    if not text:
-        return []
-
-    chunks: List[str] = []
-    start = 0
-    length = len(text)
-
-    while start < length and len(chunks) < MAX_CHUNKS:
-        end = min(length, start + chunk_size)
-        piece = text[start:end]
-
-        if end < length:
-            split_at = max(piece.rfind("\n\n"), piece.rfind(". "), piece.rfind("\n"), piece.rfind(" "))
-            if split_at > max(200, chunk_size // 3):
-                piece = piece[: split_at + 1]
-                end = start + len(piece)
-
-        piece = clean_text(piece)
-        if piece:
-            chunks.append(piece)
-
-        if end >= length:
-            break
-
-        start = max(end - overlap, start + 1)
-
-    return chunks
+def _fallback_result(
+    attachment: Dict[str, Any],
+    *,
+    name: str,
+    mime_type: str,
+    summary: str,
+    status: str,
+    meta: Optional[Dict[str, Any]] = None,
+    snippet: str = "",
+    prompt_text: str = "",
+) -> Dict[str, Any]:
+    return {
+        "id": attachment.get("id"),
+        "name": name,
+        "mime_type": mime_type or "application/pdf",
+        "type": "document",
+        "summary": _truncate(summary, MAX_SUMMARY_CHARS),
+        "snippet": _truncate(snippet, MAX_SNIPPET_CHARS),
+        "prompt_text": _truncate(prompt_text or f"Attached PDF: {name}", MAX_PROMPT_CHARS),
+        "text": _truncate(snippet, MAX_TOTAL_RAW_CHARS),
+        "status": status,
+        "meta": meta or {},
+    }
 
 
 # =========================================================
-# low-level extractors
+# extraction
 # =========================================================
+
 
 def _extract_with_pypdf(path: Path) -> Dict[str, Any]:
-    try:
-        from pypdf import PdfReader  # type: ignore
-    except Exception as exc:
-        return {
-            "ok": False,
-            "engine": "pypdf",
-            "pages": [],
-            "page_count": 0,
-            "error": f"pypdf unavailable: {exc}",
-        }
+    if PdfReader is None:
+        raise RuntimeError("pypdf backend unavailable")
 
-    try:
-        reader = PdfReader(str(path))
-        total_pages = len(reader.pages)
-        pages: List[Dict[str, Any]] = []
+    reader = PdfReader(str(path))
+    total_pages = len(reader.pages)
 
-        for index, page in enumerate(reader.pages[:MAX_PAGES_TO_READ]):
-            try:
-                text = clean_text(page.extract_text() or "")
-            except Exception:
-                text = ""
-            pages.append(
-                {
-                    "page_number": index + 1,
-                    "text": text,
-                    "chars": len(text),
-                }
-            )
+    page_blocks: List[str] = []
+    collected_text_parts: List[str] = []
+    pages_with_text = 0
+    pages_processed = 0
 
-        return {
-            "ok": True,
-            "engine": "pypdf",
-            "pages": pages,
-            "page_count": total_pages,
-            "error": None,
-        }
-    except Exception as exc:
-        return {
-            "ok": False,
-            "engine": "pypdf",
-            "pages": [],
-            "page_count": 0,
-            "error": str(exc),
-        }
-
-
-def _extract_with_pymupdf(path: Path) -> Dict[str, Any]:
-    try:
-        import fitz  # type: ignore
-    except Exception as exc:
-        return {
-            "ok": False,
-            "engine": "pymupdf",
-            "pages": [],
-            "page_count": 0,
-            "error": f"pymupdf unavailable: {exc}",
-        }
-
-    doc = None
-    try:
-        doc = fitz.open(str(path))
-        total_pages = len(doc)
-        pages: List[Dict[str, Any]] = []
-
-        for index in range(min(total_pages, MAX_PAGES_TO_READ)):
-            try:
-                page = doc[index]
-                text = clean_text(page.get_text("text") or "")
-            except Exception:
-                text = ""
-            pages.append(
-                {
-                    "page_number": index + 1,
-                    "text": text,
-                    "chars": len(text),
-                }
-            )
-
-        return {
-            "ok": True,
-            "engine": "pymupdf",
-            "pages": pages,
-            "page_count": total_pages,
-            "error": None,
-        }
-    except Exception as exc:
-        return {
-            "ok": False,
-            "engine": "pymupdf",
-            "pages": [],
-            "page_count": 0,
-            "error": str(exc),
-        }
-    finally:
+    for index, page in enumerate(reader.pages[:MAX_PAGES]):
+        pages_processed += 1
         try:
-            if doc is not None:
-                doc.close()
+            raw_text = page.extract_text() or ""
         except Exception:
-            pass
+            raw_text = ""
 
+        normalized = _normalize_page_text(raw_text)
+        if normalized:
+            pages_with_text += 1
+            trimmed = _truncate(normalized, MAX_CHARS_PER_PAGE)
+            page_label = f"[Page {index + 1}]"
+            block = f"{page_label}\n{trimmed}"
+            page_blocks.append(block)
+            collected_text_parts.append(trimmed)
 
-def _pick_best_extraction(results: List[Dict[str, Any]]) -> Dict[str, Any]:
-    scored: List[Dict[str, Any]] = []
+        current_size = sum(len(part) for part in collected_text_parts)
+        if current_size >= MAX_TOTAL_RAW_CHARS:
+            break
 
-    for result in results:
-        pages = safe_list(result.get("pages"))
-        total_chars = sum(len(clean_text(page.get("text"))) for page in pages if isinstance(page, dict))
-        scored.append(
-            {
-                "result": result,
-                "score": total_chars,
-            }
-        )
-
-    scored.sort(key=lambda x: x["score"], reverse=True)
-
-    if scored and scored[0]["score"] > 0:
-        return safe_dict(scored[0]["result"])
-
-    for item in scored:
-        result = safe_dict(item["result"])
-        if result.get("ok"):
-            return result
-
-    return safe_dict(scored[0]["result"]) if scored else {
-        "ok": False,
-        "engine": "none",
-        "pages": [],
-        "page_count": 0,
-        "error": "No PDF extraction engines available.",
-    }
-
-
-# =========================================================
-# analysis
-# =========================================================
-
-def _build_page_map(pages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    out: List[Dict[str, Any]] = []
-
-    for raw in safe_list(pages):
-        page = safe_dict(raw)
-        text = clean_text(page.get("text"))
-        out.append(
-            {
-                "page_number": int(page.get("page_number") or 0),
-                "text": text,
-                "chars": len(text),
-                "preview": preview_text(text, 180),
-            }
-        )
-
-    return out
-
-
-def _join_pages(pages: List[Dict[str, Any]]) -> str:
-    blocks: List[str] = []
-
-    for raw in safe_list(pages):
-        page = safe_dict(raw)
-        page_number = int(page.get("page_number") or 0)
-        text = clean_text(page.get("text"))
-        if not text:
-            continue
-        blocks.append(f"[Page {page_number}]\n{text}")
-
-    return truncate("\n\n".join(blocks).strip(), MAX_PDF_TEXT_CHARS)
-
-
-def _build_pdf_summary(path: Path, text: str, page_count: int, pages_read: int) -> str:
-    base = summarize_text(text, MAX_SUMMARY_CHARS)
-    prefix_parts = [f"PDF document: {path.name}."]
-    if page_count:
-        prefix_parts.append(f"Total pages: {page_count}.")
-    if pages_read and pages_read != page_count:
-        prefix_parts.append(f"Pages read: {pages_read}.")
-    prefix = " ".join(prefix_parts).strip()
-
-    if base:
-        return truncate(f"{prefix} {base}".strip(), MAX_SUMMARY_CHARS)
-
-    return truncate(prefix or f"PDF document: {path.name}.", MAX_SUMMARY_CHARS)
-
-
-def analyze_pdf_attachment(path: Path | str) -> Dict[str, Any]:
-    path = Path(path)
-
-    result: Dict[str, Any] = {
-        "ok": False,
-        "path": str(path),
-        "name": path.name,
-        "filename": path.name,
-        "mime_type": "application/pdf",
-        "kind": "document",
-        "text": "",
-        "content": "",
-        "summary": "",
-        "preview": "",
-        "chunks": [],
-        "pages": [],
-        "metadata": {
-            "exists": path.exists(),
-            "format": "pdf",
-            "parse_ok": False,
-            "engine": None,
-            "page_count": 0,
-            "pages_read": 0,
-            "characters": 0,
-            "size_bytes": path.stat().st_size if path.exists() else 0,
-        },
-        "error": None,
-    }
-
-    if not path.exists():
-        result["error"] = {
-            "code": "file_not_found",
-            "message": "PDF path does not exist.",
-        }
-        return result
-
-    extraction_candidates = [
-        _extract_with_pymupdf(path),
-        _extract_with_pypdf(path),
-    ]
-    best = _pick_best_extraction(extraction_candidates)
-
-    raw_pages = _build_page_map(safe_list(best.get("pages")))
-    combined_text = _join_pages(raw_pages)
-    summary = _build_pdf_summary(
-        path=path,
-        text=combined_text,
-        page_count=int(best.get("page_count") or 0),
-        pages_read=len(raw_pages),
-    )
-    preview = preview_text(combined_text or summary)
-    chunks = split_into_chunks(combined_text)
-
-    parse_ok = bool(combined_text or summary)
-    engine = clean_text(best.get("engine"))
-    error_text = clean_text(best.get("error"))
-
-    result.update(
-        {
-            "ok": parse_ok,
-            "text": combined_text,
-            "content": combined_text,
-            "summary": summary,
-            "preview": preview,
-            "chunks": chunks,
-            "pages": raw_pages,
-            "metadata": {
-                **safe_dict(result.get("metadata")),
-                "parse_ok": parse_ok,
-                "engine": engine or None,
-                "page_count": int(best.get("page_count") or 0),
-                "pages_read": len(raw_pages),
-                "characters": len(combined_text),
-                "chunk_count": len(chunks),
-            },
-            "error": None if parse_ok else {
-                "code": "pdf_parse_failed",
-                "message": error_text or "Unable to extract text from PDF.",
-            },
-        }
-    )
-
-    return result
-
-
-# =========================================================
-# prompt helpers
-# =========================================================
-
-def build_pdf_prompt_context(path: Path | str) -> Dict[str, Any]:
-    analyzed = analyze_pdf_attachment(path)
-
-    lines: List[str] = []
-    name = clean_text(analyzed.get("name") or "document")
-    summary = clean_text(analyzed.get("summary"))
-    chunks = [clean_text(x) for x in safe_list(analyzed.get("chunks")) if clean_text(x)]
-
-    lines.append(f"PDF: {name}")
-    if summary:
-        lines.append(f"Summary: {summary}")
-
-    if chunks:
-        lines.append("Relevant text:")
-        for idx, chunk in enumerate(chunks[:6], 1):
-            lines.append(f"[Chunk {idx}] {truncate(chunk, 1200)}")
+    extracted_text = "\n\n".join(collected_text_parts)
+    snippet = _build_snippet(page_blocks)
+    word_count_preview = _estimate_words(extracted_text)
 
     return {
-        "ok": bool(analyzed.get("ok")),
-        "document": analyzed,
-        "prompt_text": "\n".join(lines).strip(),
+        "page_count": total_pages,
+        "pages_processed": pages_processed,
+        "pages_with_text": pages_with_text,
+        "text": _truncate(extracted_text, MAX_TOTAL_RAW_CHARS),
+        "snippet": snippet,
+        "word_count_preview": word_count_preview,
+        "backend": "pypdf",
     }
-
-
-def summarize_pdf(path: Path | str) -> str:
-    analyzed = analyze_pdf_attachment(path)
-    summary = clean_text(analyzed.get("summary"))
-    if summary:
-        return summary
-    return summarize_text(clean_text(analyzed.get("text")))
-
-
-def preview_pdf(path: Path | str) -> str:
-    analyzed = analyze_pdf_attachment(path)
-    preview = clean_text(analyzed.get("preview"))
-    if preview:
-        return preview
-    return preview_text(clean_text(analyzed.get("text")))
-
-
-def extract_pdf_text(path: Path | str) -> str:
-    analyzed = analyze_pdf_attachment(path)
-    return clean_text(analyzed.get("text"))
-
-
-def extract_pdf_chunks(path: Path | str) -> List[str]:
-    analyzed = analyze_pdf_attachment(path)
-    return [clean_text(x) for x in safe_list(analyzed.get("chunks")) if clean_text(x)]
 
 
 # =========================================================
-# diagnostics
+# public analyzer
 # =========================================================
 
-def pdf_engine_status() -> Dict[str, Any]:
-    status = {
-        "pymupdf": False,
-        "pypdf": False,
-    }
+
+def analyze_pdf_attachment(attachment: Dict[str, Any]) -> Dict[str, Any]:
+    attachment = _coerce_dict(attachment)
+
+    name = _clean_text(attachment.get("name")) or "document.pdf"
+    mime_type = _clean_text(attachment.get("mime_type") or attachment.get("type") or "application/pdf")
+    path = _file_exists(_clean_text(attachment.get("stored_path") or attachment.get("path")))
+
+    if not path:
+        return _fallback_result(
+            attachment,
+            name=name,
+            mime_type=mime_type,
+            summary="PDF file is unavailable.",
+            status="missing_file",
+            meta={},
+        )
+
+    if path.suffix.lower() != ".pdf" and mime_type != "application/pdf":
+        return _fallback_result(
+            attachment,
+            name=name,
+            mime_type=mime_type,
+            summary="Attachment is not recognized as a PDF.",
+            status="skipped",
+            meta={},
+            prompt_text=f"Attached file: {name}",
+        )
+
+    if PdfReader is None:
+        return _fallback_result(
+            attachment,
+            name=name,
+            mime_type="application/pdf",
+            summary="PDF attached but PDF text extraction backend is unavailable.",
+            status="ready",
+            meta={
+                "backend": _PDF_BACKEND,
+                "page_count": 0,
+                "pages_processed": 0,
+                "pages_with_text": 0,
+                "extractable_text": False,
+            },
+            prompt_text=f"Attached PDF: {name}",
+        )
 
     try:
-        import fitz  # type: ignore  # noqa: F401
-        status["pymupdf"] = True
-    except Exception:
-        pass
+        extracted = _extract_with_pypdf(path)
 
-    try:
-        from pypdf import PdfReader  # type: ignore  # noqa: F401
-        status["pypdf"] = True
-    except Exception:
-        pass
+        page_count = _safe_int(extracted.get("page_count"))
+        pages_processed = _safe_int(extracted.get("pages_processed"))
+        pages_with_text = _safe_int(extracted.get("pages_with_text"))
+        text = _clean_text(extracted.get("text"))
+        snippet = _clean_text(extracted.get("snippet"))
+        word_count_preview = _safe_int(extracted.get("word_count_preview"))
+        backend = _clean_text(extracted.get("backend")) or _PDF_BACKEND
 
-    preferred = None
-    if status["pymupdf"]:
-        preferred = "pymupdf"
-    elif status["pypdf"]:
-        preferred = "pypdf"
+        if text.strip():
+            summary = (
+                f"PDF attached with {page_count} pages. "
+                f"Extracted text from {pages_with_text} of {pages_processed} previewed pages."
+            )
+            status = "ready"
+            extractable_text = True
+        else:
+            summary = (
+                f"PDF attached with {page_count} pages, but little or no extractable text was found "
+                f"in the previewed pages."
+            )
+            status = "ready"
+            extractable_text = False
 
-    return {
-        "ok": True,
-        "available": status,
-        "preferred": preferred,
-    }
+        prompt_text = _build_prompt_text(name=name, page_blocks=snippet.split("\n\n") if snippet else [], page_count=page_count)
+
+        return {
+            "id": attachment.get("id"),
+            "name": name,
+            "mime_type": "application/pdf",
+            "type": "document",
+            "summary": _truncate(summary, MAX_SUMMARY_CHARS),
+            "snippet": _truncate(snippet, MAX_SNIPPET_CHARS),
+            "prompt_text": _truncate(prompt_text, MAX_PROMPT_CHARS),
+            "text": _truncate(text, MAX_TOTAL_RAW_CHARS),
+            "status": status,
+            "meta": {
+                "backend": backend,
+                "page_count": page_count,
+                "pages_processed": pages_processed,
+                "pages_with_text": pages_with_text,
+                "extractable_text": extractable_text,
+                "word_count_preview": word_count_preview,
+                "max_pages": MAX_PAGES,
+                "max_chars_per_page": MAX_CHARS_PER_PAGE,
+                "source_path": str(path),
+            },
+        }
+
+    except Exception as exc:
+        return _fallback_result(
+            attachment,
+            name=name,
+            mime_type="application/pdf",
+            summary=f"Failed to analyze PDF: {exc}",
+            status="error",
+            meta={
+                "backend": _PDF_BACKEND,
+                "source_path": str(path),
+            },
+            prompt_text=f"Attached PDF: {name}",
+        )

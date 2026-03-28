@@ -11,7 +11,7 @@ import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional
 
 # =========================================================
 # paths + config
@@ -21,261 +21,698 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-UPLOADS_DIR = BASE_DIR / "uploads"
+UPLOADS_DIR = DATA_DIR / "uploads"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-ATTACHMENTS_FILE = DATA_DIR / "nova_attachments.json"
-BACKUP_DIR = DATA_DIR / "backups"
-BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+ATTACHMENTS_INDEX_FILE = DATA_DIR / "nova_attachments.json"
 
-MAX_ATTACHMENTS = int(os.getenv("NOVA_MAX_ATTACHMENTS", "500"))
-MAX_ATTACHMENTS_PER_REQUEST = int(os.getenv("NOVA_MAX_ATTACHMENTS_PER_REQUEST", "12"))
-MAX_ATTACHMENT_BYTES = int(os.getenv("NOVA_MAX_ATTACHMENT_BYTES", str(20 * 1024 * 1024)))
-MAX_TOTAL_REQUEST_ATTACHMENT_BYTES = int(os.getenv("NOVA_MAX_TOTAL_REQUEST_ATTACHMENT_BYTES", str(40 * 1024 * 1024)))
-MAX_TEXT_EXTRACT_CHARS = int(os.getenv("NOVA_MAX_ATTACHMENT_TEXT_EXTRACT_CHARS", "20000"))
-MAX_SUMMARY_CHARS = int(os.getenv("NOVA_MAX_ATTACHMENT_SUMMARY_CHARS", "900"))
-MAX_PREVIEW_CHARS = int(os.getenv("NOVA_MAX_ATTACHMENT_PREVIEW_CHARS", "320"))
+MAX_ATTACHMENT_ITEMS = 2000
+MAX_ATTACHMENT_PROMPT_CHARS = 8000
+MAX_TEXT_READ_CHARS = 30000
+MAX_DOCUMENT_SNIPPET_CHARS = 4000
+MAX_IMAGE_SNIPPET_CHARS = 1000
+MAX_NAME_CHARS = 180
+MAX_FILE_BYTES_FOR_INLINE_TEXT = 2 * 1024 * 1024  # 2MB
+CHUNK_PREVIEW_LINES = 40
 
-ALLOWED_DOCUMENT_EXTENSIONS = {".txt", ".md", ".json", ".csv", ".log", ".pdf", ".xml", ".yaml", ".yml", ".html", ".htm"}
-ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
-ALLOWED_GENERIC_EXTENSIONS = ALLOWED_DOCUMENT_EXTENSIONS | ALLOWED_IMAGE_EXTENSIONS
-
-TEXTUAL_MIME_PREFIXES = ("text/",)
-TEXTUAL_MIME_TYPES = {"application/json","application/xml","text/xml","application/csv","text/csv","application/x-csv","text/markdown"}
-DOCUMENT_MIME_TYPES = {"application/pdf","application/json","application/xml","text/xml","text/plain","text/markdown","text/csv","application/csv","application/x-csv"}
+DOCUMENT_EXTENSIONS = {
+    ".pdf",
+    ".txt",
+    ".md",
+    ".markdown",
+    ".json",
+    ".csv",
+    ".log",
+    ".xml",
+    ".html",
+    ".htm",
+    ".yaml",
+    ".yml",
+}
+IMAGE_EXTENSIONS = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".gif",
+    ".bmp",
+    ".svg",
+}
+DOCUMENT_MIME_PREFIXES = ("text/",)
+DOCUMENT_MIME_TYPES = {
+    "application/pdf",
+    "application/json",
+    "text/plain",
+    "text/markdown",
+    "text/csv",
+    "application/csv",
+    "application/x-csv",
+    "application/xml",
+    "text/xml",
+    "text/html",
+    "application/xhtml+xml",
+}
 IMAGE_MIME_PREFIXES = ("image/",)
+
+# =========================================================
+# optional service imports
+# =========================================================
+
+try:
+    from services.document_service import analyze_document_attachment as _document_analyze
+except Exception:
+    _document_analyze = None
+
+try:
+    from services.pdf_service import analyze_pdf_attachment as _pdf_analyze
+except Exception:
+    _pdf_analyze = None
+
 
 # =========================================================
 # helpers
 # =========================================================
 
-def utc_now_iso() -> str:
+def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
-def clean_text(value: Any) -> str:
+
+def _new_id() -> str:
+    return str(uuid.uuid4())
+
+
+def _clean_text(value: Any) -> str:
     if value is None:
         return ""
-    text = str(value).replace("\r\n", "\n").replace("\r", "\n").replace("\x00", "")
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+    return str(value).replace("\r\n", "\n").replace("\r", "\n")
 
-def truncate(text: str, limit: int) -> str:
-    text = clean_text(text)
-    return text if len(text) <= limit else text[:limit].rstrip() + "…"
 
-def safe_dict(value: Any) -> Dict[str, Any]:
+def _collapse_ws(value: Any) -> str:
+    return re.sub(r"\s+", " ", _clean_text(value)).strip()
+
+
+def _truncate(value: Any, limit: int) -> str:
+    text = _clean_text(value).strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit].rstrip() + "...(truncated)"
+
+
+def _coerce_dict(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
-def safe_list(value: Any) -> List[Any]:
-    return value if isinstance(value, list) else []
 
-def safe_int(value: Any, default: int = 0) -> int:
-    try: return int(value)
-    except Exception: return default
+def _coerce_list(value: Any) -> List[Any]:
+    if isinstance(value, list):
+        return value
+    if value is None:
+        return []
+    return [value]
 
-def safe_bool(value: Any, default: bool = False) -> bool:
-    return value if isinstance(value, bool) else default
 
-def file_safe_name(value: Any, fallback: str = "attachment") -> str:
-    text = clean_text(value)
-    if not text: return fallback
-    text = re.sub(r"[^A-Za-z0-9._ -]+", "", text).strip()
-    text = text.replace(" ", "_")
-    text = re.sub(r"_+", "_", text)
-    text = text[:140].strip("._-")
-    return text or fallback
+def _safe_json_load(path: Path, default: Any) -> Any:
+    if not path.exists():
+        return default
+    try:
+        raw = path.read_text(encoding="utf-8")
+        if not raw.strip():
+            return default
+        return json.loads(raw)
+    except Exception:
+        return default
 
-def sha256_bytes(data: bytes) -> str:
+
+def _safe_json_save(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
+
+
+def _ensure_index_file() -> None:
+    if not ATTACHMENTS_INDEX_FILE.exists():
+        _safe_json_save(ATTACHMENTS_INDEX_FILE, {"items": []})
+
+
+def _load_index() -> Dict[str, Any]:
+    _ensure_index_file()
+    store = _safe_json_load(ATTACHMENTS_INDEX_FILE, {"items": []})
+    if not isinstance(store, dict):
+        return {"items": []}
+    items = store.get("items")
+    if not isinstance(items, list):
+        store["items"] = []
+    return store
+
+
+def _save_index(store: Dict[str, Any]) -> None:
+    _safe_json_save(ATTACHMENTS_INDEX_FILE, store)
+
+
+def _guess_mime_type(path: Optional[Path], fallback_name: str = "") -> str:
+    if path and path.exists():
+        guessed, _ = mimetypes.guess_type(str(path))
+        if guessed:
+            return guessed
+    guessed, _ = mimetypes.guess_type(fallback_name)
+    return guessed or "application/octet-stream"
+
+
+def _safe_name(name: str) -> str:
+    name = _clean_text(name).strip() or "attachment"
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", name)
+    name = re.sub(r"\s+", " ", name).strip()
+    if not name:
+        name = "attachment"
+    if len(name) > MAX_NAME_CHARS:
+        stem, suffix = os.path.splitext(name)
+        keep = MAX_NAME_CHARS - len(suffix)
+        name = stem[: max(1, keep)] + suffix
+    return name
+
+
+def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
-def sha256_file(path: Path, chunk_size: int = 1024*1024) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(chunk_size):
-            digest.update(chunk)
-    return digest.hexdigest()
 
-def guess_mime_type(filename: str, explicit_mime: Optional[str] = None) -> str:
-    mime = clean_text(explicit_mime).lower() if explicit_mime else ""
-    if mime: return mime
-    guessed, _ = mimetypes.guess_type(filename)
-    return clean_text(guessed).lower() or "application/octet-stream"
+def _read_bytes(path: Path, max_bytes: Optional[int] = None) -> bytes:
+    if max_bytes is None:
+        return path.read_bytes()
+    with path.open("rb") as f:
+        return f.read(max_bytes)
 
-def extension_for_name(filename: str) -> str:
-    return Path(clean_text(filename)).suffix.lower()
 
-def is_image_mime(mime_type: str) -> bool:
-    return any(clean_text(mime_type).startswith(prefix) for prefix in IMAGE_MIME_PREFIXES)
+def _safe_read_text(path: Path, limit: int = MAX_TEXT_READ_CHARS) -> str:
+    raw = path.read_bytes()[:limit]
+    for encoding in ("utf-8", "utf-8-sig", "latin-1"):
+        try:
+            return raw.decode(encoding, errors="ignore")
+        except Exception:
+            continue
+    return raw.decode("utf-8", errors="ignore")
 
-def is_text_mime(mime_type: str) -> bool:
-    mime_type = clean_text(mime_type)
-    return mime_type in TEXTUAL_MIME_TYPES or any(mime_type.startswith(prefix) for prefix in TEXTUAL_MIME_PREFIXES)
 
-def is_document_mime(mime_type: str) -> bool:
-    mime_type = clean_text(mime_type)
-    return mime_type in DOCUMENT_MIME_TYPES or is_text_mime(mime_type)
+def _extension(name: str) -> str:
+    return Path(name).suffix.lower().strip()
 
-def is_document_extension(ext: str) -> bool:
-    return clean_text(ext).lower() in ALLOWED_DOCUMENT_EXTENSIONS
 
-def is_image_extension(ext: str) -> bool:
-    return clean_text(ext).lower() in ALLOWED_IMAGE_EXTENSIONS
+def _is_document_type(name: str, mime_type: str) -> bool:
+    ext = _extension(name)
+    if ext in DOCUMENT_EXTENSIONS:
+        return True
+    if mime_type in DOCUMENT_MIME_TYPES:
+        return True
+    return any(mime_type.startswith(prefix) for prefix in DOCUMENT_MIME_PREFIXES)
 
-def classify_attachment(filename: str, mime_type: str) -> str:
-    ext = extension_for_name(filename)
-    if is_image_mime(mime_type) or is_image_extension(ext):
-        return "image"
-    if is_document_mime(mime_type) or is_document_extension(ext):
-        return "document"
-    return "file"
 
-def preview_text_func(text: str, limit: int = MAX_PREVIEW_CHARS) -> str:
-    return truncate(re.sub(r"\s+", " ", clean_text(text)), limit)
+def _is_image_type(name: str, mime_type: str) -> bool:
+    ext = _extension(name)
+    if ext in IMAGE_EXTENSIONS:
+        return True
+    return any(mime_type.startswith(prefix) for prefix in IMAGE_MIME_PREFIXES)
 
-def summarize_text_func(text: str, limit: int = MAX_SUMMARY_CHARS) -> str:
-    text = clean_text(text)
-    if not text: return ""
-    parts = re.split(r"(?<=[.!?])\s+", text)
-    kept: List[str] = []
-    total = 0
-    for part in parts:
-        part = clean_text(part)
-        if not part: continue
-        if total + len(part) > limit: break
-        kept.append(part)
-        total += len(part)+1
-        if len(kept) >= 4: break
-    return truncate(" ".join(kept) if kept else text, limit)
 
-def atomic_write_json(path: Path, data: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(prefix=path.stem+"_",
-                              suffix=".tmp",
-                              dir=str(path.parent))
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(data, handle, ensure_ascii=False, indent=2)
-        os.replace(tmp, path)
-    except Exception:
-        try: os.unlink(tmp)
-        except Exception: pass
-        raise
+def _trim_lines(text: str, max_lines: int = CHUNK_PREVIEW_LINES) -> str:
+    lines = _clean_text(text).splitlines()
+    if len(lines) <= max_lines:
+        return "\n".join(lines)
+    return "\n".join(lines[:max_lines]) + "\n...(truncated)"
 
-def backup_file(path: Path) -> Optional[Path]:
-    if not path.exists(): return None
-    backup_path = BACKUP_DIR / f"{path.stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{path.suffix}"
-    try: shutil.copy2(path, backup_path); return backup_path
-    except Exception: return None
+
+def _best_existing_path(raw: Dict[str, Any]) -> Optional[Path]:
+    for key in ("stored_path", "path", "local_path", "saved_path", "file_path", "temp_path"):
+        candidate = _clean_text(raw.get(key)).strip()
+        if candidate:
+            p = Path(candidate)
+            if p.exists() and p.is_file():
+                return p
+    return None
+
+
+def _extract_inline_bytes(raw: Dict[str, Any]) -> Optional[bytes]:
+    value = raw.get("content_bytes")
+    if isinstance(value, (bytes, bytearray)):
+        return bytes(value)
+    return None
+
+
+def _extract_inline_text(raw: Dict[str, Any]) -> str:
+    for key in ("text", "content", "body", "raw_text"):
+        value = raw.get(key)
+        if isinstance(value, str):
+            return value
+    return ""
+
+
+def _write_bytes_to_uploads(data: bytes, name: str) -> Path:
+    safe_name = _safe_name(name)
+    unique_name = f"{uuid.uuid4()}_{safe_name}"
+    dest = UPLOADS_DIR / unique_name
+    dest.write_bytes(data)
+    return dest
+
+
+def _copy_file_to_uploads(source: Path, name: str) -> Path:
+    safe_name = _safe_name(name or source.name)
+    unique_name = f"{uuid.uuid4()}_{safe_name}"
+    dest = UPLOADS_DIR / unique_name
+    shutil.copy2(source, dest)
+    return dest
+
+
+def _store_inline_text(text: str, name: str) -> Path:
+    safe_name = _safe_name(name)
+    if "." not in safe_name:
+        safe_name += ".txt"
+    unique_name = f"{uuid.uuid4()}_{safe_name}"
+    dest = UPLOADS_DIR / unique_name
+    dest.write_text(text, encoding="utf-8")
+    return dest
+
 
 # =========================================================
 # persistence
 # =========================================================
 
-def default_store() -> Dict[str, Any]:
-    return {"items": [], "updated_at": utc_now_iso()}
+def list_saved_attachments() -> List[Dict[str, Any]]:
+    store = _load_index()
+    items = _coerce_list(store.get("items"))
+    items.sort(key=lambda x: _clean_text(x.get("created_at")), reverse=True)
+    return items
 
-def strip_internal_fields(item: Dict[str, Any]) -> Dict[str, Any]:
-    out = dict(item)
-    out.pop("canonical_name", None)
-    return out
 
-def normalize_attachment_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    item = safe_dict(item)
-    filename = clean_text(item.get("name") or item.get("filename") or "attachment")
-    mime_type = guess_mime_type(filename, item.get("mime_type") or item.get("content_type"))
-    ext = extension_for_name(filename)
-    size = max(0, safe_int(item.get("size"), 0))
-    path_value = clean_text(item.get("path"))
-    file_hash = clean_text(item.get("sha256") or item.get("hash"))
-    kind = clean_text(item.get("kind")) or classify_attachment(filename, mime_type)
+def get_saved_attachment(attachment_id: str) -> Optional[Dict[str, Any]]:
+    for item in list_saved_attachments():
+        if _clean_text(item.get("id")) == _clean_text(attachment_id):
+            return item
+    return None
+
+
+def _upsert_attachment_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    store = _load_index()
+    items = _coerce_list(store.get("items"))
+
+    found = False
+    for i, existing in enumerate(items):
+        if _clean_text(existing.get("id")) == _clean_text(record.get("id")):
+            items[i] = record
+            found = True
+            break
+
+    if not found:
+        items.append(record)
+
+    if len(items) > MAX_ATTACHMENT_ITEMS:
+        items = items[-MAX_ATTACHMENT_ITEMS:]
+
+    store["items"] = items
+    _save_index(store)
+    return record
+
+
+# =========================================================
+# normalization
+# =========================================================
+
+def normalize_attachment(raw: Any) -> Dict[str, Any]:
+    raw = _coerce_dict(raw)
+
+    provided_name = (
+        _clean_text(raw.get("name"))
+        or _clean_text(raw.get("filename"))
+        or _clean_text(raw.get("original_name"))
+        or "attachment"
+    )
+    provided_name = _safe_name(provided_name)
+
+    existing_path = _best_existing_path(raw)
+    inline_bytes = _extract_inline_bytes(raw)
+    inline_text = _extract_inline_text(raw)
+
+    stored_path: Optional[Path] = None
+    size: Optional[int] = None
+    sha256 = ""
+    source = "metadata"
+
+    if existing_path:
+        stored_path = _copy_file_to_uploads(existing_path, provided_name)
+        source = "file_copy"
+        try:
+            size = stored_path.stat().st_size
+            sha256 = _sha256_bytes(_read_bytes(stored_path, max_bytes=5 * 1024 * 1024))
+        except Exception:
+            size = None
+            sha256 = ""
+    elif inline_bytes is not None:
+        stored_path = _write_bytes_to_uploads(inline_bytes, provided_name)
+        source = "inline_bytes"
+        size = len(inline_bytes)
+        sha256 = _sha256_bytes(inline_bytes[: 5 * 1024 * 1024])
+    elif inline_text:
+        stored_path = _store_inline_text(inline_text, provided_name)
+        source = "inline_text"
+        encoded = inline_text.encode("utf-8", errors="ignore")
+        size = len(encoded)
+        sha256 = _sha256_bytes(encoded[: 5 * 1024 * 1024])
+
+    mime_type = (
+        _clean_text(raw.get("mime_type"))
+        or _clean_text(raw.get("type"))
+        or _guess_mime_type(stored_path, fallback_name=provided_name)
+    )
+
+    if stored_path and size is None:
+        try:
+            size = stored_path.stat().st_size
+        except Exception:
+            size = None
+
+    kind = "other"
+    if _is_document_type(provided_name, mime_type):
+        kind = "document"
+    elif _is_image_type(provided_name, mime_type):
+        kind = "image"
+
+    attachment = {
+        "id": _clean_text(raw.get("id")).strip() or _new_id(),
+        "name": provided_name,
+        "original_name": provided_name,
+        "mime_type": mime_type or "application/octet-stream",
+        "size": size,
+        "extension": _extension(provided_name),
+        "kind": kind,
+        "source": source,
+        "created_at": _now_iso(),
+        "stored_path": str(stored_path) if stored_path else "",
+        "sha256": sha256,
+        "status": "ready",
+        "meta": _coerce_dict(raw.get("meta")),
+    }
+
+    return attachment
+
+
+# =========================================================
+# analyzers
+# =========================================================
+
+def _fallback_document_analysis(attachment: Dict[str, Any]) -> Dict[str, Any]:
+    path_value = _clean_text(attachment.get("stored_path")).strip()
+    path = Path(path_value) if path_value else None
+
+    result = {
+        "id": attachment.get("id"),
+        "name": attachment.get("name"),
+        "mime_type": attachment.get("mime_type"),
+        "type": "document",
+        "summary": "",
+        "snippet": "",
+        "prompt_text": "",
+        "status": "ready",
+        "meta": {},
+    }
+
+    if not path or not path.exists():
+        result["status"] = "missing_file"
+        result["summary"] = "Document file is unavailable."
+        return result
+
+    ext = _extension(_clean_text(attachment.get("name")))
+    try:
+        if ext == ".pdf":
+            result["summary"] = "PDF attached."
+            result["snippet"] = "PDF available for downstream PDF service."
+            result["prompt_text"] = f"Attached PDF: {attachment.get('name')}"
+            return result
+
+        text = _safe_read_text(path, limit=MAX_TEXT_READ_CHARS)
+        text = _trim_lines(text, CHUNK_PREVIEW_LINES)
+        snippet = _truncate(text, MAX_DOCUMENT_SNIPPET_CHARS)
+
+        result["summary"] = f"Document attached: {attachment.get('name')}"
+        result["snippet"] = snippet
+        result["prompt_text"] = f"Attached document: {attachment.get('name')}\n{snippet}"
+        result["meta"] = {
+            "chars_read": len(text),
+        }
+        return result
+    except Exception as exc:
+        result["status"] = "error"
+        result["summary"] = f"Failed to analyze document: {exc}"
+        return result
+
+
+def _analyze_document(attachment: Dict[str, Any]) -> Dict[str, Any]:
+    path_value = _clean_text(attachment.get("stored_path")).strip()
+    name = _clean_text(attachment.get("name"))
+    mime_type = _clean_text(attachment.get("mime_type"))
+    ext = _extension(name)
+
+    if path_value and ext == ".pdf" and _pdf_analyze:
+        try:
+            result = _pdf_analyze(
+                {
+                    "id": attachment.get("id"),
+                    "name": name,
+                    "mime_type": mime_type,
+                    "stored_path": path_value,
+                }
+            )
+            if isinstance(result, dict):
+                return {
+                    "id": attachment.get("id"),
+                    "name": name,
+                    "mime_type": mime_type,
+                    "type": "document",
+                    "summary": _truncate(result.get("summary", "PDF attached."), 600),
+                    "snippet": _truncate(
+                        result.get("snippet") or result.get("text") or result.get("prompt_text") or "",
+                        MAX_DOCUMENT_SNIPPET_CHARS,
+                    ),
+                    "prompt_text": _truncate(
+                        result.get("prompt_text")
+                        or result.get("snippet")
+                        or result.get("text")
+                        or f"Attached PDF: {name}",
+                        MAX_ATTACHMENT_PROMPT_CHARS,
+                    ),
+                    "status": _clean_text(result.get("status")) or "ready",
+                    "meta": _coerce_dict(result.get("meta")),
+                }
+        except Exception:
+            pass
+
+    if _document_analyze:
+        try:
+            result = _document_analyze(
+                {
+                    "id": attachment.get("id"),
+                    "name": name,
+                    "mime_type": mime_type,
+                    "stored_path": path_value,
+                }
+            )
+            if isinstance(result, dict):
+                return {
+                    "id": attachment.get("id"),
+                    "name": name,
+                    "mime_type": mime_type,
+                    "type": "document",
+                    "summary": _truncate(result.get("summary", f"Document attached: {name}"), 600),
+                    "snippet": _truncate(
+                        result.get("snippet") or result.get("text") or result.get("prompt_text") or "",
+                        MAX_DOCUMENT_SNIPPET_CHARS,
+                    ),
+                    "prompt_text": _truncate(
+                        result.get("prompt_text")
+                        or result.get("snippet")
+                        or result.get("text")
+                        or f"Attached document: {name}",
+                        MAX_ATTACHMENT_PROMPT_CHARS,
+                    ),
+                    "status": _clean_text(result.get("status")) or "ready",
+                    "meta": _coerce_dict(result.get("meta")),
+                }
+        except Exception:
+            pass
+
+    return _fallback_document_analysis(attachment)
+
+
+def _analyze_image(attachment: Dict[str, Any]) -> Dict[str, Any]:
+    name = _clean_text(attachment.get("name"))
+    mime_type = _clean_text(attachment.get("mime_type"))
+    path_value = _clean_text(attachment.get("stored_path")).strip()
 
     return {
-        "id": clean_text(item.get("id")) or str(uuid.uuid4()),
-        "session_id": clean_text(item.get("session_id")) or None,
-        "message_id": clean_text(item.get("message_id")) or None,
-        "name": filename,
-        "filename": filename,
-        "path": path_value,
+        "id": attachment.get("id"),
+        "name": name,
         "mime_type": mime_type,
-        "content_type": mime_type,
-        "extension": ext,
-        "kind": kind,
-        "size": size,
-        "sha256": file_hash,
-        "summary": clean_text(item.get("summary")),
-        "preview": clean_text(item.get("preview")),
-        "text": truncate(clean_text(item.get("text")), MAX_TEXT_EXTRACT_CHARS),
-        "status": clean_text(item.get("status") or "ready"),
-        "created_at": clean_text(item.get("created_at")) or utc_now_iso(),
-        "updated_at": clean_text(item.get("updated_at")) or utc_now_iso(),
-        "metadata": safe_dict(item.get("metadata")),
-        "canonical_name": canonicalize_text(filename),
+        "type": "image",
+        "summary": f"Image attached: {name}",
+        "snippet": _truncate(f"Image file available at {path_value}" if path_value else f"Image file attached: {name}", MAX_IMAGE_SNIPPET_CHARS),
+        "prompt_text": f"Attached image: {name}",
+        "status": "ready",
+        "meta": {},
     }
 
+
 # =========================================================
-# store
+# public processing API
 # =========================================================
 
-def load_store() -> Dict[str, Any]:
-    if not ATTACHMENTS_FILE.exists():
-        store = default_store()
-        atomic_write_json(ATTACHMENTS_FILE, store)
-        return normalize_store(store)
+def save_attachment(raw: Any) -> Dict[str, Any]:
+    attachment = normalize_attachment(raw)
+    return _upsert_attachment_record(attachment)
+
+
+def save_attachments(raw_attachments: Iterable[Any]) -> List[Dict[str, Any]]:
+    saved: List[Dict[str, Any]] = []
+    for raw in raw_attachments:
+        try:
+            saved.append(save_attachment(raw))
+        except Exception:
+            continue
+    return saved
+
+
+def process_attachments_for_chat(raw_attachments: List[Any]) -> Dict[str, Any]:
+    result = {
+        "attachments": [],
+        "documents": [],
+        "images": [],
+        "prompt_context": "",
+        "errors": [],
+    }
+
+    attachments: List[Dict[str, Any]] = []
+    documents: List[Dict[str, Any]] = []
+    images: List[Dict[str, Any]] = []
+    prompt_parts: List[str] = []
+
+    for raw in _coerce_list(raw_attachments):
+        try:
+            attachment = save_attachment(raw)
+            attachments.append(
+                {
+                    "id": attachment.get("id"),
+                    "name": attachment.get("name"),
+                    "type": attachment.get("mime_type"),
+                    "mime_type": attachment.get("mime_type"),
+                    "size": attachment.get("size"),
+                    "kind": attachment.get("kind"),
+                    "status": attachment.get("status"),
+                    "stored_path": attachment.get("stored_path"),
+                }
+            )
+
+            kind = _clean_text(attachment.get("kind"))
+            if kind == "document":
+                analyzed = _analyze_document(attachment)
+                documents.append(analyzed)
+                prompt_text = _clean_text(analyzed.get("prompt_text")).strip()
+                if prompt_text:
+                    prompt_parts.append(prompt_text)
+            elif kind == "image":
+                analyzed = _analyze_image(attachment)
+                images.append(analyzed)
+                prompt_text = _clean_text(analyzed.get("prompt_text")).strip()
+                if prompt_text:
+                    prompt_parts.append(prompt_text)
+            else:
+                prompt_parts.append(f"Attached file: {_clean_text(attachment.get('name'))}")
+        except Exception as exc:
+            result["errors"].append(f"attachment processing failed: {exc}")
+
+    result["attachments"] = attachments
+    result["documents"] = documents
+    result["images"] = images
+    result["prompt_context"] = _truncate("\n\n".join([p for p in prompt_parts if p]).strip(), MAX_ATTACHMENT_PROMPT_CHARS)
+
+    return result
+
+
+# =========================================================
+# inspection / admin helpers
+# =========================================================
+
+def delete_attachment(attachment_id: str) -> bool:
+    store = _load_index()
+    items = _coerce_list(store.get("items"))
+
+    kept: List[Dict[str, Any]] = []
+    deleted = False
+
+    for item in items:
+        if _clean_text(item.get("id")) == _clean_text(attachment_id):
+            deleted = True
+            path_value = _clean_text(item.get("stored_path")).strip()
+            if path_value:
+                try:
+                    path = Path(path_value)
+                    if path.exists() and path.is_file():
+                        path.unlink()
+                except Exception:
+                    pass
+            continue
+        kept.append(item)
+
+    if deleted:
+        store["items"] = kept
+        _save_index(store)
+
+    return deleted
+
+
+def export_attachment(attachment_id: str) -> Optional[Dict[str, Any]]:
+    item = get_saved_attachment(attachment_id)
+    if not item:
+        return None
+    return dict(item)
+
+
+def get_attachment_text_preview(attachment_id: str, limit: int = 4000) -> Dict[str, Any]:
+    item = get_saved_attachment(attachment_id)
+    if not item:
+        return {
+            "ok": False,
+            "error": "Attachment not found.",
+            "code": "not_found",
+        }
+
+    path_value = _clean_text(item.get("stored_path")).strip()
+    path = Path(path_value) if path_value else None
+    if not path or not path.exists():
+        return {
+            "ok": False,
+            "error": "Attachment file is unavailable.",
+            "code": "missing_file",
+            "attachment": item,
+        }
+
+    mime_type = _clean_text(item.get("mime_type"))
+    if not _is_document_type(_clean_text(item.get("name")), mime_type):
+        return {
+            "ok": True,
+            "attachment": item,
+            "preview": "",
+            "message": "Preview only available for document-like attachments.",
+        }
+
     try:
-        raw = json.loads(ATTACHMENTS_FILE.read_text(encoding="utf-8"))
-        if not isinstance(raw, dict): raise ValueError()
-    except Exception:
-        backup_file(ATTACHMENTS_FILE)
-        fallback = default_store()
-        atomic_write_json(ATTACHMENTS_FILE, fallback)
-        return normalize_store(fallback)
-    return normalize_store(raw)
-
-def save_store(store: Dict[str, Any]) -> Dict[str, Any]:
-    normalized = normalize_store(store)
-    normalized["updated_at"] = utc_now_iso()
-    serializable = {
-        "items": [strip_internal_fields(item) for item in normalized["items"]],
-        "updated_at": normalized["updated_at"],
-    }
-    atomic_write_json(ATTACHMENTS_FILE, serializable)
-    return normalize_store(serializable)
-
-def normalize_store(store: Dict[str, Any]) -> Dict[str, Any]:
-    store = safe_dict(store)
-    items = [normalize_attachment_item(x) for x in safe_list(store.get("items")) if normalize_attachment_item(x)]
-    items = dedupe_items(items)
-    return {"items": items, "updated_at": clean_text(store.get("updated_at")) or utc_now_iso()}
-
-def dedupe_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    out: List[Dict[str, Any]] = []
-    for raw in items:
-        item = normalize_attachment_item(raw)
-        if not item: continue
-        merged = False
-        for idx, existing in enumerate(out):
-            same_id = existing.get("id") == item.get("id")
-            same_hash = existing.get("sha256") and existing.get("sha256") == item.get("sha256")
-            same_path = existing.get("path") and existing.get("path") == item.get("path")
-            if same_id or same_hash or same_path:
-                out[idx] = choose_better_item(existing, item)
-                merged = True
-                break
-        if not merged: out.append(item)
-    out.sort(key=lambda x: x.get("updated_at",""), reverse=True)
-    return out[:MAX_ATTACHMENTS]
-
-def choose_better_item(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
-    a_exists = Path(clean_text(a.get("path"))).exists() if clean_text(a.get("path")) else False
-    b_exists = Path(clean_text(b.get("path"))).exists() if clean_text(b.get("path")) else False
-    winner = a if a_exists else b if b_exists else (a if clean_text(a.get("updated_at")) >= clean_text(b.get("updated_at")) else b)
-    loser = b if winner is a else a
-    winner = dict(winner)
-    winner["updated_at"] = max(clean_text(a.get("updated_at")), clean_text(b.get("updated_at"))) or utc_now_iso()
-    winner["metadata"] = {**safe_dict(loser.get("metadata")), **safe_dict(winner.get("metadata"))}
-    if not winner.get("summary"): winner["summary"] = clean_text(loser.get("summary"))
-    if not winner.get("preview"): winner["preview"] = clean_text(loser.get("preview"))
-    if not winner.get("text"): winner["text"] = clean_text(loser.get("text"))
-    if not winner.get("sha256"): winner["sha256"] = clean_text(loser.get("sha256"))
-    return winner
+        if path.stat().st_size > MAX_FILE_BYTES_FOR_INLINE_TEXT:
+            preview = f"File too large for full inline preview. Name: {item.get('name')}"
+        else:
+            preview = _safe_read_text(path, limit=limit)
+        return {
+            "ok": True,
+            "attachment": item,
+            "preview": _truncate(preview, limit),
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": str(exc),
+            "code": "preview_failed",
+            "attachment": item,
+        }

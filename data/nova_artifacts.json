@@ -1,52 +1,13 @@
-{
-  "artifacts": [
-    {
-      "id": "fe6066f0-5015-4c0a-ada2-e122544a9f81",
-      "session_id": "b502b639-088a-4c52-8c83-88bf820bb98a",
-      "title": "import csv",
-      "type": "code/python",
-      "content": "import csv\nimport sys\nfrom collections import Counter, defaultdict\nfrom pathlib import Path\n\ndef try_parse_number(value):\n    if value is None:\n        return None\n    text = str(value).strip()\n    if text == \"\":\n        return None\n    try:\n        if \".\" in text:\n            return float(text)\n        return int(text)\n    except ValueError:\n        return None\n\ndef summarize_csv(file_path):\n    path = Path(file_path)\n    if not path.exists():\n        raise FileNotFoundError(f\"File not found: {file_path}\")\n\n    with path.open(\"r\", newline=\"\", encoding=\"utf-8-sig\") as f:\n        reader = csv.DictReader(f)\n        rows = list(reader)\n        headers = reader.fieldnames or []\n\n    summary = {\n        \"file\": str(path),\n        \"row_count\": len(rows),\n        \"column_count\": len(headers),\n        \"columns\": {}\n    }\n\n    for header in headers:\n        values = [row.get(header, \"\") for row in rows]\n        non_empty = [v for v in values if str(v).strip() != \"\"]\n        numeric_values = []\n\n        for v in non_empty:\n            parsed = try_parse_number(v)\n            if parsed is not None:\n                numeric_values.append(parsed)\n\n        column_summary = {\n            \"non_empty_count\": len(non_empty),\n            \"empty_count\": len(values) - len(non_empty),\n            \"unique_count\": len(set(non_empty)),\n        }\n\n        if non_empty:\n            most_common = Counter(non_empty).most_common(5)\n            column_summary[\"top_values\"] = most_common\n\n        if len(numeric_values) == len(non_empty) and numeric_values:\n            column_summary[\"type\"] = \"numeric\"\n            column_summary[\"min\"] = min(numeric_values)\n            column_summary[\"max\"] = max(numeric_values)\n            column_summary[\"sum\"] = sum(numeric_values)\n            column_summary[\"avg\"] = sum(numeric_values) / len(numeric_values)\n        else:\n            column_summary[\"type\"] = \"text\"\n\n        summary[\"columns\"][header] = column_summary\n\n    return summary\n\ndef print_summary(summary):\n    print(f\"File: {summary['file']}\")\n    print(f\"Rows: {summary['row_count']}\")\n    print(f\"Columns: {summary['column_count']}\")\n    print()\n\n    for column, info in summary[\"columns\"].items():\n        print(f\"Column: {column}\")\n        print(f\"  Type: {info['type']}\")\n        print(f\"  Non-empty: {info['non_empty_count']}\")\n        print(f\"  Empty: {info['empty_count']}\")\n        print(f\"  Unique: {info['unique_count']}\")\n\n        if \"top_values\" in info:\n            print(\"  Top values:\")\n            for value, count in info[\"top_values\"]:\n                print(f\"    {value}: {count}\")\n\n        if info[\"type\"] == \"numeric\":\n            print(f\"  Min: {info['min']}\")\n            print(f\"  Max: {info['max']}\")\n            print(f\"  Sum: {info['sum']}\")\n            print(f\"  Avg: {info['avg']:.2f}\")\n\n        print()\n\nif __name__ == \"__main__\":\n    if len(sys.argv) != 2:\n        print(\"Usage: python summarize_csv.py <file.csv>\")\n        sys.exit(1)\n\n    csv_file = sys.argv[1]\n    result = summarize_csv(csv_file)\n    print_summary(result)",
-      "source_prompt": "write python code to parse a csv and summarize the rows",
-      "route_mode": "code",
-      "contract": "full_file_only",
-      "created_at": "2026-03-28T02:57:59.249825+00:00",
-      "updated_at": "2026-03-28T02:57:59.263298+00:00"
-    },
-    {
-      "id": "7fbf6efa-94ff-4490-a02e-57f3b295f79e",
-      "session_id": "86e720e0-5458-4bf0-8b8d-a9ed79a8cd79",
-      "title": "Saved Chat Artifact",
-      "type": "document",
-      "content": "Hi — what do you need?",
-      "source_prompt": "",
-      "route_mode": "manual",
-      "contract": "direct",
-      "created_at": "2026-03-28T02:52:28.568909+00:00",
-      "updated_at": "2026-03-28T02:52:28.568922+00:00"
-    },
-    {
-      "id": "93d17e06-721c-4b42-a85f-79a5f38de52d",
-      "session_id": "7d567ae5-95a2-45d3-b730-03468b941045",
-      "title": "Test Artifact",
-      "type": "document",
-      "content": "This is a test artifact from PowerShell.",
-      "source_prompt": "manual test",
-      "route_mode": "manual",
-      "contract": "direct",
-      "created_at": "2026-03-26T05:07:28.704055+00:00",
-      "updated_at": "2026-03-26T05:07:28.704063+00:00"
-    },
-    {
-      "id": "73c5490f-35f5-4606-a9e6-06ebe692b634",
-      "session_id": "7d567ae5-95a2-45d3-b730-03468b941045",
-      "title": "Test Artifact",
-      "type": "document",
-      "content": "This is a test artifact from PowerShell.",
-      "source_prompt": "manual test",
-      "route_mode": "manual",
-      "contract": "direct",
-      "created_at": "2026-03-26T05:07:23.035090+00:00",
-      "updated_at": "2026-03-26T05:07:23.035098+00:00"
-    }
-  ]
-}
+[
+  {
+    "id": "db61b56f-b5a1-4b7c-b283-3ced87ba29d1",
+    "title": "artifact test",
+    "content": "hello artifact",
+    "kind": "text",
+    "session_id": "c290bf8d-78d4-449a-951f-659af75e4333",
+    "created_at": "2026-03-28T09:51:48.682806+00:00",
+    "updated_at": "2026-03-28T09:51:48.682814+00:00",
+    "pinned": false,
+    "meta": {}
+  }
+]

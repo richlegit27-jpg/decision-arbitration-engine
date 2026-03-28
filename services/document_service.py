@@ -4,682 +4,376 @@ from __future__ import annotations
 import csv
 import json
 import re
-from html import unescape
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
 
 # =========================================================
 # config
 # =========================================================
 
-MAX_RAW_TEXT_CHARS = 40000
-MAX_EXTRACT_TEXT_CHARS = 24000
-MAX_SUMMARY_CHARS = 1200
-MAX_PREVIEW_CHARS = 360
-MAX_CHUNKS = 12
-CHUNK_SIZE = 1800
-CHUNK_OVERLAP = 180
-MAX_CSV_ROWS = 60
+MAX_RAW_CHARS = 30000
+MAX_PROMPT_CHARS = 8000
+MAX_ROWS = 40
 MAX_JSON_ITEMS = 80
+MAX_SNIPPET_CHARS = 4000
+MAX_SUMMARY_CHARS = 600
 
 DOCUMENT_EXTENSIONS = {
-    ".txt",
-    ".md",
-    ".json",
-    ".csv",
-    ".log",
     ".pdf",
-    ".xml",
-    ".yaml",
-    ".yml",
-    ".html",
-    ".htm",
-}
-
-TEXT_EXTENSIONS = {
     ".txt",
-    ".md",
     ".log",
-    ".xml",
-    ".yaml",
-    ".yml",
-    ".html",
-    ".htm",
-}
-
-STRUCTURED_EXTENSIONS = {
+    ".md",
+    ".markdown",
     ".json",
     ".csv",
+    ".xml",
+    ".html",
+    ".htm",
+    ".yaml",
+    ".yml",
 }
-
-TEXTUAL_MIME_PREFIXES = ("text/",)
-TEXTUAL_MIME_TYPES = {
+DOCUMENT_MIME_PREFIXES = ("text/",)
+DOCUMENT_MIME_TYPES = {
+    "application/pdf",
     "application/json",
+    "text/plain",
+    "text/markdown",
+    "text/csv",
+    "application/csv",
+    "application/x-csv",
     "application/xml",
     "text/xml",
-    "application/csv",
-    "text/csv",
-    "application/x-csv",
-    "text/markdown",
-    "application/yaml",
-    "text/yaml",
-    "application/x-yaml",
+    "text/html",
+    "application/xhtml+xml",
 }
-PDF_MIME_TYPES = {"application/pdf"}
+
+# =========================================================
+# optional imports
+# =========================================================
+
+try:
+    from services.pdf_service import analyze_pdf_attachment as _pdf_analyze
+except Exception:
+    _pdf_analyze = None
 
 
 # =========================================================
-# generic helpers
+# helpers
 # =========================================================
 
-def clean_text(value: Any) -> str:
+def _clean_text(value: Any) -> str:
     if value is None:
         return ""
-    text = str(value).replace("\r\n", "\n").replace("\r", "\n").replace("\x00", "")
-    text = text.replace("\ufeff", "")
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+    return str(value).replace("\r\n", "\n").replace("\r", "\n")
 
 
-def truncate(text: str, limit: int) -> str:
-    text = clean_text(text)
+def _collapse_ws(value: Any) -> str:
+    return re.sub(r"\s+", " ", _clean_text(value)).strip()
+
+
+def _truncate(value: Any, limit: int) -> str:
+    text = _clean_text(value).strip()
     if len(text) <= limit:
         return text
-    return text[:limit].rstrip() + "…"
+    return text[:limit].rstrip() + "...(truncated)"
 
 
-def safe_dict(value: Any) -> Dict[str, Any]:
+def _coerce_dict(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def safe_list(value: Any) -> List[Any]:
-    return value if isinstance(value, list) else []
+def _coerce_list(value: Any) -> List[Any]:
+    if isinstance(value, list):
+        return value
+    if value is None:
+        return []
+    return [value]
 
 
-def safe_int(value: Any, default: int = 0) -> int:
-    try:
-        return int(value)
-    except Exception:
-        return default
-
-
-def extension_for_path(path: Path) -> str:
-    return path.suffix.lower().strip()
-
-
-def guess_kind(path: Path, mime_type: str = "") -> str:
-    ext = extension_for_path(path)
-    mime_type = clean_text(mime_type).lower()
-
-    if ext == ".pdf" or mime_type in PDF_MIME_TYPES:
-        return "pdf"
-    if ext in STRUCTURED_EXTENSIONS:
-        return "structured"
-    if ext in TEXT_EXTENSIONS:
-        return "text"
-    if mime_type in TEXTUAL_MIME_TYPES or any(mime_type.startswith(p) for p in TEXTUAL_MIME_PREFIXES):
-        return "text"
-    return "document"
-
-
-def looks_like_binary(raw: bytes) -> bool:
-    if not raw:
-        return False
-    if b"\x00" in raw[:4096]:
-        return True
-    sample = raw[:4096]
-    weird = 0
-    for b in sample:
-        if b in (9, 10, 13):
-            continue
-        if b < 32 or b > 126:
-            weird += 1
-    return weird > max(24, len(sample) // 5)
-
-
-def read_text_file(path: Path) -> str:
-    try:
-        raw = path.read_bytes()
-    except Exception:
-        return ""
-
-    if looks_like_binary(raw):
-        return ""
-
+def _safe_read_text(path: Path, limit: int = MAX_RAW_CHARS) -> str:
+    raw = path.read_bytes()[:limit]
     for encoding in ("utf-8", "utf-8-sig", "latin-1"):
         try:
-            return raw.decode(encoding, errors="replace")
+            return raw.decode(encoding, errors="ignore")
         except Exception:
             continue
-    return ""
+    return raw.decode("utf-8", errors="ignore")
 
 
-def compact_whitespace(text: str) -> str:
-    return re.sub(r"\s+", " ", clean_text(text)).strip()
+def _extension(name: str) -> str:
+    return Path(name).suffix.lower().strip()
 
 
-def strip_html(html: str) -> str:
-    if not html:
-        return ""
-    html = unescape(html)
-    html = re.sub(r"(?is)<(script|style|noscript)[^>]*>.*?</\1>", " ", html)
-    html = re.sub(r"(?i)<br\s*/?>", "\n", html)
-    html = re.sub(r"(?i)</p\s*>", "\n\n", html)
-    html = re.sub(r"(?i)</div\s*>", "\n", html)
-    html = re.sub(r"(?i)</li\s*>", "\n", html)
-    html = re.sub(r"(?i)<li[^>]*>", "- ", html)
-    html = re.sub(r"(?is)<[^>]+>", " ", html)
-    html = re.sub(r"[ \t]+", " ", html)
-    html = re.sub(r"\n{3,}", "\n\n", html)
-    return clean_text(html)
+def is_document_attachment(attachment: Dict[str, Any]) -> bool:
+    attachment = _coerce_dict(attachment)
+    name = _clean_text(attachment.get("name"))
+    mime_type = _clean_text(attachment.get("mime_type") or attachment.get("type"))
+    ext = _extension(name)
+
+    if ext in DOCUMENT_EXTENSIONS:
+        return True
+    if mime_type in DOCUMENT_MIME_TYPES:
+        return True
+    return any(mime_type.startswith(prefix) for prefix in DOCUMENT_MIME_PREFIXES)
 
 
-# =========================================================
-# summary + chunk helpers
-# =========================================================
-
-def sentence_split(text: str) -> List[str]:
-    text = clean_text(text)
-    if not text:
-        return []
-    parts = re.split(r"(?<=[.!?])\s+|\n{2,}", text)
-    return [clean_text(x) for x in parts if clean_text(x)]
+def _preview_lines(text: str, max_lines: int = 40) -> str:
+    lines = _clean_text(text).splitlines()
+    if len(lines) <= max_lines:
+        return "\n".join(lines)
+    return "\n".join(lines[:max_lines]) + "\n...(truncated)"
 
 
-def summarize_text(text: str, limit: int = MAX_SUMMARY_CHARS) -> str:
-    text = clean_text(text)
-    if not text:
-        return ""
-
-    parts = sentence_split(text)
-    if not parts:
-        return truncate(text, limit)
-
-    kept: List[str] = []
-    total = 0
-
-    for part in parts:
-        if total + len(part) > limit:
-            break
-        kept.append(part)
-        total += len(part) + 1
-        if len(kept) >= 6:
-            break
-
-    if not kept:
-        return truncate(text, limit)
-
-    return truncate(" ".join(kept), limit)
+def _file_exists(path_value: str) -> Optional[Path]:
+    path_value = _clean_text(path_value).strip()
+    if not path_value:
+        return None
+    path = Path(path_value)
+    if path.exists() and path.is_file():
+        return path
+    return None
 
 
-def preview_text(text: str, limit: int = MAX_PREVIEW_CHARS) -> str:
-    return truncate(compact_whitespace(text), limit)
+def _read_json_preview(path: Path) -> Dict[str, Any]:
+    result = {
+        "summary": "JSON document attached.",
+        "snippet": "",
+        "prompt_text": "",
+        "meta": {},
+    }
 
-
-def split_into_chunks(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[str]:
-    text = clean_text(text)
-    if not text:
-        return []
-
-    chunks: List[str] = []
-    start = 0
-    length = len(text)
-
-    while start < length and len(chunks) < MAX_CHUNKS:
-        end = min(length, start + chunk_size)
-        piece = text[start:end]
-
-        if end < length:
-            split_at = max(piece.rfind("\n\n"), piece.rfind(". "), piece.rfind("\n"), piece.rfind(" "))
-            if split_at > max(200, chunk_size // 3):
-                piece = piece[:split_at + 1]
-                end = start + len(piece)
-
-        piece = clean_text(piece)
-        if piece:
-            chunks.append(piece)
-
-        if end >= length:
-            break
-
-        start = max(end - overlap, start + 1)
-
-    return chunks
-
-
-# =========================================================
-# structured formatting helpers
-# =========================================================
-
-def flatten_json(
-    value: Any,
-    *,
-    prefix: str = "",
-    out: Optional[List[str]] = None,
-    max_items: int = MAX_JSON_ITEMS,
-) -> List[str]:
-    if out is None:
-        out = []
-
-    if len(out) >= max_items:
-        return out
-
-    if isinstance(value, dict):
-        for key, subvalue in value.items():
-            if len(out) >= max_items:
-                break
-            new_prefix = f"{prefix}.{key}" if prefix else str(key)
-            flatten_json(subvalue, prefix=new_prefix, out=out, max_items=max_items)
-        return out
-
-    if isinstance(value, list):
-        for idx, subvalue in enumerate(value):
-            if len(out) >= max_items:
-                break
-            new_prefix = f"{prefix}[{idx}]"
-            flatten_json(subvalue, prefix=new_prefix, out=out, max_items=max_items)
-        return out
-
-    value_text = clean_text(value)
-    if value_text:
-        out.append(f"{prefix}: {truncate(value_text, 240)}")
-    return out
-
-
-def parse_json_file(path: Path) -> Dict[str, Any]:
-    raw = read_text_file(path)
-    if not raw:
-        return {
-            "text": "",
-            "summary": "",
-            "preview": "",
-            "metadata": {"format": "json", "parse_ok": False},
-        }
-
+    raw = _safe_read_text(path, limit=MAX_RAW_CHARS)
     try:
         parsed = json.loads(raw)
-        pretty = json.dumps(parsed, ensure_ascii=False, indent=2)
-        flat = flatten_json(parsed)
-        flattened_text = "\n".join(flat)
-        final_text = truncate(pretty, MAX_EXTRACT_TEXT_CHARS)
-
-        if flattened_text:
-            summary_source = flattened_text
-        else:
-            summary_source = final_text
-
-        return {
-            "text": final_text,
-            "summary": summarize_text(summary_source),
-            "preview": preview_text(summary_source),
-            "metadata": {
-                "format": "json",
-                "parse_ok": True,
-                "top_level_type": type(parsed).__name__,
-                "flattened_items": len(flat),
-            },
-        }
     except Exception:
-        fallback = truncate(raw, MAX_EXTRACT_TEXT_CHARS)
-        return {
-            "text": fallback,
-            "summary": summarize_text(fallback),
-            "preview": preview_text(fallback),
-            "metadata": {"format": "json", "parse_ok": False},
-        }
+        snippet = _truncate(raw, MAX_SNIPPET_CHARS)
+        result["summary"] = "JSON-like document attached (raw parse fallback)."
+        result["snippet"] = snippet
+        result["prompt_text"] = f"Attached JSON/raw file:\n{_truncate(raw, MAX_PROMPT_CHARS)}"
+        result["meta"] = {"mode": "raw_fallback"}
+        return result
+
+    if isinstance(parsed, dict):
+        keys = list(parsed.keys())[:MAX_JSON_ITEMS]
+        compact = json.dumps({k: parsed[k] for k in keys}, indent=2, ensure_ascii=False)
+        snippet = _truncate(compact, MAX_SNIPPET_CHARS)
+        result["summary"] = f"JSON object attached with {len(parsed)} top-level keys."
+        result["snippet"] = snippet
+        result["prompt_text"] = f"Attached JSON object preview:\n{_truncate(compact, MAX_PROMPT_CHARS)}"
+        result["meta"] = {"mode": "json_object", "top_level_keys": keys}
+        return result
+
+    if isinstance(parsed, list):
+        sample = parsed[:MAX_JSON_ITEMS]
+        compact = json.dumps(sample, indent=2, ensure_ascii=False)
+        snippet = _truncate(compact, MAX_SNIPPET_CHARS)
+        result["summary"] = f"JSON array attached with {len(parsed)} items."
+        result["snippet"] = snippet
+        result["prompt_text"] = f"Attached JSON array preview:\n{_truncate(compact, MAX_PROMPT_CHARS)}"
+        result["meta"] = {"mode": "json_array", "sample_count": len(sample)}
+        return result
+
+    compact = json.dumps(parsed, indent=2, ensure_ascii=False)
+    snippet = _truncate(compact, MAX_SNIPPET_CHARS)
+    result["summary"] = "JSON value attached."
+    result["snippet"] = snippet
+    result["prompt_text"] = f"Attached JSON value:\n{_truncate(compact, MAX_PROMPT_CHARS)}"
+    result["meta"] = {"mode": "json_scalar"}
+    return result
 
 
-def parse_csv_file(path: Path) -> Dict[str, Any]:
-    raw = read_text_file(path)
-    if not raw:
-        return {
-            "text": "",
-            "summary": "",
-            "preview": "",
-            "metadata": {"format": "csv", "parse_ok": False},
-        }
+def _read_csv_preview(path: Path) -> Dict[str, Any]:
+    result = {
+        "summary": "CSV document attached.",
+        "snippet": "",
+        "prompt_text": "",
+        "meta": {},
+    }
 
-    lines: List[str] = []
-    row_count = 0
-    column_count = 0
-
-    try:
-        reader = csv.reader(raw.splitlines())
+    rows: List[List[str]] = []
+    with path.open("r", encoding="utf-8", errors="ignore", newline="") as f:
+        reader = csv.reader(f)
         for idx, row in enumerate(reader):
-            row_count += 1
-            column_count = max(column_count, len(row))
-            if idx >= MAX_CSV_ROWS:
-                continue
-            cleaned = [truncate(compact_whitespace(cell), 120) for cell in row]
-            lines.append(" | ".join(cleaned))
+            if idx >= MAX_ROWS:
+                break
+            rows.append([_clean_text(cell) for cell in row])
 
-        text = truncate("\n".join(lines), MAX_EXTRACT_TEXT_CHARS)
-        summary_bits = []
-        if lines:
-            header = lines[0]
-            summary_bits.append(f"CSV with about {row_count} rows and {column_count} columns.")
-            summary_bits.append(f"Header/sample: {truncate(header, 260)}")
-        summary = truncate(" ".join(summary_bits).strip() or summarize_text(text), MAX_SUMMARY_CHARS)
+    if not rows:
+        result["summary"] = "CSV attached but appears empty."
+        result["meta"] = {"row_count": 0}
+        return result
 
-        return {
-            "text": text,
-            "summary": summary,
-            "preview": preview_text(text),
-            "metadata": {
-                "format": "csv",
-                "parse_ok": True,
-                "rows": row_count,
-                "columns": column_count,
-                "sample_rows": min(row_count, MAX_CSV_ROWS),
-            },
-        }
-    except Exception:
-        fallback = truncate(raw, MAX_EXTRACT_TEXT_CHARS)
-        return {
-            "text": fallback,
-            "summary": summarize_text(fallback),
-            "preview": preview_text(fallback),
-            "metadata": {"format": "csv", "parse_ok": False},
-        }
+    header = rows[0]
+    body = rows[1:]
+    lines = []
+    if header:
+        lines.append(" | ".join(header))
+        lines.append("-" * min(120, max(12, len(" | ".join(header)))))
+    for row in body:
+        lines.append(" | ".join(row))
 
+    preview = "\n".join(lines)
+    snippet = _truncate(preview, MAX_SNIPPET_CHARS)
 
-# =========================================================
-# pdf integration
-# =========================================================
-
-def parse_pdf_file(path: Path) -> Dict[str, Any]:
-    try:
-        from services.pdf_service import analyze_pdf_attachment  # type: ignore
-    except Exception:
-        analyze_pdf_attachment = None  # type: ignore
-
-    if callable(analyze_pdf_attachment):
-        try:
-            result = analyze_pdf_attachment(path)
-            if isinstance(result, dict):
-                text = clean_text(
-                    result.get("text")
-                    or result.get("content")
-                    or result.get("body")
-                    or result.get("summary")
-                )
-                text = truncate(text, MAX_EXTRACT_TEXT_CHARS)
-                summary = clean_text(result.get("summary")) or summarize_text(text)
-                preview = clean_text(result.get("preview")) or preview_text(text)
-                metadata = safe_dict(result.get("metadata"))
-                metadata["format"] = "pdf"
-                metadata["parse_ok"] = True
-                return {
-                    "text": text,
-                    "summary": truncate(summary, MAX_SUMMARY_CHARS),
-                    "preview": truncate(preview, MAX_PREVIEW_CHARS),
-                    "metadata": metadata,
-                }
-            if isinstance(result, str):
-                text = truncate(clean_text(result), MAX_EXTRACT_TEXT_CHARS)
-                return {
-                    "text": text,
-                    "summary": summarize_text(text),
-                    "preview": preview_text(text),
-                    "metadata": {"format": "pdf", "parse_ok": True},
-                }
-        except Exception:
-            pass
-
-    return {
-        "text": "",
-        "summary": "PDF attached, but text extraction was unavailable.",
-        "preview": "PDF attached, but text extraction was unavailable.",
-        "metadata": {"format": "pdf", "parse_ok": False},
+    result["summary"] = f"CSV attached with {len(rows)} preview rows and {len(header)} columns."
+    result["snippet"] = snippet
+    result["prompt_text"] = f"Attached CSV preview:\n{_truncate(preview, MAX_PROMPT_CHARS)}"
+    result["meta"] = {
+        "row_count_preview": len(rows),
+        "column_count": len(header),
+        "header": header,
     }
+    return result
 
 
-# =========================================================
-# generic document analyzers
-# =========================================================
+def _read_plaintext_preview(path: Path) -> Dict[str, Any]:
+    raw = _safe_read_text(path, limit=MAX_RAW_CHARS)
+    cleaned = _preview_lines(raw, max_lines=40)
+    snippet = _truncate(cleaned, MAX_SNIPPET_CHARS)
 
-def parse_plain_text_file(path: Path) -> Dict[str, Any]:
-    ext = extension_for_path(path)
-    raw = read_text_file(path)
-    if not raw:
-        return {
-            "text": "",
-            "summary": "",
-            "preview": "",
-            "metadata": {"format": ext.lstrip(".") or "text", "parse_ok": False},
-        }
-
-    if ext in {".html", ".htm"}:
-        text = strip_html(raw)
-    else:
-        text = clean_text(raw)
-
-    text = truncate(text, MAX_EXTRACT_TEXT_CHARS)
+    nonempty_lines = [line for line in raw.splitlines() if line.strip()]
+    summary = f"Text document attached with {len(nonempty_lines)} non-empty preview lines."
 
     return {
-        "text": text,
-        "summary": summarize_text(text),
-        "preview": preview_text(text),
-        "metadata": {
-            "format": ext.lstrip(".") or "text",
-            "parse_ok": True,
-            "characters": len(text),
+        "summary": _truncate(summary, MAX_SUMMARY_CHARS),
+        "snippet": snippet,
+        "prompt_text": f"Attached document content:\n{_truncate(raw, MAX_PROMPT_CHARS)}",
+        "meta": {
+            "chars_read": len(raw),
+            "nonempty_lines_preview": len(nonempty_lines[:40]),
         },
     }
 
 
-def analyze_document_attachment(path: Path | str, mime_type: str = "") -> Dict[str, Any]:
-    path = Path(path)
-    exists = path.exists()
-    ext = extension_for_path(path)
-    mime_type = clean_text(mime_type).lower()
-    kind = guess_kind(path, mime_type)
+def _read_markup_preview(path: Path, label: str) -> Dict[str, Any]:
+    raw = _safe_read_text(path, limit=MAX_RAW_CHARS)
+    cleaned = _preview_lines(raw, max_lines=40)
+    snippet = _truncate(cleaned, MAX_SNIPPET_CHARS)
 
-    result: Dict[str, Any] = {
-        "ok": exists,
-        "path": str(path),
-        "name": path.name,
-        "filename": path.name,
-        "extension": ext,
+    title_match = re.search(r"<title>(.*?)</title>", raw, flags=re.IGNORECASE | re.DOTALL)
+    title = _collapse_ws(title_match.group(1)) if title_match else ""
+
+    summary = f"{label} document attached."
+    if title:
+        summary += f" Title: {title}"
+
+    return {
+        "summary": _truncate(summary, MAX_SUMMARY_CHARS),
+        "snippet": snippet,
+        "prompt_text": f"Attached {label.lower()} preview:\n{_truncate(raw, MAX_PROMPT_CHARS)}",
+        "meta": {
+            "title": title,
+            "chars_read": len(raw),
+        },
+    }
+
+
+def _fallback_missing_result(attachment: Dict[str, Any], reason: str) -> Dict[str, Any]:
+    name = _clean_text(attachment.get("name")) or "document"
+    mime_type = _clean_text(attachment.get("mime_type") or attachment.get("type"))
+    return {
+        "id": attachment.get("id"),
+        "name": name,
         "mime_type": mime_type,
-        "kind": kind,
-        "text": "",
-        "summary": "",
-        "preview": "",
-        "chunks": [],
-        "metadata": {
-            "exists": exists,
-            "format": ext.lstrip(".") or kind,
-            "parse_ok": False,
-            "size_bytes": path.stat().st_size if exists else 0,
-        },
-        "error": None,
+        "type": "document",
+        "summary": _truncate(reason, MAX_SUMMARY_CHARS),
+        "snippet": "",
+        "prompt_text": f"Attached document: {name}",
+        "status": "missing_file",
+        "meta": {},
     }
 
-    if not exists:
-        result["error"] = {"code": "file_not_found", "message": "Document path does not exist."}
-        return result
+
+# =========================================================
+# public analyzer
+# =========================================================
+
+def analyze_document_attachment(attachment: Dict[str, Any]) -> Dict[str, Any]:
+    attachment = _coerce_dict(attachment)
+
+    name = _clean_text(attachment.get("name")) or "document"
+    mime_type = _clean_text(attachment.get("mime_type") or attachment.get("type"))
+    path = _file_exists(_clean_text(attachment.get("stored_path") or attachment.get("path")))
+
+    base = {
+        "id": attachment.get("id"),
+        "name": name,
+        "mime_type": mime_type,
+        "type": "document",
+        "summary": "",
+        "snippet": "",
+        "prompt_text": "",
+        "status": "ready",
+        "meta": {},
+    }
+
+    if not is_document_attachment(attachment):
+        base["status"] = "skipped"
+        base["summary"] = "Attachment is not recognized as a document."
+        base["prompt_text"] = f"Attached file: {name}"
+        return base
+
+    if not path:
+        return _fallback_missing_result(attachment, "Document file is unavailable.")
+
+    ext = _extension(name)
 
     try:
-        if ext == ".pdf" or mime_type in PDF_MIME_TYPES:
-            parsed = parse_pdf_file(path)
-        elif ext == ".json":
-            parsed = parse_json_file(path)
-        elif ext == ".csv":
-            parsed = parse_csv_file(path)
+        if ext == ".pdf" or mime_type == "application/pdf":
+            if _pdf_analyze:
+                pdf_result = _pdf_analyze(
+                    {
+                        "id": attachment.get("id"),
+                        "name": name,
+                        "mime_type": mime_type or "application/pdf",
+                        "stored_path": str(path),
+                    }
+                )
+                if isinstance(pdf_result, dict):
+                    base["summary"] = _truncate(pdf_result.get("summary", "PDF attached."), MAX_SUMMARY_CHARS)
+                    base["snippet"] = _truncate(
+                        pdf_result.get("snippet") or pdf_result.get("text") or pdf_result.get("prompt_text") or "",
+                        MAX_SNIPPET_CHARS,
+                    )
+                    base["prompt_text"] = _truncate(
+                        pdf_result.get("prompt_text")
+                        or pdf_result.get("snippet")
+                        or pdf_result.get("text")
+                        or f"Attached PDF: {name}",
+                        MAX_PROMPT_CHARS,
+                    )
+                    base["status"] = _clean_text(pdf_result.get("status")) or "ready"
+                    base["meta"] = _coerce_dict(pdf_result.get("meta"))
+                    return base
+
+            base["summary"] = "PDF attached and available for downstream processing."
+            base["prompt_text"] = f"Attached PDF: {name}"
+            base["status"] = "ready"
+            return base
+
+        if ext == ".json" or mime_type == "application/json":
+            preview = _read_json_preview(path)
+        elif ext == ".csv" or "csv" in mime_type:
+            preview = _read_csv_preview(path)
+        elif ext in {".html", ".htm"} or "html" in mime_type:
+            preview = _read_markup_preview(path, "HTML")
+        elif ext == ".xml" or "xml" in mime_type:
+            preview = _read_markup_preview(path, "XML")
         else:
-            parsed = parse_plain_text_file(path)
+            preview = _read_plaintext_preview(path)
 
-        text = truncate(clean_text(parsed.get("text")), MAX_EXTRACT_TEXT_CHARS)
-        summary = truncate(clean_text(parsed.get("summary")) or summarize_text(text), MAX_SUMMARY_CHARS)
-        preview = truncate(clean_text(parsed.get("preview")) or preview_text(text or summary), MAX_PREVIEW_CHARS)
-        chunks = split_into_chunks(text)
-
-        metadata = {
-            **safe_dict(result.get("metadata")),
-            **safe_dict(parsed.get("metadata")),
-        }
-        metadata["parse_ok"] = bool(text or summary or preview)
-        metadata["chunk_count"] = len(chunks)
-        metadata["characters"] = len(text)
-
-        result.update(
-            {
-                "text": text,
-                "summary": summary,
-                "preview": preview,
-                "chunks": chunks,
-                "metadata": metadata,
-                "error": None,
-            }
+        base["summary"] = _truncate(preview.get("summary", f"Document attached: {name}"), MAX_SUMMARY_CHARS)
+        base["snippet"] = _truncate(preview.get("snippet", ""), MAX_SNIPPET_CHARS)
+        base["prompt_text"] = _truncate(
+            preview.get("prompt_text") or preview.get("snippet") or f"Attached document: {name}",
+            MAX_PROMPT_CHARS,
         )
-        return result
+        base["meta"] = _coerce_dict(preview.get("meta"))
+        base["status"] = "ready"
+        return base
 
     except Exception as exc:
-        fallback_text = ""
-        try:
-            fallback_text = truncate(clean_text(read_text_file(path)), MAX_EXTRACT_TEXT_CHARS)
-        except Exception:
-            fallback_text = ""
-
-        result["text"] = fallback_text
-        result["summary"] = summarize_text(fallback_text) if fallback_text else ""
-        result["preview"] = preview_text(fallback_text) if fallback_text else ""
-        result["chunks"] = split_into_chunks(fallback_text) if fallback_text else []
-        result["metadata"] = {
-            **safe_dict(result.get("metadata")),
-            "parse_ok": bool(fallback_text),
-            "chunk_count": len(result["chunks"]),
-            "characters": len(result["text"]),
-        }
-        result["error"] = {
-            "code": "document_parse_failed",
-            "message": str(exc),
-        }
-        return result
-
-
-# =========================================================
-# prompt shaping
-# =========================================================
-
-def build_document_prompt_context(path: Path | str, mime_type: str = "") -> Dict[str, Any]:
-    analyzed = analyze_document_attachment(path, mime_type=mime_type)
-
-    chunks = safe_list(analyzed.get("chunks"))
-    selected_chunks = chunks[:6]
-
-    lines: List[str] = []
-    name = clean_text(analyzed.get("name") or "document")
-    summary = clean_text(analyzed.get("summary"))
-    preview = clean_text(analyzed.get("preview"))
-
-    lines.append(f"Document: {name}")
-    if summary:
-        lines.append(f"Summary: {summary}")
-    elif preview:
-        lines.append(f"Preview: {preview}")
-
-    if selected_chunks:
-        lines.append("Relevant text:")
-        for idx, chunk in enumerate(selected_chunks, 1):
-            chunk_text = truncate(clean_text(chunk), 1200)
-            if chunk_text:
-                lines.append(f"[Chunk {idx}] {chunk_text}")
-
-    return {
-        "ok": bool(analyzed.get("ok")),
-        "document": analyzed,
-        "prompt_text": "\n".join(lines).strip(),
-    }
-
-
-def summarize_document(path: Path | str, mime_type: str = "") -> str:
-    analyzed = analyze_document_attachment(path, mime_type=mime_type)
-    summary = clean_text(analyzed.get("summary"))
-    if summary:
-        return summary
-    text = clean_text(analyzed.get("text"))
-    return summarize_text(text)
-
-
-def preview_document(path: Path | str, mime_type: str = "") -> str:
-    analyzed = analyze_document_attachment(path, mime_type=mime_type)
-    preview = clean_text(analyzed.get("preview"))
-    if preview:
-        return preview
-    text = clean_text(analyzed.get("text"))
-    return preview_text(text)
-
-
-def extract_document_text(path: Path | str, mime_type: str = "") -> str:
-    analyzed = analyze_document_attachment(path, mime_type=mime_type)
-    return clean_text(analyzed.get("text"))
-
-
-def extract_document_chunks(path: Path | str, mime_type: str = "") -> List[str]:
-    analyzed = analyze_document_attachment(path, mime_type=mime_type)
-    return [clean_text(x) for x in safe_list(analyzed.get("chunks")) if clean_text(x)]
-
-
-# =========================================================
-# multi-doc helpers
-# =========================================================
-
-def analyze_many_documents(items: List[Dict[str, Any]]) -> Dict[str, Any]:
-    analyzed: List[Dict[str, Any]] = []
-
-    for raw in safe_list(items):
-        item = safe_dict(raw)
-        path_value = clean_text(item.get("path"))
-        if not path_value:
-            continue
-        mime_type = clean_text(item.get("mime_type"))
-        result = analyze_document_attachment(path_value, mime_type=mime_type)
-
-        analyzed.append(
-            {
-                "id": clean_text(item.get("id")),
-                "path": path_value,
-                "name": clean_text(item.get("name") or result.get("name")),
-                "mime_type": mime_type,
-                "summary": clean_text(result.get("summary")),
-                "preview": clean_text(result.get("preview")),
-                "text": clean_text(result.get("text")),
-                "chunks": safe_list(result.get("chunks")),
-                "metadata": safe_dict(result.get("metadata")),
-                "error": result.get("error"),
-            }
-        )
-
-    return {
-        "ok": True,
-        "count": len(analyzed),
-        "documents": analyzed,
-    }
-
-
-def documents_to_prompt_text(items: List[Dict[str, Any]]) -> str:
-    result = analyze_many_documents(items)
-    docs = safe_list(result.get("documents"))
-    lines: List[str] = []
-
-    if not docs:
-        return ""
-
-    lines.append("Document context:")
-    for doc in docs[:8]:
-        d = safe_dict(doc)
-        name = clean_text(d.get("name") or "document")
-        summary = clean_text(d.get("summary") or d.get("preview"))
-        lines.append(f"- {name}")
-        if summary:
-            lines.append(f"  {truncate(summary, MAX_SUMMARY_CHARS)}")
-
-        chunks = [clean_text(x) for x in safe_list(d.get("chunks")) if clean_text(x)]
-        for idx, chunk in enumerate(chunks[:3], 1):
-            lines.append(f"  [Chunk {idx}] {truncate(chunk, 700)}")
-
-    return "\n".join(lines).strip()
+        base["status"] = "error"
+        base["summary"] = _truncate(f"Failed to analyze document: {exc}", MAX_SUMMARY_CHARS)
+        base["prompt_text"] = f"Attached document: {name}"
+        return base

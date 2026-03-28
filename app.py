@@ -3,17 +3,40 @@ from __future__ import annotations
 
 import json
 import os
+import traceback
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Tuple
 
-from flask import Flask, Response, jsonify, render_template, request, send_from_directory
-from werkzeug.utils import secure_filename
+from flask import Flask, Response, jsonify, render_template, request, send_file
+from werkzeug.exceptions import HTTPException
+
+try:
+    from flask_cors import CORS
+except Exception:
+    CORS = None  # type: ignore
+
+try:
+    from openai import OpenAI
+except Exception:
+    OpenAI = None  # type: ignore
+
+try:
+    from services.document_service import analyze_document_attachment, is_document_attachment
+except Exception:
+    analyze_document_attachment = None  # type: ignore
+    is_document_attachment = None  # type: ignore
+
+try:
+    from services.web_service import build_web_debug_payload, merge_web_prompt_into_message_context
+except Exception:
+    build_web_debug_payload = None  # type: ignore
+    merge_web_prompt_into_message_context = None  # type: ignore
 
 
 # =========================================================
-# app setup
+# paths + config
 # =========================================================
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -22,7 +45,30 @@ STATIC_DIR = BASE_DIR / "static"
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-SESSIONS_FILE = DATA_DIR / "nova_sessions.json"
+SESSIONS_PATH = DATA_DIR / "nova_sessions.json"
+MEMORY_PATH = DATA_DIR / "nova_memory.json"
+ARTIFACTS_PATH = DATA_DIR / "nova_artifacts.json"
+
+APP_NAME = "Nova"
+DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
+
+MAX_HISTORY_MESSAGES = 24
+MAX_MEMORY_ITEMS = 50
+MAX_MEMORY_PROMPT_ITEMS = 12
+MAX_CONTEXT_BLOCK_CHARS = 8000
+MAX_DEBUG_PREVIEW_CHARS = 2000
+MAX_SESSION_TITLE_CHARS = 120
+STREAM_EVENT_RETRY_MS = 1000
+
+SYSTEM_PROMPT = """You are Nova, a sharp, practical, high-agency assistant.
+Be direct, useful, and accurate. Prefer concrete action over vague advice.
+
+Use provided context when it is relevant.
+Do not claim to have used context that is empty or unavailable.
+If attached material is insufficient, say so plainly."""
+
+client = OpenAI(api_key=OPENAI_API_KEY) if OpenAI and OPENAI_API_KEY else None
 
 app = Flask(
     __name__,
@@ -30,640 +76,921 @@ app = Flask(
     static_folder=str(STATIC_DIR),
 )
 
-app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("NOVA_MAX_REQUEST_BYTES", str(50 * 1024 * 1024)))
-
-
-# =========================================================
-# optional service imports
-# =========================================================
-
-try:
-    from services.chat_service import (
-        coerce_stream_done_event,
-        generate_reply,
-        generate_reply_stream,
-        preview_chat_brain,
-        service_status as chat_service_status,
-    )
-except Exception as exc:  # pragma: no cover
-    generate_reply = None  # type: ignore
-    generate_reply_stream = None  # type: ignore
-    preview_chat_brain = None  # type: ignore
-    coerce_stream_done_event = None  # type: ignore
-    chat_service_status = None  # type: ignore
-    CHAT_IMPORT_ERROR = str(exc)
-else:
-    CHAT_IMPORT_ERROR = None
-
-try:
-    from services.memory_service import (
-        add_memory as memory_add,
-        delete_memory as memory_delete,
-        export_memory as memory_export,
-        list_memory as memory_list,
-    )
-except Exception as exc:  # pragma: no cover
-    memory_add = None  # type: ignore
-    memory_delete = None  # type: ignore
-    memory_export = None  # type: ignore
-    memory_list = None  # type: ignore
-    MEMORY_IMPORT_ERROR = str(exc)
-else:
-    MEMORY_IMPORT_ERROR = None
-
-try:
-    from services.artifact_service import (
-        create_artifact,
-        delete_artifact,
-        export_artifact,
-        get_artifact,
-        list_artifacts,
-        pin_artifact,
-        save_artifact,
-        toggle_artifact_pin,
-        update_artifact,
-    )
-except Exception as exc:  # pragma: no cover
-    create_artifact = None  # type: ignore
-    delete_artifact = None  # type: ignore
-    export_artifact = None  # type: ignore
-    get_artifact = None  # type: ignore
-    list_artifacts = None  # type: ignore
-    pin_artifact = None  # type: ignore
-    save_artifact = None  # type: ignore
-    toggle_artifact_pin = None  # type: ignore
-    update_artifact = None  # type: ignore
-    ARTIFACT_IMPORT_ERROR = str(exc)
-else:
-    ARTIFACT_IMPORT_ERROR = None
-
-try:
-    from services.attachment_service import (
-        attachment_stats,
-        cleanup_missing_files,
-        delete_attachment,
-        list_attachments,
-        register_attachment,
-        register_attachments,
-        save_uploaded_file,
-    )
-except Exception as exc:  # pragma: no cover
-    attachment_stats = None  # type: ignore
-    cleanup_missing_files = None  # type: ignore
-    delete_attachment = None  # type: ignore
-    list_attachments = None  # type: ignore
-    register_attachment = None  # type: ignore
-    register_attachments = None  # type: ignore
-    save_uploaded_file = None  # type: ignore
-    ATTACHMENT_IMPORT_ERROR = str(exc)
-else:
-    ATTACHMENT_IMPORT_ERROR = None
-
-try:
-    from services.web_service import (
-        fetch_single_url,
-        fetch_urls,
-        web_preview_from_text,
-        web_service_status,
-    )
-except Exception as exc:  # pragma: no cover
-    fetch_single_url = None  # type: ignore
-    fetch_urls = None  # type: ignore
-    web_preview_from_text = None  # type: ignore
-    web_service_status = None  # type: ignore
-    WEB_IMPORT_ERROR = str(exc)
-else:
-    WEB_IMPORT_ERROR = None
+if CORS:
+    CORS(app)
 
 
 # =========================================================
 # helpers
 # =========================================================
 
-def utc_now_iso() -> str:
+def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def new_id() -> str:
+    return str(uuid.uuid4())
 
 
 def clean_text(value: Any) -> str:
     if value is None:
         return ""
-    return str(value).replace("\x00", "").strip()
+    return str(value).replace("\r\n", "\n").replace("\r", "\n")
 
 
-def safe_dict(value: Any) -> Dict[str, Any]:
+def collapse_ws(value: Any) -> str:
+    return " ".join(clean_text(value).split()).strip()
+
+
+def truncate(value: Any, limit: int) -> str:
+    text = clean_text(value).strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit].rstrip() + "...(truncated)"
+
+
+def coerce_dict(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def safe_list(value: Any) -> List[Any]:
-    return value if isinstance(value, list) else []
+def coerce_list(value: Any) -> List[Any]:
+    if isinstance(value, list):
+        return value
+    if value is None:
+        return []
+    return [value]
 
 
-def read_json_request() -> Dict[str, Any]:
+def safe_int(value: Any, default: int = 0) -> int:
     try:
-        data = request.get_json(silent=True)
+        return int(value)
     except Exception:
-        data = None
-    return safe_dict(data)
+        return default
 
 
-def json_ok(data: Optional[Dict[str, Any]] = None, status: int = 200):
-    payload = {"ok": True}
-    if isinstance(data, dict):
-        payload.update(data)
+def safe_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return collapse_ws(value).lower() in {"1", "true", "yes", "on"}
+
+
+def ensure_parent(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def load_json_file(path: Path, default: Any) -> Any:
+    try:
+        if not path.exists():
+            return default
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return default
+
+
+def save_json_file(path: Path, data: Any) -> None:
+    ensure_parent(path)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(path)
+
+
+def json_ok(**payload: Any):
+    payload.setdefault("ok", True)
+    return jsonify(payload)
+
+
+def json_error(message: str, status: int = 400, **extra: Any):
+    payload = {"ok": False, "error": message}
+    payload.update(extra)
     return jsonify(payload), status
 
 
-def json_error(message: str, *, code: str = "bad_request", status: int = 400, extra: Optional[Dict[str, Any]] = None):
-    payload: Dict[str, Any] = {
-        "ok": False,
-        "error": {
-            "code": code,
-            "message": clean_text(message) or "Request failed.",
-        },
+def request_json() -> Dict[str, Any]:
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
+
+
+def make_message(role: str, content: str, **extra: Any) -> Dict[str, Any]:
+    msg = {
+        "id": new_id(),
+        "role": role,
+        "content": clean_text(content),
+        "created_at": now_iso(),
     }
-    if isinstance(extra, dict):
-        payload.update(extra)
-    return jsonify(payload), status
+    if extra:
+        msg.update(extra)
+    return msg
 
 
-def ensure_sessions_file() -> None:
-    if not SESSIONS_FILE.exists():
-        save_sessions([])
+def summarize_title_from_text(text: str) -> str:
+    text = collapse_ws(text)
+    if not text:
+        return "New Chat"
+    return truncate(text, MAX_SESSION_TITLE_CHARS)
 
+
+# =========================================================
+# session store
+# =========================================================
 
 def load_sessions() -> List[Dict[str, Any]]:
-    ensure_sessions_file()
-    try:
-        raw = json.loads(SESSIONS_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        raw = []
-
-    sessions: List[Dict[str, Any]] = []
-    for item in safe_list(raw):
-        if not isinstance(item, dict):
-            continue
-        sessions.append(normalize_session(item))
-    sessions.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
-    return sessions
+    data = load_json_file(SESSIONS_PATH, [])
+    if not isinstance(data, list):
+        return []
+    normalized: List[Dict[str, Any]] = []
+    for item in data:
+        item = coerce_dict(item)
+        normalized.append(
+            {
+                "id": clean_text(item.get("id")) or new_id(),
+                "title": clean_text(item.get("title")) or "New Chat",
+                "created_at": clean_text(item.get("created_at")) or now_iso(),
+                "updated_at": clean_text(item.get("updated_at")) or now_iso(),
+                "pinned": safe_bool(item.get("pinned")),
+                "messages": coerce_list(item.get("messages")),
+                "meta": coerce_dict(item.get("meta")),
+            }
+        )
+    return normalized
 
 
 def save_sessions(sessions: List[Dict[str, Any]]) -> None:
-    serializable = [normalize_session(x) for x in safe_list(sessions) if isinstance(x, dict)]
-    SESSIONS_FILE.write_text(json.dumps(serializable, ensure_ascii=False, indent=2), encoding="utf-8")
+    save_json_file(SESSIONS_PATH, sessions)
 
 
-def normalize_message(item: Dict[str, Any]) -> Dict[str, Any]:
-    item = safe_dict(item)
-    role = clean_text(item.get("role")).lower() or "user"
-    if role not in {"system", "user", "assistant", "developer", "tool"}:
-        role = "user"
-
-    return {
-        "id": clean_text(item.get("id")) or f"msg_{uuid.uuid4().hex}",
-        "role": role,
-        "content": clean_text(item.get("content")),
-        "created_at": clean_text(item.get("created_at")) or utc_now_iso(),
-        "metadata": safe_dict(item.get("metadata")),
-    }
-
-
-def normalize_session(item: Dict[str, Any]) -> Dict[str, Any]:
-    item = safe_dict(item)
-    messages = [normalize_message(x) for x in safe_list(item.get("messages")) if isinstance(x, dict)]
-    created_at = clean_text(item.get("created_at")) or utc_now_iso()
-    updated_at = clean_text(item.get("updated_at")) or created_at
-    title = clean_text(item.get("title")) or "New chat"
-
-    return {
-        "id": clean_text(item.get("id")) or str(uuid.uuid4()),
-        "title": title,
-        "created_at": created_at,
-        "updated_at": updated_at,
-        "pinned": bool(item.get("pinned", False)),
-        "messages": messages,
-        "message_count": len(messages),
-        "last_message_preview": clean_text(messages[-1].get("content"))[:180] if messages else "",
-        "metadata": safe_dict(item.get("metadata")),
-    }
-
-
-def find_session(session_id: str) -> Optional[Dict[str, Any]]:
-    session_id = clean_text(session_id)
-    if not session_id:
-        return None
+def get_session_by_id(session_id: str) -> Optional[Dict[str, Any]]:
+    session_id = clean_text(session_id).strip()
     for session in load_sessions():
-        if session.get("id") == session_id:
+        if clean_text(session.get("id")) == session_id:
             return session
     return None
 
 
 def upsert_session(session: Dict[str, Any]) -> Dict[str, Any]:
-    target = normalize_session(session)
+    session = coerce_dict(session)
     sessions = load_sessions()
-    replaced = False
+    session_id = clean_text(session.get("id")) or new_id()
+    found = False
 
-    for idx, item in enumerate(sessions):
-        if item.get("id") == target.get("id"):
-            sessions[idx] = target
-            replaced = True
+    normalized = {
+        "id": session_id,
+        "title": clean_text(session.get("title")) or "New Chat",
+        "created_at": clean_text(session.get("created_at")) or now_iso(),
+        "updated_at": clean_text(session.get("updated_at")) or now_iso(),
+        "pinned": safe_bool(session.get("pinned")),
+        "messages": coerce_list(session.get("messages")),
+        "meta": coerce_dict(session.get("meta")),
+    }
+
+    for idx, existing in enumerate(sessions):
+        if clean_text(existing.get("id")) == session_id:
+            sessions[idx] = normalized
+            found = True
             break
 
-    if not replaced:
-        sessions.insert(0, target)
+    if not found:
+        sessions.append(normalized)
 
-    sessions.sort(key=lambda x: (not x.get("pinned", False), x.get("updated_at", "")), reverse=False)
-    pinned = [s for s in sessions if s.get("pinned")]
-    unpinned = [s for s in sessions if not s.get("pinned")]
-    pinned.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
-    unpinned.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
-    save_sessions(pinned + unpinned)
-    return target
+    save_sessions(sessions)
+    return normalized
 
 
-def create_session(title: str = "New chat") -> Dict[str, Any]:
-    now = utc_now_iso()
-    session = {
-        "id": str(uuid.uuid4()),
-        "title": clean_text(title) or "New chat",
-        "created_at": now,
-        "updated_at": now,
-        "pinned": False,
-        "messages": [],
-        "metadata": {},
-    }
-    return upsert_session(session)
-
-
-def delete_session_by_id(session_id: str) -> bool:
-    session_id = clean_text(session_id)
+def delete_session(session_id: str) -> bool:
+    session_id = clean_text(session_id).strip()
     sessions = load_sessions()
-    kept = [x for x in sessions if x.get("id") != session_id]
+    kept = [s for s in sessions if clean_text(s.get("id")) != session_id]
     if len(kept) == len(sessions):
         return False
     save_sessions(kept)
     return True
 
 
-def rename_session_by_id(session_id: str, title: str) -> Optional[Dict[str, Any]]:
-    sessions = load_sessions()
-    target = None
-    for idx, session in enumerate(sessions):
-        if session.get("id") == clean_text(session_id):
-            session["title"] = clean_text(title) or session.get("title") or "New chat"
-            session["updated_at"] = utc_now_iso()
-            sessions[idx] = normalize_session(session)
-            target = sessions[idx]
-            break
-    if target is None:
-        return None
-    save_sessions(sessions)
-    return target
+def ensure_session(session_id: Optional[str], first_user_text: str = "") -> Dict[str, Any]:
+    if session_id:
+        existing = get_session_by_id(session_id)
+        if existing:
+            return existing
+
+    title = summarize_title_from_text(first_user_text) or "New Chat"
+    created = {
+        "id": new_id(),
+        "title": title,
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+        "pinned": False,
+        "messages": [],
+        "meta": {},
+    }
+    return upsert_session(created)
 
 
-def append_message_to_session(session_id: str, message: Dict[str, Any], *, title_from_first_user_message: bool = True) -> Dict[str, Any]:
-    sessions = load_sessions()
-    target = None
-
-    for idx, session in enumerate(sessions):
-        if session.get("id") == clean_text(session_id):
-            target = normalize_session(session)
-            normalized_message = normalize_message(message)
-            target["messages"].append(normalized_message)
-            target["updated_at"] = utc_now_iso()
-
-            if title_from_first_user_message and target.get("title") == "New chat" and normalized_message.get("role") == "user":
-                first_line = clean_text(normalized_message.get("content")).split("\n", 1)[0]
-                target["title"] = first_line[:60] or "New chat"
-
-            sessions[idx] = normalize_session(target)
-            break
-
-    if target is None:
-        target = create_session("New chat")
-        return append_message_to_session(target["id"], message, title_from_first_user_message=title_from_first_user_message)
-
-    save_sessions(sessions)
-    return normalize_session(target)
-
-
-def sse_event(event_type: str, data: Dict[str, Any]) -> str:
-    return f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
-
-
-def build_route_status() -> Dict[str, Any]:
+def session_summary(session: Dict[str, Any]) -> Dict[str, Any]:
+    messages = coerce_list(session.get("messages"))
+    last_message = coerce_dict(messages[-1]) if messages else {}
     return {
-        "chat_import_error": CHAT_IMPORT_ERROR,
-        "memory_import_error": MEMORY_IMPORT_ERROR,
-        "artifact_import_error": ARTIFACT_IMPORT_ERROR,
-        "attachment_import_error": ATTACHMENT_IMPORT_ERROR,
-        "web_import_error": WEB_IMPORT_ERROR,
+        "id": clean_text(session.get("id")),
+        "title": clean_text(session.get("title")) or "New Chat",
+        "created_at": clean_text(session.get("created_at")),
+        "updated_at": clean_text(session.get("updated_at")),
+        "pinned": safe_bool(session.get("pinned")),
+        "message_count": len(messages),
+        "last_message_preview": truncate(last_message.get("content", ""), 180),
     }
 
 
 # =========================================================
-# page routes
+# memory store
+# =========================================================
+
+def load_memory() -> List[Dict[str, Any]]:
+    data = load_json_file(MEMORY_PATH, [])
+    if not isinstance(data, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    for item in data:
+        item = coerce_dict(item)
+        out.append(
+            {
+                "id": clean_text(item.get("id")) or new_id(),
+                "kind": clean_text(item.get("kind")) or "note",
+                "value": clean_text(item.get("value")),
+                "created_at": clean_text(item.get("created_at")) or now_iso(),
+                "updated_at": clean_text(item.get("updated_at")) or now_iso(),
+                "pinned": safe_bool(item.get("pinned")),
+            }
+        )
+    return out[:MAX_MEMORY_ITEMS]
+
+
+def save_memory(items: List[Dict[str, Any]]) -> None:
+    save_json_file(MEMORY_PATH, items[:MAX_MEMORY_ITEMS])
+
+
+def add_memory_item(kind: str, value: str, pinned: bool = False) -> Dict[str, Any]:
+    items = load_memory()
+    normalized_value = clean_text(value).strip()
+    normalized_kind = clean_text(kind).strip() or "note"
+
+    for item in items:
+        if (
+            clean_text(item.get("kind")).lower() == normalized_kind.lower()
+            and clean_text(item.get("value")).strip().lower() == normalized_value.lower()
+        ):
+            item["updated_at"] = now_iso()
+            item["pinned"] = safe_bool(item.get("pinned")) or pinned
+            save_memory(items)
+            return item
+
+    created = {
+        "id": new_id(),
+        "kind": normalized_kind,
+        "value": normalized_value,
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+        "pinned": pinned,
+    }
+    items.insert(0, created)
+    save_memory(items)
+    return created
+
+
+def delete_memory_item(memory_id: str) -> bool:
+    memory_id = clean_text(memory_id).strip()
+    items = load_memory()
+    kept = [m for m in items if clean_text(m.get("id")) != memory_id]
+    if len(kept) == len(items):
+        return False
+    save_memory(kept)
+    return True
+
+
+def score_memory_item(item: Dict[str, Any], text: str) -> int:
+    hay = collapse_ws(item.get("value")).lower()
+    needle = collapse_ws(text).lower()
+    if not hay or not needle:
+        return 0
+
+    score = 0
+    for token in set(needle.split()):
+        if len(token) < 3:
+            continue
+        if token in hay:
+            score += 3
+
+    if safe_bool(item.get("pinned")):
+        score += 2
+
+    kind = collapse_ws(item.get("kind")).lower()
+    if kind in {"preference", "project", "goal", "workflow"}:
+        score += 1
+
+    return score
+
+
+def select_relevant_memory(text: str) -> List[Dict[str, Any]]:
+    items = load_memory()
+    ranked = sorted(items, key=lambda x: score_memory_item(x, text), reverse=True)
+    strong = [item for item in ranked if score_memory_item(item, text) > 0]
+    selected = strong[:MAX_MEMORY_PROMPT_ITEMS]
+    if not selected:
+        selected = [item for item in ranked if safe_bool(item.get("pinned"))][:MAX_MEMORY_PROMPT_ITEMS]
+    return selected
+
+
+# =========================================================
+# artifact store
+# =========================================================
+
+def load_artifacts() -> List[Dict[str, Any]]:
+    data = load_json_file(ARTIFACTS_PATH, [])
+    if not isinstance(data, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    for item in data:
+        item = coerce_dict(item)
+        out.append(
+            {
+                "id": clean_text(item.get("id")) or new_id(),
+                "title": clean_text(item.get("title")) or "Untitled Artifact",
+                "content": clean_text(item.get("content")),
+                "kind": clean_text(item.get("kind")) or "text",
+                "session_id": clean_text(item.get("session_id")),
+                "created_at": clean_text(item.get("created_at")) or now_iso(),
+                "updated_at": clean_text(item.get("updated_at")) or now_iso(),
+                "pinned": safe_bool(item.get("pinned")),
+                "meta": coerce_dict(item.get("meta")),
+            }
+        )
+    return out
+
+
+def save_artifacts(items: List[Dict[str, Any]]) -> None:
+    save_json_file(ARTIFACTS_PATH, items)
+
+
+def get_artifact(artifact_id: str) -> Optional[Dict[str, Any]]:
+    artifact_id = clean_text(artifact_id).strip()
+    for item in load_artifacts():
+        if clean_text(item.get("id")) == artifact_id:
+            return item
+    return None
+
+
+def upsert_artifact(item: Dict[str, Any]) -> Dict[str, Any]:
+    item = coerce_dict(item)
+    artifact_id = clean_text(item.get("id")) or new_id()
+    artifacts = load_artifacts()
+    normalized = {
+        "id": artifact_id,
+        "title": clean_text(item.get("title")) or "Untitled Artifact",
+        "content": clean_text(item.get("content")),
+        "kind": clean_text(item.get("kind")) or "text",
+        "session_id": clean_text(item.get("session_id")),
+        "created_at": clean_text(item.get("created_at")) or now_iso(),
+        "updated_at": now_iso(),
+        "pinned": safe_bool(item.get("pinned")),
+        "meta": coerce_dict(item.get("meta")),
+    }
+
+    found = False
+    for idx, existing in enumerate(artifacts):
+        if clean_text(existing.get("id")) == artifact_id:
+            normalized["created_at"] = clean_text(existing.get("created_at")) or normalized["created_at"]
+            artifacts[idx] = normalized
+            found = True
+            break
+
+    if not found:
+        artifacts.insert(0, normalized)
+
+    save_artifacts(artifacts)
+    return normalized
+
+
+def delete_artifact(artifact_id: str) -> bool:
+    artifact_id = clean_text(artifact_id).strip()
+    items = load_artifacts()
+    kept = [a for a in items if clean_text(a.get("id")) != artifact_id]
+    if len(kept) == len(items):
+        return False
+    save_artifacts(kept)
+    return True
+
+
+# =========================================================
+# context building
+# =========================================================
+
+def normalize_attachments(raw: Any) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for item in coerce_list(raw):
+        item = coerce_dict(item)
+        out.append(
+            {
+                "id": clean_text(item.get("id")) or new_id(),
+                "name": clean_text(item.get("name")),
+                "mime_type": clean_text(item.get("mime_type") or item.get("type")),
+                "type": clean_text(item.get("type")),
+                "stored_path": clean_text(item.get("stored_path") or item.get("path")),
+                "path": clean_text(item.get("path") or item.get("stored_path")),
+                "size": safe_int(item.get("size")),
+                "meta": coerce_dict(item.get("meta")),
+            }
+        )
+    return out
+
+
+def analyze_document_attachments(attachments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    results: List[Dict[str, Any]] = []
+    for attachment in attachments:
+        try:
+            if is_document_attachment and is_document_attachment(attachment):
+                if analyze_document_attachment:
+                    analyzed = analyze_document_attachment(attachment)
+                    if isinstance(analyzed, dict):
+                        results.append(analyzed)
+        except Exception:
+            continue
+    return results
+
+
+def build_context_blocks(
+    user_text: str,
+    attachments: List[Dict[str, Any]],
+) -> Tuple[List[str], Dict[str, Any]]:
+    blocks: List[str] = []
+    debug: Dict[str, Any] = {
+        "memory": [],
+        "documents": [],
+        "attachments": attachments,
+        "web": {},
+    }
+
+    memory_items = select_relevant_memory(user_text)
+    if memory_items:
+        memory_lines = []
+        for item in memory_items:
+            line = f"- [{clean_text(item.get('kind'))}] {clean_text(item.get('value'))}"
+            memory_lines.append(line)
+        block = "Saved user memory:\n" + "\n".join(memory_lines)
+        blocks.append(truncate(block, MAX_CONTEXT_BLOCK_CHARS))
+        debug["memory"] = memory_items
+
+    document_results = analyze_document_attachments(attachments)
+    if document_results:
+        for doc in document_results:
+            prompt_text = clean_text(doc.get("prompt_text"))
+            if prompt_text:
+                blocks.append(truncate(prompt_text, MAX_CONTEXT_BLOCK_CHARS))
+        debug["documents"] = document_results
+
+    if merge_web_prompt_into_message_context:
+        try:
+            merged = merge_web_prompt_into_message_context(user_text, blocks)
+            if isinstance(merged, dict):
+                blocks = coerce_list(merged.get("context_blocks")) or blocks
+                debug["web"] = coerce_dict(merged.get("web"))
+        except Exception:
+            debug["web"] = {}
+
+    return blocks, debug
+
+
+def build_model_messages(
+    user_text: str,
+    session: Dict[str, Any],
+    context_blocks: List[str],
+) -> List[Dict[str, str]]:
+    messages: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    if context_blocks:
+        context_text = "\n\n---\n\n".join([clean_text(x) for x in context_blocks if clean_text(x).strip()])
+        if context_text.strip():
+            messages.append(
+                {
+                    "role": "system",
+                    "content": truncate(context_text, MAX_CONTEXT_BLOCK_CHARS),
+                }
+            )
+
+    history = coerce_list(session.get("messages"))[-MAX_HISTORY_MESSAGES:]
+    for item in history:
+        role = clean_text(coerce_dict(item).get("role")).strip().lower()
+        content = clean_text(coerce_dict(item).get("content"))
+        if role in {"user", "assistant", "system"} and content.strip():
+            messages.append({"role": role, "content": content})
+
+    messages.append({"role": "user", "content": clean_text(user_text)})
+    return messages
+
+
+def messages_preview(messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    out: List[Dict[str, str]] = []
+    for item in messages:
+        out.append(
+            {
+                "role": clean_text(item.get("role")),
+                "content": truncate(item.get("content", ""), MAX_DEBUG_PREVIEW_CHARS),
+            }
+        )
+    return out
+
+
+# =========================================================
+# model
+# =========================================================
+
+def model_available() -> bool:
+    return client is not None
+
+
+def create_assistant_text(messages: List[Dict[str, str]], model: str) -> str:
+    if not client:
+        raise RuntimeError("OpenAI client is not configured. Set OPENAI_API_KEY.")
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+    )
+    choice = response.choices[0]
+    content = choice.message.content if choice and choice.message else ""
+    return clean_text(content).strip()
+
+
+def stream_assistant_text(messages: List[Dict[str, str]], model: str) -> Generator[str, None, None]:
+    if not client:
+        raise RuntimeError("OpenAI client is not configured. Set OPENAI_API_KEY.")
+
+    stream = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        stream=True,
+    )
+
+    for chunk in stream:
+        try:
+            delta = chunk.choices[0].delta.content or ""
+        except Exception:
+            delta = ""
+        if delta:
+            yield delta
+
+
+# =========================================================
+# core chat workflow
+# =========================================================
+
+def run_chat(payload: Dict[str, Any]) -> Dict[str, Any]:
+    payload = coerce_dict(payload)
+
+    user_text = clean_text(payload.get("content") or payload.get("message") or "").strip()
+    if not user_text:
+        raise ValueError("Missing content.")
+
+    model = clean_text(payload.get("model")) or DEFAULT_MODEL
+    session_id = clean_text(payload.get("session_id")).strip() or None
+    attachments = normalize_attachments(payload.get("attachments"))
+
+    session = ensure_session(session_id, first_user_text=user_text)
+
+    context_blocks, debug = build_context_blocks(user_text, attachments)
+    built_messages = build_model_messages(user_text, session, context_blocks)
+
+    user_message = make_message("user", user_text, attachments=attachments)
+    session_messages = coerce_list(session.get("messages"))
+    session_messages.append(user_message)
+    session["messages"] = session_messages
+    session["updated_at"] = now_iso()
+
+    assistant_text = create_assistant_text(built_messages, model=model)
+    assistant_message = make_message("assistant", assistant_text, model=model)
+
+    session_messages.append(assistant_message)
+    session["messages"] = session_messages
+    if len(session_messages) == 2 and clean_text(session.get("title")) == "New Chat":
+        session["title"] = summarize_title_from_text(user_text)
+    session["updated_at"] = now_iso()
+    saved = upsert_session(session)
+
+    return {
+        "ok": True,
+        "session": saved,
+        "message": assistant_message,
+        "debug": {
+            "model": model,
+            "history_count": len(coerce_list(session.get("messages"))) - 2,
+            "message_count": len(built_messages),
+            "messages_preview": messages_preview(built_messages),
+            "memory": debug.get("memory", []),
+            "documents": debug.get("documents", []),
+            "attachments": attachments,
+            "web": debug.get("web", {}),
+            "system_prompt_preview": truncate(SYSTEM_PROMPT, MAX_DEBUG_PREVIEW_CHARS),
+            "memory_update": "",
+        },
+    }
+
+
+# =========================================================
+# routes
 # =========================================================
 
 @app.get("/")
-def home():
+def index():
     return render_template("index.html")
 
 
-@app.get("/favicon.ico")
-def favicon():
-    favicon_path = STATIC_DIR / "favicon.ico"
-    if favicon_path.exists():
-        return send_from_directory(str(STATIC_DIR), "favicon.ico")
-    return ("", 204)
-
-
-# =========================================================
-# health + state
-# =========================================================
-
 @app.get("/api/health")
 def api_health():
-    chat_status = chat_service_status() if callable(chat_service_status) else {
-        "ok": False,
-        "service": "chat_service",
-        "error": {"code": "import_failed", "message": CHAT_IMPORT_ERROR or "chat_service unavailable"},
-    }
-
-    return jsonify(
-        {
-            "ok": True,
-            "app": "nova",
-            "service": "backend",
-            "model_connected": bool(safe_dict(chat_status).get("client_available")),
-            "model": safe_dict(chat_status).get("model"),
-            "chat": chat_status,
-            "routes": build_route_status(),
-            "sessions_count": len(load_sessions()),
-            "updated_at": utc_now_iso(),
-        }
-    )
-
-
-@app.get("/api/state")
-def api_state():
     sessions = load_sessions()
-    return jsonify(
-        {
-            "ok": True,
-            "sessions": sessions,
-            "session_count": len(sessions),
-            "default_model": os.getenv("OPENAI_MODEL", "gpt-5.4"),
-            "updated_at": utc_now_iso(),
-        }
+    return json_ok(
+        app=APP_NAME,
+        status="ok",
+        model=DEFAULT_MODEL,
+        model_connected=model_available(),
+        key_present=bool(OPENAI_API_KEY),
+        key_prefix=(OPENAI_API_KEY[:7] + "***") if OPENAI_API_KEY else "",
+        sessions_count=len(sessions),
     )
 
 
 @app.get("/api/models")
 def api_models():
-    env_model = clean_text(os.getenv("OPENAI_MODEL")) or "gpt-5.4"
     models = []
-    for model in [env_model, "gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini"]:
-        if model and model not in models:
-            models.append(model)
+    for name in [DEFAULT_MODEL, "gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini"]:
+        if name not in models:
+            models.append(name)
+    return json_ok(default=DEFAULT_MODEL, models=models)
 
-    return jsonify(
-        {
-            "ok": True,
-            "default": env_model,
-            "models": models,
-        }
+
+@app.get("/api/state")
+def api_state():
+    sessions = load_sessions()
+    ordered = sorted(
+        sessions,
+        key=lambda s: (
+            0 if safe_bool(s.get("pinned")) else 1,
+            clean_text(s.get("updated_at")),
+        ),
+        reverse=False,
+    )
+    ordered = sorted(
+        ordered,
+        key=lambda s: safe_bool(s.get("pinned")),
+        reverse=True,
+    )
+    ordered = sorted(
+        ordered,
+        key=lambda s: clean_text(s.get("updated_at")),
+        reverse=True,
+    )
+    summaries = [session_summary(s) for s in ordered]
+    return json_ok(
+        app=APP_NAME,
+        model=DEFAULT_MODEL,
+        sessions=summaries,
+        active_session_id=summaries[0]["id"] if summaries else None,
     )
 
 
-# =========================================================
-# session routes
-# =========================================================
-
 @app.post("/api/session/new")
 def api_session_new():
-    payload = read_json_request()
-    session = create_session(clean_text(payload.get("title")) or "New chat")
-    return jsonify({"ok": True, "session": session})
+    payload = request_json()
+    title = clean_text(payload.get("title")).strip() or "New Chat"
+    session = {
+        "id": new_id(),
+        "title": truncate(title, MAX_SESSION_TITLE_CHARS),
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+        "pinned": False,
+        "messages": [],
+        "meta": {},
+    }
+    saved = upsert_session(session)
+    return json_ok(session=saved)
 
 
 @app.post("/api/session/delete")
 def api_session_delete():
-    payload = read_json_request()
-    session_id = clean_text(payload.get("session_id") or payload.get("id"))
+    payload = request_json()
+    session_id = clean_text(payload.get("session_id")).strip()
     if not session_id:
-        return json_error("session_id is required.", code="invalid_request", status=400)
-
-    deleted = delete_session_by_id(session_id)
-    if not deleted:
-        return json_error("Session not found.", code="not_found", status=404)
-
-    return jsonify({"ok": True, "deleted_id": session_id})
+        return json_error("Missing session_id.")
+    ok = delete_session(session_id)
+    if not ok:
+        return json_error("Session not found.", status=404)
+    return json_ok(deleted=True, session_id=session_id)
 
 
 @app.post("/api/session/rename")
 def api_session_rename():
-    payload = read_json_request()
-    session_id = clean_text(payload.get("session_id") or payload.get("id"))
-    title = clean_text(payload.get("title"))
-
+    payload = request_json()
+    session_id = clean_text(payload.get("session_id")).strip()
+    title = clean_text(payload.get("title")).strip()
     if not session_id:
-        return json_error("session_id is required.", code="invalid_request", status=400)
-    if not title:
-        return json_error("title is required.", code="invalid_request", status=400)
-
-    session = rename_session_by_id(session_id, title)
+        return json_error("Missing session_id.")
+    session = get_session_by_id(session_id)
     if not session:
-        return json_error("Session not found.", code="not_found", status=404)
+        return json_error("Session not found.", status=404)
+    session["title"] = truncate(title or "New Chat", MAX_SESSION_TITLE_CHARS)
+    session["updated_at"] = now_iso()
+    saved = upsert_session(session)
+    return json_ok(session=saved)
 
-    return jsonify({"ok": True, "session": session})
+
+@app.post("/api/session/duplicate")
+def api_session_duplicate():
+    payload = request_json()
+    session_id = clean_text(payload.get("session_id")).strip()
+    source = get_session_by_id(session_id)
+    if not source:
+        return json_error("Session not found.", status=404)
+
+    duplicated = {
+        "id": new_id(),
+        "title": truncate(f"{clean_text(source.get('title'))} Copy", MAX_SESSION_TITLE_CHARS),
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+        "pinned": False,
+        "messages": coerce_list(source.get("messages")),
+        "meta": coerce_dict(source.get("meta")),
+    }
+    saved = upsert_session(duplicated)
+    return json_ok(session=saved)
+
+
+@app.post("/api/session/pin")
+def api_session_pin():
+    payload = request_json()
+    session_id = clean_text(payload.get("session_id")).strip()
+    pinned = safe_bool(payload.get("pinned"))
+    session = get_session_by_id(session_id)
+    if not session:
+        return json_error("Session not found.", status=404)
+    session["pinned"] = pinned
+    session["updated_at"] = now_iso()
+    saved = upsert_session(session)
+    return json_ok(session=saved)
 
 
 @app.get("/api/chat/<session_id>")
 def api_chat_get(session_id: str):
-    session = find_session(session_id)
+    session = get_session_by_id(session_id)
     if not session:
-        return json_error("Session not found.", code="not_found", status=404)
-    return jsonify({"ok": True, "session": session})
+        return json_error("Session not found.", status=404)
+    return json_ok(session=session)
 
-
-# =========================================================
-# chat routes
-# =========================================================
 
 @app.post("/api/chat")
 def api_chat():
-    if not callable(generate_reply):
+    try:
+        result = run_chat(request_json())
+        return jsonify(result)
+    except ValueError as exc:
+        return json_error(str(exc), status=400)
+    except Exception as exc:
         return json_error(
-            CHAT_IMPORT_ERROR or "chat_service unavailable",
-            code="service_unavailable",
+            f"Chat failed: {exc}",
             status=500,
+            trace=traceback.format_exc(limit=2),
         )
-
-    payload = read_json_request()
-    content = clean_text(payload.get("content"))
-    session_id = clean_text(payload.get("session_id"))
-
-    if not content:
-        return json_error("content is required.", code="invalid_request", status=400)
-
-    if not session_id:
-        session = create_session("New chat")
-        session_id = session["id"]
-
-    user_message = {
-        "id": f"user_{uuid.uuid4().hex}",
-        "role": "user",
-        "content": content,
-        "created_at": utc_now_iso(),
-        "metadata": {},
-    }
-    append_message_to_session(session_id, user_message)
-
-    service_payload = {
-        **payload,
-        "content": content,
-        "session_id": session_id,
-        "messages": find_session(session_id).get("messages", [])[:-1] if find_session(session_id) else [],
-        "stream": False,
-    }
-
-    result = safe_dict(generate_reply(service_payload))
-    assistant_message = safe_dict(result.get("assistant_message") or result.get("message"))
-
-    if clean_text(assistant_message.get("content")):
-        assistant_message["session_id"] = session_id
-        append_message_to_session(session_id, assistant_message)
-
-    session = find_session(session_id)
-
-    return jsonify(
-        {
-            "ok": bool(result.get("ok", True)),
-            "message": assistant_message,
-            "assistant_message": assistant_message,
-            "session": session,
-            "session_id": session_id,
-            "model": result.get("model"),
-            "debug": result.get("debug"),
-            "error": result.get("error"),
-        }
-    )
 
 
 @app.post("/api/chat/stream")
 def api_chat_stream():
-    if not callable(generate_reply_stream):
-        return json_error(
-            CHAT_IMPORT_ERROR or "chat_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
+    payload = request_json()
+    user_text = clean_text(payload.get("content") or payload.get("message") or "").strip()
+    if not user_text:
+        return json_error("Missing content.")
 
-    payload = read_json_request()
-    content = clean_text(payload.get("content"))
-    session_id = clean_text(payload.get("session_id"))
+    model = clean_text(payload.get("model")) or DEFAULT_MODEL
+    session_id = clean_text(payload.get("session_id")).strip() or None
+    attachments = normalize_attachments(payload.get("attachments"))
 
-    if not content:
-        return json_error("content is required.", code="invalid_request", status=400)
+    session = ensure_session(session_id, first_user_text=user_text)
+    context_blocks, debug = build_context_blocks(user_text, attachments)
+    built_messages = build_model_messages(user_text, session, context_blocks)
 
-    if not session_id:
-        session = create_session("New chat")
-        session_id = session["id"]
+    user_message = make_message("user", user_text, attachments=attachments)
+    session_messages = coerce_list(session.get("messages"))
+    session_messages.append(user_message)
+    session["messages"] = session_messages
+    session["updated_at"] = now_iso()
+    if len(session_messages) == 1 and clean_text(session.get("title")) == "New Chat":
+        session["title"] = summarize_title_from_text(user_text)
+    session = upsert_session(session)
 
-    user_message = {
-        "id": f"user_{uuid.uuid4().hex}",
-        "role": "user",
-        "content": content,
-        "created_at": utc_now_iso(),
-        "metadata": {},
-    }
-    append_message_to_session(session_id, user_message)
+    def event(name: str, data: Dict[str, Any]) -> str:
+        return f"event: {name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
-    existing_session = find_session(session_id)
-    history = safe_list(existing_session.get("messages"))[:-1] if existing_session else []
-
-    service_payload = {
-        **payload,
-        "content": content,
-        "session_id": session_id,
-        "messages": history,
-        "stream": True,
-    }
-
-    try:
-        stream_iter, debug = generate_reply_stream(service_payload)
-    except Exception as exc:
-        return json_error(str(exc), code="stream_init_failed", status=500)
-
-    def event_stream():
-        yield sse_event(
-            "start",
-            {
-                "ok": True,
-                "session_id": session_id,
-                "debug": debug,
-                "created_at": utc_now_iso(),
-            },
-        )
-
-        final_done: Optional[Dict[str, Any]] = None
-
+    def generate() -> Generator[str, None, None]:
+        collected: List[str] = []
         try:
-            for raw_event in stream_iter:
-                event = safe_dict(raw_event)
-                event_type = clean_text(event.get("type")) or "message"
-
-                if event_type == "done" and callable(coerce_stream_done_event):
-                    event = safe_dict(coerce_stream_done_event(event))
-
-                if event_type == "done":
-                    final_done = event
-
-                yield sse_event(event_type, event)
-
-        except Exception as exc:
-            yield sse_event(
-                "error",
+            yield f"retry: {STREAM_EVENT_RETRY_MS}\n\n"
+            yield event(
+                "start",
                 {
-                    "ok": False,
-                    "error": {
-                        "code": "stream_failed",
-                        "message": str(exc),
+                    "ok": True,
+                    "session_id": clean_text(session.get("id")),
+                    "model": model,
+                    "debug": {
+                        "message_count": len(built_messages),
+                        "messages_preview": messages_preview(built_messages),
+                        "memory": debug.get("memory", []),
+                        "documents": debug.get("documents", []),
+                        "attachments": attachments,
+                        "web": debug.get("web", {}),
+                        "system_prompt_preview": truncate(SYSTEM_PROMPT, MAX_DEBUG_PREVIEW_CHARS),
                     },
                 },
             )
-            return
 
-        if final_done:
-            assistant_message = safe_dict(final_done.get("assistant_message") or final_done.get("message"))
-            if clean_text(assistant_message.get("content")):
-                assistant_message["session_id"] = session_id
-                append_message_to_session(session_id, assistant_message)
+            for token in stream_assistant_text(built_messages, model=model):
+                collected.append(token)
+                yield event("delta", {"delta": token})
 
-    return Response(
-        event_stream(),
-        mimetype="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-            "X-Accel-Buffering": "no",
-        },
-    )
+            final_text = "".join(collected).strip()
+            assistant_message = make_message("assistant", final_text, model=model)
+
+            latest = get_session_by_id(clean_text(session.get("id"))) or session
+            latest_messages = coerce_list(latest.get("messages"))
+            latest_messages.append(assistant_message)
+            latest["messages"] = latest_messages
+            latest["updated_at"] = now_iso()
+            saved = upsert_session(latest)
+
+            yield event(
+                "done",
+                {
+                    "ok": True,
+                    "session": session_summary(saved),
+                    "message": assistant_message,
+                },
+            )
+        except Exception as exc:
+            yield event(
+                "error",
+                {
+                    "ok": False,
+                    "error": f"Stream failed: {exc}",
+                },
+            )
+
+    return Response(generate(), mimetype="text/event-stream")
 
 
 @app.post("/api/debug/brain")
 def api_debug_brain():
-    if not callable(preview_chat_brain):
-        return json_error(
-            CHAT_IMPORT_ERROR or "chat_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
+    payload = request_json()
+    user_text = clean_text(payload.get("content") or payload.get("message") or "").strip()
+    if not user_text:
+        return json_error("Missing content.")
 
-    payload = read_json_request()
-    result = safe_dict(preview_chat_brain(payload))
-    return jsonify(result)
+    session_id = clean_text(payload.get("session_id")).strip() or None
+    attachments = normalize_attachments(payload.get("attachments"))
+    session = ensure_session(session_id, first_user_text=user_text)
+    context_blocks, debug = build_context_blocks(user_text, attachments)
+    built_messages = build_model_messages(user_text, session, context_blocks)
+
+    return json_ok(
+        debug={
+            "model": clean_text(payload.get("model")) or DEFAULT_MODEL,
+            "history_count": len(coerce_list(session.get("messages"))),
+            "message_count": len(built_messages),
+            "messages_preview": messages_preview(built_messages),
+            "memory": debug.get("memory", []),
+            "documents": debug.get("documents", []),
+            "attachments": attachments,
+            "web": debug.get("web", {}),
+            "memory_update": "",
+            "system_prompt_preview": truncate(SYSTEM_PROMPT, MAX_DEBUG_PREVIEW_CHARS),
+        }
+    )
+
+
+@app.post("/api/debug/web_preview")
+def api_debug_web_preview():
+    payload = request_json()
+    text = clean_text(payload.get("text") or payload.get("content")).strip()
+    if not text:
+        return json_error("Missing text.")
+
+    if build_web_debug_payload:
+        try:
+            return json_ok(debug=build_web_debug_payload(text))
+        except Exception as exc:
+            return json_error(f"Web preview failed: {exc}", status=500)
+
+    return json_ok(
+        debug={
+            "enabled": False,
+            "input": truncate(text, 500),
+            "summary": "web_service is unavailable.",
+            "previews": [],
+            "urls": [],
+            "meta": {},
+        }
+    )
 
 
 # =========================================================
@@ -672,56 +999,32 @@ def api_debug_brain():
 
 @app.get("/api/memory")
 def api_memory_list():
-    if not callable(memory_list):
-        return json_error(
-            MEMORY_IMPORT_ERROR or "memory_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    payload = {
-        "session_id": request.args.get("session_id"),
-        "kind": request.args.get("kind"),
-        "query": request.args.get("query"),
-        "limit": request.args.get("limit"),
-    }
-    result = safe_dict(memory_list(payload))
-    return jsonify(result)
+    items = load_memory()
+    return json_ok(items=items)
 
 
 @app.post("/api/memory/add")
 def api_memory_add():
-    if not callable(memory_add):
-        return json_error(
-            MEMORY_IMPORT_ERROR or "memory_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(memory_add(read_json_request()))
-    return jsonify(result)
+    payload = request_json()
+    kind = clean_text(payload.get("kind")).strip() or "note"
+    value = clean_text(payload.get("value")).strip()
+    pinned = safe_bool(payload.get("pinned"))
+    if not value:
+        return json_error("Missing value.")
+    item = add_memory_item(kind=kind, value=value, pinned=pinned)
+    return json_ok(item=item)
 
 
 @app.post("/api/memory/delete")
 def api_memory_delete():
-    if not callable(memory_delete):
-        return json_error(
-            MEMORY_IMPORT_ERROR or "memory_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(memory_delete(read_json_request()))
-    return jsonify(result)
-
-
-@app.get("/api/memory/export")
-def api_memory_export():
-    if not callable(memory_export):
-        return json_error(
-            MEMORY_IMPORT_ERROR or "memory_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(memory_export({}))
-    return jsonify(result)
+    payload = request_json()
+    memory_id = clean_text(payload.get("id") or payload.get("memory_id")).strip()
+    if not memory_id:
+        return json_error("Missing id.")
+    ok = delete_memory_item(memory_id)
+    if not ok:
+        return json_error("Memory item not found.", status=404)
+    return json_ok(deleted=True, id=memory_id)
 
 
 # =========================================================
@@ -730,335 +1033,153 @@ def api_memory_export():
 
 @app.get("/api/artifacts")
 def api_artifacts_list():
-    if not callable(list_artifacts):
-        return json_error(
-            ARTIFACT_IMPORT_ERROR or "artifact_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
+    session_id = clean_text(request.args.get("session_id")).strip()
+    items = load_artifacts()
+    if session_id:
+        items = [item for item in items if clean_text(item.get("session_id")) == session_id]
 
-    payload = {
-        "session_id": request.args.get("session_id"),
-        "q": request.args.get("q"),
-        "kind": request.args.get("kind"),
-        "limit": request.args.get("limit"),
-    }
-    result = safe_dict(list_artifacts(payload))
-    return jsonify(result)
+    items = sorted(
+        items,
+        key=lambda a: (safe_bool(a.get("pinned")), clean_text(a.get("updated_at"))),
+        reverse=True,
+    )
+    return json_ok(artifacts=items)
 
 
 @app.get("/api/artifacts/<artifact_id>")
-def api_artifact_get(artifact_id: str):
-    if not callable(get_artifact):
-        return json_error(
-            ARTIFACT_IMPORT_ERROR or "artifact_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(get_artifact({"id": artifact_id}))
-    return jsonify(result)
+def api_artifacts_get(artifact_id: str):
+    item = get_artifact(artifact_id)
+    if not item:
+        return json_error("Artifact not found.", status=404)
+    return json_ok(artifact=item)
 
 
 @app.post("/api/artifacts/create")
-def api_artifact_create():
-    if not callable(create_artifact):
-        return json_error(
-            ARTIFACT_IMPORT_ERROR or "artifact_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(create_artifact(read_json_request()))
-    return jsonify(result)
+def api_artifacts_create():
+    payload = request_json()
+    item = upsert_artifact(
+        {
+            "title": clean_text(payload.get("title")).strip() or "Untitled Artifact",
+            "content": clean_text(payload.get("content")),
+            "kind": clean_text(payload.get("kind")).strip() or "text",
+            "session_id": clean_text(payload.get("session_id")).strip(),
+            "meta": coerce_dict(payload.get("meta")),
+            "pinned": safe_bool(payload.get("pinned")),
+        }
+    )
+    return json_ok(artifact=item)
 
 
 @app.post("/api/artifacts/save")
-def api_artifact_save():
-    if not callable(save_artifact):
-        return json_error(
-            ARTIFACT_IMPORT_ERROR or "artifact_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(save_artifact(read_json_request()))
-    return jsonify(result)
+def api_artifacts_save():
+    payload = request_json()
+    item = upsert_artifact(
+        {
+            "id": clean_text(payload.get("id")).strip(),
+            "title": clean_text(payload.get("title")).strip() or "Untitled Artifact",
+            "content": clean_text(payload.get("content")),
+            "kind": clean_text(payload.get("kind")).strip() or "text",
+            "session_id": clean_text(payload.get("session_id")).strip(),
+            "meta": coerce_dict(payload.get("meta")),
+            "pinned": safe_bool(payload.get("pinned")),
+        }
+    )
+    return json_ok(artifact=item)
 
 
 @app.post("/api/artifacts/update")
-def api_artifact_update():
-    if not callable(update_artifact):
-        return json_error(
-            ARTIFACT_IMPORT_ERROR or "artifact_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(update_artifact(read_json_request()))
-    return jsonify(result)
+def api_artifacts_update():
+    payload = request_json()
+    artifact_id = clean_text(payload.get("id")).strip()
+    existing = get_artifact(artifact_id)
+    if not existing:
+        return json_error("Artifact not found.", status=404)
+
+    existing["title"] = clean_text(payload.get("title") or existing.get("title")).strip() or "Untitled Artifact"
+    existing["content"] = clean_text(payload.get("content") if "content" in payload else existing.get("content"))
+    existing["kind"] = clean_text(payload.get("kind") or existing.get("kind")).strip() or "text"
+    existing["session_id"] = clean_text(payload.get("session_id") or existing.get("session_id")).strip()
+    existing["meta"] = coerce_dict(payload.get("meta") or existing.get("meta"))
+    if "pinned" in payload:
+        existing["pinned"] = safe_bool(payload.get("pinned"))
+
+    item = upsert_artifact(existing)
+    return json_ok(artifact=item)
 
 
 @app.post("/api/artifacts/delete")
-def api_artifact_delete():
-    if not callable(delete_artifact):
-        return json_error(
-            ARTIFACT_IMPORT_ERROR or "artifact_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(delete_artifact(read_json_request()))
-    return jsonify(result)
+def api_artifacts_delete():
+    payload = request_json()
+    artifact_id = clean_text(payload.get("id")).strip()
+    if not artifact_id:
+        return json_error("Missing id.")
+    ok = delete_artifact(artifact_id)
+    if not ok:
+        return json_error("Artifact not found.", status=404)
+    return json_ok(deleted=True, id=artifact_id)
 
 
 @app.post("/api/artifacts/pin")
-def api_artifact_pin():
-    if not callable(pin_artifact):
-        return json_error(
-            ARTIFACT_IMPORT_ERROR or "artifact_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(pin_artifact(read_json_request()))
-    return jsonify(result)
+def api_artifacts_pin():
+    payload = request_json()
+    artifact_id = clean_text(payload.get("id")).strip()
+    existing = get_artifact(artifact_id)
+    if not existing:
+        return json_error("Artifact not found.", status=404)
+    existing["pinned"] = safe_bool(payload.get("pinned"))
+    item = upsert_artifact(existing)
+    return json_ok(artifact=item)
 
 
 @app.post("/api/artifacts/toggle-pin")
-def api_artifact_toggle_pin():
-    if not callable(toggle_artifact_pin):
-        return json_error(
-            ARTIFACT_IMPORT_ERROR or "artifact_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(toggle_artifact_pin(read_json_request()))
-    return jsonify(result)
+def api_artifacts_toggle_pin():
+    payload = request_json()
+    artifact_id = clean_text(payload.get("id")).strip()
+    existing = get_artifact(artifact_id)
+    if not existing:
+        return json_error("Artifact not found.", status=404)
+    existing["pinned"] = not safe_bool(existing.get("pinned"))
+    item = upsert_artifact(existing)
+    return json_ok(artifact=item)
 
 
-@app.get("/api/artifacts/export")
-def api_artifact_export():
-    if not callable(export_artifact):
-        return json_error(
-            ARTIFACT_IMPORT_ERROR or "artifact_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    payload = {
-        "id": request.args.get("id"),
-        "artifact_id": request.args.get("artifact_id"),
-    }
-    result = safe_dict(export_artifact(payload))
-    return jsonify(result)
+@app.post("/api/artifacts/export")
+def api_artifacts_export():
+    payload = request_json()
+    artifact_id = clean_text(payload.get("id")).strip()
+    item = get_artifact(artifact_id)
+    if not item:
+        return json_error("Artifact not found.", status=404)
 
-
-# =========================================================
-# attachment routes
-# =========================================================
-
-@app.get("/api/attachments")
-def api_attachments_list():
-    if not callable(list_attachments):
-        return json_error(
-            ATTACHMENT_IMPORT_ERROR or "attachment_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-
-    payload = {
-        "session_id": request.args.get("session_id"),
-        "kind": request.args.get("kind"),
-        "limit": request.args.get("limit"),
-    }
-    result = list_attachments(payload)
-    return jsonify({"ok": True, "attachments": result, "count": len(result)})
-
-
-@app.post("/api/attachments/register")
-def api_attachment_register():
-    if not callable(register_attachment):
-        return json_error(
-            ATTACHMENT_IMPORT_ERROR or "attachment_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(register_attachment(read_json_request()))
-    return jsonify(result)
-
-
-@app.post("/api/attachments/register-many")
-def api_attachments_register_many():
-    if not callable(register_attachments):
-        return json_error(
-            ATTACHMENT_IMPORT_ERROR or "attachment_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    payload = read_json_request()
-    result = safe_dict(register_attachments(safe_list(payload.get("attachments"))))
-    return jsonify(result)
-
-
-@app.post("/api/attachments/delete")
-def api_attachment_delete():
-    if not callable(delete_attachment):
-        return json_error(
-            ATTACHMENT_IMPORT_ERROR or "attachment_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(delete_attachment(read_json_request()))
-    return jsonify(result)
-
-
-@app.post("/api/attachments/cleanup")
-def api_attachments_cleanup():
-    if not callable(cleanup_missing_files):
-        return json_error(
-            ATTACHMENT_IMPORT_ERROR or "attachment_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(cleanup_missing_files())
-    return jsonify(result)
-
-
-@app.get("/api/attachments/stats")
-def api_attachments_stats():
-    if not callable(attachment_stats):
-        return json_error(
-            ATTACHMENT_IMPORT_ERROR or "attachment_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(attachment_stats())
-    return jsonify(result)
-
-
-@app.post("/api/attachments/upload")
-def api_attachment_upload():
-    if not callable(save_uploaded_file):
-        return json_error(
-            ATTACHMENT_IMPORT_ERROR or "attachment_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-
-    if "file" not in request.files:
-        return json_error("file is required.", code="invalid_request", status=400)
-
-    uploaded = request.files["file"]
-    filename = secure_filename(uploaded.filename or "")
-    if not filename:
-        return json_error("Uploaded file must have a filename.", code="invalid_request", status=400)
-
-    content_bytes = uploaded.read()
-    session_id = clean_text(request.form.get("session_id"))
-    message_id = clean_text(request.form.get("message_id"))
-    mime_type = clean_text(uploaded.mimetype)
-
-    metadata: Dict[str, Any] = {}
-    raw_metadata = clean_text(request.form.get("metadata"))
-    if raw_metadata:
-        try:
-            parsed = json.loads(raw_metadata)
-            if isinstance(parsed, dict):
-                metadata = parsed
-        except Exception:
-            metadata = {}
-
-    result = safe_dict(
-        save_uploaded_file(
-            filename=filename,
-            content_bytes=content_bytes,
-            session_id=session_id or None,
-            message_id=message_id or None,
-            mime_type=mime_type or None,
-            metadata=metadata,
-        )
+    export_path = DATA_DIR / f"artifact_{artifact_id}.txt"
+    export_text = (
+        f"Title: {clean_text(item.get('title'))}\n"
+        f"Kind: {clean_text(item.get('kind'))}\n"
+        f"Session: {clean_text(item.get('session_id'))}\n"
+        f"Created: {clean_text(item.get('created_at'))}\n"
+        f"Updated: {clean_text(item.get('updated_at'))}\n\n"
+        f"{clean_text(item.get('content'))}"
     )
-    return jsonify(result)
-
-
-# =========================================================
-# web routes
-# =========================================================
-
-@app.post("/api/debug/web_preview")
-def api_debug_web_preview():
-    if not callable(web_preview_from_text):
-        return json_error(
-            WEB_IMPORT_ERROR or "web_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    payload = read_json_request()
-    text = clean_text(payload.get("text"))
-    if not text:
-        return json_error("text is required.", code="invalid_request", status=400)
-    result = safe_dict(web_preview_from_text(text))
-    return jsonify(result)
-
-
-@app.post("/api/web/fetch")
-def api_web_fetch():
-    if not callable(fetch_single_url):
-        return json_error(
-            WEB_IMPORT_ERROR or "web_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(fetch_single_url(read_json_request()))
-    return jsonify(result)
-
-
-@app.post("/api/web/fetch-many")
-def api_web_fetch_many():
-    if not callable(fetch_urls):
-        return json_error(
-            WEB_IMPORT_ERROR or "web_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(fetch_urls(read_json_request()))
-    return jsonify(result)
-
-
-@app.get("/api/web/status")
-def api_web_status():
-    if not callable(web_service_status):
-        return json_error(
-            WEB_IMPORT_ERROR or "web_service unavailable",
-            code="service_unavailable",
-            status=500,
-        )
-    result = safe_dict(web_service_status())
-    return jsonify(result)
+    export_path.write_text(export_text, encoding="utf-8")
+    return send_file(export_path, as_attachment=True, download_name=f"{clean_text(item.get('title')) or 'artifact'}.txt")
 
 
 # =========================================================
 # error handlers
 # =========================================================
 
-@app.errorhandler(404)
-def not_found(_error):
-    if request.path.startswith("/api/"):
-        return json_error("Not Found", code="not_found", status=404)
-    return ("Not Found", 404)
+@app.errorhandler(HTTPException)
+def handle_http_exception(exc: HTTPException):
+    return json_error(exc.description or exc.name, status=exc.code or 500)
 
 
-@app.errorhandler(405)
-def method_not_allowed(_error):
-    if request.path.startswith("/api/"):
-        return json_error("Method Not Allowed", code="method_not_allowed", status=405)
-    return ("Method Not Allowed", 405)
-
-
-@app.errorhandler(413)
-def payload_too_large(_error):
-    return json_error("Uploaded payload too large.", code="payload_too_large", status=413)
-
-
-@app.errorhandler(500)
-def internal_error(error):
-    if request.path.startswith("/api/"):
-        return json_error(str(error), code="internal_error", status=500)
-    return ("Internal Server Error", 500)
+@app.errorhandler(Exception)
+def handle_exception(exc: Exception):
+    return json_error(
+        f"Server error: {exc}",
+        status=500,
+        trace=traceback.format_exc(limit=3),
+    )
 
 
 # =========================================================
@@ -1066,14 +1187,6 @@ def internal_error(error):
 # =========================================================
 
 if __name__ == "__main__":
-    host = os.getenv("NOVA_HOST", "127.0.0.1")
-    port = int(os.getenv("NOVA_PORT", "5001"))
-    debug = os.getenv("NOVA_DEBUG", "true").lower() in {"1", "true", "yes", "on"}
-
-    print(f"[NOVA] starting Flask app on http://{host}:{port}")
-    print(f"[NOVA] templates: {TEMPLATES_DIR}")
-    print(f"[NOVA] static: {STATIC_DIR}")
-    print(f"[NOVA] sessions file: {SESSIONS_FILE}")
-    print(f"[NOVA] openai model: {os.getenv('OPENAI_MODEL', 'gpt-5.4')}")
-
-    app.run(host=host, port=port, debug=debug)
+    port = safe_int(os.getenv("PORT"), 5001)
+    debug = safe_bool(os.getenv("FLASK_DEBUG", "true"))
+    app.run(host="127.0.0.1", port=port, debug=debug, threaded=True)

@@ -1,728 +1,979 @@
-# notepad C:\Users\Owner\nova\services\chat_service.py
+# notepad C:\Users\Owner\nova\app.py
 from __future__ import annotations
 
 import json
 import os
-import re
+import traceback
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Generator, Iterable, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
+from flask import Flask, Response, jsonify, request, send_from_directory
+from flask_cors import CORS
 
-# =========================================================
-# config
-# =========================================================
-
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4")
-DEFAULT_TEMPERATURE = float(os.getenv("NOVA_TEMPERATURE", "0.7"))
-MAX_HISTORY_MESSAGES = int(os.getenv("NOVA_MAX_HISTORY_MESSAGES", "24"))
-MAX_MESSAGE_CHARS = int(os.getenv("NOVA_MAX_MESSAGE_CHARS", "24000"))
-MAX_SYSTEM_PROMPT_CHARS = int(os.getenv("NOVA_MAX_SYSTEM_PROMPT_CHARS", "12000"))
-MAX_DEBUG_PREVIEW_CHARS = int(os.getenv("NOVA_MAX_DEBUG_PREVIEW_CHARS", "1800"))
-STREAM_FAKE_CHUNK_SIZE = int(os.getenv("NOVA_STREAM_FAKE_CHUNK_SIZE", "120"))
-
-DEFAULT_SYSTEM_PROMPT = """You are Nova, a sharp, practical, high-agency assistant. Be direct, useful, and accurate.
-Prefer concrete action over vague advice.
-
-Use provided context when it is relevant.
-Do not claim to have used context that is empty or unavailable.
-If attached material is insufficient, say so plainly.
-
-When coding:
-- prefer robust, production-minded code
-- preserve existing contracts unless explicitly changing them
-- avoid unnecessary rewrites
-- return complete answers, not vague plans
-""".strip()
-
+from services.chat_service import (
+    DEFAULT_TITLE,
+    get_chat_health,
+    get_session_by_id,
+    get_session_payload,
+    list_sessions,
+    now_iso,
+    process_chat_request,
+    process_chat_stream,
+    save_all_sessions,
+    upsert_session,
+)
 
 # =========================================================
-# optional imports
+# base paths
+# =========================================================
+
+BASE_DIR = Path(__file__).resolve().parent
+TEMPLATES_DIR = BASE_DIR / "templates"
+STATIC_DIR = BASE_DIR / "static"
+DATA_DIR = BASE_DIR / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# =========================================================
+# optional service imports
+# fail-soft everywhere
 # =========================================================
 
 try:
-    from openai import OpenAI
-except Exception:  # pragma: no cover
-    OpenAI = None  # type: ignore
-
-try:
-    from services.attachment_service import (
-        attachments_to_prompt_text,
-        build_attachment_context,
+    from services.memory_service import (
+        add_memory as _memory_add,
+        delete_memory as _memory_delete,
+        export_memory as _memory_export,
+        get_all_memory as _memory_get_all,
+        search_memory as _memory_search,
     )
-except Exception:  # pragma: no cover
-    attachments_to_prompt_text = None  # type: ignore
-    build_attachment_context = None  # type: ignore
+except Exception:
+    _memory_add = None
+    _memory_delete = None
+    _memory_export = None
+    _memory_get_all = None
+    _memory_search = None
 
 try:
-    from services.web_service import build_web_prompt_context
-except Exception:  # pragma: no cover
-    build_web_prompt_context = None  # type: ignore
+    from services.artifact_service import (
+        create_artifact as _artifact_create,
+        delete_artifact as _artifact_delete,
+        export_artifact as _artifact_export,
+        get_artifact as _artifact_get,
+        list_artifacts as _artifact_list,
+        pin_artifact as _artifact_pin,
+        save_artifact as _artifact_save,
+        toggle_artifact_pin as _artifact_toggle_pin,
+        update_artifact as _artifact_update,
+    )
+except Exception:
+    _artifact_create = None
+    _artifact_delete = None
+    _artifact_export = None
+    _artifact_get = None
+    _artifact_list = None
+    _artifact_pin = None
+    _artifact_save = None
+    _artifact_toggle_pin = None
+    _artifact_update = None
 
 try:
-    from services.memory_service import build_memory_prompt_context
-except Exception:  # pragma: no cover
-    build_memory_prompt_context = None  # type: ignore
+    from services.web_service import preview_web_request as _web_preview
+except Exception:
+    _web_preview = None
 
-try:
-    from services.artifact_service import build_artifact_prompt_context
-except Exception:  # pragma: no cover
-    build_artifact_prompt_context = None  # type: ignore
+
+# =========================================================
+# app
+# =========================================================
+
+app = Flask(
+    __name__,
+    template_folder=str(TEMPLATES_DIR),
+    static_folder=str(STATIC_DIR),
+    static_url_path="/static",
+)
+app.config["JSON_SORT_KEYS"] = False
+app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("NOVA_MAX_CONTENT_LENGTH", str(32 * 1024 * 1024)))
+
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+APP_NAME = "Nova"
+APP_PORT = int(os.getenv("PORT", os.getenv("NOVA_PORT", "5001")))
 
 
 # =========================================================
 # helpers
 # =========================================================
 
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+def _json_payload() -> Dict[str, Any]:
+    payload = request.get_json(silent=True)
+    return payload if isinstance(payload, dict) else {}
 
 
-def clean_text(value: Any) -> str:
+def _clean_text(value: Any) -> str:
     if value is None:
         return ""
-    text = str(value).replace("\r\n", "\n").replace("\r", "\n").replace("\x00", "")
-    text = text.replace("\ufeff", "")
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+    return str(value).replace("\r\n", "\n").replace("\r", "\n")
 
 
-def truncate(text: str, limit: int) -> str:
-    text = clean_text(text)
-    if len(text) <= limit:
-        return text
-    return text[:limit].rstrip() + "…"
+def _collapse_ws(value: Any) -> str:
+    return " ".join(_clean_text(value).split()).strip()
 
 
-def safe_dict(value: Any) -> Dict[str, Any]:
+def _coerce_list(value: Any) -> List[Any]:
+    if isinstance(value, list):
+        return value
+    if value is None:
+        return []
+    return [value]
+
+
+def _coerce_dict(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def safe_list(value: Any) -> List[Any]:
-    return value if isinstance(value, list) else []
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
-def safe_bool(value: Any, default: bool = False) -> bool:
-    if isinstance(value, bool):
-        return value
-    return default
+def _new_id() -> str:
+    return str(uuid.uuid4())
 
 
-def safe_int(value: Any, default: int = 0) -> int:
-    try:
-        return int(value)
-    except Exception:
-        return default
+def _json_ok(payload: Dict[str, Any], status: int = 200):
+    return jsonify(payload), status
 
 
-def make_id(prefix: str = "msg") -> str:
-    return f"{prefix}_{uuid.uuid4().hex}"
+def _json_error(message: str, code: str = "request_failed", status: int = 500, **extra: Any):
+    body = {
+        "ok": False,
+        "error": message,
+        "code": code,
+    }
+    if extra:
+        body.update(extra)
+    return jsonify(body), status
 
 
-def compact_preview(value: Any, limit: int = MAX_DEBUG_PREVIEW_CHARS) -> str:
-    text = clean_text(value)
-    text = re.sub(r"\s+", " ", text)
-    return truncate(text, limit)
+def _extract_status(payload: Dict[str, Any], fallback: int = 200) -> int:
+    status_code = payload.get("status_code")
+    if isinstance(status_code, int):
+        return status_code
+    return fallback
 
 
-# =========================================================
-# request normalization
-# =========================================================
+def _session_summary(session: Dict[str, Any]) -> Dict[str, Any]:
+    messages = _coerce_list(session.get("messages"))
+    last_message = messages[-1] if messages else None
 
-def normalize_message(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    item = safe_dict(item)
-    role = clean_text(item.get("role")).lower() or "user"
-    if role not in {"system", "user", "assistant", "developer", "tool"}:
-        role = "user"
+    return {
+        "id": session.get("id"),
+        "title": _clean_text(session.get("title") or DEFAULT_TITLE).strip() or DEFAULT_TITLE,
+        "created_at": session.get("created_at"),
+        "updated_at": session.get("updated_at"),
+        "pinned": bool(session.get("pinned", False)),
+        "message_count": len(messages),
+        "last_message_preview": _clean_text((last_message or {}).get("content", ""))[:180],
+    }
 
-    content = clean_text(item.get("content"))
-    if not content:
+
+def _all_session_summaries() -> List[Dict[str, Any]]:
+    sessions = list_sessions()
+    return [_session_summary(session) for session in sessions]
+
+
+def _replace_session_in_store(updated_session: Dict[str, Any]) -> Dict[str, Any]:
+    return upsert_session(updated_session, backup=False)
+
+
+def _delete_session_by_id(session_id: str) -> bool:
+    sessions = list_sessions()
+    kept = [session for session in sessions if session.get("id") != session_id]
+    if len(kept) == len(sessions):
+        return False
+    save_all_sessions(kept, backup=False)
+    return True
+
+
+def _duplicate_session_by_id(session_id: str) -> Optional[Dict[str, Any]]:
+    source = get_session_by_id(session_id)
+    if not source:
         return None
 
-    return {
-        "id": clean_text(item.get("id")) or make_id("msg"),
-        "role": role,
-        "content": truncate(content, MAX_MESSAGE_CHARS),
-        "created_at": clean_text(item.get("created_at")) or utc_now_iso(),
-        "metadata": safe_dict(item.get("metadata")),
+    duplicated_messages: List[Dict[str, Any]] = []
+    for message in _coerce_list(source.get("messages")):
+        cloned = dict(message)
+        cloned["id"] = _new_id()
+        duplicated_messages.append(cloned)
+
+    duplicated = {
+        "id": _new_id(),
+        "title": f'{_clean_text(source.get("title") or DEFAULT_TITLE).strip() or DEFAULT_TITLE} (copy)',
+        "created_at": _now_iso(),
+        "updated_at": _now_iso(),
+        "pinned": False,
+        "messages": duplicated_messages,
+        "meta": dict(_coerce_dict(source.get("meta"))),
     }
+    return _replace_session_in_store(duplicated)
 
 
-def normalize_history(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    normalized: List[Dict[str, Any]] = []
-
-    for raw in safe_list(messages):
-        if not isinstance(raw, dict):
-            continue
-        msg = normalize_message(raw)
-        if not msg:
-            continue
-        normalized.append(msg)
-
-    return normalized[-MAX_HISTORY_MESSAGES:]
-
-
-def normalize_chat_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
-    payload = safe_dict(payload)
-
-    content = truncate(clean_text(payload.get("content")), MAX_MESSAGE_CHARS)
-    session_id = clean_text(payload.get("session_id")) or None
-    model = clean_text(payload.get("model")) or DEFAULT_MODEL
-    system_prompt = truncate(
-        clean_text(payload.get("system_prompt")) or DEFAULT_SYSTEM_PROMPT,
-        MAX_SYSTEM_PROMPT_CHARS,
+def _artifact_service_missing(name: str):
+    return _json_error(
+        f"Artifact route '{name}' is unavailable because artifact_service is not fully loaded.",
+        code="artifact_service_unavailable",
+        status=501,
     )
 
-    incoming_messages = normalize_history(payload.get("messages"))
-    attachments = [safe_dict(x) for x in safe_list(payload.get("attachments")) if isinstance(x, dict)]
-    artifacts = [safe_dict(x) for x in safe_list(payload.get("artifacts")) if isinstance(x, dict)]
 
-    stream = safe_bool(payload.get("stream"), False)
-    web_enabled = safe_bool(payload.get("web_enabled"), True)
-    memory_enabled = safe_bool(payload.get("memory_enabled"), True)
-    artifact_enabled = safe_bool(payload.get("artifact_enabled"), True)
-    attachment_enabled = safe_bool(payload.get("attachment_enabled"), True)
-
-    return {
-        "session_id": session_id,
-        "content": content,
-        "model": model,
-        "system_prompt": system_prompt,
-        "messages": incoming_messages,
-        "attachments": attachments,
-        "artifacts": artifacts,
-        "stream": stream,
-        "web_enabled": web_enabled,
-        "memory_enabled": memory_enabled,
-        "artifact_enabled": artifact_enabled,
-        "attachment_enabled": attachment_enabled,
-        "metadata": safe_dict(payload.get("metadata")),
-    }
+def _memory_service_missing(name: str):
+    return _json_error(
+        f"Memory route '{name}' is unavailable because memory_service is not fully loaded.",
+        code="memory_service_unavailable",
+        status=501,
+    )
 
 
 # =========================================================
-# context builders
+# static + page routes
 # =========================================================
 
-def _build_memory_context(payload: Dict[str, Any]) -> Dict[str, Any]:
-    if not payload.get("memory_enabled"):
-        return {"prompt_text": "", "items": [], "error": None}
-
-    if callable(build_memory_prompt_context):
-        try:
-            result = build_memory_prompt_context(
-                {
-                    "content": payload.get("content"),
-                    "messages": payload.get("messages", []),
-                    "session_id": payload.get("session_id"),
-                    "metadata": payload.get("metadata", {}),
-                }
-            )
-            result = safe_dict(result)
-            return {
-                "prompt_text": clean_text(result.get("prompt_text")),
-                "items": safe_list(result.get("items") or result.get("memory")),
-                "error": result.get("error"),
-            }
-        except Exception as exc:
-            return {
-                "prompt_text": "",
-                "items": [],
-                "error": {"code": "memory_context_failed", "message": str(exc)},
-            }
-
-    return {"prompt_text": "", "items": [], "error": None}
+@app.get("/")
+def index():
+    return send_from_directory(TEMPLATES_DIR, "index.html")
 
 
-def _build_attachment_context(payload: Dict[str, Any]) -> Dict[str, Any]:
-    attachments = safe_list(payload.get("attachments"))
-    if not payload.get("attachment_enabled") or not attachments:
-        return {
-            "prompt_text": "",
-            "attachments": [],
-            "documents": [],
-            "images": [],
-            "error": None,
+@app.get("/favicon.ico")
+def favicon():
+    favicon_path = STATIC_DIR / "favicon.ico"
+    if favicon_path.exists():
+        return send_from_directory(STATIC_DIR, "favicon.ico")
+    return Response(status=204)
+
+
+# =========================================================
+# health + state
+# =========================================================
+
+@app.get("/api/health")
+def api_health():
+    try:
+        health = get_chat_health()
+        health["ok"] = True
+        health["app_name"] = APP_NAME
+        health["port"] = APP_PORT
+        return _json_ok(health)
+    except Exception as exc:
+        return _json_error(
+            "Health check failed.",
+            code="health_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.get("/api/state")
+def api_state():
+    try:
+        sessions = list_sessions()
+        active_session_id = request.args.get("session_id")
+
+        payload = {
+            "ok": True,
+            "app": APP_NAME,
+            "sessions": [_session_summary(session) for session in sessions],
+            "active_session_id": active_session_id,
+            "default_model": os.getenv("OPENAI_MODEL", "gpt-5.4"),
+            "models": [
+                os.getenv("OPENAI_MODEL", "gpt-5.4"),
+                "gpt-4.1-mini",
+                "gpt-4.1",
+                "gpt-4o-mini",
+            ],
         }
-
-    prompt_text = ""
-    structured: Dict[str, Any] = {}
-
-    if callable(build_attachment_context):
-        try:
-            structured = safe_dict(build_attachment_context(attachments))
-        except Exception as exc:
-            return {
-                "prompt_text": "",
-                "attachments": [],
-                "documents": [],
-                "images": [],
-                "error": {"code": "attachment_context_failed", "message": str(exc)},
-            }
-
-    if callable(attachments_to_prompt_text):
-        try:
-            prompt_text = clean_text(attachments_to_prompt_text(attachments))
-        except Exception:
-            prompt_text = ""
-
-    return {
-        "prompt_text": prompt_text,
-        "attachments": safe_list(structured.get("attachments")),
-        "documents": safe_list(structured.get("documents")),
-        "images": safe_list(structured.get("images")),
-        "error": None,
-    }
+        return _json_ok(payload)
+    except Exception as exc:
+        return _json_error(
+            "Failed to load app state.",
+            code="state_failed",
+            status=500,
+            details=str(exc),
+        )
 
 
-def _build_web_context(payload: Dict[str, Any]) -> Dict[str, Any]:
-    if not payload.get("web_enabled"):
-        return {"prompt_text": "", "results": [], "debug": [], "error": None}
-
-    if callable(build_web_prompt_context):
-        try:
-            result = build_web_prompt_context(text=clean_text(payload.get("content")))
-            result = safe_dict(result)
-            return {
-                "prompt_text": clean_text(result.get("prompt_text")),
-                "results": safe_list(result.get("results")),
-                "debug": safe_list(result.get("debug")),
-                "error": result.get("error"),
-            }
-        except Exception as exc:
-            return {
-                "prompt_text": "",
-                "results": [],
-                "debug": [],
-                "error": {"code": "web_context_failed", "message": str(exc)},
-            }
-
-    return {"prompt_text": "", "results": [], "debug": [], "error": None}
-
-
-def _build_artifact_context(payload: Dict[str, Any]) -> Dict[str, Any]:
-    artifacts = safe_list(payload.get("artifacts"))
-    if not payload.get("artifact_enabled") or not artifacts:
-        return {"prompt_text": "", "items": [], "error": None}
-
-    if callable(build_artifact_prompt_context):
-        try:
-            result = build_artifact_prompt_context({"artifacts": artifacts})
-            result = safe_dict(result)
-            return {
-                "prompt_text": clean_text(result.get("prompt_text")),
-                "items": safe_list(result.get("items") or result.get("artifacts")),
-                "error": result.get("error"),
-            }
-        except Exception as exc:
-            return {
-                "prompt_text": "",
-                "items": [],
-                "error": {"code": "artifact_context_failed", "message": str(exc)},
-            }
-
-    return {"prompt_text": "", "items": [], "error": None}
-
-
-def build_context_bundle(payload: Dict[str, Any]) -> Dict[str, Any]:
-    memory_context = _build_memory_context(payload)
-    attachment_context = _build_attachment_context(payload)
-    web_context = _build_web_context(payload)
-    artifact_context = _build_artifact_context(payload)
-
-    sections: List[str] = []
-
-    memory_text = clean_text(memory_context.get("prompt_text"))
-    if memory_text:
-        sections.append(memory_text)
-
-    attachment_text = clean_text(attachment_context.get("prompt_text"))
-    if attachment_text:
-        sections.append(attachment_text)
-
-    web_text = clean_text(web_context.get("prompt_text"))
-    if web_text:
-        sections.append(web_text)
-
-    artifact_text = clean_text(artifact_context.get("prompt_text"))
-    if artifact_text:
-        sections.append(artifact_text)
-
-    return {
-        "context_text": "\n\n".join([x for x in sections if x]).strip(),
-        "memory": memory_context,
-        "attachments": attachment_context,
-        "web": web_context,
-        "artifacts": artifact_context,
-    }
-
-
-# =========================================================
-# input building
-# =========================================================
-
-def build_messages_for_model(payload: Dict[str, Any], bundle: Dict[str, Any]) -> List[Dict[str, str]]:
-    messages: List[Dict[str, str]] = []
-
-    system_prompt = clean_text(payload.get("system_prompt")) or DEFAULT_SYSTEM_PROMPT
-    context_text = clean_text(bundle.get("context_text"))
-
-    if context_text:
-        system_prompt = f"{system_prompt}\n\nContext:\n{context_text}".strip()
-
-    messages.append(
+@app.get("/api/models")
+def api_models():
+    default_model = os.getenv("OPENAI_MODEL", "gpt-5.4")
+    return _json_ok(
         {
-            "role": "system",
-            "content": system_prompt,
+            "ok": True,
+            "default": default_model,
+            "models": [
+                default_model,
+                "gpt-4.1-mini",
+                "gpt-4.1",
+                "gpt-4o-mini",
+            ],
         }
     )
 
-    for item in safe_list(payload.get("messages")):
-        msg = safe_dict(item)
-        role = clean_text(msg.get("role")).lower()
-        content = clean_text(msg.get("content"))
-        if role not in {"user", "assistant", "system", "developer"}:
-            continue
-        if not content:
-            continue
-        messages.append({"role": role, "content": content})
-
-    current_content = clean_text(payload.get("content"))
-    if current_content:
-        messages.append({"role": "user", "content": current_content})
-
-    return messages
-
 
 # =========================================================
-# openai response handling
+# chat routes
 # =========================================================
 
-def get_openai_client() -> Any:
-    if OpenAI is None:
-        return None
-
-    api_key = clean_text(os.getenv("OPENAI_API_KEY"))
-    if not api_key:
-        return None
-
+@app.post("/api/chat")
+def api_chat():
     try:
-        return OpenAI(api_key=api_key)
-    except Exception:
-        try:
-            return OpenAI()
-        except Exception:
-            return None
-
-
-def extract_response_text(response: Any) -> str:
-    try:
-        text = clean_text(getattr(response, "output_text", ""))
-        if text:
-            return text
-    except Exception:
-        pass
-
-    try:
-        output = getattr(response, "output", None)
-        if output:
-            parts: List[str] = []
-            for item in output:
-                item_type = clean_text(getattr(item, "type", ""))
-                if item_type == "message":
-                    content_list = getattr(item, "content", []) or []
-                    for content in content_list:
-                        content_type = clean_text(getattr(content, "type", ""))
-                        if content_type in {"output_text", "text"}:
-                            chunk = clean_text(getattr(content, "text", ""))
-                            if chunk:
-                                parts.append(chunk)
-                else:
-                    text = clean_text(getattr(item, "text", ""))
-                    if text:
-                        parts.append(text)
-            if parts:
-                return clean_text("\n".join(parts))
-    except Exception:
-        pass
-
-    try:
-        as_dict = response.model_dump()  # type: ignore[attr-defined]
-        if isinstance(as_dict, dict):
-            if clean_text(as_dict.get("output_text")):
-                return clean_text(as_dict.get("output_text"))
-            output = safe_list(as_dict.get("output"))
-            parts: List[str] = []
-            for item in output:
-                d = safe_dict(item)
-                if clean_text(d.get("type")) == "message":
-                    for content in safe_list(d.get("content")):
-                        c = safe_dict(content)
-                        ctype = clean_text(c.get("type"))
-                        if ctype in {"output_text", "text"}:
-                            text = clean_text(c.get("text"))
-                            if text:
-                                parts.append(text)
-            if parts:
-                return clean_text("\n".join(parts))
-    except Exception:
-        pass
-
-    return ""
-
-
-def call_model(messages: List[Dict[str, str]], model: str) -> Tuple[str, Dict[str, Any]]:
-    client = get_openai_client()
-    if client is None:
-        return (
-            "Nova backend is running, but the model client is not available. Check OPENAI_API_KEY and OpenAI SDK installation.",
-            {
-                "provider": "openai",
-                "client_available": False,
-                "model": model,
-                "error": {
-                    "code": "model_unavailable",
-                    "message": "OpenAI client unavailable or OPENAI_API_KEY missing.",
-                },
-            },
+        payload = _json_payload()
+        result = process_chat_request(payload)
+        status = _extract_status(result, 200 if result.get("ok") else 500)
+        return jsonify(result), status
+    except Exception as exc:
+        return _json_error(
+            "Chat route failed.",
+            code="chat_route_failed",
+            status=500,
+            details=str(exc),
+            traceback=traceback.format_exc(limit=3),
         )
 
+
+@app.post("/api/chat/stream")
+def api_chat_stream():
     try:
-        response = client.responses.create(
-            model=model,
-            input=messages,
-        )
-        text = extract_response_text(response)
-        if not text:
-            text = "The model returned no text."
-        return (
-            text,
-            {
-                "provider": "openai",
-                "client_available": True,
-                "model": model,
-                "response_id": clean_text(getattr(response, "id", "")),
-                "error": None,
+        payload = _json_payload()
+
+        return Response(
+            process_chat_stream(payload),
+            status=200,
+            mimetype="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache, no-transform",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
             },
         )
     except Exception as exc:
-        return (
-            "Nova hit a model error while generating a reply.",
-            {
-                "provider": "openai",
-                "client_available": True,
-                "model": model,
-                "error": {
-                    "code": "model_call_failed",
-                    "message": str(exc),
-                },
-            },
+        error_payload = {
+            "ok": False,
+            "error": "Chat stream route failed.",
+            "code": "chat_stream_route_failed",
+            "details": str(exc),
+        }
+        body = f"event: error\ndata: {json.dumps(error_payload, ensure_ascii=False)}\n\n"
+        return Response(body, status=500, mimetype="text/event-stream")
+
+
+@app.get("/api/chat/<session_id>")
+def api_chat_get_session(session_id: str):
+    try:
+        payload = get_session_payload(session_id)
+        status = _extract_status(payload, 200 if payload.get("ok") else 404)
+        return jsonify(payload), status
+    except Exception as exc:
+        return _json_error(
+            "Failed to load session.",
+            code="session_load_failed",
+            status=500,
+            details=str(exc),
         )
 
 
 # =========================================================
-# debug shaping
+# session routes
 # =========================================================
 
-def build_debug_brain(payload: Dict[str, Any], bundle: Dict[str, Any], messages: List[Dict[str, str]], model_meta: Dict[str, Any]) -> Dict[str, Any]:
-    attachment_ctx = safe_dict(bundle.get("attachments"))
-    web_ctx = safe_dict(bundle.get("web"))
-    artifact_ctx = safe_dict(bundle.get("artifacts"))
-    memory_ctx = safe_dict(bundle.get("memory"))
+@app.post("/api/session/new")
+def api_session_new():
+    try:
+        payload = _json_payload()
+        title = _collapse_ws(payload.get("title")) or DEFAULT_TITLE
 
-    messages_preview = []
-    for item in messages[-8:]:
-        msg = safe_dict(item)
-        messages_preview.append(
+        session = {
+            "id": _new_id(),
+            "title": title,
+            "created_at": _now_iso(),
+            "updated_at": _now_iso(),
+            "pinned": False,
+            "messages": [],
+            "meta": _coerce_dict(payload.get("meta")),
+        }
+        session = _replace_session_in_store(session)
+
+        return _json_ok(
             {
-                "role": clean_text(msg.get("role")),
-                "content": compact_preview(msg.get("content")),
+                "ok": True,
+                "session": session,
+                "sessions": _all_session_summaries(),
+            }
+        )
+    except Exception as exc:
+        return _json_error(
+            "Failed to create session.",
+            code="session_create_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.post("/api/session/delete")
+def api_session_delete():
+    try:
+        payload = _json_payload()
+        session_id = _clean_text(payload.get("session_id")).strip()
+
+        if not session_id:
+            return _json_error("session_id is required.", code="invalid_request", status=400)
+
+        deleted = _delete_session_by_id(session_id)
+        if not deleted:
+            return _json_error("Session not found.", code="not_found", status=404)
+
+        return _json_ok(
+            {
+                "ok": True,
+                "deleted_session_id": session_id,
+                "sessions": _all_session_summaries(),
+            }
+        )
+    except Exception as exc:
+        return _json_error(
+            "Failed to delete session.",
+            code="session_delete_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.post("/api/session/rename")
+def api_session_rename():
+    try:
+        payload = _json_payload()
+        session_id = _clean_text(payload.get("session_id")).strip()
+        title = _collapse_ws(payload.get("title"))
+
+        if not session_id:
+            return _json_error("session_id is required.", code="invalid_request", status=400)
+        if not title:
+            return _json_error("title is required.", code="invalid_request", status=400)
+
+        session = get_session_by_id(session_id)
+        if not session:
+            return _json_error("Session not found.", code="not_found", status=404)
+
+        session["title"] = title
+        session["updated_at"] = _now_iso()
+        session = _replace_session_in_store(session)
+
+        return _json_ok(
+            {
+                "ok": True,
+                "session": session,
+                "sessions": _all_session_summaries(),
+            }
+        )
+    except Exception as exc:
+        return _json_error(
+            "Failed to rename session.",
+            code="session_rename_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.post("/api/session/duplicate")
+def api_session_duplicate():
+    try:
+        payload = _json_payload()
+        session_id = _clean_text(payload.get("session_id")).strip()
+
+        if not session_id:
+            return _json_error("session_id is required.", code="invalid_request", status=400)
+
+        duplicated = _duplicate_session_by_id(session_id)
+        if not duplicated:
+            return _json_error("Session not found.", code="not_found", status=404)
+
+        return _json_ok(
+            {
+                "ok": True,
+                "session": duplicated,
+                "sessions": _all_session_summaries(),
+            }
+        )
+    except Exception as exc:
+        return _json_error(
+            "Failed to duplicate session.",
+            code="session_duplicate_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.post("/api/session/pin")
+def api_session_pin():
+    try:
+        payload = _json_payload()
+        session_id = _clean_text(payload.get("session_id")).strip()
+        pinned = bool(payload.get("pinned", True))
+
+        if not session_id:
+            return _json_error("session_id is required.", code="invalid_request", status=400)
+
+        session = get_session_by_id(session_id)
+        if not session:
+            return _json_error("Session not found.", code="not_found", status=404)
+
+        session["pinned"] = pinned
+        session["updated_at"] = _now_iso()
+        session = _replace_session_in_store(session)
+
+        return _json_ok(
+            {
+                "ok": True,
+                "session": session,
+                "sessions": _all_session_summaries(),
+            }
+        )
+    except Exception as exc:
+        return _json_error(
+            "Failed to pin session.",
+            code="session_pin_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+# =========================================================
+# memory routes
+# =========================================================
+
+@app.get("/api/memory")
+def api_memory_list():
+    if not _memory_get_all:
+        return _memory_service_missing("list")
+
+    try:
+        query = _clean_text(request.args.get("q")).strip()
+        if query and _memory_search:
+            items = _memory_search(query)
+        else:
+            items = _memory_get_all()
+
+        return _json_ok(
+            {
+                "ok": True,
+                "items": items if isinstance(items, list) else [],
+            }
+        )
+    except Exception as exc:
+        return _json_error(
+            "Failed to load memory.",
+            code="memory_list_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.post("/api/memory/add")
+def api_memory_add():
+    if not _memory_add:
+        return _memory_service_missing("add")
+
+    try:
+        payload = _json_payload()
+        result = _memory_add(
+            kind=_clean_text(payload.get("kind")).strip(),
+            value=_clean_text(payload.get("value")).strip(),
+        )
+        return _json_ok({"ok": True, "item": result})
+    except Exception as exc:
+        return _json_error(
+            "Failed to add memory.",
+            code="memory_add_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.post("/api/memory/delete")
+def api_memory_delete():
+    if not _memory_delete:
+        return _memory_service_missing("delete")
+
+    try:
+        payload = _json_payload()
+        memory_id = _clean_text(payload.get("id")).strip()
+        if not memory_id:
+            return _json_error("id is required.", code="invalid_request", status=400)
+
+        result = _memory_delete(memory_id)
+        return _json_ok({"ok": True, "deleted": bool(result), "id": memory_id})
+    except Exception as exc:
+        return _json_error(
+            "Failed to delete memory.",
+            code="memory_delete_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.get("/api/memory/export")
+def api_memory_export():
+    if not _memory_export:
+        return _memory_service_missing("export")
+
+    try:
+        payload = _memory_export()
+        return _json_ok({"ok": True, "export": payload})
+    except Exception as exc:
+        return _json_error(
+            "Failed to export memory.",
+            code="memory_export_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+# =========================================================
+# artifact routes
+# =========================================================
+
+@app.get("/api/artifacts")
+def api_artifacts_list():
+    if not _artifact_list:
+        return _artifact_service_missing("list")
+
+    try:
+        q = _clean_text(request.args.get("q")).strip()
+        session_id = _clean_text(request.args.get("session_id")).strip() or None
+        pinned_only = request.args.get("pinned") in {"1", "true", "True"}
+
+        items = _artifact_list(query=q, session_id=session_id, pinned_only=pinned_only)
+        return _json_ok({"ok": True, "artifacts": items if isinstance(items, list) else []})
+    except TypeError:
+        try:
+            items = _artifact_list()
+            return _json_ok({"ok": True, "artifacts": items if isinstance(items, list) else []})
+        except Exception as exc:
+            return _json_error(
+                "Failed to list artifacts.",
+                code="artifact_list_failed",
+                status=500,
+                details=str(exc),
+            )
+    except Exception as exc:
+        return _json_error(
+            "Failed to list artifacts.",
+            code="artifact_list_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.get("/api/artifacts/<artifact_id>")
+def api_artifact_get(artifact_id: str):
+    if not _artifact_get:
+        return _artifact_service_missing("get")
+
+    try:
+        artifact = _artifact_get(artifact_id)
+        if not artifact:
+            return _json_error("Artifact not found.", code="not_found", status=404)
+        return _json_ok({"ok": True, "artifact": artifact})
+    except Exception as exc:
+        return _json_error(
+            "Failed to load artifact.",
+            code="artifact_get_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.post("/api/artifacts/create")
+def api_artifact_create():
+    if not _artifact_create:
+        return _artifact_service_missing("create")
+
+    try:
+        payload = _json_payload()
+        artifact = _artifact_create(payload)
+        return _json_ok({"ok": True, "artifact": artifact})
+    except Exception as exc:
+        return _json_error(
+            "Failed to create artifact.",
+            code="artifact_create_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.post("/api/artifacts/save")
+def api_artifact_save():
+    if not _artifact_save:
+        return _artifact_service_missing("save")
+
+    try:
+        payload = _json_payload()
+        artifact = _artifact_save(payload)
+        return _json_ok({"ok": True, "artifact": artifact})
+    except Exception as exc:
+        return _json_error(
+            "Failed to save artifact.",
+            code="artifact_save_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.post("/api/artifacts/update")
+def api_artifact_update():
+    if not _artifact_update:
+        return _artifact_service_missing("update")
+
+    try:
+        payload = _json_payload()
+        artifact = _artifact_update(payload)
+        return _json_ok({"ok": True, "artifact": artifact})
+    except Exception as exc:
+        return _json_error(
+            "Failed to update artifact.",
+            code="artifact_update_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.post("/api/artifacts/delete")
+def api_artifact_delete():
+    if not _artifact_delete:
+        return _artifact_service_missing("delete")
+
+    try:
+        payload = _json_payload()
+        artifact_id = _clean_text(payload.get("id") or payload.get("artifact_id")).strip()
+        if not artifact_id:
+            return _json_error("artifact id is required.", code="invalid_request", status=400)
+
+        result = _artifact_delete(artifact_id)
+        return _json_ok({"ok": True, "deleted": bool(result), "id": artifact_id})
+    except Exception as exc:
+        return _json_error(
+            "Failed to delete artifact.",
+            code="artifact_delete_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.post("/api/artifacts/pin")
+def api_artifact_pin():
+    if not _artifact_pin:
+        return _artifact_service_missing("pin")
+
+    try:
+        payload = _json_payload()
+        artifact_id = _clean_text(payload.get("id") or payload.get("artifact_id")).strip()
+        pinned = bool(payload.get("pinned", True))
+
+        if not artifact_id:
+            return _json_error("artifact id is required.", code="invalid_request", status=400)
+
+        artifact = _artifact_pin(artifact_id, pinned=pinned)
+        return _json_ok({"ok": True, "artifact": artifact})
+    except TypeError:
+        try:
+            payload = _json_payload()
+            artifact_id = _clean_text(payload.get("id") or payload.get("artifact_id")).strip()
+            artifact = _artifact_pin(artifact_id)
+            return _json_ok({"ok": True, "artifact": artifact})
+        except Exception as exc:
+            return _json_error(
+                "Failed to pin artifact.",
+                code="artifact_pin_failed",
+                status=500,
+                details=str(exc),
+            )
+    except Exception as exc:
+        return _json_error(
+            "Failed to pin artifact.",
+            code="artifact_pin_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.post("/api/artifacts/toggle-pin")
+def api_artifact_toggle_pin():
+    if not _artifact_toggle_pin:
+        return _artifact_service_missing("toggle-pin")
+
+    try:
+        payload = _json_payload()
+        artifact_id = _clean_text(payload.get("id") or payload.get("artifact_id")).strip()
+        if not artifact_id:
+            return _json_error("artifact id is required.", code="invalid_request", status=400)
+
+        artifact = _artifact_toggle_pin(artifact_id)
+        return _json_ok({"ok": True, "artifact": artifact})
+    except Exception as exc:
+        return _json_error(
+            "Failed to toggle artifact pin.",
+            code="artifact_toggle_pin_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.get("/api/artifacts/export")
+def api_artifact_export():
+    if not _artifact_export:
+        return _artifact_service_missing("export")
+
+    try:
+        artifact_id = _clean_text(request.args.get("id") or request.args.get("artifact_id")).strip()
+        if not artifact_id:
+            return _json_error("artifact id is required.", code="invalid_request", status=400)
+
+        exported = _artifact_export(artifact_id)
+        return _json_ok({"ok": True, "export": exported})
+    except Exception as exc:
+        return _json_error(
+            "Failed to export artifact.",
+            code="artifact_export_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+# =========================================================
+# debug routes
+# =========================================================
+
+@app.post("/api/debug/web_preview")
+def api_debug_web_preview():
+    if not _web_preview:
+        return _json_ok(
+            {
+                "ok": True,
+                "preview": {
+                    "enabled": False,
+                    "items": [],
+                    "prompt_context": "",
+                    "errors": ["web preview service unavailable"],
+                },
             }
         )
 
-    return {
-        "model": clean_text(payload.get("model")) or DEFAULT_MODEL,
-        "system_prompt_preview": compact_preview(messages[0]["content"] if messages else ""),
-        "history_count": len(safe_list(payload.get("messages"))),
-        "message_count": len(messages),
-        "messages_preview": messages_preview,
-        "memory": safe_list(memory_ctx.get("items")),
-        "memory_update": "",
-        "attachments": safe_list(attachment_ctx.get("attachments")),
-        "documents": safe_list(attachment_ctx.get("documents")),
-        "images": safe_list(attachment_ctx.get("images")),
-        "web": safe_list(web_ctx.get("debug") or web_ctx.get("results")),
-        "artifacts": safe_list(artifact_ctx.get("items")),
-        "context_preview": compact_preview(bundle.get("context_text")),
-        "model_meta": model_meta,
-    }
+    try:
+        payload = _json_payload()
+        text = _clean_text(payload.get("text")).strip()
+        meta = _coerce_dict(payload.get("meta"))
+
+        preview = _web_preview(text=text, meta=meta)
+        return _json_ok({"ok": True, "preview": preview})
+    except TypeError:
+        try:
+            payload = _json_payload()
+            text = _clean_text(payload.get("text")).strip()
+            preview = _web_preview(text)
+            return _json_ok({"ok": True, "preview": preview})
+        except Exception as exc:
+            return _json_error(
+                "Failed to build web preview.",
+                code="web_preview_failed",
+                status=500,
+                details=str(exc),
+            )
+    except Exception as exc:
+        return _json_error(
+            "Failed to build web preview.",
+            code="web_preview_failed",
+            status=500,
+            details=str(exc),
+        )
+
+
+@app.post("/api/debug/brain")
+def api_debug_brain():
+    try:
+        payload = _json_payload()
+        result = process_chat_request(payload)
+
+        if not result.get("ok"):
+            status = _extract_status(result, 500)
+            return jsonify(result), status
+
+        debug = result.get("debug", {})
+        session = result.get("session", {})
+        message = result.get("message", {})
+        assistant = result.get("assistant", {})
+
+        return _json_ok(
+            {
+                "ok": True,
+                "debug": debug,
+                "message_count": len(_coerce_list(session.get("messages"))),
+                "messages_preview": [
+                    {
+                        "role": message.get("role"),
+                        "content": _clean_text(message.get("content"))[:280],
+                    },
+                    {
+                        "role": assistant.get("role"),
+                        "content": _clean_text(assistant.get("content"))[:280],
+                    },
+                ],
+            }
+        )
+    except Exception as exc:
+        return _json_error(
+            "Failed to build debug brain output.",
+            code="debug_brain_failed",
+            status=500,
+            details=str(exc),
+        )
 
 
 # =========================================================
-# output shaping
+# global error handlers
 # =========================================================
 
-def build_assistant_message(content: str, model: str, session_id: Optional[str] = None) -> Dict[str, Any]:
-    return {
-        "id": make_id("assistant"),
-        "role": "assistant",
-        "content": clean_text(content),
-        "created_at": utc_now_iso(),
-        "session_id": session_id,
-        "metadata": {
-            "model": model,
-        },
-    }
+@app.errorhandler(404)
+def handle_404(_error):
+    return _json_error("Not Found", code="not_found", status=404)
 
 
-def build_chat_response(payload: Dict[str, Any], assistant_text: str, debug: Dict[str, Any], model_meta: Dict[str, Any]) -> Dict[str, Any]:
-    assistant_message = build_assistant_message(
-        content=assistant_text,
-        model=clean_text(payload.get("model")) or DEFAULT_MODEL,
-        session_id=payload.get("session_id"),
+@app.errorhandler(405)
+def handle_405(_error):
+    return _json_error("Method Not Allowed", code="method_not_allowed", status=405)
+
+
+@app.errorhandler(413)
+def handle_413(_error):
+    return _json_error("Payload too large.", code="payload_too_large", status=413)
+
+
+@app.errorhandler(500)
+def handle_500(error):
+    return _json_error(
+        "Internal server error.",
+        code="internal_server_error",
+        status=500,
+        details=str(error),
     )
 
-    return {
-        "ok": True,
-        "message": assistant_message,
-        "assistant_message": assistant_message,
-        "session_id": payload.get("session_id"),
-        "model": clean_text(payload.get("model")) or DEFAULT_MODEL,
-        "debug": debug,
-        "error": model_meta.get("error"),
-    }
-
 
 # =========================================================
-# public service functions
+# main
 # =========================================================
 
-def generate_reply(payload: Dict[str, Any]) -> Dict[str, Any]:
-    normalized = normalize_chat_payload(payload)
-    bundle = build_context_bundle(normalized)
-    messages = build_messages_for_model(normalized, bundle)
-    assistant_text, model_meta = call_model(messages, normalized.get("model") or DEFAULT_MODEL)
-    debug = build_debug_brain(normalized, bundle, messages, model_meta)
-    return build_chat_response(normalized, assistant_text, debug, model_meta)
-
-
-def _chunk_text_for_stream(text: str, chunk_size: int = STREAM_FAKE_CHUNK_SIZE) -> Iterable[str]:
-    text = clean_text(text)
-    if not text:
-        return []
-    return [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
-
-
-def generate_reply_stream(payload: Dict[str, Any]) -> Tuple[Generator[Dict[str, Any], None, None], Dict[str, Any]]:
-    normalized = normalize_chat_payload({**safe_dict(payload), "stream": True})
-    bundle = build_context_bundle(normalized)
-    messages = build_messages_for_model(normalized, bundle)
-
-    placeholder_model_meta = {
-        "provider": "openai",
-        "client_available": get_openai_client() is not None,
-        "model": normalized.get("model") or DEFAULT_MODEL,
-        "error": None,
-    }
-    debug = build_debug_brain(normalized, bundle, messages, placeholder_model_meta)
-
-    def event_generator() -> Generator[Dict[str, Any], None, None]:
-        assistant_text, model_meta = call_model(messages, normalized.get("model") or DEFAULT_MODEL)
-
-        yield {
-            "type": "start",
-            "session_id": normalized.get("session_id"),
-            "model": normalized.get("model") or DEFAULT_MODEL,
-            "created_at": utc_now_iso(),
-        }
-
-        for chunk in _chunk_text_for_stream(assistant_text):
-            yield {
-                "type": "delta",
-                "delta": chunk,
-            }
-
-        assistant_message = build_assistant_message(
-            content=assistant_text,
-            model=normalized.get("model") or DEFAULT_MODEL,
-            session_id=normalized.get("session_id"),
-        )
-
-        yield {
-            "type": "done",
-            "message": assistant_message,
-            "assistant_message": assistant_message,
-            "session_id": normalized.get("session_id"),
-            "model": normalized.get("model") or DEFAULT_MODEL,
-            "debug": build_debug_brain(normalized, bundle, messages, model_meta),
-            "error": model_meta.get("error"),
-        }
-
-    return event_generator(), debug
-
-
-def preview_chat_brain(payload: Dict[str, Any]) -> Dict[str, Any]:
-    normalized = normalize_chat_payload(payload)
-    bundle = build_context_bundle(normalized)
-    messages = build_messages_for_model(normalized, bundle)
-    model_meta = {
-        "provider": "openai",
-        "client_available": get_openai_client() is not None,
-        "model": normalized.get("model") or DEFAULT_MODEL,
-        "error": None,
-    }
-
-    return {
-        "ok": True,
-        "debug": build_debug_brain(normalized, bundle, messages, model_meta),
-        "message_count": len(messages),
-        "messages_preview": [
-            {
-                "role": clean_text(m.get("role")),
-                "content": compact_preview(m.get("content")),
-            }
-            for m in messages
-        ],
-        "error": None,
-    }
-
-
-# =========================================================
-# route helpers
-# =========================================================
-
-def coerce_stream_done_event(event: Dict[str, Any]) -> Dict[str, Any]:
-    event = safe_dict(event)
-    if clean_text(event.get("type")) != "done":
-        return event
-
-    message = safe_dict(event.get("message") or event.get("assistant_message"))
-    return {
-        "type": "done",
-        "message": message,
-        "assistant_message": message,
-        "session_id": clean_text(event.get("session_id")) or message.get("session_id"),
-        "model": clean_text(event.get("model")) or safe_dict(message.get("metadata")).get("model") or DEFAULT_MODEL,
-        "debug": safe_dict(event.get("debug")),
-        "error": event.get("error"),
-    }
-
-
-def service_status() -> Dict[str, Any]:
-    client_available = get_openai_client() is not None
-    api_key = clean_text(os.getenv("OPENAI_API_KEY"))
-
-    return {
-        "ok": True,
-        "service": "chat_service",
-        "model": DEFAULT_MODEL,
-        "client_available": client_available,
-        "key_present": bool(api_key),
-        "key_prefix": api_key[:7] if api_key else "",
-        "max_history_messages": MAX_HISTORY_MESSAGES,
-        "max_message_chars": MAX_MESSAGE_CHARS,
-        "stream_chunk_size": STREAM_FAKE_CHUNK_SIZE,
-        "updated_at": utc_now_iso(),
-        "error": None,
-    }
+if __name__ == "__main__":
+    print(
+        f"[{APP_NAME}] starting on http://127.0.0.1:{APP_PORT} "
+        f"| model={os.getenv('OPENAI_MODEL', 'gpt-5.4')}"
+    )
+    app.run(host="127.0.0.1", port=APP_PORT, debug=True, threaded=True)
