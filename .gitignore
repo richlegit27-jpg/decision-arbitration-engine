@@ -1,7 +1,20 @@
-runtime/backups/
-uploads/
-*.bak
-*.BAK*
-*.WORKING*
-current_backup/
-data/*.json
+# python
+__pycache__/
+*.pyc
+*.pyo
+
+# env / secrets
+.env
+*.key
+*.pem
+
+# data backups (optional)
+data/backups/
+
+# temp
+*.log
+*.tmp
+
+# local backups
+full_*/
+nova_backups/
