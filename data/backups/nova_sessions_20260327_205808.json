@@ -1,0 +1,182 @@
+[
+  {
+    "id": "8f782ef7-c830-4e6b-879f-cc4476740099",
+    "title": "test",
+    "created_at": "2026-03-28T03:43:34.473785+00:00",
+    "updated_at": "2026-03-28T03:43:35.997839+00:00",
+    "pinned": false,
+    "messages": [
+      {
+        "id": "3585017f-c9bf-46ac-99e8-9639463766cb",
+        "role": "user",
+        "content": "test",
+        "created_at": "2026-03-28T03:43:34.479960+00:00",
+        "meta": {}
+      },
+      {
+        "id": "feace05d-3424-4960-b1db-a5721101bacf",
+        "role": "assistant",
+        "content": "Hello — I’m here. What would you like to test?",
+        "created_at": "2026-03-28T03:43:35.997829+00:00",
+        "meta": {
+          "debug": {
+            "model": "gpt-5.4",
+            "system_prompt_preview": "You are Nova, a sharp, practical, high-agency assistant. Be direct, useful, and accurate. Prefer concrete action over vague advice. Use provided context when it is relevant. Do not claim to have used context that is empty or unavailable. If attached material is insufficient, say so plainly.",
+            "history_count": 0,
+            "memory": [],
+            "attachments": [],
+            "documents": [],
+            "images": [],
+            "memory_update": null,
+            "web": {
+              "enabled": true,
+              "used": false,
+              "urls": [],
+              "pages": [],
+              "summary": ""
+            },
+            "messages_preview": [
+              {
+                "role": "system",
+                "content": "You are Nova, a sharp, practical, high-agency assistant. Be direct, useful, and accurate. Prefer concrete action over vague advice. Use provided context when it is relevant. Do not claim to have used context that is empty or unavailable. If attached material is insufficient, say so plainly."
+              },
+              {
+                "role": "user",
+                "content": "test"
+              }
+            ],
+            "message_count": 2
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "b2a3584e-3e92-4309-a600-4999e2eae3f1",
+    "title": "test",
+    "created_at": "2026-03-28T03:43:25.433092+00:00",
+    "updated_at": "2026-03-28T03:43:26.775061+00:00",
+    "pinned": false,
+    "messages": [
+      {
+        "id": "2089bcf8-576a-400c-8194-1ae57a9868d5",
+        "role": "user",
+        "content": "test",
+        "created_at": "2026-03-28T03:43:25.439957+00:00",
+        "meta": {}
+      },
+      {
+        "id": "4aecacee-3f03-4dc2-a2fc-ac604b30f559",
+        "role": "assistant",
+        "content": "Test received.",
+        "created_at": "2026-03-28T03:43:26.775052+00:00",
+        "meta": {
+          "debug": {
+            "model": "gpt-5.4",
+            "system_prompt_preview": "You are Nova, a sharp, practical, high-agency assistant. Be direct, useful, and accurate. Prefer concrete action over vague advice. Use provided context when it is relevant. Do not claim to have used context that is empty or unavailable. If attached material is insufficient, say so plainly.",
+            "history_count": 0,
+            "memory": [],
+            "attachments": [],
+            "documents": [],
+            "images": [],
+            "memory_update": null,
+            "web": {
+              "enabled": true,
+              "used": false,
+              "urls": [],
+              "pages": [],
+              "summary": ""
+            },
+            "messages_preview": [
+              {
+                "role": "system",
+                "content": "You are Nova, a sharp, practical, high-agency assistant. Be direct, useful, and accurate. Prefer concrete action over vague advice. Use provided context when it is relevant. Do not claim to have used context that is empty or unavailable. If attached material is insufficient, say so plainly."
+              },
+              {
+                "role": "user",
+                "content": "test"
+              }
+            ],
+            "message_count": 2
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "fc23ad2d-cef0-4281-bb99-8322d9d07373",
+    "title": "test",
+    "created_at": "2026-03-28T03:43:15.193859+00:00",
+    "updated_at": "2026-03-28T03:43:17.888921+00:00",
+    "pinned": false,
+    "messages": [
+      {
+        "id": "b142946b-ce49-43b5-8ba0-926c2119af68",
+        "role": "user",
+        "content": "test",
+        "created_at": "2026-03-28T03:43:15.198756+00:00",
+        "meta": {}
+      },
+      {
+        "id": "e0ead85e-c5b1-4d10-a8c5-0cd1eb0fad0a",
+        "role": "assistant",
+        "content": "Hello — I’m here. What would you like to test?",
+        "created_at": "2026-03-28T03:43:17.888911+00:00",
+        "meta": {
+          "debug": {
+            "model": "gpt-5.4",
+            "system_prompt_preview": "You are Nova, a sharp, practical, high-agency assistant. Be direct, useful, and accurate. Prefer concrete action over vague advice. Use provided context when it is relevant. Do not claim to have used context that is empty or unavailable. If attached material is insufficient, say so plainly.",
+            "history_count": 0,
+            "memory": [],
+            "attachments": [],
+            "documents": [],
+            "images": [],
+            "memory_update": null,
+            "web": {
+              "enabled": true,
+              "used": false,
+              "urls": [],
+              "pages": [],
+              "summary": ""
+            },
+            "messages_preview": [
+              {
+                "role": "system",
+                "content": "You are Nova, a sharp, practical, high-agency assistant. Be direct, useful, and accurate. Prefer concrete action over vague advice. Use provided context when it is relevant. Do not claim to have used context that is empty or unavailable. If attached material is insufficient, say so plainly."
+              },
+              {
+                "role": "user",
+                "content": "test"
+              }
+            ],
+            "message_count": 2
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "29f659a9-45db-4e35-8dea-6da61246818f",
+    "title": "test",
+    "created_at": "2026-03-28T03:42:39.073048+00:00",
+    "updated_at": "2026-03-28T03:42:39.078235+00:00",
+    "pinned": false,
+    "messages": [
+      {
+        "id": "417892b7-dd65-4589-ac05-c59a19683621",
+        "role": "user",
+        "content": "test",
+        "created_at": "2026-03-28T03:42:39.078225+00:00",
+        "meta": {}
+      }
+    ]
+  },
+  {
+    "id": "6f14e72a-0934-46e3-8afa-e0fae8941fc2",
+    "title": "test",
+    "created_at": "2026-03-28T03:42:33.724049+00:00",
+    "updated_at": "2026-03-28T03:42:33.724049+00:00",
+    "pinned": false,
+    "messages": []
+  }
+]

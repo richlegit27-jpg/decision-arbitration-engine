@@ -1,507 +1,728 @@
+# notepad C:\Users\Owner\nova\services\chat_service.py
 from __future__ import annotations
 
-import html
 import json
 import os
 import re
-from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Dict, Generator, Iterable, List, Optional, Tuple
 
-import requests
-from openai import OpenAI
 
+# =========================================================
+# config
+# =========================================================
 
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4")
-DEFAULT_SYSTEM_PROMPT = (
-    "You are Nova, a sharp, practical, high-agency assistant. "
-    "Be direct, useful, and accurate. Prefer concrete action over vague advice.\n\n"
-    "Use provided context when it is relevant. Do not claim to have used context that is "
-    "empty or unavailable. If attached material is insufficient, say so plainly."
-)
+DEFAULT_TEMPERATURE = float(os.getenv("NOVA_TEMPERATURE", "0.7"))
+MAX_HISTORY_MESSAGES = int(os.getenv("NOVA_MAX_HISTORY_MESSAGES", "24"))
+MAX_MESSAGE_CHARS = int(os.getenv("NOVA_MAX_MESSAGE_CHARS", "24000"))
+MAX_SYSTEM_PROMPT_CHARS = int(os.getenv("NOVA_MAX_SYSTEM_PROMPT_CHARS", "12000"))
+MAX_DEBUG_PREVIEW_CHARS = int(os.getenv("NOVA_MAX_DEBUG_PREVIEW_CHARS", "1800"))
+STREAM_FAKE_CHUNK_SIZE = int(os.getenv("NOVA_STREAM_FAKE_CHUNK_SIZE", "120"))
 
-MAX_HISTORY_MESSAGES = 18
-MAX_MESSAGE_CHARS = 12000
-MAX_MEMORY_ITEMS = 12
-MAX_ATTACHMENT_ITEMS = 8
-MAX_ATTACHMENT_CHARS = 3000
-MAX_WEB_PAGES = 3
-MAX_WEB_CHARS_PER_PAGE = 3500
-REQUEST_TIMEOUT = 12
+DEFAULT_SYSTEM_PROMPT = """You are Nova, a sharp, practical, high-agency assistant. Be direct, useful, and accurate.
+Prefer concrete action over vague advice.
 
-URL_RE = re.compile(r"""https?://[^\s<>"')\]]+""", re.IGNORECASE)
-TAG_RE = re.compile(r"<[^>]+>")
-SCRIPT_RE = re.compile(r"<script\b.*?</script>", re.IGNORECASE | re.DOTALL)
-STYLE_RE = re.compile(r"<style\b.*?</style>", re.IGNORECASE | re.DOTALL)
-TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
-WHITESPACE_RE = re.compile(r"\s+")
+Use provided context when it is relevant.
+Do not claim to have used context that is empty or unavailable.
+If attached material is insufficient, say so plainly.
+
+When coding:
+- prefer robust, production-minded code
+- preserve existing contracts unless explicitly changing them
+- avoid unnecessary rewrites
+- return complete answers, not vague plans
+""".strip()
 
 
-@dataclass
-class WebPageSummary:
-    url: str
-    final_url: str
-    title: str
-    content_type: str
-    status_code: int
-    ok: bool
-    text: str
-    preview: str
-    truncated: bool
-    error: str = ""
+# =========================================================
+# optional imports
+# =========================================================
+
+try:
+    from openai import OpenAI
+except Exception:  # pragma: no cover
+    OpenAI = None  # type: ignore
+
+try:
+    from services.attachment_service import (
+        attachments_to_prompt_text,
+        build_attachment_context,
+    )
+except Exception:  # pragma: no cover
+    attachments_to_prompt_text = None  # type: ignore
+    build_attachment_context = None  # type: ignore
+
+try:
+    from services.web_service import build_web_prompt_context
+except Exception:  # pragma: no cover
+    build_web_prompt_context = None  # type: ignore
+
+try:
+    from services.memory_service import build_memory_prompt_context
+except Exception:  # pragma: no cover
+    build_memory_prompt_context = None  # type: ignore
+
+try:
+    from services.artifact_service import build_artifact_prompt_context
+except Exception:  # pragma: no cover
+    build_artifact_prompt_context = None  # type: ignore
 
 
-def _clean_text(value: Any) -> str:
-    text = str(value or "")
-    text = text.replace("\x00", " ")
-    text = WHITESPACE_RE.sub(" ", text)
+# =========================================================
+# helpers
+# =========================================================
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def clean_text(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).replace("\r\n", "\n").replace("\r", "\n").replace("\x00", "")
+    text = text.replace("\ufeff", "")
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
 
-def _truncate(text: str, limit: int) -> str:
-    text = _clean_text(text)
+def truncate(text: str, limit: int) -> str:
+    text = clean_text(text)
     if len(text) <= limit:
         return text
-    return text[:limit].rstrip() + "...(truncated)"
+    return text[:limit].rstrip() + "…"
 
 
-def _safe_json(value: Any) -> str:
+def safe_dict(value: Any) -> Dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def safe_list(value: Any) -> List[Any]:
+    return value if isinstance(value, list) else []
+
+
+def safe_bool(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    return default
+
+
+def safe_int(value: Any, default: int = 0) -> int:
     try:
-        return json.dumps(value, ensure_ascii=False, indent=2)
+        return int(value)
     except Exception:
-        return str(value)
+        return default
 
 
-def _extract_urls(text: str) -> List[str]:
-    seen = set()
-    urls: List[str] = []
-    for match in URL_RE.findall(text or ""):
-        url = match.rstrip(".,;:!?)]>}\"'")
-        if url and url not in seen:
-            seen.add(url)
-            urls.append(url)
-    return urls
+def make_id(prefix: str = "msg") -> str:
+    return f"{prefix}_{uuid.uuid4().hex}"
 
 
-def _strip_html(raw_html: str) -> str:
-    if not raw_html:
-        return ""
-    text = SCRIPT_RE.sub(" ", raw_html)
-    text = STYLE_RE.sub(" ", text)
-    text = TAG_RE.sub(" ", text)
-    text = html.unescape(text)
-    return _clean_text(text)
+def compact_preview(value: Any, limit: int = MAX_DEBUG_PREVIEW_CHARS) -> str:
+    text = clean_text(value)
+    text = re.sub(r"\s+", " ", text)
+    return truncate(text, limit)
 
 
-def _extract_title(raw_html: str) -> str:
-    if not raw_html:
-        return ""
-    match = TITLE_RE.search(raw_html)
-    if not match:
-        return ""
-    return _clean_text(html.unescape(match.group(1)))
+# =========================================================
+# request normalization
+# =========================================================
 
+def normalize_message(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    item = safe_dict(item)
+    role = clean_text(item.get("role")).lower() or "user"
+    if role not in {"system", "user", "assistant", "developer", "tool"}:
+        role = "user"
 
-def _fetch_web_page(url: str) -> WebPageSummary:
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/146.0.0.0 Safari/537.36 Nova/1.0"
-        )
+    content = clean_text(item.get("content"))
+    if not content:
+        return None
+
+    return {
+        "id": clean_text(item.get("id")) or make_id("msg"),
+        "role": role,
+        "content": truncate(content, MAX_MESSAGE_CHARS),
+        "created_at": clean_text(item.get("created_at")) or utc_now_iso(),
+        "metadata": safe_dict(item.get("metadata")),
     }
+
+
+def normalize_history(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    normalized: List[Dict[str, Any]] = []
+
+    for raw in safe_list(messages):
+        if not isinstance(raw, dict):
+            continue
+        msg = normalize_message(raw)
+        if not msg:
+            continue
+        normalized.append(msg)
+
+    return normalized[-MAX_HISTORY_MESSAGES:]
+
+
+def normalize_chat_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    payload = safe_dict(payload)
+
+    content = truncate(clean_text(payload.get("content")), MAX_MESSAGE_CHARS)
+    session_id = clean_text(payload.get("session_id")) or None
+    model = clean_text(payload.get("model")) or DEFAULT_MODEL
+    system_prompt = truncate(
+        clean_text(payload.get("system_prompt")) or DEFAULT_SYSTEM_PROMPT,
+        MAX_SYSTEM_PROMPT_CHARS,
+    )
+
+    incoming_messages = normalize_history(payload.get("messages"))
+    attachments = [safe_dict(x) for x in safe_list(payload.get("attachments")) if isinstance(x, dict)]
+    artifacts = [safe_dict(x) for x in safe_list(payload.get("artifacts")) if isinstance(x, dict)]
+
+    stream = safe_bool(payload.get("stream"), False)
+    web_enabled = safe_bool(payload.get("web_enabled"), True)
+    memory_enabled = safe_bool(payload.get("memory_enabled"), True)
+    artifact_enabled = safe_bool(payload.get("artifact_enabled"), True)
+    attachment_enabled = safe_bool(payload.get("attachment_enabled"), True)
+
+    return {
+        "session_id": session_id,
+        "content": content,
+        "model": model,
+        "system_prompt": system_prompt,
+        "messages": incoming_messages,
+        "attachments": attachments,
+        "artifacts": artifacts,
+        "stream": stream,
+        "web_enabled": web_enabled,
+        "memory_enabled": memory_enabled,
+        "artifact_enabled": artifact_enabled,
+        "attachment_enabled": attachment_enabled,
+        "metadata": safe_dict(payload.get("metadata")),
+    }
+
+
+# =========================================================
+# context builders
+# =========================================================
+
+def _build_memory_context(payload: Dict[str, Any]) -> Dict[str, Any]:
+    if not payload.get("memory_enabled"):
+        return {"prompt_text": "", "items": [], "error": None}
+
+    if callable(build_memory_prompt_context):
+        try:
+            result = build_memory_prompt_context(
+                {
+                    "content": payload.get("content"),
+                    "messages": payload.get("messages", []),
+                    "session_id": payload.get("session_id"),
+                    "metadata": payload.get("metadata", {}),
+                }
+            )
+            result = safe_dict(result)
+            return {
+                "prompt_text": clean_text(result.get("prompt_text")),
+                "items": safe_list(result.get("items") or result.get("memory")),
+                "error": result.get("error"),
+            }
+        except Exception as exc:
+            return {
+                "prompt_text": "",
+                "items": [],
+                "error": {"code": "memory_context_failed", "message": str(exc)},
+            }
+
+    return {"prompt_text": "", "items": [], "error": None}
+
+
+def _build_attachment_context(payload: Dict[str, Any]) -> Dict[str, Any]:
+    attachments = safe_list(payload.get("attachments"))
+    if not payload.get("attachment_enabled") or not attachments:
+        return {
+            "prompt_text": "",
+            "attachments": [],
+            "documents": [],
+            "images": [],
+            "error": None,
+        }
+
+    prompt_text = ""
+    structured: Dict[str, Any] = {}
+
+    if callable(build_attachment_context):
+        try:
+            structured = safe_dict(build_attachment_context(attachments))
+        except Exception as exc:
+            return {
+                "prompt_text": "",
+                "attachments": [],
+                "documents": [],
+                "images": [],
+                "error": {"code": "attachment_context_failed", "message": str(exc)},
+            }
+
+    if callable(attachments_to_prompt_text):
+        try:
+            prompt_text = clean_text(attachments_to_prompt_text(attachments))
+        except Exception:
+            prompt_text = ""
+
+    return {
+        "prompt_text": prompt_text,
+        "attachments": safe_list(structured.get("attachments")),
+        "documents": safe_list(structured.get("documents")),
+        "images": safe_list(structured.get("images")),
+        "error": None,
+    }
+
+
+def _build_web_context(payload: Dict[str, Any]) -> Dict[str, Any]:
+    if not payload.get("web_enabled"):
+        return {"prompt_text": "", "results": [], "debug": [], "error": None}
+
+    if callable(build_web_prompt_context):
+        try:
+            result = build_web_prompt_context(text=clean_text(payload.get("content")))
+            result = safe_dict(result)
+            return {
+                "prompt_text": clean_text(result.get("prompt_text")),
+                "results": safe_list(result.get("results")),
+                "debug": safe_list(result.get("debug")),
+                "error": result.get("error"),
+            }
+        except Exception as exc:
+            return {
+                "prompt_text": "",
+                "results": [],
+                "debug": [],
+                "error": {"code": "web_context_failed", "message": str(exc)},
+            }
+
+    return {"prompt_text": "", "results": [], "debug": [], "error": None}
+
+
+def _build_artifact_context(payload: Dict[str, Any]) -> Dict[str, Any]:
+    artifacts = safe_list(payload.get("artifacts"))
+    if not payload.get("artifact_enabled") or not artifacts:
+        return {"prompt_text": "", "items": [], "error": None}
+
+    if callable(build_artifact_prompt_context):
+        try:
+            result = build_artifact_prompt_context({"artifacts": artifacts})
+            result = safe_dict(result)
+            return {
+                "prompt_text": clean_text(result.get("prompt_text")),
+                "items": safe_list(result.get("items") or result.get("artifacts")),
+                "error": result.get("error"),
+            }
+        except Exception as exc:
+            return {
+                "prompt_text": "",
+                "items": [],
+                "error": {"code": "artifact_context_failed", "message": str(exc)},
+            }
+
+    return {"prompt_text": "", "items": [], "error": None}
+
+
+def build_context_bundle(payload: Dict[str, Any]) -> Dict[str, Any]:
+    memory_context = _build_memory_context(payload)
+    attachment_context = _build_attachment_context(payload)
+    web_context = _build_web_context(payload)
+    artifact_context = _build_artifact_context(payload)
+
+    sections: List[str] = []
+
+    memory_text = clean_text(memory_context.get("prompt_text"))
+    if memory_text:
+        sections.append(memory_text)
+
+    attachment_text = clean_text(attachment_context.get("prompt_text"))
+    if attachment_text:
+        sections.append(attachment_text)
+
+    web_text = clean_text(web_context.get("prompt_text"))
+    if web_text:
+        sections.append(web_text)
+
+    artifact_text = clean_text(artifact_context.get("prompt_text"))
+    if artifact_text:
+        sections.append(artifact_text)
+
+    return {
+        "context_text": "\n\n".join([x for x in sections if x]).strip(),
+        "memory": memory_context,
+        "attachments": attachment_context,
+        "web": web_context,
+        "artifacts": artifact_context,
+    }
+
+
+# =========================================================
+# input building
+# =========================================================
+
+def build_messages_for_model(payload: Dict[str, Any], bundle: Dict[str, Any]) -> List[Dict[str, str]]:
+    messages: List[Dict[str, str]] = []
+
+    system_prompt = clean_text(payload.get("system_prompt")) or DEFAULT_SYSTEM_PROMPT
+    context_text = clean_text(bundle.get("context_text"))
+
+    if context_text:
+        system_prompt = f"{system_prompt}\n\nContext:\n{context_text}".strip()
+
+    messages.append(
+        {
+            "role": "system",
+            "content": system_prompt,
+        }
+    )
+
+    for item in safe_list(payload.get("messages")):
+        msg = safe_dict(item)
+        role = clean_text(msg.get("role")).lower()
+        content = clean_text(msg.get("content"))
+        if role not in {"user", "assistant", "system", "developer"}:
+            continue
+        if not content:
+            continue
+        messages.append({"role": role, "content": content})
+
+    current_content = clean_text(payload.get("content"))
+    if current_content:
+        messages.append({"role": "user", "content": current_content})
+
+    return messages
+
+
+# =========================================================
+# openai response handling
+# =========================================================
+
+def get_openai_client() -> Any:
+    if OpenAI is None:
+        return None
+
+    api_key = clean_text(os.getenv("OPENAI_API_KEY"))
+    if not api_key:
+        return None
+
     try:
-        response = requests.get(
-            url,
-            headers=headers,
-            timeout=REQUEST_TIMEOUT,
-            allow_redirects=True,
+        return OpenAI(api_key=api_key)
+    except Exception:
+        try:
+            return OpenAI()
+        except Exception:
+            return None
+
+
+def extract_response_text(response: Any) -> str:
+    try:
+        text = clean_text(getattr(response, "output_text", ""))
+        if text:
+            return text
+    except Exception:
+        pass
+
+    try:
+        output = getattr(response, "output", None)
+        if output:
+            parts: List[str] = []
+            for item in output:
+                item_type = clean_text(getattr(item, "type", ""))
+                if item_type == "message":
+                    content_list = getattr(item, "content", []) or []
+                    for content in content_list:
+                        content_type = clean_text(getattr(content, "type", ""))
+                        if content_type in {"output_text", "text"}:
+                            chunk = clean_text(getattr(content, "text", ""))
+                            if chunk:
+                                parts.append(chunk)
+                else:
+                    text = clean_text(getattr(item, "text", ""))
+                    if text:
+                        parts.append(text)
+            if parts:
+                return clean_text("\n".join(parts))
+    except Exception:
+        pass
+
+    try:
+        as_dict = response.model_dump()  # type: ignore[attr-defined]
+        if isinstance(as_dict, dict):
+            if clean_text(as_dict.get("output_text")):
+                return clean_text(as_dict.get("output_text"))
+            output = safe_list(as_dict.get("output"))
+            parts: List[str] = []
+            for item in output:
+                d = safe_dict(item)
+                if clean_text(d.get("type")) == "message":
+                    for content in safe_list(d.get("content")):
+                        c = safe_dict(content)
+                        ctype = clean_text(c.get("type"))
+                        if ctype in {"output_text", "text"}:
+                            text = clean_text(c.get("text"))
+                            if text:
+                                parts.append(text)
+            if parts:
+                return clean_text("\n".join(parts))
+    except Exception:
+        pass
+
+    return ""
+
+
+def call_model(messages: List[Dict[str, str]], model: str) -> Tuple[str, Dict[str, Any]]:
+    client = get_openai_client()
+    if client is None:
+        return (
+            "Nova backend is running, but the model client is not available. Check OPENAI_API_KEY and OpenAI SDK installation.",
+            {
+                "provider": "openai",
+                "client_available": False,
+                "model": model,
+                "error": {
+                    "code": "model_unavailable",
+                    "message": "OpenAI client unavailable or OPENAI_API_KEY missing.",
+                },
+            },
         )
-        content_type = response.headers.get("content-type", "").split(";")[0].strip().lower()
-        body = response.text or ""
 
-        if "html" in content_type:
-            title = _extract_title(body)
-            text = _strip_html(body)
-        else:
-            title = ""
-            text = _clean_text(body)
-
-        text = _truncate(text, MAX_WEB_CHARS_PER_PAGE)
-        preview = _truncate(text, 500)
-
-        return WebPageSummary(
-            url=url,
-            final_url=str(response.url),
-            title=title or _clean_text(response.url),
-            content_type=content_type or "unknown",
-            status_code=response.status_code,
-            ok=response.ok,
-            text=text,
-            preview=preview,
-            truncated=len(_clean_text(_strip_html(body) if "html" in content_type else body)) > len(text),
+    try:
+        response = client.responses.create(
+            model=model,
+            input=messages,
+        )
+        text = extract_response_text(response)
+        if not text:
+            text = "The model returned no text."
+        return (
+            text,
+            {
+                "provider": "openai",
+                "client_available": True,
+                "model": model,
+                "response_id": clean_text(getattr(response, "id", "")),
+                "error": None,
+            },
         )
     except Exception as exc:
-        return WebPageSummary(
-            url=url,
-            final_url=url,
-            title="",
-            content_type="",
-            status_code=0,
-            ok=False,
-            text="",
-            preview="",
-            truncated=False,
-            error=str(exc),
+        return (
+            "Nova hit a model error while generating a reply.",
+            {
+                "provider": "openai",
+                "client_available": True,
+                "model": model,
+                "error": {
+                    "code": "model_call_failed",
+                    "message": str(exc),
+                },
+            },
         )
 
 
-def _summarize_web_from_text(text: str) -> Tuple[str, Dict[str, Any]]:
-    urls = _extract_urls(text)
-    if not urls:
-        return "", {
-            "enabled": True,
-            "used": False,
-            "urls": [],
-            "pages": [],
-            "summary": "",
-        }
+# =========================================================
+# debug shaping
+# =========================================================
 
-    pages: List[WebPageSummary] = []
-    for url in urls[:MAX_WEB_PAGES]:
-        pages.append(_fetch_web_page(url))
+def build_debug_brain(payload: Dict[str, Any], bundle: Dict[str, Any], messages: List[Dict[str, str]], model_meta: Dict[str, Any]) -> Dict[str, Any]:
+    attachment_ctx = safe_dict(bundle.get("attachments"))
+    web_ctx = safe_dict(bundle.get("web"))
+    artifact_ctx = safe_dict(bundle.get("artifacts"))
+    memory_ctx = safe_dict(bundle.get("memory"))
 
-    usable_pages = [p for p in pages if p.ok and p.text]
-    if not usable_pages:
-        debug_payload = {
-            "enabled": True,
-            "used": False,
-            "urls": urls[:MAX_WEB_PAGES],
-            "pages": [
-                {
-                    "url": p.url,
-                    "final_url": p.final_url,
-                    "ok": p.ok,
-                    "status_code": p.status_code,
-                    "content_type": p.content_type,
-                    "title": p.title,
-                    "preview": p.preview,
-                    "error": p.error,
-                }
-                for p in pages
-            ],
-            "summary": "",
-        }
-        return "", debug_payload
-
-    blocks: List[str] = []
-    for index, page in enumerate(usable_pages, start=1):
-        blocks.append(
-            "\n".join(
-                [
-                    f"[Web Source {index}]",
-                    f"Title: {page.title or 'Untitled'}",
-                    f"URL: {page.final_url or page.url}",
-                    f"Type: {page.content_type or 'unknown'}",
-                    f"Preview: {_truncate(page.preview, 350)}",
-                    f"Extracted Text: {_truncate(page.text, MAX_WEB_CHARS_PER_PAGE)}",
-                ]
-            )
-        )
-
-    summary = (
-        "Web context was automatically fetched from URLs found in the user's latest message.\n"
-        "Use it when relevant. If the fetched content is thin, noisy, or insufficient, say so plainly.\n\n"
-        + "\n\n".join(blocks)
-    )
-
-    debug_payload = {
-        "enabled": True,
-        "used": True,
-        "urls": urls[:MAX_WEB_PAGES],
-        "pages": [
+    messages_preview = []
+    for item in messages[-8:]:
+        msg = safe_dict(item)
+        messages_preview.append(
             {
-                "url": p.url,
-                "final_url": p.final_url,
-                "ok": p.ok,
-                "status_code": p.status_code,
-                "content_type": p.content_type,
-                "title": p.title,
-                "preview": p.preview,
-                "truncated": p.truncated,
-                "error": p.error,
-            }
-            for p in pages
-        ],
-        "summary": summary,
-    }
-    return summary, debug_payload
-
-
-def _coerce_message(item: Any) -> Optional[Dict[str, str]]:
-    if not isinstance(item, dict):
-        return None
-    role = str(item.get("role") or "").strip().lower()
-    content = item.get("content", "")
-    if isinstance(content, list):
-        parts = []
-        for block in content:
-            if isinstance(block, dict):
-                parts.append(str(block.get("text") or block.get("content") or ""))
-            else:
-                parts.append(str(block))
-        content = "\n".join(parts)
-    content = _truncate(content, MAX_MESSAGE_CHARS)
-    if not role or not content:
-        return None
-    if role not in {"system", "user", "assistant"}:
-        role = "user"
-    return {"role": role, "content": content}
-
-
-def _normalize_history(history: Optional[Sequence[Dict[str, Any]]]) -> List[Dict[str, str]]:
-    normalized: List[Dict[str, str]] = []
-    for item in history or []:
-        msg = _coerce_message(item)
-        if msg:
-            normalized.append(msg)
-    if len(normalized) > MAX_HISTORY_MESSAGES:
-        normalized = normalized[-MAX_HISTORY_MESSAGES:]
-    return normalized
-
-
-def _normalize_memory(memory: Optional[Sequence[Dict[str, Any]]]) -> List[Dict[str, Any]]:
-    items: List[Dict[str, Any]] = []
-    for raw in memory or []:
-        if not isinstance(raw, dict):
-            continue
-        value = _clean_text(raw.get("value") or raw.get("text") or raw.get("content") or "")
-        if not value:
-            continue
-        items.append(
-            {
-                "kind": _clean_text(raw.get("kind") or "note"),
-                "value": value,
-                "score": raw.get("score"),
-                "source": raw.get("source"),
+                "role": clean_text(msg.get("role")),
+                "content": compact_preview(msg.get("content")),
             }
         )
-    return items[:MAX_MEMORY_ITEMS]
 
-
-def _format_memory_block(memory: Optional[Sequence[Dict[str, Any]]]) -> str:
-    items = _normalize_memory(memory)
-    if not items:
-        return ""
-    lines = ["Saved user memory:"]
-    for item in items:
-        kind = item.get("kind") or "note"
-        value = item.get("value") or ""
-        lines.append(f"- [{kind}] {value}")
-    return "\n".join(lines)
-
-
-def _normalize_attachments(attachments: Optional[Sequence[Dict[str, Any]]]) -> List[Dict[str, Any]]:
-    normalized: List[Dict[str, Any]] = []
-    for raw in attachments or []:
-        if not isinstance(raw, dict):
-            continue
-        name = _clean_text(raw.get("name") or raw.get("filename") or raw.get("path") or "attachment")
-        summary = _clean_text(
-            raw.get("summary")
-            or raw.get("preview")
-            or raw.get("text")
-            or raw.get("content")
-            or ""
-        )
-        if not summary:
-            continue
-        normalized.append(
-            {
-                "name": name,
-                "summary": _truncate(summary, MAX_ATTACHMENT_CHARS),
-                "mime_type": _clean_text(raw.get("mime_type") or raw.get("content_type") or ""),
-            }
-        )
-    return normalized[:MAX_ATTACHMENT_ITEMS]
-
-
-def _format_attachments_block(attachments: Optional[Sequence[Dict[str, Any]]]) -> str:
-    items = _normalize_attachments(attachments)
-    if not items:
-        return ""
-    lines = ["Attachment context:"]
-    for item in items:
-        mime = f" ({item['mime_type']})" if item.get("mime_type") else ""
-        lines.append(f"- {item['name']}{mime}: {item['summary']}")
-    return "\n".join(lines)
-
-
-def _build_messages(
-    *,
-    user_text: str,
-    history: Optional[Sequence[Dict[str, Any]]] = None,
-    memory: Optional[Sequence[Dict[str, Any]]] = None,
-    attachments: Optional[Sequence[Dict[str, Any]]] = None,
-    system_prompt: Optional[str] = None,
-    web_enabled: bool = True,
-) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
-    final_system_prompt = _clean_text(system_prompt or DEFAULT_SYSTEM_PROMPT) or DEFAULT_SYSTEM_PROMPT
-    cleaned_user_text = _truncate(user_text, MAX_MESSAGE_CHARS)
-
-    memory_block = _format_memory_block(memory)
-    attachments_block = _format_attachments_block(attachments)
-    web_block, web_debug = _summarize_web_from_text(cleaned_user_text) if web_enabled else (
-        "",
-        {"enabled": False, "used": False, "urls": [], "pages": [], "summary": ""},
-    )
-
-    system_parts = [final_system_prompt]
-    if memory_block:
-        system_parts.append(memory_block)
-    if attachments_block:
-        system_parts.append(attachments_block)
-    if web_block:
-        system_parts.append(web_block)
-
-    messages: List[Dict[str, str]] = [{"role": "system", "content": "\n\n".join(system_parts)}]
-    messages.extend(_normalize_history(history))
-    messages.append({"role": "user", "content": cleaned_user_text})
-
-    debug = {
-        "model": DEFAULT_MODEL,
-        "system_prompt_preview": _truncate(final_system_prompt, 500),
-        "history_count": len(_normalize_history(history)),
-        "memory": _normalize_memory(memory),
-        "attachments": _normalize_attachments(attachments),
-        "documents": _normalize_attachments(attachments),
-        "images": [],
-        "memory_update": None,
-        "web": web_debug,
-        "messages_preview": messages[-4:],
-        "message_count": len(messages),
-    }
-    return messages, debug
-
-
-def _make_client() -> OpenAI:
-    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-
-def generate_reply(
-    *,
-    user_text: str = "",
-    history: Optional[Sequence[Dict[str, Any]]] = None,
-    memory: Optional[Sequence[Dict[str, Any]]] = None,
-    attachments: Optional[Sequence[Dict[str, Any]]] = None,
-    model: Optional[str] = None,
-    system_prompt: Optional[str] = None,
-    web_enabled: bool = True,
-    temperature: float = 0.4,
-    **_: Any,
-) -> Tuple[str, Dict[str, Any]]:
-    messages, debug = _build_messages(
-        user_text=user_text,
-        history=history,
-        memory=memory,
-        attachments=attachments,
-        system_prompt=system_prompt,
-        web_enabled=web_enabled,
-    )
-
-    chosen_model = model or os.getenv("OPENAI_MODEL", DEFAULT_MODEL)
-    debug["model"] = chosen_model
-
-    client = _make_client()
-    response = client.chat.completions.create(
-        model=chosen_model,
-        messages=messages,
-        temperature=temperature,
-    )
-
-    text = ""
-    try:
-        text = response.choices[0].message.content or ""
-    except Exception:
-        text = ""
-
-    text = text.strip()
-    if not text:
-        text = "I couldn't produce a response from the model."
-
-    return text, debug
-
-
-def generate_reply_stream(
-    *,
-    user_text: str = "",
-    history: Optional[Sequence[Dict[str, Any]]] = None,
-    memory: Optional[Sequence[Dict[str, Any]]] = None,
-    attachments: Optional[Sequence[Dict[str, Any]]] = None,
-    model: Optional[str] = None,
-    system_prompt: Optional[str] = None,
-    web_enabled: bool = True,
-    temperature: float = 0.4,
-    **_: Any,
-) -> Tuple[Iterator[Dict[str, Any]], Dict[str, Any]]:
-    messages, debug = _build_messages(
-        user_text=user_text,
-        history=history,
-        memory=memory,
-        attachments=attachments,
-        system_prompt=system_prompt,
-        web_enabled=web_enabled,
-    )
-
-    chosen_model = model or os.getenv("OPENAI_MODEL", DEFAULT_MODEL)
-    debug["model"] = chosen_model
-    client = _make_client()
-
-    stream = client.chat.completions.create(
-        model=chosen_model,
-        messages=messages,
-        temperature=temperature,
-        stream=True,
-    )
-
-    def iterator() -> Iterator[Dict[str, Any]]:
-        parts: List[str] = []
-        try:
-            for chunk in stream:
-                if not getattr(chunk, "choices", None):
-                    continue
-                delta = chunk.choices[0].delta
-                piece = getattr(delta, "content", None) or ""
-                if not piece:
-                    continue
-                parts.append(piece)
-                yield {"type": "delta", "delta": piece}
-            final_text = "".join(parts).strip()
-            yield {"type": "done", "text": final_text}
-        except Exception as exc:
-            yield {"type": "error", "error": str(exc)}
-
-    return iterator(), debug
-
-
-def preview_chat_context(
-    *,
-    user_text: str = "",
-    history: Optional[Sequence[Dict[str, Any]]] = None,
-    memory: Optional[Sequence[Dict[str, Any]]] = None,
-    attachments: Optional[Sequence[Dict[str, Any]]] = None,
-    system_prompt: Optional[str] = None,
-    web_enabled: bool = True,
-    **_: Any,
-) -> Dict[str, Any]:
-    messages, debug = _build_messages(
-        user_text=user_text,
-        history=history,
-        memory=memory,
-        attachments=attachments,
-        system_prompt=system_prompt,
-        web_enabled=web_enabled,
-    )
     return {
-        "messages": messages,
+        "model": clean_text(payload.get("model")) or DEFAULT_MODEL,
+        "system_prompt_preview": compact_preview(messages[0]["content"] if messages else ""),
+        "history_count": len(safe_list(payload.get("messages"))),
+        "message_count": len(messages),
+        "messages_preview": messages_preview,
+        "memory": safe_list(memory_ctx.get("items")),
+        "memory_update": "",
+        "attachments": safe_list(attachment_ctx.get("attachments")),
+        "documents": safe_list(attachment_ctx.get("documents")),
+        "images": safe_list(attachment_ctx.get("images")),
+        "web": safe_list(web_ctx.get("debug") or web_ctx.get("results")),
+        "artifacts": safe_list(artifact_ctx.get("items")),
+        "context_preview": compact_preview(bundle.get("context_text")),
+        "model_meta": model_meta,
+    }
+
+
+# =========================================================
+# output shaping
+# =========================================================
+
+def build_assistant_message(content: str, model: str, session_id: Optional[str] = None) -> Dict[str, Any]:
+    return {
+        "id": make_id("assistant"),
+        "role": "assistant",
+        "content": clean_text(content),
+        "created_at": utc_now_iso(),
+        "session_id": session_id,
+        "metadata": {
+            "model": model,
+        },
+    }
+
+
+def build_chat_response(payload: Dict[str, Any], assistant_text: str, debug: Dict[str, Any], model_meta: Dict[str, Any]) -> Dict[str, Any]:
+    assistant_message = build_assistant_message(
+        content=assistant_text,
+        model=clean_text(payload.get("model")) or DEFAULT_MODEL,
+        session_id=payload.get("session_id"),
+    )
+
+    return {
+        "ok": True,
+        "message": assistant_message,
+        "assistant_message": assistant_message,
+        "session_id": payload.get("session_id"),
+        "model": clean_text(payload.get("model")) or DEFAULT_MODEL,
         "debug": debug,
+        "error": model_meta.get("error"),
+    }
+
+
+# =========================================================
+# public service functions
+# =========================================================
+
+def generate_reply(payload: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = normalize_chat_payload(payload)
+    bundle = build_context_bundle(normalized)
+    messages = build_messages_for_model(normalized, bundle)
+    assistant_text, model_meta = call_model(messages, normalized.get("model") or DEFAULT_MODEL)
+    debug = build_debug_brain(normalized, bundle, messages, model_meta)
+    return build_chat_response(normalized, assistant_text, debug, model_meta)
+
+
+def _chunk_text_for_stream(text: str, chunk_size: int = STREAM_FAKE_CHUNK_SIZE) -> Iterable[str]:
+    text = clean_text(text)
+    if not text:
+        return []
+    return [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
+
+
+def generate_reply_stream(payload: Dict[str, Any]) -> Tuple[Generator[Dict[str, Any], None, None], Dict[str, Any]]:
+    normalized = normalize_chat_payload({**safe_dict(payload), "stream": True})
+    bundle = build_context_bundle(normalized)
+    messages = build_messages_for_model(normalized, bundle)
+
+    placeholder_model_meta = {
+        "provider": "openai",
+        "client_available": get_openai_client() is not None,
+        "model": normalized.get("model") or DEFAULT_MODEL,
+        "error": None,
+    }
+    debug = build_debug_brain(normalized, bundle, messages, placeholder_model_meta)
+
+    def event_generator() -> Generator[Dict[str, Any], None, None]:
+        assistant_text, model_meta = call_model(messages, normalized.get("model") or DEFAULT_MODEL)
+
+        yield {
+            "type": "start",
+            "session_id": normalized.get("session_id"),
+            "model": normalized.get("model") or DEFAULT_MODEL,
+            "created_at": utc_now_iso(),
+        }
+
+        for chunk in _chunk_text_for_stream(assistant_text):
+            yield {
+                "type": "delta",
+                "delta": chunk,
+            }
+
+        assistant_message = build_assistant_message(
+            content=assistant_text,
+            model=normalized.get("model") or DEFAULT_MODEL,
+            session_id=normalized.get("session_id"),
+        )
+
+        yield {
+            "type": "done",
+            "message": assistant_message,
+            "assistant_message": assistant_message,
+            "session_id": normalized.get("session_id"),
+            "model": normalized.get("model") or DEFAULT_MODEL,
+            "debug": build_debug_brain(normalized, bundle, messages, model_meta),
+            "error": model_meta.get("error"),
+        }
+
+    return event_generator(), debug
+
+
+def preview_chat_brain(payload: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = normalize_chat_payload(payload)
+    bundle = build_context_bundle(normalized)
+    messages = build_messages_for_model(normalized, bundle)
+    model_meta = {
+        "provider": "openai",
+        "client_available": get_openai_client() is not None,
+        "model": normalized.get("model") or DEFAULT_MODEL,
+        "error": None,
+    }
+
+    return {
+        "ok": True,
+        "debug": build_debug_brain(normalized, bundle, messages, model_meta),
+        "message_count": len(messages),
+        "messages_preview": [
+            {
+                "role": clean_text(m.get("role")),
+                "content": compact_preview(m.get("content")),
+            }
+            for m in messages
+        ],
+        "error": None,
+    }
+
+
+# =========================================================
+# route helpers
+# =========================================================
+
+def coerce_stream_done_event(event: Dict[str, Any]) -> Dict[str, Any]:
+    event = safe_dict(event)
+    if clean_text(event.get("type")) != "done":
+        return event
+
+    message = safe_dict(event.get("message") or event.get("assistant_message"))
+    return {
+        "type": "done",
+        "message": message,
+        "assistant_message": message,
+        "session_id": clean_text(event.get("session_id")) or message.get("session_id"),
+        "model": clean_text(event.get("model")) or safe_dict(message.get("metadata")).get("model") or DEFAULT_MODEL,
+        "debug": safe_dict(event.get("debug")),
+        "error": event.get("error"),
+    }
+
+
+def service_status() -> Dict[str, Any]:
+    client_available = get_openai_client() is not None
+    api_key = clean_text(os.getenv("OPENAI_API_KEY"))
+
+    return {
+        "ok": True,
+        "service": "chat_service",
+        "model": DEFAULT_MODEL,
+        "client_available": client_available,
+        "key_present": bool(api_key),
+        "key_prefix": api_key[:7] if api_key else "",
+        "max_history_messages": MAX_HISTORY_MESSAGES,
+        "max_message_chars": MAX_MESSAGE_CHARS,
+        "stream_chunk_size": STREAM_FAKE_CHUNK_SIZE,
+        "updated_at": utc_now_iso(),
+        "error": None,
     }
