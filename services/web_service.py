@@ -1,10 +1,11 @@
-# notepad C:\Users\Owner\nova\services\web_service.py
 from __future__ import annotations
 
 import html
 import json
 import mimetypes
 import re
+import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
@@ -54,6 +55,10 @@ DEFAULT_HEADERS = {
 # =========================================================
 # helpers
 # =========================================================
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
 
 def _clean_text(value: Any) -> str:
     if value is None:
@@ -123,6 +128,25 @@ def _unique_dicts_by_key(items: List[Dict[str, Any]], key_name: str) -> List[Dic
     return out
 
 
+def _unique_media(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen = set()
+    out: List[Dict[str, Any]] = []
+    for item in items:
+        item = _coerce_dict(item)
+        key = (
+            _clean_text(item.get("kind")).strip().lower(),
+            _clean_text(item.get("source_url")).strip(),
+            _clean_text(item.get("preview_url")).strip(),
+        )
+        if not key[1] and not key[2]:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
+
+
 def _is_probable_url(value: str) -> bool:
     value = value.strip()
     return value.startswith("http://") or value.startswith("https://")
@@ -156,6 +180,15 @@ def _domain_from_url(url: str) -> str:
         return ""
 
 
+def _filename_from_url(url: str, fallback: str = "asset") -> str:
+    try:
+        name = urlparse(url).path.split("/")[-1]
+        name = _clean_text(name).strip()
+        return name or fallback
+    except Exception:
+        return fallback
+
+
 def _guess_media_kind(url: str, mime_type: str = "") -> str:
     url_lower = _clean_text(url).lower()
     mime_lower = _clean_text(mime_type).lower()
@@ -166,6 +199,18 @@ def _guess_media_kind(url: str, mime_type: str = "") -> str:
         return "video"
     if mime_lower.startswith("audio/"):
         return "audio"
+    if "html" in mime_lower:
+        return "webpage"
+    if mime_lower.startswith("text/"):
+        return "document"
+    if mime_lower in {
+        "application/pdf",
+        "application/json",
+        "application/xml",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }:
+        return "document"
 
     guessed, _ = mimetypes.guess_type(url_lower)
     guessed = guessed or ""
@@ -175,6 +220,10 @@ def _guess_media_kind(url: str, mime_type: str = "") -> str:
         return "video"
     if guessed.startswith("audio/"):
         return "audio"
+    if "html" in guessed:
+        return "webpage"
+    if guessed.startswith("text/") or guessed == "application/pdf":
+        return "document"
 
     if re.search(r"\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)", url_lower):
         return "image"
@@ -182,6 +231,10 @@ def _guess_media_kind(url: str, mime_type: str = "") -> str:
         return "video"
     if re.search(r"\.(mp3|wav|m4a|aac|flac|oga)(\?|#|$)", url_lower):
         return "audio"
+    if re.search(r"\.(html?|xhtml)(\?|#|$)", url_lower):
+        return "webpage"
+    if re.search(r"\.(pdf|txt|md|csv|json|xml|doc|docx)(\?|#|$)", url_lower):
+        return "document"
 
     return "file"
 
@@ -244,6 +297,76 @@ def _extract_attr(tag: Any, attr: str) -> str:
     if tag and tag.get(attr):
         return _collapse_ws(tag.get(attr))
     return ""
+
+
+def _build_media_item(
+    *,
+    kind: str,
+    source_url: str,
+    preview_url: str = "",
+    title: str = "",
+    mime_type: str = "",
+    status: str = "ready",
+    summary: str = "",
+    extracted_text: str = "",
+    transcript: str = "",
+    thumbnail_url: str = "",
+    local_path: str = "",
+    duration_seconds: Optional[int] = None,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    size_bytes: Optional[int] = None,
+    provider: str = "",
+    host: str = "",
+    errors: Optional[List[str]] = None,
+    source: str = "",
+    alt: str = "",
+    canonical_url: str = "",
+) -> Dict[str, Any]:
+    source_url = _clean_text(source_url).strip()
+    preview_url = _clean_text(preview_url).strip() or source_url
+    host = _clean_text(host).strip() or _domain_from_url(source_url or preview_url)
+    provider = _clean_text(provider).strip() or host
+    title = _truncate(title, 300)
+    summary = _truncate(summary, MAX_SUMMARY_CHARS)
+    extracted_text = _truncate(extracted_text, MAX_TEXT_BLOCK_CHARS)
+    transcript = _truncate(transcript, MAX_TEXT_BLOCK_CHARS)
+    thumbnail_url = _clean_text(thumbnail_url).strip()
+    local_path = _clean_text(local_path).strip()
+
+    normalized_errors = []
+    for err in _coerce_list(errors):
+        err_text = _truncate(err, 300)
+        if err_text:
+            normalized_errors.append(err_text)
+
+    return {
+        "id": uuid.uuid4().hex,
+        "kind": _clean_text(kind).strip() or _guess_media_kind(source_url or preview_url, mime_type),
+        "title": title,
+        "source_url": source_url,
+        "preview_url": preview_url,
+        "thumbnail_url": thumbnail_url,
+        "local_path": local_path,
+        "mime_type": _clean_text(mime_type).strip(),
+        "status": _clean_text(status).strip() or "ready",
+        "summary": summary,
+        "extracted_text": extracted_text,
+        "transcript": transcript,
+        "duration_seconds": duration_seconds,
+        "width": width,
+        "height": height,
+        "size_bytes": size_bytes,
+        "provider": provider,
+        "host": host,
+        "created_at": _now_iso(),
+        "errors": normalized_errors,
+        "meta": {
+            "source": _clean_text(source),
+            "alt": _clean_text(alt),
+            "canonical_url": _clean_text(canonical_url),
+        },
+    }
 
 
 def _collect_media_from_bs4(soup: Any, base_url: str) -> Dict[str, List[Dict[str, Any]]]:
@@ -523,14 +646,33 @@ def _extract_html_fields(html_text: str, base_url: str) -> Dict[str, Any]:
     return _extract_html_fields_fallback(html_text, base_url)
 
 
-def _build_media_summary(images: List[Dict[str, Any]], videos: List[Dict[str, Any]], audios: List[Dict[str, Any]]) -> str:
+def _split_media(media: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+    images: List[Dict[str, Any]] = []
+    videos: List[Dict[str, Any]] = []
+    audios: List[Dict[str, Any]] = []
+
+    for item in media:
+        item = _coerce_dict(item)
+        kind = _clean_text(item.get("kind")).lower()
+        if kind == "image":
+            images.append(item)
+        elif kind == "video":
+            videos.append(item)
+        elif kind == "audio":
+            audios.append(item)
+
+    return {"images": images, "videos": videos, "audios": audios}
+
+
+def _build_media_summary_from_media(media: List[Dict[str, Any]]) -> str:
+    split = _split_media(media)
     parts: List[str] = []
-    if images:
-        parts.append(f"{len(images)} image(s)")
-    if videos:
-        parts.append(f"{len(videos)} video(s)")
-    if audios:
-        parts.append(f"{len(audios)} audio item(s)")
+    if split["images"]:
+        parts.append(f"{len(split['images'])} image(s)")
+    if split["videos"]:
+        parts.append(f"{len(split['videos'])} video(s)")
+    if split["audios"]:
+        parts.append(f"{len(split['audios'])} audio item(s)")
     return ", ".join(parts)
 
 
@@ -539,11 +681,9 @@ def _build_summary(
     description: str,
     content: str,
     domain: str,
-    images: List[Dict[str, Any]],
-    videos: List[Dict[str, Any]],
-    audios: List[Dict[str, Any]],
+    media: List[Dict[str, Any]],
 ) -> str:
-    media_summary = _build_media_summary(images, videos, audios)
+    media_summary = _build_media_summary_from_media(media)
 
     if description and media_summary:
         return _truncate(f"{description} Media found: {media_summary}.", MAX_SUMMARY_CHARS)
@@ -575,29 +715,29 @@ def _build_preview(
     title: str,
     description: str,
     content: str,
-    images: List[Dict[str, Any]],
-    videos: List[Dict[str, Any]],
-    audios: List[Dict[str, Any]],
+    media: List[Dict[str, Any]],
 ) -> str:
     parts: List[str] = []
+    split = _split_media(media)
+
     if title:
         parts.append(f"Title: {title}")
     if description:
         parts.append(f"Description: {description}")
-    if images:
+    if split["images"]:
         parts.append("Images:")
-        for item in images[:MAX_MEDIA_PREVIEW_ITEMS]:
-            label = _clean_text(item.get("alt") or item.get("title") or item.get("url"))
+        for item in split["images"][:MAX_MEDIA_PREVIEW_ITEMS]:
+            label = _clean_text(item.get("title") or _coerce_dict(item.get("meta")).get("alt") or item.get("preview_url"))
             parts.append(f"- {label}")
-    if videos:
+    if split["videos"]:
         parts.append("Videos:")
-        for item in videos[:MAX_MEDIA_PREVIEW_ITEMS]:
-            label = _clean_text(item.get("title") or item.get("url"))
+        for item in split["videos"][:MAX_MEDIA_PREVIEW_ITEMS]:
+            label = _clean_text(item.get("title") or item.get("preview_url"))
             parts.append(f"- {label}")
-    if audios:
+    if split["audios"]:
         parts.append("Audio:")
-        for item in audios[:MAX_MEDIA_PREVIEW_ITEMS]:
-            label = _clean_text(item.get("title") or item.get("url"))
+        for item in split["audios"][:MAX_MEDIA_PREVIEW_ITEMS]:
+            label = _clean_text(item.get("title") or item.get("preview_url"))
             parts.append(f"- {label}")
     if content:
         parts.append("Content Preview:")
@@ -611,31 +751,30 @@ def _build_prompt_text(
     title: str,
     description: str,
     content: str,
-    images: List[Dict[str, Any]],
-    videos: List[Dict[str, Any]],
-    audios: List[Dict[str, Any]],
+    media: List[Dict[str, Any]],
 ) -> str:
     parts = [f"Fetched URL: {url}"]
+    split = _split_media(media)
 
     if title:
         parts.append(f"Title: {title}")
     if description:
         parts.append(f"Description: {description}")
 
-    if images:
+    if split["images"]:
         parts.append("Image URLs:")
-        for item in images[:MAX_MEDIA_PREVIEW_ITEMS]:
-            parts.append(f"- {_clean_text(item.get('url'))}")
+        for item in split["images"][:MAX_MEDIA_PREVIEW_ITEMS]:
+            parts.append(f"- {_clean_text(item.get('preview_url') or item.get('source_url'))}")
 
-    if videos:
+    if split["videos"]:
         parts.append("Video URLs:")
-        for item in videos[:MAX_MEDIA_PREVIEW_ITEMS]:
-            parts.append(f"- {_clean_text(item.get('url'))}")
+        for item in split["videos"][:MAX_MEDIA_PREVIEW_ITEMS]:
+            parts.append(f"- {_clean_text(item.get('preview_url') or item.get('source_url'))}")
 
-    if audios:
+    if split["audios"]:
         parts.append("Audio URLs:")
-        for item in audios[:MAX_MEDIA_PREVIEW_ITEMS]:
-            parts.append(f"- {_clean_text(item.get('url'))}")
+        for item in split["audios"][:MAX_MEDIA_PREVIEW_ITEMS]:
+            parts.append(f"- {_clean_text(item.get('preview_url') or item.get('source_url'))}")
 
     if content:
         parts.append("Extracted content:")
@@ -646,51 +785,102 @@ def _build_prompt_text(
 
 def _media_item_to_attachment(item: Dict[str, Any], page_url: str) -> Dict[str, Any]:
     item = _coerce_dict(item)
-    url = _clean_text(item.get("url"))
+    url = _clean_text(item.get("preview_url") or item.get("source_url"))
     kind = _clean_text(item.get("kind")) or _guess_media_kind(url, _clean_text(item.get("mime_type")))
-    name = urlparse(url).path.split("/")[-1] if url else ""
-    if not name:
-        name = f"{kind}_asset"
+    name = _filename_from_url(url, fallback=f"{kind}_asset")
 
     return {
-        "id": "",
+        "id": _clean_text(item.get("id")),
         "name": name,
         "mime_type": _clean_text(item.get("mime_type")),
         "type": kind,
         "url": url,
-        "source_url": page_url,
-        "stored_path": "",
-        "path": "",
-        "size": 0,
+        "source_url": _clean_text(item.get("source_url")) or page_url,
+        "stored_path": _clean_text(item.get("local_path")),
+        "path": _clean_text(item.get("local_path")),
+        "size": item.get("size_bytes") or 0,
         "meta": {
             "kind": kind,
-            "source": _clean_text(item.get("source")),
-            "alt": _clean_text(item.get("alt")),
             "title": _clean_text(item.get("title")),
-            "poster": _clean_text(item.get("poster")),
+            "thumbnail_url": _clean_text(item.get("thumbnail_url")),
             "page_url": page_url,
+            "host": _clean_text(item.get("host")),
+            "provider": _clean_text(item.get("provider")),
         },
     }
 
 
-def _fallback_media_from_non_html(final_url: str, content_type: str) -> Dict[str, List[Dict[str, Any]]]:
-    media_kind = _guess_media_kind(final_url, content_type)
-    item = {
-        "url": final_url,
-        "kind": media_kind,
-        "source": "direct",
-        "alt": "",
-        "title": "",
-        "mime_type": content_type,
-        "poster": "",
+def _legacy_media_item(
+    *,
+    url: str,
+    kind: str,
+    source: str = "",
+    alt: str = "",
+    title: str = "",
+    mime_type: str = "",
+    poster: str = "",
+) -> Dict[str, Any]:
+    return {
+        "url": _clean_text(url),
+        "kind": _clean_text(kind),
+        "source": _clean_text(source),
+        "alt": _clean_text(alt),
+        "title": _clean_text(title),
+        "mime_type": _clean_text(mime_type),
+        "poster": _clean_text(poster),
     }
-    if media_kind == "image":
-        return {"images": [item], "videos": [], "audios": []}
-    if media_kind == "video":
-        return {"images": [], "videos": [item], "audios": []}
-    if media_kind == "audio":
-        return {"images": [], "videos": [], "audios": [item]}
-    return {"images": [], "videos": [], "audios": []}
+
+
+def _fallback_media_from_non_html(final_url: str, content_type: str) -> List[Dict[str, Any]]:
+    media_kind = _guess_media_kind(final_url, content_type)
+    return [
+        _build_media_item(
+            kind=media_kind,
+            source_url=final_url,
+            preview_url=final_url,
+            title=_filename_from_url(final_url, fallback=media_kind),
+            mime_type=content_type,
+            status="ready",
+            summary="Direct media or file URL fetched.",
+            extracted_text="",
+            transcript="",
+            thumbnail_url="",
+            provider=_domain_from_url(final_url),
+            host=_domain_from_url(final_url),
+            source="direct",
+        )
+    ]
+
+
+def _derive_legacy_lists_from_media(media: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+    images: List[Dict[str, Any]] = []
+    videos: List[Dict[str, Any]] = []
+    audios: List[Dict[str, Any]] = []
+
+    for item in media:
+        item = _coerce_dict(item)
+        kind = _clean_text(item.get("kind")).lower()
+        legacy = _legacy_media_item(
+            url=_clean_text(item.get("preview_url") or item.get("source_url")),
+            kind=kind,
+            source=_coerce_dict(item.get("meta")).get("source", ""),
+            alt=_coerce_dict(item.get("meta")).get("alt", ""),
+            title=_clean_text(item.get("title")),
+            mime_type=_clean_text(item.get("mime_type")),
+            poster=_clean_text(item.get("thumbnail_url")),
+        )
+        if kind == "image":
+            images.append(legacy)
+        elif kind == "video":
+            videos.append(legacy)
+        elif kind == "audio":
+            audios.append(legacy)
+
+    return {
+        "images": _unique_dicts_by_key(images, "url")[: MAX_MEDIA_ITEMS * MAX_URLS],
+        "videos": _unique_dicts_by_key(videos, "url")[: MAX_MEDIA_ITEMS * MAX_URLS],
+        "audios": _unique_dicts_by_key(audios, "url")[: MAX_MEDIA_ITEMS * MAX_URLS],
+    }
 
 
 # =========================================================
@@ -715,20 +905,45 @@ def fetch_url_preview(url: str) -> Dict[str, Any]:
         "status": "error",
         "status_code": None,
         "content_type": "",
+        "media": [],
+        "attachments": [],
         "images": [],
         "videos": [],
         "audios": [],
-        "attachments": [],
         "meta": {},
     }
 
     if not normalized_url or not _is_probable_url(normalized_url):
+        error_media = _build_media_item(
+            kind="webpage",
+            source_url=normalized_url,
+            preview_url=normalized_url,
+            title="Invalid URL",
+            status="failed",
+            summary="Invalid URL.",
+            host=domain,
+            provider=domain,
+            errors=["invalid_url"],
+        )
         base["summary"] = "Invalid URL."
+        base["media"] = [error_media]
         base["meta"] = {"reason": "invalid_url"}
         return base
 
     if not _requests_available():
+        error_media = _build_media_item(
+            kind="webpage",
+            source_url=normalized_url,
+            preview_url=normalized_url,
+            title="Web fetch unavailable",
+            status="failed",
+            summary="Web fetching is unavailable because the requests package is not installed.",
+            host=domain,
+            provider=domain,
+            errors=["requests_unavailable"],
+        )
         base["summary"] = "Web fetching is unavailable because the requests package is not installed."
+        base["media"] = [error_media]
         base["meta"] = {"reason": "requests_unavailable"}
         return base
 
@@ -766,7 +981,21 @@ def fetch_url_preview(url: str) -> Dict[str, Any]:
         base["content_type"] = content_type
 
         if response.status_code >= 400:
+            error_media = _build_media_item(
+                kind="webpage",
+                source_url=final_url,
+                preview_url=final_url,
+                title="HTTP fetch failed",
+                mime_type=content_type,
+                status="failed",
+                summary=f"Fetch failed with status {response.status_code}.",
+                host=final_domain,
+                provider=final_domain,
+                size_bytes=len(raw_bytes),
+                errors=[f"http_error:{response.status_code}"],
+            )
             base["summary"] = f"Fetch failed with status {response.status_code}."
+            base["media"] = [error_media]
             base["meta"] = {
                 "reason": "http_error",
                 "status_code": response.status_code,
@@ -783,22 +1012,114 @@ def fetch_url_preview(url: str) -> Dict[str, Any]:
             author = _truncate(extracted.get("author", ""), 200)
             canonical_url = _clean_text(extracted.get("canonical_url")) or final_url
 
-            images = _unique_dicts_by_key(_coerce_list(extracted.get("images")), "url")[:MAX_MEDIA_ITEMS]
-            videos = _unique_dicts_by_key(_coerce_list(extracted.get("videos")), "url")[:MAX_MEDIA_ITEMS]
-            audios = _unique_dicts_by_key(_coerce_list(extracted.get("audios")), "url")[:MAX_MEDIA_ITEMS]
+            raw_images = _unique_dicts_by_key(_coerce_list(extracted.get("images")), "url")[:MAX_MEDIA_ITEMS]
+            raw_videos = _unique_dicts_by_key(_coerce_list(extracted.get("videos")), "url")[:MAX_MEDIA_ITEMS]
+            raw_audios = _unique_dicts_by_key(_coerce_list(extracted.get("audios")), "url")[:MAX_MEDIA_ITEMS]
 
-            attachments = []
-            for item in images + videos + audios:
-                attachments.append(_media_item_to_attachment(item, canonical_url))
+            media: List[Dict[str, Any]] = []
+
+            page_summary = _build_summary(title, description, content, final_domain, [])
+            page_media = _build_media_item(
+                kind="webpage",
+                source_url=canonical_url,
+                preview_url=canonical_url,
+                title=title or canonical_url,
+                mime_type=content_type or "text/html",
+                status="ready",
+                summary=page_summary,
+                extracted_text=content,
+                transcript="",
+                thumbnail_url="",
+                local_path="",
+                size_bytes=len(raw_bytes),
+                provider=site_name or final_domain,
+                host=final_domain,
+                source="page",
+                canonical_url=canonical_url,
+            )
+            media.append(page_media)
+
+            for item in raw_images:
+                item = _coerce_dict(item)
+                media.append(
+                    _build_media_item(
+                        kind="image",
+                        source_url=_clean_text(item.get("url")),
+                        preview_url=_clean_text(item.get("url")),
+                        title=_clean_text(item.get("title") or item.get("alt") or _filename_from_url(_clean_text(item.get("url")), "image")),
+                        mime_type=_clean_text(item.get("mime_type")),
+                        status="ready",
+                        summary=f"Image discovered on {final_domain}.",
+                        extracted_text="",
+                        transcript="",
+                        thumbnail_url=_clean_text(item.get("url")),
+                        provider=site_name or final_domain,
+                        host=final_domain,
+                        source=_clean_text(item.get("source")),
+                        alt=_clean_text(item.get("alt")),
+                        canonical_url=canonical_url,
+                    )
+                )
+
+            for item in raw_videos:
+                item = _coerce_dict(item)
+                media.append(
+                    _build_media_item(
+                        kind="video",
+                        source_url=_clean_text(item.get("url")),
+                        preview_url=_clean_text(item.get("url")),
+                        title=_clean_text(item.get("title") or _filename_from_url(_clean_text(item.get("url")), "video")),
+                        mime_type=_clean_text(item.get("mime_type")),
+                        status="ready",
+                        summary=f"Video discovered on {final_domain}.",
+                        extracted_text="",
+                        transcript="",
+                        thumbnail_url=_clean_text(item.get("poster")),
+                        provider=site_name or final_domain,
+                        host=final_domain,
+                        source=_clean_text(item.get("source")),
+                        alt="",
+                        canonical_url=canonical_url,
+                    )
+                )
+
+            for item in raw_audios:
+                item = _coerce_dict(item)
+                media.append(
+                    _build_media_item(
+                        kind="audio",
+                        source_url=_clean_text(item.get("url")),
+                        preview_url=_clean_text(item.get("url")),
+                        title=_clean_text(item.get("title") or _filename_from_url(_clean_text(item.get("url")), "audio")),
+                        mime_type=_clean_text(item.get("mime_type")),
+                        status="ready",
+                        summary=f"Audio discovered on {final_domain}.",
+                        extracted_text="",
+                        transcript="",
+                        thumbnail_url="",
+                        provider=site_name or final_domain,
+                        host=final_domain,
+                        source=_clean_text(item.get("source")),
+                        alt="",
+                        canonical_url=canonical_url,
+                    )
+                )
+
+            media = _unique_media(media)[: MAX_MEDIA_ITEMS + 1]
+            attachments = [_media_item_to_attachment(item, canonical_url) for item in media]
 
             base["title"] = title
-            base["summary"] = _build_summary(title, description, content, final_domain, images, videos, audios)
-            base["preview"] = _build_preview(title, description, content, images, videos, audios)
-            base["prompt_text"] = _build_prompt_text(canonical_url, title, description, content, images, videos, audios)
-            base["images"] = images
-            base["videos"] = videos
-            base["audios"] = audios
+            base["summary"] = _build_summary(title, description, content, final_domain, media)
+            base["preview"] = _build_preview(title, description, content, media)
+            base["prompt_text"] = _build_prompt_text(canonical_url, title, description, content, media)
+            base["media"] = media
             base["attachments"] = attachments
+
+            split = _derive_legacy_lists_from_media(media)
+            base["images"] = split["images"]
+            base["videos"] = split["videos"]
+            base["audios"] = split["audios"]
+
             base["status"] = "ready"
             base["meta"] = {
                 "mode": "html",
@@ -808,9 +1129,11 @@ def fetch_url_preview(url: str) -> Dict[str, Any]:
                 "status_code": response.status_code,
                 "site_name": site_name,
                 "author": author,
-                "image_count": len(images),
-                "video_count": len(videos),
-                "audio_count": len(audios),
+                "media_count": len(media),
+                "image_count": len(base["images"]),
+                "video_count": len(base["videos"]),
+                "audio_count": len(base["audios"]),
+                "attachment_count": len(attachments),
             }
             return base
 
@@ -818,36 +1141,56 @@ def fetch_url_preview(url: str) -> Dict[str, Any]:
         plain_text = _truncate(plain_text, MAX_TEXT_BLOCK_CHARS)
 
         media = _fallback_media_from_non_html(final_url, content_type)
-        images = media["images"]
-        videos = media["videos"]
-        audios = media["audios"]
+        if media:
+            first = _coerce_dict(media[0])
+            first["summary"] = _build_summary("", "", plain_text, final_domain, media)
+            first["extracted_text"] = plain_text if first.get("kind") in {"document", "file"} else ""
+            first["size_bytes"] = len(raw_bytes)
 
-        attachments = []
-        for item in images + videos + audios:
-            attachments.append(_media_item_to_attachment(item, final_url))
+        media = _unique_media(media)[:MAX_MEDIA_ITEMS]
+        attachments = [_media_item_to_attachment(item, final_url) for item in media]
 
-        base["summary"] = _build_summary("", "", plain_text, final_domain, images, videos, audios)
-        base["preview"] = _build_preview("", "", plain_text, images, videos, audios)
-        base["prompt_text"] = _build_prompt_text(final_url, "", "", plain_text, images, videos, audios)
-        base["images"] = images
-        base["videos"] = videos
-        base["audios"] = audios
+        base["summary"] = _build_summary("", "", plain_text, final_domain, media)
+        base["preview"] = _build_preview("", "", plain_text, media)
+        base["prompt_text"] = _build_prompt_text(final_url, "", "", plain_text, media)
+        base["media"] = media
         base["attachments"] = attachments
+
+        split = _derive_legacy_lists_from_media(media)
+        base["images"] = split["images"]
+        base["videos"] = split["videos"]
+        base["audios"] = split["audios"]
+
         base["status"] = "ready"
         base["meta"] = {
             "mode": "text_or_binary",
             "bytes_read": len(raw_bytes),
             "final_url": final_url,
             "status_code": response.status_code,
-            "image_count": len(images),
-            "video_count": len(videos),
-            "audio_count": len(audios),
+            "media_count": len(media),
+            "image_count": len(base["images"]),
+            "video_count": len(base["videos"]),
+            "audio_count": len(base["audios"]),
+            "attachment_count": len(attachments),
         }
         return base
 
     except Exception as exc:
+        error_message = _truncate(str(exc), 300)
+        error_media = _build_media_item(
+            kind="webpage",
+            source_url=normalized_url,
+            preview_url=normalized_url,
+            title="Fetch failed",
+            status="failed",
+            summary=_truncate(f"Fetch failed: {exc}", MAX_SUMMARY_CHARS),
+            host=domain,
+            provider=domain,
+            errors=[error_message],
+        )
         base["summary"] = _truncate(f"Fetch failed: {exc}", MAX_SUMMARY_CHARS)
-        base["meta"] = {"reason": "exception", "error": _truncate(str(exc), 300)}
+        base["media"] = [error_media]
+        base["meta"] = {"reason": "exception", "error": error_message}
         return base
 
 
@@ -875,9 +1218,7 @@ def analyze_web_request(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     combined_prompt_parts: List[str] = []
     collected_attachments: List[Dict[str, Any]] = []
-    collected_images: List[Dict[str, Any]] = []
-    collected_videos: List[Dict[str, Any]] = []
-    collected_audios: List[Dict[str, Any]] = []
+    collected_media: List[Dict[str, Any]] = []
 
     for item in ready_results:
         prompt_text = _clean_text(item.get("prompt_text"))
@@ -886,19 +1227,16 @@ def analyze_web_request(payload: Dict[str, Any]) -> Dict[str, Any]:
 
         for attachment in _coerce_list(item.get("attachments")):
             collected_attachments.append(_coerce_dict(attachment))
-        for media_item in _coerce_list(item.get("images")):
-            collected_images.append(_coerce_dict(media_item))
-        for media_item in _coerce_list(item.get("videos")):
-            collected_videos.append(_coerce_dict(media_item))
-        for media_item in _coerce_list(item.get("audios")):
-            collected_audios.append(_coerce_dict(media_item))
+
+        for media_item in _coerce_list(item.get("media")):
+            collected_media.append(_coerce_dict(media_item))
 
     combined_prompt = _truncate("\n\n---\n\n".join(combined_prompt_parts), MAX_TEXT_BLOCK_CHARS)
 
+    collected_media = _unique_media(collected_media)[: MAX_MEDIA_ITEMS * MAX_URLS]
     collected_attachments = _unique_dicts_by_key(collected_attachments, "url")[: MAX_MEDIA_ITEMS * MAX_URLS]
-    collected_images = _unique_dicts_by_key(collected_images, "url")[: MAX_MEDIA_ITEMS * MAX_URLS]
-    collected_videos = _unique_dicts_by_key(collected_videos, "url")[: MAX_MEDIA_ITEMS * MAX_URLS]
-    collected_audios = _unique_dicts_by_key(collected_audios, "url")[: MAX_MEDIA_ITEMS * MAX_URLS]
+
+    split = _derive_legacy_lists_from_media(collected_media)
 
     return {
         "ok": True,
@@ -913,14 +1251,16 @@ def analyze_web_request(payload: Dict[str, Any]) -> Dict[str, Any]:
             + (f"; {len(failed_results)} failed." if failed_results else "."),
             MAX_SUMMARY_CHARS,
         ),
+        "media": collected_media,
         "attachments": collected_attachments,
-        "images": collected_images,
-        "videos": collected_videos,
-        "audios": collected_audios,
+        "images": split["images"],
+        "videos": split["videos"],
+        "audios": split["audios"],
         "meta": {
-            "image_count": len(collected_images),
-            "video_count": len(collected_videos),
-            "audio_count": len(collected_audios),
+            "media_count": len(collected_media),
+            "image_count": len(split["images"]),
+            "video_count": len(split["videos"]),
+            "audio_count": len(split["audios"]),
             "attachment_count": len(collected_attachments),
         },
     }
@@ -946,10 +1286,11 @@ def build_web_debug_payload(text: str) -> Dict[str, Any]:
                 "status": _clean_text(item.get("status")),
                 "status_code": item.get("status_code"),
                 "content_type": _clean_text(item.get("content_type")),
+                "media": _coerce_list(item.get("media")),
+                "attachments": _coerce_list(item.get("attachments")),
                 "images": _coerce_list(item.get("images")),
                 "videos": _coerce_list(item.get("videos")),
                 "audios": _coerce_list(item.get("audios")),
-                "attachments": _coerce_list(item.get("attachments")),
                 "meta": _coerce_dict(item.get("meta")),
             }
         )
@@ -961,6 +1302,7 @@ def build_web_debug_payload(text: str) -> Dict[str, Any]:
         "summary": _clean_text(analyzed.get("summary")),
         "prompt_text": _clean_text(analyzed.get("prompt_text")),
         "previews": previews,
+        "media": _coerce_list(analyzed.get("media")),
         "attachments": _coerce_list(analyzed.get("attachments")),
         "images": _coerce_list(analyzed.get("images")),
         "videos": _coerce_list(analyzed.get("videos")),
@@ -969,6 +1311,7 @@ def build_web_debug_payload(text: str) -> Dict[str, Any]:
             "count": analyzed.get("count", 0),
             "ready_count": analyzed.get("ready_count", 0),
             "failed_count": analyzed.get("failed_count", 0),
+            "media_count": _coerce_dict(analyzed.get("meta")).get("media_count", 0),
             "image_count": _coerce_dict(analyzed.get("meta")).get("image_count", 0),
             "video_count": _coerce_dict(analyzed.get("meta")).get("video_count", 0),
             "audio_count": _coerce_dict(analyzed.get("meta")).get("audio_count", 0),
@@ -992,6 +1335,7 @@ def merge_web_prompt_into_message_context(
     return {
         "web": web,
         "context_blocks": merged_blocks,
+        "media": _coerce_list(web.get("media")),
         "attachments": _coerce_list(web.get("attachments")),
         "images": _coerce_list(web.get("images")),
         "videos": _coerce_list(web.get("videos")),
@@ -1036,10 +1380,11 @@ def results_to_json(results: List[Dict[str, Any]]) -> str:
                 "status": _clean_text(item.get("status")),
                 "status_code": item.get("status_code"),
                 "content_type": _clean_text(item.get("content_type")),
+                "media": _coerce_list(item.get("media")),
+                "attachments": _coerce_list(item.get("attachments")),
                 "images": _coerce_list(item.get("images")),
                 "videos": _coerce_list(item.get("videos")),
                 "audios": _coerce_list(item.get("audios")),
-                "attachments": _coerce_list(item.get("attachments")),
                 "meta": _coerce_dict(item.get("meta")),
             }
         )
