@@ -1,4 +1,3 @@
-# notepad C:\Users\Owner\nova\app.py
 from __future__ import annotations
 
 import json
@@ -18,7 +17,6 @@ from services.chat_service import (
     get_session_by_id,
     get_session_payload,
     list_sessions,
-    now_iso,
     process_chat_request,
     process_chat_stream,
     save_all_sessions,
@@ -79,9 +77,13 @@ except Exception:
     _artifact_update = None
 
 try:
-    from services.web_service import preview_web_request as _web_preview
+    from services.web_service import (
+        analyze_web_request as _web_analyze_request,
+        build_web_debug_payload as _web_build_debug_payload,
+    )
 except Exception:
-    _web_preview = None
+    _web_analyze_request = None
+    _web_build_debug_payload = None
 
 
 # =========================================================
@@ -232,6 +234,14 @@ def _memory_service_missing(name: str):
     return _json_error(
         f"Memory route '{name}' is unavailable because memory_service is not fully loaded.",
         code="memory_service_unavailable",
+        status=501,
+    )
+
+
+def _web_service_missing(name: str):
+    return _json_error(
+        f"Web route '{name}' is unavailable because web_service is not fully loaded.",
+        code="web_service_unavailable",
         status=501,
     )
 
@@ -850,19 +860,69 @@ def api_artifact_export():
 
 
 # =========================================================
-# debug routes
+# web + debug routes
 # =========================================================
+
+@app.post("/api/web/analyze")
+def api_web_analyze():
+    if not _web_analyze_request:
+        return _web_service_missing("analyze")
+
+    try:
+        payload = _json_payload()
+        result = _web_analyze_request(payload)
+        return _json_ok(
+            {
+                "ok": True,
+                "urls": result.get("urls", []),
+                "summary": result.get("summary", ""),
+                "prompt_text": result.get("prompt_text", ""),
+                "media": result.get("media", []),
+                "attachments": result.get("attachments", []),
+                "images": result.get("images", []),
+                "videos": result.get("videos", []),
+                "audios": result.get("audios", []),
+                "results": result.get("results", []),
+                "meta": result.get("meta", {}),
+            }
+        )
+    except Exception as exc:
+        return _json_error(
+            "Failed to analyze web request.",
+            code="web_analyze_failed",
+            status=500,
+            details=str(exc),
+        )
+
 
 @app.post("/api/debug/web_preview")
 def api_debug_web_preview():
-    if not _web_preview:
+    if not _web_build_debug_payload:
         return _json_ok(
             {
                 "ok": True,
                 "preview": {
                     "enabled": False,
-                    "items": [],
-                    "prompt_context": "",
+                    "input": "",
+                    "urls": [],
+                    "summary": "",
+                    "prompt_text": "",
+                    "previews": [],
+                    "media": [],
+                    "attachments": [],
+                    "images": [],
+                    "videos": [],
+                    "audios": [],
+                    "meta": {
+                        "count": 0,
+                        "ready_count": 0,
+                        "failed_count": 0,
+                        "media_count": 0,
+                        "image_count": 0,
+                        "video_count": 0,
+                        "audio_count": 0,
+                        "attachment_count": 0,
+                    },
                     "errors": ["web preview service unavailable"],
                 },
             }
@@ -870,24 +930,10 @@ def api_debug_web_preview():
 
     try:
         payload = _json_payload()
-        text = _clean_text(payload.get("text")).strip()
-        meta = _coerce_dict(payload.get("meta"))
+        text = _clean_text(payload.get("text") or payload.get("content")).strip()
 
-        preview = _web_preview(text=text, meta=meta)
+        preview = _web_build_debug_payload(text)
         return _json_ok({"ok": True, "preview": preview})
-    except TypeError:
-        try:
-            payload = _json_payload()
-            text = _clean_text(payload.get("text")).strip()
-            preview = _web_preview(text)
-            return _json_ok({"ok": True, "preview": preview})
-        except Exception as exc:
-            return _json_error(
-                "Failed to build web preview.",
-                code="web_preview_failed",
-                status=500,
-                details=str(exc),
-            )
     except Exception as exc:
         return _json_error(
             "Failed to build web preview.",
@@ -907,10 +953,10 @@ def api_debug_brain():
             status = _extract_status(result, 500)
             return jsonify(result), status
 
-        debug = result.get("debug", {})
-        session = result.get("session", {})
-        message = result.get("message", {})
-        assistant = result.get("assistant", {})
+        debug = _coerce_dict(result.get("debug"))
+        session = _coerce_dict(result.get("session"))
+        message = _coerce_dict(result.get("message"))
+        assistant = _coerce_dict(result.get("assistant"))
 
         return _json_ok(
             {
@@ -927,6 +973,7 @@ def api_debug_brain():
                         "content": _clean_text(assistant.get("content"))[:280],
                     },
                 ],
+                "media": result.get("media", []),
             }
         )
     except Exception as exc:
