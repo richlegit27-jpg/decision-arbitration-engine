@@ -1,105 +1,449 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nova Ultimate Chat + Web + Media</title>
-  <link rel="stylesheet" href="/static/css/nova-main.css?v=endgame">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nova Ultimate Chat</title>
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=endgame" />
+  <style>
+    .nova-chat-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 18px;
+      min-height: 70vh;
+      overflow-y: auto;
+    }
+
+    .nova-message {
+      max-width: 840px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.45;
+    }
+
+    .nova-message-user {
+      align-self: flex-end;
+      background: rgba(90, 140, 255, 0.18);
+    }
+
+    .nova-message-assistant {
+      align-self: flex-start;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .nova-message-badge {
+      display: inline-block;
+      font-size: 12px;
+      opacity: 0.8;
+      margin-bottom: 6px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .nova-attachment-wrap {
+      align-self: flex-start;
+      max-width: 840px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 10px;
+    }
+
+    .nova-attachment-image {
+      display: block;
+      max-width: 320px;
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+    }
+
+    .nova-attachment-file {
+      display: inline-block;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .nova-empty-state {
+      padding: 18px;
+      opacity: 0.7;
+    }
+
+    .nova-typing-indicator {
+      padding: 0 18px 12px 18px;
+      opacity: 0.75;
+    }
+
+    .nova-composer {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 16px 18px 22px 18px;
+    }
+
+    .nova-composer-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .nova-composer textarea {
+      flex: 1;
+      min-height: 52px;
+      max-height: 180px;
+      resize: vertical;
+      padding: 12px;
+      border-radius: 12px;
+    }
+
+    .nova-composer button {
+      padding: 12px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+
+    .nova-pending-attachments {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .nova-pending-chip {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 140px;
+      max-width: 220px;
+      padding: 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .nova-pending-chip-image {
+      width: 100%;
+      max-width: 180px;
+      border-radius: 10px;
+      display: block;
+    }
+
+    .nova-pending-chip-title {
+      font-size: 13px;
+      line-height: 1.3;
+      word-break: break-word;
+      opacity: 0.95;
+    }
+
+    .nova-pending-chip-remove {
+      align-self: flex-start;
+      border: 0;
+      padding: 6px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      background: rgba(255, 80, 80, 0.18);
+      color: inherit;
+    }
+
+    .nova-hidden {
+      display: none !important;
+    }
+  </style>
 </head>
 <body>
   <div class="nova-app-shell" id="novaAppShell">
-
-    <!-- Chat Messages -->
     <div class="nova-chat-panel" id="messages"></div>
     <div id="novaEmptyState" class="nova-empty-state">Nova is ready. Type a message!</div>
-
-    <!-- Typing indicator -->
     <div id="typingIndicator" class="nova-typing-indicator" style="display:none;">Nova is typing...</div>
 
-    <!-- Composer -->
     <div class="nova-composer">
-      <textarea id="chatInput" placeholder="Type your message..."></textarea>
-      <button id="sendBtn">Send</button>
-      <button id="uploadBtn">📎</button>
-      <input type="file" id="fileInput" style="display:none;" accept="image/*,video/*">
-    </div>
+      <div id="pendingAttachments" class="nova-pending-attachments nova-hidden"></div>
 
+      <div class="nova-composer-row">
+        <textarea id="chatInput" placeholder="Type your message... Use /image your prompt to generate an image"></textarea>
+        <button id="uploadBtn" type="button">📎</button>
+        <button id="sendBtn" type="button">Send</button>
+        <input type="file" id="fileInput" style="display:none;" accept="image/*,video/*" multiple />
+      </div>
+    </div>
   </div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const chatInput = document.getElementById('chatInput');
-      const sendBtn = document.getElementById('sendBtn');
-      const messages = document.getElementById('messages');
-      const emptyState = document.getElementById('novaEmptyState');
-      const typingIndicator = document.getElementById('typingIndicator');
-      const uploadBtn = document.getElementById('uploadBtn');
-      const fileInput = document.getElementById('fileInput');
+    document.addEventListener("DOMContentLoaded", () => {
+      const chatInput = document.getElementById("chatInput");
+      const sendBtn = document.getElementById("sendBtn");
+      const uploadBtn = document.getElementById("uploadBtn");
+      const fileInput = document.getElementById("fileInput");
+      const messages = document.getElementById("messages");
+      const emptyState = document.getElementById("novaEmptyState");
+      const typingIndicator = document.getElementById("typingIndicator");
+      const pendingAttachmentsEl = document.getElementById("pendingAttachments");
 
-      let sessionId = localStorage.getItem('nova_session_id') || crypto.randomUUID();
-      localStorage.setItem('nova_session_id', sessionId);
+      let sessionId = localStorage.getItem("nova_session_id") || crypto.randomUUID();
+      localStorage.setItem("nova_session_id", sessionId);
 
-      function appendMessage(content, from='assistant', badge='') {
-        emptyState.style.display = 'none';
-        const div = document.createElement('div');
-        div.className = `nova-message nova-message-${from}`;
-        div.textContent = content;
-        if(badge) div.textContent = `[${badge}] ${content}`;
-        messages.appendChild(div);
+      let pendingAttachments = [];
+
+      function hideEmptyState() {
+        if (emptyState) emptyState.style.display = "none";
+      }
+
+      function scrollToBottom() {
         messages.scrollTop = messages.scrollHeight;
       }
 
-      async function sendChat(content='', attachments=[]) {
-        if(!content.trim() && attachments.length===0) return;
-        if(content) appendMessage(content, 'user');
+      function appendTextMessage(content, from = "assistant", badge = "") {
+        hideEmptyState();
 
-        typingIndicator.style.display = 'block';
-        try {
-          const payload = { content, session_id: sessionId };
-          if(attachments.length) payload.attachments = attachments;
+        const wrap = document.createElement("div");
+        wrap.className = `nova-message nova-message-${from}`;
 
-          const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify(payload)
-          });
-          const data = await res.json();
-          if(data.ok){
-            appendMessage(data.message, 'assistant', 'AI');
-            if(data.web) appendMessage(data.web, 'assistant', 'Web');
-            if(data.attachments_desc){
-              data.attachments_desc.forEach(desc => appendMessage(desc, 'assistant', 'Attachment'));
-            }
-          } else appendMessage(`Error: ${data.error || 'Unknown'}`, 'assistant');
-        } catch(e){
-          appendMessage('Network error while sending message.', 'assistant');
-        } finally { typingIndicator.style.display='none'; }
+        if (badge) {
+          const badgeEl = document.createElement("div");
+          badgeEl.className = "nova-message-badge";
+          badgeEl.textContent = badge;
+          wrap.appendChild(badgeEl);
+        }
+
+        const body = document.createElement("div");
+        body.textContent = content || "";
+        wrap.appendChild(body);
+
+        messages.appendChild(wrap);
+        scrollToBottom();
       }
 
-      sendBtn.addEventListener('click', () => sendChat(chatInput.value));
+      function appendImageAttachment(url, filename = "") {
+        hideEmptyState();
 
-      chatInput.addEventListener('keydown', e => {
-        if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendBtn.click(); }
-      });
+        const wrap = document.createElement("div");
+        wrap.className = "nova-attachment-wrap";
 
-      uploadBtn.addEventListener('click', () => fileInput.click());
+        const badgeEl = document.createElement("div");
+        badgeEl.className = "nova-message-badge";
+        badgeEl.textContent = "Image";
+        wrap.appendChild(badgeEl);
 
-      fileInput.addEventListener('change', async () => {
-        if(!fileInput.files.length) return;
-        const file = fileInput.files[0];
-        const formData = new FormData();
-        formData.append('files', file);
+        const img = document.createElement("img");
+        img.className = "nova-attachment-image";
+        img.src = url;
+        img.alt = filename || "Image";
+        img.loading = "lazy";
+        wrap.appendChild(img);
+
+        messages.appendChild(wrap);
+        scrollToBottom();
+      }
+
+      function appendGenericAttachment(url, filename = "attachment") {
+        hideEmptyState();
+
+        const wrap = document.createElement("div");
+        wrap.className = "nova-attachment-wrap";
+
+        const badgeEl = document.createElement("div");
+        badgeEl.className = "nova-message-badge";
+        badgeEl.textContent = "Attachment";
+        wrap.appendChild(badgeEl);
+
+        const link = document.createElement("a");
+        link.className = "nova-attachment-file";
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = filename;
+        wrap.appendChild(link);
+
+        messages.appendChild(wrap);
+        scrollToBottom();
+      }
+
+      function renderReturnedAttachments(items) {
+        if (!Array.isArray(items)) return;
+
+        items.forEach((item) => {
+          if (!item || !item.url) return;
+
+          if ((item.type || "").startsWith("image/")) {
+            appendImageAttachment(item.url, item.filename || "");
+          } else {
+            appendGenericAttachment(item.url, item.filename || "attachment");
+          }
+        });
+      }
+
+      function renderGeneratedImages(items) {
+        if (!Array.isArray(items)) return;
+
+        items.forEach((item) => {
+          if (!item || !item.url) return;
+          appendImageAttachment(item.url, item.filename || "generated.png");
+        });
+      }
+
+      function removePendingAttachment(id) {
+        pendingAttachments = pendingAttachments.filter((item) => item.id !== id);
+        renderPendingAttachments();
+      }
+
+      function renderPendingAttachments() {
+        pendingAttachmentsEl.innerHTML = "";
+
+        if (!pendingAttachments.length) {
+          pendingAttachmentsEl.classList.add("nova-hidden");
+          return;
+        }
+
+        pendingAttachmentsEl.classList.remove("nova-hidden");
+
+        pendingAttachments.forEach((item) => {
+          const chip = document.createElement("div");
+          chip.className = "nova-pending-chip";
+
+          if ((item.type || "").startsWith("image/") && item.url) {
+            const img = document.createElement("img");
+            img.className = "nova-pending-chip-image";
+            img.src = item.url;
+            img.alt = item.filename || "Pending image";
+            chip.appendChild(img);
+          }
+
+          const title = document.createElement("div");
+          title.className = "nova-pending-chip-title";
+          title.textContent = item.filename || "attachment";
+          chip.appendChild(title);
+
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "nova-pending-chip-remove";
+          removeBtn.textContent = "Remove";
+          removeBtn.addEventListener("click", () => removePendingAttachment(item.id));
+          chip.appendChild(removeBtn);
+
+          pendingAttachmentsEl.appendChild(chip);
+        });
+      }
+
+      async function sendChat(content = "", attachments = []) {
+        const trimmed = (content || "").trim();
+        if (!trimmed && attachments.length === 0) return;
+
+        if (trimmed) {
+          appendTextMessage(trimmed, "user", "You");
+        }
+
+        typingIndicator.style.display = "block";
 
         try {
-          const res = await fetch('/api/upload', { method:'POST', body:formData });
+          const payload = {
+            content: trimmed,
+            session_id: sessionId,
+            attachments: attachments,
+          };
+
+          const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
           const data = await res.json();
-          if(data.ok && data.files && data.files.length){
-            const attachmentIds = data.files.map(f => f.id || f.filename);
-            sendChat('', attachmentIds);
-          } else appendMessage('Upload failed.', 'assistant');
-        } catch(e){
-          appendMessage('Network error during upload.', 'assistant');
-        } finally { fileInput.value=''; }
+
+          if (!data.ok) {
+            appendTextMessage(`Error: ${data.error || "Unknown error"}`, "assistant", "AI");
+            return;
+          }
+
+          renderGeneratedImages(data.generated_images);
+          renderReturnedAttachments(data.attachments);
+
+          if (data.web) {
+            appendTextMessage(data.web, "assistant", "Web");
+          }
+
+          if (Array.isArray(data.attachments_desc) && data.attachments_desc.length) {
+            data.attachments_desc.forEach((desc) => {
+              appendTextMessage(desc, "assistant", "Attachment");
+            });
+          }
+
+          if (data.message) {
+            appendTextMessage(data.message, "assistant", "AI");
+          }
+        } catch (err) {
+          appendTextMessage("Network error while sending message.", "assistant", "AI");
+        } finally {
+          typingIndicator.style.display = "none";
+        }
+      }
+
+      sendBtn.addEventListener("click", async () => {
+        const value = chatInput.value;
+        const attachmentIds = pendingAttachments.map((item) => item.id).filter(Boolean);
+
+        chatInput.value = "";
+        pendingAttachments = [];
+        renderPendingAttachments();
+
+        await sendChat(value, attachmentIds);
+      });
+
+      chatInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendBtn.click();
+        }
+      });
+
+      uploadBtn.addEventListener("click", () => {
+        fileInput.click();
+      });
+
+      fileInput.addEventListener("change", async () => {
+        const files = fileInput.files;
+        if (!files || !files.length) return;
+
+        const formData = new FormData();
+        for (const file of files) {
+          formData.append("files", file);
+        }
+
+        typingIndicator.style.display = "block";
+
+        try {
+          const res = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await res.json();
+
+          if (!data.ok || !Array.isArray(data.files) || !data.files.length) {
+            appendTextMessage(data.error || "Upload failed.", "assistant", "AI");
+            return;
+          }
+
+          const okFiles = data.files.filter((f) => f && f.ok);
+
+          okFiles.forEach((file) => {
+            pendingAttachments.push({
+              id: file.id,
+              filename: file.filename || file.id || "attachment",
+              type: file.type || "",
+              url: file.url || "",
+            });
+          });
+
+          renderPendingAttachments();
+        } catch (err) {
+          appendTextMessage("Network error during upload.", "assistant", "AI");
+        } finally {
+          typingIndicator.style.display = "none";
+          fileInput.value = "";
+        }
       });
     });
   </script>
