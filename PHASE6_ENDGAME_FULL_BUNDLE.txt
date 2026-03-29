@@ -1,0 +1,73 @@
+==============================
+NOVA ULTIMATE 2026 — PHASE 6 ENDGAME FULL BUNDLE
+==============================
+
+1️⃣ HTML
+--------------------------------
+File: templates\index.html
+- Sidebar, topbar, chat stage, composer, right rail panels (memory + artifacts)
+- IDs: messages, composerInput, sendBtn, attachmentsBar, voiceBtn
+- Memory panel: memoryPanel, memoryList, memoryCloseBtn
+- Artifacts panel: novaArtifactsRoot, novaArtifactsList, artifactsCloseBtn
+- Fully wired for panel toggling and endgame UI
+
+2️⃣ CSS
+--------------------------------
+File: static\css\nova-main.css
+- Dark theme, panels, messages, composer, attachments bar
+- User/assistant message styling, hover, shadows, code blocks
+- Scrollable chat, responsive layout
+- .is-active used for panel visibility
+
+3️⃣ JS
+--------------------------------
+File: static\js/nova-render.js
+- Sidebar toggle
+- Theme toggle
+- Memory and Artifacts panel open/close + close buttons
+
+File: static\js/nova-artifacts.js
+- Artifact panel rendering and viewer logic
+- Count and status updates
+- Empty state handling
+
+File: static\js/nova-chat.js
+- Chat composer logic
+- Send button, Enter key handling
+- Voice and attachment placeholders
+- Messages append and scroll simulation
+
+File: static\js/nova-ui-connect.js
+- Keyboard shortcuts: Ctrl+Enter (send), Ctrl+Space (focus composer)
+- Placeholder wiring for voice/attachments
+
+File: static\js/nova-chat-render.js
+- Full message rendering engine
+- Normalization, attachments, copy buttons
+- Inline markdown, code blocks
+- Patch/replace messages dynamically
+- Panel open/close fix applied for memory & artifacts
+- Scroll and empty state handling
+- Session rendering
+
+4️⃣ NOTES
+--------------------------------
+- All files are SMFF, drop-in, fully wired
+- Memory and Artifacts panels now toggle correctly
+- Messages render properly with assistant/user roles, attachments, markdown, code
+- Panels populate once backend data is present
+- Fully interactive and visually polished Phase 6 endgame UI
+
+==============================
+INSTRUCTIONS
+==============================
+1. Backup your current `nova` folder.
+2. Replace all files with the Phase 6 bundle:
+   - templates\index.html
+   - static\css\nova-main.css
+   - static\js\* (all five JS files)
+3. Launch Nova backend (Flask/FastAPI) or portable build.
+4. Send messages and/or create artifacts to populate Memory/Artifacts panels.
+5. Verify sidebar, topbar, chat, memory, artifacts, composer all work as expected.
+6. Done — Phase 6 endgame fully interactive and launch-ready.
+==============================

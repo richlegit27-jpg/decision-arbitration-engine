@@ -1,0 +1,485 @@
+// C:\Users\Owner\nova\static\js\render-service.js
+
+(() => {
+"use strict"
+
+function createRenderService(options = {}){
+  const {
+    state,
+    elements = {},
+  } = options
+
+  if(!state){
+    throw new Error("NovaRenderService: state is required")
+  }
+
+  const el = {
+    messages: elements.messages || null,
+    messagesScroll: elements.messagesScroll || null,
+    emptyState: elements.emptyState || null,
+    messagesEmpty: elements.messagesEmpty || null,
+    chatList: elements.chatList || null,
+    chatListCount: elements.chatListCount || null,
+    topbarTitle: elements.topbarTitle || null,
+    topbarSubtitle: elements.topbarSubtitle || null,
+    composerMeta: elements.composerMeta || null,
+  }
+
+  function renderHeader({ title, subtitle } = {}){
+    if(el.topbarTitle){
+      el.topbarTitle.textContent = String(title || "Nova")
+    }
+
+    if(el.topbarSubtitle){
+      el.topbarSubtitle.textContent = String(subtitle || "")
+    }
+  }
+
+  function renderChatList({ chats = [], activeChatId = null } = {}){
+    if(!el.chatList){
+      return
+    }
+
+    el.chatList.innerHTML = ""
+
+    if(!Array.isArray(chats) || chats.length === 0){
+      const empty = document.createElement("div")
+      empty.className = "chat-list-empty"
+      empty.textContent = "No chats yet"
+      el.chatList.appendChild(empty)
+
+      if(el.chatListCount){
+        el.chatListCount.textContent = "0"
+      }
+      return
+    }
+
+    chats.forEach((chat) => {
+      const item = document.createElement("button")
+      item.type = "button"
+      item.className = "chat-list-item"
+      item.setAttribute("data-chat-id", chat.chat_id)
+
+      if(chat.chat_id === activeChatId){
+        item.classList.add("is-active")
+      }
+
+      const main = document.createElement("div")
+      main.className = "chat-list-main"
+
+      const title = document.createElement("div")
+      title.className = "chat-list-title"
+      title.textContent = chat.title || "New chat"
+
+      const time = document.createElement("div")
+      time.className = "chat-list-time"
+      time.textContent = formatTime(chat.updated_at || chat.updated || chat.created_at || "")
+
+      main.appendChild(title)
+      main.appendChild(time)
+      item.appendChild(main)
+      el.chatList.appendChild(item)
+    })
+
+    if(el.chatListCount){
+      el.chatListCount.textContent = String(chats.length)
+    }
+  }
+
+  function renderMessages({ messages = [] } = {}){
+    if(!el.messages){
+      return
+    }
+
+    el.messages.innerHTML = ""
+
+    const list = Array.isArray(messages) ? messages : []
+
+    if(el.messagesEmpty){
+      el.messagesEmpty.hidden = list.length > 0
+    }
+
+    if(el.emptyState){
+      el.emptyState.hidden = list.length > 0
+    }
+
+    list.forEach((message) => {
+      el.messages.appendChild(createMessageElement(message))
+    })
+  }
+
+  function renderStreamingMessage({ message } = {}){
+    if(!el.messages || !message){
+      return
+    }
+
+    let node = el.messages.querySelector(`[data-message-id="${message.message_id}"]`)
+
+    if(!node){
+      node = createMessageElement(message)
+      el.messages.appendChild(node)
+    }
+
+    patchMessageElement(node, message)
+
+    if(el.messagesEmpty){
+      el.messagesEmpty.hidden = true
+    }
+
+    if(el.emptyState){
+      el.emptyState.hidden = true
+    }
+  }
+
+  function removeStreamingMessage(messageId){
+    if(!el.messages || !messageId){
+      return
+    }
+
+    const node = el.messages.querySelector(`[data-message-id="${messageId}"]`)
+    if(node){
+      node.remove()
+    }
+  }
+
+  function setMessageStatus(messageId, status){
+    if(!el.messages || !messageId){
+      return
+    }
+
+    const node = el.messages.querySelector(`[data-message-id="${messageId}"]`)
+    if(!node){
+      return
+    }
+
+    const statusEl = node.querySelector("[data-message-status]")
+    if(!statusEl){
+      return
+    }
+
+    statusEl.textContent = formatStatusLabel(status)
+    statusEl.className = buildStatusClass(status)
+  }
+
+  function flashMessageAction(messageId, action, label){
+    if(!el.messages || !messageId || !action){
+      return
+    }
+
+    const btn = el.messages.querySelector(
+      `[data-message-id="${messageId}"] [data-message-action="${action}"]`
+    )
+
+    if(!btn){
+      return
+    }
+
+    const original = btn.textContent
+    btn.textContent = label || "Done"
+
+    window.setTimeout(() => {
+      btn.textContent = original
+    }, 1200)
+  }
+
+  function showComposerMeta(text, type = "info"){
+    if(!el.composerMeta){
+      return
+    }
+
+    el.composerMeta.hidden = false
+    el.composerMeta.textContent = String(text || "")
+    el.composerMeta.dataset.state = String(type || "info")
+  }
+
+  function hideComposerMeta(){
+    if(!el.composerMeta){
+      return
+    }
+
+    el.composerMeta.hidden = true
+    el.composerMeta.textContent = ""
+    delete el.composerMeta.dataset.state
+  }
+
+  function createMessageElement(message){
+    const row = document.createElement("div")
+    row.className = `message-row role-${message.role || "assistant"}`
+    row.setAttribute("data-message-id", message.message_id)
+
+    if(message.status === "error"){
+      row.classList.add("has-error")
+    }
+
+    const avatar = document.createElement("div")
+    avatar.className = "message-avatar"
+    avatar.textContent = avatarLabelForRole(message.role)
+
+    const wrap = document.createElement("div")
+    wrap.className = "message-bubble-wrap"
+
+    const meta = document.createElement("div")
+    meta.className = "message-meta"
+
+    const author = document.createElement("div")
+    author.className = "message-author"
+    author.textContent = authorLabelForRole(message.role)
+
+    const time = document.createElement("div")
+    time.className = "message-time"
+    time.textContent = formatTime(message.created_at)
+
+    const status = document.createElement("div")
+    status.setAttribute("data-message-status", "")
+    status.className = buildStatusClass(message.status)
+    status.textContent = formatStatusLabel(message.status)
+
+    meta.appendChild(author)
+    meta.appendChild(time)
+    if(status.textContent){
+      meta.appendChild(status)
+    }
+
+    const bubble = document.createElement("div")
+    bubble.className = "message-bubble"
+
+    const content = document.createElement("div")
+    content.className = "message-content"
+    content.setAttribute("data-message-content", "")
+    content.textContent = String(message.content || "")
+    content.classList.toggle("is-streaming", !!message.isStreaming)
+    content.classList.toggle("is-thinking", message.status === "thinking")
+
+    bubble.appendChild(content)
+
+    const attachments = createAttachmentsElement(message.attachments || [])
+    if(attachments){
+      bubble.appendChild(attachments)
+    }
+
+    if(message.error){
+      const errorEl = document.createElement("div")
+      errorEl.className = "message-error"
+      errorEl.textContent = String(message.error)
+      bubble.appendChild(errorEl)
+    }
+
+    const actions = document.createElement("div")
+    actions.className = "message-actions"
+
+    const copyBtn = document.createElement("button")
+    copyBtn.type = "button"
+    copyBtn.className = "message-action-btn"
+    copyBtn.setAttribute("data-message-action", "copy")
+    copyBtn.setAttribute("data-message-id", message.message_id)
+    copyBtn.textContent = "Copy"
+    actions.appendChild(copyBtn)
+
+    if(message.role === "assistant"){
+      const regenBtn = document.createElement("button")
+      regenBtn.type = "button"
+      regenBtn.className = "message-action-btn"
+      regenBtn.setAttribute("data-message-action", "regenerate")
+      regenBtn.setAttribute("data-message-id", message.message_id)
+      regenBtn.textContent = "Regenerate"
+      actions.appendChild(regenBtn)
+    }
+
+    wrap.appendChild(meta)
+    wrap.appendChild(bubble)
+    wrap.appendChild(actions)
+
+    row.appendChild(avatar)
+    row.appendChild(wrap)
+
+    return row
+  }
+
+  function patchMessageElement(node, message){
+    node.className = `message-row role-${message.role || "assistant"}`
+    node.classList.toggle("has-error", message.status === "error")
+
+    const contentEl = node.querySelector("[data-message-content]")
+    if(contentEl){
+      contentEl.textContent = String(message.content || "")
+      contentEl.classList.toggle("is-streaming", !!message.isStreaming)
+      contentEl.classList.toggle("is-thinking", message.status === "thinking")
+    }
+
+    const statusEl = node.querySelector("[data-message-status]")
+    if(statusEl){
+      const label = formatStatusLabel(message.status)
+      statusEl.textContent = label
+      statusEl.className = buildStatusClass(message.status)
+      statusEl.hidden = !label
+    }
+
+    const timeEl = node.querySelector(".message-time")
+    if(timeEl){
+      timeEl.textContent = formatTime(message.created_at)
+    }
+
+    const bubble = node.querySelector(".message-bubble")
+    if(bubble){
+      const existingAttachments = node.querySelector(".message-attachments")
+      if(existingAttachments){
+        existingAttachments.remove()
+      }
+
+      const attachments = createAttachmentsElement(message.attachments || [])
+      if(attachments){
+        bubble.appendChild(attachments)
+      }
+    }
+  }
+
+  function createAttachmentsElement(attachments){
+    const list = Array.isArray(attachments) ? attachments : []
+    if(list.length === 0){
+      return null
+    }
+
+    const wrap = document.createElement("div")
+    wrap.className = "message-attachments"
+
+    list.forEach((attachment) => {
+      const chip = document.createElement("div")
+      chip.className = "attachment-chip"
+
+      const body = document.createElement("div")
+      body.className = "attachment-chip-body"
+
+      const name = document.createElement("div")
+      name.className = "attachment-chip-name"
+      name.textContent =
+        attachment?.name ||
+        attachment?.filename ||
+        "Attachment"
+
+      const meta = document.createElement("div")
+      meta.className = "attachment-chip-meta"
+      meta.textContent = buildAttachmentMeta(attachment)
+
+      body.appendChild(name)
+      body.appendChild(meta)
+      chip.appendChild(body)
+      wrap.appendChild(chip)
+    })
+
+    return wrap
+  }
+
+  function buildAttachmentMeta(attachment){
+    const type = attachment?.content_type || attachment?.type || "file"
+    const size = formatBytes(attachment?.size || 0)
+    return `${type} • ${size}`
+  }
+
+  function formatStatusLabel(status){
+    switch(String(status || "").toLowerCase()){
+      case "sending":
+        return "Sending"
+      case "thinking":
+        return "Thinking"
+      case "streaming":
+        return "Streaming"
+      case "done":
+        return ""
+      case "stopped":
+        return "Stopped"
+      case "error":
+        return "Error"
+      default:
+        return status ? String(status) : ""
+    }
+  }
+
+  function buildStatusClass(status){
+    const base = "message-status"
+    switch(String(status || "").toLowerCase()){
+      case "thinking":
+      case "streaming":
+        return `${base} is-streaming`
+      case "error":
+        return `${base} is-error`
+      default:
+        return base
+    }
+  }
+
+  function authorLabelForRole(role){
+    switch(String(role || "").toLowerCase()){
+      case "user":
+        return "You"
+      case "system":
+        return "System"
+      default:
+        return "Nova"
+    }
+  }
+
+  function avatarLabelForRole(role){
+    switch(String(role || "").toLowerCase()){
+      case "user":
+        return "Y"
+      case "system":
+        return "!"
+      default:
+        return "N"
+    }
+  }
+
+  function formatTime(value){
+    if(!value){
+      return ""
+    }
+
+    const date = new Date(value)
+    if(Number.isNaN(date.getTime())){
+      return ""
+    }
+
+    return date.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    })
+  }
+
+  function formatBytes(bytes){
+    const n = Number(bytes || 0)
+
+    if(!Number.isFinite(n) || n <= 0){
+      return "0 B"
+    }
+
+    const units = ["B", "KB", "MB", "GB", "TB"]
+    let size = n
+    let i = 0
+
+    while(size >= 1024 && i < units.length - 1){
+      size /= 1024
+      i += 1
+    }
+
+    const rounded = size >= 10 || i === 0 ? Math.round(size) : size.toFixed(1)
+    return `${rounded} ${units[i]}`
+  }
+
+  return {
+    renderHeader,
+    renderChatList,
+    renderMessages,
+    renderStreamingMessage,
+    removeStreamingMessage,
+    setMessageStatus,
+    flashMessageAction,
+    showComposerMeta,
+    hideComposerMeta,
+  }
+}
+
+window.NovaRenderService = {
+  createRenderService,
+}
+
+})()

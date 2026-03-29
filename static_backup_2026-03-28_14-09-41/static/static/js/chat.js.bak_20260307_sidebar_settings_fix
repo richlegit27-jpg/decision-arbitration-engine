@@ -1,0 +1,804 @@
+﻿// C:\Users\Owner\nova\static\js\chat.js
+
+(() => {
+"use strict"
+
+const el = {
+  sidebar: document.getElementById("sidebar"),
+  mobileOverlay: document.getElementById("mobileOverlay"),
+  btnSidebarToggle: document.getElementById("btnSidebarToggle"),
+  btnSidebarClose: document.getElementById("btnSidebarClose"),
+
+  btnNewChat: document.getElementById("btnNewChat"),
+  btnRenameChat: document.getElementById("btnRenameChat"),
+  btnDeleteChat: document.getElementById("btnDeleteChat"),
+  btnSettings: document.getElementById("btnSettings"),
+
+  settingsModal: document.getElementById("settingsModal"),
+  settingsBackdrop: document.getElementById("settingsBackdrop"),
+  btnSettingsClose: document.getElementById("btnSettingsClose"),
+  btnToggleSidebarMode: document.getElementById("btnToggleSidebarMode"),
+  btnFocusComposer: document.getElementById("btnFocusComposer"),
+
+  chatList: document.getElementById("chatList"),
+  chatListCount: document.getElementById("chatListCount"),
+
+  topbarTitle: document.getElementById("topbarTitle"),
+  topbarSubtitle: document.getElementById("topbarSubtitle"),
+
+  messagesScroll: document.getElementById("messagesScroll"),
+  messages: document.getElementById("messages"),
+  emptyState: document.getElementById("emptyState"),
+  messagesEmpty: document.getElementById("messagesEmpty"),
+
+  composerForm: document.getElementById("composerForm"),
+  input: document.getElementById("messageInput"),
+  sendBtn: document.getElementById("sendBtn"),
+  stopBtn: document.getElementById("stopBtn"),
+  attachBtn: document.getElementById("attachBtn"),
+  fileInput: document.getElementById("fileInput"),
+  composerMeta: document.getElementById("composerMeta"),
+
+  pendingAttachments: document.getElementById("pendingAttachments"),
+  pendingAttachmentsList: document.getElementById("pendingAttachmentsList"),
+}
+
+if(!window.NovaState) throw new Error("NovaState is required")
+if(!window.NovaAPI) throw new Error("NovaAPI is required")
+if(!window.NovaRenderService) throw new Error("NovaRenderService is required")
+if(!window.NovaAttachmentsService) throw new Error("NovaAttachmentsService is required")
+if(!window.NovaStreamService) throw new Error("NovaStreamService is required")
+if(!window.NovaDialogService) throw new Error("NovaDialogService is required")
+if(!window.NovaChatService) throw new Error("NovaChatService is required")
+
+const state = window.NovaState.createState()
+
+const renderService = window.NovaRenderService.createRenderService({
+  state,
+  elements: {
+    messages: el.messages,
+    messagesScroll: el.messagesScroll,
+    emptyState: el.emptyState,
+    messagesEmpty: el.messagesEmpty,
+    chatList: el.chatList,
+    chatListCount: el.chatListCount,
+    topbarTitle: el.topbarTitle,
+    topbarSubtitle: el.topbarSubtitle,
+    composerMeta: el.composerMeta,
+  },
+})
+
+const dialogService = window.NovaDialogService.createDialogService()
+
+const attachmentsService = window.NovaAttachmentsService.createAttachmentsService({
+  state,
+  elements: {
+    fileInput: el.fileInput,
+    pendingAttachments: el.pendingAttachments,
+    pendingAttachmentsList: el.pendingAttachmentsList,
+    composerMeta: el.composerMeta,
+  },
+  onChange(){
+    renderComposerState()
+  },
+})
+
+const streamService = window.NovaStreamService.createStreamService({
+  state,
+  api: window.NovaAPI,
+  onStart(){
+    state.isStreaming = true
+    renderComposerState()
+    renderHeader()
+  },
+  onMeta(meta){
+    if(meta?.chat_id){
+      state.activeChatId = meta.chat_id
+    }
+
+    renderHeader()
+    renderComposerState()
+  },
+  onToken(payload){
+    ensureStreamingAssistantMessage()
+    state.streamingMessage.content = payload.fullText || ""
+    renderStreamingMessage()
+  },
+  onDone(payload){
+    finalizeStreamingMessage(payload?.fullText || "")
+  },
+  onError(payload){
+    if(payload?.aborted){
+      finalizeStreamingMessage(state.streamingMessage?.content || "", {
+        aborted: true,
+      })
+      return
+    }
+
+    removeStreamingMessage()
+
+    if(state.pendingUserMessageId){
+      renderService.setMessageStatus(state.pendingUserMessageId, "error")
+    }
+
+    renderService.showComposerMeta(payload?.message || "Network/stream error", "error")
+  },
+  onFinally(){
+    state.isStreaming = false
+    renderComposerState()
+    renderHeader()
+  },
+})
+
+const chatService = window.NovaChatService.createChatService({
+  state,
+  api: window.NovaAPI,
+})
+
+boot().catch((error) => {
+  console.error("Nova boot failed:", error)
+  renderService.showComposerMeta("Failed to start Nova.", "error")
+})
+
+async function boot(){
+  bindEvents()
+  renderComposerState()
+  renderHeader()
+  await loadChats()
+  await ensureActiveChat()
+  autosizeInput()
+}
+
+function bindEvents(){
+  el.btnSidebarToggle?.addEventListener("click", () => {
+    openSidebar()
+  })
+
+  el.btnSidebarClose?.addEventListener("click", () => {
+    closeSidebar()
+  })
+
+  el.mobileOverlay?.addEventListener("click", () => {
+    closeSidebar()
+  })
+
+  el.btnNewChat?.addEventListener("click", async () => {
+    await createNewChat()
+  })
+
+  el.btnRenameChat?.addEventListener("click", async () => {
+    await renameActiveChat()
+  })
+
+  el.btnDeleteChat?.addEventListener("click", async () => {
+    await deleteActiveChat()
+  })
+
+  el.btnSettings?.addEventListener("click", () => {
+    openSettings()
+  })
+
+  el.settingsBackdrop?.addEventListener("click", () => {
+    closeSettings()
+  })
+
+  el.btnSettingsClose?.addEventListener("click", () => {
+    closeSettings()
+  })
+
+  el.btnToggleSidebarMode?.addEventListener("click", () => {
+    document.body.classList.toggle("sidebar-collapsed")
+    closeSettings()
+  })
+
+  el.btnFocusComposer?.addEventListener("click", () => {
+    focusInput()
+    closeSettings()
+  })
+
+  document.addEventListener("keydown", (event) => {
+    if(event.key === "Escape"){
+      closeSettings()
+      closeSidebar()
+    }
+  })
+
+  el.chatList?.addEventListener("click", async (event) => {
+    const item = event.target.closest("[data-chat-id]")
+    if(!item){
+      return
+    }
+
+    const nextChatId = item.getAttribute("data-chat-id")
+    if(!nextChatId){
+      return
+    }
+
+    state.activeChatId = nextChatId
+    renderHeader()
+    renderChatList()
+    closeSidebar()
+    await loadMessages(nextChatId)
+  })
+
+  el.messages?.addEventListener("click", async (event) => {
+    const actionBtn = event.target.closest("[data-message-action]")
+    if(!actionBtn){
+      return
+    }
+
+    const action = actionBtn.getAttribute("data-message-action")
+    const messageId = actionBtn.getAttribute("data-message-id")
+
+    if(!action || !messageId){
+      return
+    }
+
+    if(action === "copy"){
+      await handleCopyMessage(messageId)
+      return
+    }
+
+    if(action === "regenerate"){
+      await handleRegenerate(messageId)
+    }
+  })
+
+  el.attachBtn?.addEventListener("click", () => {
+    attachmentsService.openPicker()
+  })
+
+  el.fileInput?.addEventListener("change", (event) => {
+    attachmentsService.handleFileInput(event)
+  })
+
+  el.composerForm?.addEventListener("submit", async (event) => {
+    event.preventDefault()
+    await handleSend()
+  })
+
+  el.stopBtn?.addEventListener("click", () => {
+    streamService.stop()
+  })
+
+  el.input?.addEventListener("input", () => {
+    autosizeInput()
+    renderComposerState()
+  })
+
+  el.input?.addEventListener("keydown", async (event) => {
+    if(event.key !== "Enter"){
+      return
+    }
+
+    if(event.shiftKey){
+      return
+    }
+
+    event.preventDefault()
+    await handleSend()
+  })
+}
+
+async function loadChats(){
+  try{
+    const chats = await chatService.listChats()
+    state.chats = Array.isArray(chats) ? chats : []
+    renderChatList()
+  }catch(error){
+    console.error("Failed to load chats:", error)
+    renderService.showComposerMeta("Failed to load chats.", "error")
+  }
+}
+
+async function ensureActiveChat(){
+  if(state.activeChatId){
+    await loadMessages(state.activeChatId)
+    return
+  }
+
+  if(state.chats.length > 0){
+    state.activeChatId = state.chats[0].chat_id
+    renderHeader()
+    renderChatList()
+    await loadMessages(state.activeChatId)
+    return
+  }
+
+  renderEmptyConversation()
+}
+
+async function createNewChat(){
+  state.activeChatId = null
+  state.messages = []
+  state.pendingUserMessageId = null
+  removeStreamingMessage()
+  attachmentsService.clear()
+  renderHeader()
+  renderChatList()
+  renderEmptyConversation()
+  focusInput()
+}
+
+async function renameActiveChat(){
+  if(!state.activeChatId){
+    renderService.showComposerMeta("No active chat to rename.", "error")
+    return
+  }
+
+  const currentChat = state.chats.find((chat) => chat.chat_id === state.activeChatId)
+  const currentTitle = currentChat?.title || "New chat"
+
+  const nextTitle = await dialogService.prompt({
+    title: "Rename chat",
+    message: "Enter a new chat title.",
+    value: currentTitle,
+  })
+
+  if(nextTitle === null){
+    return
+  }
+
+  const cleanTitle = String(nextTitle).trim()
+  if(!cleanTitle){
+    return
+  }
+
+  try{
+    const updated = await chatService.renameChat(state.activeChatId, cleanTitle)
+
+    const chat = state.chats.find((item) => item.chat_id === state.activeChatId)
+    if(chat){
+      chat.title = updated?.title || cleanTitle
+    }
+
+    renderHeader()
+    renderChatList()
+    renderService.showComposerMeta("Chat renamed.", "success")
+  }catch(error){
+    console.error("Rename failed:", error)
+    renderService.showComposerMeta("Failed to rename chat.", "error")
+  }
+}
+
+async function deleteActiveChat(){
+  if(!state.activeChatId){
+    return
+  }
+
+  const ok = await dialogService.confirm({
+    title: "Delete chat",
+    message: "This chat will be removed permanently.",
+  })
+
+  if(!ok){
+    return
+  }
+
+  const deletingId = state.activeChatId
+
+  try{
+    await chatService.deleteChat(deletingId)
+    state.chats = state.chats.filter((chat) => chat.chat_id !== deletingId)
+    state.activeChatId = null
+    state.messages = []
+    state.pendingUserMessageId = null
+    removeStreamingMessage()
+
+    renderChatList()
+    renderHeader()
+
+    if(state.chats.length > 0){
+      state.activeChatId = state.chats[0].chat_id
+      renderChatList()
+      renderHeader()
+      await loadMessages(state.activeChatId)
+      return
+    }
+
+    renderEmptyConversation()
+  }catch(error){
+    console.error("Delete failed:", error)
+    renderService.showComposerMeta("Failed to delete chat.", "error")
+  }
+}
+
+async function loadMessages(chatId){
+  if(!chatId){
+    renderEmptyConversation()
+    return
+  }
+
+  try{
+    const messages = await chatService.getMessages(chatId)
+    state.messages = Array.isArray(messages) ? messages : []
+    state.pendingUserMessageId = null
+    removeStreamingMessage()
+    renderMessages()
+    renderHeader()
+  }catch(error){
+    console.error("Failed to load messages:", error)
+    state.messages = []
+    renderMessages()
+    renderService.showComposerMeta("Failed to load messages.", "error")
+  }
+}
+
+async function ensureChatForSend(message){
+  if(state.activeChatId){
+    return state.activeChatId
+  }
+
+  const titleSeed = String(message || "").trim()
+  const title = titleSeed ? titleSeed.slice(0, 60) : "New chat"
+
+  const created = await chatService.createChat({ title })
+  const createdChatId = created?.chat_id || null
+
+  if(!createdChatId){
+    throw new Error("Failed to create chat before send.")
+  }
+
+  state.activeChatId = createdChatId
+
+  const existingIndex = state.chats.findIndex((chat) => chat.chat_id === createdChatId)
+  if(existingIndex === -1){
+    state.chats.unshift(created)
+  }else{
+    state.chats[existingIndex] = created
+  }
+
+  renderChatList()
+  renderHeader()
+
+  return createdChatId
+}
+
+async function handleSend(){
+  if(state.isStreaming){
+    return
+  }
+
+  const rawMessage = String(el.input?.value || "")
+  const message = rawMessage.trim()
+  const pendingFiles = attachmentsService.getPendingFiles()
+
+  if(!message && pendingFiles.length === 0){
+    return
+  }
+
+  hideComposerMeta()
+  ensureChatShellVisible()
+
+  let sendChatId = null
+
+  try{
+    sendChatId = await ensureChatForSend(message)
+  }catch(error){
+    console.error("Failed to prepare chat:", error)
+    renderService.showComposerMeta(error?.message || "Failed to prepare chat.", "error")
+    return
+  }
+
+  const localUserMessageId = "local-user-" + Date.now()
+
+  const optimisticUserMessage = {
+    message_id: localUserMessageId,
+    role: "user",
+    content: message,
+    attachments: pendingFiles.map((file, index) => ({
+      attachment_id: "pending-" + index,
+      name: file.name,
+      filename: file.name,
+      content_type: file.type || "application/octet-stream",
+      size: file.size || 0,
+    })),
+    created_at: new Date().toISOString(),
+    status: "sending",
+  }
+
+  state.messages.push(optimisticUserMessage)
+  state.pendingUserMessageId = localUserMessageId
+
+  renderMessages()
+  focusInput()
+
+  if(el.input){
+    el.input.value = ""
+  }
+
+  autosizeInput()
+  attachmentsService.clear()
+  renderComposerState()
+  renderHeader()
+
+  try{
+    const result = await streamService.send({
+      chatId: sendChatId,
+      message,
+      files: pendingFiles,
+    })
+
+    if(!result?.ok && !result?.aborted){
+      throw new Error(result?.error || "Send failed")
+    }
+
+    const resultingChatId =
+      result?.meta?.chat_id ||
+      state.activeChatId ||
+      sendChatId
+
+    if(resultingChatId){
+      state.activeChatId = resultingChatId
+    }
+
+    await refreshAfterSend()
+  }catch(error){
+    console.error("Send failed:", error)
+
+    removeStreamingMessage()
+
+    if(state.pendingUserMessageId){
+      renderService.setMessageStatus(state.pendingUserMessageId, "error")
+    }
+
+    renderService.showComposerMeta(error?.message || "Send failed.", "error")
+    renderComposerState()
+    renderHeader()
+  }
+}
+
+async function refreshAfterSend(){
+  await loadChats()
+
+  if(state.activeChatId){
+    await loadMessages(state.activeChatId)
+  }else{
+    renderMessages()
+  }
+
+  renderComposerState()
+  renderHeader()
+  focusInput()
+}
+
+async function handleCopyMessage(messageId){
+  const message = findMessageById(messageId)
+  if(!message){
+    return
+  }
+
+  const text = String(message.content || "")
+  if(!text){
+    return
+  }
+
+  try{
+    await navigator.clipboard.writeText(text)
+    renderService.flashMessageAction(messageId, "copy", "Copied")
+  }catch(error){
+    console.error("Copy failed:", error)
+    renderService.showComposerMeta("Copy failed.", "error")
+  }
+}
+
+async function handleRegenerate(messageId){
+  const index = state.messages.findIndex((message) => message.message_id === messageId)
+  if(index <= 0){
+    return
+  }
+
+  for(let i = index - 1; i >= 0; i -= 1){
+    const previous = state.messages[i]
+    if(previous?.role === "user" && String(previous.content || "").trim()){
+      if(el.input){
+        el.input.value = previous.content
+      }
+      autosizeInput()
+      focusInput()
+      await handleSend()
+      return
+    }
+  }
+}
+
+function renderChatList(){
+  renderService.renderChatList({
+    chats: state.chats,
+    activeChatId: state.activeChatId,
+  })
+}
+
+function renderMessages(){
+  renderService.renderMessages({
+    messages: state.messages,
+  })
+}
+
+function renderStreamingMessage(){
+  renderService.renderStreamingMessage({
+    message: state.streamingMessage,
+  })
+}
+
+function renderEmptyConversation(){
+  state.messages = []
+  renderMessages()
+  renderHeader()
+  hideComposerMeta()
+  renderComposerState()
+}
+
+function renderHeader(){
+  const activeChat = state.chats.find((chat) => chat.chat_id === state.activeChatId)
+  const title = activeChat?.title || "Nova"
+
+  let subtitle = "Ready"
+
+  if(state.isStreaming){
+    subtitle = "Thinking…"
+  }else if(state.activeChatId && state.messages.length > 0){
+    subtitle = `${state.messages.length} message${state.messages.length === 1 ? "" : "s"}`
+  }else if(state.activeChatId){
+    subtitle = "No messages yet"
+  }
+
+  renderService.renderHeader({
+    title,
+    subtitle,
+  })
+}
+
+function renderComposerState(){
+  const text = String(el.input?.value || "").trim()
+  const hasText = text.length > 0
+  const hasFiles = attachmentsService.getPendingFiles().length > 0
+  const canSend = !state.isStreaming && (hasText || hasFiles)
+
+  if(el.sendBtn){
+    el.sendBtn.disabled = !canSend
+    el.sendBtn.hidden = state.isStreaming
+  }
+
+  if(el.stopBtn){
+    el.stopBtn.hidden = !state.isStreaming
+  }
+
+  if(el.attachBtn){
+    el.attachBtn.disabled = state.isStreaming
+  }
+
+  if(el.input){
+    el.input.disabled = state.isStreaming
+  }
+}
+
+function ensureChatShellVisible(){
+  if(el.emptyState){
+    el.emptyState.hidden = true
+  }
+
+  if(el.messagesEmpty){
+    el.messagesEmpty.hidden = true
+  }
+}
+
+function ensureStreamingAssistantMessage(){
+  ensureChatShellVisible()
+
+  if(state.streamingMessage){
+    return state.streamingMessage
+  }
+
+  const message = {
+    message_id: "streaming-assistant",
+    role: "assistant",
+    content: "",
+    created_at: new Date().toISOString(),
+    status: "thinking",
+    isStreaming: true,
+  }
+
+  state.streamingMessage = message
+  renderStreamingMessage()
+  return message
+}
+
+function finalizeStreamingMessage(finalText, options = {}){
+  const { aborted = false } = options
+
+  if(!state.streamingMessage){
+    return
+  }
+
+  if(aborted && !String(finalText || "").trim()){
+    removeStreamingMessage()
+    renderComposerState()
+    renderHeader()
+    return
+  }
+
+  state.streamingMessage.content = String(finalText || "")
+  state.streamingMessage.status = aborted ? "stopped" : "done"
+  state.streamingMessage.isStreaming = false
+
+  renderStreamingMessage()
+}
+
+function removeStreamingMessage(){
+  if(!state.streamingMessage){
+    return
+  }
+
+  renderService.removeStreamingMessage(state.streamingMessage.message_id)
+  state.streamingMessage = null
+}
+
+function findMessageById(messageId){
+  return state.messages.find((message) => message.message_id === messageId) || null
+}
+
+function focusInput(){
+  if(!el.input){
+    return
+  }
+
+  el.input.focus({ preventScroll: true })
+}
+
+function autosizeInput(){
+  if(!el.input){
+    return
+  }
+
+  el.input.style.height = "auto"
+  const nextHeight = Math.min(el.input.scrollHeight, 220)
+  el.input.style.height = `${nextHeight}px`
+}
+
+function hideComposerMeta(){
+  renderService.hideComposerMeta()
+}
+
+function isMobileViewport(){
+  return window.matchMedia("(max-width: 959px)").matches
+}
+
+function openSidebar(){
+  if(isMobileViewport()){
+    document.body.classList.add("sidebar-open")
+    document.body.classList.remove("sidebar-collapsed")
+    return
+  }
+
+  document.body.classList.remove("sidebar-collapsed")
+}
+
+function closeSidebar(){
+  if(isMobileViewport()){
+    document.body.classList.remove("sidebar-open")
+    return
+  }
+
+  document.body.classList.add("sidebar-collapsed")
+}
+
+function openSettings(){
+  if(!el.settingsModal){
+    return
+  }
+
+  el.settingsModal.hidden = false
+  document.body.classList.add("settings-open")
+}
+
+function closeSettings(){
+  if(!el.settingsModal){
+    return
+  }
+
+  el.settingsModal.hidden = true
+  document.body.classList.remove("settings-open")
+}
+
+})()

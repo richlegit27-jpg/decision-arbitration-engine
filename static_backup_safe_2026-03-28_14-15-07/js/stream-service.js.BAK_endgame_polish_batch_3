@@ -1,0 +1,180 @@
+// C:\Users\Owner\nova\static\js\stream-service.js
+
+(() => {
+"use strict"
+
+function createStreamService(options = {}){
+
+  const {
+    state,
+    onStart = null,
+    onToken = null,
+    onFinish = null,
+    onError = null,
+  } = options
+
+  if(!state){
+    throw new Error("NovaStreamService: state is required")
+  }
+
+  let controller = null
+  let streaming = false
+
+  function isStreaming(){
+    return streaming
+  }
+
+  function stop(){
+
+    if(controller){
+      try{
+        controller.abort()
+      }catch(_){}
+    }
+
+    controller = null
+    streaming = false
+  }
+
+  async function streamChat(payload = {}){
+
+    if(streaming){
+      stop()
+    }
+
+    controller = new AbortController()
+    streaming = true
+
+    const signal = controller.signal
+
+    const messageId =
+      payload.message_id ||
+      `msg_${Date.now()}_${Math.random().toString(16).slice(2)}`
+
+    try{
+
+      if(onStart){
+        onStart(messageId)
+      }
+
+      const response = await fetch("/api/chat/stream",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+        },
+        body:JSON.stringify(payload),
+        signal,
+      })
+
+      if(!response.ok){
+        throw new Error(`Stream failed (${response.status})`)
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+
+      let buffer = ""
+      let finalText = ""
+
+      while(true){
+
+        const { done, value } = await reader.read()
+
+        if(done){
+          break
+        }
+
+        buffer += decoder.decode(value,{ stream:true })
+
+        const parts = buffer.split("\n")
+
+        buffer = parts.pop()
+
+        for(const part of parts){
+
+          const line = part.trim()
+
+          if(!line){
+            continue
+          }
+
+          let data
+
+          try{
+            data = JSON.parse(line)
+          }catch{
+            continue
+          }
+
+          if(data.type === "token"){
+
+            const token = data.token || ""
+
+            finalText += token
+
+            if(onToken){
+              onToken(messageId, token)
+            }
+
+            if(window.NovaChatMessages?.appendStreamingToken){
+              window.NovaChatMessages.appendStreamingToken(messageId, token)
+            }
+
+          }
+
+          if(data.type === "done"){
+
+            if(onFinish){
+              onFinish(messageId, finalText)
+            }
+
+            if(window.NovaChatMessages?.finishAssistantStream){
+              window.NovaChatMessages.finishAssistantStream(messageId, finalText)
+            }
+
+          }
+
+        }
+
+      }
+
+      streaming = false
+
+      return {
+        ok:true,
+        message_id:messageId,
+        text:finalText,
+      }
+
+    }catch(error){
+
+      streaming = false
+
+      if(onError){
+        onError(error)
+      }
+
+      console.error("Nova stream error:", error)
+
+      return {
+        ok:false,
+        error:String(error),
+      }
+
+    }
+
+  }
+
+  return {
+    streamChat,
+    stop,
+    isStreaming,
+  }
+
+}
+
+window.NovaStreamService = {
+  createStreamService,
+}
+
+})()

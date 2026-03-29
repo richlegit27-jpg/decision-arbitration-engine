@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Building Nova V1</title>
+  <link rel="stylesheet" href="/static/css/nova-style.css">
+  <style>
+    body {
+      overflow: auto;
+    }
+
+    .site-shell {
+      min-height: 100vh;
+      padding: 18px;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(139, 92, 246, 0.34), transparent 24%),
+        radial-gradient(circle at 86% 14%, rgba(34, 197, 94, 0.22), transparent 20%),
+        radial-gradient(circle at 50% 100%, rgba(59, 130, 246, 0.22), transparent 30%),
+        linear-gradient(180deg, #0a1020 0%, #101935 100%);
+      color: var(--text);
+    }
+
+    .site-container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .site-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(20, 28, 51, 0.88), rgba(16, 23, 42, 0.88));
+      box-shadow: var(--shadow-md);
+      backdrop-filter: blur(14px);
+    }
+
+    .site-brand {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .site-brand-title {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .site-brand-subtitle {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .site-nav-links {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .site-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 0 14px;
+      border-radius: 10px;
+      text-decoration: none;
+      color: var(--text);
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      transition: 0.16s ease;
+    }
+
+    .site-link:hover {
+      transform: translateY(-1px);
+      background: var(--panel-3);
+      border-color: var(--line-strong);
+    }
+
+    .site-link.active {
+      background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+      color: #08111f;
+      border-color: transparent;
+      font-weight: 700;
+    }
+
+    .post-card {
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(20, 28, 51, 0.88), rgba(16, 23, 42, 0.88));
+      box-shadow: var(--shadow-md);
+      backdrop-filter: blur(14px);
+      padding: 28px;
+    }
+
+    .post-back {
+      display: inline-block;
+      margin-bottom: 18px;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .post-meta {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+
+    .post-title {
+      font-size: 2rem;
+      font-weight: 800;
+      margin-bottom: 18px;
+    }
+
+    .post-body {
+      color: var(--text);
+      line-height: 1.75;
+      font-size: 1rem;
+    }
+
+    .post-body p {
+      margin: 0 0 18px;
+    }
+
+    @media (max-width: 700px) {
+      .site-shell {
+        padding: 10px;
+      }
+
+      .site-nav {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .post-title {
+        font-size: 1.5rem;
+      }
+
+      .post-card {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="site-shell">
+    <div class="site-container">
+      <nav class="site-nav">
+        <div class="site-brand">
+          <div class="site-brand-title">Nova</div>
+          <div class="site-brand-subtitle">AI + blog under one roof</div>
+        </div>
+
+        <div class="site-nav-links">
+          <a href="/" class="site-link">Chat</a>
+          <a href="/blog" class="site-link active">Blog</a>
+        </div>
+      </nav>
+
+      <article class="post-card">
+        <a href="/blog" class="post-back">← Back to Blog</a>
+
+        <div class="post-meta">Launch Post</div>
+        <div class="post-title">Building Nova V1</div>
+
+        <div class="post-body">
+          <p>
+            This is the beginning of Nova.
+          </p>
+
+          <p>
+            Nova started as a raw idea and became a real working AI product through trial, debugging,
+            rebuilding, and pushing through messy versions until something stable finally stood up.
+          </p>
+
+          <p>
+            Version one is not the end goal. It is proof. Proof that Nova exists, works, and has a real foundation.
+          </p>
+
+          <p>
+            From here, the next chapters are about expanding the product, sharpening the intelligence,
+            and building a stronger public-facing identity around it.
+          </p>
+        </div>
+      </article>
+    </div>
+  </div>
+</body>
+</html>

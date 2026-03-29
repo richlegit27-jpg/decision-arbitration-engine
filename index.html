@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nova Phase 4 Endgame</title>
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=phase4full" />
+</head>
+<body>
+  <div class="nova-app-shell" id="novaAppShell">
+
+    <!-- Sidebar -->
+    <aside class="nova-sidebar" id="novaSidebar">
+      <div class="nova-sidebar-top">
+        <div class="nova-brand">
+          <div class="nova-brand-mark">N</div>
+          <div class="nova-brand-copy">
+            <div class="nova-brand-title">Nova</div>
+            <div class="nova-brand-subtitle">Phase 4</div>
+          </div>
+        </div>
+        <button type="button" class="nova-icon-button nova-sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">☰</button>
+      </div>
+      <div class="nova-sidebar-content" id="novaSidebarContent"></div>
+    </aside>
+
+    <!-- Main chat area -->
+    <main class="nova-main" id="novaMain">
+      <div class="nova-chat-container" id="novaChatContainer">
+        <div id="chatMessages" class="chat-messages"></div>
+        <div id="chatComposer" class="chat-composer">
+          <textarea id="composerInput" placeholder="Type a message..."></textarea>
+          <button id="sendBtn" class="nova-action-button">Send</button>
+          <button id="stopBtn" hidden>Stop</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Right panel: Artifacts + Media -->
+    <aside class="nova-right-panel" id="novaRightPanel">
+      <div id="novaArtifactsContainer">
+        <h3>Artifacts</h3>
+        <div id="novaArtifactsList"></div>
+      </div>
+      <div id="novaMediaContainer">
+        <h3>Media & Web</h3>
+        <div id="novaMediaList"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- JS Wiring -->
+  <script src="/static/js/nova-attachments.js?v=phase4full"></script>
+  <script src="/static/js/nova-panels.js?v=phase4full"></script>
+  <script src="/static/js/nova-render.js?v=phase4full"></script>
+  <script src="/static/js/nova-chat-stream.js?v=phase4full"></script>
+  <script src="/static/js/nova-voice.js?v=phase4full"></script>
+  <script src="/static/js/nova-artifacts.js?v=phase4full"></script>
+  <script src="/static/js/nova-media.js?v=phase4full"></script>
+  <script src="/static/js/nova-test-init.js?v=phase4full"></script>
+</body>
+</html>

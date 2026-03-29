@@ -1,0 +1,285 @@
+﻿<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Nova</title>
+  <style>
+    body { font-family: Consolas, monospace; background:#0f0f0f; color:#e6e6e6; margin:0; padding:20px; }
+    #topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px; }
+    #status { font-size:12px; opacity:0.8; }
+    #meta { font-size:12px; opacity:0.8; margin-top:4px; }
+    #sessionbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    #sid { width: 360px; background:#1a1a1a; color:#fff; border:1px solid #333; padding:6px 8px; }
+    button { padding:7px 12px; background:#222; color:#fff; border:1px solid #444; cursor:pointer; }
+    button:hover { background:#333; }
+    #chat { border:1px solid #333; padding:12px; min-height:260px; margin-bottom:10px; overflow:auto; white-space:pre-wrap; }
+    .msg { margin: 0 0 10px 0; }
+    .role { opacity:0.75; font-size:12px; }
+    .bubble { margin-top:4px; padding:10px; border:1px solid #333; background:#141414; }
+    textarea { width:100%; height:90px; background:#1a1a1a; color:#fff; border:1px solid #333; padding:10px; resize:vertical; }
+  </style>
+</head>
+<body>
+
+<div id="topbar">
+  <div style="display:flex; flex-direction:column; gap:6px;">
+    <div style="font-size:18px; font-weight:700;">Nova (Summary Memory + Streaming)</div>
+    <div id="status">status: idle</div>
+    <div id="meta">summary: 0 chars</div>
+  </div>
+
+  <div id="sessionbar">
+    <span style="opacity:.8;">session_id</span>
+    <input id="sid" spellcheck="false" />
+    <button id="newSessionBtn">New Session</button>
+    <button id="summarizeBtn">Summarize Now</button>
+  </div>
+</div>
+
+<div id="chat"></div>
+
+<textarea id="input" placeholder="Type here..."></textarea>
+<br>
+<button id="sendBtn">Send</button>
+
+<script>
+const API_KEY = "testkey123";
+const LS_SID = "nova.session_id";
+
+const $ = (id) => document.getElementById(id);
+const chat = $("chat");
+const input = $("input");
+const status = $("status");
+const meta = $("meta");
+const sidEl = $("sid");
+const sendBtn = $("sendBtn");
+const newSessionBtn = $("newSessionBtn");
+const summarizeBtn = $("summarizeBtn");
+
+function setStatus(s){ status.textContent = "status: " + s; }
+function setMeta(summaryText){ meta.textContent = "summary: " + ((summaryText||"").length) + " chars"; }
+function autoScroll(){ try { chat.scrollTop = chat.scrollHeight; } catch(e){} }
+
+function addMsg(role, text){
+  const wrap = document.createElement("div");
+  wrap.className = "msg";
+  const r = document.createElement("div");
+  r.className = "role";
+  r.textContent = role;
+  const b = document.createElement("div");
+  b.className = "bubble";
+  b.textContent = text || "";
+  wrap.appendChild(r);
+  wrap.appendChild(b);
+  chat.appendChild(wrap);
+  autoScroll();
+  return b;
+}
+
+function getSessionId(){ return (sidEl.value || "").trim(); }
+function setSessionId(v){
+  sidEl.value = v || "";
+  try { localStorage.setItem(LS_SID, sidEl.value); } catch(e){}
+}
+
+async function refreshSummaryMeta(){
+  const sid = getSessionId();
+  if(!sid){ setMeta(""); return; }
+  try{
+    const r = await fetch("/api/session/summary?session_id=" + encodeURIComponent(sid), {
+      headers: { "x-api-key": API_KEY }
+    });
+    const j = await r.json();
+    setMeta(j.summary || "");
+  } catch(e){}
+}
+
+async function newSession(){
+  setStatus("new session…");
+  const r = await fetch("/api/session/new", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": API_KEY
+    },
+    body: "{}"
+  });
+  const j = await r.json();
+  if(!j || !j.session_id) throw new Error("No session_id returned");
+  setSessionId(j.session_id);
+  chat.textContent = "";
+  setStatus("idle");
+  await refreshSummaryMeta();
+}
+
+async function summarizeNow(){
+  const sid = getSessionId();
+  if(!sid){ await newSession(); }
+  setStatus("summarizing…");
+  summarizeBtn.disabled = true;
+  try{
+    const r = await fetch("/api/session/summarize", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": API_KEY
+      },
+      body: JSON.stringify({ session_id: getSessionId() })
+    });
+    const j = await r.json();
+    if(j.summary !== undefined){
+      setMeta(j.summary || "");
+    }
+    setStatus("done");
+  } catch(e){
+    setStatus("error");
+    alert(e.message || e);
+  } finally {
+    summarizeBtn.disabled = false;
+  }
+}
+
+function parseSSEChunk(chunk){
+  const lines = chunk.split("\n").map(x => x.trimEnd());
+  let ev = "";
+  let dataLine = "";
+  for(const ln of lines){
+    if(ln.startsWith("event:")) ev = ln.slice(6).trim();
+    if(ln.startsWith("data:")) dataLine = ln;
+  }
+  if(!ev) return null;
+  let payload = null;
+  if(dataLine){
+    const raw = dataLine.replace(/^data:\s*/,"");
+    try { payload = JSON.parse(raw); } catch(e){ payload = { raw }; }
+  }
+  return { ev, payload };
+}
+
+async function send(){
+  const text = input.value.trim();
+  if(!text) return;
+
+  if(!getSessionId()){
+    await newSession();
+  }
+
+  input.value = "";
+  setStatus("streaming…");
+  sendBtn.disabled = true;
+
+  addMsg("user", text);
+  const assistantBubble = addMsg("assistant", "");
+
+  try{
+    const response = await fetch("/api/chat/stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": API_KEY
+      },
+      body: JSON.stringify({ text, session_id: getSessionId() })
+    });
+
+    if(!response.ok || !response.body){
+      throw new Error("Stream failed: HTTP " + response.status);
+    }
+
+    const sidHdr = response.headers.get("x-nova-session-id");
+    if(sidHdr) setSessionId(sidHdr);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while(true){
+      const { done, value } = await reader.read();
+      if(done) break;
+
+      buffer += decoder.decode(value, { stream:true });
+
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() || "";
+
+      for(const part of parts){
+        if(!part) continue;
+        if(part.startsWith(":")) continue;
+
+        const msg = parseSSEChunk(part);
+        if(!msg) continue;
+
+        if(msg.ev === "token"){
+          const t = msg.payload?.t || "";
+          if(t){
+            assistantBubble.textContent += t;
+            autoScroll();
+          }
+          if(msg.payload?.session_id){
+            setSessionId(msg.payload.session_id);
+          }
+        } else if(msg.ev === "done"){
+          if(msg.payload?.session_id){
+            setSessionId(msg.payload.session_id);
+          }
+          setStatus("done");
+          await refreshSummaryMeta();
+        } else if(msg.ev === "error"){
+          setStatus("error");
+          assistantBubble.textContent += "\n\n[stream error] " + (msg.payload?.error || "unknown");
+        }
+      }
+    }
+
+    if(status.textContent === "status: streaming…"){
+      setStatus("done");
+      await refreshSummaryMeta();
+    }
+
+  } catch(err){
+    setStatus("fallback…");
+    try{
+      const fb = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": API_KEY
+        },
+        body: JSON.stringify({ text, session_id: getSessionId() })
+      });
+      const j = await fb.json();
+      if(j.session_id) setSessionId(j.session_id);
+      assistantBubble.textContent = j.response || ("Error: " + (j.error || "unknown"));
+      setStatus("done (fallback)");
+      await refreshSummaryMeta();
+    } catch(e2){
+      setStatus("error");
+      assistantBubble.textContent = "Error: " + (err?.message || err) + "\n" + (e2?.message || e2);
+    }
+  } finally {
+    sendBtn.disabled = false;
+  }
+}
+
+sendBtn.addEventListener("click", send);
+
+input.addEventListener("keydown", (e) => {
+  if(e.key === "Enter" && !e.shiftKey){
+    e.preventDefault();
+    send();
+  }
+});
+
+newSessionBtn.addEventListener("click", () => newSession().catch(e => { setStatus("error"); alert(e.message || e); }));
+summarizeBtn.addEventListener("click", () => summarizeNow().catch(e => { setStatus("error"); alert(e.message || e); }));
+
+(function boot(){
+  try{
+    const saved = localStorage.getItem(LS_SID);
+    if(saved) sidEl.value = saved;
+  } catch(e){}
+  refreshSummaryMeta();
+})();
+</script>
+
+</body>
+</html>

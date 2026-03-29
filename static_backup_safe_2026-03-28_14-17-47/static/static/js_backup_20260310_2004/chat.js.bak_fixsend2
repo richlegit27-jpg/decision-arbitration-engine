@@ -1,0 +1,528 @@
+﻿// C:\Users\Owner\nova\static\js\chat.js
+
+document.addEventListener("DOMContentLoaded", () => {
+  const chatMessages = document.getElementById("chatMessages")
+  const chatInput = document.getElementById("chatInput")
+  const sendBtn = document.getElementById("sendBtn")
+  const sendBtnText = document.getElementById("sendBtnText")
+  const stopBtn = document.getElementById("stopBtn")
+  const newChatBtn = document.getElementById("newChatBtn")
+  const chatList = document.getElementById("chatList")
+  const attachBtn = document.getElementById("btnAttach")
+  const fileInput = document.getElementById("fileUpload")
+  const emptyState = document.getElementById("emptyState")
+  const sidebar = document.getElementById("sidebar")
+  const sidebarToggle = document.getElementById("sidebarToggle")
+  const mobileOverlay = document.getElementById("mobileOverlay")
+  const clearComposerBtn = document.getElementById("clearComposerBtn")
+  const regenBtn = document.getElementById("regenBtn")
+  const renameChatBtn = document.getElementById("renameChatBtn")
+  const deleteChatBtn = document.getElementById("deleteChatBtn")
+  const chatTitleTop = document.getElementById("chatTitleTop")
+
+  let currentChatId = null
+  let isSending = false
+  let lastUserMessage = ""
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;")
+  }
+
+  function setTopTitle(text) {
+    if (chatTitleTop) {
+      chatTitleTop.textContent = text || "Ready"
+    }
+  }
+
+  function setEmptyState() {
+    if (!emptyState || !chatMessages) return
+    const hasMessages = chatMessages.querySelector(".message")
+    emptyState.style.display = hasMessages ? "none" : ""
+  }
+
+  function scrollToBottom() {
+    if (!chatMessages) return
+    chatMessages.scrollTop = chatMessages.scrollHeight
+  }
+
+  function setSendingState(sending) {
+    isSending = sending
+
+    if (sendBtn) sendBtn.disabled = sending
+    if (attachBtn) attachBtn.disabled = sending
+    if (chatInput) chatInput.disabled = sending
+
+    if (sendBtnText) {
+      sendBtnText.textContent = sending ? "Sending..." : "Send"
+    } else if (sendBtn) {
+      sendBtn.textContent = sending ? "Sending..." : "Send"
+    }
+
+    if (stopBtn) {
+      stopBtn.hidden = true
+      stopBtn.disabled = true
+    }
+  }
+
+  function getChatIdFromUrl() {
+    const url = new URL(window.location.href)
+    return url.searchParams.get("chat_id") || null
+  }
+
+  function setChatIdInUrl(chatId) {
+    const url = new URL(window.location.href)
+
+    if (chatId) {
+      url.searchParams.set("chat_id", chatId)
+    } else {
+      url.searchParams.delete("chat_id")
+    }
+
+    window.history.replaceState({}, "", url.toString())
+  }
+
+  function closeSidebar() {
+    if (sidebar) sidebar.classList.remove("open")
+    if (mobileOverlay) mobileOverlay.classList.remove("show")
+  }
+
+  function openSidebar() {
+    if (sidebar) sidebar.classList.add("open")
+    if (mobileOverlay) mobileOverlay.classList.add("show")
+  }
+
+  function renderUserMessage(text) {
+    if (!chatMessages) return null
+
+    const el = document.createElement("div")
+    el.className = "message user"
+    el.innerHTML = `
+      <div class="message-inner">
+        <div class="message-text">${escapeHtml(text || "").replace(/\n/g, "<br>")}</div>
+      </div>
+    `
+    chatMessages.appendChild(el)
+    setEmptyState()
+    scrollToBottom()
+    return el
+  }
+
+  function renderAssistantMessage(text) {
+    if (!chatMessages) return null
+
+    const el = document.createElement("div")
+    el.className = "message assistant"
+    el.innerHTML = `
+      <div class="message-inner">
+        <div class="message-text"></div>
+      </div>
+    `
+    chatMessages.appendChild(el)
+    renderAssistantText(el, text || "")
+    setEmptyState()
+    scrollToBottom()
+    return el
+  }
+
+  function renderAssistantText(messageEl, text) {
+    if (!messageEl) return
+    const textEl = messageEl.querySelector(".message-text")
+    if (!textEl) return
+
+    if (window.marked) {
+      try {
+        textEl.innerHTML = marked.parse(text || "")
+      } catch (_) {
+        textEl.innerHTML = escapeHtml(text || "").replace(/\n/g, "<br>")
+      }
+    } else {
+      textEl.innerHTML = escapeHtml(text || "").replace(/\n/g, "<br>")
+    }
+
+    if (window.hljs) {
+      textEl.querySelectorAll("pre code").forEach((block) => {
+        try {
+          window.hljs.highlightElement(block)
+        } catch (_) {}
+      })
+    }
+
+    scrollToBottom()
+  }
+
+  function renderError(text) {
+    if (!chatMessages) return
+
+    const el = document.createElement("div")
+    el.className = "message error"
+    el.innerHTML = `
+      <div class="message-inner">
+        <div class="message-text">${escapeHtml(text)}</div>
+      </div>
+    `
+    chatMessages.appendChild(el)
+    setEmptyState()
+    scrollToBottom()
+  }
+
+  async function loadChats() {
+    if (!chatList) return
+
+    try {
+      const res = await fetch("/api/chats", { cache: "no-store" })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+      const data = await res.json()
+      const chats = Array.isArray(data.chats) ? data.chats : []
+
+      chatList.innerHTML = ""
+
+      if (!chats.length) {
+        chatList.innerHTML = `<div class="chat-list-empty">No chats yet</div>`
+        return
+      }
+
+      chats.forEach((chat) => {
+        const btn = document.createElement("button")
+        btn.type = "button"
+        btn.className = "chat-item"
+        btn.innerHTML = `
+          <div class="chat-item-title">${escapeHtml(chat.title || "New chat")}</div>
+          <div class="chat-item-meta">${escapeHtml(chat.updated || "")}</div>
+        `
+
+        if (chat.chat_id === currentChatId) {
+          btn.classList.add("active")
+        }
+
+        btn.addEventListener("click", async () => {
+          currentChatId = chat.chat_id
+          setChatIdInUrl(currentChatId)
+          await loadChats()
+          await loadMessages(currentChatId)
+          closeSidebar()
+        })
+
+        chatList.appendChild(btn)
+      })
+    } catch (err) {
+      chatList.innerHTML = `<div class="chat-list-empty">Failed to load chats</div>`
+    }
+  }
+
+  async function loadMessages(chatId) {
+    if (!chatMessages) return
+
+    chatMessages.innerHTML = ""
+
+    if (!chatId) {
+      setTopTitle("Ready")
+      setEmptyState()
+      return
+    }
+
+    try {
+      const res = await fetch(`/api/chats/${encodeURIComponent(chatId)}`, {
+        cache: "no-store"
+      })
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
+
+      const data = await res.json()
+      const title = data.title || data.chat_title || "Chat"
+
+      setTopTitle(title)
+
+      const messages = Array.isArray(data.messages) ? data.messages : []
+
+      messages.forEach((msg) => {
+        const role = msg.role === "assistant" ? "assistant" : "user"
+        const text = msg.content || msg.message || ""
+
+        if (role === "assistant") {
+          renderAssistantMessage(text)
+        } else {
+          renderUserMessage(text)
+        }
+      })
+
+      setEmptyState()
+      scrollToBottom()
+    } catch (err) {
+      renderError(`Failed to load messages: ${err.message}`)
+    }
+  }
+
+  async function createNewChat() {
+    currentChatId = null
+    setChatIdInUrl(null)
+
+    if (chatMessages) {
+      chatMessages.innerHTML = ""
+    }
+
+    setTopTitle("Ready")
+    setEmptyState()
+    await loadChats()
+
+    if (chatInput) {
+      chatInput.value = ""
+      chatInput.focus()
+    }
+  }
+
+  async function sendMessage() {
+    if (isSending) return
+    if (!chatInput) return
+
+    const message = chatInput.value.trim()
+    if (!message) return
+
+    renderUserMessage(message)
+    lastUserMessage = message
+    chatInput.value = ""
+
+    setSendingState(true)
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          chat_id: currentChatId,
+          message: message
+        })
+      })
+
+      if (!res.ok) {
+        let errText = `HTTP ${res.status}`
+        try {
+          const errJson = await res.json()
+          errText = errJson.error || errText
+        } catch (_) {}
+        throw new Error(errText)
+      }
+
+      const data = await res.json()
+
+      currentChatId = data.chat_id || currentChatId
+
+      if (currentChatId) {
+        setChatIdInUrl(currentChatId)
+      }
+
+      const assistantText =
+        data.reply ||
+        data.response ||
+        data.message ||
+        data.content ||
+        data.answer ||
+        ""
+
+      renderAssistantMessage(assistantText)
+
+      await loadChats()
+    } catch (err) {
+      renderError(`⚠️ Network error: ${err.message}`)
+    } finally {
+      setSendingState(false)
+      setEmptyState()
+      scrollToBottom()
+    }
+  }
+
+  async function regenerateLast() {
+    if (isSending || !currentChatId) return
+
+    setSendingState(true)
+
+    try {
+      const res = await fetch("/api/chat/regenerate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          chat_id: currentChatId,
+          message: lastUserMessage
+        })
+      })
+
+      if (!res.ok) {
+        let errText = `HTTP ${res.status}`
+        try {
+          const errJson = await res.json()
+          errText = errJson.error || errText
+        } catch (_) {}
+        throw new Error(errText)
+      }
+
+      const data = await res.json()
+
+      const assistantText =
+        data.reply ||
+        data.response ||
+        data.message ||
+        data.content ||
+        data.answer ||
+        ""
+
+      renderAssistantMessage(assistantText)
+      await loadChats()
+    } catch (err) {
+      renderError(`Regenerate failed: ${err.message}`)
+    } finally {
+      setSendingState(false)
+    }
+  }
+
+  async function renameCurrentChat() {
+    if (!currentChatId) return
+
+    const nextTitle = window.prompt("Rename chat")
+    if (!nextTitle || !nextTitle.trim()) return
+
+    try {
+      const res = await fetch(`/api/chats/${encodeURIComponent(currentChatId)}/rename`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          title: nextTitle.trim()
+        })
+      })
+
+      if (!res.ok) {
+        let errText = `HTTP ${res.status}`
+        try {
+          const errJson = await res.json()
+          errText = errJson.error || errText
+        } catch (_) {}
+        throw new Error(errText)
+      }
+
+      setTopTitle(nextTitle.trim())
+      await loadChats()
+    } catch (err) {
+      renderError(`Rename failed: ${err.message}`)
+    }
+  }
+
+  async function deleteCurrentChat() {
+    if (!currentChatId) return
+
+    const ok = window.confirm("Delete this chat?")
+    if (!ok) return
+
+    try {
+      const res = await fetch(`/api/chats/${encodeURIComponent(currentChatId)}`, {
+        method: "DELETE"
+      })
+
+      if (!res.ok) {
+        let errText = `HTTP ${res.status}`
+        try {
+          const errJson = await res.json()
+          errText = errJson.error || errText
+        } catch (_) {}
+        throw new Error(errText)
+      }
+
+      await createNewChat()
+    } catch (err) {
+      renderError(`Delete failed: ${err.message}`)
+    }
+  }
+
+  if (sendBtn) {
+    sendBtn.addEventListener("click", sendMessage)
+  }
+
+  if (chatInput) {
+    chatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault()
+        sendMessage()
+      }
+    })
+  }
+
+  if (newChatBtn) {
+    newChatBtn.addEventListener("click", async () => {
+      await createNewChat()
+      closeSidebar()
+    })
+  }
+
+  if (attachBtn) {
+    attachBtn.addEventListener("click", () => {
+      if (fileInput) fileInput.click()
+    })
+  }
+
+  if (fileInput) {
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files && fileInput.files[0]
+      if (!file) return
+      renderError(`Attachment selected: ${file.name} (disabled for this fix pass)`)
+      fileInput.value = ""
+    })
+  }
+
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener("click", () => {
+      const isOpen = sidebar && sidebar.classList.contains("open")
+      if (isOpen) closeSidebar()
+      else openSidebar()
+    })
+  }
+
+  if (mobileOverlay) {
+    mobileOverlay.addEventListener("click", closeSidebar)
+  }
+
+  if (clearComposerBtn) {
+    clearComposerBtn.addEventListener("click", () => {
+      if (chatInput) chatInput.value = ""
+      if (fileInput) fileInput.value = ""
+    })
+  }
+
+  if (regenBtn) {
+    regenBtn.addEventListener("click", regenerateLast)
+  }
+
+  if (renameChatBtn) {
+    renameChatBtn.addEventListener("click", renameCurrentChat)
+  }
+
+  if (deleteChatBtn) {
+    deleteChatBtn.addEventListener("click", deleteCurrentChat)
+  }
+
+  if (stopBtn) {
+    stopBtn.hidden = true
+    stopBtn.disabled = true
+  }
+
+  currentChatId = getChatIdFromUrl()
+
+  loadChats().then(async () => {
+    if (currentChatId) {
+      await loadMessages(currentChatId)
+    } else {
+      setTopTitle("Ready")
+      setEmptyState()
+    }
+  })
+})

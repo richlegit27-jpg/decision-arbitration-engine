@@ -1,0 +1,1865 @@
+﻿<!-- NOVA_SERVE_STAMP_20260301_105356 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova Chat</title>
+
+    <style>
+        /* Global Styles */
+        :root {
+            --bg: #f0f0f0;
+            --panel: rgba(0,0,0,.05);
+            --panel2: rgba(0,0,0,.07);
+            --text: rgba(0,0,0,.88);
+            --muted: rgba(0,0,0,.62);
+            --shadow: 0 10px 20px rgba(0,0,0,.1);
+            --brand: #4e73df;
+            --danger: #ff4d4f;
+            --ok: #22c55e;
+            --radius: 8px;
+            --font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            font-family: var(--font-family);
+            background-color: var(--bg);
+            color: var(--text);
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+            flex-direction: column;
+        }
+
+        .chat-container {
+            flex-grow: 1;
+            background: white;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow);
+            border-radius: var(--radius);
+            margin: 20px;
+        }
+
+        .chat-area {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+
+        /* Chat Bubble */
+        .chat-bubble {
+            padding: 12px;
+            border-radius: 10px;
+            max-width: 75%;
+            margin: 5px 0;
+            font-size: 14px;
+            background-color: #e1e1e1;
+        }
+
+        .user-message {
+            background-color: #007bff;
+            color: white;
+            align-self: flex-end;
+        }
+
+        .bot-message {
+            background-color: #f1f1f1;
+            color: black;
+            align-self: flex-start;
+        }
+
+        /* Textarea & Send Button */
+        textarea {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border-radius: var(--radius);
+            border: 1px solid #ccc;
+            font-size: 16px;
+            color: var(--text);
+            background: #f9f9f9;
+            resize: none;
+        }
+
+        .send-btn {
+            padding: 12px;
+            margin-top: 10px;
+            background-color: var(--brand);
+            color: white;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: var(--radius);
+        }
+
+        .send-btn:hover {
+            background-color: #3e6bb5;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            .app-container {
+                padding: 10px;
+            }
+
+            .chat-container {
+                margin: 10px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Chat Area -->
+        <main class="chat-container">
+            <div class="chat-area" id="chat-area"></div>
+            <textarea id="input-area" placeholder="Type your message..." rows="3"></textarea>
+            <button id="send-btn" class="send-btn">Send</button>
+        </main>
+    </div>
+
+    <script>
+        // Auto-resize input area
+        document.getElementById('input-area').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        // Send message on button click
+        document.getElementById('send-btn').addEventListener('click', async function() {
+            const inputArea = document.getElementById('input-area');
+            const message = inputArea.value.trim();
+
+            if (message) {
+                const chatArea = document.getElementById('chat-area');
+
+                // User message
+                const userMessage = document.createElement('div');
+                userMessage.classList.add('chat-bubble', 'user-message');
+                userMessage.textContent = message;
+                chatArea.appendChild(userMessage);
+
+                // Typing indicator for bot
+                const typingIndicator = document.createElement('div');
+                typingIndicator.classList.add('chat-bubble', 'bot-message');
+                typingIndicator.textContent = "Bot is typing...";
+                chatArea.appendChild(typingIndicator);
+
+                // Auto scroll to the latest message
+                chatArea.scrollTop = chatArea.scrollHeight;
+
+                // Clear input
+                inputArea.value = '';
+
+                // Send the message to the backend
+                const response = await fetch('http://127.0.0.1:8000/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+
+                const data = await response.json();
+
+                // Remove typing indicator
+                chatArea.removeChild(typingIndicator);
+
+                // Bot response
+                const botMessage = document.createElement('div');
+                botMessage.classList.add('chat-bubble', 'bot-message');
+                botMessage.textContent = data.response;
+                chatArea.appendChild(botMessage);
+
+                // Auto scroll to the latest message
+                chatArea.scrollTop = chatArea.scrollHeight;
+            }
+        });
+
+        // Handle sending messages with Enter key
+        document.getElementById('input-area').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                document.getElementById('send-btn').click();
+                event.preventDefault(); // Prevent default newline behavior
+            }
+        });
+    </script>
+
+    <!-- Link to the JavaScript file -->
+    <script src="/static/js/chat.js"></script>
+<!-- NOVA_SESSION_SUMMARY_PANEL_V2 -->
+<style>
+  .nova-sum-card{
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483647;
+  width: min(720px, calc(100vw - 32px));
+  max-width: 720px;
+
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(0,0,0,.18);
+  border-radius: 14px;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 10px 30px rgba(0,0,0,.18);
+
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+  .nova-sum-row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  .nova-sum-row label{ font-size:12px; opacity:.75; display:block; margin-bottom:4px; }
+  .nova-sum-row input, .nova-sum-row select{
+    padding: 8px 10px;
+    border: 1px solid rgba(0,0,0,.18);
+    border-radius: 10px;
+    min-width: 280px;
+  }
+  .nova-sum-btn{
+    padding: 9px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(0,0,0,.18);
+    cursor: pointer;
+    background: rgba(0,0,0,.06);
+  }
+  .nova-sum-btn:active{ transform: translateY(1px); }
+  .nova-sum-out{
+    margin-top: 10px;
+    white-space: pre-wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.35;
+    border: 1px solid rgba(0,0,0,.12);
+    border-radius: 12px;
+    padding: 10px;
+    max-height: 260px;
+    overflow: auto;
+    background: rgba(0,0,0,.03);
+  }
+  .nova-sum-hint{ font-size: 12px; opacity:.75; margin-top:6px; }
+</style>
+
+<div class="nova-sum-card" id="novaSummaryCard">
+  <div style="font-weight:600; margin-bottom:8px;">Session Summary</div>
+
+  <div class="nova-sum-row">
+    <div>
+      <label for="novaSessionSelect">Sessions</label>
+      <select id="novaSessionSelect">
+        <option value="">(loading...)</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom:2px;">
+      <button class="nova-sum-btn" id="novaRefreshSessionsBtn" type="button">Refresh list</button>
+    </div>
+  </div>
+
+  <div class="nova-sum-row" style="margin-top:10px;">
+    <div>
+      <label for="novaSessionId">Session ID (manual override)</label>
+      <input id="novaSessionId" type="text" spellcheck="false" />
+    </div>
+
+    <div>
+      <label for="novaApiKey">x-api-key (optional)</label>
+      <input id="novaApiKey" type="password" spellcheck="false" placeholder="stored locally in this browser" />
+    </div>
+
+    <div>
+      <button class="nova-sum-btn" id="novaFetchSummaryBtn" type="button">Fetch Summary</button>
+    </div>
+  </div>
+
+  <div class="nova-sum-hint">
+    Tip: paste your key once — it saves to LocalStorage as <code>nova_api_key</code>.
+  </div>
+
+  <div class="nova-sum-out" id="novaSummaryOut">Ready.</div>
+</div>
+
+<script>
+(function(){
+  function $(id){ return document.getElementById(id); }
+
+  function getOrCreateSessionId(){
+    // 1) URL param ?session_id=...
+    try{
+      var u = new URL(window.location.href);
+      var q = (u.searchParams.get("session_id") || "").trim();
+      if(q){ return q; }
+    }catch(e){}
+
+    // 2) LocalStorage
+    try{
+      var s = (localStorage.getItem("nova_session_id") || "").trim();
+      if(s){ return s; }
+    }catch(e){}
+
+    // 3) Generate
+    var sid = "";
+    try{
+      sid = (crypto && crypto.randomUUID) ? crypto.randomUUID().replace(/-/g,"") : "";
+    }catch(e){}
+    if(!sid){
+      sid = (Date.now().toString(16) + Math.random().toString(16).slice(2)).replace(/\./g,"");
+    }
+    try{ localStorage.setItem("nova_session_id", sid); }catch(e){}
+    return sid;
+  }
+
+  function loadApiKey(){
+    try{ return (localStorage.getItem("nova_api_key") || "").trim(); }catch(e){ return ""; }
+  }
+  function saveApiKey(v){
+    try{
+      if(v && v.trim()) localStorage.setItem("nova_api_key", v.trim());
+      else localStorage.removeItem("nova_api_key");
+    }catch(e){}
+  }
+
+  function buildHeaders(){
+  var keyEl = $("novaApiKey");
+  var key = (keyEl && typeof keyEl.value === "string") ? keyEl.value.trim() : "";
+
+  // Field wins; if set, persist it
+  if(key){
+    try{ localStorage.setItem("nova_api_key", key); }catch(e){}
+  } else {
+    // fallback to stored
+    try{ key = (localStorage.getItem("nova_api_key") || "").trim(); }catch(e){ key=""; }
+    if(keyEl && key) keyEl.value = key;
+  }
+
+  var h = { "Content-Type": "application/json" };
+  if(key) h["x-api-key"] = key;
+  return h;
+}
+
+  function setSessionId(sid){
+    sid = (sid || "").trim();
+    if(!sid) return;
+    try{ localStorage.setItem("nova_session_id", sid); }catch(e){}
+    var inEl = $("novaSessionId");
+    if(inEl) inEl.value = sid;
+  }
+
+  function setSelectValue(sid){
+    var sel = $("novaSessionSelect");
+    if(!sel) return;
+    for(var i=0;i<sel.options.length;i++){
+      if(sel.options[i].value === sid){
+        sel.value = sid;
+        return;
+      }
+    }
+  }
+
+  async function loadSessions(){
+  var out = $("novaSummaryOut");
+  var sel = $("novaSessionSelect");
+  if(!sel) return;
+
+  sel.innerHTML = '<option value="">(loading...)</option>';
+  if(out) out.textContent = "Loading sessions list...";
+
+  try{
+    var r = await fetch("/api/session/list", { method:"GET", headers: buildHeaders() });
+    var text = await r.text();
+
+    var data = null;
+    try{ data = JSON.parse(text); }catch(e){ data = null; }
+
+    if(!r.ok){
+      var msg = (data && (data.error || data.detail)) ? (data.error || data.detail) : text;
+      if(out) out.textContent = "ERROR " + r.status + " loading sessions:\n" + msg;
+      sel.innerHTML = '<option value="">(failed to load)</option>';
+      return;
+    }
+
+    // Accept possible shapes:
+    // A) {sessions:[...]}
+    // B) {content:{sessions:[...]}} (if something wraps it)
+    var sessions = [];
+    if(data && Array.isArray(data.sessions)) sessions = data.sessions;
+    else if(data && data.content && Array.isArray(data.content.sessions)) sessions = data.content.sessions;
+
+    var opts = [];
+    opts.push('<option value="">(select a session)</option>');
+    for(var i=0;i<sessions.length;i++){
+      var s = sessions[i] || {};
+      var sid = (s.session_id || "").trim();
+      if(!sid) continue;
+      var mc = (s.message_count != null) ? (" • " + s.message_count + " msgs") : "";
+      opts.push('<option value="' + sid.replace(/"/g,"&quot;") + '">' + sid + mc + '</option>');
+    }
+    sel.innerHTML = opts.join("");
+
+// If still on placeholder, auto-select the first real session
+try{
+  if((sel.value || "").trim() === "" && sel.options && sel.options.length > 1){
+    sel.selectedIndex = 1;
+  }
+}catch(e){}
+var current = ( $("novaSessionId").value || "").trim() || getOrCreateSessionId();
+    setSessionId(current);
+    setSelectValue(current);
+
+    if(out) out.textContent = "Sessions loaded. Select one and click Fetch Summary.";
+  }catch(err){
+    if(out) out.textContent = "ERROR loading sessions: " + (err && err.message ? err.message : String(err));
+    sel.innerHTML = '<option value="">(failed to load)</option>';
+  }
+}
+
+  async function fetchSummary(){
+    // Guard: if dropdown has sessions but value is empty, select first real entry
+    try{
+      var sel = $("novaSessionSelect");
+      if(sel && (!sel.value || !sel.value.trim()) && sel.options && sel.options.length > 1){
+        sel.selectedIndex = 1;
+        if(sel.value) setSid(sel.value);
+      }
+    }catch(e){}var out = $("novaSummaryOut");
+  var sidEl = $("novaSessionId");
+  var sid = (sidEl.value || "").trim();
+  if(!sid){
+    sid = getOrCreateSessionId();
+    sidEl.value = sid;
+  }
+  setSessionId(sid);
+
+  if(out) out.textContent = "Fetching summary for session_id=" + sid + "";
+
+  try{
+    var r = await fetch("/api/session/summary", {
+      method: "POST",
+      headers: buildHeaders(),
+      body: JSON.stringify({ session_id: sid })
+    });
+
+    var text = await r.text();
+    var data = null;
+    try{ data = JSON.parse(text); }catch(e){ data = null; }
+
+    if(!r.ok){
+      var msg = (data && (data.error || data.detail)) ? (data.error || data.detail) : text;
+      if(out) out.textContent = "ERROR " + r.status + " fetching summary:\n" + msg;
+      return;
+    }
+
+    var summary = (data && data.summary) ? data.summary : text;
+    if(out) out.textContent = summary || "(empty summary)";
+  }catch(err){
+    if(out) out.textContent = "ERROR: " + (err && err.message ? err.message : String(err));
+  }
+}
+
+  function init(){
+    try{
+      setSessionId(getOrCreateSessionId());
+
+      var k = loadApiKey();
+      if(k) $("novaApiKey").value = k;
+
+      $("novaFetchSummaryBtn").addEventListener("click", fetchSummary);
+      $("novaRefreshSessionsBtn").addEventListener("click", loadSessions);
+
+      $("novaSessionSelect").addEventListener("change", function(){
+        var sid = (this.value || "").trim();
+        if(sid){
+          setSessionId(sid);
+        }
+      });
+
+      // Auto-load list on page load
+      loadSessions\(\);\s*
+      // Panel show/hide handle
+      try{
+        var card = $("novaSummaryCard");
+        var handle = document.getElementById("novaSummaryHandle");
+        if(card && handle){
+          function setOpen(open){
+            card.style.display = open ? "block" : "none";
+            handle.textContent = open ? "Session Summary ▾" : "Session Summary ▸";
+            try{ localStorage.setItem("nova_summary_open", open ? "1" : "0"); }catch(e){}
+          }
+          var open = true;
+          try{
+            var s = localStorage.getItem("nova_summary_open");
+            if(s === "0") open = false;
+          }catch(e){}
+          setOpen(open);
+
+          handle.addEventListener("click", function(){
+            open = !(card.style.display !== "none");
+            setOpen(!open);
+          });
+        }
+      }catch(e){}}catch(e){}
+  }
+
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
+<!-- /NOVA_SESSION_SUMMARY_PANEL_V2 -->
+<!-- NOVA_SUMMARY_PANEL_REBIND_V2 -->
+<script>
+(function(){
+  function $(id){ return document.getElementById(id); }
+  function out(msg){
+    var o = $("novaSummaryOut");
+    if(o) o.textContent = msg;
+  }
+
+  function getKey(){
+    var k = "";
+    try{ k = ($("novaApiKey") && $("novaApiKey").value ? $("novaApiKey").value : "").trim(); }catch(e){}
+    if(!k){
+      try{ k = (localStorage.getItem("nova_api_key") || "").trim(); }catch(e){}
+      try{ if(k && $("novaApiKey")) $("novaApiKey").value = k; }catch(e){}
+    } else {
+      try{ localStorage.setItem("nova_api_key", k); }catch(e){}
+    }
+    return k;
+  }
+
+  function setSid(sid){
+    sid = (sid || "").trim();
+    if(!sid) return;
+    try{ localStorage.setItem("nova_session_id", sid); }catch(e){}
+    try{ if($("novaSessionId")) $("novaSessionId").value = sid; }catch(e){}
+  }
+
+  function getSidPreferSelect(){
+    // 1) dropdown selection
+    try{
+      var sel = $("novaSessionSelect");
+      var v = sel && sel.value ? sel.value.trim() : "";
+      if(v) return v;
+    }catch(e){}
+
+    // 2) input field
+    try{
+      var v2 = $("novaSessionId") && $("novaSessionId").value ? $("novaSessionId").value.trim() : "";
+      if(v2) return v2;
+    }catch(e){}
+
+    // 3) localStorage
+    try{
+      var v3 = (localStorage.getItem("nova_session_id") || "").trim();
+      if(v3) return v3;
+    }catch(e){}
+
+    // 4) generate
+    var sid = (Date.now().toString(16) + Math.random().toString(16).slice(2)).replace(/\./g,"");
+    setSid(sid);
+    return sid;
+  }
+
+  async function loadSessions(){
+    out("Loading sessions");
+    var key = getKey();
+    var headers = {};
+    if(key) headers["x-api-key"] = key;
+
+    try{
+      var r = await fetch("/api/session/list", { method:"GET", headers: headers });
+      var text = await r.text();
+
+      var data = null;
+      try{ data = JSON.parse(text); }catch(e){ data = null; }
+
+      if(!r.ok){
+        out("Sessions FAILED ("+r.status+"):\n" + (data && (data.detail||data.error) ? (data.detail||data.error) : text));
+        return;
+      }
+
+      var sessions = (data && Array.isArray(data.sessions)) ? data.sessions : [];
+      var sel = $("novaSessionSelect");
+      if(!sel){
+        out("Sessions OK, but dropdown element not found (#novaSessionSelect).");
+        return;
+      }
+
+      var opts = ['<option value="">(select a session)</option>'];
+      for(var i=0;i<sessions.length;i++){
+        var s = sessions[i] || {};
+        var sid = (s.session_id || "").trim();
+        if(!sid) continue;
+        var mc = (s.message_count != null) ? (" • " + s.message_count + " msgs") : "";
+        opts.push('<option value="'+sid.replace(/"/g,'&quot;')+'">'+sid+mc+'</option>');
+      }
+      sel.innerHTML = opts.join("");
+
+// If still on placeholder, auto-select the first real session
+try{
+  if((sel.value || "").trim() === "" && sel.options && sel.options.length > 1){
+    sel.selectedIndex = 1;
+  }
+}catch(e){}
+// auto-select stored sid if present
+      var stored = "";
+      try{ stored = (localStorage.getItem("nova_session_id") || "").trim(); }catch(e){}
+      if(stored){
+        for(var j=0;j<sel.options.length;j++){
+          if(sel.options[j].value === stored){ sel.value = stored; break; }
+        }
+      } else if(sessions.length){
+        // if nothing stored, default to newest
+        sel.value = sessions[0].session_id || "";
+        if(sel.value) setSid(sel.value);
+      }
+
+      // sync input
+      if(sel.value) setSid(sel.value);
+
+            // If still on placeholder, auto-select first real session
+      try{
+        if((sel.value || "").trim() === "" && sel.options && sel.options.length > 1){
+          sel.selectedIndex = 1;
+          if(sel.value) setSid(sel.value);
+        }
+      }catch(e){}
+      out\("Sessions loaded: "\s*\+\s*sessions\.length\);\s*}catch(err){
+      out("Sessions ERROR:\n" + (err && err.message ? err.message : String(err)));
+    }
+  }
+
+  async function fetchSummary(){
+    // Guard: if dropdown has sessions but value is empty, select first real entry
+    try{
+      var sel = $("novaSessionSelect");
+      if(sel && (!sel.value || !sel.value.trim()) && sel.options && sel.options.length > 1){
+        sel.selectedIndex = 1;
+        if(sel.value) setSid(sel.value);
+      }
+    }catch(e){}var sid = getSidPreferSelect();
+    setSid(sid);
+    out("Fetching summary for " + sid + " ");
+
+    var key = getKey();
+    var headers = { "Content-Type":"application/json" };
+    if(key) headers["x-api-key"] = key;
+
+    try{
+      var r = await fetch("/api/session/summary", {
+        method:"POST",
+        headers: headers,
+        body: JSON.stringify({ session_id: sid })
+      });
+      var text = await r.text();
+
+      var data = null;
+      try{ data = JSON.parse(text); }catch(e){ data = null; }
+
+      if(!r.ok){
+        out("Summary FAILED ("+r.status+"):\n" + (data && (data.detail||data.error) ? (data.detail||data.error) : text));
+        return;
+      }
+
+      out((data && data.summary) ? data.summary : text);
+    }catch(err){
+      out("Summary ERROR:\n" + (err && err.message ? err.message : String(err)));
+    }
+  }
+function bind(){
+  try{ window.__novaRebindSummaryPanel = bind; }catch(e){}
+    var card = $("novaSummaryCard");
+    if(!card){ return; }
+
+    var btnList = $("novaRefreshSessionsBtn");
+    var btnSum  = $("novaFetchSummaryBtn");
+    var sel     = $("novaSessionSelect");
+
+    if(!btnList || !btnSum){
+      out("Panel exists but buttons not found. IDs missing.");
+      return;
+    }
+
+    // Brutal replace to ensure clean handlers
+    var btnList2 = btnList.cloneNode(true); btnList.parentNode.replaceChild(btnList2, btnList);
+    var btnSum2  = btnSum.cloneNode(true);  btnSum.parentNode.replaceChild(btnSum2, btnSum);
+
+    btnList2.addEventListener("click", function(ev){ ev.preventDefault(); ev.stopPropagation(); loadSessions(); }, true);
+    btnSum2.addEventListener("click", function(ev){ ev.preventDefault(); ev.stopPropagation(); fetchSummary(); }, true);
+
+    if(sel){
+      sel.addEventListener("change", function(){
+        var v = (this.value || "").trim();
+        if(v){ setSid(v); }
+      }, true);
+    }
+
+    out("Panel ready. Auto-loading sessions");
+    // Auto-load immediately
+    setTimeout(loadSessions, 50);
+    // Auto-fetch summary after sessions load/select
+  // Async-safe + order-safe: retry until loadSessions/fetchSummary exist, then wrap once.
+  (function(){
+    function tryWrap(){
+      try{
+        if(typeof loadSessions === "function" && typeof fetchSummary === "function"){
+          if(!loadSessions.__autoFetchWrapped){
+            var _origLoad = loadSessions;
+            loadSessions = async function(){
+              var r = await _origLoad.apply(this, arguments);
+              try{ setTimeout(fetchSummary, 50); }catch(e){}
+              return r;
+            };
+            loadSessions.__autoFetchWrapped = true;
+          }
+          return true;
+        }
+      }catch(e){}
+      return false;
+    }
+
+    // Try now, then retry for ~2.5s
+    if(tryWrap()) return;
+    var tries = 0;
+    var t = setInterval(function(){
+      tries++;
+      if(tryWrap() || tries >= 25){
+        try{ clearInterval(t); }catch(e){}
+      }
+    }, 100);
+  })();}
+
+  function start(){
+    try{ bind(); }catch(e){ try{ out("Rebind V2 crashed: " + (e && e.message ? e.message : String(e))); }catch(_){ } }
+  }
+
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
+else start();
+      // === NOVA_SUMMARY_AUTORUN_V1 ===
+  try{
+    // Rebind first (ensures handlers attached to current buttons), then click.
+    setTimeout(function(){
+      try{
+        if(window.__novaRebindSummaryPanel) window.__novaRebindSummaryPanel();
+      }catch(e){}
+      try{
+        var b1 = document.getElementById("novaRefreshSessionsBtn");
+        if(b1) b1.click();
+      }catch(e){}
+      try{
+        setTimeout(function(){
+          var b2 = document.getElementById("novaFetchSummaryBtn");
+          if(b2) b2.click();
+        }, 700);
+      }catch(e){}
+    }, 200);
+  }catch(e){}try{
+        setTimeout(function(){
+          var b2 = document.getElementById("novaFetchSummaryBtn");
+          if(b2) b2.click();
+        }, 600);
+      }catch(e){}
+    }, 150);
+  }catch(e){}try{ setTimeout(fetchSummary, 400); }catch(e){}
+    }, 50);
+  }catch(e){}})();
+</script>
+<!-- /NOVA_SUMMARY_PANEL_REBIND_V2 -->
+<script>
+/* === NOVA_SUMMARY_DELEGATED_BIND_V1 ===
+   Scope-free controller that survives DOM cloning by using event delegation.
+*/
+(function(){
+  function $(id){ return document.getElementById(id); }
+
+  function authHeaders(){
+    try{
+      if(typeof window.NOVA_AUTH_HEADERS === "function"){
+        var h = window.NOVA_AUTH_HEADERS();
+        if(h && typeof h === "object") return h;
+      }
+    }catch(e){}
+    return {};
+  }
+
+  function buildHeaders(){
+    var h = { "Content-Type":"application/json" };
+    try{
+      var a = authHeaders();
+      for(var k in a){ try{ h[k]=a[k]; }catch(e){} }
+    }catch(e){}
+    return h;
+  }
+
+  function setOut(msg){
+    var out = $("novaSummaryOut");
+    if(out) out.textContent = String(msg || "");
+  }
+
+  function getOrCreateSessionId(){
+    // URL ?session_id=...
+    try{
+      var u = new URL(location.href);
+      var sid = (u.searchParams.get("session_id") || "").trim();
+      if(sid) return sid;
+    }catch(e){}
+    // localStorage
+    try{
+      var sid2 = (localStorage.getItem("nova_session_id") || "").trim();
+      if(sid2) return sid2;
+    }catch(e){}
+    // new
+    var s = "s_" + Math.random().toString(16).slice(2) + "_" + Date.now().toString(16);
+    try{ localStorage.setItem("nova_session_id", s); }catch(e){}
+    return s;
+  }
+
+  function setSessionId(sid){
+    sid = String(sid||"").trim();
+    if(!sid) return;
+    try{
+      localStorage.setItem("nova_session_id", sid);
+    }catch(e){}
+    try{
+      var u = new URL(location.href);
+      u.searchParams.set("session_id", sid);
+      history.replaceState(null, "", u.toString());
+    }catch(e){}
+  }
+
+  async function fetchJsonTry(url, opts){
+    try{
+      var r = await fetch(url, opts || {});
+      var txt = await r.text();
+      var data = null;
+      try{ data = JSON.parse(txt); }catch(e){ data = { _raw: txt }; }
+      return { ok:r.ok, status:r.status, data:data, url:url };
+    }catch(e){
+      return { ok:false, status:0, data:{ error:String(e && e.message || e) }, url:url };
+    }
+  }
+
+  async function loadSessions(){
+    var sel = $("novaSessionList");
+    if(sel){
+      try{ sel.innerHTML = '<option value="">(loading...)</option>'; }catch(e){}
+    }
+    setOut("Loading sessions list...");
+
+    // Try a few common endpoints until one works
+    var candidates = [
+      "/api/sessions",
+      "/api/session/sessions",
+      "/api/session/list",
+      "/api/sessions/list"
+    ];
+
+    var best = null;
+    for(var i=0;i<candidates.length;i++){
+      var res = await fetchJsonTry(candidates[i], { method:"GET", headers: authHeaders() });
+      if(res.ok){
+        best = res; break;
+      }
+      if(!best) best = res;
+    }
+
+    if(!best || !best.ok){
+      setOut("ERROR " + (best ? best.status : "?") + " loading sessions: " + JSON.stringify(best ? best.data : {}));
+      if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+      return [];
+    }
+
+    var data = best.data || {};
+    var sessions = [];
+    if(Array.isArray(data.sessions)) sessions = data.sessions;
+    else if(data.content && Array.isArray(data.content.sessions)) sessions = data.content.sessions;
+    else if(Array.isArray(data)) sessions = data;
+
+    // Normalize to strings
+    var ids = [];
+    for(var j=0;j<sessions.length;j++){
+      var s = sessions[j];
+      if(typeof s === "string") ids.push(s);
+      else if(s && typeof s === "object"){
+        if(s.session_id) ids.push(String(s.session_id));
+        else if(s.id) ids.push(String(s.id));
+      }
+    }
+
+    if(sel){
+      var opts = ['<option value="">(select a session)</option>'];
+      for(var k=0;k<ids.length;k++){
+        var sid = ids[k];
+        opts.push('<option value="' + sid.replace(/"/g,"&quot;") + '">' + sid + '</option>');
+      }
+      sel.innerHTML = opts.join("");
+    }
+
+    setOut("Loaded " + ids.length + " sessions.");
+    return ids;
+  }
+
+  async function fetchSummary(){
+    var out = $("novaSummaryOut");
+    var sidEl = $("novaSessionId");
+    var sid = "";
+
+    try{
+      if(sidEl) sid = (sidEl.value || "").trim();
+    }catch(e){}
+
+    if(!sid){
+      // If dropdown selected, use it
+      try{
+        var sel = $("novaSessionList");
+        if(sel && sel.value) sid = String(sel.value).trim();
+      }catch(e){}
+    }
+
+    if(!sid){
+      sid = getOrCreateSessionId();
+      try{ if(sidEl) sidEl.value = sid; }catch(e){}
+    }
+
+    setSessionId(sid);
+    if(out) out.textContent = "Fetching summary for session_id=" + sid + " ...";
+
+    var res = await fetchJsonTry("/api/session/summary", {
+      method: "POST",
+      headers: buildHeaders(),
+      body: JSON.stringify({ session_id: sid })
+    });
+
+    if(!res.ok){
+      if(out) out.textContent = "ERROR " + res.status + " fetching summary:\n" + JSON.stringify(res.data, null, 2);
+      return;
+    }
+
+    // Accept common shapes
+    var data = res.data || {};
+    var summary =
+      (typeof data.summary === "string" && data.summary) ? data.summary :
+      (data.content && typeof data.content.summary === "string") ? data.content.summary :
+      (typeof data.text === "string") ? data.text :
+      JSON.stringify(data, null, 2);
+
+    if(out) out.textContent = summary;
+  }
+
+  // Delegated click handling survives cloning/replacing buttons
+  document.addEventListener("click", function(ev){
+    var t = ev.target;
+    if(!t) return;
+
+    // handle clicks on child elements inside buttons too
+    var id = t.id || (t.closest ? (t.closest("button") && t.closest("button").id) : "");
+    if(!id) return;
+
+    if(id === "novaSummaryRefresh"){
+      ev.preventDefault();
+      try{ loadSessions(); }catch(e){}
+      return;
+    }
+    if(id === "novaSummaryFetch"){
+      ev.preventDefault();
+      try{ fetchSummary(); }catch(e){}
+      return;
+    }
+  }, true);
+
+  // Delegated change handler for dropdown
+  document.addEventListener("change", function(ev){
+    var t = ev.target;
+    if(!t) return;
+    if(t.id === "novaSessionList"){
+      try{
+        var sidEl = $("novaSessionId");
+        if(sidEl) sidEl.value = (t.value || "").trim();
+      }catch(e){}
+    }
+  }, true);
+
+  // Export a global autorun (guaranteed global)
+  window.__novaSummaryAutoRun = function(){
+    try{ loadSessions(); }catch(e){}
+    try{ setTimeout(fetchSummary, 500); }catch(e){}
+  };
+
+  // Run once on load (after DOM settles)
+  try{ setTimeout(function(){ try{ window.__novaSummaryAutoRun(); }catch(e){} }, 350); }catch(e){}
+})();
+</script>
+<!-- /NOVA_SUMMARY_DELEGATED_BIND_V1 -->
+<script>
+// === Expose loadSessions and fetchSummary globally ===
+(function(){
+  // Expose these functions globally
+  window.loadSessions = function(){
+    // Existing implementation of loadSessions goes here
+    console.log("loadSessions triggered");
+    // Replace with your current loadSessions code from IIFE
+  };
+
+  window.fetchSummary = function(){
+    // Existing implementation of fetchSummary goes here
+    console.log("fetchSummary triggered");
+    // Replace with your current fetchSummary code from IIFE
+  };
+
+  // Existing export function
+  window.__novaSummaryAutoRun = function(){
+    console.log("window.__novaSummaryAutoRun triggered");
+    try{ loadSessions(); }catch(e){ console.log("Error loading sessions", e); }
+    try{ setTimeout(fetchSummary, 500); }catch(e){ console.log("Error fetching summary", e); }
+  };
+
+  // Run once on load (after DOM settles)
+  try{ setTimeout(function(){ try{ window.__novaSummaryAutoRun(); }catch(e){} }, 350); }catch(e){}
+})();
+</script>
+<script>
+// === Expose loadSessions and fetchSummary globally ===
+(function(){
+  // Expose these functions globally
+  window.loadSessions = function(){
+    // Existing implementation of loadSessions goes here
+    console.log("loadSessions triggered");
+    // Replace with your current loadSessions code from IIFE
+  };
+
+  window.fetchSummary = function(){
+    // Existing implementation of fetchSummary goes here
+    console.log("fetchSummary triggered");
+    // Replace with your current fetchSummary code from IIFE
+  };
+
+  // Existing export function
+  window.__novaSummaryAutoRun = function(){
+    console.log("window.__novaSummaryAutoRun triggered");
+    try{ loadSessions(); }catch(e){ console.log("Error loading sessions", e); }
+    try{ setTimeout(fetchSummary, 500); }catch(e){ console.log("Error fetching summary", e); }
+  };
+
+  // Run once on load (after DOM settles)
+  try{ setTimeout(function(){ try{ window.__novaSummaryAutoRun(); }catch(e){} }, 350); }catch(e){}
+})();
+</script>
+<script>
+// === FINAL CLEAN-UP ===
+// Expose loadSessions and fetchSummary globally
+(function(){
+  window.loadSessions = function(){
+    console.log("loadSessions triggered");
+    // Your clean version of loadSessions goes here
+    // Copy the existing loadSessions code here, ensuring it's fully functional
+  };
+
+  window.fetchSummary = function(){
+    console.log("fetchSummary triggered");
+    // Your clean version of fetchSummary goes here
+    // Copy the existing fetchSummary code here, ensuring it's fully functional
+  };
+
+  window.__novaSummaryAutoRun = function(){
+    console.log("window.__novaSummaryAutoRun triggered");
+    try{ loadSessions(); }catch(e){ console.log("Error loading sessions", e); }
+    try{ setTimeout(fetchSummary, 500); }catch(e){ console.log("Error fetching summary", e); }
+  };
+
+  try{ setTimeout(function(){ try{ window.__novaSummaryAutoRun(); }catch(e){} }, 350); }catch(e){}
+})();
+</script>
+<script>
+// === FINAL GLOBAL FUNCTIONS ===
+(function(){
+  // Global loadSessions function
+  window.loadSessions = async function(){
+    console.log("loadSessions triggered");
+    var sel = document.getElementById("novaSessionList");
+    if(sel) sel.innerHTML = '<option value="">(loading...)</option>';
+    var sessions = [];
+    try {
+      var res = await fetch("/api/sessions", { method: "GET", headers: { "Content-Type": "application/json" } });
+      var data = await res.json();
+      if(data.sessions) sessions = data.sessions;
+    } catch(e) {
+      console.log("Error loading sessions:", e);
+      if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+    }
+    setOut("Loaded " + sessions.length + " sessions.");
+  };
+
+  // Global fetchSummary function
+  window.fetchSummary = async function(){
+    console.log("fetchSummary triggered");
+    var sid = document.getElementById("novaSessionId").value.trim() || getOrCreateSessionId();
+    try {
+      var res = await fetch("/api/session/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sid })
+      });
+      var data = await res.json();
+      if(!res.ok) {
+        throw new Error("Error fetching summary");
+      }
+      var summary = data.summary || JSON.stringify(data);
+      setOut(summary);
+    } catch (e) {
+      console.log("Error fetching summary:", e);
+      setOut("Error fetching summary.");
+    }
+  };
+
+  // Global auto-run function
+  window.__novaSummaryAutoRun = function(){
+    console.log("window.__novaSummaryAutoRun triggered");
+    try{ loadSessions(); }catch(e){ console.log("Error loading sessions", e); }
+    try{ setTimeout(fetchSummary, 500); }catch(e){ console.log("Error fetching summary", e); }
+  };
+
+  // Call once after the page loads
+  try{ setTimeout(function(){ window.__novaSummaryAutoRun(); }, 350); }catch(e){}
+})();
+</script>
+<script>
+// === Globalized loadSessions and fetchSummary ===
+(function(){
+  // Define loadSessions as a global function
+  window.loadSessions = function(){
+    console.log("loadSessions triggered");
+    var sel = document.getElementById("novaSessionList");
+    if(sel) sel.innerHTML = '<option value="">(loading...)</option>';
+    var sessions = [];
+    try {
+      var res = fetch("/api/sessions", { method: "GET", headers: { "Content-Type": "application/json" } });
+      res.then(function(response) {
+        return response.json();
+      }).then(function(data) {
+        if(data.sessions) sessions = data.sessions;
+        setOut("Loaded " + sessions.length + " sessions.");
+      }).catch(function(e) {
+        console.log("Error loading sessions:", e);
+        if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+      });
+    } catch(e) {
+      console.log("Error loading sessions:", e);
+      if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+    }
+  };
+
+  // Define fetchSummary as a global function
+  window.fetchSummary = function(){
+    console.log("fetchSummary triggered");
+    var sid = document.getElementById("novaSessionId").value.trim() || getOrCreateSessionId();
+    try {
+      var res = fetch("/api/session/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sid })
+      });
+      res.then(function(response) {
+        return response.json();
+      }).then(function(data) {
+        if(!res.ok) {
+          throw new Error("Error fetching summary");
+        }
+        var summary = data.summary || JSON.stringify(data);
+        setOut(summary);
+      }).catch(function(e) {
+        console.log("Error fetching summary:", e);
+        setOut("Error fetching summary.");
+      });
+    } catch (e) {
+      console.log("Error fetching summary:", e);
+      setOut("Error fetching summary.");
+    }
+  };
+
+  // Export the auto-run function globally
+  window.__novaSummaryAutoRun = function(){
+    console.log("window.__novaSummaryAutoRun triggered");
+    try{ loadSessions(); }catch(e){ console.log("Error loading sessions", e); }
+    try{ setTimeout(fetchSummary, 500); }catch(e){ console.log("Error fetching summary", e); }
+  };
+
+  // Run the auto-run function once after page load
+  try{ setTimeout(function(){ window.__novaSummaryAutoRun(); }, 350); }catch(e){}
+})();
+</script>
+<script>
+// === Globalized Functions ===
+
+// Define global loadSessions function
+window.loadSessions = function(){
+  console.log("loadSessions triggered");
+  var sel = document.getElementById("novaSessionList");
+  if(sel) sel.innerHTML = '<option value="">(loading...)</option>';
+  var sessions = [];
+  try {
+    var res = fetch("/api/sessions", { method: "GET", headers: { "Content-Type": "application/json" } });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(data.sessions) sessions = data.sessions;
+      setOut("Loaded " + sessions.length + " sessions.");
+    }).catch(function(e) {
+      console.log("Error loading sessions:", e);
+      if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+    });
+  } catch(e) {
+    console.log("Error loading sessions:", e);
+    if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+  }
+};
+
+// Define global fetchSummary function
+window.fetchSummary = function(){
+  console.log("fetchSummary triggered");
+  var sid = document.getElementById("novaSessionId").value.trim() || getOrCreateSessionId();
+  try {
+    var res = fetch("/api/session/summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sid })
+    });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(!res.ok) {
+        throw new Error("Error fetching summary");
+      }
+      var summary = data.summary || JSON.stringify(data);
+      setOut(summary);
+    }).catch(function(e) {
+      console.log("Error fetching summary:", e);
+      setOut("Error fetching summary.");
+    });
+  } catch (e) {
+    console.log("Error fetching summary:", e);
+    setOut("Error fetching summary.");
+  }
+};
+
+// Expose the auto-run function globally
+window.__novaSummaryAutoRun = function(){
+  console.log("window.__novaSummaryAutoRun triggered");
+  try{ loadSessions(); }catch(e){ console.log("Error loading sessions", e); }
+  try{ setTimeout(fetchSummary, 500); }catch(e){ console.log("Error fetching summary", e); }
+};
+
+// Run the auto-run function once after page load
+try{ setTimeout(function(){ window.__novaSummaryAutoRun(); }, 350); }catch(e){}
+</script>
+<script>
+// === Define global functions first ===
+
+// Global loadSessions function
+window.loadSessions = function(){
+  console.log("loadSessions triggered");
+  var sel = document.getElementById("novaSessionList");
+  if(sel) sel.innerHTML = '<option value="">(loading...)</option>';
+  var sessions = [];
+  try {
+    var res = fetch("/api/sessions", { method: "GET", headers: { "Content-Type": "application/json" } });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(data.sessions) sessions = data.sessions;
+      setOut("Loaded " + sessions.length + " sessions.");
+    }).catch(function(e) {
+      console.log("Error loading sessions:", e);
+      if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+    });
+  } catch(e) {
+    console.log("Error loading sessions:", e);
+    if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+  }
+};
+
+// Global fetchSummary function
+window.fetchSummary = function(){
+  console.log("fetchSummary triggered");
+  var sid = document.getElementById("novaSessionId").value.trim() || getOrCreateSessionId();
+  try {
+    var res = fetch("/api/session/summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sid })
+    });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(!res.ok) {
+        throw new Error("Error fetching summary");
+      }
+      var summary = data.summary || JSON.stringify(data);
+      setOut(summary);
+    }).catch(function(e) {
+      console.log("Error fetching summary:", e);
+      setOut("Error fetching summary.");
+    });
+  } catch (e) {
+    console.log("Error fetching summary:", e);
+    setOut("Error fetching summary.");
+  }
+};
+
+// Expose the auto-run function globally
+window.__novaSummaryAutoRun = function(){
+  console.log("window.__novaSummaryAutoRun triggered");
+  try{ loadSessions(); }catch(e){ console.log("Error loading sessions", e); }
+  try{ setTimeout(fetchSummary, 500); }catch(e){ console.log("Error fetching summary", e); }
+};
+
+// Run the auto-run function once after page load
+try{ setTimeout(function(){ window.__novaSummaryAutoRun(); }, 350); }catch(e){}
+</script>
+<script>
+// === Globalized Functions ===
+
+// Define global loadSessions function (only the final one)
+window.loadSessions = function(){
+  console.log("loadSessions triggered");
+  var sel = document.getElementById("novaSessionList");
+  if(sel) sel.innerHTML = '<option value="">(loading...)</option>';
+  var sessions = [];
+  try {
+    var res = fetch("/api/sessions", { method: "GET", headers: { "Content-Type": "application/json" } });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(data.sessions) sessions = data.sessions;
+      setOut("Loaded " + sessions.length + " sessions.");
+    }).catch(function(e) {
+      console.log("Error loading sessions:", e);
+      if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+    });
+  } catch(e) {
+    console.log("Error loading sessions:", e);
+    if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+  }
+};
+
+// Define global fetchSummary function (only the final one)
+window.fetchSummary = function(){
+  console.log("fetchSummary triggered");
+  var sid = document.getElementById("novaSessionId").value.trim() || getOrCreateSessionId();
+  try {
+    var res = fetch("/api/session/summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sid })
+    });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(!res.ok) {
+        throw new Error("Error fetching summary");
+      }
+      var summary = data.summary || JSON.stringify(data);
+      setOut(summary);
+    }).catch(function(e) {
+      console.log("Error fetching summary:", e);
+      setOut("Error fetching summary.");
+    });
+  } catch (e) {
+    console.log("Error fetching summary:", e);
+    setOut("Error fetching summary.");
+  }
+};
+
+// Expose the auto-run function globally
+window.__novaSummaryAutoRun = function(){
+  console.log("window.__novaSummaryAutoRun triggered");
+  try{ loadSessions(); }catch(e){ console.log("Error loading sessions", e); }
+  try{ setTimeout(fetchSummary, 500); }catch(e){ console.log("Error fetching summary", e); }
+};
+
+// Run the auto-run function once after page load
+try{ setTimeout(function(){ window.__novaSummaryAutoRun(); }, 350); }catch(e){}
+</script>
+<script>
+// === Globalized Functions ===
+
+// Final, single definition of loadSessions (placed globally)
+window.loadSessions = function(){
+  console.log("loadSessions triggered");
+  var sel = document.getElementById("novaSessionList");
+  if(sel) sel.innerHTML = '<option value="">(loading...)</option>';
+  var sessions = [];
+  try {
+    var res = fetch("/api/sessions", { method: "GET", headers: { "Content-Type": "application/json" } });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(data.sessions) sessions = data.sessions;
+      setOut("Loaded " + sessions.length + " sessions.");
+    }).catch(function(e) {
+      console.log("Error loading sessions:", e);
+      if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+    });
+  } catch(e) {
+    console.log("Error loading sessions:", e);
+    if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+  }
+};
+
+// Final, single definition of fetchSummary (placed globally)
+window.fetchSummary = function(){
+  console.log("fetchSummary triggered");
+  var sid = document.getElementById("novaSessionId").value.trim() || getOrCreateSessionId();
+  try {
+    var res = fetch("/api/session/summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sid })
+    });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(!res.ok) {
+        throw new Error("Error fetching summary");
+      }
+      var summary = data.summary || JSON.stringify(data);
+      setOut(summary);
+    }).catch(function(e) {
+      console.log("Error fetching summary:", e);
+      setOut("Error fetching summary.");
+    });
+  } catch (e) {
+    console.log("Error fetching summary:", e);
+    setOut("Error fetching summary.");
+  }
+};
+
+// Expose the auto-run function globally
+window.__novaSummaryAutoRun = function(){
+  console.log("window.__novaSummaryAutoRun triggered");
+  try{ loadSessions(); }catch(e){ console.log("Error loading sessions", e); }
+  try{ setTimeout(fetchSummary, 500); }catch(e){ console.log("Error fetching summary", e); }
+};
+
+// Run the auto-run function once after page load
+try{ setTimeout(function(){ window.__novaSummaryAutoRun(); }, 350); }catch(e){}
+</script>
+<script>
+// === Final Globalized Functions ===
+
+// Final, single definition of loadSessions (placed globally)
+window.loadSessions = function(){
+  console.log("loadSessions triggered");
+  var sel = document.getElementById("novaSessionList");
+  if(sel) sel.innerHTML = '<option value="">(loading...)</option>';
+  var sessions = [];
+  try {
+    var res = fetch("/api/sessions", { method: "GET", headers: { "Content-Type": "application/json" } });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(data.sessions) sessions = data.sessions;
+      setOut("Loaded " + sessions.length + " sessions.");
+    }).catch(function(e) {
+      console.log("Error loading sessions:", e);
+      if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+    });
+  } catch(e) {
+    console.log("Error loading sessions:", e);
+    if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+  }
+};
+
+// Final, single definition of fetchSummary (placed globally)
+window.fetchSummary = function(){
+  console.log("fetchSummary triggered");
+  var sid = document.getElementById("novaSessionId").value.trim() || getOrCreateSessionId();
+  try {
+    var res = fetch("/api/session/summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sid })
+    });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(!res.ok) {
+        throw new Error("Error fetching summary");
+      }
+      var summary = data.summary || JSON.stringify(data);
+      setOut(summary);
+    }).catch(function(e) {
+      console.log("Error fetching summary:", e);
+      setOut("Error fetching summary.");
+    });
+  } catch (e) {
+    console.log("Error fetching summary:", e);
+    setOut("Error fetching summary.");
+  }
+};
+
+// Expose the auto-run function globally
+window.__novaSummaryAutoRun = function(){
+  console.log("window.__novaSummaryAutoRun triggered");
+  try{ loadSessions(); }catch(e){ console.log("Error loading sessions", e); }
+  try{ setTimeout(fetchSummary, 500); }catch(e){ console.log("Error fetching summary", e); }
+};
+
+// Run the auto-run function once after page load
+try{ setTimeout(function(){ window.__novaSummaryAutoRun(); }, 350); }catch(e){}
+</script>
+<script>
+// === Final Globalized Functions ===
+
+// Final, single definition of loadSessions (placed globally)
+window.loadSessions = function(){
+  console.log("loadSessions triggered");
+  var sel = document.getElementById("novaSessionList");
+  if(sel) sel.innerHTML = '<option value="">(loading...)</option>';
+  var sessions = [];
+  try {
+    var res = fetch("/api/sessions", { method: "GET", headers: { "Content-Type": "application/json" } });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(data.sessions) sessions = data.sessions;
+      setOut("Loaded " + sessions.length + " sessions.");
+    }).catch(function(e) {
+      console.log("Error loading sessions:", e);
+      if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+    });
+  } catch(e) {
+    console.log("Error loading sessions:", e);
+    if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+  }
+};
+
+// Final, single definition of fetchSummary (placed globally)
+window.fetchSummary = function(){
+  console.log("fetchSummary triggered");
+  var sid = document.getElementById("novaSessionId").value.trim() || getOrCreateSessionId();
+  try {
+    var res = fetch("/api/session/summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sid })
+    });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(!res.ok) {
+        throw new Error("Error fetching summary");
+      }
+      var summary = data.summary || JSON.stringify(data);
+      setOut(summary);
+    }).catch(function(e) {
+      console.log("Error fetching summary:", e);
+      setOut("Error fetching summary.");
+    });
+  } catch (e) {
+    console.log("Error fetching summary:", e);
+    setOut("Error fetching summary.");
+  }
+};
+
+// Expose the auto-run function globally
+window.__novaSummaryAutoRun = function(){
+  console.log("window.__novaSummaryAutoRun triggered");
+  try{ loadSessions(); }catch(e){ console.log("Error loading sessions", e); }
+  try{ setTimeout(fetchSummary, 500); }catch(e){ console.log("Error fetching summary", e); }
+};
+
+// Run the auto-run function once after page load
+try{ setTimeout(function(){ window.__novaSummaryAutoRun(); }, 350); }catch(e){}
+</script>
+<script>
+// === Final Globalized Functions ===
+
+// Define setOut globally to handle output display
+window.setOut = function(msg){
+  var out = document.getElementById("novaSummaryOut");
+  if(out) out.textContent = String(msg || "");
+};
+
+// Final, single definition of loadSessions (placed globally)
+window.loadSessions = function(){
+  console.log("loadSessions triggered");
+  var sel = document.getElementById("novaSessionList");
+  if(sel) sel.innerHTML = '<option value="">(loading...)</option>';
+  var sessions = [];
+  try {
+    var res = fetch("/api/sessions", { method: "GET", headers: { "Content-Type": "application/json" } });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(data.sessions) sessions = data.sessions;
+      setOut("Loaded " + sessions.length + " sessions.");
+    }).catch(function(e) {
+      console.log("Error loading sessions:", e);
+      if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+    });
+  } catch(e) {
+    console.log("Error loading sessions:", e);
+    if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+  }
+};
+
+// Final, single definition of fetchSummary (placed globally)
+window.fetchSummary = function(){
+  console.log("fetchSummary triggered");
+  var sid = document.getElementById("novaSessionId").value.trim() || getOrCreateSessionId();
+  try {
+    var res = fetch("/api/session/summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sid })
+    });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(!res.ok) {
+        throw new Error("Error fetching summary");
+      }
+      var summary = data.summary || JSON.stringify(data);
+      setOut(summary);
+    }).catch(function(e) {
+      console.log("Error fetching summary:", e);
+      setOut("Error fetching summary.");
+    });
+  } catch (e) {
+    console.log("Error fetching summary:", e);
+    setOut("Error fetching summary.");
+  }
+};
+
+// Expose the auto-run function globally
+window.__novaSummaryAutoRun = function(){
+  console.log("window.__novaSummaryAutoRun triggered");
+  try{ loadSessions(); }catch(e){ console.log("Error loading sessions", e); }
+  try{ setTimeout(fetchSummary, 500); }catch(e){ console.log("Error fetching summary", e); }
+};
+
+// Run the auto-run function once after page load
+try{ setTimeout(function(){ window.__novaSummaryAutoRun(); }, 350); }catch(e){}
+</script>
+<script>
+// === Global Functions ===
+
+// Define setOut globally to handle output display
+window.setOut = function(msg){
+  var out = document.getElementById("novaSummaryOut");
+  if(out) out.textContent = String(msg || "");
+};
+
+// Final, single definition of loadSessions (placed globally)
+window.loadSessions = function(){
+  console.log("loadSessions triggered");
+  var sel = document.getElementById("novaSessionList");
+  if(sel) sel.innerHTML = '<option value="">(loading...)</option>';
+  var sessions = [];
+  try {
+    var res = fetch("/api/sessions", { method: "GET", headers: { "Content-Type": "application/json" } });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(data.sessions) sessions = data.sessions;
+      setOut("Loaded " + sessions.length + " sessions.");
+    }).catch(function(e) {
+      console.log("Error loading sessions:", e);
+      if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+    });
+  } catch(e) {
+    console.log("Error loading sessions:", e);
+    if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+  }
+};
+
+// Final, single definition of fetchSummary (placed globally)
+window.fetchSummary = function(){
+  console.log("fetchSummary triggered");
+  var sid = document.getElementById("novaSessionId").value.trim() || getOrCreateSessionId();
+  try {
+    var res = fetch("/api/session/summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sid })
+    });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(!res.ok) {
+        throw new Error("Error fetching summary");
+      }
+      var summary = data.summary || JSON.stringify(data);
+      setOut(summary);
+    }).catch(function(e) {
+      console.log("Error fetching summary:", e);
+      setOut("Error fetching summary.");
+    });
+  } catch (e) {
+    console.log("Error fetching summary:", e);
+    setOut("Error fetching summary.");
+  }
+};
+
+// Expose the auto-run function globally
+window.__novaSummaryAutoRun = function(){
+  console.log("window.__novaSummaryAutoRun triggered");
+  try{ loadSessions(); }catch(e){ console.log("Error loading sessions", e); }
+  try{ setTimeout(fetchSummary, 500); }catch(e){ console.log("Error fetching summary", e); }
+};
+
+// Run the auto-run function once after page load
+try{ setTimeout(function(){ window.__novaSummaryAutoRun(); }, 350); }catch(e){}
+</script>
+<script>
+// === Final Globalized Functions with Safe Execution Control ===
+
+// Define setOut globally to handle output display
+window.setOut = function(msg){
+  var out = document.getElementById("novaSummaryOut");
+  if(out) out.textContent = String(msg || "");
+};
+
+// Global flag to prevent recursive auto-run calls
+window.autoRunInProgress = false;
+
+// Final, single definition of loadSessions (placed globally)
+window.loadSessions = function(){
+  console.log("loadSessions triggered");
+  var sel = document.getElementById("novaSessionList");
+  if(sel) sel.innerHTML = '<option value="">(loading...)</option>';
+  var sessions = [];
+  try {
+    var res = fetch("/api/sessions", { method: "GET", headers: { "Content-Type": "application/json" } });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(data.sessions) sessions = data.sessions;
+      setOut("Loaded " + sessions.length + " sessions.");
+    }).catch(function(e) {
+      console.log("Error loading sessions:", e);
+      if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+    });
+  } catch(e) {
+    console.log("Error loading sessions:", e);
+    if(sel) sel.innerHTML = '<option value="">(failed to load)</option>';
+  }
+};
+
+// Final, single definition of fetchSummary (placed globally)
+window.fetchSummary = function(){
+  console.log("fetchSummary triggered");
+  var sid = document.getElementById("novaSessionId").value.trim() || getOrCreateSessionId();
+  try {
+    var res = fetch("/api/session/summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sid })
+    });
+    res.then(function(response) {
+      return response.json();
+    }).then(function(data) {
+      if(!res.ok) {
+        throw new Error("Error fetching summary");
+      }
+      var summary = data.summary || JSON.stringify(data);
+      setOut(summary);
+    }).catch(function(e) {
+      console.log("Error fetching summary:", e);
+      setOut("Error fetching summary.");
+    });
+  } catch (e) {
+    console.log("Error fetching summary:", e);
+    setOut("Error fetching summary.");
+  }
+};
+
+// Expose the auto-run function globally with control
+window.__novaSummaryAutoRun = function(){
+  console.log("window.__novaSummaryAutoRun triggered");
+
+  if (window.autoRunInProgress) {
+    console.log("Auto-run already in progress. Skipping...");
+    return; // Prevent multiple auto-run calls
+  }
+
+  window.autoRunInProgress = true; // Set the flag to true to block other calls
+
+  try {
+    loadSessions();
+  } catch(e) {
+    console.log("Error loading sessions", e);
+  }
+
+  try {
+    setTimeout(fetchSummary, 500);
+  } catch(e) {
+    console.log("Error fetching summary", e);
+  }
+
+  // After execution, reset the flag to allow future runs
+  window.autoRunInProgress = false;
+};
+
+// Run the auto-run function once after page load
+try {
+  setTimeout(function() {
+    window.__novaSummaryAutoRun();
+  }, 350);
+} catch(e) {
+  console.log("Error executing auto-run function", e);
+}
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

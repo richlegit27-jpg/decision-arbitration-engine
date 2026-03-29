@@ -1,0 +1,324 @@
+﻿<!-- NOVA_HTML_STAMP_V1 20260221_030856 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script id="novaDirectSend98" src="/static/js/98.direct_send.js?v=DISABLED98_20260220_171315"></script>
+
+
+  <meta charset="utf-8" />
+  <meta http-equiv="refresh" content="0; url=/app" />
+  <script>
+    // JS redirect backup (for clients that ignore meta refresh)
+    try { location.replace("/app"); } catch(e) { location.href = "/app"; }
+  </script>
+  <title>Redirecting…</title>
+<script>
+(function(){
+  try{
+    var u = "/static/js/99.patch2.js?v=DEDUP_20260220_164945";
+    var s = document.createElement("script");
+    s.src = u;
+    s.async = false;
+    s.onload=function(){try{if(window.__NOVA_PATCHLOADER_DEBUG__) console.log("[PATCHLOADER] loaded",u);}catch(_){}};
+    s.onerror=function(e){try{if(window.__NOVA_PATCHLOADER_DEBUG__) console.error("[PATCHLOADER] ERROR",u,e);}catch(_){}};
+    (document.head || document.documentElement).appendChild(s);
+  }catch(e){ try{ console.error("[PATCHLOADER] FAIL", e); }catch(_){} }
+})();
+</script><style id="novaSendovrStyle">
+  #out .nova-user{
+    margin: 6px 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(31,111,235,.18);
+    border: 1px solid rgba(31,111,235,.35);
+    white-space: pre-wrap;
+  }
+  #out .nova-assistant{
+    margin: 6px 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(34,34,34,.65);
+    border: 1px solid rgba(255,255,255,.08);
+    white-space: pre-wrap;
+  }
+  #out .nova-error{
+    margin: 6px 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(248,81,73,.18);
+    border: 1px solid rgba(248,81,73,.35);
+    white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+  Redirecting to /app…
+  <script src="/static/js/20.app.js?v=DEDUP_20260220_164945"></script>
+<!-- 97.force_novasend REMOVED 20260221_031955 -->
+<script>
+/* === NOVA_DEDUP_BTN_V1 ===
+   Goal: Stop double-send by nuking all existing click handlers on #sendBtn.
+   Method: clone+replace the button once, then attach a single handler that calls window.novaSend().
+*/
+(function(){
+  const TAG = "[NOVA DEDUP BTN]";
+  function getMsg(){
+    try{
+      const a = document.getElementById("text");
+      if(a && typeof a.value==="string" && a.value.trim()) return a.value.trim();
+    }catch(_){}
+    try{
+      const b = document.getElementById("novaIn");
+      if(b && typeof b.value==="string" && b.value.trim()) return b.value.trim();
+    }catch(_){}
+    return "";
+  }
+  function clearMsg(){
+    try{ const a=document.getElementById("text"); if(a && typeof a.value==="string") a.value=""; }catch(_){}
+    try{ const b=document.getElementById("novaIn"); if(b && typeof b.value==="string") b.value=""; }catch(_){}
+  }
+  function arm(){
+    try{
+      const btn = document.getElementById("sendBtn");
+      if(!btn) return false;
+
+      // If we've already replaced it, don't do it again.
+      if(btn.__novaDedupBtnArmed) return true;
+
+      // Clone+replace nukes ALL prior listeners (including the app's)
+      const clone = btn.cloneNode(true);
+      clone.__novaDedupBtnArmed = true;
+      btn.parentNode.replaceChild(clone, btn);
+
+      clone.addEventListener("click", async (e) => {
+        try{ e.preventDefault(); e.stopPropagation(); }catch(_){}
+        try{
+          const fn = (typeof window.novaSend === "function") ? window.novaSend :
+                     (typeof window.__NOVA_SEND === "function") ? window.__NOVA_SEND : null;
+          if(!fn){
+            try{ console.warn(TAG, "no send fn"); }catch(_){}
+            return;
+          }
+
+          const msg = getMsg();
+          if(!msg){
+            try{ console.warn(TAG, "no msg"); }catch(_){}
+            return;
+          }
+
+          // extra guard (in case something still triggers twice)
+          if(window.__NOVA_BTN_INFLIGHT__){
+            try{ console.warn(TAG, "blocked: inflight"); }catch(_){}
+            return;
+          }
+          window.__NOVA_BTN_INFLIGHT__ = true;
+
+          const r = await fn(msg);
+          try{ console.log(TAG, "sent", r); }catch(_){}
+          clearMsg();
+        }catch(err){
+          try{ console.warn(TAG, "send err:", err); }catch(_){}
+        }finally{
+          setTimeout(()=>{ try{ window.__NOVA_BTN_INFLIGHT__ = false; }catch(_){} }, 80);
+        }
+      }, true);
+
+      try{ console.log(TAG, "armed: replaced #sendBtn and bound single handler"); }catch(_){}
+      return true;
+    }catch(e){
+      try{ console.warn(TAG, "arm failed:", e); }catch(_){}
+      return false;
+    }
+  }
+  arm();
+  window.addEventListener("load", arm, { once:false });
+})();
+</script>
+/* === /NOVA_DEDUP_BTN_V1 === */
+<script>
+/* === NOVA_SENDLOCK_V1 ===
+   Goal: ensure ONLY the send button click sends.
+   - Prevent form submit sends
+   - Prevent Enter-to-send unless Ctrl/Cmd+Enter (your hotkey script can own that)
+*/
+(function(){
+  const TAG = "[NOVA SENDLOCK]";
+
+  function killFormSubmit(){
+    try{
+      const forms = Array.from(document.querySelectorAll("form"));
+      forms.forEach(f=>{
+        if(f.__novaSendlock) return;
+        f.__novaSendlock = true;
+        f.addEventListener("submit", (e)=>{
+          try{ e.preventDefault(); e.stopPropagation(); }catch(_){}
+          try{ console.warn(TAG, "blocked form submit"); }catch(_){}
+          return false;
+        }, true);
+      });
+    }catch(_){}
+  }
+
+  function blockPlainEnter(){
+    try{
+      if(window.__NOVA_SENDLOCK_KEYDOWN__) return;
+      window.__NOVA_SENDLOCK_KEYDOWN__ = true;
+      document.addEventListener("keydown", (e)=>{
+        try{
+          if(!e) return;
+          // If it's Enter WITHOUT ctrl/cmd, block so it can't trigger submit/send
+          if(e.key === "Enter" && !(e.ctrlKey || e.metaKey)){
+            const ae = document.activeElement;
+            const tag = (ae && ae.tagName) ? ae.tagName.toLowerCase() : "";
+            // only block inside inputs/textareas/contenteditable
+            const isCE = !!(ae && ae.isContentEditable);
+            if(tag === "textarea" || tag === "input" || isCE){
+              e.preventDefault();
+              e.stopPropagation();
+              try{ console.warn(TAG, "blocked plain Enter"); }catch(_){}
+            }
+          }
+        }catch(_){}
+      }, true);
+    }catch(_){}
+  }
+
+  function arm(){
+    killFormSubmit();
+    blockPlainEnter();
+  }
+
+  arm();
+  window.addEventListener("load", arm, { once:false });
+})();
+</script>
+/* === /NOVA_SENDLOCK_V1 === */
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- NOTE: UI currently serves app.html?v=DEDUPBTN_20260220_163818, not index.html -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

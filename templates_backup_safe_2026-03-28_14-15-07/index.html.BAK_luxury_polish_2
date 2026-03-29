@@ -1,0 +1,216 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nova</title>
+
+  <link rel="stylesheet" href="{{ url_for('static', path='css/base.css') }}?v=endgame_polish_batch_1">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/layout.css') }}?v=endgame_polish_batch_1">
+</head>
+
+<body class="sidebar-open">
+
+<div id="appShell" class="app-shell">
+
+  <aside id="sidebar" class="sidebar" data-open="true">
+
+    <div class="sidebar-header">
+      <div class="sidebar-title">Nova</div>
+      <button id="btnCloseSidebar" class="sidebar-close" type="button" aria-label="Close sidebar">✕</button>
+    </div>
+
+    <div class="sidebar-actions">
+      <button id="btnNewChat" class="sidebar-btn" type="button">+ New chat</button>
+      <button id="btnOpenMemory" class="sidebar-btn" type="button">Memory</button>
+    </div>
+
+    <div id="chatList" class="chat-list">
+      <div class="chat-list-empty">No chats yet</div>
+    </div>
+
+  </aside>
+
+  <div id="mobileOverlay" class="mobile-overlay" hidden></div>
+
+  <main class="main">
+
+    <header class="topbar">
+      <button id="btnSidebarToggle" class="sidebar-toggle" type="button" aria-label="Open sidebar">☰</button>
+
+      <div class="topbar-center">
+        <div class="topbar-eyebrow">Nova Workspace</div>
+        <div id="topbarTitle" class="topbar-title">New chat</div>
+      </div>
+
+      <div class="topbar-actions">
+        <button id="btnTopbarMemory" class="sidebar-toggle" type="button">Memory</button>
+        <button id="btnWorkspaceFiles" class="sidebar-toggle" type="button">Files</button>
+      </div>
+    </header>
+
+    <section class="chat-stage">
+
+      <div id="messagesScroll" class="messages-scroll">
+
+        <div id="emptyState" class="empty-state">
+
+          <div class="empty-state-badge">Built for focus</div>
+          <h1 class="empty-state-title">What are we building today?</h1>
+          <p class="empty-state-subtitle">Code, debug, organize files, and keep momentum without breaking flow.</p>
+
+          <div id="emptySuggestions" class="empty-suggestions">
+            <button class="empty-suggestion" type="button">
+              <span class="empty-suggestion-title">Plan the next feature</span>
+              <span class="empty-suggestion-text">Break a build into clean steps I can execute fast.</span>
+            </button>
+
+            <button class="empty-suggestion" type="button">
+              <span class="empty-suggestion-title">Fix a bug</span>
+              <span class="empty-suggestion-text">Trace the issue, find the weak file, and patch it cleanly.</span>
+            </button>
+
+            <button class="empty-suggestion" type="button">
+              <span class="empty-suggestion-title">Refactor code</span>
+              <span class="empty-suggestion-text">Tighten a messy file without losing what already works.</span>
+            </button>
+
+            <button class="empty-suggestion" type="button">
+              <span class="empty-suggestion-title">Explain a file</span>
+              <span class="empty-suggestion-text">Show me what this file does and where it fits in the stack.</span>
+            </button>
+          </div>
+
+        </div>
+
+        <div id="messages" class="messages"></div>
+
+      </div>
+
+      <div class="composer-wrap">
+
+        <div class="composer-shell">
+
+          <div id="pendingAttachments" class="pending-attachments"></div>
+
+          <div id="composer" class="composer">
+
+            <button id="attachBtn" class="composer-btn" type="button" aria-label="Attach file">+</button>
+
+            <textarea
+              id="input"
+              class="composer-input"
+              rows="1"
+              placeholder="Message Nova..."
+            ></textarea>
+
+            <button id="stopBtn" class="composer-btn" type="button" hidden aria-label="Stop generating">■</button>
+
+            <button id="sendBtn" class="composer-btn" type="button" aria-label="Send message">↑</button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+</div>
+
+<button id="jumpToLatestBtn" class="jump-to-latest" type="button" hidden>
+  Jump to latest
+</button>
+
+<div id="workspaceFilesRoot"></div>
+
+<div id="memoryBackdrop" class="memory-backdrop" hidden></div>
+
+<aside id="memoryPanel" class="memory-panel" hidden>
+  <div class="memory-panel-header">
+    <div>
+      <div class="memory-panel-title">Memory</div>
+      <div class="memory-panel-subtitle">Save durable notes that help Nova stay aligned with your workflow.</div>
+    </div>
+
+    <button id="btnCloseMemory" class="sidebar-btn" type="button">Close</button>
+  </div>
+
+  <div class="memory-panel-body">
+    <div class="memory-panel-controls">
+      <textarea
+        id="memoryInput"
+        class="memory-input"
+        rows="3"
+        placeholder="Add one or more memory items..."
+      ></textarea>
+
+      <div class="memory-panel-actions">
+        <button id="btnAddMemory" class="sidebar-btn" type="button">Add</button>
+        <button id="btnRefreshMemory" class="sidebar-btn" type="button">Refresh</button>
+        <button id="btnClearMemory" class="sidebar-btn" type="button">Clear all</button>
+      </div>
+
+      <div id="memoryStatus" class="memory-status"></div>
+    </div>
+
+    <div id="memoryList" class="memory-list">
+      <div class="memory-empty">No memory saved.</div>
+    </div>
+  </div>
+</aside>
+
+<!-- API LAYER -->
+
+<script src="{{ url_for('static', path='js/api-core.js') }}?v=endgame_polish_batch_1"></script>
+<script src="{{ url_for('static', path='js/api-chats.js') }}?v=endgame_polish_batch_1"></script>
+<script src="{{ url_for('static', path='js/api-memory.js') }}?v=endgame_polish_batch_1"></script>
+<script src="{{ url_for('static', path='js/api-stream.js') }}?v=endgame_polish_batch_1"></script>
+<script src="{{ url_for('static', path='js/api.js') }}?v=endgame_polish_batch_1"></script>
+
+<!-- SERVICES -->
+
+<script src="{{ url_for('static', path='js/stream-service.js') }}?v=endgame_polish_batch_1"></script>
+<script src="{{ url_for('static', path='js/attachments-service.js') }}?v=endgame_polish_batch_1"></script>
+
+<!-- STATE -->
+
+<script src="{{ url_for('static', path='js/chat-state.js') }}?v=endgame_polish_batch_1"></script>
+<script src="{{ url_for('static', path='js/chat-storage.js') }}?v=endgame_polish_batch_1"></script>
+
+<!-- SIDEBAR -->
+
+<script src="{{ url_for('static', path='js/chat-sidebar-render.js') }}?v=endgame_polish_batch_1"></script>
+<script src="{{ url_for('static', path='js/chat-sidebar-actions.js') }}?v=endgame_polish_batch_1"></script>
+<script src="{{ url_for('static', path='js/chat-sidebar-layout.js') }}?v=endgame_polish_batch_1"></script>
+<script src="{{ url_for('static', path='js/chat-sidebar.js') }}?v=endgame_polish_batch_1"></script>
+
+<!-- MESSAGES -->
+
+<script src="{{ url_for('static', path='js/chat-messages.js') }}?v=endgame_polish_batch_1"></script>
+
+<!-- COMPOSER -->
+
+<script src="{{ url_for('static', path='js/composer-input.js') }}?v=endgame_polish_batch_1"></script>
+<script src="{{ url_for('static', path='js/composer-actions.js') }}?v=endgame_polish_batch_1"></script>
+<script src="{{ url_for('static', path='js/composer-attachments.js') }}?v=endgame_polish_batch_1"></script>
+<script src="{{ url_for('static', path='js/composer.js') }}?v=endgame_polish_batch_1"></script>
+
+<!-- MEMORY -->
+
+<script src="{{ url_for('static', path='js/memory-panel.js') }}?v=endgame_polish_batch_1"></script>
+
+<!-- WORKSPACE FILES -->
+
+<script src="{{ url_for('static', path='js/workspace-files.js') }}?v=endgame_polish_batch_1"></script>
+
+<!-- APP -->
+
+<script src="{{ url_for('static', path='js/chat-orchestrator.js') }}?v=endgame_polish_batch_1"></script>
+<script src="{{ url_for('static', path='js/chat-bootstrap.js') }}?v=endgame_polish_batch_1"></script>
+<script src="{{ url_for('static', path='js/chat-app.js') }}?v=endgame_polish_batch_1"></script>
+
+</body>
+</html>

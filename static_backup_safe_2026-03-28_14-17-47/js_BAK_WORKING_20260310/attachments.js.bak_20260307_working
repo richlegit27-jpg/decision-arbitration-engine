@@ -1,0 +1,196 @@
+// C:\Users\Owner\nova\static\js\attachments.js
+
+(() => {
+"use strict"
+
+function createAttachmentsService(options = {}){
+  const {
+    state,
+    elements = {},
+    utils = {},
+    renderService,
+  } = options
+
+  if(!state){
+    throw new Error("NovaAttachmentsService: state is required")
+  }
+
+  const el = {
+    fileInput: elements.fileInput || null,
+    pendingAttachments: elements.pendingAttachments || null,
+  }
+
+  const escapeHtml = utils.escapeHtml || ((v) => String(v ?? ""))
+  const formatBytes =
+    utils.formatBytes ||
+    ((bytes) => {
+      const n = Number(bytes || 0)
+      if(!Number.isFinite(n) || n <= 0) return "0 B"
+      const units = ["B", "KB", "MB", "GB", "TB"]
+      let size = n
+      let i = 0
+      while(size >= 1024 && i < units.length - 1){
+        size /= 1024
+        i += 1
+      }
+      return `${size < 10 && i > 0 ? size.toFixed(1) : Math.round(size)} ${units[i]}`
+    })
+
+  function ensurePendingFilesArray(){
+    if(!Array.isArray(state.pendingFiles)){
+      state.pendingFiles = []
+    }
+
+    return state.pendingFiles
+  }
+
+  function getPendingFiles(){
+    return ensurePendingFilesArray()
+  }
+
+  function setPendingFiles(files){
+    state.pendingFiles = Array.isArray(files) ? files : []
+    renderPendingAttachments()
+    return state.pendingFiles
+  }
+
+  function addPendingFiles(files){
+    const current = ensurePendingFilesArray()
+    const incoming = Array.isArray(files) ? files : Array.from(files || [])
+
+    for(const file of incoming){
+      if(!(file instanceof File)){
+        continue
+      }
+
+      const duplicate = current.some((existing) => {
+        return (
+          existing.name === file.name &&
+          existing.size === file.size &&
+          existing.lastModified === file.lastModified
+        )
+      })
+
+      if(!duplicate){
+        current.push(file)
+      }
+    }
+
+    renderPendingAttachments()
+    return current
+  }
+
+  function removePendingFile(index){
+    const files = ensurePendingFilesArray()
+    const i = Number(index)
+
+    if(Number.isInteger(i) && i >= 0 && i < files.length){
+      files.splice(i, 1)
+    }
+
+    renderPendingAttachments()
+    return files
+  }
+
+  function clearPendingFiles(){
+    state.pendingFiles = []
+
+    if(el.fileInput){
+      el.fileInput.value = ""
+    }
+
+    renderPendingAttachments()
+    return state.pendingFiles
+  }
+
+  function renderPendingAttachments(){
+    if(!el.pendingAttachments){
+      renderService?.renderPendingAttachments?.()
+      return
+    }
+
+    const files = ensurePendingFilesArray()
+
+    if(files.length === 0){
+      el.pendingAttachments.innerHTML = ""
+      renderService?.renderPendingAttachments?.()
+      return
+    }
+
+    el.pendingAttachments.innerHTML = files.map((file, index) => {
+      const name = escapeHtml(file.name || "file")
+      const size = escapeHtml(formatBytes(file.size || 0))
+      return `
+        <div class="pending-file" data-file-index="${index}">
+          <div class="pending-file-main">
+            <div class="pending-file-name" title="${name}">${name}</div>
+            <div class="pending-file-size">${size}</div>
+          </div>
+          <button
+            type="button"
+            class="pending-file-remove"
+            data-remove-file="${index}"
+            aria-label="Remove ${name}"
+            title="Remove file"
+          >
+            ×
+          </button>
+        </div>
+      `
+    }).join("")
+  }
+
+  function handleFileInputChange(event){
+    const files = Array.from(event?.target?.files || [])
+
+    if(files.length === 0){
+      return
+    }
+
+    addPendingFiles(files)
+
+    if(el.fileInput){
+      el.fileInput.value = ""
+    }
+  }
+
+  function handlePendingAttachmentsClick(event){
+    const button = event.target.closest("[data-remove-file]")
+
+    if(!button){
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const index = Number(button.dataset.removeFile)
+    removePendingFile(index)
+  }
+
+  function bindEvents(){
+    el.fileInput?.addEventListener("change", handleFileInputChange)
+    el.pendingAttachments?.addEventListener("click", handlePendingAttachmentsClick)
+  }
+
+  function init(){
+    bindEvents()
+    renderPendingAttachments()
+  }
+
+  return {
+    init,
+    getPendingFiles,
+    setPendingFiles,
+    addPendingFiles,
+    removePendingFile,
+    clearPendingFiles,
+    renderPendingAttachments,
+  }
+}
+
+window.NovaAttachmentsService = {
+  createAttachmentsService,
+}
+
+})()

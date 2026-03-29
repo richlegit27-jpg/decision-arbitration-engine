@@ -1,0 +1,361 @@
+// C:\Users\Owner\nova\static\js\stream-service.js
+
+(() => {
+"use strict"
+
+function createStreamService(options = {}){
+  const {
+    state,
+    api,
+    utils = {},
+    chatService,
+    messageService,
+    renderService,
+    attachmentsService,
+  } = options
+
+  if(!state){
+    throw new Error("NovaStreamService: state is required")
+  }
+
+  if(!api){
+    throw new Error("NovaStreamService: api is required")
+  }
+
+  if(!messageService){
+    throw new Error("NovaStreamService: messageService is required")
+  }
+
+  function setAbortController(controller){
+    state.streamAbortController = controller || null
+    return state.streamAbortController
+  }
+
+  function getAbortController(){
+    return state.streamAbortController || null
+  }
+
+  function abortActiveStream(){
+    const controller = getAbortController()
+
+    if(controller){
+      try {
+        controller.abort()
+      } catch(_error){
+      }
+    }
+
+    state.isStreaming = false
+    state.streamingMessageId = ""
+    setAbortController(null)
+  }
+
+  function buildPayload({
+    chatId,
+    message,
+    files,
+  } = {}){
+    return {
+      chat_id: String(chatId || state.activeChatId || state.chatId || "").trim(),
+      message: String(message || ""),
+      files: Array.isArray(files) ? files : [],
+    }
+  }
+
+  function ensureActiveChatId(chatIdFromEvent){
+    const incoming = String(chatIdFromEvent || "").trim()
+
+    if(incoming){
+      if(chatService && typeof chatService.setActiveChat === "function"){
+        chatService.setActiveChat(incoming)
+      } else {
+        state.activeChatId = incoming
+        state.chatId = incoming
+      }
+      return incoming
+    }
+
+    return String(state.activeChatId || state.chatId || "").trim()
+  }
+
+  function updateChatTimestamp(chatId){
+    const targetChatId = String(chatId || "").trim()
+
+    if(!targetChatId || !chatService || typeof chatService.upsertChat !== "function"){
+      return null
+    }
+
+    const existingChat = Array.isArray(state.chats)
+      ? state.chats.find(chat => String(chat.chat_id || "") === targetChatId)
+      : null
+
+    return chatService.upsertChat({
+      ...(existingChat || {}),
+      chat_id: targetChatId,
+      title: String(existingChat?.title || "New chat"),
+      updated: new Date().toISOString(),
+    })
+  }
+
+  function rerenderMessages(){
+    if(renderService && typeof renderService.renderMessages === "function"){
+      renderService.renderMessages()
+    }
+  }
+
+  function rerenderChats(){
+    if(renderService && typeof renderService.renderChatList === "function"){
+      renderService.renderChatList()
+    }
+  }
+
+  function handleMetaEvent(data = {}, assistantMessageId){
+    const chatId = ensureActiveChatId(data.chat_id)
+
+    if(data.user_message_id){
+      const userMessage = messageService.getMessageById(data.user_message_id)
+      if(userMessage){
+        messageService.patchMessage(userMessage.id, {
+          message_id: String(data.user_message_id),
+        })
+      }
+    }
+
+    if(Array.isArray(data.attachments) && data.attachments.length){
+      const userMessages = messageService.getMessages().filter(message => message.role === "user")
+      const latestUser = userMessages[userMessages.length - 1]
+
+      if(latestUser){
+        messageService.addAttachments(latestUser.id, data.attachments)
+      }
+    }
+
+    if(chatId){
+      updateChatTimestamp(chatId)
+      rerenderChats()
+    }
+
+    if(assistantMessageId && data.assistant_message_id){
+      messageService.patchMessage(assistantMessageId, {
+        message_id: String(data.assistant_message_id),
+      })
+    }
+
+    rerenderMessages()
+  }
+
+  function handleTokenEvent(data = {}, assistantMessageId){
+    const token = String(data.t || data.token || "")
+
+    if(!assistantMessageId){
+      return
+    }
+
+    messageService.appendToMessageContent(assistantMessageId, token)
+    messageService.setMessageStatus(assistantMessageId, "streaming")
+    rerenderMessages()
+  }
+
+  function handleDoneEvent(data = {}, assistantMessageId){
+    if(!assistantMessageId){
+      return
+    }
+
+    const fullText = data.full_text
+
+    if(typeof fullText === "string"){
+      messageService.setMessageContent(assistantMessageId, fullText)
+    }
+
+    messageService.patchMessage(assistantMessageId, {
+      status: "done",
+      error: "",
+    })
+
+    const doneChatId = ensureActiveChatId(data.chat_id)
+
+    if(doneChatId){
+      updateChatTimestamp(doneChatId)
+      rerenderChats()
+    }
+
+    rerenderMessages()
+  }
+
+  function handleErrorEvent(data = {}, assistantMessageId){
+    const errorText = String(
+      data.error ||
+      data.message ||
+      "Stream error."
+    )
+
+    if(assistantMessageId){
+      const current = messageService.getMessageById(assistantMessageId)
+
+      if(current && String(current.content || "").trim()){
+        messageService.patchMessage(assistantMessageId, {
+          status: "error",
+          error: errorText,
+        })
+      } else {
+        messageService.patchMessage(assistantMessageId, {
+          content: `⚠️ ${errorText}`,
+          status: "error",
+          error: errorText,
+        })
+      }
+    } else {
+      messageService.addMessage(
+        messageService.createSystemMessage(`⚠️ ${errorText}`)
+      )
+    }
+
+    rerenderMessages()
+  }
+
+  async function sendMessage(options = {}){
+    const payload = buildPayload(options)
+    const messageText = String(payload.message || "")
+    const pendingFiles = Array.isArray(payload.files) ? payload.files : []
+    const hasFiles = pendingFiles.length > 0
+
+    if(!messageText.trim() && !hasFiles){
+      throw new Error("NovaStreamService: message or files required")
+    }
+
+    if(state.isStreaming){
+      abortActiveStream()
+    }
+
+    const userMessage = messageService.addMessage(
+      messageService.createUserMessage(messageText, pendingFiles)
+    )
+
+    const assistantMessage = messageService.addMessage(
+      messageService.createAssistantPlaceholder()
+    )
+
+    state.isStreaming = true
+    state.streamingMessageId = assistantMessage.id
+
+    rerenderMessages()
+
+    const controller = new AbortController()
+    setAbortController(controller)
+
+    try {
+      await api.streamChat({
+        chat_id: payload.chat_id,
+        message: payload.message,
+        files: payload.files,
+        signal: controller.signal,
+        onEvent(event = {}){
+          const eventType = String(event.event || "").toLowerCase()
+          const data = event.data && typeof event.data === "object"
+            ? event.data
+            : {}
+
+          switch(eventType){
+            case "meta":
+              handleMetaEvent(data, assistantMessage.id)
+              break
+
+            case "token":
+              handleTokenEvent(data, assistantMessage.id)
+              break
+
+            case "done":
+              handleDoneEvent(data, assistantMessage.id)
+              break
+
+            case "error":
+              handleErrorEvent(data, assistantMessage.id)
+              break
+
+            default:
+              break
+          }
+        },
+      })
+
+      messageService.patchMessage(userMessage.id, {
+        status: "sent",
+      })
+
+      const activeChatId = String(state.activeChatId || state.chatId || "").trim()
+      if(activeChatId){
+        updateChatTimestamp(activeChatId)
+        rerenderChats()
+      }
+
+      if(
+        attachmentsService &&
+        typeof attachmentsService.clearPendingFiles === "function"
+      ){
+        attachmentsService.clearPendingFiles()
+      }
+
+      return {
+        ok: true,
+        userMessageId: userMessage.id,
+        assistantMessageId: assistantMessage.id,
+      }
+    } catch(error){
+      const wasAborted =
+        error?.name === "AbortError" ||
+        /aborted|abort/i.test(String(error?.message || ""))
+
+      if(wasAborted){
+        const current = messageService.getMessageById(assistantMessage.id)
+
+        if(current && !String(current.content || "").trim()){
+          messageService.removeMessage(assistantMessage.id)
+        } else {
+          messageService.patchMessage(assistantMessage.id, {
+            status: "done",
+          })
+        }
+
+        rerenderMessages()
+
+        return {
+          ok: false,
+          aborted: true,
+          userMessageId: userMessage.id,
+          assistantMessageId: assistantMessage.id,
+        }
+      }
+
+      handleErrorEvent(
+        {
+          error: error?.message || "Network/stream error.",
+        },
+        assistantMessage.id
+      )
+
+      return {
+        ok: false,
+        error,
+        userMessageId: userMessage.id,
+        assistantMessageId: assistantMessage.id,
+      }
+    } finally {
+      state.isStreaming = false
+      state.streamingMessageId = ""
+      setAbortController(null)
+    }
+  }
+
+  return {
+    sendMessage,
+    abortActiveStream,
+    getAbortController,
+    setAbortController,
+  }
+}
+
+window.NovaStreamService = {
+  createStreamService,
+}
+
+})()

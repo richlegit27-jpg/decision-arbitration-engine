@@ -1,0 +1,623 @@
+// C:\Users\Owner\nova\static\js\chat-messages.js
+
+(() => {
+"use strict"
+
+const chatStateApi = window.NovaChatState
+
+if(!chatStateApi){
+  throw new Error("NovaChatMessages: window.NovaChatState is required")
+}
+
+const { state } = chatStateApi
+
+const el = {
+  messages: document.getElementById("messages"),
+  messagesScroll: document.getElementById("messagesScroll"),
+  emptyState: document.getElementById("emptyState"),
+  jumpToLatestBtn: document.getElementById("jumpToLatestBtn"),
+}
+
+const SCROLL_LOCK_THRESHOLD = 140
+const COPY_FEEDBACK_MS = 1200
+
+let eventsBound = false
+let thinkingIndicatorId = ""
+let copiedMessageId = ""
+let copyFeedbackTimer = null
+
+let callbacks = {
+  onRetry: null,
+  onDelete: null,
+  onEdit: null,
+}
+
+function ensureMessagesArray(){
+  if(!Array.isArray(state.messages)){
+    state.messages = []
+  }
+  return state.messages
+}
+
+function escapeHtml(value){
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;")
+}
+
+function getMessageId(message){
+  return String(message?.message_id || message?.id || "").trim()
+}
+
+function getMessageRole(message){
+  return String(message?.role || "assistant").toLowerCase() === "user"
+    ? "user"
+    : "assistant"
+}
+
+function getDistanceFromBottom(){
+  if(!el.messagesScroll){
+    return 0
+  }
+
+  return el.messagesScroll.scrollHeight - el.messagesScroll.scrollTop - el.messagesScroll.clientHeight
+}
+
+function isNearBottom(){
+  return getDistanceFromBottom() <= SCROLL_LOCK_THRESHOLD
+}
+
+function updateUserScrolledState(){
+  state.userScrolledUp = !isNearBottom()
+  updateJumpButton()
+}
+
+function updateJumpButton(){
+  if(!el.jumpToLatestBtn){
+    return
+  }
+
+  const hasMessages = ensureMessagesArray().length > 0 || !!thinkingIndicatorId
+  el.jumpToLatestBtn.hidden = !hasMessages || !state.userScrolledUp
+}
+
+function normalizeAttachment(att = {}){
+  return {
+    name: String(att?.filename || att?.name || "file"),
+    href: String(att?.url || att?.storage_path || att?.path || "").trim(),
+    meta: String(att?.mime_type || att?.type || "").trim(),
+  }
+}
+
+function renderAttachment(att){
+  const normalized = normalizeAttachment(att)
+  const safeName = escapeHtml(normalized.name)
+  const safeMeta = escapeHtml(normalized.meta)
+
+  if(normalized.href){
+    return `
+      <a class="message-attachment" href="${escapeHtml(normalized.href)}" target="_blank" rel="noopener noreferrer">
+        <span class="message-attachment-name">${safeName}</span>
+        ${safeMeta ? `<span class="message-attachment-meta">${safeMeta}</span>` : ""}
+      </a>
+    `
+  }
+
+  return `
+    <div class="message-attachment">
+      <span class="message-attachment-name">${safeName}</span>
+      ${safeMeta ? `<span class="message-attachment-meta">${safeMeta}</span>` : ""}
+    </div>
+  `
+}
+
+function formatContentToHtml(content, options = {}){
+  const text = String(content || "")
+  const streaming = !!options.streaming
+
+  if(!text && streaming){
+    return `<span class="streaming-cursor" aria-hidden="true"></span>`
+  }
+
+  if(!text){
+    return "&nbsp;"
+  }
+
+  const lines = text.split("\n")
+  const htmlLines = []
+
+  for(const line of lines){
+    htmlLines.push(escapeHtml(line) || "&nbsp;")
+  }
+
+  let html = htmlLines.join("<br>")
+
+  if(streaming){
+    html += `<span class="streaming-cursor" aria-hidden="true"></span>`
+  }
+
+  return html
+}
+
+function getActionLabel(role, action){
+  if(action === "retry"){
+    return role === "assistant" ? "Regenerate" : "Reply"
+  }
+
+  if(action === "edit"){
+    return "Edit"
+  }
+
+  if(action === "delete"){
+    return "Delete"
+  }
+
+  if(action === "copy"){
+    return copiedMessageId ? "Copied" : "Copy"
+  }
+
+  return ""
+}
+
+function renderMessageActions(message){
+  const role = getMessageRole(message)
+  const messageId = escapeHtml(getMessageId(message))
+  const isCopied = copiedMessageId && copiedMessageId === getMessageId(message)
+
+  if(role === "assistant"){
+    return `
+      <div class="message-actions">
+        <button type="button" class="message-action-btn" data-action="copy" data-message-id="${messageId}">
+          ${isCopied ? "Copied" : "Copy"}
+        </button>
+        <button type="button" class="message-action-btn" data-action="retry" data-message-id="${messageId}">
+          ${getActionLabel(role, "retry")}
+        </button>
+        <button type="button" class="message-action-btn" data-action="delete" data-message-id="${messageId}">
+          Delete
+        </button>
+      </div>
+    `
+  }
+
+  return `
+    <div class="message-actions">
+      <button type="button" class="message-action-btn" data-action="copy" data-message-id="${messageId}">
+        ${isCopied ? "Copied" : "Copy"}
+      </button>
+      <button type="button" class="message-action-btn" data-action="edit" data-message-id="${messageId}">
+        Edit
+      </button>
+      <button type="button" class="message-action-btn" data-action="retry" data-message-id="${messageId}">
+        Reply
+      </button>
+      <button type="button" class="message-action-btn" data-action="delete" data-message-id="${messageId}">
+        Delete
+      </button>
+    </div>
+  `
+}
+
+function renderMessage(message, index){
+  const role = getMessageRole(message)
+  const messageId = escapeHtml(getMessageId(message) || `msg_${index}`)
+  const attachments = Array.isArray(message?.attachments) ? message.attachments : []
+  const isStreaming = String(state.streamingMessageId || "").trim() === getMessageId(message) && !!state.isStreaming
+
+  return `
+    <div class="message-row message-row-${role}">
+      <article class="message message-${role}" data-message-id="${messageId}">
+        <div class="message-bubble ${isStreaming ? "is-streaming" : ""}">
+          <div class="message-content">${formatContentToHtml(message?.content || "", { streaming: isStreaming })}</div>
+          ${attachments.length ? `<div class="message-attachments">${attachments.map(renderAttachment).join("")}</div>` : ""}
+        </div>
+        ${renderMessageActions(message)}
+      </article>
+    </div>
+  `
+}
+
+function renderThinkingIndicator(){
+  if(!thinkingIndicatorId){
+    return ""
+  }
+
+  return `
+    <div class="message-row message-row-assistant" data-thinking-row="true">
+      <article class="message message-assistant" data-message-id="${escapeHtml(thinkingIndicatorId)}" data-thinking-indicator="true">
+        <div class="message-bubble is-thinking">
+          <div class="message-content">
+            <span class="thinking-dots" aria-label="Nova is thinking">
+              <span></span>
+              <span></span>
+              <span></span>
+            </span>
+          </div>
+        </div>
+      </article>
+    </div>
+  `
+}
+
+function renderAllMessagesHtml(){
+  const messages = ensureMessagesArray()
+  const parts = messages.map(renderMessage)
+
+  if(thinkingIndicatorId){
+    parts.push(renderThinkingIndicator())
+  }
+
+  return parts.join("")
+}
+
+function getMessageElement(messageId){
+  if(!el.messages){
+    return null
+  }
+
+  const safeId = typeof CSS !== "undefined" && typeof CSS.escape === "function"
+    ? CSS.escape(String(messageId || ""))
+    : String(messageId || "").replace(/"/g, '\\"')
+
+  return el.messages.querySelector(`[data-message-id="${safeId}"]`)
+}
+
+function getMessageContentElement(messageId){
+  const messageEl = getMessageElement(messageId)
+  if(!messageEl){
+    return null
+  }
+
+  return messageEl.querySelector(".message-content")
+}
+
+function getMessageActionsElement(messageId){
+  const messageEl = getMessageElement(messageId)
+  if(!messageEl){
+    return null
+  }
+
+  return messageEl.querySelector(".message-actions")
+}
+
+function patchMessageContent(messageId, content){
+  const contentEl = getMessageContentElement(messageId)
+  if(!contentEl){
+    return false
+  }
+
+  const isStreaming = String(state.streamingMessageId || "").trim() === String(messageId || "").trim() && !!state.isStreaming
+  contentEl.innerHTML = formatContentToHtml(content, { streaming: isStreaming })
+  return true
+}
+
+function patchMessageActions(message){
+  const actionsEl = getMessageActionsElement(getMessageId(message))
+  if(!actionsEl){
+    return false
+  }
+
+  const wrapper = document.createElement("div")
+  wrapper.innerHTML = renderMessageActions(message)
+  const nextActions = wrapper.firstElementChild
+
+  if(!nextActions){
+    return false
+  }
+
+  actionsEl.replaceWith(nextActions)
+  return true
+}
+
+function renderMessages(){
+  if(!el.messages){
+    return
+  }
+
+  const messages = ensureMessagesArray()
+
+  if(el.emptyState){
+    el.emptyState.hidden = messages.length > 0 || !!thinkingIndicatorId
+  }
+
+  if(!messages.length && !thinkingIndicatorId){
+    el.messages.innerHTML = ""
+    updateJumpButton()
+    return
+  }
+
+  el.messages.innerHTML = renderAllMessagesHtml()
+  updateJumpButton()
+}
+
+function syncMessagesFromStorage(messages){
+  state.messages = Array.isArray(messages) ? messages.slice() : []
+  renderMessages()
+}
+
+function addMessage(message){
+  ensureMessagesArray().push(message)
+  renderMessages()
+}
+
+function clearMessages(){
+  state.messages = []
+  state.userScrolledUp = false
+  thinkingIndicatorId = ""
+  clearCopyFeedback()
+  renderMessages()
+}
+
+function findMessageById(id){
+  const targetId = String(id || "").trim()
+  return ensureMessagesArray().find(message => getMessageId(message) === targetId) || null
+}
+
+function replaceMessage(id, patch){
+  const targetId = String(id || "").trim()
+  const messages = ensureMessagesArray()
+  const index = messages.findIndex(message => getMessageId(message) === targetId)
+
+  if(index === -1){
+    return
+  }
+
+  messages[index] = {
+    ...messages[index],
+    ...patch,
+  }
+
+  const updated = messages[index]
+
+  if(!patchMessageContent(targetId, updated.content || "")){
+    renderMessages()
+    return
+  }
+
+  patchMessageActions(updated)
+  updateJumpButton()
+}
+
+function removeMessage(id){
+  const targetId = String(id || "").trim()
+  state.messages = ensureMessagesArray().filter(message => getMessageId(message) !== targetId)
+
+  if(copiedMessageId === targetId){
+    clearCopyFeedback()
+  }
+
+  renderMessages()
+}
+
+function upsertStreamingAssistantMessage(messageId){
+  const id = String(messageId || "").trim()
+  if(!id){
+    return null
+  }
+
+  removeThinkingIndicator()
+
+  const existing = findMessageById(id)
+  if(existing){
+    return existing
+  }
+
+  const message = {
+    message_id: id,
+    id,
+    role: "assistant",
+    content: "",
+    attachments: [],
+    created_at: new Date().toISOString(),
+  }
+
+  ensureMessagesArray().push(message)
+  renderMessages()
+  return message
+}
+
+function appendToStreamingMessage(messageId, token){
+  const msg = findMessageById(messageId)
+  if(!msg){
+    return
+  }
+
+  msg.content = String(msg.content || "") + String(token || "")
+
+  if(!patchMessageContent(messageId, msg.content)){
+    renderMessages()
+    return
+  }
+
+  patchMessageActions(msg)
+  updateJumpButton()
+}
+
+function finishStreamingMessage(){
+  removeThinkingIndicator()
+
+  const streamingId = String(state.streamingMessageId || "").trim()
+  if(streamingId){
+    const streamingMessage = findMessageById(streamingId)
+    if(streamingMessage){
+      patchMessageContent(streamingId, streamingMessage.content || "")
+      patchMessageActions(streamingMessage)
+    }
+  }
+
+  updateJumpButton()
+  scrollToBottom(false)
+}
+
+function showThinkingIndicator(){
+  if(thinkingIndicatorId){
+    return
+  }
+
+  thinkingIndicatorId = `thinking_${Date.now()}`
+  renderMessages()
+}
+
+function removeThinkingIndicator(){
+  if(!thinkingIndicatorId){
+    return
+  }
+
+  thinkingIndicatorId = ""
+  renderMessages()
+}
+
+function scrollToBottom(force = false){
+  if(!el.messagesScroll){
+    return
+  }
+
+  if(force || !state.userScrolledUp){
+    el.messagesScroll.scrollTop = el.messagesScroll.scrollHeight
+    state.userScrolledUp = false
+    updateJumpButton()
+    return
+  }
+
+  if(isNearBottom()){
+    el.messagesScroll.scrollTop = el.messagesScroll.scrollHeight
+    state.userScrolledUp = false
+    updateJumpButton()
+  }
+}
+
+function updateScrollState(){
+  updateUserScrolledState()
+}
+
+function clearCopyFeedback(){
+  copiedMessageId = ""
+
+  if(copyFeedbackTimer){
+    clearTimeout(copyFeedbackTimer)
+    copyFeedbackTimer = null
+  }
+}
+
+function scheduleCopyFeedbackReset(){
+  if(copyFeedbackTimer){
+    clearTimeout(copyFeedbackTimer)
+  }
+
+  copyFeedbackTimer = setTimeout(() => {
+    copiedMessageId = ""
+    copyFeedbackTimer = null
+    renderMessages()
+  }, COPY_FEEDBACK_MS)
+}
+
+async function copyMessageById(messageId){
+  const msg = findMessageById(messageId)
+  if(!msg){
+    return
+  }
+
+  const text = String(msg.content || "")
+
+  try{
+    await navigator.clipboard.writeText(text)
+  }catch(_error){
+    const temp = document.createElement("textarea")
+    temp.value = text
+    document.body.appendChild(temp)
+    temp.select()
+    document.execCommand("copy")
+    temp.remove()
+  }
+
+  copiedMessageId = String(messageId || "").trim()
+  scheduleCopyFeedbackReset()
+  renderMessages()
+}
+
+async function handleActionClick(action, messageId){
+  const id = String(messageId || "").trim()
+
+  if(!id){
+    return
+  }
+
+  if(action === "copy"){
+    await copyMessageById(id)
+    return
+  }
+
+  if(action === "retry" && typeof callbacks.onRetry === "function"){
+    await callbacks.onRetry(id)
+    return
+  }
+
+  if(action === "delete"){
+    if(typeof callbacks.onDelete === "function"){
+      await callbacks.onDelete(id)
+      return
+    }
+
+    removeMessage(id)
+    return
+  }
+
+  if(action === "edit" && typeof callbacks.onEdit === "function"){
+    await callbacks.onEdit(id)
+  }
+}
+
+function bindEvents({ onRetry, onDelete, onEdit } = {}){
+  callbacks.onRetry = onRetry || callbacks.onRetry
+  callbacks.onDelete = onDelete || callbacks.onDelete
+  callbacks.onEdit = onEdit || callbacks.onEdit
+
+  if(eventsBound || !el.messages){
+    return
+  }
+
+  el.messages.addEventListener("click", async (event) => {
+    const actionBtn = event.target.closest("[data-action][data-message-id]")
+    if(!actionBtn){
+      return
+    }
+
+    const action = actionBtn.getAttribute("data-action") || ""
+    const messageId = actionBtn.getAttribute("data-message-id") || ""
+
+    await handleActionClick(action, messageId)
+  })
+
+  el.messagesScroll?.addEventListener("scroll", () => {
+    updateUserScrolledState()
+  })
+
+  el.jumpToLatestBtn?.addEventListener("click", () => {
+    scrollToBottom(true)
+  })
+
+  eventsBound = true
+  updateJumpButton()
+}
+
+window.NovaChatMessages = {
+  renderMessages,
+  syncMessagesFromStorage,
+  addMessage,
+  clearMessages,
+  findMessageById,
+  replaceMessage,
+  removeMessage,
+  upsertStreamingAssistantMessage,
+  appendToStreamingMessage,
+  finishStreamingMessage,
+  showThinkingIndicator,
+  removeThinkingIndicator,
+  scrollToBottom,
+  updateScrollState,
+  bindEvents,
+}
+})()

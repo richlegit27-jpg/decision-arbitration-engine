@@ -1,0 +1,166 @@
+/* C:\Users\Owner\nova\static\css\composer-endgame.css */
+
+/* --- General workspace --- */
+body {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #0b0f14;
+  color: #e7edf5;
+  margin: 0;
+  padding: 0;
+}
+
+.hidden { display: none !important; }
+
+/* --- Messages container --- */
+#messagesContainer {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  height: calc(100vh - 180px);
+}
+
+/* --- Message bubbles --- */
+.message {
+  padding: 8px 12px;
+  border-radius: 12px;
+  max-width: 70%;
+  word-wrap: break-word;
+  display: inline-block;
+}
+
+.message.user {
+  background-color: #10a37f;
+  color: #fff;
+  align-self: flex-end;
+}
+
+.message.assistant {
+  background-color: #1f2937;
+  color: #e7edf5;
+  align-self: flex-start;
+}
+
+/* --- Attachments inside messages --- */
+.message-attachment {
+  margin-top: 4px;
+  padding: 4px 8px;
+  background-color: #2d3748;
+  border-radius: 8px;
+  font-size: 0.85em;
+  color: #cbd5e1;
+}
+
+/* --- Composer area --- */
+#composerForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  background-color: #0f141b;
+}
+
+#composerInput {
+  width: 100%;
+  resize: none;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background-color: #121925;
+  color: #e7edf5;
+  font-size: 1em;
+  min-height: 40px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+/* --- Composer buttons --- */
+#composerForm button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+#sendBtn {
+  background-color: #10a37f;
+  color: #fff;
+}
+
+#sendBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#attachBtn, #imageBtn, #voiceBtn {
+  background-color: #1f2937;
+  color: #e7edf5;
+}
+
+#attachBtn:hover, #imageBtn:hover, #voiceBtn:hover, #sendBtn:hover {
+  opacity: 0.85;
+}
+
+/* --- Pending attachments --- */
+#pendingAttachments {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.pending-attachment-chip {
+  background-color: #2d3748;
+  color: #cbd5e1;
+  padding: 4px 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85em;
+}
+
+.pending-attachment-chip button {
+  background: transparent;
+  border: none;
+  color: #f56565;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1em;
+}
+
+/* --- Memory panel --- */
+#memoryPanel {
+  background-color: #121925;
+  padding: 12px;
+  border-left: 1px solid rgba(255,255,255,0.1);
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+}
+
+.memory-item {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 0.9em;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.memory-attachment {
+  background-color: #2d3748;
+  color: #cbd5e1;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 0.8em;
+}
+
+/* --- Status hints --- */
+#thinkingStatus, #voiceStatus, #imageModeHint {
+  font-size: 0.85em;
+  color: #8ea0b5;
+  margin-top: 4px;
+}

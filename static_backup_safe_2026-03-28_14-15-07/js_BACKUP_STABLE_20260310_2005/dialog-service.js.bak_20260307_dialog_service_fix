@@ -1,0 +1,19 @@
+// C:\Users\Owner\nova\static\js\dialog-service.js
+
+(() => {
+"use strict"
+
+function promptText(message, defaultValue = ""){
+  return window.prompt(message, defaultValue)
+}
+
+function confirmAction(message){
+  return window.confirm(message)
+}
+
+window.NovaDialogService = {
+  promptText,
+  confirmAction,
+}
+
+})()

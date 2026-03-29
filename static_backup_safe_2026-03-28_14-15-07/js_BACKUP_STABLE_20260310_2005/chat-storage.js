@@ -1,0 +1,464 @@
+// C:\Users\Owner\nova\static\js\chat-storage.js
+
+(() => {
+"use strict"
+
+const chatStateApi = window.NovaChatState
+
+if(!chatStateApi){
+  throw new Error("NovaChatStorage: window.NovaChatState is required")
+}
+
+const {
+  state,
+  STORAGE_KEYS,
+  setActiveChat,
+  restoreActiveChat,
+} = chatStateApi
+
+const CHATS_KEY = "nova_chats"
+const DEFAULT_CHAT_TITLE = "New chat"
+const MAX_AUTO_TITLE_LENGTH = 40
+
+function makeId(prefix){
+  if(window.crypto?.randomUUID){
+    return `${prefix}_${window.crypto.randomUUID()}`
+  }
+  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`
+}
+
+function safeStorageGet(key){
+  try{
+    return localStorage.getItem(key)
+  }catch(_error){
+    return null
+  }
+}
+
+function safeStorageSet(key, value){
+  try{
+    localStorage.setItem(key, value)
+  }catch(_error){
+    // ignore storage failures
+  }
+}
+
+function safeStorageRemove(key){
+  try{
+    localStorage.removeItem(key)
+  }catch(_error){
+    // ignore storage failures
+  }
+}
+
+function normalizeText(value){
+  if(value == null){
+    return ""
+  }
+
+  if(typeof value === "string"){
+    return value
+  }
+
+  if(typeof value === "number" || typeof value === "boolean"){
+    return String(value)
+  }
+
+  if(Array.isArray(value)){
+    return value
+      .map(item => normalizeText(item))
+      .filter(Boolean)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim()
+  }
+
+  if(typeof value === "object"){
+    if(typeof value.text === "string"){
+      return value.text
+    }
+
+    if(typeof value.content === "string"){
+      return value.content
+    }
+
+    if(Array.isArray(value.content)){
+      return value.content
+        .map(item => normalizeText(item))
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim()
+    }
+
+    return ""
+  }
+
+  return ""
+}
+
+function normalizeTitle(value){
+  const text = normalizeText(value).replace(/\s+/g, " ").trim()
+  return text || DEFAULT_CHAT_TITLE
+}
+
+function isDefaultChatTitle(value){
+  return normalizeTitle(value) === DEFAULT_CHAT_TITLE
+}
+
+function cleanAutoTitle(value){
+  let text = normalizeText(value)
+    .replace(/\s+/g, " ")
+    .trim()
+
+  if(!text){
+    return DEFAULT_CHAT_TITLE
+  }
+
+  text = text
+    .replace(/^[`"'“”‘’.,:;!?()[\]{}\-_/\\|+=*#~]+/, "")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  if(!text){
+    return DEFAULT_CHAT_TITLE
+  }
+
+  if(text.length > MAX_AUTO_TITLE_LENGTH){
+    text = text.slice(0, MAX_AUTO_TITLE_LENGTH).trim()
+
+    const lastSpace = text.lastIndexOf(" ")
+    if(lastSpace >= 18){
+      text = text.slice(0, lastSpace).trim()
+    }
+  }
+
+  text = text.replace(/[.,:;!?]+$/g, "").trim()
+
+  return text || DEFAULT_CHAT_TITLE
+}
+
+function normalizeChat(raw){
+  const chatId = String(raw?.chat_id || raw?.id || "").trim()
+
+  return {
+    ...raw,
+    chat_id: chatId,
+    id: chatId,
+    title: normalizeTitle(raw?.title),
+    created_at: raw?.created_at || new Date().toISOString(),
+    updated_at: raw?.updated_at || raw?.created_at || new Date().toISOString(),
+  }
+}
+
+function normalizeMessage(raw){
+  const messageId = String(raw?.message_id || raw?.id || makeId("msg")).trim()
+
+  return {
+    ...raw,
+    id: messageId,
+    message_id: messageId,
+    role: String(raw?.role || "assistant"),
+    content: normalizeText(raw?.content),
+    attachments: Array.isArray(raw?.attachments) ? raw.attachments.slice() : [],
+    created_at: raw?.created_at || new Date().toISOString(),
+  }
+}
+
+function getMessagesKey(chatId){
+  return `nova_messages_${String(chatId || "").trim()}`
+}
+
+function getActiveChatId(){
+  return String(state.activeChatId || "").trim()
+}
+
+function findChatById(chatId){
+  const targetId = String(chatId || "").trim()
+
+  if(!targetId || !Array.isArray(state.chats)){
+    return null
+  }
+
+  return state.chats.find(chat => String(chat?.chat_id || chat?.id || "").trim() === targetId) || null
+}
+
+function sortChatsInPlace(){
+  if(!Array.isArray(state.chats)){
+    state.chats = []
+    return state.chats
+  }
+
+  state.chats.sort((a, b) => {
+    const aTime = new Date(a?.updated_at || a?.created_at || 0).getTime()
+    const bTime = new Date(b?.updated_at || b?.created_at || 0).getTime()
+    return bTime - aTime
+  })
+
+  return state.chats
+}
+
+function persistChats(){
+  if(!Array.isArray(state.chats)){
+    state.chats = []
+  }
+
+  safeStorageSet(CHATS_KEY, JSON.stringify(state.chats.map(normalizeChat)))
+  return state.chats
+}
+
+function saveChats(chats){
+  state.chats = Array.isArray(chats)
+    ? chats.map(normalizeChat).filter(chat => chat.chat_id)
+    : []
+
+  sortChatsInPlace()
+  persistChats()
+  return state.chats
+}
+
+function loadChats(){
+  const raw = safeStorageGet(CHATS_KEY)
+
+  if(!raw){
+    state.chats = Array.isArray(state.chats) ? state.chats.map(normalizeChat) : []
+    sortChatsInPlace()
+    return state.chats
+  }
+
+  try{
+    const parsed = JSON.parse(raw)
+    state.chats = Array.isArray(parsed)
+      ? parsed.map(normalizeChat).filter(chat => chat.chat_id)
+      : []
+  }catch(_error){
+    state.chats = []
+  }
+
+  sortChatsInPlace()
+  return state.chats
+}
+
+function persistMessages(chatId, messages){
+  const id = String(chatId || "").trim()
+
+  if(!id){
+    return []
+  }
+
+  const normalized = Array.isArray(messages)
+    ? messages.map(normalizeMessage)
+    : []
+
+  safeStorageSet(getMessagesKey(id), JSON.stringify(normalized))
+  return normalized
+}
+
+function saveMessages(chatId, messages){
+  const normalized = persistMessages(chatId, messages)
+
+  if(String(getActiveChatId()) === String(chatId || "").trim()){
+    state.messages = normalized.slice()
+  }
+
+  return normalized
+}
+
+function loadMessages(chatId){
+  const id = String(chatId || "").trim()
+
+  if(!id){
+    return []
+  }
+
+  const raw = safeStorageGet(getMessagesKey(id))
+
+  if(!raw){
+    return []
+  }
+
+  try{
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.map(normalizeMessage) : []
+  }catch(_error){
+    return []
+  }
+}
+
+function loadMessagesIntoState(chatId){
+  const id = String(chatId || "").trim()
+
+  if(!id){
+    state.messages = []
+    return state.messages
+  }
+
+  const messages = loadMessages(id)
+  state.messages = messages.slice()
+  return state.messages
+}
+
+function restoreMessagesForActiveChat(){
+  const activeChatId = getActiveChatId()
+
+  if(!activeChatId){
+    state.messages = []
+    return state.messages
+  }
+
+  state.messages = loadMessages(activeChatId)
+  return state.messages
+}
+
+function persistAll(){
+  persistChats()
+
+  const activeChatId = getActiveChatId()
+  if(activeChatId){
+    persistMessages(activeChatId, state.messages)
+  }
+}
+
+function createLocalChat(chat = {}){
+  const normalized = normalizeChat({
+    ...chat,
+    chat_id: chat.chat_id || chat.id || makeId("chat"),
+    title: chat.title || DEFAULT_CHAT_TITLE,
+    created_at: chat.created_at || new Date().toISOString(),
+    updated_at: chat.updated_at || new Date().toISOString(),
+  })
+
+  if(!Array.isArray(state.chats)){
+    state.chats = []
+  }
+
+  state.chats.unshift(normalized)
+  sortChatsInPlace()
+  persistChats()
+
+  return normalized
+}
+
+function createChat(chat = {}){
+  return createLocalChat(chat)
+}
+
+function updateChat(chatId, updates = {}){
+  const chat = findChatById(chatId)
+
+  if(!chat){
+    return null
+  }
+
+  Object.assign(chat, updates)
+
+  if("title" in updates){
+    chat.title = normalizeTitle(updates.title)
+  }
+
+  chat.updated_at = updates.updated_at || new Date().toISOString()
+
+  sortChatsInPlace()
+  persistChats()
+
+  return chat
+}
+
+function renameChat(chatId, title){
+  return updateChat(chatId, {
+    title: normalizeTitle(title),
+    updated_at: new Date().toISOString(),
+  })
+}
+
+function removeChat(chatId){
+  const id = String(chatId || "").trim()
+
+  if(!id || !Array.isArray(state.chats)){
+    return false
+  }
+
+  const before = state.chats.length
+
+  state.chats = state.chats.filter(chat => String(chat?.chat_id || chat?.id || "").trim() !== id)
+
+  safeStorageRemove(getMessagesKey(id))
+  persistChats()
+
+  if(getActiveChatId() === id){
+    state.activeChatId = ""
+    state.messages = []
+    safeStorageRemove(STORAGE_KEYS.activeChatId)
+  }
+
+  return state.chats.length !== before
+}
+
+function deleteChat(chatId){
+  return removeChat(chatId)
+}
+
+function hydrateChatFromMessageActivity(chatId, messageText){
+  const chat = findChatById(chatId)
+
+  if(!chat){
+    return null
+  }
+
+  const trimmedText = normalizeText(messageText).replace(/\s+/g, " ").trim()
+
+  if(isDefaultChatTitle(chat.title) && trimmedText){
+    chat.title = cleanAutoTitle(trimmedText)
+  }else{
+    chat.title = normalizeTitle(chat.title)
+  }
+
+  chat.updated_at = new Date().toISOString()
+
+  sortChatsInPlace()
+  persistChats()
+
+  return chat
+}
+
+function bootFromStorage(){
+  loadChats()
+  restoreActiveChat()
+  restoreMessagesForActiveChat()
+
+  return {
+    chats: state.chats,
+    activeChatId: state.activeChatId,
+    messages: state.messages,
+  }
+}
+
+window.NovaChatStorage = {
+  normalizeChat,
+  normalizeMessage,
+  normalizeText,
+  normalizeTitle,
+  cleanAutoTitle,
+  getActiveChatId,
+  findChatById,
+  sortChatsInPlace,
+  persistChats,
+  persistMessages,
+  persistAll,
+  saveChats,
+  loadChats,
+  saveMessages,
+  loadMessages,
+  loadMessagesIntoState,
+  restoreMessagesForActiveChat,
+  createLocalChat,
+  createChat,
+  updateChat,
+  renameChat,
+  removeChat,
+  deleteChat,
+  hydrateChatFromMessageActivity,
+  bootFromStorage,
+  setActiveChat,
+}
+})()

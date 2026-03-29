@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nova Ultimate 2026</title>
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=phase4full" />
+  <style>
+    /* Minimal inline overrides for assets grid & lightbox */
+    #novaAssetsList { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 1rem; }
+    .asset-card { background: var(--panel); padding: 0.5rem; border-radius: 0.4rem; cursor: pointer; position: relative; width: 120px; text-align: center; }
+    .asset-card .asset-action { margin-top: 0.25rem; display: block; width: 100%; }
+    .asset-preview img, .asset-preview video, .asset-preview iframe { max-width: 100%; border-radius: 0.3rem; }
+    #novaLightbox { display: none; position: fixed; inset:0; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; z-index: 9999; }
+    #novaLightboxPreview { max-width: 95%; max-height: 95%; }
+    #novaLightboxClose { position: absolute; top: 1rem; right: 1rem; font-size: 1.5rem; color: #fff; cursor: pointer; }
+    .nova-toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; padding: 0.5rem 1rem; border-radius: 0.5rem; z-index: 9999; }
+    .nova-sidebar.collapsed { width: 3rem; }
+    .nova-messages { max-height: 200px; overflow-y: auto; margin-bottom: 0.5rem; background: var(--panel-2); padding: 0.5rem; border-radius: 0.3rem; }
+    .chat-message.user { color: var(--accent); }
+    .chat-message.assistant { color: var(--ok); }
+  </style>
+</head>
+<body>
+  <div class="nova-app-shell" id="novaAppShell">
+    <!-- Sidebar -->
+    <aside class="nova-sidebar" id="novaSidebar">
+      <div class="nova-sidebar-top">
+        <div class="nova-brand">
+          <div class="nova-brand-mark">N</div>
+          <div class="nova-brand-copy">
+            <div class="nova-brand-title">Nova</div>
+            <div class="nova-brand-subtitle">Ultimate 2026</div>
+          </div>
+        </div>
+        <button id="sidebarToggle" class="nova-icon-button" aria-label="Toggle sidebar">☰</button>
+      </div>
+      <!-- Sidebar content can go here -->
+    </aside>
+
+    <!-- Main content -->
+    <main class="nova-main">
+      <header class="nova-header">
+        <h1>Nova Assets</h1>
+        <input type="file" id="novaMediaInput" multiple />
+      </header>
+
+      <!-- Assets grid -->
+      <section id="novaAssetsList">
+        <!-- Assets will load here via JS -->
+      </section>
+
+      <!-- Chat panel -->
+      <section id="novaChatPanel">
+        <div id="novaMessages" class="nova-messages"></div>
+        <div class="nova-composer">
+          <input type="text" id="novaChatInput" placeholder="Type a message..." />
+          <button id="novaSendBtn">Send</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Memory panel -->
+    <aside id="novaMemoryPanel">
+      <h3>Memory</h3>
+      <ul id="novaMemoryList"></ul>
+      <input type="text" id="novaMemoryInput" placeholder="Add memory..." />
+      <button id="novaMemoryAdd">Add</button>
+    </aside>
+
+    <!-- Lightbox -->
+    <div id="novaLightbox">
+      <div id="novaLightboxPreview"></div>
+      <div id="novaLightboxClose">✕</div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/static/js/nova-assets.js?v=phase4full"></script>
+  <script src="/static/js/nova-ui-connect.js"></script>
+</body>
+</html>

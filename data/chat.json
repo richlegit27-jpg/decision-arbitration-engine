@@ -1,0 +1,378 @@
+[
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "user",
+    "content": "jo"
+  },
+  {
+    "role": "user",
+    "content": "jo"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: jo"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: jo"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Echo: hi"
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "assistant",
+    "content": "Received: hi\nHere are example attachments:",
+    "attachments": [
+      {
+        "type": "image",
+        "src": "https://via.placeholder.com/300",
+        "name": "Dynamic Image"
+      },
+      {
+        "type": "video",
+        "src": "https://www.w3schools.com/html/mov_bbb.mp4",
+        "name": "Dynamic Video"
+      },
+      {
+        "type": "web",
+        "src": "https://example.com",
+        "name": "Dynamic Web"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "dog"
+  },
+  {
+    "role": "assistant",
+    "content": "Received: dog\nHere are example attachments:",
+    "attachments": [
+      {
+        "type": "image",
+        "src": "https://via.placeholder.com/300",
+        "name": "Dynamic Image"
+      },
+      {
+        "type": "video",
+        "src": "https://www.w3schools.com/html/mov_bbb.mp4",
+        "name": "Dynamic Video"
+      },
+      {
+        "type": "web",
+        "src": "https://example.com",
+        "name": "Dynamic Web"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "Show me something cool"
+  },
+  {
+    "role": "assistant",
+    "content": "AI simulated response to: Show me something cool",
+    "attachments": [
+      {
+        "type": "image",
+        "src": "https://via.placeholder.com/300/FF0000/FFFFFF?text=Image1",
+        "name": "Dynamic Image"
+      },
+      {
+        "type": "video",
+        "src": "https://www.w3schools.com/html/mov_bbb.mp4",
+        "name": "Dynamic Video"
+      },
+      {
+        "type": "web",
+        "src": "https://example.com",
+        "name": "Dynamic Web"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "Show me another one"
+  },
+  {
+    "role": "assistant",
+    "content": "AI simulated response to: Show me another one",
+    "attachments": [
+      {
+        "type": "image",
+        "src": "https://via.placeholder.com/300/FF0000/FFFFFF?text=Image1",
+        "name": "Dynamic Image"
+      },
+      {
+        "type": "video",
+        "src": "https://www.w3schools.com/html/movie.mp4",
+        "name": "Dynamic Video"
+      },
+      {
+        "type": "web",
+        "src": "https://example.com",
+        "name": "Dynamic Web"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "i want to see something gay"
+  },
+  {
+    "role": "assistant",
+    "content": "AI simulated response to: i want to see something gay",
+    "attachments": [
+      {
+        "type": "image",
+        "src": "https://via.placeholder.com/300/00FF00/FFFFFF?text=Image2",
+        "name": "Dynamic Image"
+      },
+      {
+        "type": "video",
+        "src": "https://www.w3schools.com/html/movie.mp4",
+        "name": "Dynamic Video"
+      },
+      {
+        "type": "web",
+        "src": "https://www.python.org",
+        "name": "Dynamic Web"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "dog"
+  },
+  {
+    "role": "assistant",
+    "content": "AI simulated response to: dog",
+    "attachments": [
+      {
+        "type": "image",
+        "src": "https://via.placeholder.com/300/FF0000/FFFFFF?text=Image1",
+        "name": "Dynamic Image"
+      },
+      {
+        "type": "video",
+        "src": "https://www.w3schools.com/html/movie.mp4",
+        "name": "Dynamic Video"
+      },
+      {
+        "type": "web",
+        "src": "https://www.wikipedia.org",
+        "name": "Dynamic Web"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "dog"
+  },
+  {
+    "role": "assistant",
+    "content": "AI simulated response to: dog",
+    "attachments": [
+      {
+        "type": "image",
+        "src": "https://via.placeholder.com/300/00FF00/FFFFFF?text=Image2",
+        "name": "Dynamic Image"
+      },
+      {
+        "type": "video",
+        "src": "https://www.w3schools.com/html/mov_bbb.mp4",
+        "name": "Dynamic Video"
+      },
+      {
+        "type": "web",
+        "src": "https://example.com",
+        "name": "Dynamic Web"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "hi"
+  },
+  {
+    "role": "assistant",
+    "content": "AI reply: I just analyzed 'hi' and here\u2019s what I found.",
+    "attachments": [
+      {
+        "type": "image",
+        "src": "https://via.placeholder.com/300/FF0000/FFFFFF?text=hi",
+        "name": "AI Image"
+      },
+      {
+        "type": "video",
+        "src": "https://www.w3schools.com/html/mov_bbb.mp4",
+        "name": "Video Placeholder"
+      },
+      {
+        "type": "web",
+        "src": "https://www.wikipedia.org",
+        "name": "Web Preview"
+      }
+    ]
+  }
+]

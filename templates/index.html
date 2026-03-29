@@ -1,301 +1,107 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nova</title>
-  <link rel="stylesheet" href="/static/css/nova-main.css?v=endgamevisual1" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nova Ultimate Chat + Web + Media</title>
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=endgame">
 </head>
 <body>
   <div class="nova-app-shell" id="novaAppShell">
-    <aside class="nova-sidebar" id="novaSidebar">
-      <div class="nova-sidebar-top">
-        <div class="nova-brand">
-          <div class="nova-brand-mark">N</div>
-          <div class="nova-brand-copy">
-            <div class="nova-brand-title">Nova</div>
-            <div class="nova-brand-subtitle">Ultimate 2026</div>
-          </div>
-        </div>
 
-        <button
-          type="button"
-          class="nova-icon-button nova-sidebar-toggle"
-          id="sidebarToggle"
-          aria-label="Toggle sidebar"
-          title="Toggle sidebar"
-        >
-          ☰
-        </button>
-      </div>
+    <!-- Chat Messages -->
+    <div class="nova-chat-panel" id="messages"></div>
+    <div id="novaEmptyState" class="nova-empty-state">Nova is ready. Type a message!</div>
 
-      <div class="nova-sidebar-actions">
-        <button type="button" class="nova-primary-button" id="newChatBtn">
-          + New Chat
-        </button>
-      </div>
+    <!-- Typing indicator -->
+    <div id="typingIndicator" class="nova-typing-indicator" style="display:none;">Nova is typing...</div>
 
-      <div class="nova-sidebar-section">
-        <div class="nova-section-label">Sessions</div>
-        <div class="nova-session-list" id="sessionList"></div>
-      </div>
-    </aside>
+    <!-- Composer -->
+    <div class="nova-composer">
+      <textarea id="chatInput" placeholder="Type your message..."></textarea>
+      <button id="sendBtn">Send</button>
+      <button id="uploadBtn">📎</button>
+      <input type="file" id="fileInput" style="display:none;" accept="image/*,video/*">
+    </div>
 
-    <main class="nova-main" id="novaMain">
-      <header class="nova-topbar">
-        <div class="nova-topbar-left">
-          <button
-            type="button"
-            class="nova-icon-button nova-mobile-sidebar-toggle"
-            id="mobileSidebarToggle"
-            aria-label="Open sidebar"
-            title="Open sidebar"
-          >
-            ☰
-          </button>
-
-          <div class="nova-topbar-title-wrap">
-            <h1 class="nova-topbar-title">Nova</h1>
-            <div class="nova-topbar-subtitle" id="sessionTitle">Ready</div>
-          </div>
-        </div>
-
-        <div class="nova-topbar-actions">
-          <button
-            type="button"
-            class="nova-icon-button"
-            id="themeToggle"
-            title="Theme"
-            aria-label="Toggle theme"
-          >
-            ◐
-          </button>
-
-          <button
-            type="button"
-            class="nova-icon-button"
-            id="memoryPanelToggle"
-            title="Memory"
-            aria-label="Toggle memory panel"
-          >
-            🧠
-          </button>
-
-          <button
-            type="button"
-            class="nova-icon-button"
-            id="artifactsPanelToggle"
-            title="Artifacts"
-            aria-label="Toggle artifacts panel"
-          >
-            📄
-          </button>
-        </div>
-      </header>
-
-      <section class="nova-chat-stage">
-        <div class="nova-chat-scroll" id="chatScroll">
-          <div class="nova-empty-state" id="emptyState">
-            <div class="nova-empty-icon">✦</div>
-            <h2 class="nova-empty-title">Nova is ready</h2>
-            <p class="nova-empty-copy">
-              Build, plan, fix, and ship without losing momentum.
-            </p>
-          </div>
-
-          <div class="nova-message-list" id="messages"></div>
-        </div>
-
-        <footer class="nova-composer-shell">
-          <div class="nova-attachments-bar" id="attachmentsBar" hidden></div>
-
-          <div class="nova-composer">
-            <button
-              type="button"
-              class="nova-composer-utility"
-              id="voiceBtn"
-              title="Voice"
-              aria-label="Voice"
-            >
-              🎙
-            </button>
-
-            <textarea
-              id="composerInput"
-              class="nova-composer-input"
-              placeholder="Message Nova..."
-              rows="1"
-            ></textarea>
-
-            <button
-              type="button"
-              class="nova-composer-utility"
-              id="attachBtn"
-              title="Attach"
-              aria-label="Attach"
-            >
-              ＋
-            </button>
-
-            <button
-              type="button"
-              class="nova-send-button"
-              id="sendBtn"
-              title="Send"
-              aria-label="Send"
-            >
-              Send
-            </button>
-          </div>
-        </footer>
-      </section>
-    </main>
-
-    <aside class="nova-right-rail" id="novaRightRail">
-      <div class="nova-side-panel is-active" id="memoryPanel">
-        <div class="nova-panel-head">
-          <div>
-            <div class="nova-panel-eyebrow">Memory</div>
-            <h3 class="nova-panel-title">Saved context</h3>
-          </div>
-
-          <button
-            type="button"
-            class="nova-icon-button"
-            id="memoryCloseBtn"
-            aria-label="Close memory panel"
-            title="Close memory panel"
-          >
-            ×
-          </button>
-        </div>
-
-        <div class="nova-panel-body">
-          <div class="nova-panel-tools">
-            <input
-              type="text"
-              id="memorySearch"
-              class="nova-search-input"
-              placeholder="Search memory"
-            />
-          </div>
-
-          <div class="nova-memory-list" id="memoryList"></div>
-        </div>
-      </div>
-
-      <div class="nova-side-panel is-active" id="novaArtifactsRoot" data-artifacts-root>
-        <div class="nova-panel-head nova-artifacts-panel-head">
-          <div>
-            <div class="nova-panel-eyebrow">Artifacts</div>
-            <h3 class="nova-panel-title">Saved outputs</h3>
-          </div>
-
-          <div class="nova-panel-head-actions">
-            <div class="nova-artifacts-count-wrap">
-              <span class="nova-panel-chip">Count</span>
-              <span
-                class="nova-panel-chip nova-panel-chip-strong"
-                id="novaArtifactsCount"
-                data-artifacts-count
-              >0</span>
-            </div>
-
-            <button
-              type="button"
-              class="nova-icon-button"
-              id="artifactsCloseBtn"
-              aria-label="Close artifacts panel"
-              title="Close artifacts panel"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-
-        <div class="nova-panel-body nova-artifacts-panel-body">
-          <div
-            class="nova-artifacts-status"
-            id="novaArtifactsStatus"
-            data-artifacts-status
-          ></div>
-
-          <div
-            class="nova-artifacts-empty"
-            id="novaArtifactsEmpty"
-            data-artifacts-empty
-          >
-            <div class="nova-artifacts-empty-icon">📄</div>
-            <div class="nova-artifacts-empty-title">No artifacts yet</div>
-            <div class="nova-artifacts-empty-copy">
-              Saved documents, code, and structured outputs will appear here.
-            </div>
-          </div>
-
-          <div
-            class="nova-artifacts-list"
-            id="novaArtifactsList"
-            data-artifacts-list
-          ></div>
-
-          <div
-            class="nova-artifact-viewer"
-            id="novaArtifactViewer"
-            data-artifact-viewer
-            hidden
-          >
-            <div class="nova-artifact-viewer-head">
-              <div class="nova-artifact-viewer-head-copy">
-                <div
-                  class="nova-artifact-viewer-title"
-                  id="novaArtifactViewerTitle"
-                  data-artifact-viewer-title
-                >
-                  Artifact
-                </div>
-
-                <div class="nova-artifact-viewer-meta-row">
-                  <span
-                    class="nova-panel-chip"
-                    id="novaArtifactViewerType"
-                    data-artifact-viewer-type
-                  >
-                    document
-                  </span>
-
-                  <span
-                    class="nova-artifact-viewer-time"
-                    id="novaArtifactViewerTime"
-                    data-artifact-viewer-time
-                  ></span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                class="nova-icon-button"
-                id="artifactViewerCloseBtn"
-                aria-label="Close artifact viewer"
-                title="Close artifact viewer"
-              >
-                ×
-              </button>
-            </div>
-
-            <div class="nova-artifact-viewer-body">
-              <pre
-                class="nova-artifact-viewer-content"
-                id="novaArtifactViewerContent"
-                data-artifact-viewer-content
-              ></pre>
-            </div>
-          </div>
-        </div>
-      </div>
-    </aside>
   </div>
 
-  <script src="/static/js/nova-render.js?v=endgamevisual1"></script>
-  <script src="/static/js/nova-artifacts.js?v=endgamevisual1"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const chatInput = document.getElementById('chatInput');
+      const sendBtn = document.getElementById('sendBtn');
+      const messages = document.getElementById('messages');
+      const emptyState = document.getElementById('novaEmptyState');
+      const typingIndicator = document.getElementById('typingIndicator');
+      const uploadBtn = document.getElementById('uploadBtn');
+      const fileInput = document.getElementById('fileInput');
+
+      let sessionId = localStorage.getItem('nova_session_id') || crypto.randomUUID();
+      localStorage.setItem('nova_session_id', sessionId);
+
+      function appendMessage(content, from='assistant', badge='') {
+        emptyState.style.display = 'none';
+        const div = document.createElement('div');
+        div.className = `nova-message nova-message-${from}`;
+        div.textContent = content;
+        if(badge) div.textContent = `[${badge}] ${content}`;
+        messages.appendChild(div);
+        messages.scrollTop = messages.scrollHeight;
+      }
+
+      async function sendChat(content='', attachments=[]) {
+        if(!content.trim() && attachments.length===0) return;
+        if(content) appendMessage(content, 'user');
+
+        typingIndicator.style.display = 'block';
+        try {
+          const payload = { content, session_id: sessionId };
+          if(attachments.length) payload.attachments = attachments;
+
+          const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if(data.ok){
+            appendMessage(data.message, 'assistant', 'AI');
+            if(data.web) appendMessage(data.web, 'assistant', 'Web');
+            if(data.attachments_desc){
+              data.attachments_desc.forEach(desc => appendMessage(desc, 'assistant', 'Attachment'));
+            }
+          } else appendMessage(`Error: ${data.error || 'Unknown'}`, 'assistant');
+        } catch(e){
+          appendMessage('Network error while sending message.', 'assistant');
+        } finally { typingIndicator.style.display='none'; }
+      }
+
+      sendBtn.addEventListener('click', () => sendChat(chatInput.value));
+
+      chatInput.addEventListener('keydown', e => {
+        if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendBtn.click(); }
+      });
+
+      uploadBtn.addEventListener('click', () => fileInput.click());
+
+      fileInput.addEventListener('change', async () => {
+        if(!fileInput.files.length) return;
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append('files', file);
+
+        try {
+          const res = await fetch('/api/upload', { method:'POST', body:formData });
+          const data = await res.json();
+          if(data.ok && data.files && data.files.length){
+            const attachmentIds = data.files.map(f => f.id || f.filename);
+            sendChat('', attachmentIds);
+          } else appendMessage('Upload failed.', 'assistant');
+        } catch(e){
+          appendMessage('Network error during upload.', 'assistant');
+        } finally { fileInput.value=''; }
+      });
+    });
+  </script>
 </body>
 </html>
