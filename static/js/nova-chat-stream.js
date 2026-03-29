@@ -1,4 +1,3 @@
-// notepad C:\Users\Owner\nova\static\js\nova-chat-stream.js
 (function () {
   "use strict";
 
@@ -10,7 +9,6 @@
   const CONFIG = {
     stateEndpoint: "/api/state",
     chatEndpoint: "/api/chat",
-    streamEndpoint: "/api/chat/stream",
     sessionNewEndpoint: "/api/session/new",
     sessionGetBase: "/api/chat/",
     defaultModel: "gpt-5.4",
@@ -23,12 +21,8 @@
       messages: [],
       models: [],
       selectedModel: null,
-      defaultModel: CONFIG.defaultModel,
       isSending: false,
-      isStreaming: false,
       pendingAttachments: [],
-      pendingAssistantMessageId: null,
-      currentAbortController: null,
       booted: false,
     },
     Nova.state || {}
@@ -46,16 +40,21 @@
     return typeof value === "string" ? value : fallback;
   }
 
-  function safeObject(value) {
-    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  }
-
   function nowIso() {
     return new Date().toISOString();
   }
 
   function uid(prefix = "id") {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
   }
 
   function pickOne(selectors) {
@@ -69,7 +68,6 @@
   function findComposer() {
     return pickOne([
       "#composerInput",
-      "#novaComposer",
       "#composer",
       "#messageInput",
       "#chatInput",
@@ -81,42 +79,28 @@
   function findSendBtn() {
     return pickOne([
       "#sendBtn",
-      "#novaSendBtn",
       "#sendButton",
       ".send-btn",
       "button[data-role='send']",
-      "button[data-action='send-message']",
       "button[type='submit']",
-    ]);
-  }
-
-  function findStopBtn() {
-    return pickOne([
-      "#stopBtn",
-      "#novaStopBtn",
-      "button[data-action='stop-stream']",
     ]);
   }
 
   function findMessagesRoot() {
     return pickOne([
-      "#novaMessages",
       "#chatMessages",
       "#messages",
       "#messageList",
       ".chat-messages",
       ".messages",
-      "[data-nova-messages]",
     ]);
   }
 
   function findSessionRoot() {
     return pickOne([
-      "#novaSessionList",
       "#sessionList",
       ".session-list",
       "[data-role='session-list']",
-      "[data-nova-sessions]",
     ]);
   }
 
@@ -146,54 +130,106 @@
 
   function normalizeRole(role) {
     const value = safeString(role, "assistant").toLowerCase();
-    if (value === "user" || value === "assistant" || value === "system" || value === "tool") {
-      return value;
-    }
+    if (value === "user" || value === "assistant" || value === "system") return value;
     return "assistant";
   }
 
   function normalizeMessage(message) {
-    const item = safeObject(message);
+    if (!message || typeof message !== "object") {
+      return {
+        id: uid("msg"),
+        role: "assistant",
+        content: "",
+        created_at: nowIso(),
+        attachments: [],
+        meta: {},
+      };
+    }
 
     return {
-      id: safeString(item.id, uid("msg")),
-      role: normalizeRole(item.role),
+      id: safeString(message.id, uid("msg")),
+      role: normalizeRole(message.role),
       content:
-        safeString(item.content, "") ||
-        safeString(item.text, "") ||
-        safeString(item.message, ""),
-      created_at: safeString(item.created_at, nowIso()),
-      attachments: safeArray(item.attachments),
-      images: safeArray(item.images),
-      videos: safeArray(item.videos),
-      audios: safeArray(item.audios),
-      media: safeArray(item.media),
-      meta: safeObject(item.meta),
-      error: !!item.error || !!safeObject(item.meta).error,
+        safeString(message.content, "") ||
+        safeString(message.text, "") ||
+        safeString(message.message, ""),
+      created_at: safeString(message.created_at, nowIso()),
+      attachments: safeArray(message.attachments),
+      meta: message.meta && typeof message.meta === "object" ? message.meta : {},
     };
   }
 
   function normalizeSession(session) {
-    const item = safeObject(session);
+    if (!session || typeof session !== "object") {
+      return {
+        id: uid("session"),
+        title: "New chat",
+        created_at: nowIso(),
+        updated_at: nowIso(),
+        pinned: false,
+        messages: [],
+      };
+    }
 
     return {
-      id: safeString(item.id, uid("session")),
-      title: safeString(item.title, "New chat"),
-      created_at: safeString(item.created_at, nowIso()),
-      updated_at: safeString(item.updated_at || item.created_at, nowIso()),
-      pinned: !!item.pinned,
-      messages: safeArray(item.messages).map(normalizeMessage),
+      id: safeString(session.id, uid("session")),
+      title: safeString(session.title, "New chat"),
+      created_at: safeString(session.created_at, nowIso()),
+      updated_at: safeString(session.updated_at || session.created_at, nowIso()),
+      pinned: !!session.pinned,
+      messages: safeArray(session.messages).map(normalizeMessage),
     };
   }
 
-  function emit(name, detail) {
-    document.dispatchEvent(
-      new CustomEvent(name, {
-        bubbles: true,
-        cancelable: false,
-        detail: detail || {},
+  function renderInline(text) {
+    return escapeHtml(text)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  }
+
+  function renderParagraphs(text) {
+    return safeString(text, "")
+      .split(/\n{2,}/)
+      .map((block) => {
+        const trimmed = block.trim();
+        if (!trimmed) return "";
+        return `<p>${renderInline(trimmed).replace(/\n/g, "<br>")}</p>`;
       })
-    );
+      .join("");
+  }
+
+  function renderMessageContent(text) {
+    const value = safeString(text, "");
+    if (!value) return "";
+
+    const parts = [];
+    const fence = /```([a-zA-Z0-9_-]+)?\n([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = fence.exec(value))) {
+      const before = value.slice(lastIndex, match.index);
+      if (before) parts.push(renderParagraphs(before));
+
+      const lang = escapeHtml(match[1] || "");
+      const code = escapeHtml(match[2] || "");
+      parts.push(`<pre><code class="language-${lang}">${code}</code></pre>`);
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    const tail = value.slice(lastIndex);
+    if (tail) parts.push(renderParagraphs(tail));
+
+    return parts.join("");
+  }
+
+  function formatTime(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   }
 
   function getActiveModel() {
@@ -206,31 +242,16 @@
 
   function setBusy(isBusy) {
     state.isSending = !!isBusy;
-
     if (els.composer) els.composer.disabled = !!isBusy;
     if (els.sendBtn) els.sendBtn.disabled = !!isBusy;
     if (els.modelSelect) els.modelSelect.disabled = !!isBusy;
   }
 
-  function setStreaming(isStreaming, pendingAssistantMessageId) {
-    state.isStreaming = !!isStreaming;
-    state.pendingAssistantMessageId = pendingAssistantMessageId || null;
-
-    if (els.stopBtn) {
-      els.stopBtn.hidden = !state.isStreaming;
-      els.stopBtn.disabled = !state.isStreaming;
-    }
-
-    emit("nova:streaming:update", {
-      isStreaming: state.isStreaming,
-      pendingAssistantMessageId: state.pendingAssistantMessageId,
-    });
-  }
-
   function autoResizeComposer() {
-    if (!els.composer || els.composer.tagName !== "TEXTAREA") return;
+    if (!els.composer) return;
+    if (els.composer.tagName !== "TEXTAREA") return;
     els.composer.style.height = "auto";
-    const next = Math.min(Math.max(els.composer.scrollHeight, 42), 220);
+    const next = Math.min(Math.max(els.composer.scrollHeight, 42), 180);
     els.composer.style.height = `${next}px`;
   }
 
@@ -252,131 +273,152 @@
 
   function scrollMessagesToBottom(force = false) {
     if (!els.messagesRoot) return;
-
     const nearBottom =
       els.messagesRoot.scrollHeight - els.messagesRoot.scrollTop - els.messagesRoot.clientHeight < 180;
 
-    if (force || nearBottom || state.isStreaming) {
+    if (force || nearBottom) {
       els.messagesRoot.scrollTop = els.messagesRoot.scrollHeight;
     }
   }
 
-  function renderAll() {
-    if (Nova.render && typeof Nova.render.syncState === "function") {
-      Nova.render.syncState({
-        activeSessionId: state.activeSessionId,
-        sessions: state.sessions,
-        messages: state.messages,
-        isStreaming: state.isStreaming,
-        composerLocked: state.isSending,
-        pendingAssistantMessageId: state.pendingAssistantMessageId,
+  function createMessageNode(raw) {
+    const msg = normalizeMessage(raw);
+
+    const node = document.createElement("article");
+    node.className = `chat-message ${msg.role}`;
+    node.dataset.messageId = msg.id;
+
+    const body = document.createElement("div");
+    body.className = "message-body";
+
+    const content = document.createElement("div");
+    content.className = "message-content";
+    content.innerHTML = renderMessageContent(msg.content);
+    body.appendChild(content);
+
+    if (safeArray(msg.attachments).length) {
+      const attachments = document.createElement("div");
+      attachments.className = "message-attachments";
+
+      msg.attachments.forEach((att) => {
+        const chip = document.createElement("div");
+        chip.className = "message-attachment-chip";
+        chip.textContent =
+          safeString(att?.name, "") ||
+          safeString(att?.filename, "") ||
+          "attachment";
+        attachments.appendChild(chip);
       });
-      return;
+
+      body.appendChild(attachments);
     }
 
-    renderSessionsFallback();
-    renderMessagesFallback();
+    const footer = document.createElement("div");
+    footer.className = "message-footer";
+    footer.innerHTML = `
+      <span class="message-role">${escapeHtml(msg.role)}</span>
+      <span class="message-time">${escapeHtml(formatTime(msg.created_at))}</span>
+    `;
+    body.appendChild(footer);
+
+    node.appendChild(body);
+
+    if (msg.role === "assistant") {
+      const actions = document.createElement("div");
+      actions.className = "message-actions";
+
+      const copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "icon-btn";
+      copyBtn.textContent = "Copy";
+      copyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(msg.content || "");
+          copyBtn.textContent = "Copied";
+          setTimeout(() => {
+            copyBtn.textContent = "Copy";
+          }, 1000);
+        } catch (_err) {
+          copyBtn.textContent = "Failed";
+          setTimeout(() => {
+            copyBtn.textContent = "Copy";
+          }, 1000);
+        }
+      });
+
+      actions.appendChild(copyBtn);
+      node.appendChild(actions);
+    }
+
+    return node;
   }
 
   function renderMessages() {
-    if (Nova.render && typeof Nova.render.replaceMessages === "function") {
-      Nova.render.replaceMessages(state.messages);
-      updateEmptyState();
-      scrollMessagesToBottom(true);
-      return;
-    }
-
-    renderMessagesFallback();
-  }
-
-  function renderSessions() {
-    if (Nova.render && typeof Nova.render.replaceSessions === "function") {
-      Nova.render.replaceSessions(state.sessions);
-      return;
-    }
-
-    renderSessionsFallback();
-  }
-
-  function renderMessagesFallback() {
     if (!els.messagesRoot) return;
 
+    if (Nova.render && typeof Nova.render.renderMessages === "function") {
+      try {
+        Nova.render.renderMessages(state.messages, state.activeSessionId);
+        updateEmptyState();
+        scrollMessagesToBottom(true);
+        return;
+      } catch (_err) {}
+    }
+
     els.messagesRoot.innerHTML = "";
-
-    safeArray(state.messages).forEach((raw) => {
-      const msg = normalizeMessage(raw);
-
-      const node = document.createElement("article");
-      node.className = `chat-message ${msg.role}${msg.error ? " is-error" : ""}`;
-      node.dataset.messageId = msg.id;
-
-      const body = document.createElement("div");
-      body.className = "message-body";
-
-      const content = document.createElement("div");
-      content.className = "message-content";
-      content.textContent = msg.content || "";
-      body.appendChild(content);
-
-      const footer = document.createElement("div");
-      footer.className = "message-footer";
-      footer.textContent = `${msg.role} • ${msg.created_at || ""}`;
-      body.appendChild(footer);
-
-      node.appendChild(body);
-      els.messagesRoot.appendChild(node);
+    safeArray(state.messages).forEach((msg) => {
+      els.messagesRoot.appendChild(createMessageNode(msg));
     });
 
     updateEmptyState();
     scrollMessagesToBottom(true);
   }
 
-  function renderSessionsFallback() {
+  function renderSessions() {
     if (!els.sessionRoot) return;
+
+    if (Nova.render && typeof Nova.render.renderSessions === "function") {
+      try {
+        Nova.render.renderSessions(state.sessions, state.activeSessionId);
+        return;
+      } catch (_err) {}
+    }
 
     els.sessionRoot.innerHTML = "";
 
-    safeArray(state.sessions).forEach((raw) => {
-      const session = normalizeSession(raw);
-
-      const row = document.createElement("button");
-      row.type = "button";
+    safeArray(state.sessions).forEach((session) => {
+      const row = document.createElement("div");
       row.className = `session-item${session.id === state.activeSessionId ? " is-active" : ""}`;
-      row.dataset.sessionId = session.id;
-      row.textContent = session.title || "New chat";
 
-      row.addEventListener("click", function () {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "session-main-btn";
+      btn.dataset.sessionId = session.id;
+      btn.innerHTML = `
+        <span class="session-title">${escapeHtml(session.title || "New chat")}</span>
+        <span class="session-meta">${escapeHtml(formatTime(session.updated_at || session.created_at))}</span>
+      `;
+
+      btn.addEventListener("click", () => {
         openSession(session.id);
       });
 
+      row.appendChild(btn);
       els.sessionRoot.appendChild(row);
     });
-  }
-
-  function replaceOrUpsertSession(session) {
-    const normalized = normalizeSession(session);
-    const index = state.sessions.findIndex((item) => item.id === normalized.id);
-
-    if (index >= 0) {
-      state.sessions[index] = normalized;
-    } else {
-      state.sessions.unshift(normalized);
-    }
-
-    return normalized;
   }
 
   function syncSessionMessages() {
     const session = state.sessions.find((item) => item.id === state.activeSessionId);
     if (!session) return;
 
-    session.messages = state.messages.map((msg) => Object.assign({}, normalizeMessage(msg)));
+    session.messages = state.messages.map((msg) => Object.assign({}, msg));
     session.updated_at = nowIso();
 
     if (!session.title || session.title === "New chat") {
-      const firstUser = state.messages.find((msg) => normalizeRole(msg.role) === "user" && safeString(msg.content, "").trim());
+      const firstUser = state.messages.find((msg) => msg.role === "user" && msg.content);
       if (firstUser) {
-        session.title = safeString(firstUser.content, "New chat").trim().slice(0, 60) || "New chat";
+        session.title = firstUser.content.slice(0, 60);
       }
     }
 
@@ -417,11 +459,10 @@
     return data;
   }
 
-  async function apiPost(url, payload, signal) {
+  async function apiPost(url, payload) {
     const response = await fetch(url, {
       method: "POST",
       credentials: "same-origin",
-      signal,
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
@@ -453,11 +494,18 @@
     if (state.activeSessionId) return state.activeSessionId;
 
     const data = await apiPost(CONFIG.sessionNewEndpoint, { title: "New chat" });
-    const session = replaceOrUpsertSession(data.session || data);
+    const session = normalizeSession(data.session || data);
 
     state.activeSessionId = session.id;
-    state.messages = safeArray(session.messages).map(normalizeMessage);
 
+    const existingIndex = state.sessions.findIndex((item) => item.id === session.id);
+    if (existingIndex >= 0) {
+      state.sessions[existingIndex] = session;
+    } else {
+      state.sessions.unshift(session);
+    }
+
+    state.messages = safeArray(session.messages);
     renderSessions();
     renderMessages();
 
@@ -483,7 +531,7 @@
     }
 
     const active = state.sessions.find((item) => item.id === state.activeSessionId);
-    state.messages = active ? safeArray(active.messages).map(normalizeMessage) : [];
+    state.messages = active ? safeArray(active.messages) : [];
 
     renderModels();
     renderSessions();
@@ -511,11 +559,17 @@
     if (!sessionId) return;
 
     const data = await apiGet(`${CONFIG.sessionGetBase}${encodeURIComponent(sessionId)}`);
-    const session = replaceOrUpsertSession(data.session || data);
+    const session = normalizeSession(data.session || data);
+
+    const index = state.sessions.findIndex((item) => item.id === session.id);
+    if (index >= 0) {
+      state.sessions[index] = session;
+    } else {
+      state.sessions.unshift(session);
+    }
 
     state.activeSessionId = session.id;
-    state.messages = safeArray(session.messages).map(normalizeMessage);
-
+    state.messages = safeArray(session.messages);
     renderSessions();
     renderMessages();
   }
@@ -534,21 +588,6 @@
     return message;
   }
 
-  function createPendingAssistantMessage() {
-    const message = normalizeMessage({
-      id: uid("assistant"),
-      role: "assistant",
-      content: "",
-      created_at: nowIso(),
-      meta: { pending: true },
-    });
-
-    state.messages.push(message);
-    state.pendingAssistantMessageId = message.id;
-    renderMessages();
-    return message;
-  }
-
   function patchOrInsertAssistantMessage(raw) {
     const message = normalizeMessage(raw);
     const index = state.messages.findIndex((item) => item.id === message.id);
@@ -563,40 +602,6 @@
     return message;
   }
 
-  function patchPendingAssistantContent(content, meta) {
-    const messageId = state.pendingAssistantMessageId;
-    if (!messageId) return null;
-
-    const index = state.messages.findIndex((item) => safeString(item.id) === messageId);
-    if (index < 0) return null;
-
-    const current = normalizeMessage(state.messages[index]);
-    current.content = safeString(content, current.content);
-    current.meta = Object.assign({}, current.meta, safeObject(meta));
-    state.messages[index] = current;
-
-    renderMessages();
-    return current;
-  }
-
-  function finalizePendingAssistant(raw) {
-    const pendingId = state.pendingAssistantMessageId;
-    const message = normalizeMessage(
-      Object.assign({}, safeObject(raw), pendingId && !safeObject(raw).id ? { id: pendingId } : {})
-    );
-
-    const index = state.messages.findIndex((item) => safeString(item.id) === message.id);
-    if (index >= 0) {
-      state.messages[index] = message;
-    } else {
-      state.messages.push(message);
-    }
-
-    state.pendingAssistantMessageId = null;
-    renderMessages();
-    return message;
-  }
-
   function buildPayload(text) {
     return {
       session_id: state.activeSessionId,
@@ -606,35 +611,8 @@
     };
   }
 
-  async function sendViaStandardEndpoint(text) {
-    const data = await apiPost(CONFIG.chatEndpoint, buildPayload(text), state.currentAbortController?.signal);
-
-    const assistantMessage = normalizeMessage(
-      data.message ||
-        data.reply ||
-        data.assistant_message || {
-          id: state.pendingAssistantMessageId || uid("assistant"),
-          role: "assistant",
-          content: safeString(data.content, "") || safeString(data.text, "") || "",
-          created_at: nowIso(),
-        }
-    );
-
-    finalizePendingAssistant(assistantMessage);
-
-    if (data.session) {
-      const session = replaceOrUpsertSession(data.session);
-      state.activeSessionId = session.id;
-      state.messages = safeArray(session.messages).map(normalizeMessage);
-    }
-
-    syncSessionMessages();
-    renderSessions();
-    renderMessages();
-  }
-
   async function sendCurrentMessage() {
-    if (state.isSending || state.isStreaming) return;
+    if (state.isSending) return;
 
     const text = getComposerValue().trim();
     const hasAttachments = safeArray(state.pendingAttachments).length > 0;
@@ -647,82 +625,58 @@
       pushUserMessage(text);
       setComposerValue("");
       state.pendingAttachments = [];
+      setBusy(true);
       syncSessionMessages();
 
-      state.currentAbortController = new AbortController();
-      setBusy(true);
-      setStreaming(true, null);
+      const data = await apiPost(CONFIG.chatEndpoint, buildPayload(text));
 
-      createPendingAssistantMessage();
-      setStreaming(true, state.pendingAssistantMessageId);
+      const assistantMessage = normalizeMessage(
+        data.message ||
+          data.reply ||
+          data.assistant_message || {
+            id: uid("assistant"),
+            role: "assistant",
+            content:
+              safeString(data.content, "") ||
+              safeString(data.text, "") ||
+              "",
+            created_at: nowIso(),
+          }
+      );
 
-      await sendViaStandardEndpoint(text);
+      patchOrInsertAssistantMessage(assistantMessage);
+
+      if (data.session) {
+        const session = normalizeSession(data.session);
+        const existingIndex = state.sessions.findIndex((item) => item.id === session.id);
+        if (existingIndex >= 0) {
+          state.sessions[existingIndex] = session;
+        } else {
+          state.sessions.unshift(session);
+        }
+        state.activeSessionId = session.id;
+        state.messages = safeArray(session.messages).map(normalizeMessage);
+      }
+
+      syncSessionMessages();
+      renderSessions();
+      renderMessages();
     } catch (err) {
       console.error("[nova-chat-stream] send failed:", err);
 
-      if (safeString(err && err.name) === "AbortError") {
-        finalizePendingAssistant({
-          id: state.pendingAssistantMessageId || uid("assistant"),
-          role: "assistant",
-          content: "[stopped]",
-          created_at: nowIso(),
-          meta: { stopped: true },
-        });
-      } else {
-        finalizePendingAssistant({
-          id: state.pendingAssistantMessageId || uid("assistant"),
-          role: "assistant",
-          content: `Error: ${safeString(err && err.message, "request failed")}`,
-          created_at: nowIso(),
-          meta: { error: true },
-          error: true,
-        });
-      }
+      patchOrInsertAssistantMessage({
+        id: uid("assistant"),
+        role: "assistant",
+        content: `Error: ${safeString(err && err.message, "request failed")}`,
+        created_at: nowIso(),
+        meta: { error: true },
+      });
 
       syncSessionMessages();
     } finally {
       setBusy(false);
-      setStreaming(false, null);
-      state.currentAbortController = null;
       scrollMessagesToBottom(true);
     }
-  }
-
-  function stopCurrentStream() {
-    if (state.currentAbortController) {
-      try {
-        state.currentAbortController.abort();
-      } catch (_err) {}
-    }
-  }
-
-  function retryFromMessage(messageId) {
-    const messages = safeArray(state.messages);
-    let retryText = "";
-
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      const msg = normalizeMessage(messages[i]);
-      if (messageId && msg.id === messageId) {
-        for (let j = i - 1; j >= 0; j -= 1) {
-          const candidate = normalizeMessage(messages[j]);
-          if (candidate.role === "user" && safeString(candidate.content).trim()) {
-            retryText = candidate.content;
-            break;
-          }
-        }
-        break;
-      }
-    }
-
-    if (!retryText) {
-      const lastUser = [...messages].reverse().map(normalizeMessage).find((msg) => msg.role === "user" && safeString(msg.content).trim());
-      retryText = lastUser ? lastUser.content : "";
-    }
-
-    if (!retryText) return;
-
-    setComposerValue(retryText);
-    sendCurrentMessage();
   }
 
   function handleComposerKeydown(event) {
@@ -735,7 +689,6 @@
   function wireDom() {
     els.composer = findComposer();
     els.sendBtn = findSendBtn();
-    els.stopBtn = findStopBtn();
     els.messagesRoot = findMessagesRoot();
     els.sessionRoot = findSessionRoot();
     els.modelSelect = findModelSelect();
@@ -755,15 +708,6 @@
       });
     }
 
-    if (els.stopBtn) {
-      els.stopBtn.addEventListener("click", function (event) {
-        event.preventDefault();
-        stopCurrentStream();
-      });
-      els.stopBtn.hidden = true;
-      els.stopBtn.disabled = true;
-    }
-
     if (els.modelSelect) {
       els.modelSelect.addEventListener("change", function () {
         state.selectedModel = els.modelSelect.value || CONFIG.defaultModel;
@@ -780,35 +724,10 @@
     }
 
     document.addEventListener("click", function (event) {
-      const sessionBtn = event.target.closest("[data-session-id]");
-      if (sessionBtn && sessionBtn.dataset.sessionId) {
-        if (
-          sessionBtn.dataset.action === "rename-session" ||
-          sessionBtn.dataset.action === "delete-session" ||
-          sessionBtn.dataset.action === "toggle-session-pin"
-        ) {
-          return;
-        }
-        openSession(sessionBtn.dataset.sessionId);
+      const btn = event.target.closest("[data-session-id]");
+      if (btn && btn.dataset.sessionId) {
+        openSession(btn.dataset.sessionId);
       }
-    });
-
-    document.addEventListener("nova:chat:send", function () {
-      sendCurrentMessage();
-    });
-
-    document.addEventListener("nova:chat:stop", function () {
-      stopCurrentStream();
-    });
-
-    document.addEventListener("nova:session:open", function (event) {
-      const sessionId = safeString(event && event.detail && event.detail.sessionId, "");
-      if (sessionId) openSession(sessionId);
-    });
-
-    document.addEventListener("nova:message:retry", function (event) {
-      const messageId = safeString(event && event.detail && event.detail.messageId, "");
-      retryFromMessage(messageId);
     });
   }
 
@@ -816,14 +735,10 @@
     Nova.chatStream.sendCurrentMessage = sendCurrentMessage;
     Nova.chatStream.loadState = loadState;
     Nova.chatStream.openSession = openSession;
-    Nova.chatStream.stopCurrentStream = stopCurrentStream;
-    Nova.chatStream.retryFromMessage = retryFromMessage;
-    Nova.chatStream.patchPendingAssistantContent = patchPendingAssistantContent;
 
     Nova.chat.sendCurrentMessage = sendCurrentMessage;
     Nova.chat.loadState = loadState;
     Nova.chat.openSession = openSession;
-    Nova.chat.stopCurrentStream = stopCurrentStream;
   }
 
   async function bootstrap() {
@@ -833,13 +748,12 @@
     wireDom();
     exposeApi();
     setBusy(false);
-    setStreaming(false, null);
 
     try {
       await loadState();
     } catch (err) {
       console.error("[nova-chat-stream] bootstrap failed:", err);
-      renderAll();
+      renderMessages();
     }
   }
 
