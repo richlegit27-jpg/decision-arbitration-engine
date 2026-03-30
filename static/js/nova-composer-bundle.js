@@ -1,422 +1,427 @@
-(() => {
+(function () {
   "use strict";
 
-  const Nova = (window.Nova = window.Nova || {});
-  Nova.composer = Nova.composer || {};
+  const CHAT_ENDPOINT = "/api/chat";
+  const UPLOAD_ENDPOINT = "/api/upload";
+
+  const els = {
+    chatInput: document.getElementById("chatInput"),
+    sendBtn: document.getElementById("sendBtn"),
+    uploadBtn: document.getElementById("uploadBtn"),
+    fileInput: document.getElementById("fileInput"),
+    pendingFiles: document.getElementById("novaPendingFiles"),
+  };
 
   const state = {
     sessionId: "default-session",
     pendingFiles: [],
-    sending: false,
+    isSending: false,
+    pendingAssistantId: null,
   };
 
-  function $(selector, root = document) {
-    return root.querySelector(selector);
+  function log(...args) {
+    console.log("nova-composer-bundle loaded", ...args);
   }
 
-  function text(value) {
-    if (value == null) return "";
-    if (typeof value === "string") return value;
-    if (typeof value === "number" || typeof value === "boolean") return String(value);
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch {
-      return String(value);
-    }
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
   }
 
-  function safeMessageText(value) {
+  function nowTime() {
+    return new Date().toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  function getRenderer() {
+    return window.NovaRender || null;
+  }
+
+  function normalizeMessageText(value) {
     if (value == null) return "";
-
     if (typeof value === "string") return value;
-    if (typeof value === "number" || typeof value === "boolean") return String(value);
-
-    if (Array.isArray(value)) {
-      return value.map(safeMessageText).filter(Boolean).join("\n");
-    }
 
     if (typeof value === "object") {
       if (typeof value.content === "string") return value.content;
       if (typeof value.text === "string") return value.text;
-      if (typeof value.message === "string") return value.message;
-      if (typeof value.output_text === "string") return value.output_text;
 
-      if (value.message && typeof value.message === "object") {
-        if (typeof value.message.content === "string") return value.message.content;
-        if (typeof value.message.text === "string") return value.message.text;
-      }
-
-      if (Array.isArray(value.content)) {
-        return value.content.map(safeMessageText).filter(Boolean).join("\n");
-      }
-
-      if (Array.isArray(value.output)) {
-        return value.output
-          .map((entry) => {
-            if (!entry) return "";
-            if (typeof entry.text === "string") return entry.text;
-            if (Array.isArray(entry.content)) {
-              return entry.content.map(safeMessageText).filter(Boolean).join("\n");
-            }
-            return safeMessageText(entry);
-          })
-          .filter(Boolean)
-          .join("\n");
-      }
-
-      try {
-        return JSON.stringify(value, null, 2);
-      } catch {
-        return String(value);
+      if (Array.isArray(value.parts)) {
+        return value.parts.map((part) => {
+          if (typeof part === "string") return part;
+          if (part && typeof part.text === "string") return part.text;
+          return "";
+        }).join("\n");
       }
     }
 
     return String(value);
   }
 
-  function setBusy(isBusy) {
-    state.sending = Boolean(isBusy);
+  function extractAssistantText(payload) {
+    if (!payload || typeof payload !== "object") return "";
 
-    const sendBtn = $("#sendBtn");
-    const chatInput = $("#chatInput");
-    const uploadBtn = $("#uploadBtn");
+    if (typeof payload.message === "string") return payload.message;
+    if (typeof payload.reply === "string") return payload.reply;
+    if (typeof payload.response === "string") return payload.response;
+    if (typeof payload.output_text === "string") return payload.output_text;
 
-    if (sendBtn) {
-      sendBtn.disabled = state.sending;
-      sendBtn.textContent = state.sending ? "Sending..." : "Send";
+    if (payload.assistant_message) {
+      const text =
+        normalizeMessageText(payload.assistant_message.content) ||
+        normalizeMessageText(payload.assistant_message);
+      if (text) return text;
     }
 
-    if (chatInput) {
-      chatInput.disabled = state.sending;
+    if (payload.data && typeof payload.data === "object") {
+      const nested =
+        payload.data.message ||
+        payload.data.reply ||
+        payload.data.response ||
+        normalizeMessageText(payload.data.assistant_message?.content) ||
+        normalizeMessageText(payload.data.assistant_message);
+      if (nested) return normalizeMessageText(nested);
     }
 
-    if (uploadBtn) {
-      uploadBtn.disabled = state.sending;
+    return "";
+  }
+
+  function extractResponseAttachments(payload) {
+    if (!payload || typeof payload !== "object") return [];
+    if (Array.isArray(payload.attachments)) return payload.attachments;
+    if (Array.isArray(payload.assistant_message?.attachments)) {
+      return payload.assistant_message.attachments;
+    }
+    return [];
+  }
+
+  function extractResponseDebug(payload) {
+    if (!payload || typeof payload !== "object") return null;
+    return payload.debug || payload.meta || payload.assistant_message?.meta || null;
+  }
+
+  function setSending(isSending) {
+    state.isSending = isSending;
+
+    if (els.sendBtn) {
+      els.sendBtn.disabled = isSending;
+      els.sendBtn.textContent = isSending ? "..." : "Send";
+    }
+
+    if (els.uploadBtn) {
+      els.uploadBtn.disabled = isSending;
+    }
+
+    if (els.chatInput) {
+      els.chatInput.disabled = isSending;
     }
   }
 
-  async function callJson(url, options = {}) {
-    const response = await fetch(url, options);
-    const raw = await response.text();
+  function autosizeTextarea() {
+    if (!els.chatInput) return;
+    els.chatInput.style.height = "auto";
+    els.chatInput.style.height = `${Math.min(els.chatInput.scrollHeight, 180)}px`;
+  }
 
+  function renderPendingFiles() {
+    if (!els.pendingFiles) return;
+
+    if (!state.pendingFiles.length) {
+      els.pendingFiles.style.display = "none";
+      els.pendingFiles.innerHTML = "";
+      return;
+    }
+
+    els.pendingFiles.style.display = "flex";
+    els.pendingFiles.innerHTML = state.pendingFiles.map((file, index) => {
+      return `
+        <span class="nova-attachment-chip">
+          ${escapeHtml(file.name)}
+          <button
+            type="button"
+            class="nova-attachment-chip-remove"
+            data-remove-pending-index="${index}"
+            aria-label="Remove file"
+          >×</button>
+        </span>
+      `;
+    }).join("");
+
+    els.pendingFiles.querySelectorAll("[data-remove-pending-index]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const index = Number(btn.getAttribute("data-remove-pending-index"));
+        if (Number.isNaN(index)) return;
+        state.pendingFiles.splice(index, 1);
+        renderPendingFiles();
+      });
+    });
+  }
+
+  async function parseJsonResponse(response, fallbackPrefix) {
+    const rawText = await response.text();
     let data = null;
+
     try {
-      data = raw ? JSON.parse(raw) : null;
-    } catch {
-      data = raw;
+      data = rawText ? JSON.parse(rawText) : null;
+    } catch (error) {
+      throw new Error(rawText || `${fallbackPrefix}: ${response.status}`);
     }
 
     if (!response.ok) {
-      const message =
-        (data && data.error) ||
-        (data && data.message) ||
-        raw ||
-        `Request failed: ${response.status}`;
-      throw new Error(message);
+      throw new Error(
+        data?.error ||
+        data?.message ||
+        `${fallbackPrefix}: ${response.status}`
+      );
     }
 
     return data;
   }
 
-  function ensureRender() {
-    if (!window.Nova?.render?.appendMessage) {
-      throw new Error("Nova.render.appendMessage is missing");
-    }
-    return window.Nova.render;
-  }
-
-  function makeUserMessage(content, attachments = []) {
-    return {
-      id: `user_${Date.now()}`,
-      role: "user",
-      content: safeMessageText(content),
-      created_at: new Date().toISOString(),
-      attachments,
-    };
-  }
-
-  function makeAssistantMessage(result) {
-    const payload =
-      result?.message && typeof result.message === "object"
-        ? result.message
-        : result;
-
-    const content = safeMessageText(
-      payload?.content ??
-        payload?.text ??
-        payload?.message ??
-        result?.content ??
-        result?.text ??
-        result?.message ??
-        ""
-    );
-
-    return {
-      id: payload?.id || `assistant_${Date.now()}`,
-      role: payload?.role || "assistant",
-      content,
-      created_at: payload?.created_at || new Date().toISOString(),
-      attachments: Array.isArray(payload?.attachments) ? payload.attachments : [],
-      debug: result?.debug || null,
-      raw: result,
-    };
-  }
-
-  function currentPendingFiles() {
-    return Array.isArray(state.pendingFiles) ? [...state.pendingFiles] : [];
-  }
-
-  function clearPendingFiles() {
-    state.pendingFiles = [];
-    renderPendingFiles();
-    const fileInput = $("#fileInput");
-    if (fileInput) fileInput.value = "";
-  }
-
-  function renderPendingFiles() {
-    const list =
-      $("#novaPendingFiles") ||
-      $("#pendingFiles") ||
-      $('[data-pending-files]');
-
-    if (!list) return;
-
-    const files = currentPendingFiles();
-
-    if (!files.length) {
-      list.innerHTML = "";
-      list.style.display = "none";
-      return;
-    }
-
-    list.style.display = "";
-    list.innerHTML = files
-      .map((file, index) => {
-        const name = text(file?.name || file?.filename || `attachment-${index + 1}`);
-        const meta = [];
-        if (file?.type) meta.push(text(file.type));
-        if (file?.extracted_chars) meta.push(`${file.extracted_chars} chars`);
-
-        return `
-          <div class="nova-attachment-chip" data-pending-index="${index}" title="${name}">
-            <span>${name}${meta.length ? ` • ${meta.join(" • ")}` : ""}</span>
-            <button type="button" class="nova-attachment-chip-remove" data-remove-pending="${index}">×</button>
-          </div>
-        `;
-      })
-      .join("");
-  }
-
-  function installPendingFileEvents() {
-    const list =
-      $("#novaPendingFiles") ||
-      $("#pendingFiles") ||
-      $('[data-pending-files]');
-
-    if (!list) return;
-
-    list.addEventListener("click", (event) => {
-      const btn = event.target.closest("[data-remove-pending]");
-      if (!btn) return;
-
-      const index = Number(btn.getAttribute("data-remove-pending"));
-      if (!Number.isFinite(index)) return;
-
-      state.pendingFiles.splice(index, 1);
-      renderPendingFiles();
-    });
-  }
-
-  async function uploadSelectedFiles(fileList) {
-    const files = Array.from(fileList || []);
-    if (!files.length) return [];
+  async function uploadPendingFiles() {
+    if (!state.pendingFiles.length) return [];
 
     const formData = new FormData();
-    for (const file of files) {
+    state.pendingFiles.forEach((file) => {
       formData.append("files", file);
-    }
+    });
+    formData.append("session_id", state.sessionId);
 
-    const result = await callJson("/api/upload", {
+    const response = await fetch(UPLOAD_ENDPOINT, {
       method: "POST",
       body: formData,
     });
 
-    const uploaded = Array.isArray(result?.files) ? result.files : [];
-    return uploaded.map((file) => ({
-      name: file?.name || "",
-      filename: file?.name || "",
-      url: file?.url || "",
-      size: file?.size || 0,
-      type: file?.type || guessMimeTypeFromName(file?.name || ""),
-      kind: file?.kind || "",
-      content: file?.content || "",
-      preview: file?.preview || "",
-      extracted_chars: file?.extracted_chars || 0,
-    }));
+    const data = await parseJsonResponse(response, "Upload failed");
+
+    const uploaded =
+      data?.files ||
+      data?.attachments ||
+      data?.uploaded_files ||
+      [];
+
+    return Array.isArray(uploaded) ? uploaded : [];
   }
 
-  function guessMimeTypeFromName(name) {
-    const lower = String(name || "").toLowerCase();
-    if (lower.endsWith(".txt") || lower.endsWith(".md") || lower.endsWith(".log")) return "text/plain";
-    if (lower.endsWith(".json")) return "application/json";
-    if (lower.endsWith(".csv")) return "text/csv";
-    if (lower.endsWith(".pdf")) return "application/pdf";
-    if (lower.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/)) return "image/*";
-    return "";
-  }
+  function renderUserMessage(content, attachments) {
+    const renderer = getRenderer();
 
-  async function sendChat() {
-    if (state.sending) return;
-
-    const render = ensureRender();
-    const chatInput = $("#chatInput");
-    if (!chatInput) {
-      throw new Error("chatInput not found");
-    }
-
-    const userText = String(chatInput.value || "").trim();
-    const attachmentsForSend = currentPendingFiles();
-
-    if (!userText && !attachmentsForSend.length) {
+    if (renderer && typeof renderer.renderUserMessage === "function") {
+      renderer.renderUserMessage(content, {
+        time: nowTime(),
+        attachments: attachments || [],
+      });
       return;
     }
 
-    render.appendMessage(makeUserMessage(userText, attachmentsForSend));
+    document.dispatchEvent(new CustomEvent("nova:render:user", {
+      detail: {
+        content,
+        time: nowTime(),
+        attachments: attachments || [],
+      },
+    }));
+  }
 
-    chatInput.value = "";
-    clearPendingFiles();
-    setBusy(true);
+  function createPendingAssistantBubble() {
+    const renderer = getRenderer();
+    const pendingId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    state.pendingAssistantId = pendingId;
 
-    try {
-      const result = await callJson("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content: userText,
-          session_id: state.sessionId,
-          attachments: attachmentsForSend,
-        }),
+    if (renderer && typeof renderer.setPendingAssistantId === "function") {
+      renderer.setPendingAssistantId(pendingId);
+    }
+
+    if (renderer && typeof renderer.createPendingAssistantBubble === "function") {
+      renderer.createPendingAssistantBubble("...", { pendingId });
+      return;
+    }
+
+    document.dispatchEvent(new CustomEvent("nova:render:assistant-pending", {
+      detail: {
+        content: "...",
+        pendingId,
+      },
+    }));
+  }
+
+  function replacePendingAssistantBubble(payload) {
+    const renderer = getRenderer();
+
+    if (renderer && typeof renderer.setPendingAssistantId === "function") {
+      renderer.setPendingAssistantId(state.pendingAssistantId);
+    }
+
+    if (renderer && typeof renderer.renderAssistantPayload === "function") {
+      renderer.renderAssistantPayload(payload, {
+        replacePending: true,
+        pendingId: state.pendingAssistantId || "",
+        time: nowTime(),
       });
-
-      console.log("Nova route debug:", result?.debug || null);
-
-      const assistantMessage = makeAssistantMessage(result);
-      render.appendMessage(assistantMessage);
-
-      if (window.Nova?.artifacts?.reload) {
-        window.Nova.artifacts.reload().catch((err) => {
-          console.warn("Artifact reload failed after chat:", err);
-        });
-      }
-    } catch (error) {
-      console.error("sendChat failed:", error);
-      render.appendMessage({
-        id: `assistant_error_${Date.now()}`,
-        role: "assistant",
-        content: `Error: ${safeMessageText(error?.message || error)}`,
-        created_at: new Date().toISOString(),
+    } else if (renderer && typeof renderer.renderAssistantMessage === "function") {
+      renderer.renderAssistantMessage(extractAssistantText(payload) || "(empty response)", {
+        replacePending: true,
+        pendingId: state.pendingAssistantId || "",
+        time: nowTime(),
+        debug: extractResponseDebug(payload),
+        attachments: extractResponseAttachments(payload),
       });
-    } finally {
-      setBusy(false);
-      chatInput.focus();
+    } else {
+      document.dispatchEvent(new CustomEvent("nova:render:assistant-final", {
+        detail: {
+          payload,
+          replacePending: true,
+          pendingId: state.pendingAssistantId || "",
+          time: nowTime(),
+        },
+      }));
+    }
+
+    state.pendingAssistantId = null;
+
+    if (renderer && typeof renderer.setPendingAssistantId === "function") {
+      renderer.setPendingAssistantId(null);
+    }
+
+    if (window.NovaArtifacts && typeof window.NovaArtifacts.refresh === "function") {
+      window.dispatchEvent(new CustomEvent("nova:artifacts:refresh"));
     }
   }
 
-  function handleSend() {
-    sendChat().catch((err) => {
-      console.error("handleSend failed:", err);
+  function renderErrorBubble(error) {
+    replacePendingAssistantBubble({
+      message: `Error: ${error.message}`,
+      debug: {
+        failed: true,
+        error: error.message,
+      },
     });
   }
 
-  function installComposerEvents() {
-    const sendBtn = $("#sendBtn");
-    const chatInput = $("#chatInput");
-    const uploadBtn = $("#uploadBtn");
-    const fileInput = $("#fileInput");
+  async function sendMessage() {
+    if (state.isSending) return;
 
-    if (sendBtn) {
-      sendBtn.addEventListener("click", handleSend);
+    const text = (els.chatInput?.value || "").trim();
+    const hasFiles = state.pendingFiles.length > 0;
+
+    if (!text && !hasFiles) return;
+
+    setSending(true);
+
+    try {
+      let uploadedAttachments = [];
+
+      if (hasFiles) {
+        uploadedAttachments = await uploadPendingFiles();
+      }
+
+      const userText = text || "Describe or use the uploaded attachment(s).";
+
+      renderUserMessage(userText, uploadedAttachments);
+
+      if (els.chatInput) {
+        els.chatInput.value = "";
+        autosizeTextarea();
+      }
+
+      state.pendingFiles = [];
+      renderPendingFiles();
+
+      createPendingAssistantBubble();
+
+      const payload = {
+        content: userText,
+        session_id: state.sessionId,
+        attachments: uploadedAttachments,
+      };
+
+      const response = await fetch(CHAT_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await parseJsonResponse(response, "Chat failed");
+      replacePendingAssistantBubble(data);
+    } catch (error) {
+      renderErrorBubble(error);
+    } finally {
+      setSending(false);
+      if (els.chatInput) {
+        els.chatInput.focus();
+      }
+    }
+  }
+
+  function bindComposer() {
+    if (els.sendBtn) {
+      els.sendBtn.addEventListener("click", sendMessage);
     }
 
-    if (chatInput) {
-      chatInput.addEventListener("keydown", (event) => {
+    if (els.uploadBtn && els.fileInput) {
+      els.uploadBtn.addEventListener("click", () => {
+        els.fileInput.click();
+      });
+    }
+
+    if (els.fileInput) {
+      els.fileInput.addEventListener("change", (event) => {
+        const files = Array.from(event.target.files || []);
+        if (!files.length) return;
+
+        state.pendingFiles.push(...files);
+        renderPendingFiles();
+        event.target.value = "";
+      });
+    }
+
+    if (els.chatInput) {
+      els.chatInput.addEventListener("input", autosizeTextarea);
+
+      els.chatInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
-          handleSend();
+          sendMessage();
         }
       });
-    }
 
-    if (uploadBtn && fileInput) {
-      uploadBtn.addEventListener("click", () => {
-        fileInput.click();
-      });
-    }
-
-    if (fileInput) {
-      fileInput.addEventListener("change", async (event) => {
-        const files = event.target.files;
-        if (!files || !files.length) return;
-
-        try {
-          setBusy(true);
-          const uploaded = await uploadSelectedFiles(files);
-          state.pendingFiles.push(...uploaded);
-          renderPendingFiles();
-        } catch (error) {
-          console.error("Upload failed:", error);
-          const render = window.Nova?.render;
-          if (render?.appendMessage) {
-            render.appendMessage({
-              id: `upload_error_${Date.now()}`,
-              role: "assistant",
-              content: `Upload failed: ${safeMessageText(error?.message || error)}`,
-              created_at: new Date().toISOString(),
-            });
-          }
-        } finally {
-          setBusy(false);
-          fileInput.value = "";
-        }
-      });
+      autosizeTextarea();
     }
   }
 
-  async function loadInitialState() {
-    try {
-      const result = await callJson(`/api/state?session_id=${encodeURIComponent(state.sessionId)}`);
-      const session = result?.session || {};
-      const messages = Array.isArray(session?.messages) ? session.messages : [];
-
-      if (window.Nova?.render?.renderMessages) {
-        window.Nova.render.renderMessages(messages);
-      }
-
-      if (window.Nova?.artifacts?.reload) {
-        await window.Nova.artifacts.reload();
-      }
-    } catch (error) {
-      console.warn("Initial state load failed:", error);
+  function init() {
+    if (!els.chatInput || !els.sendBtn) {
+      console.warn("nova-composer-bundle: required DOM missing");
+      return;
     }
-  }
 
-  async function bootstrap() {
-    installComposerEvents();
-    installPendingFileEvents();
+    bindComposer();
     renderPendingFiles();
-    await loadInitialState();
+    log();
   }
 
-  Nova.composer.sendChat = sendChat;
-  Nova.composer.safeMessageText = safeMessageText;
-  Nova.composer.getPendingFiles = currentPendingFiles;
-  Nova.composer.clearPendingFiles = clearPendingFiles;
+  window.NovaComposer = {
+    sendMessage,
+    getState() {
+      return {
+        sessionId: state.sessionId,
+        pendingFiles: [...state.pendingFiles],
+        isSending: state.isSending,
+        pendingAssistantId: state.pendingAssistantId,
+      };
+    },
+  };
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bootstrap);
+    document.addEventListener("DOMContentLoaded", init, { once: true });
   } else {
-    bootstrap();
+    init();
   }
-
-  console.log("nova-composer-bundle loaded");
 })();

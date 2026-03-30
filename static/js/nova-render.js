@@ -1,15 +1,21 @@
-(() => {
+(function () {
   "use strict";
 
-  const Nova = (window.Nova = window.Nova || {});
-  Nova.render = Nova.render || {};
+  const els = {
+    messages: document.getElementById("messages"),
+    emptyState: document.getElementById("novaEmptyState"),
+  };
 
-  function $(selector, root = document) {
-    return root.querySelector(selector);
+  const state = {
+    pendingAssistantId: null,
+  };
+
+  function log(...args) {
+    console.log("nova-render loaded", ...args);
   }
 
   function escapeHtml(value) {
-    return String(value ?? "")
+    return String(value == null ? "" : value)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
@@ -17,268 +23,500 @@
       .replace(/'/g, "&#039;");
   }
 
-  function safeText(content) {
-    if (content == null) return "";
+  function nowTime() {
+    return new Date().toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
 
-    if (typeof content === "string") {
-      return content;
-    }
+  function setEmptyStateVisible(visible) {
+    if (!els.emptyState) return;
+    els.emptyState.style.display = visible ? "" : "none";
+  }
 
-    if (typeof content === "number" || typeof content === "boolean") {
-      return String(content);
-    }
+  function scrollMessagesToBottom() {
+    if (!els.messages) return;
+    els.messages.scrollTop = els.messages.scrollHeight;
+  }
 
-    if (Array.isArray(content)) {
-      return content
-        .map((item) => {
-          if (item == null) return "";
-          if (typeof item === "string") return item;
-          if (typeof item === "number" || typeof item === "boolean") return String(item);
+  function safeArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
 
-          if (typeof item === "object") {
-            if (typeof item.text === "string") return item.text;
-            if (typeof item.content === "string") return item.content;
+  function normalizeText(value) {
+    if (value == null) return "";
+    if (typeof value === "string") return value;
 
-            if (Array.isArray(item.content)) {
-              return item.content
-                .map((part) => {
-                  if (typeof part === "string") return part;
-                  if (part && typeof part.text === "string") return part.text;
-                  try {
-                    return JSON.stringify(part, null, 2);
-                  } catch {
-                    return String(part);
-                  }
-                })
-                .join("\n");
-            }
+    if (typeof value === "object") {
+      if (typeof value.content === "string") return value.content;
+      if (typeof value.text === "string") return value.text;
 
-            try {
-              return JSON.stringify(item, null, 2);
-            } catch {
-              return String(item);
-            }
-          }
-
-          return String(item);
-        })
-        .filter(Boolean)
-        .join("\n");
-    }
-
-    if (typeof content === "object") {
-      if (typeof content.text === "string") return content.text;
-      if (typeof content.content === "string") return content.content;
-      if (typeof content.message === "string") return content.message;
-
-      if (content.message && typeof content.message === "object") {
-        if (typeof content.message.content === "string") return content.message.content;
-        if (typeof content.message.text === "string") return content.message.text;
-      }
-
-      if (Array.isArray(content.output)) {
-        const outputText = content.output
-          .map((entry) => {
-            if (!entry) return "";
-
-            if (typeof entry.text === "string") return entry.text;
-
-            if (Array.isArray(entry.content)) {
-              return entry.content
-                .map((part) => {
-                  if (!part) return "";
-                  if (typeof part.text === "string") return part.text;
-                  if (typeof part.content === "string") return part.content;
-                  try {
-                    return JSON.stringify(part, null, 2);
-                  } catch {
-                    return String(part);
-                  }
-                })
-                .filter(Boolean)
-                .join("\n");
-            }
-
-            try {
-              return JSON.stringify(entry, null, 2);
-            } catch {
-              return String(entry);
-            }
-          })
-          .filter(Boolean)
-          .join("\n");
-
-        if (outputText.trim()) return outputText;
-      }
-
-      try {
-        return JSON.stringify(content, null, 2);
-      } catch {
-        return String(content);
+      if (Array.isArray(value.parts)) {
+        return value.parts.map((part) => {
+          if (typeof part === "string") return part;
+          if (part && typeof part.text === "string") return part.text;
+          return "";
+        }).join("\n");
       }
     }
 
-    return String(content);
+    return String(value);
   }
 
-  function formatTimestamp(value) {
-    if (!value) return "";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  function extractAssistantText(payload) {
+    if (!payload || typeof payload !== "object") return "";
+
+    if (typeof payload.message === "string") return payload.message;
+    if (typeof payload.reply === "string") return payload.reply;
+    if (typeof payload.response === "string") return payload.response;
+    if (typeof payload.output_text === "string") return payload.output_text;
+
+    if (payload.assistant_message) {
+      const direct =
+        normalizeText(payload.assistant_message.content) ||
+        normalizeText(payload.assistant_message);
+      if (direct) return direct;
+    }
+
+    if (payload.data && typeof payload.data === "object") {
+      const nested =
+        payload.data.message ||
+        payload.data.reply ||
+        payload.data.response ||
+        normalizeText(payload.data.assistant_message?.content) ||
+        normalizeText(payload.data.assistant_message);
+      if (nested) return normalizeText(nested);
+    }
+
+    return "";
   }
 
-  function getRoleLabel(role) {
-    const normalized = String(role || "").toLowerCase();
-    if (normalized === "assistant") return "CHAT";
-    if (normalized === "user") return "USER";
-    if (normalized === "system") return "SYSTEM";
-    return normalized ? normalized.toUpperCase() : "CHAT";
+  function extractDebug(payload) {
+    if (!payload || typeof payload !== "object") return null;
+    return payload.debug || payload.meta || payload.assistant_message?.meta || null;
   }
 
-  function normalizeMessage(input) {
-    const raw = input || {};
+  function extractAttachments(payload) {
+    if (!payload || typeof payload !== "object") return [];
+    if (Array.isArray(payload.attachments)) return payload.attachments;
+    if (Array.isArray(payload.assistant_message?.attachments)) {
+      return payload.assistant_message.attachments;
+    }
+    return [];
+  }
+
+  function normalizeAttachment(attachment) {
+    if (!attachment || typeof attachment !== "object") {
+      return {
+        url: "#",
+        label: "attachment",
+      };
+    }
+
     return {
-      id: raw.id || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      role: raw.role || "assistant",
-      content: safeText(raw.content),
-      created_at: raw.created_at || "",
-      attachments: Array.isArray(raw.attachments) ? raw.attachments : [],
-      debug: raw.debug || null,
-      meta: raw.meta || null,
-      raw,
+      url:
+        attachment.url ||
+        attachment.file_url ||
+        attachment.path ||
+        attachment.href ||
+        "#",
+      label:
+        attachment.name ||
+        attachment.filename ||
+        attachment.title ||
+        "attachment",
     };
   }
 
-  function renderAttachments(attachments) {
-    if (!Array.isArray(attachments) || !attachments.length) return "";
+  function createAttachmentsNode(attachments) {
+    const list = safeArray(attachments).map(normalizeAttachment).filter(Boolean);
+    if (!list.length) return null;
 
-    return `
-      <div class="nova-message-attachments">
-        ${attachments
-          .map((file) => {
-            const name = escapeHtml(file?.name || file?.filename || "attachment");
-            const url = file?.url ? escapeHtml(file.url) : "";
-            if (url) {
-              return `<a class="nova-attachment-chip" href="${url}" target="_blank" rel="noopener noreferrer">${name}</a>`;
-            }
-            return `<span class="nova-attachment-chip">${name}</span>`;
-          })
-          .join("")}
-      </div>
-    `;
+    const wrap = document.createElement("div");
+    wrap.className = "nova-message-attachments";
+
+    list.forEach((item) => {
+      const chip = document.createElement("a");
+      chip.className = "nova-attachment-chip";
+      chip.href = item.url;
+      chip.target = "_blank";
+      chip.rel = "noreferrer";
+      chip.textContent = item.label;
+      wrap.appendChild(chip);
+    });
+
+    return wrap;
   }
 
-  function renderDebugBlock(message) {
-    if (!message.debug) return "";
-    return `
-      <details class="nova-message-debug">
-        <summary>debug</summary>
-        <pre>${escapeHtml(safeText(message.debug))}</pre>
-      </details>
-    `;
+  function createDebugNode(debug) {
+    if (!debug) return null;
+
+    const details = document.createElement("details");
+    details.className = "nova-message-debug";
+
+    const summary = document.createElement("summary");
+    summary.textContent = "Debug";
+
+    const pre = document.createElement("pre");
+    pre.textContent = JSON.stringify(debug, null, 2);
+
+    details.appendChild(summary);
+    details.appendChild(pre);
+    return details;
   }
 
-  function messageHtml(message) {
-    const roleLabel = getRoleLabel(message.role);
-    const content = escapeHtml(message.content || "");
-    const time = formatTimestamp(message.created_at);
+  function createMessageElement({
+    role = "assistant",
+    content = "",
+    time = "",
+    debug = null,
+    attachments = [],
+    pending = false,
+    pendingId = "",
+    messageId = "",
+  }) {
+    const wrapper = document.createElement("div");
+    wrapper.className = `nova-message nova-message-${role}`;
 
-    return `
-      <article class="nova-message nova-message-${escapeHtml(String(message.role || "assistant").toLowerCase())}" data-message-id="${escapeHtml(message.id)}">
-        <div class="nova-message-inner">
-          <div class="nova-message-head">
-            <div class="nova-message-role">${roleLabel}</div>
-            ${time ? `<div class="nova-message-time">${escapeHtml(time)}</div>` : ""}
-          </div>
-          <div class="nova-message-markdown">${content.replace(/\n/g, "<br>")}</div>
-          ${renderAttachments(message.attachments)}
-          ${renderDebugBlock(message)}
-        </div>
-      </article>
-    `;
+    if (pending) wrapper.dataset.pending = "true";
+    if (pendingId) wrapper.dataset.pendingId = pendingId;
+    if (messageId) wrapper.dataset.messageId = messageId;
+
+    const inner = document.createElement("div");
+    inner.className = "nova-message-inner";
+
+    const head = document.createElement("div");
+    head.className = "nova-message-head";
+
+    const roleEl = document.createElement("div");
+    roleEl.className = "nova-message-role";
+    roleEl.textContent = role === "user" ? "YOU" : "NOVA";
+
+    const timeEl = document.createElement("div");
+    timeEl.className = "nova-message-time";
+    timeEl.textContent = time || nowTime();
+
+    head.appendChild(roleEl);
+    head.appendChild(timeEl);
+
+    const body = document.createElement("div");
+    body.className = "nova-message-markdown";
+    body.textContent = content || "";
+
+    inner.appendChild(head);
+    inner.appendChild(body);
+
+    const attachmentsNode = createAttachmentsNode(attachments);
+    if (attachmentsNode) {
+      inner.appendChild(attachmentsNode);
+    }
+
+    const debugNode = createDebugNode(debug);
+    if (debugNode) {
+      inner.appendChild(debugNode);
+    }
+
+    wrapper.appendChild(inner);
+    return wrapper;
   }
 
-  function renderMessages(messages, options = {}) {
-    const container =
-      options.container ||
-      $("#messages") ||
-      $("#novaMessages") ||
-      $('[data-messages]');
+  function updateMessageElement(node, {
+    content,
+    debug,
+    attachments,
+    pending = false,
+    pendingId = "",
+    messageId = "",
+  }) {
+    if (!node) return;
 
-    if (!container) {
-      console.warn("Nova render: message container not found");
+    const body = node.querySelector(".nova-message-markdown");
+    if (body) {
+      body.textContent = content || "";
+    }
+
+    const existingAttachments = node.querySelector(".nova-message-attachments");
+    if (existingAttachments) {
+      existingAttachments.remove();
+    }
+
+    const attachmentsNode = createAttachmentsNode(attachments);
+    if (attachmentsNode) {
+      const inner = node.querySelector(".nova-message-inner");
+      if (inner) inner.appendChild(attachmentsNode);
+    }
+
+    const existingDebug = node.querySelector(".nova-message-debug");
+    if (existingDebug) {
+      existingDebug.remove();
+    }
+
+    const debugNode = createDebugNode(debug);
+    if (debugNode) {
+      const inner = node.querySelector(".nova-message-inner");
+      if (inner) inner.appendChild(debugNode);
+    }
+
+    if (pending) {
+      node.dataset.pending = "true";
+    } else {
+      delete node.dataset.pending;
+    }
+
+    if (pendingId) {
+      node.dataset.pendingId = pendingId;
+    } else {
+      delete node.dataset.pendingId;
+    }
+
+    if (messageId) {
+      node.dataset.messageId = messageId;
+    }
+
+    scrollMessagesToBottom();
+  }
+
+  function findPendingAssistantNode(pendingId) {
+    if (!els.messages) return null;
+
+    if (pendingId) {
+      try {
+        const node = els.messages.querySelector(
+          `.nova-message-assistant[data-pending-id="${CSS.escape(pendingId)}"]`
+        );
+        if (node) return node;
+      } catch (error) {
+        // ignore bad selector edge case
+      }
+    }
+
+    return els.messages.querySelector('.nova-message-assistant[data-pending="true"]');
+  }
+
+  function appendMessage(message) {
+    if (!els.messages) return null;
+    setEmptyStateVisible(false);
+
+    const node = createMessageElement(message);
+    els.messages.appendChild(node);
+    scrollMessagesToBottom();
+    return node;
+  }
+
+  function replacePendingAssistant(message, options = {}) {
+    if (!els.messages) return null;
+
+    const pendingId =
+      options.pendingId ||
+      message.pendingId ||
+      state.pendingAssistantId ||
+      "";
+
+    let node = findPendingAssistantNode(pendingId);
+
+    if (node) {
+      updateMessageElement(node, {
+        content: message.content || "",
+        debug: message.debug || null,
+        attachments: safeArray(message.attachments),
+        pending: false,
+        pendingId: "",
+        messageId: message.messageId || "",
+      });
+      state.pendingAssistantId = null;
+      return node;
+    }
+
+    state.pendingAssistantId = null;
+    return appendMessage({
+      role: "assistant",
+      content: message.content || "",
+      time: message.time || nowTime(),
+      debug: message.debug || null,
+      attachments: safeArray(message.attachments),
+      pending: false,
+      pendingId: "",
+      messageId: message.messageId || "",
+    });
+  }
+
+  function createPendingAssistantBubble(content = "...", options = {}) {
+    if (!els.messages) return null;
+
+    const pendingId =
+      options.pendingId ||
+      `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const existing = findPendingAssistantNode(pendingId);
+    if (existing) {
+      state.pendingAssistantId = pendingId;
+      return existing;
+    }
+
+    state.pendingAssistantId = pendingId;
+
+    return appendMessage({
+      role: "assistant",
+      content,
+      time: nowTime(),
+      pending: true,
+      pendingId,
+      messageId: "",
+    });
+  }
+
+  function renderUserMessage(content, options = {}) {
+    return appendMessage({
+      role: "user",
+      content: normalizeText(content),
+      time: options.time || nowTime(),
+      debug: options.debug || null,
+      attachments: safeArray(options.attachments),
+      pending: false,
+      pendingId: "",
+      messageId: options.messageId || "",
+    });
+  }
+
+  function renderAssistantMessage(content, options = {}) {
+    const normalized = normalizeText(content);
+
+    if (options.replacePending) {
+      return replacePendingAssistant({
+        content: normalized,
+        time: options.time || nowTime(),
+        debug: options.debug || null,
+        attachments: safeArray(options.attachments),
+        messageId: options.messageId || "",
+      }, {
+        pendingId: options.pendingId || "",
+      });
+    }
+
+    return appendMessage({
+      role: "assistant",
+      content: normalized,
+      time: options.time || nowTime(),
+      debug: options.debug || null,
+      attachments: safeArray(options.attachments),
+      pending: !!options.pending,
+      pendingId: options.pendingId || "",
+      messageId: options.messageId || "",
+    });
+  }
+
+  function renderAssistantPayload(payload, options = {}) {
+    const text = extractAssistantText(payload) || "(empty response)";
+    const debug = extractDebug(payload);
+    const attachments = extractAttachments(payload);
+    const messageId =
+      payload?.assistant_message?.id ||
+      payload?.message_id ||
+      "";
+
+    return renderAssistantMessage(text, {
+      time: options.time || nowTime(),
+      debug,
+      attachments,
+      replacePending: options.replacePending !== false,
+      pendingId: options.pendingId || state.pendingAssistantId || "",
+      messageId,
+    });
+  }
+
+  function clearMessages() {
+    if (!els.messages) return;
+
+    Array.from(els.messages.children).forEach((child) => {
+      if (child.id === "novaEmptyState") return;
+      child.remove();
+    });
+
+    state.pendingAssistantId = null;
+    setEmptyStateVisible(true);
+  }
+
+  function removeMessageByMessageId(messageId) {
+    if (!els.messages || !messageId) return false;
+    const node = els.messages.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+    if (!node) return false;
+    node.remove();
+    setEmptyStateVisible(els.messages.children.length <= 1);
+    return true;
+  }
+
+  function init() {
+    if (!els.messages) {
+      console.warn("nova-render: #messages missing");
       return;
     }
 
-    const normalized = Array.isArray(messages)
-      ? messages.map(normalizeMessage)
-      : [];
-
-    container.innerHTML = normalized.map(messageHtml).join("");
-
-    const emptyState =
-      $("#novaEmptyState") ||
-      $('[data-empty-state]');
-
-    if (emptyState) {
-      emptyState.style.display = normalized.length ? "none" : "";
-    }
-
-    container.scrollTop = container.scrollHeight;
+    setEmptyStateVisible(els.messages.children.length <= 1);
+    log();
   }
 
-  function appendMessage(message, options = {}) {
-    const container =
-      options.container ||
-      $("#messages") ||
-      $("#novaMessages") ||
-      $('[data-messages]');
+  const NovaRender = {
+    appendMessage,
+    createMessageElement,
+    updateMessageElement,
+    renderUserMessage,
+    renderAssistantMessage,
+    renderAssistantPayload,
+    createPendingAssistantBubble,
+    replacePendingAssistant,
+    clearMessages,
+    removeMessageByMessageId,
+    setEmptyStateVisible,
+    scrollMessagesToBottom,
+    extractAssistantText,
+    extractDebug,
+    extractAttachments,
+    getState() {
+      return {
+        pendingAssistantId: state.pendingAssistantId,
+      };
+    },
+    setPendingAssistantId(value) {
+      state.pendingAssistantId = value || null;
+    },
+  };
 
-    if (!container) {
-      console.warn("Nova render: message container not found");
+  window.NovaRender = NovaRender;
+
+  document.addEventListener("nova:render:user", (event) => {
+    const detail = event.detail || {};
+    NovaRender.renderUserMessage(detail.content || "", detail);
+  });
+
+  document.addEventListener("nova:render:assistant-pending", (event) => {
+    const detail = event.detail || {};
+    NovaRender.createPendingAssistantBubble(detail.content || "...", detail);
+  });
+
+  document.addEventListener("nova:render:assistant-final", (event) => {
+    const detail = event.detail || {};
+    if (detail.payload) {
+      NovaRender.renderAssistantPayload(detail.payload, {
+        ...detail,
+        replacePending: true,
+      });
       return;
     }
 
-    const normalized = normalizeMessage(message);
-    container.insertAdjacentHTML("beforeend", messageHtml(normalized));
+    NovaRender.renderAssistantMessage(detail.content || "", {
+      ...detail,
+      replacePending: true,
+    });
+  });
 
-    const emptyState =
-      $("#novaEmptyState") ||
-      $('[data-empty-state]');
+  document.addEventListener("nova:render:clear", () => {
+    NovaRender.clearMessages();
+  });
 
-    if (emptyState) {
-      emptyState.style.display = "none";
-    }
-
-    container.scrollTop = container.scrollHeight;
-    return normalized;
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init, { once: true });
+  } else {
+    init();
   }
-
-  function clearMessages(options = {}) {
-    const container =
-      options.container ||
-      $("#messages") ||
-      $("#novaMessages") ||
-      $('[data-messages]');
-
-    if (!container) return;
-    container.innerHTML = "";
-
-    const emptyState =
-      $("#novaEmptyState") ||
-      $('[data-empty-state]');
-
-    if (emptyState) {
-      emptyState.style.display = "";
-    }
-  }
-
-  Nova.render.safeText = safeText;
-  Nova.render.normalizeMessage = normalizeMessage;
-  Nova.render.renderMessages = renderMessages;
-  Nova.render.appendMessage = appendMessage;
-  Nova.render.clearMessages = clearMessages;
-
-  console.log("nova-render loaded");
 })();

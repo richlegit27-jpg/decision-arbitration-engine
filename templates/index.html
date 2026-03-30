@@ -4,7 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nova Ultimate 2026</title>
+
   <link rel="stylesheet" href="/static/css/nova-main.css?v=endgame" />
+
   <style>
     :root {
       --bg: #07111f;
@@ -12,16 +14,21 @@
       --panel: rgba(12, 20, 37, 0.94);
       --panel-2: rgba(16, 27, 49, 0.97);
       --line: rgba(130, 158, 222, 0.14);
+      --line-strong: rgba(130, 158, 222, 0.24);
       --text: #eef4ff;
       --muted: #9cafcf;
       --accent: #6ea8ff;
       --accent-soft: rgba(110, 168, 255, 0.16);
       --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      --rail-w: 430px;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
-    html, body {
+    html,
+    body {
       margin: 0;
       padding: 0;
       width: 100%;
@@ -32,9 +39,15 @@
       font-family: "Segoe UI", sans-serif;
     }
 
+    button,
+    input,
+    textarea {
+      font: inherit;
+    }
+
     .nova-app-shell {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 380px;
+      grid-template-columns: minmax(0, 1fr) var(--rail-w);
       width: 100%;
       height: 100vh;
       overflow: hidden;
@@ -51,10 +64,18 @@
 
     .nova-topbar {
       flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
       padding: 16px 18px;
       border-bottom: 1px solid var(--line);
-      background: rgba(255,255,255,0.02);
+      background: rgba(255, 255, 255, 0.02);
       backdrop-filter: blur(10px);
+    }
+
+    .nova-topbar-copy {
+      min-width: 0;
     }
 
     .nova-title {
@@ -67,6 +88,27 @@
       font-size: 12px;
       color: var(--muted);
       margin-top: 4px;
+    }
+
+    .nova-rail-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .nova-rail-tab {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    .nova-rail-tab.is-active {
+      background: var(--accent-soft);
+      border-color: rgba(110, 168, 255, 0.35);
+      color: #dcecff;
     }
 
     .nova-chat-wrap {
@@ -223,7 +265,6 @@
       background: rgba(255,255,255,0.05);
       color: var(--text);
       padding: 12px 14px;
-      font: inherit;
       outline: none;
     }
 
@@ -240,8 +281,9 @@
     }
 
     #sendBtn:hover,
-    #uploadBtn:hover {
-      background: rgba(255,255,255,0.1);
+    #uploadBtn:hover,
+    .nova-rail-tab:hover {
+      background: rgba(255,255,255,0.10);
     }
 
     .nova-right-rail {
@@ -253,7 +295,7 @@
       overflow: hidden;
     }
 
-    .nova-rail-head {
+    .nova-right-rail-head {
       flex: 0 0 auto;
       padding: 16px 18px;
       border-bottom: 1px solid var(--line);
@@ -261,21 +303,142 @@
       font-weight: 700;
     }
 
-    #novaArtifactsPanel {
+    .nova-right-rail-panels {
+      flex: 1 1 auto;
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .nova-rail-panel {
+      position: absolute;
+      inset: 0;
+      display: none;
+      min-height: 0;
+      min-width: 0;
+      background: transparent;
+    }
+
+    .nova-rail-panel.is-active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .nova-rail-panel-body {
       flex: 1 1 auto;
       min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
+      padding: 12px;
+    }
+
+    .nova-panel-empty {
+      color: var(--muted);
+      font-size: 13px;
+      padding: 10px 4px;
+    }
+
+    .nova-panel-block {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .nova-panel-block-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .nova-panel-block-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .nova-panel-block-content {
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    #artifactsPanel {
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .nova-artifacts-toolbar {
+      flex: 0 0 auto;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #artifactSearch {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      padding: 10px 12px;
+      outline: none;
+    }
+
+    .nova-artifacts-toolbar-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    #artifactPinnedOnly,
+    #artifactRefreshBtn,
+    #artifactCleanBtn {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+    }
+
+    .nova-artifacts-split {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 42% 58%;
+      overflow: hidden;
+    }
+
+    #artifactList {
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      border-right: 1px solid var(--line);
+      padding: 12px;
+    }
+
+    #artifactViewer {
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 12px;
     }
 
     @media (max-width: 1100px) {
-      html, body {
+      html,
+      body {
         overflow: auto;
       }
 
       .nova-app-shell {
         grid-template-columns: 1fr;
-        grid-template-rows: minmax(0, 1fr) 320px;
+        grid-template-rows: minmax(0, 1fr) 360px;
         height: auto;
         min-height: 100vh;
       }
@@ -286,7 +449,16 @@
 
       .nova-right-rail {
         border-top: 1px solid var(--line);
-        min-height: 320px;
+        min-height: 360px;
+      }
+
+      .nova-artifacts-split {
+        grid-template-columns: 1fr;
+      }
+
+      #artifactList {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
       }
     }
   </style>
@@ -295,8 +467,16 @@
   <div class="nova-app-shell" id="novaAppShell">
     <main class="nova-main">
       <div class="nova-topbar">
-        <div class="nova-title">Nova Ultimate 2026</div>
-        <div class="nova-subtitle">Stateful chat • artifacts • brain retrieval</div>
+        <div class="nova-topbar-copy">
+          <div class="nova-title">Nova Ultimate 2026</div>
+          <div class="nova-subtitle">Stateful chat • artifacts • brain retrieval • web</div>
+        </div>
+
+        <div class="nova-rail-tabs">
+          <button id="memoryPanelToggle" class="nova-rail-tab" type="button">Memory</button>
+          <button id="artifactsPanelToggle" class="nova-rail-tab is-active" type="button">Artifacts</button>
+          <button id="webPanelToggle" class="nova-rail-tab" type="button">Web</button>
+        </div>
       </div>
 
       <div class="nova-chat-wrap">
@@ -307,10 +487,13 @@
 
       <div class="nova-composer-wrap">
         <div id="novaPendingFiles" class="nova-pending-files"></div>
+
         <div class="nova-composer">
           <textarea id="chatInput" placeholder="Type your message..."></textarea>
+
           <button id="uploadBtn" type="button">Upload</button>
           <button id="sendBtn" type="button">Send</button>
+
           <input
             type="file"
             id="fileInput"
@@ -322,18 +505,101 @@
       </div>
     </main>
 
-    <aside class="nova-right-rail">
-      <div class="nova-rail-head">Artifacts</div>
-      <div id="novaArtifactsPanel">
-        <div id="novaArtifactsList"></div>
-        <div class="nova-artifact-viewer-fallback">
-          <div id="novaArtifactViewerTitle" style="font-weight:700;margin-bottom:6px;"></div>
-          <div id="novaArtifactViewerMeta" style="font-size:12px;opacity:.72;margin-bottom:10px;"></div>
-          <pre id="novaArtifactViewerContent" style="white-space:pre-wrap;word-break:break-word;"></pre>
-        </div>
+    <aside class="nova-right-rail" id="rightRail">
+      <div class="nova-right-rail-head">Nova Right Rail</div>
+
+      <div class="nova-right-rail-panels">
+
+        <!-- MEMORY -->
+        <section id="memoryPanel" class="nova-rail-panel">
+          <div class="nova-rail-panel-body">
+            <div id="memoryList">
+              <div class="nova-panel-empty">No memory loaded yet.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ARTIFACTS -->
+        <section id="artifactsPanel" class="nova-rail-panel is-active">
+          <div class="nova-artifacts-toolbar">
+            <input id="artifactSearch" type="text" placeholder="Search artifacts..." />
+
+            <div class="nova-artifacts-toolbar-row">
+              <button id="artifactPinnedOnly" type="button">Pinned</button>
+              <button id="artifactRefreshBtn" type="button">Refresh</button>
+              <button id="artifactCleanBtn" type="button">Clean</button>
+            </div>
+          </div>
+
+          <div class="nova-artifacts-split">
+            <div id="artifactList"></div>
+            <div id="artifactViewer">
+              <div class="nova-panel-empty">Select an artifact to view it here.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- WEB -->
+        <section id="webPanel" class="nova-rail-panel">
+          <div class="nova-rail-panel-body">
+            <div id="webPreviewList">
+              <div class="nova-panel-empty">No web preview yet.</div>
+            </div>
+          </div>
+        </section>
+
       </div>
     </aside>
   </div>
+
+  <script>
+    (function () {
+      const panelToggles = {
+        memory: document.getElementById("memoryPanelToggle"),
+        artifacts: document.getElementById("artifactsPanelToggle"),
+        web: document.getElementById("webPanelToggle")
+      };
+
+      const panels = {
+        memory: document.getElementById("memoryPanel"),
+        artifacts: document.getElementById("artifactsPanel"),
+        web: document.getElementById("webPanel")
+      };
+
+      function openPanel(name) {
+        Object.keys(panels).forEach((key) => {
+          const panel = panels[key];
+          const toggle = panelToggles[key];
+          if (panel) {
+            panel.classList.toggle("is-active", key === name);
+          }
+          if (toggle) {
+            toggle.classList.toggle("is-active", key === name);
+          }
+        });
+      }
+
+      if (panelToggles.memory) {
+        panelToggles.memory.addEventListener("click", function () {
+          openPanel("memory");
+        });
+      }
+
+      if (panelToggles.artifacts) {
+        panelToggles.artifacts.addEventListener("click", function () {
+          openPanel("artifacts");
+        });
+      }
+
+      if (panelToggles.web) {
+        panelToggles.web.addEventListener("click", function () {
+          openPanel("web");
+        });
+      }
+
+      openPanel("artifacts");
+    })();
+  </script>
 
   <script src="/static/js/nova-render.js?v=endgame"></script>
   <script src="/static/js/nova-artifacts.js?v=endgame"></script>
