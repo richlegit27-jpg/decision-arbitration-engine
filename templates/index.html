@@ -6,419 +6,337 @@
   <title>Nova Ultimate 2026</title>
   <link rel="stylesheet" href="/static/css/nova-main.css?v=endgame" />
   <style>
-    .nova-app-shell {
-      display: grid;
-      grid-template-columns: 1fr 380px;
-      min-height: 100vh;
-      background: var(--bg, #07111f);
-      color: var(--text, #eef4ff);
+    :root {
+      --bg: #07111f;
+      --bg-2: #0b1730;
+      --panel: rgba(12, 20, 37, 0.94);
+      --panel-2: rgba(16, 27, 49, 0.97);
+      --line: rgba(130, 158, 222, 0.14);
+      --text: #eef4ff;
+      --muted: #9cafcf;
+      --accent: #6ea8ff;
+      --accent-soft: rgba(110, 168, 255, 0.16);
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
     }
 
-    .nova-main-shell {
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(180deg, var(--bg), var(--bg-2));
+      color: var(--text);
+      font-family: "Segoe UI", sans-serif;
+    }
+
+    .nova-app-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 380px;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .nova-main {
+      min-width: 0;
+      min-height: 0;
       display: flex;
       flex-direction: column;
-      min-width: 0;
-      min-height: 100vh;
+      border-right: 1px solid var(--line);
+      overflow: hidden;
     }
 
     .nova-topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
+      flex: 0 0 auto;
       padding: 16px 18px;
-      border-bottom: 1px solid var(--line, rgba(130, 158, 222, 0.14));
-      background: var(--panel, rgba(12, 20, 37, 0.94));
-      position: sticky;
-      top: 0;
-      z-index: 10;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.02);
       backdrop-filter: blur(10px);
     }
 
-    .nova-brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 0;
-    }
-
-    .nova-brand-mark {
-      width: 38px;
-      height: 38px;
-      border-radius: 12px;
-      display: grid;
-      place-items: center;
-      font-weight: 800;
-      background: var(--accent-soft, rgba(110, 168, 255, 0.16));
-      color: var(--accent, #6ea8ff);
-      flex: 0 0 auto;
-    }
-
-    .nova-brand-copy {
-      min-width: 0;
-    }
-
-    .nova-brand-title {
-      font-size: 16px;
-      font-weight: 800;
-      line-height: 1.1;
-    }
-
-    .nova-brand-subtitle {
-      font-size: 12px;
-      color: var(--muted, #9cafcf);
-      line-height: 1.2;
-    }
-
-    .nova-topbar-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .nova-topbar-btn {
-      appearance: none;
-      border: 1px solid var(--line, rgba(130, 158, 222, 0.14));
-      background: rgba(255, 255, 255, 0.04);
-      color: inherit;
-      border-radius: 12px;
-      padding: 10px 12px;
-      cursor: pointer;
+    .nova-title {
+      font-size: 18px;
       font-weight: 700;
+      margin: 0;
     }
 
-    .nova-topbar-btn:hover {
-      border-color: var(--accent, #6ea8ff);
-      background: rgba(110, 168, 255, 0.08);
+    .nova-subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
     }
 
-    .nova-chat-stage {
+    .nova-chat-wrap {
+      flex: 1 1 auto;
+      min-height: 0;
+      min-width: 0;
+      position: relative;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
-      flex: 1;
-      min-height: 0;
     }
 
     .nova-chat-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      padding: 18px;
-      flex: 1;
+      flex: 1 1 auto;
       min-height: 0;
       overflow-y: auto;
+      overflow-x: hidden;
+      padding: 18px;
+      padding-bottom: 28px;
+      scroll-behavior: smooth;
     }
 
     .nova-empty-state {
-      padding: 18px;
-      color: var(--muted, #9cafcf);
-      display: none;
+      padding: 20px 18px 0 18px;
+      color: var(--muted);
+      font-size: 14px;
     }
 
     .nova-message {
-      display: flex;
-      width: 100%;
-    }
-
-    .nova-message-user {
-      justify-content: flex-end;
-    }
-
-    .nova-message-assistant {
-      justify-content: flex-start;
+      margin-bottom: 14px;
     }
 
     .nova-message-inner {
-      width: min(840px, 100%);
-      padding: 12px 14px;
+      background: rgba(255,255,255,0.035);
+      border: 1px solid var(--line);
       border-radius: 16px;
-      border: 1px solid var(--line, rgba(130, 158, 222, 0.14));
-      background: rgba(255, 255, 255, 0.05);
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+      padding: 14px;
+      box-shadow: var(--shadow);
     }
 
     .nova-message-user .nova-message-inner {
-      background: rgba(90, 140, 255, 0.16);
+      background: rgba(110, 168, 255, 0.08);
     }
 
-    .nova-message-badges {
+    .nova-message-head {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 8px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      gap: 12px;
     }
 
-    .nova-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: var(--accent, #6ea8ff);
-      background: var(--accent-soft, rgba(110, 168, 255, 0.16));
-      border: 1px solid rgba(110, 168, 255, 0.18);
+    .nova-message-role {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.08em;
+    }
+
+    .nova-message-time {
+      font-size: 12px;
+      color: var(--muted);
     }
 
     .nova-message-markdown {
-      white-space: normal;
+      white-space: pre-wrap;
       word-break: break-word;
       line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .nova-message-attachments {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .nova-attachment-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      text-decoration: none;
+      font-size: 12px;
+    }
+
+    .nova-attachment-chip-remove {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .nova-message-debug {
+      margin-top: 12px;
+      border-top: 1px solid var(--line);
+      padding-top: 10px;
+    }
+
+    .nova-message-debug summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .nova-message-debug pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 12px;
+      color: #cfe0ff;
+      background: rgba(0,0,0,0.22);
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      margin: 0;
     }
 
     .nova-composer-wrap {
-      border-top: 1px solid var(--line, rgba(130, 158, 222, 0.14));
-      background: var(--panel, rgba(12, 20, 37, 0.94));
-      padding: 14px 18px 18px 18px;
+      flex: 0 0 auto;
+      border-top: 1px solid var(--line);
+      padding: 14px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .nova-pending-files {
+      display: none;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
     }
 
     .nova-composer {
       display: flex;
-      flex-direction: column;
       gap: 10px;
-      max-width: 980px;
-    }
-
-    .nova-composer-row {
-      display: flex;
       align-items: flex-end;
-      gap: 10px;
     }
 
-    .nova-composer textarea {
+    #chatInput {
       flex: 1;
       min-height: 54px;
-      max-height: 200px;
+      max-height: 180px;
       resize: vertical;
-      padding: 13px 14px;
       border-radius: 14px;
-      border: 1px solid var(--line, rgba(130, 158, 222, 0.14));
-      background: rgba(255, 255, 255, 0.04);
-      color: inherit;
-      outline: none;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      padding: 12px 14px;
       font: inherit;
+      outline: none;
     }
 
-    .nova-composer textarea:focus {
-      border-color: var(--accent, #6ea8ff);
-      box-shadow: 0 0 0 3px rgba(110, 168, 255, 0.12);
-    }
-
-    .nova-composer button {
-      appearance: none;
-      border: 1px solid var(--line, rgba(130, 158, 222, 0.14));
-      background: rgba(255, 255, 255, 0.05);
-      color: inherit;
+    #sendBtn,
+    #uploadBtn {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
       border-radius: 14px;
       padding: 12px 14px;
       cursor: pointer;
-      font-weight: 700;
-      min-width: 56px;
+      min-width: 72px;
+      flex: 0 0 auto;
     }
 
-    .nova-composer button:hover {
-      border-color: var(--accent, #6ea8ff);
-      background: rgba(110, 168, 255, 0.08);
+    #sendBtn:hover,
+    #uploadBtn:hover {
+      background: rgba(255,255,255,0.1);
     }
 
     .nova-right-rail {
-      border-left: 1px solid var(--line, rgba(130, 158, 222, 0.14));
-      background: var(--panel-2, rgba(16, 27, 49, 0.97));
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
       min-width: 0;
-    }
-
-    .nova-panel {
+      min-height: 0;
       display: flex;
       flex-direction: column;
-      height: 100%;
+      background: rgba(255,255,255,0.02);
+      overflow: hidden;
+    }
+
+    .nova-rail-head {
+      flex: 0 0 auto;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    #novaArtifactsPanel {
+      flex: 1 1 auto;
       min-height: 0;
-    }
-
-    .nova-panel-head {
-      padding: 18px;
-      border-bottom: 1px solid var(--line, rgba(130, 158, 222, 0.14));
-    }
-
-    .nova-panel-title {
-      font-size: 15px;
-      font-weight: 800;
-      margin-bottom: 4px;
-    }
-
-    .nova-panel-subtitle {
-      font-size: 12px;
-      color: var(--muted, #9cafcf);
-    }
-
-    .nova-panel-body {
-      display: grid;
-      grid-template-rows: minmax(220px, 38%) 1fr;
-      min-height: 0;
-      flex: 1;
-    }
-
-    .nova-artifacts-list-wrap {
-      padding: 14px;
-      border-bottom: 1px solid var(--line, rgba(130, 158, 222, 0.14));
       overflow-y: auto;
-      min-height: 0;
+      overflow-x: hidden;
     }
 
-    .nova-artifact-viewer {
-      padding: 14px;
-      overflow-y: auto;
-      min-height: 0;
-    }
+    @media (max-width: 1100px) {
+      html, body {
+        overflow: auto;
+      }
 
-    .nova-artifact-viewer-card {
-      border: 1px solid var(--line, rgba(130, 158, 222, 0.14));
-      background: rgba(255, 255, 255, 0.03);
-      border-radius: 16px;
-      padding: 14px;
-    }
-
-    .nova-artifact-viewer-title {
-      font-size: 16px;
-      font-weight: 800;
-      margin-bottom: 10px;
-    }
-
-    .nova-artifact-viewer-meta {
-      margin-bottom: 12px;
-    }
-
-    .nova-artifact-viewer-content {
-      margin: 0;
-      white-space: pre-wrap;
-      word-break: break-word;
-      line-height: 1.5;
-      font-family: inherit;
-      color: inherit;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid var(--line, rgba(130, 158, 222, 0.14));
-      border-radius: 14px;
-      padding: 12px;
-    }
-
-    @media (max-width: 1080px) {
       .nova-app-shell {
         grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) 320px;
+        height: auto;
+        min-height: 100vh;
+      }
+
+      .nova-main {
+        min-height: 70vh;
       }
 
       .nova-right-rail {
-        min-height: auto;
-        border-left: 0;
-        border-top: 1px solid var(--line, rgba(130, 158, 222, 0.14));
-      }
-
-      .nova-panel-body {
-        grid-template-rows: 260px 1fr;
+        border-top: 1px solid var(--line);
+        min-height: 320px;
       }
     }
   </style>
 </head>
 <body>
   <div class="nova-app-shell" id="novaAppShell">
-    <main class="nova-main-shell">
-      <header class="nova-topbar">
-        <div class="nova-brand">
-          <div class="nova-brand-mark">N</div>
-          <div class="nova-brand-copy">
-            <div class="nova-brand-title">Nova</div>
-            <div class="nova-brand-subtitle">Ultimate 2026</div>
-          </div>
-        </div>
+    <main class="nova-main">
+      <div class="nova-topbar">
+        <div class="nova-title">Nova Ultimate 2026</div>
+        <div class="nova-subtitle">Stateful chat • artifacts • brain retrieval</div>
+      </div>
 
-        <div class="nova-topbar-actions">
-          <button
-            type="button"
-            class="nova-topbar-btn"
-            id="artifactsPanelToggle"
-            title="Artifacts"
-          >
-            Artifacts
-          </button>
+      <div class="nova-chat-wrap">
+        <div class="nova-chat-panel" id="messages">
+          <div id="novaEmptyState" class="nova-empty-state">Nova is ready. Type a message.</div>
         </div>
-      </header>
+      </div>
 
-      <section class="nova-chat-stage">
-        <div class="nova-chat-panel" id="messages"></div>
-        <div id="novaEmptyState" class="nova-empty-state">Nova is ready. Type your message.</div>
-
-        <div class="nova-composer-wrap">
-          <div class="nova-composer">
-            <div class="nova-composer-row">
-              <textarea
-                id="chatInput"
-                placeholder="Type your message... current-info prompts will use live knowledge"
-              ></textarea>
-              <button id="uploadBtn" type="button" title="Upload">📎</button>
-              <button id="sendBtn" type="button" title="Send">Send</button>
-              <input
-                type="file"
-                id="fileInput"
-                style="display:none;"
-                accept="image/*,video/*,.pdf,.txt,.md,.json,.csv,.html,.xml,.yaml,.yml"
-                multiple
-              />
-            </div>
-          </div>
+      <div class="nova-composer-wrap">
+        <div id="novaPendingFiles" class="nova-pending-files"></div>
+        <div class="nova-composer">
+          <textarea id="chatInput" placeholder="Type your message..."></textarea>
+          <button id="uploadBtn" type="button">Upload</button>
+          <button id="sendBtn" type="button">Send</button>
+          <input
+            type="file"
+            id="fileInput"
+            style="display:none"
+            multiple
+            accept=".txt,.md,.log,.json,.csv,.pdf,image/*"
+          />
         </div>
-      </section>
+      </div>
     </main>
 
     <aside class="nova-right-rail">
-      <section class="nova-panel is-open" id="novaArtifactsPanel" data-artifacts-panel>
-        <div class="nova-panel-head">
-          <div class="nova-panel-title">Artifacts</div>
-          <div class="nova-panel-subtitle">Saved replies, web answers, and source-backed knowledge</div>
+      <div class="nova-rail-head">Artifacts</div>
+      <div id="novaArtifactsPanel">
+        <div id="novaArtifactsList"></div>
+        <div class="nova-artifact-viewer-fallback">
+          <div id="novaArtifactViewerTitle" style="font-weight:700;margin-bottom:6px;"></div>
+          <div id="novaArtifactViewerMeta" style="font-size:12px;opacity:.72;margin-bottom:10px;"></div>
+          <pre id="novaArtifactViewerContent" style="white-space:pre-wrap;word-break:break-word;"></pre>
         </div>
-
-        <div class="nova-panel-body">
-          <div class="nova-artifacts-list-wrap">
-            <div id="novaArtifactsList" data-artifacts-list></div>
-          </div>
-
-          <div class="nova-artifact-viewer">
-            <div class="nova-artifact-viewer-card">
-              <div
-                class="nova-artifact-viewer-title"
-                id="novaArtifactViewerTitle"
-                data-artifact-viewer-title
-              >
-                Artifact Viewer
-              </div>
-
-              <div
-                class="nova-artifact-viewer-meta"
-                id="novaArtifactViewerMeta"
-                data-artifact-viewer-meta
-              ></div>
-
-              <pre
-                class="nova-artifact-viewer-content"
-                id="novaArtifactViewerContent"
-                data-artifact-viewer-content
-              ></pre>
-
-              <div
-                id="novaArtifactViewerSources"
-                data-artifact-viewer-sources
-              ></div>
-            </div>
-          </div>
-        </div>
-      </section>
+      </div>
     </aside>
   </div>
 
-  <script src="/static/js/nova-composer-bundle.js?v=endgame"></script>
+  <script src="/static/js/nova-render.js?v=endgame"></script>
   <script src="/static/js/nova-artifacts.js?v=endgame"></script>
+  <script src="/static/js/nova-composer-bundle.js?v=endgame"></script>
 </body>
 </html>

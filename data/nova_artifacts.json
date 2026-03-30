@@ -1,5 +1,169 @@
 [
   {
+    "id": "683ea99e-7757-4503-88bd-96368c1c62f9",
+    "title": "/image car",
+    "content": "{\"prompt\":\"car\"}",
+    "kind": "reply",
+    "session_id": "2a205fc1-0b18-4d7a-82d7-b35574e671f1",
+    "tags": [
+      "chat"
+    ],
+    "meta": {
+      "route": "chat",
+      "debug": {}
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T02:31:38.261387+00:00",
+    "updated_at": "2026-03-30T02:31:38.261387+00:00"
+  },
+  {
+    "id": "232d9cf1-5072-4540-afae-81e7824e069a",
+    "title": "Knowledge: who is hegseth",
+    "content": "Hegseth is **Defense Secretary Hegseth**.\n\nIn the latest coverage, he is being reported by **The New York Times, Military Times, NPR, and The Hill** as having **intervened in Army promotions**, specifically **removing two Black officers and two female officers from a 1-star promotion list**.",
+    "kind": "knowledge",
+    "session_id": "2a205fc1-0b18-4d7a-82d7-b35574e671f1",
+    "tags": [
+      "knowledge",
+      "web"
+    ],
+    "meta": {
+      "route": "knowledge",
+      "query": "who is hegseth",
+      "sources": [
+        {
+          "title": "Hegseth Strikes Two Black and Two Female Officers From Promotion List - nytimes.com",
+          "url": "https://news.google.com/rss/articles/CBMic0FVX3lxTE5lUUI5MEc1eDN0UnNsZ09zV3o3dEhHTmE2V29mVjRLWWJ2M3gtRWdCbWpjSWxDT1lXdzluVDlPRUVuS3RGb3MybWZ3eVlFRGhhTWlhalUtSlpxR3ZwbW9IdDF3SzBIelZoZkx4WHloSEtBMTQ?oc=5",
+          "description": "Hegseth Strikes Two Black and Two Female Officers From Promotion List nytimes.com\nSource: nytimes.com\nPublished: Fri, 27 Mar 2026 09:02:07 GMT"
+        },
+        {
+          "title": "Hegseth reportedly removes 2 Black, 2 female Army officers from 1-star promotion list - Military Times",
+          "url": "https://news.google.com/rss/articles/CBMi4wFBVV95cUxOMTJfRi1kQVJBcnNJbHFweFh1VXNOMVhfNDJJREtIN2NGUXJSVVRqcDFzRGpYWFE3eEc2VXdialdTNDFKRjRrQlBXemUyOC1IcXdUWEJHTzBkWVBzaXNJYnBERTB1T0FEUkl4ZzU1VHFySFBjSnREazg5OVpRQlNRMXV0UEVEQkRmQ291RWFabnZSdkNLa2pBVTYxOHZoakhxd3pfRW1UeGNxMnp6X2V2MEFwZ2d5VTA5RXdtZVZhemdJd0RId0EzV0lRaGtOWmlwMG1ZS25NOVJIdEhrU1g2RFc3UQ?oc=5",
+          "description": "Hegseth reportedly removes 2 Black, 2 female Army officers from 1-star promotion list Military Times\nSource: Military Times\nPublished: Fri, 27 Mar 2026 22:24:19 GMT"
+        },
+        {
+          "title": "Defense Secretary Hegseth intervened to stop promotions of Black and female officers - NPR",
+          "url": "https://news.google.com/rss/articles/CBMifEFVX3lxTFA3X3B3TWtqcmFYV29lMlBsLTF2SkxJNko0eTJsSC1ZWDdqam51cjRBVlJMYmFBRnJmaVNjc2ZGdll3VlJyTl90MHROY3JwdTFpcmU1VGNGMVBMR05PU2tpc0ozWjFlcVpLWXU0ZHhVUzViYWVxWFpuVHowdkM?oc=5",
+          "description": "Defense Secretary Hegseth intervened to stop promotions of Black and female officers NPR\nSource: NPR\nPublished: Fri, 27 Mar 2026 19:06:19 GMT"
+        },
+        {
+          "title": "Hegseth removes 2 Black and 2 female officers from promotion list: Report - The Hill",
+          "url": "https://news.google.com/rss/articles/CBMihwFBVV95cUxPekRxS2FCNXBqQ0MxZkZJWmJnZnhZMXNGcGZLeUhuMkZEQUdONUxQbjJMa1AwZ2VuVVNuT0NSU3lmQzF2U0M5OThBZF92bmRzYUNwSDExX0hXQXMtUWlHaWhqYzhsVEY5TWg4bnhmb1BpVU1pcmp0QTY4b09vMlF4eVNFVkFoaVnSAYwBQVVfeXFMUHkzdVJhVUN1b21SWFN0Q0xPeV9QRXllS3RNa3VQWUtLNGYybTNFcl9lYi1lUmZNeWxfR3p0YkQ3ZnZYSHktaERCSUVtNktNTEUtRC0xN2o5T0FPZld2YjRfRlpuY1Znd21MOENULUZDa0w1NFlRYllwYlBwTmpzZ3dEWDVvMmdTNVNPcHI?oc=5",
+          "description": "Hegseth removes 2 Black and 2 female officers from promotion list: Report The Hill\nSource: The Hill\nPublished: Fri, 27 Mar 2026 19:24:00 GMT"
+        }
+      ],
+      "debug": {
+        "route": "knowledge",
+        "memory_used": false,
+        "search_count": 6,
+        "fetch_count": 4,
+        "usable_count": 4,
+        "web_used": true,
+        "source_count": 4
+      }
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T02:29:34.270864+00:00",
+    "updated_at": "2026-03-30T02:29:34.270864+00:00"
+  },
+  {
+    "id": "aae1dad3-5c93-447a-bde5-ab1e1e95fca2",
+    "title": "Knowledge: who is dan richards",
+    "content": "The sources point to **multiple people named Dan Richards**, not one single well-known figure:\n\n- **Dan Richards at Evergreen Home Loans**: named **Chief Strategy Officer** in January 2026, according to **National Mortgage Professional** and **Yahoo Finance**.\n- **Dan Richards the author**: wrote **_Overnight_**, featured by **The Observer** in March 2026.\n- **Dan Richards from Swansea**: a man featured by the **BBC** after being **paralysed by a wave** and saying AI could help him walk again.\n\nBottom line: based on these sources, “Dan Richards” could refer to a **mortgage executive, an author, or the Swansea man in the BBC story**.",
+    "kind": "knowledge",
+    "session_id": "2a205fc1-0b18-4d7a-82d7-b35574e671f1",
+    "tags": [
+      "knowledge",
+      "web"
+    ],
+    "meta": {
+      "route": "knowledge",
+      "query": "who is dan richards",
+      "sources": [
+        {
+          "title": "Evergreen Home Loans Names Dan Richards Chief Strategy Officer - National Mortgage Professional",
+          "url": "https://news.google.com/rss/articles/CBMirAFBVV95cUxPZ3h6SC1vUGtzZk9YcFJpZkZkRUt0NXIyelhQRFhEZ0h6SXRGYlB1cmpVVkhJN3B1MlJhVnJkTHJ1bE8tZDZMVVB2VG16bER1MDVGVlgycnVOSHpBR0FTT05iUUdLZm9zNnpURXFqVU5EYnpMS0dMeUNVN1hHSFNOWXNBM2pEWkxHRXd5eXNXZVRidEwwVmZwZnVmRGtqSjdkejk4UmNuTFk0YVpy?oc=5",
+          "description": "Evergreen Home Loans Names Dan Richards Chief Strategy Officer National Mortgage Professional\nSource: National Mortgage Professional\nPublished: Mon, 12 Jan 2026 08:00:00 GMT"
+        },
+        {
+          "title": "Evergreen Home Loans Appoints Dan Richards as Chief Strategy Officer to Drive Strategic Growth - Yahoo Finance",
+          "url": "https://news.google.com/rss/articles/CBMihgFBVV95cUxQbTRiX1ZxMWZkckZrdnU1Q2NzSkh4d1FZeFZVbzZmWWVVNTFYcTdBekJZc3hydngxQm1DZklReDQ3TmN6Z3VWRVBpWW4wVmNLNzU2MW1JbXNMcWNvQUpNWTJ2OTFxbWhyeUpLajQwUDdjMkJwMVRzOTc0YXpyYnRhbG45YWM3QQ?oc=5",
+          "description": "Evergreen Home Loans Appoints Dan Richards as Chief Strategy Officer to Drive Strategic Growth Yahoo Finance\nSource: Yahoo Finance\nPublished: Fri, 09 Jan 2026 08:00:00 GMT"
+        },
+        {
+          "title": "Paperback of the week: Overnight by Dan Richards - The Observer",
+          "url": "https://news.google.com/rss/articles/CBMilwFBVV95cUxOUW8zVEJtZVlfRTZVVFl1c1NHcm5sb2JCNWNqQklMTXhrMGptZXgwVEJSVFlrY3drWXdMX1NuS195dS12OGwyS1dkTldQUWZDdFRvd1J3Nlh3YU1UcU55ZExoamRFTEk1TWZSWVFJck5ReXlFU041UFNtcExUbjh1UjE1MVpULVBvNXBmMkVTX1MzZ2pLbWxF?oc=5",
+          "description": "Paperback of the week: Overnight by Dan Richards The Observer\nSource: The Observer\nPublished: Fri, 20 Mar 2026 05:45:44 GMT"
+        },
+        {
+          "title": "Swansea man paralysed by wave says AI could help him walk again - BBC",
+          "url": "https://news.google.com/rss/articles/CBMiWkFVX3lxTE9INzlWTjkyLTBxTVJGdmxKOTEtai1DSjlLbzlnQkhJRkpnN3ZoLWs5MFdGTHA2MTVtVGhMaUItVWVwekZ3eUtJME5neEprbUN4ZGFzVDI4TU1hdw?oc=5",
+          "description": "Swansea man paralysed by wave says AI could help him walk again BBC\nSource: BBC\nPublished: Tue, 30 Dec 2025 08:00:00 GMT"
+        }
+      ],
+      "debug": {
+        "route": "knowledge",
+        "memory_used": false,
+        "search_count": 6,
+        "fetch_count": 4,
+        "usable_count": 4,
+        "web_used": true,
+        "source_count": 4
+      }
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T02:28:08.845967+00:00",
+    "updated_at": "2026-03-30T02:28:08.845967+00:00"
+  },
+  {
+    "id": "12a82d2f-711a-46d3-8031-76ce1adeaf50",
+    "title": "Knowledge: who is the most useful idiot for the democrats",
+    "content": "The provided sources do **not** identify any single person as “the most useful idiot for the Democrats.”\n\nWhat they do show:\n- **Awful Announcing** says Dan Dakich called **Stephen A. Smith** “a useful idiot for the **Republican Party**.”\n- **The Hill** discusses “useful idiots” on **the left** in a broad opinion piece, but the snippet names no specific person.\n- **The New Republic** refers generally to **media figures** “abetting Trump’s D.C. takeover,” without naming one in the snippet.\n- **The New York Times** opinion piece says Putin is using certain Americans as “useful idiots,” but the snippet does not identify them.\n\nBottom line: based on these sources alone, there’s **no sourced answer** to “who is the most useful idiot for the Democrats.”",
+    "kind": "knowledge",
+    "session_id": "2a205fc1-0b18-4d7a-82d7-b35574e671f1",
+    "tags": [
+      "knowledge",
+      "web"
+    ],
+    "meta": {
+      "route": "knowledge",
+      "query": "who is the most useful idiot for the democrats",
+      "sources": [
+        {
+          "title": "Dan Dakich: Stephen A. Smith has ‘become a useful idiot for the Republican Party’ - Awful Announcing",
+          "url": "https://news.google.com/rss/articles/CBMinwFBVV95cUxQOG94dWowaDg5cDhMTzdDUDNoeWpvanZoa3lPbFhkT2pFMkJxWl83YTBNMVlaTmJ1emdNVGZHdjhXSndzVE84aHZTQmR3c2NVRGRtY2RxNUswVGUwRG9zNmhDQXU0bU5QMFgtdUZnRDQ0SDNxNDFrYTBhTXE0VVZIbVNVbkNBekdIYnV3dDVtekJlVFFLc3otQjhFb0QzVmPSAaQBQVVfeXFMUGlycVVDZlkwdjh3MHJlYXJ1UzJJS2dEU3RsX0hKVE8xRTIzYlN3eVhNYzVoTGJ6QjBpbFNrUDZlWDdYNFdjWXluYzFucDM2Wm1vN3RuOE82ZDBKa2tVdEFMd3k2eWtZWHk1M0tTb2w2M2gxWjhkU2dHQXBwSmhic3NTenp5MzF5Tl9JaVJiWlVPd0pOX0ZBNjVjdFdBZF9nVHNjNUc?oc=5",
+          "description": "Dan Dakich: Stephen A. Smith has ‘become a useful idiot for the Republican Party’ Awful Announcing\nSource: Awful Announcing\nPublished: Wed, 03 Dec 2025 08:00:00 GMT"
+        },
+        {
+          "title": "America’s ‘useful idiots’ — the left calls for revolution as the ultimate virtue signal - The Hill",
+          "url": "https://news.google.com/rss/articles/CBMifEFVX3lxTE1rNTNrY1pUSWYwRTU2LTFWOEF0cmc3c3pVZEF2VGZ1S1JHelcxbjd3S1FEZ1k4VGxFOE51N0x2eVQyREFVUWc3eG53a2REdFg1ZW9wSWlmaFB3YTZtTFF0VjlkV0tJcnBzVGFXWGxaZFhBUWs4TEZ4c2hOWnPSAYIBQVVfeXFMT3ZlSW9fMklCaDNQb1ExRVJnazRDTGVCcXNBRzZ5UFltNDR4eGlWNzdIR19xV21Ic1lxcVFaSkF2TUxqdVVWMFVNWGYyQUR6d0NiUEU5Y1hnd0ZRNERYUzBLVzF4eURRbnN0OWJKek1FVldLb0IwM2dUWVdqZnd3R1ZLUQ?oc=5",
+          "description": "America’s ‘useful idiots’ — the left calls for revolution as the ultimate virtue signal The Hill\nSource: The Hill\nPublished: Sat, 12 Jul 2025 07:00:00 GMT"
+        },
+        {
+          "title": "The Useful Idiots in the Media Abetting Trump’s D.C. Takeover - The New Republic",
+          "url": "https://news.google.com/rss/articles/CBMid0FVX3lxTFBaXzgzVmxqS1g0T0djRTFiUTFDeFZ4bnpfSkZQRzhndzRXbV8tcWZ4Q29xc0dMUkxIdk1nM3ZvdmgtTE9pYXI4WUVOWGppaU9KaXowci1RVUlEd212SE1TblgweFdneWdvdzIzRmZlQkFfQVFTaTNV?oc=5",
+          "description": "The Useful Idiots in the Media Abetting Trump’s D.C. Takeover The New Republic\nSource: The New Republic\nPublished: Sat, 23 Aug 2025 07:00:00 GMT"
+        },
+        {
+          "title": "Opinion | The ‘Useful Idiots’ From America Whom Putin Is Playing Like a Flute - nytimes.com",
+          "url": "https://news.google.com/rss/articles/CBMif0FVX3lxTE9kb2lpMDRsT051R0pWZzMyWTZxRmZkaTZISUhyS0FBc3RVN3RuQ2RCcHpFU3F5QnhPMUFGaWN2dnhuUXlWX1V6dEYwb3BYdjhobGwtRGxTY1NDWUQ5SHlSb3c4VExjaFg2bnhwdnhucEs1aVNlcklXVFU5VFVwQ1k?oc=5",
+          "description": "Opinion | The ‘Useful Idiots’ From America Whom Putin Is Playing Like a Flute nytimes.com\nSource: nytimes.com\nPublished: Thu, 04 Dec 2025 08:00:00 GMT"
+        }
+      ],
+      "debug": {
+        "route": "knowledge",
+        "memory_used": false,
+        "search_count": 6,
+        "fetch_count": 4,
+        "usable_count": 4,
+        "web_used": true,
+        "source_count": 4
+      }
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T02:25:20.863971+00:00",
+    "updated_at": "2026-03-30T02:25:20.863971+00:00"
+  },
+  {
     "id": "103de819-bba3-4fb0-ac80-12663ef01740",
     "title": "latest AI news",
     "kind": "web",
@@ -409,5 +573,595 @@
     "updated_at": "2026-03-28T09:51:48.682814+00:00",
     "pinned": false,
     "meta": {}
+  },
+  {
+    "id": "f549fa98-99fa-43b3-a5c1-daa549a6767b",
+    "title": "Chat reply • continue the car thing",
+    "content": "Sure — here’s a more complete image prompt based on the earlier **car** request:\n\n```json\n{\n  \"prompt\": \"A sleek modern sports car parked on a city street at sunset, cinematic lighting, highly detailed, reflective paint, realistic style\"\n}\n```\n\nIf you want, I can also make it:\n- **realistic**\n- **luxury**\n- **race car**\n- **vintage**\n- **cyberpunk**\n- **cartoon**",
+    "kind": "chat",
+    "session_id": "2a205fc1-0b18-4d7a-82d7-b35574e671f1",
+    "tags": [
+      "chat",
+      "reply",
+      "memory"
+    ],
+    "meta": {
+      "source": "chat_service",
+      "user_prompt": "continue the car thing",
+      "model": "gpt-5.4",
+      "source_summary": {
+        "artifact_retrieval_used": true,
+        "artifact_count": 3,
+        "attachment_count": 0,
+        "history_count": 10
+      },
+      "retrieved_artifacts": [
+        {
+          "id": "683ea99e-7757-4503-88bd-96368c1c62f9",
+          "title": "/image car",
+          "kind": "reply",
+          "score": 11.25,
+          "updated_at": "2026-03-30T02:31:38.261387+00:00"
+        },
+        {
+          "id": "232d9cf1-5072-4540-afae-81e7824e069a",
+          "title": "Knowledge: who is hegseth",
+          "kind": "knowledge",
+          "score": 0.25,
+          "updated_at": "2026-03-30T02:29:34.270864+00:00"
+        },
+        {
+          "id": "aae1dad3-5c93-447a-bde5-ab1e1e95fca2",
+          "title": "Knowledge: who is dan richards",
+          "kind": "knowledge",
+          "score": 0.25,
+          "updated_at": "2026-03-30T02:28:08.845967+00:00"
+        }
+      ],
+      "attachments": []
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T03:09:00.944890+00:00",
+    "updated_at": "2026-03-30T03:09:00.944890+00:00"
+  },
+  {
+    "id": "202dcf1f-ec7e-47fb-9be7-d65e322cf727",
+    "title": "Chat reply • hi",
+    "content": "Hi.",
+    "kind": "chat",
+    "session_id": "2a205fc1-0b18-4d7a-82d7-b35574e671f1",
+    "tags": [
+      "chat",
+      "reply",
+      "memory"
+    ],
+    "meta": {
+      "source": "chat_service",
+      "user_prompt": "hi",
+      "model": "gpt-5.4",
+      "source_summary": {
+        "artifact_retrieval_used": true,
+        "artifact_count": 3,
+        "attachment_count": 0,
+        "history_count": 10
+      },
+      "retrieved_artifacts": [
+        {
+          "id": "f549fa98-99fa-43b3-a5c1-daa549a6767b",
+          "title": "Chat reply • continue the car thing",
+          "kind": "chat",
+          "score": 14.25,
+          "updated_at": "2026-03-30T03:09:00.944890+00:00"
+        },
+        {
+          "id": "aae1dad3-5c93-447a-bde5-ab1e1e95fca2",
+          "title": "Knowledge: who is dan richards",
+          "kind": "knowledge",
+          "score": 12.25,
+          "updated_at": "2026-03-30T02:28:08.845967+00:00"
+        },
+        {
+          "id": "232d9cf1-5072-4540-afae-81e7824e069a",
+          "title": "Knowledge: who is hegseth",
+          "kind": "knowledge",
+          "score": 7.75,
+          "updated_at": "2026-03-30T02:29:34.270864+00:00"
+        }
+      ],
+      "attachments": []
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T03:10:34.819445+00:00",
+    "updated_at": "2026-03-30T03:10:34.819445+00:00"
+  },
+  {
+    "id": "95d3f3c1-04c5-4057-938b-ceb303aa95fa",
+    "title": "Chat reply • hi",
+    "content": "Hi.",
+    "kind": "chat",
+    "session_id": "2a205fc1-0b18-4d7a-82d7-b35574e671f1",
+    "tags": [
+      "chat",
+      "reply",
+      "memory"
+    ],
+    "meta": {
+      "source": "chat_service",
+      "user_prompt": "hi",
+      "model": "gpt-5.4",
+      "source_summary": {
+        "artifact_retrieval_used": true,
+        "artifact_count": 3,
+        "attachment_count": 0,
+        "history_count": 10
+      },
+      "retrieved_artifacts": [
+        {
+          "id": "202dcf1f-ec7e-47fb-9be7-d65e322cf727",
+          "title": "Chat reply • hi",
+          "kind": "chat",
+          "score": 15.75,
+          "updated_at": "2026-03-30T03:10:34.819445+00:00"
+        },
+        {
+          "id": "f549fa98-99fa-43b3-a5c1-daa549a6767b",
+          "title": "Chat reply • continue the car thing",
+          "kind": "chat",
+          "score": 14.25,
+          "updated_at": "2026-03-30T03:09:00.944890+00:00"
+        },
+        {
+          "id": "aae1dad3-5c93-447a-bde5-ab1e1e95fca2",
+          "title": "Knowledge: who is dan richards",
+          "kind": "knowledge",
+          "score": 12.25,
+          "updated_at": "2026-03-30T02:28:08.845967+00:00"
+        }
+      ],
+      "attachments": []
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T03:12:00.239156+00:00",
+    "updated_at": "2026-03-30T03:12:00.239156+00:00"
+  },
+  {
+    "id": "e8ef2d93-5b23-4ebc-ab5a-31c6b31ec834",
+    "title": "Chat reply • hi",
+    "content": "Hi.",
+    "kind": "chat",
+    "session_id": "2a205fc1-0b18-4d7a-82d7-b35574e671f1",
+    "tags": [
+      "chat",
+      "reply",
+      "memory"
+    ],
+    "meta": {
+      "source": "chat_service",
+      "user_prompt": "hi",
+      "model": "gpt-5.4",
+      "source_summary": {
+        "artifact_retrieval_used": true,
+        "artifact_count": 3,
+        "attachment_count": 0,
+        "history_count": 10
+      },
+      "retrieved_artifacts": [
+        {
+          "id": "95d3f3c1-04c5-4057-938b-ceb303aa95fa",
+          "title": "Chat reply • hi",
+          "kind": "chat",
+          "score": 17.25,
+          "updated_at": "2026-03-30T03:12:00.239156+00:00"
+        },
+        {
+          "id": "202dcf1f-ec7e-47fb-9be7-d65e322cf727",
+          "title": "Chat reply • hi",
+          "kind": "chat",
+          "score": 15.75,
+          "updated_at": "2026-03-30T03:10:34.819445+00:00"
+        },
+        {
+          "id": "f549fa98-99fa-43b3-a5c1-daa549a6767b",
+          "title": "Chat reply • continue the car thing",
+          "kind": "chat",
+          "score": 14.25,
+          "updated_at": "2026-03-30T03:09:00.944890+00:00"
+        }
+      ],
+      "attachments": []
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T03:14:20.490878+00:00",
+    "updated_at": "2026-03-30T03:14:20.490878+00:00"
+  },
+  {
+    "id": "d5b08e43-ed04-4d3e-b264-d34a5fd7f56e",
+    "title": "Chat reply • hi",
+    "content": "Hi.",
+    "kind": "chat",
+    "session_id": "2a205fc1-0b18-4d7a-82d7-b35574e671f1",
+    "tags": [
+      "chat",
+      "reply",
+      "memory"
+    ],
+    "meta": {
+      "source": "chat_service",
+      "user_prompt": "hi",
+      "model": "gpt-5.4",
+      "source_summary": {
+        "artifact_retrieval_used": true,
+        "artifact_count": 3,
+        "attachment_count": 0,
+        "history_count": 10
+      },
+      "retrieved_artifacts": [
+        {
+          "id": "e8ef2d93-5b23-4ebc-ab5a-31c6b31ec834",
+          "title": "Chat reply • hi",
+          "kind": "chat",
+          "score": 18.75,
+          "updated_at": "2026-03-30T03:14:20.490878+00:00"
+        },
+        {
+          "id": "95d3f3c1-04c5-4057-938b-ceb303aa95fa",
+          "title": "Chat reply • hi",
+          "kind": "chat",
+          "score": 17.25,
+          "updated_at": "2026-03-30T03:12:00.239156+00:00"
+        },
+        {
+          "id": "202dcf1f-ec7e-47fb-9be7-d65e322cf727",
+          "title": "Chat reply • hi",
+          "kind": "chat",
+          "score": 15.75,
+          "updated_at": "2026-03-30T03:10:34.819445+00:00"
+        }
+      ],
+      "attachments": []
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T03:14:56.189686+00:00",
+    "updated_at": "2026-03-30T03:14:56.189686+00:00"
+  },
+  {
+    "id": "182a6e27-5dbc-46e5-a539-d03ac0bd1d1a",
+    "title": "Chat reply • hi",
+    "content": "Hi.",
+    "kind": "chat",
+    "session_id": "2a205fc1-0b18-4d7a-82d7-b35574e671f1",
+    "tags": [
+      "chat",
+      "reply",
+      "memory"
+    ],
+    "meta": {
+      "source": "chat_service",
+      "user_prompt": "hi",
+      "model": "gpt-5.4",
+      "source_summary": {
+        "artifact_retrieval_used": true,
+        "artifact_count": 3,
+        "attachment_count": 0,
+        "history_count": 10
+      },
+      "retrieved_artifacts": [
+        {
+          "id": "d5b08e43-ed04-4d3e-b264-d34a5fd7f56e",
+          "title": "Chat reply • hi",
+          "kind": "chat",
+          "score": 18.75,
+          "updated_at": "2026-03-30T03:14:56.189686+00:00"
+        },
+        {
+          "id": "e8ef2d93-5b23-4ebc-ab5a-31c6b31ec834",
+          "title": "Chat reply • hi",
+          "kind": "chat",
+          "score": 18.75,
+          "updated_at": "2026-03-30T03:14:20.490878+00:00"
+        },
+        {
+          "id": "95d3f3c1-04c5-4057-938b-ceb303aa95fa",
+          "title": "Chat reply • hi",
+          "kind": "chat",
+          "score": 17.25,
+          "updated_at": "2026-03-30T03:12:00.239156+00:00"
+        }
+      ],
+      "attachments": []
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T03:17:25.966112+00:00",
+    "updated_at": "2026-03-30T03:17:25.966112+00:00"
+  },
+  {
+    "id": "5982e4db-b55b-48ea-99e7-359db8a67767",
+    "title": "Chat reply • hi",
+    "content": "Hi — how can I help?",
+    "kind": "chat",
+    "session_id": "default-session",
+    "tags": [
+      "chat",
+      "reply",
+      "memory"
+    ],
+    "meta": {
+      "source": "chat_service",
+      "user_prompt": "hi",
+      "model": "gpt-5.4",
+      "source_summary": {
+        "artifact_retrieval_used": true,
+        "artifact_count": 3,
+        "attachment_count": 0,
+        "history_count": 10
+      },
+      "retrieved_artifacts": [
+        {
+          "id": "103de819-bba3-4fb0-ac80-12663ef01740",
+          "title": "latest AI news",
+          "kind": "web",
+          "score": 6.25,
+          "updated_at": "2026-03-30T01:51:31.830382+00:00"
+        },
+        {
+          "id": "b40c5b02-e72e-47fe-b0ec-2d4a66aa3651",
+          "title": "latest AI news",
+          "kind": "web",
+          "score": 6.25,
+          "updated_at": "2026-03-30T01:46:23.016826+00:00"
+        },
+        {
+          "id": "6be5038f-95c1-49da-9db4-ff3ec1a23f36",
+          "title": "Example Domain",
+          "kind": "web",
+          "score": 4.75,
+          "updated_at": "2026-03-30T00:09:56.460053+00:00"
+        }
+      ],
+      "attachments": []
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T03:24:33.993665+00:00",
+    "updated_at": "2026-03-30T03:24:33.993665+00:00"
+  },
+  {
+    "id": "fd0826fd-ff5c-4803-af4f-1c9075c2d2c4",
+    "title": "Chat reply • hi",
+    "content": "Hi — how can I help?",
+    "kind": "chat",
+    "session_id": "default-session",
+    "tags": [
+      "chat",
+      "reply",
+      "memory"
+    ],
+    "meta": {
+      "source": "chat_service",
+      "user_prompt": "hi",
+      "model": "gpt-5.4",
+      "source_summary": {
+        "artifact_retrieval_used": true,
+        "artifact_count": 3,
+        "attachment_count": 0,
+        "history_count": 10
+      },
+      "retrieved_artifacts": [
+        {
+          "id": "5982e4db-b55b-48ea-99e7-359db8a67767",
+          "title": "Chat reply • hi",
+          "kind": "chat",
+          "score": 14.25,
+          "updated_at": "2026-03-30T03:24:33.993665+00:00"
+        },
+        {
+          "id": "103de819-bba3-4fb0-ac80-12663ef01740",
+          "title": "latest AI news",
+          "kind": "web",
+          "score": 6.25,
+          "updated_at": "2026-03-30T01:51:31.830382+00:00"
+        },
+        {
+          "id": "b40c5b02-e72e-47fe-b0ec-2d4a66aa3651",
+          "title": "latest AI news",
+          "kind": "web",
+          "score": 6.25,
+          "updated_at": "2026-03-30T01:46:23.016826+00:00"
+        }
+      ],
+      "attachments": []
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T03:33:01.455567+00:00",
+    "updated_at": "2026-03-30T03:33:01.455567+00:00"
+  },
+  {
+    "id": "5fb7383a-4375-48d3-95be-e6d6bf551a3e",
+    "title": "Chat reply • untitled",
+    "content": "Hi!",
+    "kind": "chat",
+    "session_id": "default-session",
+    "tags": [
+      "chat",
+      "reply",
+      "fresh"
+    ],
+    "meta": {
+      "source": "chat_service",
+      "user_prompt": "",
+      "model": "gpt-5.4",
+      "source_summary": {
+        "artifact_retrieval_used": false,
+        "artifact_count": 0,
+        "attachment_count": 2,
+        "history_count": 10
+      },
+      "retrieved_artifacts": [],
+      "attachments": [
+        {
+          "name": "test_log.txt",
+          "type": "text/plain",
+          "url": "/api/uploads/test_log.txt",
+          "size": 34
+        },
+        {
+          "name": "schedule.txt",
+          "type": "text/plain",
+          "url": "/api/uploads/schedule.txt",
+          "size": 238
+        }
+      ]
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T03:34:57.232153+00:00",
+    "updated_at": "2026-03-30T03:34:57.232153+00:00"
+  },
+  {
+    "id": "507b3bc4-6cd6-409f-89fe-2906a3674e66",
+    "title": "Chat reply • untitled",
+    "content": "Hello!",
+    "kind": "chat",
+    "session_id": "default-session",
+    "tags": [
+      "chat",
+      "reply",
+      "fresh"
+    ],
+    "meta": {
+      "source": "chat_service",
+      "user_prompt": "",
+      "model": "gpt-5.4",
+      "source_summary": {
+        "artifact_retrieval_used": false,
+        "artifact_count": 0,
+        "attachment_count": 1,
+        "history_count": 10
+      },
+      "retrieved_artifacts": [],
+      "attachments": [
+        {
+          "name": "key.txt",
+          "type": "text/plain",
+          "url": "/api/uploads/key.txt",
+          "size": 1204
+        }
+      ]
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T03:35:18.134089+00:00",
+    "updated_at": "2026-03-30T03:35:18.134089+00:00"
+  },
+  {
+    "id": "4ef27617-1e83-450b-a131-4d9e2a4f73fb",
+    "title": "Chat reply • what is this file",
+    "content": "I see an attached file named **`test_log_1.txt`**, but its content appears **empty** in this chat.\n\nSo right now, I can only say:\n- **File name:** `test_log_1.txt`\n- **Type:** plain text\n- **Visible content:** none / empty\n\nIf you want, I can help by:\n1. checking whether it’s actually empty,\n2. explaining what a `.txt` log file usually contains,\n3. or analyzing it if you paste the contents here.",
+    "kind": "chat",
+    "session_id": "default-session",
+    "tags": [
+      "chat",
+      "reply",
+      "memory"
+    ],
+    "meta": {
+      "source": "chat_service",
+      "user_prompt": "what is this file",
+      "model": "gpt-5.4",
+      "source_summary": {
+        "artifact_retrieval_used": true,
+        "artifact_count": 3,
+        "attachment_count": 1,
+        "history_count": 10
+      },
+      "retrieved_artifacts": [
+        {
+          "id": "6be5038f-95c1-49da-9db4-ff3ec1a23f36",
+          "title": "Example Domain",
+          "kind": "web",
+          "score": 12.25,
+          "updated_at": "2026-03-30T00:09:56.460053+00:00"
+        },
+        {
+          "id": "103de819-bba3-4fb0-ac80-12663ef01740",
+          "title": "latest AI news",
+          "kind": "web",
+          "score": 7.75,
+          "updated_at": "2026-03-30T01:51:31.830382+00:00"
+        },
+        {
+          "id": "b40c5b02-e72e-47fe-b0ec-2d4a66aa3651",
+          "title": "latest AI news",
+          "kind": "web",
+          "score": 7.75,
+          "updated_at": "2026-03-30T01:46:23.016826+00:00"
+        }
+      ],
+      "attachments": [
+        {
+          "name": "test_log_1.txt",
+          "type": "text/plain",
+          "url": "/api/uploads/test_log_1.txt",
+          "size": 34
+        }
+      ]
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T03:35:42.867462+00:00",
+    "updated_at": "2026-03-30T03:35:42.867462+00:00"
+  },
+  {
+    "id": "7db088fb-9bd2-4f54-9a6f-356720d30a82",
+    "title": "Chat reply • what is this crap",
+    "content": "You’re right to call that out — I answered as if there were a file attached, but in this chat I only see **`key_1.txt`**.\n\nIts visible content is:\n\n```txt\n\n```\n\nSo **the attached file appears empty**.\n\nIf you meant a different file, upload it again or paste its contents, and I’ll tell you exactly what it is.",
+    "kind": "chat",
+    "session_id": "default-session",
+    "tags": [
+      "chat",
+      "reply",
+      "memory"
+    ],
+    "meta": {
+      "source": "chat_service",
+      "user_prompt": "what is this crap",
+      "model": "gpt-5.4",
+      "source_summary": {
+        "artifact_retrieval_used": true,
+        "artifact_count": 3,
+        "attachment_count": 1,
+        "history_count": 10
+      },
+      "retrieved_artifacts": [
+        {
+          "id": "4ef27617-1e83-450b-a131-4d9e2a4f73fb",
+          "title": "Chat reply • what is this file",
+          "kind": "chat",
+          "score": 18.75,
+          "updated_at": "2026-03-30T03:35:42.867462+00:00"
+        },
+        {
+          "id": "6be5038f-95c1-49da-9db4-ff3ec1a23f36",
+          "title": "Example Domain",
+          "kind": "web",
+          "score": 12.25,
+          "updated_at": "2026-03-30T00:09:56.460053+00:00"
+        },
+        {
+          "id": "103de819-bba3-4fb0-ac80-12663ef01740",
+          "title": "latest AI news",
+          "kind": "web",
+          "score": 7.75,
+          "updated_at": "2026-03-30T01:51:31.830382+00:00"
+        }
+      ],
+      "attachments": [
+        {
+          "name": "key_1.txt",
+          "type": "text/plain",
+          "url": "/api/uploads/key_1.txt",
+          "size": 1204
+        }
+      ]
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T03:36:21.436745+00:00",
+    "updated_at": "2026-03-30T03:36:21.436745+00:00"
   }
 ]

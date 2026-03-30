@@ -1,585 +1,735 @@
-(function () {
+(() => {
   "use strict";
 
   const Nova = (window.Nova = window.Nova || {});
-  Nova.state = Nova.state || {};
   Nova.artifacts = Nova.artifacts || {};
 
-  const SEL = {
-    panel: "#novaArtifactsPanel",
-    list: "#novaArtifactsList",
-    empty: "#novaArtifactsEmpty",
-    viewer: "#novaArtifactViewer",
-    viewerTitle: "#novaArtifactViewerTitle",
-    viewerMeta: "#novaArtifactViewerMeta",
-    viewerContent: "#novaArtifactViewerContent",
-    viewerClose: "#novaArtifactViewerClose",
-    artifactsPanelToggle: "#artifactsPanelToggle",
-    memoryPanelToggle: "#memoryPanelToggle",
-    webPanelToggle: "#webPanelToggle",
+  const state = {
+    artifacts: [],
+    filtered: [],
+    selectedId: null,
+    ui: null,
+    filters: {
+      q: "",
+      kind: "all",
+      pinnedOnly: false,
+      sort: "newest",
+    },
   };
 
-  function qs(selector, root) {
-    return (root || document).querySelector(selector);
+  function $(selector, root = document) {
+    return root.querySelector(selector);
   }
 
-  function qsa(selector, root) {
-    return Array.from((root || document).querySelectorAll(selector));
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
   }
 
-  function injectStyles() {
-    if (document.getElementById("novaArtifactsImageViewerStyles")) return;
+  function text(value) {
+    if (value == null) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return String(value);
+    }
+  }
+
+  function stripHtml(value) {
+    return text(value).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  }
+
+  function formatDate(value) {
+    if (!value) return "";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return text(value);
+    return d.toLocaleString();
+  }
+
+  function summarize(value, max = 180) {
+    const clean = stripHtml(value);
+    if (!clean) return "";
+    if (clean.length <= max) return clean;
+    return clean.slice(0, max - 1).trim() + "…";
+  }
+
+  function normalizeKind(raw) {
+    const v = text(raw).toLowerCase().trim();
+    if (!v) return "chat";
+    if (v.includes("web")) return "web";
+    if (v.includes("knowledge")) return "knowledge";
+    if (v.includes("doc")) return "document";
+    if (v.includes("pdf")) return "document";
+    if (v.includes("image")) return "image";
+    if (v.includes("upload")) return "document";
+    if (v.includes("chat")) return "chat";
+    return v;
+  }
+
+  function artifactUpdatedAt(a) {
+    return a.updated_at || a.created_at || "";
+  }
+
+  function artifactSearchBlob(a) {
+    return [
+      a.title,
+      a.content,
+      a.kind,
+      ...(Array.isArray(a.tags) ? a.tags : []),
+      text(a.meta),
+    ]
+      .join(" ")
+      .toLowerCase();
+  }
+
+  function ensureStyles() {
+    if (document.getElementById("novaArtifactsSearchStyles")) return;
 
     const style = document.createElement("style");
-    style.id = "novaArtifactsImageViewerStyles";
+    style.id = "novaArtifactsSearchStyles";
     style.textContent = `
-      .nova-artifact-item {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        padding: 12px;
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 14px;
-        background: rgba(255,255,255,0.03);
-        margin-bottom: 10px;
+      .nova-artifacts-toolbar{
+        display:flex;
+        flex-direction:column;
+        gap:12px;
+        padding:12px;
+        border-bottom:1px solid rgba(255,255,255,0.08);
+        background:rgba(255,255,255,0.02);
+        position:sticky;
+        top:0;
+        z-index:2;
+        backdrop-filter:blur(8px);
       }
-
-      .nova-artifact-item:hover {
-        background: rgba(255,255,255,0.05);
+      .nova-artifacts-toolbar-row{
+        display:flex;
+        gap:8px;
+        flex-wrap:wrap;
+        align-items:center;
       }
-
-      .nova-artifact-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
+      .nova-artifacts-toolbar input[type="search"],
+      .nova-artifacts-toolbar select{
+        min-height:38px;
+        border-radius:10px;
+        border:1px solid rgba(255,255,255,0.12);
+        background:rgba(255,255,255,0.04);
+        color:inherit;
+        padding:0 12px;
+        outline:none;
       }
-
-      .nova-artifact-title {
-        font-weight: 600;
-        font-size: 14px;
-        line-height: 1.3;
-        word-break: break-word;
+      .nova-artifacts-toolbar input[type="search"]{
+        flex:1 1 220px;
       }
-
-      .nova-artifact-kind {
-        font-size: 11px;
-        opacity: 0.8;
-        padding: 4px 8px;
-        border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.1);
-        white-space: nowrap;
+      .nova-artifacts-toolbar label{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        font-size:13px;
+        opacity:0.92;
       }
-
-      .nova-artifact-preview {
-        font-size: 12px;
-        opacity: 0.85;
-        line-height: 1.45;
-        word-break: break-word;
+      .nova-artifacts-count{
+        font-size:12px;
+        opacity:0.75;
+        margin-left:auto;
       }
-
-      .nova-artifact-thumb-wrap {
-        width: 100%;
-        border-radius: 12px;
-        overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.08);
-        background: rgba(255,255,255,0.03);
+      .nova-artifact-list-wrap{
+        display:flex;
+        flex-direction:column;
+        min-height:0;
       }
-
-      .nova-artifact-thumb {
-        display: block;
-        width: 100%;
-        max-height: 220px;
-        object-fit: cover;
+      .nova-artifact-list{
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+        padding:12px;
       }
-
-      .nova-artifact-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
+      .nova-artifact-empty{
+        padding:16px;
+        font-size:13px;
+        opacity:0.72;
       }
-
-      .nova-artifact-btn {
-        appearance: none;
-        border: 1px solid rgba(255,255,255,0.12);
-        background: rgba(255,255,255,0.06);
-        color: inherit;
-        padding: 8px 12px;
-        border-radius: 10px;
-        cursor: pointer;
-        font: inherit;
-        line-height: 1;
+      .nova-artifact-card{
+        border:1px solid rgba(255,255,255,0.09);
+        border-radius:14px;
+        padding:12px;
+        background:rgba(255,255,255,0.03);
+        cursor:pointer;
       }
-
-      .nova-artifact-btn:hover {
-        background: rgba(255,255,255,0.10);
+      .nova-artifact-card:hover{
+        background:rgba(255,255,255,0.05);
       }
-
-      .nova-artifact-viewer-image-wrap {
-        width: 100%;
-        margin-bottom: 12px;
-        border-radius: 14px;
-        overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.08);
-        background: rgba(255,255,255,0.03);
+      .nova-artifact-card.active{
+        outline:1px solid rgba(110,168,255,0.55);
+        background:rgba(110,168,255,0.08);
       }
-
-      .nova-artifact-viewer-image {
-        display: block;
-        width: 100%;
-        max-height: 70vh;
-        object-fit: contain;
+      .nova-artifact-head{
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:10px;
+        margin-bottom:8px;
       }
-
-      .nova-artifact-viewer-pre {
-        white-space: pre-wrap;
-        word-break: break-word;
+      .nova-artifact-title{
+        font-weight:700;
+        line-height:1.25;
+        word-break:break-word;
       }
-
-      .nova-artifact-meta-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 8px;
-        margin-bottom: 12px;
+      .nova-artifact-meta{
+        display:flex;
+        flex-wrap:wrap;
+        gap:6px;
+        margin:0 0 8px;
       }
-
-      .nova-artifact-meta-chip {
-        font-size: 12px;
-        padding: 8px 10px;
-        border-radius: 10px;
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.08);
-        word-break: break-word;
+      .nova-artifact-pill{
+        font-size:11px;
+        line-height:1;
+        padding:6px 8px;
+        border-radius:999px;
+        background:rgba(255,255,255,0.07);
+        border:1px solid rgba(255,255,255,0.08);
+        opacity:0.95;
       }
-
-      .nova-artifacts-empty {
-        opacity: 0.8;
-        font-size: 13px;
-        padding: 12px 0;
+      .nova-artifact-preview{
+        font-size:13px;
+        line-height:1.45;
+        opacity:0.88;
+        white-space:pre-wrap;
+        word-break:break-word;
+      }
+      .nova-artifact-actions{
+        display:flex;
+        gap:6px;
+        flex-wrap:wrap;
+        margin-top:10px;
+      }
+      .nova-artifact-btn{
+        border:1px solid rgba(255,255,255,0.1);
+        background:rgba(255,255,255,0.04);
+        color:inherit;
+        border-radius:10px;
+        padding:7px 10px;
+        font-size:12px;
+        cursor:pointer;
+      }
+      .nova-artifact-btn:hover{
+        background:rgba(255,255,255,0.08);
+      }
+      .nova-artifact-viewer-fallback{
+        border-top:1px solid rgba(255,255,255,0.08);
+        padding:12px;
+      }
+      .nova-artifact-viewer-fallback pre{
+        margin:0;
+        white-space:pre-wrap;
+        word-break:break-word;
+        font-family:inherit;
+        line-height:1.45;
       }
     `;
     document.head.appendChild(style);
   }
 
-  function getCurrentSessionId() {
+  function findPanel() {
     return (
-      Nova.state.sessionId ||
-      Nova.state.currentSessionId ||
-      window.currentSessionId ||
-      localStorage.getItem("nova_session_id") ||
-      document.body?.dataset?.sessionId ||
-      ""
+      $("#novaArtifactsPanel") ||
+      $("#artifactsPanel") ||
+      $('[data-panel="artifacts"]') ||
+      $(".nova-artifacts-panel") ||
+      $(".artifact-panel")
     );
   }
 
-  function escapeHtml(value) {
-    return String(value == null ? "" : value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
-  function formatWhen(iso) {
-    if (!iso) return "";
-    try {
-      const d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return String(iso);
-      return d.toLocaleString();
-    } catch (_) {
-      return String(iso);
-    }
-  }
-
-  function artifactImageUrl(artifact) {
+  function findListContainer(panel) {
     return (
-      artifact?.meta?.image_url ||
-      artifact?.meta?.url ||
-      artifact?.image_url ||
-      ""
+      $("#novaArtifactsList", panel) ||
+      $("#artifactList", panel) ||
+      $("#artifactsList", panel) ||
+      $('[data-artifacts-list]', panel) ||
+      $(".nova-artifacts-list", panel) ||
+      $(".artifact-list", panel)
     );
   }
 
-  function artifactPrompt(artifact) {
-    return (
-      artifact?.meta?.prompt ||
-      artifact?.prompt ||
-      artifact?.content ||
-      ""
-    );
-  }
-
-  function artifactTitle(artifact) {
-    return artifact?.title || "Untitled Artifact";
-  }
-
-  function artifactKind(artifact) {
-    return artifact?.kind || "note";
-  }
-
-  function viewerEls() {
+  function findViewer(panel) {
     return {
-      viewer: qs(SEL.viewer),
-      title: qs(SEL.viewerTitle),
-      meta: qs(SEL.viewerMeta),
-      content: qs(SEL.viewerContent),
+      title:
+        $("#novaArtifactViewerTitle", panel) ||
+        $("#artifactViewerTitle", panel) ||
+        $('[data-artifact-viewer-title]', panel),
+      meta:
+        $("#novaArtifactViewerMeta", panel) ||
+        $("#artifactViewerMeta", panel) ||
+        $('[data-artifact-viewer-meta]', panel),
+      content:
+        $("#novaArtifactViewerContent", panel) ||
+        $("#artifactViewerContent", panel) ||
+        $('[data-artifact-viewer-content]', panel),
+      root:
+        $("#novaArtifactViewer", panel) ||
+        $("#artifactViewer", panel) ||
+        $('[data-artifact-viewer]', panel),
     };
   }
 
-  function closeViewer() {
-    const el = qs(SEL.viewer);
-    if (!el) return;
-    el.classList.remove("open");
-    el.setAttribute("aria-hidden", "true");
+  function ensurePanelScaffold() {
+    const panel = findPanel();
+    if (!panel) {
+      console.warn("Nova artifacts: panel not found");
+      return null;
+    }
+
+    ensureStyles();
+
+    let listContainer = findListContainer(panel);
+    if (!listContainer) {
+      const wrap = document.createElement("div");
+      wrap.className = "nova-artifact-list-wrap";
+
+      listContainer = document.createElement("div");
+      listContainer.id = "novaArtifactsList";
+      listContainer.className = "nova-artifact-list";
+
+      wrap.appendChild(listContainer);
+      panel.appendChild(wrap);
+    } else {
+      listContainer.classList.add("nova-artifact-list");
+    }
+
+    if (!findViewer(panel).content) {
+      const fallback = document.createElement("div");
+      fallback.className = "nova-artifact-viewer-fallback";
+      fallback.innerHTML = `
+        <div id="novaArtifactViewerTitle" style="font-weight:700;margin-bottom:6px;"></div>
+        <div id="novaArtifactViewerMeta" style="font-size:12px;opacity:.72;margin-bottom:10px;"></div>
+        <pre id="novaArtifactViewerContent"></pre>
+      `;
+      panel.appendChild(fallback);
+    }
+
+    return panel;
   }
 
-  function openViewer() {
-    const el = qs(SEL.viewer);
-    if (!el) return;
-    el.classList.add("open");
-    el.setAttribute("aria-hidden", "false");
+  function injectToolbar(panel) {
+    let toolbar = $("#novaArtifactsToolbar", panel);
+    if (toolbar) return toolbar;
+
+    toolbar = document.createElement("div");
+    toolbar.id = "novaArtifactsToolbar";
+    toolbar.className = "nova-artifacts-toolbar";
+    toolbar.innerHTML = `
+      <div class="nova-artifacts-toolbar-row">
+        <input
+          id="novaArtifactSearchInput"
+          type="search"
+          placeholder="Search title, content, tags..."
+          autocomplete="off"
+        />
+        <select id="novaArtifactKindFilter" aria-label="Artifact kind filter">
+          <option value="all">all</option>
+          <option value="chat">chat</option>
+          <option value="knowledge">knowledge</option>
+          <option value="web">web</option>
+          <option value="document">document</option>
+          <option value="image">image</option>
+        </select>
+        <select id="novaArtifactSort" aria-label="Artifact sort">
+          <option value="newest">newest first</option>
+          <option value="oldest">oldest first</option>
+        </select>
+      </div>
+      <div class="nova-artifacts-toolbar-row">
+        <label>
+          <input id="novaArtifactPinnedOnly" type="checkbox" />
+          pinned only
+        </label>
+        <button id="novaArtifactRefreshBtn" type="button" class="nova-artifact-btn">refresh</button>
+        <button id="novaArtifactClearBtn" type="button" class="nova-artifact-btn">clear</button>
+        <div id="novaArtifactsCount" class="nova-artifacts-count">0 items</div>
+      </div>
+    `;
+
+    panel.insertBefore(toolbar, panel.firstChild);
+    return toolbar;
   }
 
-  async function fetchArtifacts() {
-    const sessionId = getCurrentSessionId();
-    const url = sessionId
-      ? `/api/artifacts?session_id=${encodeURIComponent(sessionId)}`
-      : "/api/artifacts";
+  function wireToolbar(panel) {
+    const searchInput = $("#novaArtifactSearchInput", panel);
+    const kindFilter = $("#novaArtifactKindFilter", panel);
+    const sortSelect = $("#novaArtifactSort", panel);
+    const pinnedOnly = $("#novaArtifactPinnedOnly", panel);
+    const refreshBtn = $("#novaArtifactRefreshBtn", panel);
+    const clearBtn = $("#novaArtifactClearBtn", panel);
 
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { Accept: "application/json" },
+    searchInput.value = state.filters.q;
+    kindFilter.value = state.filters.kind;
+    sortSelect.value = state.filters.sort;
+    pinnedOnly.checked = state.filters.pinnedOnly;
+
+    searchInput.addEventListener("input", () => {
+      state.filters.q = searchInput.value.trim().toLowerCase();
+      applyFilters();
+      renderArtifactList();
     });
 
-    let data = {};
-    try {
-      data = await res.json();
-    } catch (_) {
-      data = {};
-    }
-
-    if (!res.ok || !data.ok) {
-      throw new Error(data.error || "Failed to load artifacts.");
-    }
-
-    return Array.isArray(data.artifacts) ? data.artifacts : [];
-  }
-
-  function copyText(text) {
-    return navigator.clipboard.writeText(String(text || ""));
-  }
-
-  function downloadUrl(url, fileName) {
-    const a = document.createElement("a");
-    a.href = url;
-    if (fileName) a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }
-
-  async function deleteArtifact(artifactId) {
-    const res = await fetch(`/api/artifacts/${encodeURIComponent(artifactId)}`, {
-      method: "DELETE",
-      headers: { Accept: "application/json" },
+    kindFilter.addEventListener("change", () => {
+      state.filters.kind = kindFilter.value;
+      applyFilters();
+      renderArtifactList();
     });
 
-    let data = {};
+    sortSelect.addEventListener("change", () => {
+      state.filters.sort = sortSelect.value;
+      applyFilters();
+      renderArtifactList();
+    });
+
+    pinnedOnly.addEventListener("change", () => {
+      state.filters.pinnedOnly = pinnedOnly.checked;
+      applyFilters();
+      renderArtifactList();
+    });
+
+    refreshBtn.addEventListener("click", async () => {
+      await loadArtifacts();
+    });
+
+    clearBtn.addEventListener("click", () => {
+      state.filters.q = "";
+      state.filters.kind = "all";
+      state.filters.sort = "newest";
+      state.filters.pinnedOnly = false;
+
+      searchInput.value = "";
+      kindFilter.value = "all";
+      sortSelect.value = "newest";
+      pinnedOnly.checked = false;
+
+      applyFilters();
+      renderArtifactList();
+    });
+  }
+
+  async function apiJson(url, options) {
+    const res = await fetch(url, options);
+    const raw = await res.text();
+    let data = null;
+
     try {
-      data = await res.json();
-    } catch (_) {
-      data = {};
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      data = raw;
     }
 
-    if (!res.ok || !data.ok) {
-      throw new Error(data.error || "Delete failed.");
+    if (!res.ok) {
+      const message =
+        (data && data.error) ||
+        (data && data.message) ||
+        raw ||
+        `Request failed: ${res.status}`;
+      throw new Error(message);
     }
 
     return data;
   }
 
-  function renderViewerMeta(artifact) {
-    const bits = [];
-
-    if (artifactKind(artifact)) {
-      bits.push(`<div class="nova-artifact-meta-chip"><strong>Kind:</strong> ${escapeHtml(artifactKind(artifact))}</div>`);
-    }
-
-    if (artifact?.meta?.file_name) {
-      bits.push(`<div class="nova-artifact-meta-chip"><strong>File:</strong> ${escapeHtml(artifact.meta.file_name)}</div>`);
-    }
-
-    if (artifact?.meta?.mime_type) {
-      bits.push(`<div class="nova-artifact-meta-chip"><strong>Type:</strong> ${escapeHtml(artifact.meta.mime_type)}</div>`);
-    }
-
-    if (artifact?.meta?.model) {
-      bits.push(`<div class="nova-artifact-meta-chip"><strong>Model:</strong> ${escapeHtml(artifact.meta.model)}</div>`);
-    }
-
-    if (artifact?.meta?.width && artifact?.meta?.height) {
-      bits.push(`<div class="nova-artifact-meta-chip"><strong>Size:</strong> ${escapeHtml(artifact.meta.width)} × ${escapeHtml(artifact.meta.height)}</div>`);
-    }
-
-    if (artifact?.created_at) {
-      bits.push(`<div class="nova-artifact-meta-chip"><strong>Created:</strong> ${escapeHtml(formatWhen(artifact.created_at))}</div>`);
-    }
-
-    return bits.length
-      ? `<div class="nova-artifact-meta-grid">${bits.join("")}</div>`
-      : "";
+  function normalizeArtifact(item) {
+    const a = item || {};
+    return {
+      id: text(a.id),
+      title: text(a.title || a.name || "Untitled artifact"),
+      content: text(a.content),
+      kind: normalizeKind(a.kind),
+      tags: Array.isArray(a.tags) ? a.tags.map((x) => text(x)) : [],
+      pinned: Boolean(a.pinned),
+      created_at: a.created_at || "",
+      updated_at: a.updated_at || "",
+      session_id: text(a.session_id || ""),
+      meta: a.meta || {},
+      raw: a,
+    };
   }
 
-  function showArtifactViewer(artifact) {
-    const { title, meta, content } = viewerEls();
-    if (!title || !meta || !content) return;
+  async function loadArtifacts() {
+    const panel = state.ui?.panel || ensurePanelScaffold();
+    if (!panel) return;
 
-    title.textContent = artifactTitle(artifact);
-    meta.innerHTML = renderViewerMeta(artifact);
-
-    const kind = artifactKind(artifact);
-    const imageUrl = artifactImageUrl(artifact);
-    const prompt = artifactPrompt(artifact);
-
-    if (kind === "image" && imageUrl) {
-      content.innerHTML = `
-        <div class="nova-artifact-viewer-image-wrap">
-          <img class="nova-artifact-viewer-image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(artifactTitle(artifact))}">
-        </div>
-        <div class="nova-artifact-actions">
-          <button type="button" class="nova-artifact-btn" data-viewer-action="download">Download</button>
-          <button type="button" class="nova-artifact-btn" data-viewer-action="copy-prompt">Copy prompt</button>
-          <button type="button" class="nova-artifact-btn" data-viewer-action="open-image">Open image</button>
-        </div>
-        <pre class="nova-artifact-viewer-pre">${escapeHtml(prompt || "")}</pre>
-      `;
-
-      const downloadBtn = content.querySelector('[data-viewer-action="download"]');
-      const copyBtn = content.querySelector('[data-viewer-action="copy-prompt"]');
-      const openBtn = content.querySelector('[data-viewer-action="open-image"]');
-
-      if (downloadBtn) {
-        downloadBtn.addEventListener("click", () => {
-          downloadUrl(imageUrl, artifact?.meta?.file_name || "saved-image");
-        });
-      }
-
-      if (copyBtn) {
-        copyBtn.addEventListener("click", async () => {
-          try {
-            await copyText(prompt || "");
-            copyBtn.textContent = "Copied";
-          } catch (_) {
-            copyBtn.textContent = "Copy failed";
-          }
-        });
-      }
-
-      if (openBtn) {
-        openBtn.addEventListener("click", () => {
-          window.open(imageUrl, "_blank", "noopener,noreferrer");
-        });
-      }
-    } else {
-      content.innerHTML = `
-        <div class="nova-artifact-actions">
-          <button type="button" class="nova-artifact-btn" data-viewer-action="copy-content">Copy</button>
-        </div>
-        <pre class="nova-artifact-viewer-pre">${escapeHtml(artifact?.content || "")}</pre>
-      `;
-
-      const copyBtn = content.querySelector('[data-viewer-action="copy-content"]');
-      if (copyBtn) {
-        copyBtn.addEventListener("click", async () => {
-          try {
-            await copyText(artifact?.content || "");
-            copyBtn.textContent = "Copied";
-          } catch (_) {
-            copyBtn.textContent = "Copy failed";
-          }
-        });
-      }
+    const list = state.ui?.list || findListContainer(panel);
+    if (list) {
+      list.innerHTML = `<div class="nova-artifact-empty">Loading artifacts...</div>`;
     }
 
-    openViewer();
-  }
+    try {
+      const data = await apiJson("/api/artifacts");
 
-  function makeArtifactCard(artifact) {
-    const item = document.createElement("div");
-    item.className = "nova-artifact-item";
-    item.dataset.artifactId = artifact.id || "";
-    item.dataset.kind = artifactKind(artifact);
+      const items = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data?.artifacts)
+        ? data.artifacts
+        : [];
 
-    const title = artifactTitle(artifact);
-    const kind = artifactKind(artifact);
-    const imageUrl = artifactImageUrl(artifact);
-    const prompt = artifactPrompt(artifact);
-    const previewText = prompt || artifact?.content || "";
+      console.log("Nova artifacts raw response:", data);
+      console.log("Nova artifacts parsed items:", items);
 
-    item.innerHTML = `
-      <div class="nova-artifact-head">
-        <div class="nova-artifact-title">${escapeHtml(title)}</div>
-        <div class="nova-artifact-kind">${escapeHtml(kind)}</div>
-      </div>
-      ${
-        kind === "image" && imageUrl
-          ? `
-            <div class="nova-artifact-thumb-wrap">
-              <img class="nova-artifact-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(title)}">
-            </div>
-          `
-          : ""
-      }
-      <div class="nova-artifact-preview">${escapeHtml(previewText).slice(0, 220)}</div>
-      <div class="nova-artifact-actions">
-        <button type="button" class="nova-artifact-btn" data-action="open">Open</button>
-        ${
-          kind === "image" && imageUrl
-            ? `<button type="button" class="nova-artifact-btn" data-action="download">Download</button>`
-            : `<button type="button" class="nova-artifact-btn" data-action="copy">Copy</button>`
+      state.artifacts = items.map(normalizeArtifact);
+      applyFilters();
+      renderArtifactList();
+
+      if (state.selectedId) {
+        const stillExists = state.artifacts.find((a) => a.id === state.selectedId);
+        if (stillExists) {
+          await openArtifact(state.selectedId, false);
+        } else {
+          clearViewer();
         }
-        <button type="button" class="nova-artifact-btn" data-action="delete">Delete</button>
-      </div>
-    `;
-
-    const openBtn = item.querySelector('[data-action="open"]');
-    const downloadBtn = item.querySelector('[data-action="download"]');
-    const copyBtn = item.querySelector('[data-action="copy"]');
-    const deleteBtn = item.querySelector('[data-action="delete"]');
-
-    if (openBtn) {
-      openBtn.addEventListener("click", () => {
-        showArtifactViewer(artifact);
-      });
+      }
+    } catch (err) {
+      console.error("Nova artifacts load failed:", err);
+      if (list) {
+        list.innerHTML = `<div class="nova-artifact-empty">Failed to load artifacts: ${escapeHtml(err.message)}</div>`;
+      }
+      state.artifacts = [];
+      state.filtered = [];
+      updateCount(0, 0);
     }
-
-    if (downloadBtn) {
-      downloadBtn.addEventListener("click", () => {
-        downloadUrl(imageUrl, artifact?.meta?.file_name || "saved-image");
-      });
-    }
-
-    if (copyBtn) {
-      copyBtn.addEventListener("click", async () => {
-        try {
-          await copyText(artifact?.content || "");
-          copyBtn.textContent = "Copied";
-        } catch (_) {
-          copyBtn.textContent = "Copy failed";
-        }
-      });
-    }
-
-    if (deleteBtn) {
-      deleteBtn.addEventListener("click", async () => {
-        try {
-          deleteBtn.disabled = true;
-          await deleteArtifact(artifact.id);
-          item.remove();
-          const list = qs(SEL.list);
-          if (list && !list.children.length) {
-            renderEmpty("No saved artifacts yet.");
-          }
-          closeViewer();
-        } catch (_) {
-          deleteBtn.disabled = false;
-          deleteBtn.textContent = "Delete failed";
-        }
-      });
-    }
-
-    return item;
   }
 
-  function renderEmpty(message) {
-    const list = qs(SEL.list);
-    if (!list) return;
-    list.innerHTML = `<div class="nova-artifacts-empty">${escapeHtml(message || "No artifacts yet.")}</div>`;
+  function applyFilters() {
+    const q = state.filters.q;
+    const kind = state.filters.kind;
+    const pinnedOnly = state.filters.pinnedOnly;
+    const sort = state.filters.sort;
+
+    let items = [...state.artifacts];
+
+    if (kind !== "all") {
+      items = items.filter((a) => a.kind === kind);
+    }
+
+    if (pinnedOnly) {
+      items = items.filter((a) => a.pinned);
+    }
+
+    if (q) {
+      items = items.filter((a) => artifactSearchBlob(a).includes(q));
+    }
+
+    items.sort((a, b) => {
+      const da = new Date(artifactUpdatedAt(a)).getTime() || 0;
+      const db = new Date(artifactUpdatedAt(b)).getTime() || 0;
+      return sort === "oldest" ? da - db : db - da;
+    });
+
+    state.filtered = items;
+    updateCount(items.length, state.artifacts.length);
   }
 
-  function renderArtifacts(artifacts) {
-    const list = qs(SEL.list);
-    if (!list) return;
+  function updateCount(filteredCount, totalCount) {
+    const el = state.ui?.count;
+    if (!el) return;
 
-    list.innerHTML = "";
-
-    if (!Array.isArray(artifacts) || !artifacts.length) {
-      renderEmpty("No saved artifacts yet.");
+    if (filteredCount === totalCount) {
+      el.textContent = `${filteredCount} item${filteredCount === 1 ? "" : "s"}`;
       return;
     }
 
-    artifacts.forEach((artifact) => {
-      list.appendChild(makeArtifactCard(artifact));
-    });
+    el.textContent = `${filteredCount} of ${totalCount} items`;
   }
 
-  async function refreshArtifacts() {
-    try {
-      const artifacts = await fetchArtifacts();
-      Nova.artifacts.items = artifacts;
-      renderArtifacts(artifacts);
-    } catch (err) {
-      renderEmpty(err?.message || "Failed to load artifacts.");
-    }
-  }
+  function renderArtifactList() {
+    const list = state.ui?.list;
+    if (!list) return;
 
-  function togglePanel(forceOpen) {
-    const panel = qs(SEL.panel);
-    if (!panel) return;
-
-    const shouldOpen = typeof forceOpen === "boolean"
-      ? forceOpen
-      : !panel.classList.contains("open");
-
-    qsa(".nova-right-panel.open").forEach((el) => {
-      if (el !== panel) el.classList.remove("open");
-    });
-
-    panel.classList.toggle("open", shouldOpen);
-
-    if (shouldOpen) {
-      refreshArtifacts();
-    }
-  }
-
-  function installPanelToggles() {
-    const artifactsBtn = qs(SEL.artifactsPanelToggle);
-    if (artifactsBtn) {
-      artifactsBtn.addEventListener("click", () => togglePanel());
+    if (!state.filtered.length) {
+      list.innerHTML = `<div class="nova-artifact-empty">No artifacts match the current search/filter.</div>`;
+      return;
     }
 
-    const closeBtn = qs(SEL.viewerClose);
-    if (closeBtn) {
-      closeBtn.addEventListener("click", closeViewer);
-    }
+    list.innerHTML = state.filtered
+      .map((a) => {
+        const preview = summarize(a.content, 180);
+        const active = a.id === state.selectedId ? " active" : "";
+        const pills = [
+          `<span class="nova-artifact-pill">${escapeHtml(a.kind)}</span>`,
+          a.pinned ? `<span class="nova-artifact-pill">pinned</span>` : "",
+          artifactUpdatedAt(a)
+            ? `<span class="nova-artifact-pill">${escapeHtml(formatDate(artifactUpdatedAt(a)))}</span>`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("");
 
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        closeViewer();
+        return `
+          <div class="nova-artifact-card${active}" data-artifact-id="${escapeHtml(a.id)}">
+            <div class="nova-artifact-head">
+              <div class="nova-artifact-title">${escapeHtml(a.title)}</div>
+            </div>
+            <div class="nova-artifact-meta">${pills}</div>
+            <div class="nova-artifact-preview">${escapeHtml(preview || "(no content)")}</div>
+            <div class="nova-artifact-actions">
+              <button type="button" class="nova-artifact-btn" data-action="open" data-artifact-id="${escapeHtml(a.id)}">open</button>
+              <button type="button" class="nova-artifact-btn" data-action="copy" data-artifact-id="${escapeHtml(a.id)}">copy</button>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    list.onclick = async (event) => {
+      const btn = event.target.closest("[data-action]");
+      if (btn) {
+        event.stopPropagation();
+        const id = btn.getAttribute("data-artifact-id");
+        const action = btn.getAttribute("data-action");
+
+        if (action === "open") {
+          await openArtifact(id, true);
+          return;
+        }
+
+        if (action === "copy") {
+          await copyArtifact(id);
+          return;
+        }
       }
-    });
+
+      const card = event.target.closest("[data-artifact-id]");
+      if (!card) return;
+      const id = card.getAttribute("data-artifact-id");
+      await openArtifact(id, true);
+    };
   }
 
-  function installHooks() {
-    document.addEventListener("nova:artifacts:refresh", refreshArtifacts);
+  async function openArtifact(id, rerenderList = true) {
+    const local = state.artifacts.find((a) => a.id === id);
+    state.selectedId = id;
+    if (rerenderList) renderArtifactList();
 
-    document.addEventListener("click", (event) => {
-      const saveBtn = event.target.closest?.('[data-action="save"], [data-viewer-action]');
-      if (!saveBtn) return;
-    });
+    if (local) {
+      renderViewer(local);
+    }
+
+    try {
+      const fresh = await apiJson(`/api/artifacts/${encodeURIComponent(id)}`);
+      const item =
+        fresh?.artifact && typeof fresh.artifact === "object"
+          ? fresh.artifact
+          : fresh;
+      const normalized = normalizeArtifact(item);
+
+      const idx = state.artifacts.findIndex((a) => a.id === normalized.id);
+      if (idx >= 0) state.artifacts[idx] = normalized;
+
+      applyFilters();
+      if (rerenderList) renderArtifactList();
+      renderViewer(normalized);
+    } catch (err) {
+      if (!local) {
+        renderViewer({
+          id,
+          title: "Artifact load failed",
+          content: `Failed to load artifact ${id}\n\n${err.message}`,
+          kind: "chat",
+          tags: [],
+          pinned: false,
+          created_at: "",
+          updated_at: "",
+          session_id: "",
+          meta: {},
+        });
+      }
+    }
+  }
+
+  function clearViewer() {
+    const viewer = state.ui?.viewer;
+    if (!viewer) return;
+    if (viewer.title) viewer.title.textContent = "";
+    if (viewer.meta) viewer.meta.textContent = "";
+    if (viewer.content) viewer.content.textContent = "";
+  }
+
+  function renderViewer(a) {
+    const viewer = state.ui?.viewer;
+    if (!viewer) return;
+
+    if (viewer.title) viewer.title.textContent = a.title || "Untitled artifact";
+
+    const metaParts = [
+      a.kind ? `kind: ${a.kind}` : "",
+      a.pinned ? "pinned" : "",
+      a.session_id ? `session: ${a.session_id}` : "",
+      artifactUpdatedAt(a) ? `updated: ${formatDate(artifactUpdatedAt(a))}` : "",
+    ].filter(Boolean);
+
+    if (viewer.meta) viewer.meta.textContent = metaParts.join("  •  ");
+
+    if (viewer.content) {
+      const metaDump =
+        a.meta && Object.keys(a.meta).length
+          ? `\n\n--- meta ---\n${text(a.meta)}`
+          : "";
+      viewer.content.textContent = `${text(a.content || "(no content)")}${metaDump}`;
+    }
+  }
+
+  async function copyArtifact(id) {
+    const a = state.artifacts.find((x) => x.id === id);
+    if (!a) return;
+
+    const payload = `${a.title}\n\n${a.content || ""}`;
+    try {
+      await navigator.clipboard.writeText(payload);
+      const btn = document.querySelector(`[data-action="copy"][data-artifact-id="${CSS.escape(id)}"]`);
+      if (btn) {
+        const old = btn.textContent;
+        btn.textContent = "copied";
+        setTimeout(() => {
+          btn.textContent = old;
+        }, 900);
+      }
+    } catch (err) {
+      console.error("Copy failed:", err);
+    }
+  }
+
+  function exposePublicApi() {
+    Nova.artifacts.reload = loadArtifacts;
+    Nova.artifacts.getAll = () => [...state.artifacts];
+    Nova.artifacts.getFiltered = () => [...state.filtered];
+    Nova.artifacts.open = openArtifact;
+    Nova.artifacts.search = (q = "") => {
+      state.filters.q = text(q).toLowerCase().trim();
+      if (state.ui?.searchInput) state.ui.searchInput.value = state.filters.q;
+      applyFilters();
+      renderArtifactList();
+    };
   }
 
   function bootstrap() {
-    injectStyles();
-    installPanelToggles();
-    installHooks();
-  }
+    const panel = ensurePanelScaffold();
+    if (!panel) return;
 
-  Nova.artifacts.refresh = refreshArtifacts;
-  Nova.artifacts.openViewer = showArtifactViewer;
-  Nova.artifacts.closeViewer = closeViewer;
-  Nova.artifacts.togglePanel = togglePanel;
+    injectToolbar(panel);
+
+    state.ui = {
+      panel,
+      list: findListContainer(panel),
+      viewer: findViewer(panel),
+      count: $("#novaArtifactsCount", panel),
+      searchInput: $("#novaArtifactSearchInput", panel),
+    };
+
+    wireToolbar(panel);
+    exposePublicApi();
+    loadArtifacts();
+  }
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bootstrap);

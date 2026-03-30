@@ -1,184 +1,184 @@
 from __future__ import annotations
 
 import os
-from flask import Flask, request, jsonify, render_template
-from services.chat_service import ChatService
-from services.memory_service import MemoryService
+from pathlib import Path
+from typing import Any, Dict, List
+
+from flask import Flask, jsonify, render_template, request, send_from_directory
+
 from services.artifact_service import ArtifactService
-from services.attachment_service import AttachmentService
-from services.web_service import WebService
+from services.chat_service import ChatService
+
+
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+UPLOADS_DIR = BASE_DIR / "uploads"
+
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024
 
-chat_service = ChatService()
-memory_service = MemoryService()
-artifact_service = ArtifactService()
-attachment_service = AttachmentService()
-web_service = WebService()
-
-# =========================================================
-# 🔥 HARD FIX: guarantee add_artifact exists
-# =========================================================
-if not hasattr(artifact_service, "add_artifact"):
-    def _fallback_add_artifact(*args, **kwargs):
-        payload = kwargs if kwargs else (args[0] if args else {})
-        return payload
-    artifact_service.add_artifact = _fallback_add_artifact
+artifact_service = ArtifactService(str(DATA_DIR))
+chat_service = ChatService(str(DATA_DIR), artifact_service=artifact_service)
 
 
-# =========================================================
-# routes
-# =========================================================
+def json_ok(payload: Dict[str, Any], status: int = 200):
+    return jsonify(payload), status
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
 
+@app.route("/api/health", methods=["GET"])
+def api_health():
+    return json_ok(
+        {
+            "ok": True,
+            "service": "nova",
+            "port": int(os.getenv("APP_PORT", "5001")),
+            "cwd": str(BASE_DIR),
+        }
+    )
+
+
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
     try:
-        data = request.get_json()
-        content = data.get("content")
-        session_id = data.get("session_id")
+        data = request.get_json(force=True, silent=True) or {}
+        content = (data.get("content") or "").strip()
+        session_id = (data.get("session_id") or "default-session").strip()
+        attachments = data.get("attachments") or []
 
-        result = chat_service.send_message(content=content, session_id=session_id)
-
-        return jsonify({
-            "ok": True,
-            "message": result.get("message"),
-            "session": result.get("session"),
-            "debug": result.get("debug")
-        })
-
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Chat failed: {str(e)}"}), 500
-
-
-# =========================================================
-# 🔥 KNOWLEDGE ROUTE (FIXED PIPELINE)
-# =========================================================
-
-@app.route("/api/knowledge", methods=["POST"])
-def api_knowledge():
-    try:
-        data = request.get_json()
-        query = data.get("query")
-        session_id = data.get("session_id")
-        search_limit = int(data.get("search_limit", 5))
-        fetch_limit = int(data.get("fetch_limit", 3))
-
-        # -------------------------
-        # MEMORY
-        # -------------------------
-        memory_hits = []
-        if hasattr(memory_service, "search"):
-            memory_hits = memory_service.search(query=query)
-
-        # -------------------------
-        # WEB SEARCH + FETCH
-        # -------------------------
-        pipeline = web_service.search_and_fetch(
-            query=query,
-            search_limit=search_limit,
-            fetch_limit=fetch_limit
+        result = chat_service.send_message(
+            content=content,
+            session_id=session_id,
+            attachments=attachments,
         )
+        return json_ok(result)
+    except ValueError as e:
+        return json_ok({"ok": False, "error": str(e)}, 400)
+    except Exception as e:
+        return json_ok({"ok": False, "error": f"Chat failed: {e}"}, 500)
 
-        search_results = pipeline.get("search", {}).get("results", [])
-        fetched_items = pipeline.get("fetch", {}).get("items", [])
 
-        usable_sources = []
-        for item in fetched_items:
-            if item.get("ok"):
-                usable_sources.append({
-                    "title": item.get("title") or item.get("url"),
-                    "url": item.get("url"),
-                    "content": (item.get("content") or "")[:4000],
-                })
+@app.route("/api/artifacts", methods=["GET"])
+def api_artifacts():
+    try:
+        session_id = request.args.get("session_id", "").strip() or None
+        items = artifact_service.list_artifacts(session_id=session_id)
+        return json_ok({"ok": True, "items": items})
+    except Exception as e:
+        return json_ok({"ok": False, "error": f"Artifacts load failed: {e}"}, 500)
 
-        # 🔥 FORCE SECOND PASS IF EMPTY
-        if not usable_sources:
-            pipeline = web_service.search_and_fetch(
-                query=query,
-                search_limit=10,
-                fetch_limit=5
+
+@app.route("/api/artifacts/<artifact_id>", methods=["GET"])
+def api_artifact_get(artifact_id: str):
+    try:
+        item = artifact_service.get_artifact(artifact_id)
+        if not item:
+            return json_ok({"ok": False, "error": "Artifact not found"}, 404)
+        return json_ok({"ok": True, "artifact": item})
+    except Exception as e:
+        return json_ok({"ok": False, "error": f"Artifact read failed: {e}"}, 500)
+
+
+@app.route("/api/artifacts/save", methods=["POST"])
+def api_artifact_save():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        item = artifact_service.save_artifact(
+            title=data.get("title") or "Untitled artifact",
+            content=data.get("content") or "",
+            kind=data.get("kind") or "chat",
+            session_id=data.get("session_id") or "default-session",
+            tags=data.get("tags") or [],
+            meta=data.get("meta") or {},
+            pinned=bool(data.get("pinned", False)),
+        )
+        return json_ok({"ok": True, "artifact": item})
+    except Exception as e:
+        return json_ok({"ok": False, "error": f"Artifact save failed: {e}"}, 500)
+
+
+@app.route("/api/artifacts/search", methods=["POST"])
+def api_artifacts_search():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        query = (data.get("query") or "").strip()
+        session_id = (data.get("session_id") or "").strip() or None
+        limit = int(data.get("limit") or 5)
+
+        items = artifact_service.search_artifacts(
+            query,
+            session_id=session_id,
+            limit=limit,
+        )
+        return json_ok({"ok": True, "items": items})
+    except Exception as e:
+        return json_ok({"ok": False, "error": f"Artifact search failed: {e}"}, 500)
+
+
+@app.route("/api/state", methods=["GET"])
+def api_state():
+    try:
+        session_id = request.args.get("session_id", "default-session").strip()
+        session = chat_service.get_session(session_id)
+        artifacts = artifact_service.list_artifacts(session_id=session_id, limit=50)
+        return json_ok(
+            {
+                "ok": True,
+                "session": session,
+                "artifacts": artifacts,
+            }
+        )
+    except Exception as e:
+        return json_ok({"ok": False, "error": f"State failed: {e}"}, 500)
+
+
+@app.route("/api/upload", methods=["POST"])
+def api_upload():
+    try:
+        uploaded = request.files.getlist("files")
+        if not uploaded:
+            return json_ok({"ok": False, "error": "No files uploaded"}, 400)
+
+        saved: List[Dict[str, Any]] = []
+        for file in uploaded:
+            if not file or not file.filename:
+                continue
+
+            filename = Path(file.filename).name
+            target = UPLOADS_DIR / filename
+            stem = target.stem
+            suffix = target.suffix
+            counter = 1
+
+            while target.exists():
+                target = UPLOADS_DIR / f"{stem}_{counter}{suffix}"
+                counter += 1
+
+            file.save(target)
+            saved.append(
+                {
+                    "name": target.name,
+                    "url": f"/api/uploads/{target.name}",
+                    "size": target.stat().st_size,
+                }
             )
 
-            fetched_items = pipeline.get("fetch", {}).get("items", [])
-
-            for item in fetched_items:
-                if item.get("ok"):
-                    usable_sources.append({
-                        "title": item.get("title") or item.get("url"),
-                        "url": item.get("url"),
-                        "content": (item.get("content") or "")[:4000],
-                    })
-
-        # -------------------------
-        # BUILD CONTEXT
-        # -------------------------
-        context = ""
-
-        if usable_sources:
-            context += "WEB SOURCES:\n"
-            for s in usable_sources:
-                context += f"{s['title']}\n{s['content']}\n\n"
-
-        if memory_hits:
-            context += "MEMORY:\n"
-            for m in memory_hits[:5]:
-                context += f"{str(m)}\n\n"
-
-        # -------------------------
-        # FINAL ANSWER
-        # -------------------------
-        result = chat_service.send_message(
-            content=f"{query}\n\n{context}",
-            session_id=session_id
-        )
-
-        message = result.get("message")
-
-        # -------------------------
-        # SAVE ARTIFACT (SAFE NOW)
-        # -------------------------
-        artifact_service.add_artifact(
-            title=query,
-            content=message,
-            kind="knowledge",
-            session_id=session_id,
-            tags=["knowledge"],
-            meta={
-                "search_count": len(search_results),
-                "fetch_count": len(fetched_items),
-                "usable_count": len(usable_sources),
-                "memory_count": len(memory_hits),
-            }
-        )
-
-        return jsonify({
-            "ok": True,
-            "message": message,
-            "session": result.get("session"),
-            "sources": usable_sources,
-            "debug": {
-                "memory_used": bool(memory_hits),
-                "search_count": len(search_results),
-                "fetch_count": len(fetched_items),
-                "usable_count": len(usable_sources),
-            }
-        })
-
+        return json_ok({"ok": True, "files": saved})
     except Exception as e:
-        return jsonify({
-            "ok": False,
-            "error": f"Knowledge failed: {str(e)}"
-        }), 500
+        return json_ok({"ok": False, "error": f"Upload failed: {e}"}, 500)
 
 
-# =========================================================
-# RUN
-# =========================================================
+@app.route("/api/uploads/<path:filename>", methods=["GET"])
+def api_uploaded_file(filename: str):
+    return send_from_directory(UPLOADS_DIR, filename)
+
 
 if __name__ == "__main__":
     port = int(os.getenv("APP_PORT", "5001"))

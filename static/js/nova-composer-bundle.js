@@ -1,556 +1,422 @@
-(function () {
+(() => {
   "use strict";
 
-  const API_BASE = "http://127.0.0.1:5001";
+  const Nova = (window.Nova = window.Nova || {});
+  Nova.composer = Nova.composer || {};
 
   const state = {
-    sessionId: loadSessionId(),
+    sessionId: "default-session",
     pendingFiles: [],
     sending: false,
   };
 
-  function loadSessionId() {
-    const key = "nova_session_id";
-    let value = localStorage.getItem(key);
-    if (!value) {
-      value = crypto.randomUUID();
-      localStorage.setItem(key, value);
-    }
-    return value;
+  function $(selector, root = document) {
+    return root.querySelector(selector);
   }
 
-  function $(id) {
-    return document.getElementById(id);
-  }
-
-  function getEls() {
-    return {
-      chatInput: $("chatInput"),
-      sendBtn: $("sendBtn"),
-      uploadBtn: $("uploadBtn"),
-      fileInput: $("fileInput"),
-      messages: $("messages"),
-      emptyState: $("novaEmptyState"),
-    };
-  }
-
-  function ensureMessagesContainer() {
-    const { messages } = getEls();
-    return messages || null;
-  }
-
-  function hideEmptyState() {
-    const { emptyState } = getEls();
-    if (emptyState) emptyState.style.display = "none";
-  }
-
-  function showEmptyStateIfNeeded() {
-    const { emptyState, messages } = getEls();
-    if (!emptyState || !messages) return;
-    emptyState.style.display = messages.children.length ? "none" : "";
-  }
-
-  function escapeHtml(value) {
-    return String(value || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-  function nl2br(value) {
-    return escapeHtml(value).replace(/\n/g, "<br>");
-  }
-
-  function safeUrl(url) {
-    const value = String(url || "").trim();
-    if (!/^https?:\/\//i.test(value)) return "#";
-    return value;
-  }
-
-  function hostnameFromUrl(url) {
+  function text(value) {
+    if (value == null) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
     try {
-      return new URL(url).hostname.replace(/^www\./i, "");
+      return JSON.stringify(value, null, 2);
     } catch {
-      return "";
+      return String(value);
     }
   }
 
-  function shortTitle(value, max = 44) {
-    const text = String(value || "").trim();
-    if (!text) return "Untitled source";
-    if (text.length <= max) return text;
-    return `${text.slice(0, max - 1)}…`;
-  }
+  function safeMessageText(value) {
+    if (value == null) return "";
 
-  function addMessage(role, text, meta = {}) {
-    const messages = ensureMessagesContainer();
-    if (!messages) return null;
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
 
-    hideEmptyState();
-
-    const wrap = document.createElement("div");
-    wrap.className = `nova-message nova-message-${role}`;
-
-    const inner = document.createElement("div");
-    inner.className = "nova-message-inner";
-
-    const badges = document.createElement("div");
-    badges.className = "nova-message-badges";
-
-    if (meta.route) {
-      const badge = document.createElement("span");
-      badge.className = "nova-badge";
-      badge.textContent = meta.route;
-      badges.appendChild(badge);
+    if (Array.isArray(value)) {
+      return value.map(safeMessageText).filter(Boolean).join("\n");
     }
 
-    if (meta.webUsed) {
-      const badge = document.createElement("span");
-      badge.className = "nova-badge";
-      badge.textContent = "web";
-      badges.appendChild(badge);
+    if (typeof value === "object") {
+      if (typeof value.content === "string") return value.content;
+      if (typeof value.text === "string") return value.text;
+      if (typeof value.message === "string") return value.message;
+      if (typeof value.output_text === "string") return value.output_text;
+
+      if (value.message && typeof value.message === "object") {
+        if (typeof value.message.content === "string") return value.message.content;
+        if (typeof value.message.text === "string") return value.message.text;
+      }
+
+      if (Array.isArray(value.content)) {
+        return value.content.map(safeMessageText).filter(Boolean).join("\n");
+      }
+
+      if (Array.isArray(value.output)) {
+        return value.output
+          .map((entry) => {
+            if (!entry) return "";
+            if (typeof entry.text === "string") return entry.text;
+            if (Array.isArray(entry.content)) {
+              return entry.content.map(safeMessageText).filter(Boolean).join("\n");
+            }
+            return safeMessageText(entry);
+          })
+          .filter(Boolean)
+          .join("\n");
+      }
+
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch {
+        return String(value);
+      }
     }
 
-    if (meta.fetchUsed) {
-      const badge = document.createElement("span");
-      badge.className = "nova-badge";
-      badge.textContent = "fetch";
-      badges.appendChild(badge);
+    return String(value);
+  }
+
+  function setBusy(isBusy) {
+    state.sending = Boolean(isBusy);
+
+    const sendBtn = $("#sendBtn");
+    const chatInput = $("#chatInput");
+    const uploadBtn = $("#uploadBtn");
+
+    if (sendBtn) {
+      sendBtn.disabled = state.sending;
+      sendBtn.textContent = state.sending ? "Sending..." : "Send";
     }
 
-    if (badges.children.length) {
-      inner.appendChild(badges);
+    if (chatInput) {
+      chatInput.disabled = state.sending;
     }
 
-    const body = document.createElement("div");
-    body.className = "nova-message-markdown";
-    body.innerHTML = nl2br(text || "");
-    inner.appendChild(body);
-
-    const sourcesHost = document.createElement("div");
-    sourcesHost.className = "nova-sources-host";
-    inner.appendChild(sourcesHost);
-
-    wrap.appendChild(inner);
-    messages.appendChild(wrap);
-    messages.scrollTop = messages.scrollHeight;
-
-    return { wrap, body, sourcesHost };
+    if (uploadBtn) {
+      uploadBtn.disabled = state.sending;
+    }
   }
 
-  function setMessageText(ref, text) {
-    if (!ref || !ref.body) return;
-    ref.body.innerHTML = nl2br(text || "");
-  }
-
-  function renderSources(ref, sources) {
-    if (!ref || !ref.sourcesHost) return;
-
-    const host = ref.sourcesHost;
-    host.innerHTML = "";
-
-    if (!Array.isArray(sources) || !sources.length) return;
-
-    const header = document.createElement("div");
-    header.className = "nova-sources-header";
-
-    const title = document.createElement("div");
-    title.className = "nova-sources-title";
-    title.textContent = "Sources";
-
-    const actions = document.createElement("div");
-    actions.className = "nova-sources-actions";
-
-    const openAllBtn = document.createElement("button");
-    openAllBtn.type = "button";
-    openAllBtn.className = "nova-sources-open-all";
-    openAllBtn.textContent = `Open all (${sources.length})`;
-    openAllBtn.addEventListener("click", () => {
-      sources.forEach((source, index) => {
-        const url = safeUrl(source.url);
-        if (url === "#") return;
-        setTimeout(() => {
-          window.open(url, "_blank", "noopener,noreferrer");
-        }, index * 120);
-      });
-    });
-
-    actions.appendChild(openAllBtn);
-    header.appendChild(title);
-    header.appendChild(actions);
-    host.appendChild(header);
-
-    const chips = document.createElement("div");
-    chips.className = "nova-source-chips";
-
-    sources.forEach((source, index) => {
-      const chip = document.createElement("a");
-      chip.className = "nova-source-chip";
-      chip.href = safeUrl(source.url);
-      chip.target = "_blank";
-      chip.rel = "noopener noreferrer";
-      chip.title = source.title || source.url || "Source";
-
-      const chipIndex = document.createElement("span");
-      chipIndex.className = "nova-source-chip-index";
-      chipIndex.textContent = String(index + 1);
-
-      const chipText = document.createElement("span");
-      chipText.className = "nova-source-chip-text";
-      chipText.textContent = shortTitle(source.title || hostnameFromUrl(source.url) || "Source");
-
-      chip.appendChild(chipIndex);
-      chip.appendChild(chipText);
-      chips.appendChild(chip);
-    });
-
-    host.appendChild(chips);
-
-    const list = document.createElement("div");
-    list.className = "nova-sources-list";
-
-    sources.forEach((source, index) => {
-      const card = document.createElement("a");
-      card.className = "nova-source-card";
-      card.href = safeUrl(source.url);
-      card.target = "_blank";
-      card.rel = "noopener noreferrer";
-
-      const cardTop = document.createElement("div");
-      cardTop.className = "nova-source-card-top";
-
-      const number = document.createElement("span");
-      number.className = "nova-source-index";
-      number.textContent = String(index + 1);
-
-      const domain = document.createElement("span");
-      domain.className = "nova-source-domain";
-      domain.textContent = hostnameFromUrl(source.url) || "source";
-
-      cardTop.appendChild(number);
-      cardTop.appendChild(domain);
-
-      const heading = document.createElement("div");
-      heading.className = "nova-source-title-text";
-      heading.textContent = source.title || source.url || "Untitled source";
-
-      const desc = document.createElement("div");
-      desc.className = "nova-source-desc";
-      desc.textContent = source.description || source.url || "";
-
-      card.appendChild(cardTop);
-      card.appendChild(heading);
-      card.appendChild(desc);
-
-      list.appendChild(card);
-    });
-
-    host.appendChild(list);
-  }
-
-  function isUrlOnly(text) {
-    return /^(https?:\/\/[^\s]+)$/i.test(String(text || "").trim());
-  }
-
-  function looksLikeCurrentInfo(text) {
-    const t = String(text || "").trim().toLowerCase();
-    if (!t) return false;
-
-    const patterns = [
-      /\blatest\b/,
-      /\brecent\b/,
-      /\bcurrent\b/,
-      /\bright now\b/,
-      /\btoday\b/,
-      /\byesterday\b/,
-      /\bthis week\b/,
-      /\bthis month\b/,
-      /\bnews\b/,
-      /\bheadline(s)?\b/,
-      /\bupdate(s)?\b/,
-      /\bwhat('?s| is) happening\b/,
-      /\bwhat('?s| is) going on\b/,
-      /\bai news\b/,
-      /\brelease notes\b/,
-      /\bversion\b/,
-      /\bprice of\b/,
-      /\bstock\b/,
-      /\bweather\b/,
-      /\bscore\b/,
-      /\bwho is\b/,
-      /\bwhen is\b/,
-      /\bwhere is\b/,
-      /\bsearch\b/,
-      /\blook up\b/,
-      /\bfind\b/,
-      /\bnews on\b/,
-      /\bstatus of\b/,
-      /\btrend(s)?\b/,
-      /\btop story\b/,
-      /\btop stories\b/,
-      /\bresearch\b/,
-      /\bnew paper(s)?\b/,
-      /\bannouncement(s)?\b/,
-      /\blaunch(ed|ing)?\b/,
-      /\bup to date\b/,
-      /\bupdated\b/,
-      /\brefresh\b/
-    ];
-
-    return patterns.some((rx) => rx.test(t));
-  }
-
-  function looksLikeCreativeTask(text) {
-    const t = String(text || "").trim().toLowerCase();
-    if (!t) return false;
-
-    const patterns = [
-      /\bwrite\b/,
-      /\brewrite\b/,
-      /\bimprove\b/,
-      /\bfix this code\b/,
-      /\bmake me\b/,
-      /\bcreate\b/,
-      /\bbrainstorm\b/,
-      /\bhomepage\b/,
-      /\bhero section\b/,
-      /\bemail\b/,
-      /\bpoem\b/,
-      /\bstory\b/,
-      /\bcopy\b/,
-      /\bcaption\b/,
-      /\brefactor\b/,
-      /\bdebug this\b/,
-      /\bsmff\b/
-    ];
-
-    return patterns.some((rx) => rx.test(t));
-  }
-
-  function detectRoute(text) {
-    const value = String(text || "").trim();
-    if (!value) return "chat";
-    if (isUrlOnly(value)) return "fetch";
-    if (looksLikeCurrentInfo(value) && !looksLikeCreativeTask(value)) return "knowledge";
-    return "chat";
-  }
-
-  async function callJson(url, payload) {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+  async function callJson(url, options = {}) {
+    const response = await fetch(url, options);
+    const raw = await response.text();
 
     let data = null;
     try {
-      data = await response.json();
-    } catch (e) {
-      data = null;
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      data = raw;
     }
 
     if (!response.ok) {
       const message =
-        (data && (data.error || data.message)) ||
-        `${response.status} ${response.statusText}`;
+        (data && data.error) ||
+        (data && data.message) ||
+        raw ||
+        `Request failed: ${response.status}`;
       throw new Error(message);
     }
 
-    return data || {};
+    return data;
   }
 
-  async function sendChat(content) {
-    return callJson(`${API_BASE}/api/chat`, {
+  function ensureRender() {
+    if (!window.Nova?.render?.appendMessage) {
+      throw new Error("Nova.render.appendMessage is missing");
+    }
+    return window.Nova.render;
+  }
+
+  function makeUserMessage(content, attachments = []) {
+    return {
+      id: `user_${Date.now()}`,
+      role: "user",
+      content: safeMessageText(content),
+      created_at: new Date().toISOString(),
+      attachments,
+    };
+  }
+
+  function makeAssistantMessage(result) {
+    const payload =
+      result?.message && typeof result.message === "object"
+        ? result.message
+        : result;
+
+    const content = safeMessageText(
+      payload?.content ??
+        payload?.text ??
+        payload?.message ??
+        result?.content ??
+        result?.text ??
+        result?.message ??
+        ""
+    );
+
+    return {
+      id: payload?.id || `assistant_${Date.now()}`,
+      role: payload?.role || "assistant",
       content,
-      session_id: state.sessionId,
+      created_at: payload?.created_at || new Date().toISOString(),
+      attachments: Array.isArray(payload?.attachments) ? payload.attachments : [],
+      debug: result?.debug || null,
+      raw: result,
+    };
+  }
+
+  function currentPendingFiles() {
+    return Array.isArray(state.pendingFiles) ? [...state.pendingFiles] : [];
+  }
+
+  function clearPendingFiles() {
+    state.pendingFiles = [];
+    renderPendingFiles();
+    const fileInput = $("#fileInput");
+    if (fileInput) fileInput.value = "";
+  }
+
+  function renderPendingFiles() {
+    const list =
+      $("#novaPendingFiles") ||
+      $("#pendingFiles") ||
+      $('[data-pending-files]');
+
+    if (!list) return;
+
+    const files = currentPendingFiles();
+
+    if (!files.length) {
+      list.innerHTML = "";
+      list.style.display = "none";
+      return;
+    }
+
+    list.style.display = "";
+    list.innerHTML = files
+      .map((file, index) => {
+        const name = text(file?.name || file?.filename || `attachment-${index + 1}`);
+        const meta = [];
+        if (file?.type) meta.push(text(file.type));
+        if (file?.extracted_chars) meta.push(`${file.extracted_chars} chars`);
+
+        return `
+          <div class="nova-attachment-chip" data-pending-index="${index}" title="${name}">
+            <span>${name}${meta.length ? ` • ${meta.join(" • ")}` : ""}</span>
+            <button type="button" class="nova-attachment-chip-remove" data-remove-pending="${index}">×</button>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  function installPendingFileEvents() {
+    const list =
+      $("#novaPendingFiles") ||
+      $("#pendingFiles") ||
+      $('[data-pending-files]');
+
+    if (!list) return;
+
+    list.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-remove-pending]");
+      if (!btn) return;
+
+      const index = Number(btn.getAttribute("data-remove-pending"));
+      if (!Number.isFinite(index)) return;
+
+      state.pendingFiles.splice(index, 1);
+      renderPendingFiles();
     });
   }
 
-  async function sendFetch(url) {
-    return callJson(`${API_BASE}/api/web/fetch`, {
-      url,
-      session_id: state.sessionId,
-    });
-  }
-
-  async function sendKnowledge(query) {
-    return callJson(`${API_BASE}/api/knowledge`, {
-      query,
-      session_id: state.sessionId,
-      search_limit: 6,
-      fetch_limit: 4,
-    });
-  }
-
-  async function uploadFiles(files) {
-    if (!files || !files.length) return [];
+  async function uploadSelectedFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return [];
 
     const formData = new FormData();
     for (const file of files) {
       formData.append("files", file);
     }
 
-    const response = await fetch(`${API_BASE}/api/upload`, {
+    const result = await callJson("/api/upload", {
       method: "POST",
       body: formData,
     });
 
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      throw new Error((data && data.error) || "Upload failed");
-    }
-
-    return (data && data.files) || [];
+    const uploaded = Array.isArray(result?.files) ? result.files : [];
+    return uploaded.map((file) => ({
+      name: file?.name || "",
+      filename: file?.name || "",
+      url: file?.url || "",
+      size: file?.size || 0,
+      type: file?.type || guessMimeTypeFromName(file?.name || ""),
+      kind: file?.kind || "",
+      content: file?.content || "",
+      preview: file?.preview || "",
+      extracted_chars: file?.extracted_chars || 0,
+    }));
   }
 
-  function renderPendingFiles() {
-    let tray = document.getElementById("novaPendingFilesTray");
-    const { chatInput } = getEls();
-    if (!chatInput || !chatInput.parentElement) return;
+  function guessMimeTypeFromName(name) {
+    const lower = String(name || "").toLowerCase();
+    if (lower.endsWith(".txt") || lower.endsWith(".md") || lower.endsWith(".log")) return "text/plain";
+    if (lower.endsWith(".json")) return "application/json";
+    if (lower.endsWith(".csv")) return "text/csv";
+    if (lower.endsWith(".pdf")) return "application/pdf";
+    if (lower.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/)) return "image/*";
+    return "";
+  }
 
-    if (!tray) {
-      tray = document.createElement("div");
-      tray.id = "novaPendingFilesTray";
-      tray.className = "nova-pending-files-tray";
-      chatInput.parentElement.insertBefore(tray, chatInput);
+  async function sendChat() {
+    if (state.sending) return;
+
+    const render = ensureRender();
+    const chatInput = $("#chatInput");
+    if (!chatInput) {
+      throw new Error("chatInput not found");
     }
 
-    tray.innerHTML = "";
+    const userText = String(chatInput.value || "").trim();
+    const attachmentsForSend = currentPendingFiles();
 
-    if (!state.pendingFiles.length) {
-      tray.style.display = "none";
+    if (!userText && !attachmentsForSend.length) {
       return;
     }
 
-    tray.style.display = "flex";
+    render.appendMessage(makeUserMessage(userText, attachmentsForSend));
 
-    state.pendingFiles.forEach((file, index) => {
-      const chip = document.createElement("div");
-      chip.className = "nova-attachment-chip";
-
-      const label = document.createElement("span");
-      label.textContent = file.name;
-
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "nova-chip-remove";
-      remove.textContent = "×";
-      remove.addEventListener("click", () => {
-        state.pendingFiles.splice(index, 1);
-        renderPendingFiles();
-      });
-
-      chip.appendChild(label);
-      chip.appendChild(remove);
-      tray.appendChild(chip);
-    });
-  }
-
-  async function handleSend() {
-    const { chatInput, sendBtn } = getEls();
-    if (!chatInput || !sendBtn || state.sending) return;
-
-    const raw = chatInput.value || "";
-    const content = raw.trim();
-
-    if (!content && !state.pendingFiles.length) return;
-
-    state.sending = true;
-    sendBtn.disabled = true;
+    chatInput.value = "";
+    clearPendingFiles();
+    setBusy(true);
 
     try {
-      let finalUserText = content;
-
-      if (state.pendingFiles.length) {
-        const uploaded = await uploadFiles(state.pendingFiles);
-        const attachmentLines = uploaded.map((f) => `Attachment: ${f.name} ${f.url}`);
-        finalUserText = [content, ...attachmentLines].filter(Boolean).join("\n");
-        state.pendingFiles = [];
-        renderPendingFiles();
-      }
-
-      addMessage("user", finalUserText || "[Uploaded file]", { route: "user" });
-      chatInput.value = "";
-
-      const route = detectRoute(content);
-      const pending = addMessage("assistant", "Thinking...", {
-        route,
-        webUsed: route === "knowledge",
-        fetchUsed: route === "fetch",
+      const result = await callJson("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: userText,
+          session_id: state.sessionId,
+          attachments: attachmentsForSend,
+        }),
       });
 
-      let data;
-      if (route === "fetch") {
-        data = await sendFetch(content);
-      } else if (route === "knowledge") {
-        data = await sendKnowledge(content);
-      } else {
-        data = await sendChat(finalUserText);
-      }
+      console.log("Nova route debug:", result?.debug || null);
 
-      const reply = data.message || data.reply || data.content || "No response returned.";
-      setMessageText(pending, reply);
+      const assistantMessage = makeAssistantMessage(result);
+      render.appendMessage(assistantMessage);
 
-      if (route === "knowledge" && Array.isArray(data.sources)) {
-        renderSources(pending, data.sources);
-      }
-
-      if (data.debug) {
-        console.log("Nova route debug:", data.debug);
+      if (window.Nova?.artifacts?.reload) {
+        window.Nova.artifacts.reload().catch((err) => {
+          console.warn("Artifact reload failed after chat:", err);
+        });
       }
     } catch (error) {
-      addMessage("assistant", `Error: ${error.message}`, { route: "error" });
+      console.error("sendChat failed:", error);
+      render.appendMessage({
+        id: `assistant_error_${Date.now()}`,
+        role: "assistant",
+        content: `Error: ${safeMessageText(error?.message || error)}`,
+        created_at: new Date().toISOString(),
+      });
     } finally {
-      state.sending = false;
-      sendBtn.disabled = false;
+      setBusy(false);
       chatInput.focus();
-      showEmptyStateIfNeeded();
     }
   }
 
-  function bindUpload() {
-    const { uploadBtn, fileInput } = getEls();
-    if (!uploadBtn || !fileInput) return;
-
-    uploadBtn.addEventListener("click", () => fileInput.click());
-
-    fileInput.addEventListener("change", () => {
-      const files = Array.from(fileInput.files || []);
-      if (!files.length) return;
-      state.pendingFiles.push(...files);
-      renderPendingFiles();
-      fileInput.value = "";
+  function handleSend() {
+    sendChat().catch((err) => {
+      console.error("handleSend failed:", err);
     });
   }
 
-  function bindComposer() {
-    const { sendBtn, chatInput } = getEls();
-    if (!sendBtn || !chatInput) return;
+  function installComposerEvents() {
+    const sendBtn = $("#sendBtn");
+    const chatInput = $("#chatInput");
+    const uploadBtn = $("#uploadBtn");
+    const fileInput = $("#fileInput");
 
-    sendBtn.addEventListener("click", handleSend);
+    if (sendBtn) {
+      sendBtn.addEventListener("click", handleSend);
+    }
 
-    chatInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
-        handleSend();
+    if (chatInput) {
+      chatInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          handleSend();
+        }
+      });
+    }
+
+    if (uploadBtn && fileInput) {
+      uploadBtn.addEventListener("click", () => {
+        fileInput.click();
+      });
+    }
+
+    if (fileInput) {
+      fileInput.addEventListener("change", async (event) => {
+        const files = event.target.files;
+        if (!files || !files.length) return;
+
+        try {
+          setBusy(true);
+          const uploaded = await uploadSelectedFiles(files);
+          state.pendingFiles.push(...uploaded);
+          renderPendingFiles();
+        } catch (error) {
+          console.error("Upload failed:", error);
+          const render = window.Nova?.render;
+          if (render?.appendMessage) {
+            render.appendMessage({
+              id: `upload_error_${Date.now()}`,
+              role: "assistant",
+              content: `Upload failed: ${safeMessageText(error?.message || error)}`,
+              created_at: new Date().toISOString(),
+            });
+          }
+        } finally {
+          setBusy(false);
+          fileInput.value = "";
+        }
+      });
+    }
+  }
+
+  async function loadInitialState() {
+    try {
+      const result = await callJson(`/api/state?session_id=${encodeURIComponent(state.sessionId)}`);
+      const session = result?.session || {};
+      const messages = Array.isArray(session?.messages) ? session.messages : [];
+
+      if (window.Nova?.render?.renderMessages) {
+        window.Nova.render.renderMessages(messages);
       }
-    });
+
+      if (window.Nova?.artifacts?.reload) {
+        await window.Nova.artifacts.reload();
+      }
+    } catch (error) {
+      console.warn("Initial state load failed:", error);
+    }
   }
 
-  function bootstrap() {
-    bindComposer();
-    bindUpload();
+  async function bootstrap() {
+    installComposerEvents();
+    installPendingFileEvents();
     renderPendingFiles();
-    showEmptyStateIfNeeded();
-    console.log("nova-composer-bundle loaded");
+    await loadInitialState();
   }
+
+  Nova.composer.sendChat = sendChat;
+  Nova.composer.safeMessageText = safeMessageText;
+  Nova.composer.getPendingFiles = currentPendingFiles;
+  Nova.composer.clearPendingFiles = clearPendingFiles;
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bootstrap);
   } else {
     bootstrap();
   }
+
+  console.log("nova-composer-bundle loaded");
 })();

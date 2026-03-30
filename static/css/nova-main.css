@@ -539,3 +539,288 @@ body {
   line-height: 1.45;
   color: var(--muted);
 }
+
+.nova-artifacts-panel {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: none;
+  z-index: 3000;
+}
+
+.nova-artifacts-panel.is-open {
+  display: block;
+}
+
+.nova-artifacts-panel-inner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(1100px, 94vw);
+  height: 100%;
+  background: #0f172a;
+  color: #e5ecff;
+  box-shadow: -24px 0 64px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+}
+
+.nova-artifacts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.nova-artifacts-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.nova-artifacts-body {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  min-height: 0;
+  flex: 1;
+}
+
+.nova-artifacts-list-wrap {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: auto;
+}
+
+.nova-artifacts-list {
+  padding: 12px;
+}
+
+.nova-artifact-row {
+  width: 100%;
+  text-align: left;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  color: inherit;
+  padding: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.nova-artifact-row:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.nova-artifact-row-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.nova-artifact-row-meta {
+  font-size: 12px;
+  opacity: 0.72;
+}
+
+.nova-artifacts-empty {
+  padding: 18px 10px;
+  opacity: 0.76;
+}
+
+.nova-artifact-viewer {
+  overflow: auto;
+  padding: 18px;
+}
+
+.nova-artifact-viewer-title {
+  font-size: 20px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.nova-artifact-viewer-meta {
+  font-size: 12px;
+  opacity: 0.72;
+  margin-bottom: 14px;
+}
+
+.nova-artifact-viewer-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 14px;
+  min-height: 180px;
+}
+
+.nova-artifact-sources-wrap {
+  margin-top: 18px;
+}
+
+.nova-artifact-sources-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.nova-artifact-debug {
+  font-size: 12px;
+  opacity: 0.82;
+  margin-bottom: 10px;
+}
+
+.nova-source-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.nova-source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.nova-source-chip-index {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.14);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.nova-source-chip-text {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.nova-sources-list {
+  display: grid;
+  gap: 10px;
+}
+
+.nova-source-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.nova-source-card:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.nova-source-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.nova-source-index {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.14);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.nova-source-domain {
+  font-size: 12px;
+  opacity: 0.72;
+}
+
+.nova-source-title-text {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.nova-source-desc {
+  font-size: 12px;
+  opacity: 0.82;
+  line-height: 1.45;
+}
+
+.nova-artifacts-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nova-artifact-row.is-active {
+  border-color: rgba(110, 168, 255, 0.55);
+  background: rgba(110, 168, 255, 0.12);
+}
+
+.nova-artifact-action-bar {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 14px 0;
+}
+
+.nova-action-btn {
+  appearance: none;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: #e5ecff;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nova-action-btn:hover {
+  background: rgba(255,255,255,0.10);
+}
+
+.nova-action-btn-danger {
+  border-color: rgba(255, 107, 107, 0.35);
+  background: rgba(255, 107, 107, 0.12);
+}
+
+.nova-action-btn-danger:hover {
+  background: rgba(255, 107, 107, 0.18);
+}
+
+.nova-artifact-row-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.nova-artifact-pin-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 196, 0, 0.16);
+  border: 1px solid rgba(255, 196, 0, 0.30);
+  color: #ffd76a;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
