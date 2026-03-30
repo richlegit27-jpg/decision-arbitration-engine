@@ -1,120 +1,173 @@
 from __future__ import annotations
 
-import base64
+import json
 import os
-import uuid
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Dict, List
 
 from openai import OpenAI
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR = BASE_DIR / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+SESSIONS_FILE = DATA_DIR / "nova_sessions.json"
+MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _safe_json_load(path: Path, default: Any):
+    if not path.exists():
+        return default
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return default
+
+
+def _safe_json_save(path: Path, data: Any) -> None:
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _clip_text(value: str, limit: int) -> str:
+    value = value or ""
+    if len(value) <= limit:
+        return value
+    return value[:limit]
+
+
 class ChatService:
-    def __init__(self):
-        self.sessions = {}
+    def __init__(self) -> None:
+        self.sessions: Dict[str, Dict[str, Any]] = _safe_json_load(SESSIONS_FILE, {})
+        if not isinstance(self.sessions, dict):
+            self.sessions = {}
 
-    def send_message(self, content: str, session_id: str) -> str:
-        if session_id not in self.sessions:
-            self.sessions[session_id] = []
+    def _save(self) -> None:
+        _safe_json_save(SESSIONS_FILE, self.sessions)
 
-        self.sessions[session_id].append({"role": "user", "content": content})
+    def _ensure_session(self, session_id: str) -> Dict[str, Any]:
+        session = self.sessions.get(session_id)
+        if not isinstance(session, dict):
+            session = {
+                "id": session_id,
+                "title": "New Chat",
+                "created_at": _now_iso(),
+                "updated_at": _now_iso(),
+                "message_count": 0,
+                "last_message_preview": "",
+                "messages": [],
+            }
+            self.sessions[session_id] = session
 
-        if not content.strip():
-            return "Hi there! What can I do for you?"
+        session.setdefault("id", session_id)
+        session.setdefault("title", "New Chat")
+        session.setdefault("created_at", _now_iso())
+        session.setdefault("updated_at", _now_iso())
+        session.setdefault("message_count", 0)
+        session.setdefault("last_message_preview", "")
+        session.setdefault("messages", [])
 
-        try:
-            response = client.chat.completions.create(
-                model="gpt-5.4",
-                messages=self.sessions[session_id],
-                max_completion_tokens=500,
-            )
-            assistant_msg = (response.choices[0].message.content or "").strip()
-            self.sessions[session_id].append({"role": "assistant", "content": assistant_msg})
-            return assistant_msg or "No response."
-        except Exception as e:
-            return f"AI error: {str(e)}"
+        if not isinstance(session["messages"], list):
+            session["messages"] = []
 
-    def describe_image(self, image_path: str) -> str:
-        if not os.path.exists(image_path):
-            return "Image not found."
+        return session
 
-        try:
-            with open(image_path, "rb") as f:
-                image_bytes = f.read()
+    def get_sessions(self) -> List[Dict[str, Any]]:
+        rows: List[Dict[str, Any]] = []
+        for session_id, session in self.sessions.items():
+            if not isinstance(session, dict):
+                continue
+            rows.append({
+                "id": session_id,
+                "title": session.get("title", "New Chat"),
+                "created_at": session.get("created_at"),
+                "updated_at": session.get("updated_at"),
+                "message_count": session.get("message_count", 0),
+                "last_message_preview": session.get("last_message_preview", ""),
+            })
+        rows.sort(key=lambda x: x.get("updated_at") or "", reverse=True)
+        return rows
 
-            b64 = base64.b64encode(image_bytes).decode("utf-8")
-            ext = os.path.splitext(image_path)[1].lower()
-            mime = "image/jpeg" if ext in [".jpg", ".jpeg"] else f"image/{ext[1:]}"
-            data_url = f"data:{mime};base64,{b64}"
+    def get_session(self, session_id: str) -> Dict[str, Any]:
+        return self._ensure_session(session_id)
 
-            response = client.responses.create(
-                model="gpt-4.1-mini",
-                input=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "input_text", "text": "Describe this image in clear English."},
-                            {"type": "input_image", "image_url": data_url},
-                        ],
-                    }
-                ],
-            )
+    def send_message(self, content: str, session_id: str) -> Dict[str, Any]:
+        session = self._ensure_session(session_id)
+        history = session["messages"]
 
-            return response.output_text or "No description available."
-        except Exception as e:
-            return f"Failed to describe image: {str(e)}"
+        system_prompt = """
+You are Nova, a sharp, practical, high-agency assistant.
 
-    def generate_image(self, prompt: str) -> dict:
-        prompt = (prompt or "").strip()
-        if not prompt:
-            return {"ok": False, "error": "Missing image prompt."}
+Rules:
+- Be direct, useful, and accurate.
+- When the user provides page content, document content, pasted text, or extracted webpage text, treat that content as readable source material.
+- Never claim you cannot browse, open links, access a page, or read the source if the source text is already included in the user's message.
+- If the user asks about provided page text, answer from that text.
+- If the text does not contain the answer, say that clearly.
+- Do not make up source details that are not present.
+- Keep answers clean and natural, not robotic.
 
-        try:
-            response = client.images.generate(
-                model="gpt-image-1.5",
-                prompt=prompt,
-                size="1024x1024",
-            )
+Behavior:
+- For normal chat, respond normally.
+- For webpage/document questions, summarize or answer based on the provided content.
+- Prefer concrete answers over generic disclaimers.
+""".strip()
 
-            image_b64 = None
-            image_url = None
+        messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
 
-            if getattr(response, "data", None):
-                first = response.data[0]
-                image_b64 = getattr(first, "b64_json", None)
-                image_url = getattr(first, "url", None)
+        recent_history = history[-12:]
+        for msg in recent_history:
+            role = msg.get("role")
+            text = msg.get("content")
+            if role in {"user", "assistant"} and isinstance(text, str) and text.strip():
+                messages.append({"role": role, "content": text})
 
-            if image_b64:
-                raw = base64.b64decode(image_b64)
-                filename = f"{uuid.uuid4().hex}_generated.png"
-                output_path = UPLOAD_DIR / filename
-                with open(output_path, "wb") as f:
-                    f.write(raw)
+        messages.append({"role": "user", "content": content})
 
-                return {
-                    "ok": True,
-                    "filename": filename,
-                    "path": str(output_path),
-                    "url": f"/uploads/{filename}",
-                    "type": "image/png",
-                    "prompt": prompt,
-                }
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=messages,
+            max_completion_tokens=900,
+        )
 
-            if image_url:
-                return {
-                    "ok": True,
-                    "filename": "",
-                    "path": "",
-                    "url": image_url,
-                    "type": "image/png",
-                    "prompt": prompt,
-                }
+        reply = (response.choices[0].message.content or "").strip()
+        if not reply:
+            reply = "I do not have a response."
 
-            return {"ok": False, "error": "Image API returned no image data."}
-        except Exception as e:
-            return {"ok": False, "error": f"Image generation failed: {str(e)}"}
+        history.append({
+            "role": "user",
+            "content": content,
+            "created_at": _now_iso(),
+        })
+        history.append({
+            "role": "assistant",
+            "content": reply,
+            "created_at": _now_iso(),
+        })
+
+        if session["title"] == "New Chat":
+            session["title"] = _clip_text(content.strip() or "New Chat", 60)
+
+        session["updated_at"] = _now_iso()
+        session["message_count"] = len(history)
+        session["last_message_preview"] = _clip_text(reply, 140)
+
+        self._save()
+
+        return {
+            "message": reply,
+            "session": {
+                "id": session["id"],
+                "title": session["title"],
+                "created_at": session["created_at"],
+                "updated_at": session["updated_at"],
+                "message_count": session["message_count"],
+                "last_message_preview": session["last_message_preview"],
+            }
+        }

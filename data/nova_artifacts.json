@@ -1,5 +1,292 @@
 [
   {
+    "id": "6be5038f-95c1-49da-9db4-ff3ec1a23f36",
+    "title": "Example Domain",
+    "kind": "web",
+    "content": "Example Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+    "session_id": "default-session",
+    "tags": [],
+    "meta": {
+      "ok": true,
+      "url": "https://example.com/",
+      "final_url": "https://example.com/",
+      "status_code": 200,
+      "content_type": "text/html",
+      "title": "Example Domain",
+      "description": "",
+      "text": "Example Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+      "summary": "Example Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+      "site_name": "example.com",
+      "author": "",
+      "published_time": "",
+      "images": [],
+      "videos": [],
+      "audios": [],
+      "meta": {
+        "canonical_url": "https://example.com/",
+        "lang": "en",
+        "image_count": 0,
+        "video_count": 0,
+        "audio_count": 0,
+        "ssl_verify": false
+      },
+      "error": ""
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T00:09:56.460053+00:00",
+    "updated_at": "2026-03-30T00:09:56.460053+00:00"
+  },
+  {
+    "id": "7bb017d3-d74a-42fc-8ce1-2768b9a5758a",
+    "title": "Example Domain",
+    "kind": "web",
+    "content": "Example Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+    "session_id": "default-session",
+    "tags": [
+      "web",
+      "fetch"
+    ],
+    "meta": {
+      "url": "https://example.com/",
+      "final_url": "https://example.com/",
+      "status_code": 200,
+      "content_type": "text/html",
+      "site_name": "example.com",
+      "description": "",
+      "author": "",
+      "published_time": "",
+      "images": [],
+      "videos": [],
+      "audios": [],
+      "meta": {
+        "canonical_url": "https://example.com/",
+        "lang": "en",
+        "image_count": 0,
+        "video_count": 0,
+        "audio_count": 0,
+        "ssl_verify": false
+      }
+    },
+    "pinned": false,
+    "created_at": "2026-03-29T23:57:36.822420+00:00",
+    "updated_at": "2026-03-29T23:57:36.822420+00:00"
+  },
+  {
+    "id": "104f03ac-d63f-441f-a553-c3947cf7887e",
+    "title": "Example Domain",
+    "kind": "web",
+    "content": "Example Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+    "session_id": "default-session",
+    "tags": [
+      "web",
+      "fetch"
+    ],
+    "meta": {
+      "url": "https://example.com/",
+      "final_url": "https://example.com/",
+      "status_code": 200,
+      "content_type": "text/html",
+      "site_name": "example.com",
+      "description": "",
+      "author": "",
+      "published_time": "",
+      "images": [],
+      "videos": [],
+      "audios": [],
+      "meta": {
+        "canonical_url": "https://example.com/",
+        "lang": "en",
+        "image_count": 0,
+        "video_count": 0,
+        "audio_count": 0,
+        "ssl_verify": false
+      }
+    },
+    "pinned": false,
+    "created_at": "2026-03-29T23:57:25.885975+00:00",
+    "updated_at": "2026-03-29T23:57:25.885975+00:00"
+  },
+  {
+    "id": "ff1d2f26-2bba-4e0f-b4c5-f3f0389d8f14",
+    "title": "Example Domain",
+    "kind": "web",
+    "content": "Example Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+    "session_id": "default-session",
+    "tags": [
+      "web",
+      "fetch"
+    ],
+    "meta": {
+      "url": "https://example.com/",
+      "final_url": "https://example.com/",
+      "status_code": 200,
+      "content_type": "text/html",
+      "site_name": "example.com",
+      "description": "",
+      "author": "",
+      "published_time": "",
+      "images": [],
+      "videos": [],
+      "audios": [],
+      "meta": {
+        "canonical_url": "https://example.com/",
+        "lang": "en",
+        "image_count": 0,
+        "video_count": 0,
+        "audio_count": 0,
+        "ssl_verify": false
+      }
+    },
+    "pinned": false,
+    "created_at": "2026-03-29T23:55:17.346705+00:00",
+    "updated_at": "2026-03-29T23:55:17.346705+00:00"
+  },
+  {
+    "id": "ae762e53-3732-459e-a55a-e5a6116899d3",
+    "title": "Example Domain",
+    "kind": "web",
+    "content": "Example Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+    "session_id": "default-session",
+    "tags": [
+      "web",
+      "fetch"
+    ],
+    "meta": {
+      "url": "https://example.com/",
+      "final_url": "https://example.com/",
+      "status_code": 200,
+      "content_type": "text/html",
+      "site_name": "example.com",
+      "description": "",
+      "author": "",
+      "published_time": "",
+      "images": [],
+      "videos": [],
+      "audios": [],
+      "meta": {
+        "canonical_url": "https://example.com/",
+        "lang": "en",
+        "image_count": 0,
+        "video_count": 0,
+        "audio_count": 0,
+        "ssl_verify": false
+      }
+    },
+    "pinned": false,
+    "created_at": "2026-03-29T23:52:29.689058+00:00",
+    "updated_at": "2026-03-29T23:52:29.689058+00:00"
+  },
+  {
+    "id": "2294311b-016b-4374-85a4-6cea7391bcae",
+    "title": "Example Domain",
+    "kind": "web",
+    "content": "Example Domain\nThis domain is for use in documentation examples without needing permission. Avoid use in operations.\nLearn more",
+    "session_id": "default-session",
+    "tags": [
+      "web",
+      "fetch"
+    ],
+    "meta": {
+      "url": "https://example.com/",
+      "final_url": "https://example.com/",
+      "status_code": 200,
+      "content_type": "text/html",
+      "site_name": "example.com",
+      "description": "",
+      "author": "",
+      "published_time": "",
+      "images": [],
+      "videos": [],
+      "audios": [],
+      "meta": {
+        "canonical_url": "https://example.com/",
+        "lang": "en",
+        "image_count": 0,
+        "video_count": 0,
+        "audio_count": 0,
+        "ssl_verify": false
+      }
+    },
+    "pinned": false,
+    "created_at": "2026-03-29T23:52:18.603506+00:00",
+    "updated_at": "2026-03-29T23:52:18.603506+00:00"
+  },
+  {
+    "id": "f93cac66-8dcc-4fc5-be59-6d8dcd47070c",
+    "title": "Generated Image",
+    "kind": "image",
+    "content": "generate an image of a golden retriever",
+    "session_id": "test123",
+    "tags": [
+      "image",
+      "generated"
+    ],
+    "meta": {
+      "image_url": "/api/uploads/generated/nova_generated_image_2.png",
+      "prompt": "generate an image of a golden retriever",
+      "source": "generated",
+      "mime_type": "image/png",
+      "file_name": "nova_generated_image_2.png",
+      "file_size": 1906743,
+      "width": null,
+      "height": null,
+      "model": "gpt-image-1.5"
+    },
+    "pinned": false,
+    "created_at": "2026-03-29T23:00:27.274680+00:00",
+    "updated_at": "2026-03-29T23:00:27.274680+00:00"
+  },
+  {
+    "id": "cfde3ee6-a938-45c0-b50e-5ff887873bf2",
+    "title": "Generated Image",
+    "kind": "image",
+    "content": "generate an image of a golden retriever",
+    "session_id": "test123",
+    "tags": [
+      "image",
+      "generated"
+    ],
+    "meta": {
+      "image_url": "/api/uploads/generated/nova_generated_image_1.png",
+      "prompt": "generate an image of a golden retriever",
+      "source": "generated",
+      "mime_type": "image/png",
+      "file_name": "nova_generated_image_1.png",
+      "file_size": 1891830,
+      "width": null,
+      "height": null,
+      "model": "gpt-image-1.5"
+    },
+    "pinned": false,
+    "created_at": "2026-03-29T23:00:08.056679+00:00",
+    "updated_at": "2026-03-29T23:00:08.056679+00:00"
+  },
+  {
+    "id": "d0333c1a-e6eb-4a66-b50b-11e5c835b1cd",
+    "title": "Generated Image",
+    "kind": "image",
+    "content": "a golden retriever sitting in a grassy field at sunset",
+    "session_id": null,
+    "tags": [
+      "image",
+      "generated"
+    ],
+    "meta": {
+      "image_url": "/api/uploads/generated/nova_generated_image.png",
+      "prompt": "a golden retriever sitting in a grassy field at sunset",
+      "source": "generated",
+      "mime_type": "image/png",
+      "file_name": "nova_generated_image.png",
+      "file_size": 1726020,
+      "width": null,
+      "height": null,
+      "model": "gpt-image-1.5"
+    },
+    "pinned": false,
+    "created_at": "2026-03-29T22:59:45.960080+00:00",
+    "updated_at": "2026-03-29T22:59:45.960080+00:00"
+  },
+  {
     "id": "c643ae74-eec3-4820-9d05-916a0bb2fe15",
     "title": "final test",
     "content": "artifact content",

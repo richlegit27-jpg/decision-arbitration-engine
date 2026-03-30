@@ -3,449 +3,422 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nova Ultimate Chat</title>
+  <title>Nova Ultimate 2026</title>
   <link rel="stylesheet" href="/static/css/nova-main.css?v=endgame" />
   <style>
+    .nova-app-shell {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      min-height: 100vh;
+      background: var(--bg, #07111f);
+      color: var(--text, #eef4ff);
+    }
+
+    .nova-main-shell {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 100vh;
+    }
+
+    .nova-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line, rgba(130, 158, 222, 0.14));
+      background: var(--panel, rgba(12, 20, 37, 0.94));
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(10px);
+    }
+
+    .nova-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .nova-brand-mark {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      background: var(--accent-soft, rgba(110, 168, 255, 0.16));
+      color: var(--accent, #6ea8ff);
+      flex: 0 0 auto;
+    }
+
+    .nova-brand-copy {
+      min-width: 0;
+    }
+
+    .nova-brand-title {
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+
+    .nova-brand-subtitle {
+      font-size: 12px;
+      color: var(--muted, #9cafcf);
+      line-height: 1.2;
+    }
+
+    .nova-topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .nova-topbar-btn {
+      appearance: none;
+      border: 1px solid var(--line, rgba(130, 158, 222, 0.14));
+      background: rgba(255, 255, 255, 0.04);
+      color: inherit;
+      border-radius: 12px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .nova-topbar-btn:hover {
+      border-color: var(--accent, #6ea8ff);
+      background: rgba(110, 168, 255, 0.08);
+    }
+
+    .nova-chat-stage {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+
     .nova-chat-panel {
       display: flex;
       flex-direction: column;
       gap: 12px;
       padding: 18px;
-      min-height: 70vh;
+      flex: 1;
+      min-height: 0;
       overflow-y: auto;
-    }
-
-    .nova-message {
-      max-width: 840px;
-      padding: 12px 14px;
-      border-radius: 14px;
-      white-space: pre-wrap;
-      word-break: break-word;
-      line-height: 1.45;
-    }
-
-    .nova-message-user {
-      align-self: flex-end;
-      background: rgba(90, 140, 255, 0.18);
-    }
-
-    .nova-message-assistant {
-      align-self: flex-start;
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    .nova-message-badge {
-      display: inline-block;
-      font-size: 12px;
-      opacity: 0.8;
-      margin-bottom: 6px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-
-    .nova-attachment-wrap {
-      align-self: flex-start;
-      max-width: 840px;
-      background: rgba(255, 255, 255, 0.06);
-      border-radius: 14px;
-      padding: 10px;
-    }
-
-    .nova-attachment-image {
-      display: block;
-      max-width: 320px;
-      width: 100%;
-      height: auto;
-      border-radius: 12px;
-    }
-
-    .nova-attachment-file {
-      display: inline-block;
-      padding: 10px 12px;
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.08);
-      text-decoration: none;
-      color: inherit;
     }
 
     .nova-empty-state {
       padding: 18px;
-      opacity: 0.7;
+      color: var(--muted, #9cafcf);
+      display: none;
     }
 
-    .nova-typing-indicator {
-      padding: 0 18px 12px 18px;
-      opacity: 0.75;
+    .nova-message {
+      display: flex;
+      width: 100%;
+    }
+
+    .nova-message-user {
+      justify-content: flex-end;
+    }
+
+    .nova-message-assistant {
+      justify-content: flex-start;
+    }
+
+    .nova-message-inner {
+      width: min(840px, 100%);
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--line, rgba(130, 158, 222, 0.14));
+      background: rgba(255, 255, 255, 0.05);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+    }
+
+    .nova-message-user .nova-message-inner {
+      background: rgba(90, 140, 255, 0.16);
+    }
+
+    .nova-message-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .nova-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--accent, #6ea8ff);
+      background: var(--accent-soft, rgba(110, 168, 255, 0.16));
+      border: 1px solid rgba(110, 168, 255, 0.18);
+    }
+
+    .nova-message-markdown {
+      white-space: normal;
+      word-break: break-word;
+      line-height: 1.55;
+    }
+
+    .nova-composer-wrap {
+      border-top: 1px solid var(--line, rgba(130, 158, 222, 0.14));
+      background: var(--panel, rgba(12, 20, 37, 0.94));
+      padding: 14px 18px 18px 18px;
     }
 
     .nova-composer {
       display: flex;
       flex-direction: column;
       gap: 10px;
-      padding: 16px 18px 22px 18px;
+      max-width: 980px;
     }
 
     .nova-composer-row {
       display: flex;
-      gap: 10px;
       align-items: flex-end;
+      gap: 10px;
     }
 
     .nova-composer textarea {
       flex: 1;
-      min-height: 52px;
-      max-height: 180px;
+      min-height: 54px;
+      max-height: 200px;
       resize: vertical;
-      padding: 12px;
-      border-radius: 12px;
+      padding: 13px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line, rgba(130, 158, 222, 0.14));
+      background: rgba(255, 255, 255, 0.04);
+      color: inherit;
+      outline: none;
+      font: inherit;
+    }
+
+    .nova-composer textarea:focus {
+      border-color: var(--accent, #6ea8ff);
+      box-shadow: 0 0 0 3px rgba(110, 168, 255, 0.12);
     }
 
     .nova-composer button {
+      appearance: none;
+      border: 1px solid var(--line, rgba(130, 158, 222, 0.14));
+      background: rgba(255, 255, 255, 0.05);
+      color: inherit;
+      border-radius: 14px;
       padding: 12px 14px;
-      border-radius: 12px;
       cursor: pointer;
+      font-weight: 700;
+      min-width: 56px;
     }
 
-    .nova-pending-attachments {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
+    .nova-composer button:hover {
+      border-color: var(--accent, #6ea8ff);
+      background: rgba(110, 168, 255, 0.08);
     }
 
-    .nova-pending-chip {
+    .nova-right-rail {
+      border-left: 1px solid var(--line, rgba(130, 158, 222, 0.14));
+      background: var(--panel-2, rgba(16, 27, 49, 0.97));
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      min-width: 140px;
-      max-width: 220px;
-      padding: 10px;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.08);
+      min-width: 0;
     }
 
-    .nova-pending-chip-image {
-      width: 100%;
-      max-width: 180px;
-      border-radius: 10px;
-      display: block;
+    .nova-panel {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
     }
 
-    .nova-pending-chip-title {
-      font-size: 13px;
-      line-height: 1.3;
+    .nova-panel-head {
+      padding: 18px;
+      border-bottom: 1px solid var(--line, rgba(130, 158, 222, 0.14));
+    }
+
+    .nova-panel-title {
+      font-size: 15px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .nova-panel-subtitle {
+      font-size: 12px;
+      color: var(--muted, #9cafcf);
+    }
+
+    .nova-panel-body {
+      display: grid;
+      grid-template-rows: minmax(220px, 38%) 1fr;
+      min-height: 0;
+      flex: 1;
+    }
+
+    .nova-artifacts-list-wrap {
+      padding: 14px;
+      border-bottom: 1px solid var(--line, rgba(130, 158, 222, 0.14));
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .nova-artifact-viewer {
+      padding: 14px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .nova-artifact-viewer-card {
+      border: 1px solid var(--line, rgba(130, 158, 222, 0.14));
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .nova-artifact-viewer-title {
+      font-size: 16px;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .nova-artifact-viewer-meta {
+      margin-bottom: 12px;
+    }
+
+    .nova-artifact-viewer-content {
+      margin: 0;
+      white-space: pre-wrap;
       word-break: break-word;
-      opacity: 0.95;
-    }
-
-    .nova-pending-chip-remove {
-      align-self: flex-start;
-      border: 0;
-      padding: 6px 10px;
-      border-radius: 10px;
-      cursor: pointer;
-      background: rgba(255, 80, 80, 0.18);
+      line-height: 1.5;
+      font-family: inherit;
       color: inherit;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--line, rgba(130, 158, 222, 0.14));
+      border-radius: 14px;
+      padding: 12px;
     }
 
-    .nova-hidden {
-      display: none !important;
+    @media (max-width: 1080px) {
+      .nova-app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .nova-right-rail {
+        min-height: auto;
+        border-left: 0;
+        border-top: 1px solid var(--line, rgba(130, 158, 222, 0.14));
+      }
+
+      .nova-panel-body {
+        grid-template-rows: 260px 1fr;
+      }
     }
   </style>
 </head>
 <body>
   <div class="nova-app-shell" id="novaAppShell">
-    <div class="nova-chat-panel" id="messages"></div>
-    <div id="novaEmptyState" class="nova-empty-state">Nova is ready. Type a message!</div>
-    <div id="typingIndicator" class="nova-typing-indicator" style="display:none;">Nova is typing...</div>
+    <main class="nova-main-shell">
+      <header class="nova-topbar">
+        <div class="nova-brand">
+          <div class="nova-brand-mark">N</div>
+          <div class="nova-brand-copy">
+            <div class="nova-brand-title">Nova</div>
+            <div class="nova-brand-subtitle">Ultimate 2026</div>
+          </div>
+        </div>
 
-    <div class="nova-composer">
-      <div id="pendingAttachments" class="nova-pending-attachments nova-hidden"></div>
+        <div class="nova-topbar-actions">
+          <button
+            type="button"
+            class="nova-topbar-btn"
+            id="artifactsPanelToggle"
+            title="Artifacts"
+          >
+            Artifacts
+          </button>
+        </div>
+      </header>
 
-      <div class="nova-composer-row">
-        <textarea id="chatInput" placeholder="Type your message... Use /image your prompt to generate an image"></textarea>
-        <button id="uploadBtn" type="button">📎</button>
-        <button id="sendBtn" type="button">Send</button>
-        <input type="file" id="fileInput" style="display:none;" accept="image/*,video/*" multiple />
-      </div>
-    </div>
+      <section class="nova-chat-stage">
+        <div class="nova-chat-panel" id="messages"></div>
+        <div id="novaEmptyState" class="nova-empty-state">Nova is ready. Type your message.</div>
+
+        <div class="nova-composer-wrap">
+          <div class="nova-composer">
+            <div class="nova-composer-row">
+              <textarea
+                id="chatInput"
+                placeholder="Type your message... current-info prompts will use live knowledge"
+              ></textarea>
+              <button id="uploadBtn" type="button" title="Upload">📎</button>
+              <button id="sendBtn" type="button" title="Send">Send</button>
+              <input
+                type="file"
+                id="fileInput"
+                style="display:none;"
+                accept="image/*,video/*,.pdf,.txt,.md,.json,.csv,.html,.xml,.yaml,.yml"
+                multiple
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="nova-right-rail">
+      <section class="nova-panel is-open" id="novaArtifactsPanel" data-artifacts-panel>
+        <div class="nova-panel-head">
+          <div class="nova-panel-title">Artifacts</div>
+          <div class="nova-panel-subtitle">Saved replies, web answers, and source-backed knowledge</div>
+        </div>
+
+        <div class="nova-panel-body">
+          <div class="nova-artifacts-list-wrap">
+            <div id="novaArtifactsList" data-artifacts-list></div>
+          </div>
+
+          <div class="nova-artifact-viewer">
+            <div class="nova-artifact-viewer-card">
+              <div
+                class="nova-artifact-viewer-title"
+                id="novaArtifactViewerTitle"
+                data-artifact-viewer-title
+              >
+                Artifact Viewer
+              </div>
+
+              <div
+                class="nova-artifact-viewer-meta"
+                id="novaArtifactViewerMeta"
+                data-artifact-viewer-meta
+              ></div>
+
+              <pre
+                class="nova-artifact-viewer-content"
+                id="novaArtifactViewerContent"
+                data-artifact-viewer-content
+              ></pre>
+
+              <div
+                id="novaArtifactViewerSources"
+                data-artifact-viewer-sources
+              ></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </aside>
   </div>
 
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const chatInput = document.getElementById("chatInput");
-      const sendBtn = document.getElementById("sendBtn");
-      const uploadBtn = document.getElementById("uploadBtn");
-      const fileInput = document.getElementById("fileInput");
-      const messages = document.getElementById("messages");
-      const emptyState = document.getElementById("novaEmptyState");
-      const typingIndicator = document.getElementById("typingIndicator");
-      const pendingAttachmentsEl = document.getElementById("pendingAttachments");
-
-      let sessionId = localStorage.getItem("nova_session_id") || crypto.randomUUID();
-      localStorage.setItem("nova_session_id", sessionId);
-
-      let pendingAttachments = [];
-
-      function hideEmptyState() {
-        if (emptyState) emptyState.style.display = "none";
-      }
-
-      function scrollToBottom() {
-        messages.scrollTop = messages.scrollHeight;
-      }
-
-      function appendTextMessage(content, from = "assistant", badge = "") {
-        hideEmptyState();
-
-        const wrap = document.createElement("div");
-        wrap.className = `nova-message nova-message-${from}`;
-
-        if (badge) {
-          const badgeEl = document.createElement("div");
-          badgeEl.className = "nova-message-badge";
-          badgeEl.textContent = badge;
-          wrap.appendChild(badgeEl);
-        }
-
-        const body = document.createElement("div");
-        body.textContent = content || "";
-        wrap.appendChild(body);
-
-        messages.appendChild(wrap);
-        scrollToBottom();
-      }
-
-      function appendImageAttachment(url, filename = "") {
-        hideEmptyState();
-
-        const wrap = document.createElement("div");
-        wrap.className = "nova-attachment-wrap";
-
-        const badgeEl = document.createElement("div");
-        badgeEl.className = "nova-message-badge";
-        badgeEl.textContent = "Image";
-        wrap.appendChild(badgeEl);
-
-        const img = document.createElement("img");
-        img.className = "nova-attachment-image";
-        img.src = url;
-        img.alt = filename || "Image";
-        img.loading = "lazy";
-        wrap.appendChild(img);
-
-        messages.appendChild(wrap);
-        scrollToBottom();
-      }
-
-      function appendGenericAttachment(url, filename = "attachment") {
-        hideEmptyState();
-
-        const wrap = document.createElement("div");
-        wrap.className = "nova-attachment-wrap";
-
-        const badgeEl = document.createElement("div");
-        badgeEl.className = "nova-message-badge";
-        badgeEl.textContent = "Attachment";
-        wrap.appendChild(badgeEl);
-
-        const link = document.createElement("a");
-        link.className = "nova-attachment-file";
-        link.href = url;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.textContent = filename;
-        wrap.appendChild(link);
-
-        messages.appendChild(wrap);
-        scrollToBottom();
-      }
-
-      function renderReturnedAttachments(items) {
-        if (!Array.isArray(items)) return;
-
-        items.forEach((item) => {
-          if (!item || !item.url) return;
-
-          if ((item.type || "").startsWith("image/")) {
-            appendImageAttachment(item.url, item.filename || "");
-          } else {
-            appendGenericAttachment(item.url, item.filename || "attachment");
-          }
-        });
-      }
-
-      function renderGeneratedImages(items) {
-        if (!Array.isArray(items)) return;
-
-        items.forEach((item) => {
-          if (!item || !item.url) return;
-          appendImageAttachment(item.url, item.filename || "generated.png");
-        });
-      }
-
-      function removePendingAttachment(id) {
-        pendingAttachments = pendingAttachments.filter((item) => item.id !== id);
-        renderPendingAttachments();
-      }
-
-      function renderPendingAttachments() {
-        pendingAttachmentsEl.innerHTML = "";
-
-        if (!pendingAttachments.length) {
-          pendingAttachmentsEl.classList.add("nova-hidden");
-          return;
-        }
-
-        pendingAttachmentsEl.classList.remove("nova-hidden");
-
-        pendingAttachments.forEach((item) => {
-          const chip = document.createElement("div");
-          chip.className = "nova-pending-chip";
-
-          if ((item.type || "").startsWith("image/") && item.url) {
-            const img = document.createElement("img");
-            img.className = "nova-pending-chip-image";
-            img.src = item.url;
-            img.alt = item.filename || "Pending image";
-            chip.appendChild(img);
-          }
-
-          const title = document.createElement("div");
-          title.className = "nova-pending-chip-title";
-          title.textContent = item.filename || "attachment";
-          chip.appendChild(title);
-
-          const removeBtn = document.createElement("button");
-          removeBtn.type = "button";
-          removeBtn.className = "nova-pending-chip-remove";
-          removeBtn.textContent = "Remove";
-          removeBtn.addEventListener("click", () => removePendingAttachment(item.id));
-          chip.appendChild(removeBtn);
-
-          pendingAttachmentsEl.appendChild(chip);
-        });
-      }
-
-      async function sendChat(content = "", attachments = []) {
-        const trimmed = (content || "").trim();
-        if (!trimmed && attachments.length === 0) return;
-
-        if (trimmed) {
-          appendTextMessage(trimmed, "user", "You");
-        }
-
-        typingIndicator.style.display = "block";
-
-        try {
-          const payload = {
-            content: trimmed,
-            session_id: sessionId,
-            attachments: attachments,
-          };
-
-          const res = await fetch("/api/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-
-          const data = await res.json();
-
-          if (!data.ok) {
-            appendTextMessage(`Error: ${data.error || "Unknown error"}`, "assistant", "AI");
-            return;
-          }
-
-          renderGeneratedImages(data.generated_images);
-          renderReturnedAttachments(data.attachments);
-
-          if (data.web) {
-            appendTextMessage(data.web, "assistant", "Web");
-          }
-
-          if (Array.isArray(data.attachments_desc) && data.attachments_desc.length) {
-            data.attachments_desc.forEach((desc) => {
-              appendTextMessage(desc, "assistant", "Attachment");
-            });
-          }
-
-          if (data.message) {
-            appendTextMessage(data.message, "assistant", "AI");
-          }
-        } catch (err) {
-          appendTextMessage("Network error while sending message.", "assistant", "AI");
-        } finally {
-          typingIndicator.style.display = "none";
-        }
-      }
-
-      sendBtn.addEventListener("click", async () => {
-        const value = chatInput.value;
-        const attachmentIds = pendingAttachments.map((item) => item.id).filter(Boolean);
-
-        chatInput.value = "";
-        pendingAttachments = [];
-        renderPendingAttachments();
-
-        await sendChat(value, attachmentIds);
-      });
-
-      chatInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          sendBtn.click();
-        }
-      });
-
-      uploadBtn.addEventListener("click", () => {
-        fileInput.click();
-      });
-
-      fileInput.addEventListener("change", async () => {
-        const files = fileInput.files;
-        if (!files || !files.length) return;
-
-        const formData = new FormData();
-        for (const file of files) {
-          formData.append("files", file);
-        }
-
-        typingIndicator.style.display = "block";
-
-        try {
-          const res = await fetch("/api/upload", {
-            method: "POST",
-            body: formData,
-          });
-
-          const data = await res.json();
-
-          if (!data.ok || !Array.isArray(data.files) || !data.files.length) {
-            appendTextMessage(data.error || "Upload failed.", "assistant", "AI");
-            return;
-          }
-
-          const okFiles = data.files.filter((f) => f && f.ok);
-
-          okFiles.forEach((file) => {
-            pendingAttachments.push({
-              id: file.id,
-              filename: file.filename || file.id || "attachment",
-              type: file.type || "",
-              url: file.url || "",
-            });
-          });
-
-          renderPendingAttachments();
-        } catch (err) {
-          appendTextMessage("Network error during upload.", "assistant", "AI");
-        } finally {
-          typingIndicator.style.display = "none";
-          fileInput.value = "";
-        }
-      });
-    });
-  </script>
+  <script src="/static/js/nova-composer-bundle.js?v=endgame"></script>
+  <script src="/static/js/nova-artifacts.js?v=endgame"></script>
 </body>
 </html>
