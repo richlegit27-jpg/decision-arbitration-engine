@@ -1,5 +1,107 @@
 [
   {
+    "id": "103de819-bba3-4fb0-ac80-12663ef01740",
+    "title": "latest AI news",
+    "kind": "web",
+    "content": "I don’t have any web sources attached in this chat, so I can’t reliably give you the *latest* AI news right now.\n\nWhat I can do instead:\n\n1. **Give a concise AI news roundup from existing knowledge**  \n   I’ll clearly mark it as **not live-verified**.\n\n2. **Summarize live AI news if you send links/headlines**  \n   I’ll turn them into a clean briefing with inline citations like [Source: ...].\n\n3. **Give you a fast way to track live AI news yourself**  \n   Best sources, search queries, and a daily briefing template.\n\n### Background-only AI news themes\nThese are common recent themes, but **not confirmed as today’s latest**:\n\n- **Frontier model releases and upgrades** from major AI labs\n- **AI video generation** improving quickly\n- **Agentic AI tools** for coding, research, and office workflows\n- **Regulation and safety debates** around transparency, copyright, and evaluations\n- **AI hardware competition** across GPUs, custom chips, and inference efficiency\n- **Enterprise AI adoption** in search, support, productivity, and software development\n- **Copyright and licensing disputes** over training data and outputs\n\nIf you want, I can do one of these next:\n\n- **“Give me a background-only AI news briefing”**\n- **“Create a live AI news tracking workflow”**\n- **Paste sources and say: summarize these”**",
+    "session_id": "default-session",
+    "tags": [
+      "web",
+      "search",
+      "knowledge",
+      "sources",
+      "memory"
+    ],
+    "meta": {
+      "route": "knowledge",
+      "query": "latest AI news",
+      "model": "gpt-5.4",
+      "memory_used": true,
+      "memory_hits": 3,
+      "memory_titles": [
+        "latest AI news",
+        "Example Domain",
+        "Example Domain"
+      ],
+      "search_count": 0,
+      "fetch_count": 0,
+      "usable_count": 0,
+      "web": {
+        "used": true,
+        "query": "latest AI news",
+        "result_count": 0,
+        "search_results": [],
+        "urls": [],
+        "titles": [],
+        "sources": []
+      },
+      "artifact_view": {
+        "kind": "knowledge",
+        "summary": {
+          "query": "latest AI news",
+          "source_count": 0,
+          "memory_used": true,
+          "memory_hits": 3
+        },
+        "sources": []
+      }
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T01:51:31.830382+00:00",
+    "updated_at": "2026-03-30T01:51:31.830382+00:00"
+  },
+  {
+    "id": "b40c5b02-e72e-47fe-b0ec-2d4a66aa3651",
+    "title": "latest AI news",
+    "kind": "web",
+    "content": "I don’t have any web sources attached in this chat, so I can’t reliably give you the *latest* AI news right now.\n\nIf you want, I can still help in one of these ways:\n\n1. **Give a concise AI news roundup based on my existing knowledge**  \n   I’ll label it clearly as not fully up-to-date.\n\n2. **Summarize AI news from sources you provide**  \n   Paste links, headlines, or articles and I’ll turn them into a clean briefing with inline citations.\n\n3. **Create a live-news workflow**  \n   I can give you:\n   - best AI news sources to follow\n   - a daily AI briefing template\n   - search queries for finding the latest updates fast\n\nIf you want a quick non-live overview, here’s the kind of AI news landscape that has been dominating recently:\n\n- **Frontier model releases and upgrades** from major labs\n- **AI video generation** improving rapidly\n- **Agentic AI** tools for coding, research, and office work\n- **Regulation and safety debates**, especially around transparency, copyright, and model evaluation\n- **AI hardware competition**, including GPUs, custom chips, and inference optimization\n- **Enterprise adoption** in search, customer service, software development, and productivity tools\n- **Copyright and licensing disputes** involving training data and model outputs\n\nIf you want, I can give you a **“today-style AI news briefing”** marked as **background only, not live-verified**.",
+    "session_id": "default-session",
+    "tags": [
+      "web",
+      "search",
+      "knowledge",
+      "sources",
+      "memory"
+    ],
+    "meta": {
+      "route": "knowledge",
+      "query": "latest AI news",
+      "model": "gpt-5.4",
+      "memory_used": true,
+      "memory_hits": 3,
+      "memory_titles": [
+        "Example Domain",
+        "Example Domain",
+        "Example Domain"
+      ],
+      "search_count": 0,
+      "fetch_count": 0,
+      "usable_count": 0,
+      "web": {
+        "used": true,
+        "query": "latest AI news",
+        "result_count": 0,
+        "search_results": [],
+        "urls": [],
+        "titles": [],
+        "sources": []
+      },
+      "artifact_view": {
+        "kind": "knowledge",
+        "summary": {
+          "query": "latest AI news",
+          "source_count": 0,
+          "memory_used": true,
+          "memory_hits": 3
+        },
+        "sources": []
+      }
+    },
+    "pinned": false,
+    "created_at": "2026-03-30T01:46:23.016826+00:00",
+    "updated_at": "2026-03-30T01:46:23.016826+00:00"
+  },
+  {
     "id": "6be5038f-95c1-49da-9db4-ff3ec1a23f36",
     "title": "Example Domain",
     "kind": "web",

@@ -2,380 +2,266 @@ from __future__ import annotations
 
 import html
 import re
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, List, Optional
-from urllib.parse import quote_plus, urljoin
-
-import requests
-from bs4 import BeautifulSoup
-
-
-DEFAULT_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/146.0.0.0 Safari/537.36"
-    )
-}
-
-
-@dataclass
-class SearchHit:
-    title: str
-    url: str
-    snippet: str = ""
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+from typing import Any, Dict, List
 
 
 class WebService:
-    def __init__(
+    def __init__(self) -> None:
+        self.timeout = 15
+        self.headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            )
+        }
+
+    # =========================================================
+    # public api
+    # =========================================================
+
+    def search_and_fetch(
         self,
-        timeout: int = 12,
-        max_fetch_bytes: int = 2_000_000,
-        max_text_chars: int = 12_000,
-    ) -> None:
-        self.timeout = timeout
-        self.max_fetch_bytes = max_fetch_bytes
-        self.max_text_chars = max_text_chars
-        self.session = requests.Session()
-        self.session.headers.update(DEFAULT_HEADERS)
+        query: str,
+        search_limit: int = 5,
+        fetch_limit: int = 3,
+    ) -> Dict[str, Any]:
+        search_results = self.search_web(query=query, limit=search_limit)
+        fetched_items: List[Dict[str, Any]] = []
 
-    # =========================================================
-    # Public API
-    # =========================================================
+        for item in search_results[:fetch_limit]:
+            url = item.get("url", "").strip()
+            rss_title = (item.get("title") or "").strip()
+            rss_description = (item.get("description") or "").strip()
 
-    def search(self, query: str, limit: int = 5) -> Dict[str, Any]:
+            fetched = self.fetch_url(url) if url else {
+                "ok": False,
+                "url": url,
+                "title": rss_title or url,
+                "description": rss_description,
+                "content": "",
+                "content_type": "",
+                "status_code": 0,
+                "source": "missing-url",
+            }
+
+            fetched_title = (fetched.get("title") or "").strip()
+            fetched_content = (fetched.get("content") or "").strip()
+            fetched_description = (fetched.get("description") or "").strip()
+
+            bad_fetch = (
+                not fetched.get("ok")
+                or fetched_title.lower() == "google news"
+                or fetched_content.lower() == "google news"
+                or len(fetched_content) < 120
+            )
+
+            if bad_fetch:
+                fallback_content_parts = []
+                if rss_title:
+                    fallback_content_parts.append(f"Headline: {rss_title}")
+                if rss_description:
+                    fallback_content_parts.append(f"Snippet: {rss_description}")
+
+                fallback_content = "\n".join(fallback_content_parts).strip()
+
+                fetched = {
+                    "ok": True,
+                    "url": url,
+                    "title": rss_title or fetched_title or url,
+                    "description": rss_description or fetched_description,
+                    "content": fallback_content or rss_title or rss_description or url,
+                    "content_type": "text/plain",
+                    "status_code": 200,
+                    "source": "rss-fallback",
+                }
+
+            fetched_items.append(fetched)
+
+        return {
+            "search": {
+                "query": query,
+                "results": search_results,
+            },
+            "fetch": {
+                "items": fetched_items,
+            },
+        }
+
+    def search_web(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
         query = (query or "").strip()
         if not query:
-            return {
-                "ok": False,
-                "error": "Missing query",
-                "query": query,
-                "results": [],
-            }
+            return []
+
+        rss_url = self._google_news_rss_url(query)
 
         try:
-            results = self._duckduckgo_search(query=query, limit=limit)
-            return {
-                "ok": True,
-                "query": query,
-                "count": len(results),
-                "results": [asdict(r) for r in results],
-            }
-        except Exception as exc:
-            return {
+            raw_xml = self._http_get_text(rss_url)
+            return self._parse_google_news_rss(raw_xml, limit=limit)
+        except Exception as e:
+            return [{
+                "title": "Web search failed",
+                "url": "",
+                "description": str(e),
                 "ok": False,
-                "error": f"Search failed: {exc}",
-                "query": query,
-                "results": [],
-            }
+            }]
 
     def fetch_url(self, url: str) -> Dict[str, Any]:
         url = (url or "").strip()
         if not url:
             return {
                 "ok": False,
-                "error": "Missing url",
+                "url": "",
+                "title": "",
+                "description": "Missing URL",
+                "content": "",
+                "content_type": "",
+                "status_code": 0,
             }
 
         try:
-            response = self.session.get(
-                url,
-                timeout=self.timeout,
-                allow_redirects=True,
-                stream=True,
-            )
+            html_text = self._http_get_text(url)
+            title = self._extract_title(html_text) or url
+            description = self._extract_meta_description(html_text)
+            content = self._extract_main_text(html_text)
 
-            content_type = (response.headers.get("Content-Type") or "").split(";")[0].strip()
-            final_url = response.url
-            status_code = response.status_code
-
-            chunks: List[bytes] = []
-            total = 0
-            for chunk in response.iter_content(chunk_size=8192):
-                if not chunk:
-                    continue
-                chunks.append(chunk)
-                total += len(chunk)
-                if total >= self.max_fetch_bytes:
-                    break
-
-            raw = b"".join(chunks)
-            text = raw.decode(response.encoding or "utf-8", errors="replace")
-
-            parsed = self._parse_html(final_url, text) if "html" in content_type or "<html" in text.lower() else {
-                "title": final_url,
-                "description": "",
-                "content": text[: self.max_text_chars],
-                "site_name": "",
-                "images": [],
-                "videos": [],
-                "audios": [],
-            }
+            if not content.strip():
+                content = description or title
 
             return {
-                "ok": 200 <= status_code < 400,
+                "ok": True,
                 "url": url,
-                "final_url": final_url,
-                "status_code": status_code,
-                "content_type": content_type,
-                "title": parsed["title"],
-                "description": parsed["description"],
-                "site_name": parsed["site_name"],
-                "content": parsed["content"],
-                "image_count": len(parsed["images"]),
-                "video_count": len(parsed["videos"]),
-                "audio_count": len(parsed["audios"]),
-                "images": parsed["images"][:12],
-                "videos": parsed["videos"][:8],
-                "audios": parsed["audios"][:8],
+                "title": title,
+                "description": description,
+                "content": content[:12000],
+                "content_type": "text/html",
+                "status_code": 200,
+                "source": "fetch",
             }
-        except Exception as exc:
+
+        except Exception as e:
             return {
                 "ok": False,
                 "url": url,
-                "error": f"Fetch failed: {exc}",
+                "title": url,
+                "description": str(e),
+                "content": "",
+                "content_type": "",
+                "status_code": 0,
+                "source": "fetch-error",
             }
 
-    def fetch_many(self, urls: List[str], limit: int = 3) -> Dict[str, Any]:
-        cleaned: List[str] = []
-        seen = set()
-
-        for raw in urls or []:
-            url = (raw or "").strip()
-            if not url or url in seen:
-                continue
-            seen.add(url)
-            cleaned.append(url)
-
-        cleaned = cleaned[:limit]
-        items = [self.fetch_url(url) for url in cleaned]
-
-        return {
-            "ok": True,
-            "count": len(items),
-            "items": items,
-        }
-
-    def search_and_fetch(self, query: str, search_limit: int = 5, fetch_limit: int = 3) -> Dict[str, Any]:
-        search_data = self.search(query=query, limit=search_limit)
-        if not search_data.get("ok"):
-            return {
-                "ok": False,
-                "query": query,
-                "search": search_data,
-                "fetch": {"ok": False, "items": []},
-            }
-
-        urls = [item.get("url", "") for item in search_data.get("results", [])]
-        fetch_data = self.fetch_many(urls=urls, limit=fetch_limit)
-
-        return {
-            "ok": True,
-            "query": query,
-            "search": search_data,
-            "fetch": fetch_data,
-        }
-
     # =========================================================
-    # Search helpers
+    # internals
     # =========================================================
 
-    def _duckduckgo_search(self, query: str, limit: int) -> List[SearchHit]:
-        url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
-        response = self.session.get(url, timeout=self.timeout)
-        response.raise_for_status()
+    def _google_news_rss_url(self, query: str) -> str:
+        encoded = urllib.parse.quote(query)
+        return (
+            f"https://news.google.com/rss/search?q={encoded}"
+            f"&hl=en-US&gl=US&ceid=US:en"
+        )
 
-        soup = BeautifulSoup(response.text, "html.parser")
-        results: List[SearchHit] = []
+    def _http_get_text(self, url: str) -> str:
+        req = urllib.request.Request(url, headers=self.headers)
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            raw = resp.read()
+            charset = resp.headers.get_content_charset() or "utf-8"
+            return raw.decode(charset, errors="replace")
 
-        for block in soup.select(".result"):
-            a = block.select_one(".result__title a") or block.select_one("a.result__a")
-            if not a:
-                continue
+    def _parse_google_news_rss(self, raw_xml: str, limit: int = 5) -> List[Dict[str, Any]]:
+        results: List[Dict[str, Any]] = []
 
-            href = (a.get("href") or "").strip()
-            title = self._clean_text(a.get_text(" ", strip=True))
-            snippet_el = block.select_one(".result__snippet")
-            snippet = self._clean_text(snippet_el.get_text(" ", strip=True) if snippet_el else "")
+        root = ET.fromstring(raw_xml)
+        items = root.findall(".//item")
 
-            if not href or not title:
-                continue
+        for item in items[:limit]:
+            title = self._safe_xml_text(item.find("title"))
+            link = self._safe_xml_text(item.find("link"))
+            description = self._safe_xml_text(item.find("description"))
+            pub_date = self._safe_xml_text(item.find("pubDate"))
+            source_name = self._safe_xml_text(item.find("source"))
 
-            href = html.unescape(href)
-            href = self._unwrap_duckduckgo_redirect(href)
+            title = self._clean_text(title)
+            description = self._clean_text(description)
+            source_name = self._clean_text(source_name)
 
-            results.append(
-                SearchHit(
-                    title=title,
-                    url=href,
-                    snippet=snippet,
-                )
-            )
+            extra_bits = []
+            if source_name:
+                extra_bits.append(f"Source: {source_name}")
+            if pub_date:
+                extra_bits.append(f"Published: {pub_date}")
 
-            if len(results) >= limit:
-                break
+            if extra_bits:
+                description = (description + "\n" + "\n".join(extra_bits)).strip() if description else "\n".join(extra_bits)
+
+            results.append({
+                "title": title or link,
+                "url": link,
+                "description": description,
+                "ok": True,
+            })
 
         return results
 
-    def _unwrap_duckduckgo_redirect(self, href: str) -> str:
-        # DuckDuckGo sometimes returns direct URLs already.
-        if href.startswith("http://") or href.startswith("https://"):
-            return href
+    def _safe_xml_text(self, node) -> str:
+        if node is None or node.text is None:
+            return ""
+        return node.text.strip()
 
-        match = re.search(r"uddg=([^&]+)", href)
-        if match:
-            try:
-                from urllib.parse import unquote
-                return unquote(match.group(1))
-            except Exception:
-                return href
+    def _extract_title(self, raw_html: str) -> str:
+        match = re.search(r"<title[^>]*>(.*?)</title>", raw_html, flags=re.IGNORECASE | re.DOTALL)
+        if not match:
+            return ""
+        return self._clean_text(match.group(1))
 
-        return href
-
-    # =========================================================
-    # HTML parsing helpers
-    # =========================================================
-
-    def _parse_html(self, base_url: str, html_text: str) -> Dict[str, Any]:
-        soup = BeautifulSoup(html_text, "html.parser")
-
-        for tag in soup(["script", "style", "noscript", "svg", "canvas", "iframe"]):
-            tag.decompose()
-
-        title = self._extract_title(soup, base_url)
-        description = self._extract_description(soup)
-        site_name = self._extract_site_name(soup)
-
-        main = (
-            soup.find("main")
-            or soup.find("article")
-            or soup.find(attrs={"role": "main"})
-            or soup.body
-            or soup
-        )
-
-        text = self._clean_text(main.get_text("\n", strip=True))
-        text = self._trim_repeated_lines(text)
-        text = text[: self.max_text_chars]
-
-        images = self._extract_media_urls(soup, base_url, "img", "src")
-        videos = self._extract_media_urls(soup, base_url, "video", "src")
-        audios = self._extract_media_urls(soup, base_url, "audio", "src")
-
-        for meta_prop in [
-            ("meta[property='og:image']", "content", images),
-            ("meta[name='twitter:image']", "content", images),
-            ("meta[property='og:video']", "content", videos),
-            ("meta[name='twitter:player']", "content", videos),
-        ]:
-            node = soup.select_one(meta_prop[0])
-            if node and node.get(meta_prop[1]):
-                absolute = urljoin(base_url, node.get(meta_prop[1]).strip())
-                if absolute not in meta_prop[2]:
-                    meta_prop[2].insert(0, absolute)
-
-        return {
-            "title": title,
-            "description": description,
-            "site_name": site_name,
-            "content": text,
-            "images": images,
-            "videos": videos,
-            "audios": audios,
-        }
-
-    def _extract_title(self, soup: BeautifulSoup, fallback: str) -> str:
-        selectors = [
-            "meta[property='og:title']",
-            "meta[name='twitter:title']",
-            "title",
-            "h1",
+    def _extract_meta_description(self, raw_html: str) -> str:
+        patterns = [
+            r'<meta[^>]+name="description"[^>]+content="([^"]*)"',
+            r"<meta[^>]+name='description'[^>]+content='([^']*)'",
+            r'<meta[^>]+property="og:description"[^>]+content="([^"]*)"',
+            r"<meta[^>]+property='og:description'[^>]+content='([^']*)'",
         ]
-        for selector in selectors:
-            node = soup.select_one(selector)
-            if not node:
-                continue
-            value = (node.get("content") or node.get_text(" ", strip=True) or "").strip()
-            if value:
-                return self._clean_text(value)
-        return fallback
-
-    def _extract_description(self, soup: BeautifulSoup) -> str:
-        selectors = [
-            "meta[name='description']",
-            "meta[property='og:description']",
-            "meta[name='twitter:description']",
-        ]
-        for selector in selectors:
-            node = soup.select_one(selector)
-            if not node:
-                continue
-            value = (node.get("content") or "").strip()
-            if value:
-                return self._clean_text(value)
+        for pattern in patterns:
+            match = re.search(pattern, raw_html, flags=re.IGNORECASE | re.DOTALL)
+            if match:
+                return self._clean_text(match.group(1))
         return ""
 
-    def _extract_site_name(self, soup: BeautifulSoup) -> str:
-        selectors = [
-            "meta[property='og:site_name']",
-            "meta[name='application-name']",
-        ]
-        for selector in selectors:
-            node = soup.select_one(selector)
-            if not node:
-                continue
-            value = (node.get("content") or "").strip()
-            if value:
-                return self._clean_text(value)
-        return ""
+    def _extract_main_text(self, raw_html: str) -> str:
+        text = raw_html
 
-    def _extract_media_urls(
-        self,
-        soup: BeautifulSoup,
-        base_url: str,
-        tag_name: str,
-        attr_name: str,
-    ) -> List[str]:
-        urls: List[str] = []
-        seen = set()
+        text = re.sub(r"<script\b[^>]*>.*?</script>", " ", text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r"<style\b[^>]*>.*?</style>", " ", text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r"<noscript\b[^>]*>.*?</noscript>", " ", text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)
 
-        for node in soup.find_all(tag_name):
-            raw = (node.get(attr_name) or "").strip()
-            if not raw:
-                source = node.find("source")
-                raw = ((source.get("src") if source else "") or "").strip()
+        text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"</p\s*>", "\n\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"</div\s*>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"</h[1-6]\s*>", "\n\n", text, flags=re.IGNORECASE)
 
-            if not raw:
-                continue
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = html.unescape(text)
+        text = re.sub(r"[ \t\r\f\v]+", " ", text)
+        text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
+        text = re.sub(r"\s+\n", "\n", text)
+        text = re.sub(r"\n\s+", "\n", text)
 
-            absolute = urljoin(base_url, raw)
-            if absolute in seen:
-                continue
-
-            seen.add(absolute)
-            urls.append(absolute)
-
-        return urls
-
-    def _trim_repeated_lines(self, text: str) -> str:
         lines = [line.strip() for line in text.splitlines()]
-        output: List[str] = []
-        seen_recent: List[str] = []
+        lines = [line for line in lines if len(line) >= 40]
 
-        for line in lines:
-            if not line:
-                continue
-            if line in seen_recent:
-                continue
-            output.append(line)
-            seen_recent.append(line)
-            if len(seen_recent) > 20:
-                seen_recent.pop(0)
+        joined = "\n".join(lines).strip()
+        if len(joined) < 300:
+            joined = text.strip()
 
-        return "\n".join(output)
+        return joined[:12000]
 
     def _clean_text(self, value: str) -> str:
-        value = html.unescape(value or "")
-        value = re.sub(r"[ \t\r\f\v]+", " ", value)
-        value = re.sub(r"\n{3,}", "\n\n", value)
-        return value.strip()
+        value = re.sub(r"<[^>]+>", " ", value or "")
+        value = html.unescape(value)
+        value = re.sub(r"\s+", " ", value).strip()
+        return value
