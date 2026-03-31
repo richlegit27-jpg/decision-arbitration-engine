@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nova Ultimate 2026</title>
 
-  <link rel="stylesheet" href="/static/css/nova-main.css?v=historybadge-2026-03-30-001" />
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=session-rail-2026-03-31-001" />
 
   <style>
     :root {
@@ -20,7 +20,8 @@
       --accent: #6ea8ff;
       --accent-soft: rgba(110, 168, 255, 0.16);
       --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
-      --rail-w: 430px;
+      --left-rail-w: 300px;
+      --right-rail-w: 430px;
     }
 
     * {
@@ -47,10 +48,113 @@
 
     .nova-app-shell {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) var(--rail-w);
+      grid-template-columns: var(--left-rail-w) minmax(0, 1fr) var(--right-rail-w);
       width: 100%;
       height: 100vh;
       overflow: hidden;
+    }
+
+    .nova-left-rail {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+      background: rgba(255,255,255,0.025);
+      overflow: hidden;
+    }
+
+    .nova-left-rail-head {
+      flex: 0 0 auto;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .nova-left-rail-title {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .nova-session-toolbar {
+      display: flex;
+      gap: 8px;
+    }
+
+    .nova-session-toolbar button {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      flex: 1 1 auto;
+    }
+
+    .nova-session-toolbar button:hover {
+      background: rgba(255,255,255,0.10);
+    }
+
+    .nova-session-list {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 12px;
+    }
+
+    .nova-session-card {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.035);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      display: block;
+    }
+
+    .nova-session-card:hover {
+      background: rgba(255,255,255,0.07);
+    }
+
+    .nova-session-card.is-active {
+      border-color: rgba(110,168,255,0.42);
+      background: rgba(110,168,255,0.12);
+      box-shadow: 0 0 0 1px rgba(110,168,255,0.16) inset;
+    }
+
+    .nova-session-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .nova-session-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .nova-session-preview {
+      font-size: 12px;
+      line-height: 1.45;
+      color: #d7e6ff;
+      white-space: pre-wrap;
+      word-break: break-word;
+      opacity: 0.92;
+    }
+
+    .nova-session-empty {
+      color: var(--muted);
+      font-size: 13px;
+      padding: 8px 4px;
     }
 
     .nova-main {
@@ -88,6 +192,19 @@
       font-size: 12px;
       color: var(--muted);
       margin-top: 4px;
+    }
+
+    .nova-session-chip {
+      margin-top: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      color: #dcecff;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.05);
     }
 
     .nova-rail-tabs {
@@ -153,21 +270,6 @@
       background: rgba(110, 168, 255, 0.08);
     }
 
-    .nova-message-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 10px;
-      gap: 12px;
-    }
-
-    .nova-message-role {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--accent);
-      letter-spacing: 0.08em;
-    }
-
     .nova-message-time {
       font-size: 12px;
       color: var(--muted);
@@ -208,31 +310,6 @@
       font-size: 16px;
       line-height: 1;
       padding: 0;
-    }
-
-    .nova-message-debug {
-      margin-top: 12px;
-      border-top: 1px solid var(--line);
-      padding-top: 10px;
-    }
-
-    .nova-message-debug summary {
-      cursor: pointer;
-      color: var(--muted);
-      font-size: 12px;
-      margin-bottom: 8px;
-    }
-
-    .nova-message-debug pre {
-      white-space: pre-wrap;
-      word-break: break-word;
-      font-size: 12px;
-      color: #cfe0ff;
-      background: rgba(0,0,0,0.22);
-      padding: 10px;
-      border-radius: 10px;
-      border: 1px solid var(--line);
-      margin: 0;
     }
 
     .nova-composer-wrap {
@@ -430,6 +507,12 @@
       padding: 12px;
     }
 
+    @media (max-width: 1350px) {
+      .nova-app-shell {
+        grid-template-columns: 260px minmax(0, 1fr) 380px;
+      }
+    }
+
     @media (max-width: 1100px) {
       html,
       body {
@@ -438,13 +521,20 @@
 
       .nova-app-shell {
         grid-template-columns: 1fr;
-        grid-template-rows: minmax(0, 1fr) 360px;
+        grid-template-rows: 260px minmax(0, 1fr) 360px;
         height: auto;
         min-height: 100vh;
       }
 
+      .nova-left-rail {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+        min-height: 260px;
+      }
+
       .nova-main {
         min-height: 70vh;
+        border-right: 0;
       }
 
       .nova-right-rail {
@@ -465,11 +555,27 @@
 </head>
 <body>
   <div class="nova-app-shell" id="novaAppShell">
+    <aside class="nova-left-rail" id="sessionsRail">
+      <div class="nova-left-rail-head">
+        <div class="nova-left-rail-title">Sessions</div>
+
+        <div class="nova-session-toolbar">
+          <button id="newChatBtn" type="button">New Chat</button>
+          <button id="refreshSessionsBtn" type="button">Refresh</button>
+        </div>
+      </div>
+
+      <div class="nova-session-list" id="sessionList">
+        <div class="nova-session-empty">No sessions loaded yet.</div>
+      </div>
+    </aside>
+
     <main class="nova-main">
       <div class="nova-topbar">
         <div class="nova-topbar-copy">
           <div class="nova-title">Nova Ultimate 2026</div>
           <div class="nova-subtitle">Stateful chat • artifacts • brain retrieval • web</div>
+          <div class="nova-session-chip" id="activeSessionChip">Session: loading...</div>
         </div>
 
         <div class="nova-rail-tabs">
@@ -490,7 +596,6 @@
 
         <div class="nova-composer">
           <textarea id="chatInput" placeholder="Type your message..."></textarea>
-
           <button id="uploadBtn" type="button">Upload</button>
           <button id="sendBtn" type="button">Send</button>
 
@@ -509,7 +614,6 @@
       <div class="nova-right-rail-head">Nova Right Rail</div>
 
       <div class="nova-right-rail-panels">
-
         <section id="memoryPanel" class="nova-rail-panel">
           <div class="nova-rail-panel-body">
             <div id="memoryList">
@@ -544,13 +648,12 @@
             </div>
           </div>
         </section>
-
       </div>
     </aside>
   </div>
 
   <script>
-    window.NOVA_BUILD = "session-restore-2026-03-31-001";
+    window.NOVA_BUILD = "session-rail-2026-03-31-001";
 
     (function () {
       const panelToggles = {
@@ -602,6 +705,7 @@
 
   <script src="/static/js/nova-render.js?v=history-hooks-2026-03-31-001"></script>
   <script src="/static/js/nova-artifacts.js?v=historybadge-2026-03-30-001"></script>
-  <script src="/static/js/nova-composer-bundle.js?v=session-restore-2026-03-31-001"></script>
+  <script src="/static/js/nova-panels.js?v=session-rail-2026-03-31-001"></script>
+  <script src="/static/js/nova-composer-bundle.js?v=session-rail-2026-03-31-001"></script>
 </body>
 </html>

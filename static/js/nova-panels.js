@@ -1,255 +1,146 @@
 (() => {
   "use strict";
 
-  if (window.__novaPanelsLoaded) return;
-  window.__novaPanelsLoaded = true;
+  const PANELS_VERSION = "session-rail-2026-03-31-001";
 
-  const Nova = (window.Nova = window.Nova || {});
-  Nova.panels = Nova.panels || {};
-
-  const MOBILE_BREAKPOINT = 980;
-
-  function byId(id) {
-    return document.getElementById(id);
+  function qs(selector, root = document) {
+    return root.querySelector(selector);
   }
 
-  function isMobile() {
-    return window.innerWidth <= MOBILE_BREAKPOINT;
+  function formatWhen(value) {
+    if (!value) return "";
+    try {
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return "";
+      return d.toLocaleString([], {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    } catch (_err) {
+      return "";
+    }
   }
 
-  function getEls() {
-    return {
-      app: byId("novaApp"),
-      leftSidebar: byId("leftSidebar"),
-      memoryPanel: byId("memoryPanel"),
-      toggleSidebarBtn: byId("toggleSidebarBtn"),
-      closeSidebarBtn: byId("closeSidebarBtn"),
-      toggleMemoryBtn: byId("toggleMemoryBtn"),
-      closeMemoryBtn: byId("closeMemoryBtn"),
-      mainShell: byId("mainShell"),
-    };
+  function text(value) {
+    if (value == null) return "";
+    return String(value).replace(/\r\n/g, "\n").trim();
   }
 
-  const panelState = {
-    sidebarOpen: true,
-    memoryOpen: true,
-    initialized: false,
-    lastMobile: null,
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  const NovaPanels = {
+    version: PANELS_VERSION,
+
+    getSessionListEl() {
+      return qs("#sessionList");
+    },
+
+    getActiveSessionChipEl() {
+      return qs("#activeSessionChip");
+    },
+
+    setActiveSessionChip(sessionId, title = "") {
+      const el = this.getActiveSessionChipEl();
+      if (!el) return;
+      const shownTitle = text(title) || "New Chat";
+      const shortId = text(sessionId).slice(0, 8) || "none";
+      el.textContent = `Session: ${shownTitle} · ${shortId}`;
+    },
+
+    renderSessionList(sessions, activeSessionId) {
+      const el = this.getSessionListEl();
+      if (!el) return;
+
+      const items = Array.isArray(sessions) ? sessions.slice() : [];
+      items.sort((a, b) => {
+        const aTime = Date.parse(a?.updated_at || a?.created_at || 0) || 0;
+        const bTime = Date.parse(b?.updated_at || b?.created_at || 0) || 0;
+        return bTime - aTime;
+      });
+
+      if (!items.length) {
+        el.innerHTML = `<div class="nova-session-empty">No sessions yet.</div>`;
+        this.setActiveSessionChip(activeSessionId || "", "New Chat");
+        return;
+      }
+
+      el.innerHTML = items.map((session) => {
+        const id = text(session?.id);
+        const title = text(session?.title) || "New Chat";
+        const updated = formatWhen(session?.updated_at || session?.created_at || "");
+        const preview = text(session?.last_message_preview || "");
+        const count = Number(session?.message_count || 0);
+        const isActive = id === activeSessionId;
+
+        return `
+          <button
+            type="button"
+            class="nova-session-card${isActive ? " is-active" : ""}"
+            data-session-id="${escapeHtml(id)}"
+            title="${escapeHtml(title)}"
+          >
+            <div class="nova-session-title">${escapeHtml(title)}</div>
+            <div class="nova-session-meta">${escapeHtml(updated)} · ${escapeHtml(String(count))} messages</div>
+            <div class="nova-session-preview">${escapeHtml(preview || "No preview yet.")}</div>
+          </button>
+        `;
+      }).join("");
+
+      const active = items.find((item) => text(item?.id) === text(activeSessionId)) || items[0];
+      this.setActiveSessionChip(text(active?.id), text(active?.title));
+    },
+
+    bindSessionClicks(onSelect) {
+      const el = this.getSessionListEl();
+      if (!el) return;
+
+      el.addEventListener("click", (event) => {
+        const btn = event.target.closest("[data-session-id]");
+        if (!btn) return;
+        const sessionId = text(btn.getAttribute("data-session-id"));
+        if (!sessionId) return;
+        if (typeof onSelect === "function") {
+          onSelect(sessionId);
+        }
+      });
+    },
+
+    bindToolbar({ onNewChat, onRefresh }) {
+      const newBtn = qs("#newChatBtn");
+      const refreshBtn = qs("#refreshSessionsBtn");
+
+      if (newBtn) {
+        newBtn.addEventListener("click", () => {
+          if (typeof onNewChat === "function") {
+            onNewChat();
+          }
+        });
+      }
+
+      if (refreshBtn) {
+        refreshBtn.addEventListener("click", () => {
+          if (typeof onRefresh === "function") {
+            onRefresh();
+          }
+        });
+      }
+    },
+
+    init() {
+      window.NovaPanels = this;
+      console.log("nova-panels loaded", PANELS_VERSION);
+      return this;
+    },
   };
 
-  function setBtnExpanded(btn, open) {
-    if (!btn) return;
-    btn.setAttribute("aria-expanded", open ? "true" : "false");
-    btn.classList.toggle("is-active", !!open);
-  }
-
-  function applySidebar(open) {
-    const { app, leftSidebar, toggleSidebarBtn } = getEls();
-    if (!app || !leftSidebar) return;
-
-    panelState.sidebarOpen = !!open;
-
-    app.classList.toggle("sidebar-open", !!open);
-    app.classList.toggle("sidebar-closed", !open);
-
-    leftSidebar.classList.toggle("is-open", !!open);
-    leftSidebar.classList.toggle("is-closed", !open);
-    leftSidebar.setAttribute("aria-hidden", open ? "false" : "true");
-
-    setBtnExpanded(toggleSidebarBtn, !!open);
-  }
-
-  function applyMemory(open) {
-    const { app, memoryPanel, toggleMemoryBtn } = getEls();
-    if (!app || !memoryPanel) return;
-
-    panelState.memoryOpen = !!open;
-
-    app.classList.toggle("memory-open", !!open);
-    app.classList.toggle("memory-closed", !open);
-
-    memoryPanel.classList.toggle("is-open", !!open);
-    memoryPanel.classList.toggle("is-closed", !open);
-    memoryPanel.setAttribute("aria-hidden", open ? "false" : "true");
-
-    setBtnExpanded(toggleMemoryBtn, !!open);
-  }
-
-  function syncFromDom() {
-    const { app, leftSidebar, memoryPanel } = getEls();
-    if (!app || !leftSidebar || !memoryPanel) return false;
-
-    const sidebarOpen =
-      leftSidebar.classList.contains("is-open") ||
-      app.classList.contains("sidebar-open") ||
-      (!leftSidebar.classList.contains("is-closed") &&
-        !app.classList.contains("sidebar-closed"));
-
-    const memoryOpen =
-      memoryPanel.classList.contains("is-open") ||
-      app.classList.contains("memory-open") ||
-      (!memoryPanel.classList.contains("is-closed") &&
-        !app.classList.contains("memory-closed"));
-
-    applySidebar(sidebarOpen);
-    applyMemory(memoryOpen);
-    return true;
-  }
-
-  function openSidebar() {
-    applySidebar(true);
-  }
-
-  function closeSidebar() {
-    applySidebar(false);
-  }
-
-  function toggleSidebar() {
-    applySidebar(!panelState.sidebarOpen);
-  }
-
-  function openMemory() {
-    applyMemory(true);
-  }
-
-  function closeMemory() {
-    applyMemory(false);
-  }
-
-  function toggleMemory() {
-    applyMemory(!panelState.memoryOpen);
-  }
-
-  function handleMainShellClick() {
-    if (!isMobile()) return;
-    closeSidebar();
-    closeMemory();
-  }
-
-  function handleEscape(event) {
-    if (event.key !== "Escape") return;
-    if (panelState.sidebarOpen) closeSidebar();
-    if (panelState.memoryOpen) closeMemory();
-  }
-
-  function recoverForViewport() {
-    const mobileNow = isMobile();
-    const firstRun = panelState.lastMobile === null;
-    const changed = panelState.lastMobile !== mobileNow;
-
-    panelState.lastMobile = mobileNow;
-
-    if (firstRun) {
-      if (mobileNow) {
-        applySidebar(false);
-        applyMemory(false);
-      } else {
-        syncFromDom();
-      }
-      return;
-    }
-
-    if (!changed) {
-      applySidebar(panelState.sidebarOpen);
-      applyMemory(panelState.memoryOpen);
-      return;
-    }
-
-    if (mobileNow) {
-      applySidebar(false);
-      applyMemory(false);
-      return;
-    }
-
-    applySidebar(panelState.sidebarOpen);
-    applyMemory(panelState.memoryOpen);
-  }
-
-  function bindClickOnce(el, handler) {
-    if (!el || el.__novaPanelBound) return;
-    el.__novaPanelBound = true;
-
-    el.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      handler();
-    });
-  }
-
-  function bindEvents() {
-    const {
-      toggleSidebarBtn,
-      closeSidebarBtn,
-      toggleMemoryBtn,
-      closeMemoryBtn,
-      mainShell,
-    } = getEls();
-
-    bindClickOnce(toggleSidebarBtn, toggleSidebar);
-    bindClickOnce(closeSidebarBtn, closeSidebar);
-    bindClickOnce(toggleMemoryBtn, toggleMemory);
-    bindClickOnce(closeMemoryBtn, closeMemory);
-
-    if (mainShell && !mainShell.__novaPanelShellBound) {
-      mainShell.__novaPanelShellBound = true;
-      mainShell.addEventListener("click", handleMainShellClick);
-    }
-
-    if (!window.__novaPanelsResizeBound) {
-      window.__novaPanelsResizeBound = true;
-      let timer = null;
-
-      window.addEventListener("resize", () => {
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-          recoverForViewport();
-        }, 90);
-      });
-    }
-
-    if (!window.__novaPanelsKeyBound) {
-      window.__novaPanelsKeyBound = true;
-      window.addEventListener("keydown", handleEscape);
-    }
-  }
-
-  function bootstrap() {
-    const { app, leftSidebar, memoryPanel } = getEls();
-    if (!app || !leftSidebar || !memoryPanel) {
-      console.warn("Nova panels: required elements missing.");
-      return false;
-    }
-
-    bindEvents();
-
-    if (!panelState.initialized) {
-      panelState.initialized = true;
-      syncFromDom();
-      recoverForViewport();
-    } else {
-      syncFromDom();
-    }
-
-    return true;
-  }
-
-  Nova.panels.bootstrap = bootstrap;
-  Nova.panels.sync = syncFromDom;
-  Nova.panels.openSidebar = openSidebar;
-  Nova.panels.closeSidebar = closeSidebar;
-  Nova.panels.toggleSidebar = toggleSidebar;
-  Nova.panels.openMemory = openMemory;
-  Nova.panels.closeMemory = closeMemory;
-  Nova.panels.toggleMemory = toggleMemory;
-  Nova.panels.getState = () => ({
-    sidebarOpen: !!panelState.sidebarOpen,
-    memoryOpen: !!panelState.memoryOpen,
-    mobile: isMobile(),
-  });
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bootstrap, { once: true });
-  } else {
-    bootstrap();
-  }
+  NovaPanels.init();
 })();
