@@ -1,6 +1,8 @@
 (function () {
   "use strict";
 
+  const RENDER_VERSION = "history-hooks-2026-03-31-001";
+
   function $(id) {
     return document.getElementById(id);
   }
@@ -66,6 +68,16 @@
     if (value === "true") return true;
     if (value === "false") return false;
     return fallback;
+  }
+
+  function coerceNumber(value, fallback = 0) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
+  function normalizeText(value) {
+    if (value == null) return "";
+    return String(value).replace(/\r\n/g, "\n").trim();
   }
 
   function getAttachmentList(message) {
@@ -166,18 +178,86 @@
       );
     }
 
-    const memorySelected =
-      Number(debug.memory_selected_count ?? debug.memory_count ?? 0) || 0;
-    if (memorySelected > 0) {
+    const historyIncluded = coerceBool(
+      meta.history_included,
+      coerceBool(debug.history_included, false)
+    );
+    const historyCount = coerceNumber(
+      meta.history_count ??
+      debug.history_count ??
+      0,
+      0
+    );
+
+    if (historyIncluded || historyCount > 0) {
       badges.push(
-        buildBadge(`Memory ${memorySelected}`, "is-memory", `${memorySelected} memory item(s) used`)
+        buildBadge(
+          `History ${historyCount}`,
+          "is-history",
+          historyIncluded
+            ? `${historyCount} recent chat message(s) sent to backend`
+            : "history badge present but backend did not mark inclusion"
+        )
       );
     }
 
-    const pinnedCount = Number(debug.memory_pinned_count ?? 0) || 0;
+    const memoryUsed = coerceBool(
+      meta.memory_used,
+      coerceBool(debug.memory_used, false)
+    );
+
+    const memorySelected = coerceNumber(
+      meta.memory_selected_count ??
+      debug.memory_selected_count ??
+      debug.memory_count ??
+      0,
+      0
+    );
+
+    if (memoryUsed || memorySelected > 0) {
+      const memoryTitles = safeArray(debug.memory_titles).filter(Boolean);
+      const title =
+        memoryTitles.length > 0
+          ? memoryTitles.join(" • ")
+          : `${memorySelected} memory item(s) used`;
+
+      badges.push(buildBadge(`Memory ${memorySelected}`, "is-memory", title));
+    }
+
+    const pinnedCount = coerceNumber(
+      meta.memory_pinned_count ??
+      debug.memory_pinned_count ??
+      0,
+      0
+    );
+
     if (pinnedCount > 0) {
+      badges.push(buildBadge(`Pinned ${pinnedCount}`, "is-pinned", `${pinnedCount} pinned item(s)`));
+    }
+
+    const artifactRecallCount = coerceNumber(
+      meta.artifact_recall_count ??
+      debug.artifact_recall_count ??
+      debug.memory_relevant_count ??
+      debug.artifact_context_count ??
+      0,
+      0
+    );
+
+    if (artifactRecallCount > 0) {
+      const recallTitles = safeArray(
+        debug.artifact_recall_titles ??
+        debug.memory_titles ??
+        debug.document_names ??
+        []
+      ).filter(Boolean);
+
       badges.push(
-        buildBadge(`Pinned ${pinnedCount}`, "is-pinned", `${pinnedCount} pinned item(s)`)
+        buildBadge(
+          `Recall ${artifactRecallCount}`,
+          "is-recall",
+          recallTitles.length ? recallTitles.join(" • ") : `${artifactRecallCount} saved artifact(s) recalled`
+        )
       );
     }
 
@@ -197,35 +277,77 @@
       badges.push(buildBadge("Docs", "is-docs"));
     }
 
+    const serviceVersion =
+      meta.chat_service_version ||
+      debug.chat_service_version ||
+      "";
+
+    if (serviceVersion) {
+      badges.push(buildBadge(serviceVersion, "is-service-version", "chat service version"));
+    }
+
     return badges;
   }
 
   function renderMessageBody(message) {
     const text = textFromMessage(message);
     if (!text) {
-      return `<div class="nova-message-markdown"></div>`;
+      return `<div class="nova-message-markdown" data-message-content=""></div>`;
     }
 
-    return `<div class="nova-message-markdown">${nl2br(text)}</div>`;
+    return `<div class="nova-message-markdown" data-message-content="${escapeHtml(normalizeText(text))}">${nl2br(text)}</div>`;
+  }
+
+  function normalizeMessage(message, roleFallback = "assistant") {
+    const source = safeObject(message);
+    const content = normalizeText(textFromMessage(source));
+    const role = normalizeText(source.role || roleFallback).toLowerCase() === "user" ? "user" : "assistant";
+    const createdAt = normalizeText(source.created_at) || new Date().toISOString();
+    const id = normalizeText(source.id) || "";
+    const meta = safeObject(source.meta);
+    const attachments = safeArray(source.attachments);
+
+    return {
+      id,
+      role,
+      content,
+      created_at: createdAt,
+      meta,
+      attachments,
+    };
   }
 
   function renderMessageCard(message, options = {}) {
-    const role = message?.role || "assistant";
-    const createdAt = message?.created_at || options.created_at || "";
+    const normalized = normalizeMessage(message, message?.role || "assistant");
+    const role = normalized.role;
+    const createdAt = normalized.created_at || options.created_at || "";
     const time = formatTime(createdAt);
-    const badgeHtml = collectBadges(message, options).join("");
+    const badgeHtml = collectBadges(normalized, options).join("");
     const roleLabel = role === "user" ? "You" : "Nova";
+    const rawText = normalizeText(normalized.content);
 
     return `
-      <article class="nova-message nova-message-${escapeHtml(role)}">
-        <div class="nova-message-inner">
+      <article
+        class="nova-message nova-message-${escapeHtml(role)}"
+        data-role="${escapeHtml(role)}"
+        data-message-id="${escapeHtml(normalized.id || "")}"
+        data-created-at="${escapeHtml(createdAt)}"
+        data-message-text="${escapeHtml(rawText)}"
+      >
+        <div
+          class="nova-message-inner"
+          data-role="${escapeHtml(role)}"
+          data-message-id="${escapeHtml(normalized.id || "")}"
+          data-created-at="${escapeHtml(createdAt)}"
+          data-message-text="${escapeHtml(rawText)}"
+        >
           <div class="nova-message-topline">
             <div class="nova-message-author">${escapeHtml(roleLabel)}</div>
             ${time ? `<div class="nova-message-time">${escapeHtml(time)}</div>` : ""}
           </div>
           ${badgeHtml ? `<div class="nova-message-badges">${badgeHtml}</div>` : ""}
-          ${renderMessageBody(message)}
-          ${renderAttachments(message)}
+          ${renderMessageBody(normalized)}
+          ${renderAttachments(normalized)}
         </div>
       </article>
     `;
@@ -264,16 +386,46 @@
         assistantMeta.used_fallback ??
         rootDebug.used_fallback ??
         false,
+      history_included:
+        assistantMeta.history_included ??
+        rootDebug.history_included ??
+        false,
+      history_count:
+        assistantMeta.history_count ??
+        rootDebug.history_count ??
+        0,
+      memory_used:
+        assistantMeta.memory_used ??
+        rootDebug.memory_used ??
+        false,
+      memory_selected_count:
+        assistantMeta.memory_selected_count ??
+        rootDebug.memory_selected_count ??
+        rootDebug.memory_count ??
+        0,
+      memory_pinned_count:
+        assistantMeta.memory_pinned_count ??
+        rootDebug.memory_pinned_count ??
+        0,
+      artifact_recall_count:
+        assistantMeta.artifact_recall_count ??
+        rootDebug.artifact_recall_count ??
+        rootDebug.memory_relevant_count ??
+        rootDebug.artifact_context_count ??
+        0,
     };
 
-    const normalizedMessage = {
-      id: assistant.id || root.message_id || root.id || null,
-      role: assistant.role || "assistant",
-      content,
-      created_at: assistant.created_at || root.created_at || new Date().toISOString(),
-      meta: normalizedMeta,
-      attachments: safeArray(assistant.attachments),
-    };
+    const normalizedMessage = normalizeMessage(
+      {
+        id: assistant.id || root.message_id || root.id || null,
+        role: assistant.role || "assistant",
+        content,
+        created_at: assistant.created_at || root.created_at || new Date().toISOString(),
+        meta: normalizedMeta,
+        attachments: safeArray(assistant.attachments),
+      },
+      "assistant"
+    );
 
     const normalizedDebug = {
       ...rootDebug,
@@ -285,6 +437,17 @@
       used_fallback:
         normalizedMeta.used_fallback === true ||
         normalizedMeta.used_fallback === "true",
+      history_included:
+        normalizedMeta.history_included === true ||
+        normalizedMeta.history_included === "true",
+      history_count: coerceNumber(normalizedMeta.history_count || 0, 0),
+      memory_used:
+        normalizedMeta.memory_used === true ||
+        normalizedMeta.memory_used === "true",
+      memory_selected_count: coerceNumber(normalizedMeta.memory_selected_count || 0, 0),
+      memory_pinned_count: coerceNumber(normalizedMeta.memory_pinned_count || 0, 0),
+      artifact_recall_count: coerceNumber(normalizedMeta.artifact_recall_count || 0, 0),
+      render_version: RENDER_VERSION,
     };
 
     return {
@@ -314,7 +477,7 @@
     init() {
       this.messagesEl = $("messages");
       this.emptyStateEl = $("novaEmptyState");
-      console.log("nova-render loaded");
+      console.log("nova-render loaded", RENDER_VERSION);
       return this;
     },
 
@@ -327,18 +490,42 @@
       }
     },
 
-    toggleEmptyState() {
+    ensureEmptyStateMounted() {
       this.ensureReady();
       if (!this.messagesEl || !this.emptyStateEl) return;
 
-      const hasMessages = this.messagesEl.children.length > 0;
+      if (!this.emptyStateEl.parentElement || this.emptyStateEl.parentElement !== this.messagesEl) {
+        this.messagesEl.prepend(this.emptyStateEl);
+      }
+    },
+
+    getMessageWrappers() {
+      this.ensureReady();
+      if (!this.messagesEl) return [];
+      return Array.from(this.messagesEl.querySelectorAll(".nova-message-wrap"));
+    },
+
+    toggleEmptyState() {
+      this.ensureReady();
+      this.ensureEmptyStateMounted();
+      if (!this.messagesEl || !this.emptyStateEl) return;
+
+      const hasMessages = this.getMessageWrappers().length > 0;
       this.emptyStateEl.style.display = hasMessages ? "none" : "";
     },
 
     clearMessages() {
       this.ensureReady();
       if (!this.messagesEl) return;
+
+      const emptyState = this.emptyStateEl || $("novaEmptyState");
       this.messagesEl.innerHTML = "";
+
+      if (emptyState) {
+        this.emptyStateEl = emptyState;
+        this.messagesEl.appendChild(emptyState);
+      }
+
       this.toggleEmptyState();
     },
 
@@ -352,9 +539,16 @@
       this.ensureReady();
       if (!this.messagesEl) return null;
 
+      const normalized = normalizeMessage(message, message?.role || "assistant");
       const wrapper = document.createElement("div");
+
       wrapper.className = "nova-message-wrap";
-      wrapper.innerHTML = renderMessageCard(message, options);
+      wrapper.setAttribute("data-role", normalized.role);
+      wrapper.setAttribute("data-message-id", normalized.id || "");
+      wrapper.setAttribute("data-created-at", normalized.created_at || "");
+      wrapper.setAttribute("data-message-text", normalized.content);
+      wrapper.innerHTML = renderMessageCard(normalized, options);
+
       this.messagesEl.appendChild(wrapper);
       this.toggleEmptyState();
       this.scrollToBottom();
@@ -388,23 +582,22 @@
       this.ensureReady();
       if (!this.messagesEl) return;
 
-      this.messagesEl.innerHTML = "";
+      this.clearMessages();
 
       safeArray(items).forEach((item) => {
-        const msg = safeObject(item);
-        const role = msg.role || "assistant";
+        const msg = normalizeMessage(item, safeObject(item).role || "assistant");
 
         this.appendMessage(
           {
             id: msg.id || null,
-            role,
-            content: textFromMessage(msg),
+            role: msg.role,
+            content: msg.content,
             created_at: msg.created_at || new Date().toISOString(),
             attachments: safeArray(msg.attachments),
             meta: safeObject(msg.meta),
           },
           {
-            debug: safeObject(msg.debug),
+            debug: safeObject(safeObject(item).debug),
           }
         );
       });
@@ -422,8 +615,10 @@
       const wraps = this.messagesEl.querySelectorAll(".nova-message-wrap");
       for (let i = wraps.length - 1; i >= 0; i -= 1) {
         const node = wraps[i];
-        const card = node.querySelector(".nova-message-assistant");
-        if (card) {
+        const role =
+          node.getAttribute("data-role") ||
+          node.querySelector(".nova-message")?.getAttribute("data-role");
+        if (role === "assistant") {
           node.remove();
           break;
         }
