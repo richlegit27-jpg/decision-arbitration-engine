@@ -1,1 +1,65 @@
-[]
+[
+  {
+    "id": "6fd42172-f509-4865-b360-d95fbdbca009",
+    "title": "Chat Reply - Hi! How can I help?",
+    "kind": "chat_reply",
+    "created_at": "2026-03-31T18:44:30.197958+00:00",
+    "updated_at": "2026-03-31T18:44:30.197970+00:00",
+    "session_id": "b98cbde4-ccdc-4ef0-8854-5b4ba9de9e23",
+    "content": "Hi! How can I help?",
+    "message_id": "37b5d96d-41ba-40d9-99d5-9d32830e108d",
+    "meta": {
+      "role": "assistant",
+      "artifact_source": "chat_service",
+      "debug": {
+        "model": "gpt-5.4",
+        "history_count": 3,
+        "history_included": true,
+        "fallback": false,
+        "fallback_reason": ""
+      }
+    }
+  },
+  {
+    "id": "9d6ccd5e-a7ee-427f-a80f-439d633fbf24",
+    "title": "Chat Reply - Plastics can be bad mainly because of how they’re made, used",
+    "kind": "chat_reply",
+    "created_at": "2026-03-31T18:12:19.769552+00:00",
+    "updated_at": "2026-03-31T18:12:19.769563+00:00",
+    "session_id": "b7c19bd2-576d-4a82-b63e-6d56676353fd",
+    "content": "Plastics can be bad mainly because of how they’re made, used, and disposed of:\n\n- **They don’t break down easily** — many last hundreds of years.\n- **They create pollution** — especially in oceans, rivers, and soil.\n- **Animals can eat them or get tangled in them**.\n- **They break into microplastics** — tiny pieces that can end up in water, food, and even our bodies.\n- **Making plastic uses fossil fuels** and adds greenhouse gases.\n\n### What kinds of plastic are most concerning?\nSome plastics are considered more problematic than others:\n\n1. **Single-use plastics**\n   - Plastic bags\n   - Straws\n   - Bottles\n   - Food wrappers\n   These are used briefly but last a very long time.\n\n2. **PVC (#3)**\n   - Used in pipes, flooring, some packaging\n   - Can contain harmful chemicals\n\n3. **Polystyrene (#6)**\n   - Foam cups, takeout containers, packing foam\n   - Breaks apart easily and is hard to recycle\n\n4. **Some plastics with additives**\n   - Can contain chemicals like BPA or phthalates\n\n### Less problematic plastics\n- **PET (#1)** and **HDPE (#2)** are often more widely recyclable, though they still cause pollution if not disposed of properly.\n\nIf you want, I can also give you a **simple list of the 7 plastic types and which are safest to use**.",
+    "message_id": "0274c436-8ec1-4035-bb06-997fb0bb6be1",
+    "meta": {
+      "role": "assistant",
+      "artifact_source": "chat_service",
+      "debug": {
+        "model": "gpt-5.4",
+        "history_count": 7,
+        "history_included": true,
+        "fallback": false,
+        "fallback_reason": ""
+      }
+    }
+  },
+  {
+    "id": "d7afec93-b404-42c4-8b46-ceb56f1738bd",
+    "title": "Chat Reply - Hi! How can I help?",
+    "kind": "chat_reply",
+    "created_at": "2026-03-31T18:05:35.377311+00:00",
+    "updated_at": "2026-03-31T18:05:35.377319+00:00",
+    "session_id": "default-session",
+    "content": "Hi! How can I help?",
+    "message_id": "41cd03b0-4073-4694-931a-83aff65f488f",
+    "meta": {
+      "role": "assistant",
+      "artifact_source": "chat_service",
+      "debug": {
+        "model": "gpt-5.4",
+        "history_count": 1,
+        "history_included": true,
+        "fallback": false,
+        "fallback_reason": ""
+      }
+    }
+  }
+]
