@@ -42,7 +42,7 @@ ALLOWED_UPLOAD_EXTENSIONS = {
     "yml",
 }
 
-ROUTE_BUILD = "clean-chat-pipeline-2026-03-31-005"
+ROUTE_BUILD = "clean-chat-pipeline-2026-03-31-006"
 
 app = Flask(
     __name__,
@@ -129,7 +129,17 @@ def read_json_file(path: Path, default: Any) -> Any:
 
 
 def write_json_file(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def ensure_data_files_exist() -> None:
+    if not SESSIONS_FILE.exists():
+        write_json_file(SESSIONS_FILE, [])
+    if not MEMORY_FILE.exists():
+        write_json_file(MEMORY_FILE, [])
+    if not ARTIFACTS_FILE.exists():
+        write_json_file(ARTIFACTS_FILE, [])
 
 
 def allowed_file(filename: str) -> bool:
@@ -302,15 +312,25 @@ def normalize_message_for_session(message: Any, *, role_fallback: str) -> dict[s
 
 
 def load_sessions() -> list[dict[str, Any]]:
+    ensure_data_files_exist()
     sessions = read_json_file(SESSIONS_FILE, [])
     return sessions if isinstance(sessions, list) else []
 
 
 def save_sessions(sessions: list[dict[str, Any]]) -> None:
+    ensure_data_files_exist()
     write_json_file(SESSIONS_FILE, sessions)
 
 
-def ensure_session_record(session_id: str) -> dict[str, Any]:
+def build_session_title(user_content: str, existing_title: str = "") -> str:
+    existing = normalize_text(existing_title, "").strip()
+    if existing:
+        return existing
+    seed = normalize_text(user_content, "").strip()
+    return (seed[:60] or "New Chat").strip()
+
+
+def ensure_session_record(session_id: str, title_seed: str = "") -> dict[str, Any]:
     sessions = load_sessions()
     now = utc_now_iso()
 
@@ -318,13 +338,16 @@ def ensure_session_record(session_id: str) -> dict[str, Any]:
         if normalize_text(session.get("id"), "") == session_id:
             if not isinstance(session.get("messages"), list):
                 session["messages"] = []
+            if not normalize_text(session.get("title"), "").strip():
+                session["title"] = build_session_title(title_seed)
+            session["message_count"] = len(session["messages"])
             session["updated_at"] = now
             save_sessions(sessions)
             return session
 
     new_session = {
         "id": session_id,
-        "title": "New Chat",
+        "title": build_session_title(title_seed),
         "created_at": now,
         "updated_at": now,
         "pinned": False,
@@ -337,20 +360,28 @@ def ensure_session_record(session_id: str) -> dict[str, Any]:
     return new_session
 
 
-def get_session_messages(session_id: str) -> list[dict[str, Any]]:
+def get_session_by_id(session_id: str) -> dict[str, Any] | None:
     sessions = load_sessions()
     for session in sessions:
         if normalize_text(session.get("id"), "") == session_id:
-            messages = session.get("messages", [])
-            return messages if isinstance(messages, list) else []
-    return []
+            return session
+    return None
+
+
+def get_session_messages(session_id: str) -> list[dict[str, Any]]:
+    session = get_session_by_id(session_id)
+    if not session:
+        return []
+    messages = session.get("messages", [])
+    return messages if isinstance(messages, list) else []
 
 
 def persist_chat_exchange(
     session_id: str,
     user_content: str,
     assistant_message: dict[str, Any],
-) -> None:
+    attachments: list[Any] | None = None,
+) -> dict[str, Any]:
     sessions = load_sessions()
     now = utc_now_iso()
     target_session: dict[str, Any] | None = None
@@ -363,7 +394,7 @@ def persist_chat_exchange(
     if target_session is None:
         target_session = {
             "id": session_id,
-            "title": user_content[:60] or "New Chat",
+            "title": build_session_title(user_content),
             "created_at": now,
             "updated_at": now,
             "pinned": False,
@@ -376,13 +407,20 @@ def persist_chat_exchange(
     if not isinstance(target_session.get("messages"), list):
         target_session["messages"] = []
 
+    normalized_user_attachments = attachments if isinstance(attachments, list) else []
+
     user_message = {
         "id": str(uuid.uuid4()),
         "role": "user",
-        "content": user_content,
+        "content": normalize_text(user_content, ""),
         "created_at": now,
-        "attachments": [],
-        "meta": {},
+        "attachments": normalized_user_attachments,
+        "meta": {
+            "attachments_count": len(normalized_user_attachments),
+            "document_used": False,
+            "document_count": 0,
+            "document_names": [],
+        },
     }
 
     assistant_normalized = normalize_message_for_session(
@@ -416,32 +454,47 @@ def persist_chat_exchange(
     if should_add_assistant and normalize_text(assistant_normalized.get("content"), ""):
         messages.append(assistant_normalized)
 
+    target_session["title"] = build_session_title(
+        user_content,
+        normalize_text(target_session.get("title"), ""),
+    )
     target_session["updated_at"] = now
     target_session["message_count"] = len(messages)
     target_session["last_message_preview"] = normalize_text(
         assistant_normalized.get("content"),
         user_content,
     )[:160]
-    if not normalize_text(target_session.get("title"), ""):
-        target_session["title"] = (user_content[:60] or "New Chat").strip()
 
     save_sessions(sessions)
+    return target_session
 
 
-def try_get_state() -> dict[str, Any]:
+def try_get_state(active_session_id: str = "") -> dict[str, Any]:
+    ensure_data_files_exist()
+
     sessions = load_sessions()
     memory = read_json_file(MEMORY_FILE, [])
     artifacts = read_json_file(ARTIFACTS_FILE, [])
+
+    active_session_id = normalize_text(active_session_id, "").strip()
+    active_messages = get_session_messages(active_session_id) if active_session_id else []
 
     return {
         "ok": True,
         "sessions": sessions if isinstance(sessions, list) else [],
         "memory": memory if isinstance(memory, list) else [],
         "artifacts": artifacts if isinstance(artifacts, list) else [],
+        "active_session_id": active_session_id or None,
+        "active_messages": active_messages,
         "debug": {
+            "sessions_file": str(SESSIONS_FILE),
+            "memory_file": str(MEMORY_FILE),
+            "artifacts_file": str(ARTIFACTS_FILE),
             "sessions_count": len(sessions) if isinstance(sessions, list) else 0,
             "memory_count": len(memory) if isinstance(memory, list) else 0,
             "artifacts_count": len(artifacts) if isinstance(artifacts, list) else 0,
+            "active_session_id": active_session_id or None,
+            "active_messages_count": len(active_messages),
             "route_build": ROUTE_BUILD,
         },
     }
@@ -499,6 +552,7 @@ def index():
 
 @app.get("/api/health")
 def api_health():
+    ensure_data_files_exist()
     service_debug = get_chat_service_debug()
     return jsonify(
         {
@@ -509,6 +563,9 @@ def api_health():
                 "cwd": str(BASE_DIR),
                 "uploads_dir": str(UPLOADS_DIR),
                 "data_dir": str(DATA_DIR),
+                "sessions_file": str(SESSIONS_FILE),
+                "memory_file": str(MEMORY_FILE),
+                "artifacts_file": str(ARTIFACTS_FILE),
                 "route_build": ROUTE_BUILD,
                 **service_debug,
             },
@@ -520,14 +577,9 @@ def api_health():
 def api_state():
     try:
         session_id = normalize_text(request.args.get("session_id"), "").strip()
-        state = try_get_state()
-
         if session_id:
-            state["active_session_id"] = session_id
-            state["active_messages"] = get_session_messages(session_id)
-            state["debug"]["active_session_id"] = session_id
-            state["debug"]["active_messages_count"] = len(state["active_messages"])
-
+            ensure_session_record(session_id)
+        state = try_get_state(session_id)
         return jsonify(state)
     except Exception as exc:
         return safe_error_response(route="/api/state", exc=exc)
@@ -536,6 +588,7 @@ def api_state():
 @app.get("/api/artifacts")
 def api_artifacts():
     try:
+        ensure_data_files_exist()
         artifacts = read_json_file(ARTIFACTS_FILE, [])
         if not isinstance(artifacts, list):
             artifacts = []
@@ -618,6 +671,8 @@ def api_chat():
     attachments: list[Any] = []
 
     try:
+        ensure_data_files_exist()
+
         payload = request.get_json(silent=True) or {}
 
         if not isinstance(payload, dict):
@@ -639,7 +694,7 @@ def api_chat():
         raw_attachments = payload.get("attachments", [])
         attachments = raw_attachments if isinstance(raw_attachments, list) else []
 
-        ensure_session_record(session_id)
+        ensure_session_record(session_id, title_seed=content)
 
         if "history" not in payload or not isinstance(payload.get("history"), list) or not payload.get("history"):
             existing_messages = get_session_messages(session_id)
@@ -652,6 +707,7 @@ def api_chat():
             "content_chars": len(content),
             "session_id": session_id,
             "attachments_count": len(attachments),
+            "history_count_in": len(payload.get("history", [])) if isinstance(payload.get("history"), list) else 0,
             "timestamp": utc_now_iso(),
             "route_build": ROUTE_BUILD,
         }
@@ -686,15 +742,26 @@ def api_chat():
         if not isinstance(response_payload["assistant_message"].get("attachments"), list):
             response_payload["assistant_message"]["attachments"] = []
 
-        persist_chat_exchange(
+        saved_session = persist_chat_exchange(
             session_id=session_id,
             user_content=content,
             assistant_message=response_payload["assistant_message"],
+            attachments=attachments,
         )
 
+        active_messages = get_session_messages(session_id)
+
+        response_payload["session_id"] = session_id
         response_payload["debug"]["request_debug"] = debug_in
         response_payload["debug"]["route_shielded"] = True
         response_payload["debug"]["route_build"] = ROUTE_BUILD
+        response_payload["debug"]["sessions_file"] = str(SESSIONS_FILE)
+        response_payload["debug"]["persisted_session_id"] = session_id
+        response_payload["debug"]["persisted_session_title"] = normalize_text(saved_session.get("title"), "")
+        response_payload["debug"]["persisted_session_message_count"] = len(
+            saved_session.get("messages", []) if isinstance(saved_session.get("messages"), list) else []
+        )
+        response_payload["debug"]["active_messages_count"] = len(active_messages)
         response_payload["assistant_message"]["meta"]["route_build"] = ROUTE_BUILD
 
         return jsonify(response_payload), 200
@@ -713,11 +780,13 @@ def api_chat():
                 "request_content_type": request.content_type,
                 "route_shielded": True,
                 "route_build": ROUTE_BUILD,
+                "sessions_file": str(SESSIONS_FILE),
             },
         )
 
 
 if __name__ == "__main__":
+    ensure_data_files_exist()
     port = int(os.getenv("APP_PORT", os.getenv("NOVA_PORT", "5001")))
     app.run(
         host="127.0.0.1",

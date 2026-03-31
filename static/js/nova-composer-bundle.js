@@ -1,13 +1,14 @@
 (() => {
   "use strict";
 
-  const BUNDLE_VERSION = "history-hard-fallback-2026-03-30-004";
+  const BUNDLE_VERSION = "session-restore-2026-03-31-001";
   const MAX_HISTORY_MESSAGES = 12;
 
   const state = {
     isSending: false,
     stagedAttachments: [],
     sessionId: loadSessionId(),
+    restored: false,
   };
 
   function log(...args) {
@@ -21,7 +22,7 @@
         return String(saved).trim();
       }
     } catch (_err) {}
-    return "default-session";
+    return crypto && crypto.randomUUID ? crypto.randomUUID() : `session-${Date.now()}`;
   }
 
   function saveSessionId(sessionId) {
@@ -43,15 +44,6 @@
   function normalizeText(value) {
     if (value == null) return "";
     return String(value).replace(/\r\n/g, "\n").trim();
-  }
-
-  function escapeHtml(value) {
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
   }
 
   function getEls() {
@@ -138,12 +130,12 @@
   function getMessageRoleFromNode(node) {
     if (!node) return "";
 
-    const roleFromData =
+    const dataRole =
       normalizeText(node.getAttribute?.("data-role")).toLowerCase() ||
       normalizeText(node.dataset?.role).toLowerCase();
 
-    if (roleFromData === "user" || roleFromData === "assistant") {
-      return roleFromData;
+    if (dataRole === "user" || dataRole === "assistant") {
+      return dataRole;
     }
 
     const cls = String(node.className || "");
@@ -156,14 +148,17 @@
       qs(".message-role", node) ||
       qs(".role", node);
 
-    const authorRole = getRoleFromText(author ? author.textContent : "");
-    if (authorRole) return authorRole;
-
-    return "";
+    return getRoleFromText(author ? author.textContent : "");
   }
 
   function getMessageContentFromNode(node) {
     if (!node) return "";
+
+    const explicit = normalizeText(node.getAttribute?.("data-message-text"));
+    if (explicit) return explicit;
+
+    const innerExplicit = normalizeText(qs(".nova-message", node)?.getAttribute?.("data-message-text"));
+    if (innerExplicit) return innerExplicit;
 
     const candidates = [
       ".nova-message-markdown",
@@ -175,7 +170,7 @@
 
     for (const selector of candidates) {
       const el = qs(selector, node);
-      const text = normalizeText(el ? el.textContent : "");
+      const text = normalizeText(el ? el.getAttribute?.("data-message-content") || el.textContent : "");
       if (text) return text;
     }
 
@@ -209,235 +204,36 @@
     return deduped;
   }
 
-  function collectHistoryFromRichNodes(messagesEl) {
-    const nodes = qsa(".nova-message, .nova-message-wrap, [data-role]", messagesEl);
+  function collectHistoryFromDom() {
+    const { messages } = getEls();
+    if (!messages) return [];
+
+    const nodes = qsa(".nova-message-wrap, .nova-message, [data-role]", messages);
     const items = [];
 
     for (const node of nodes) {
       let target = node;
-
       if (!String(node.className || "").includes("nova-message")) {
         const nested = qs(".nova-message", node);
         if (nested) target = nested;
       }
 
-      const role = getMessageRoleFromNode(target);
+      const role = getMessageRoleFromNode(target) || getMessageRoleFromNode(node);
       if (role !== "user" && role !== "assistant") continue;
 
-      let content = getMessageContentFromNode(target);
-      if (!content) continue;
-
-      content = content.replace(/\s+\n/g, "\n").trim();
+      const content = getMessageContentFromNode(target) || getMessageContentFromNode(node);
       if (!content) continue;
 
       items.push({ role, content });
     }
 
-    return dedupeSequentialHistory(items).slice(-MAX_HISTORY_MESSAGES);
-  }
-
-  function collectHistoryFromDirectChildren(messagesEl) {
-    const items = [];
-    const children = Array.from(messagesEl.children || []);
-
-    for (const child of children) {
-      if (child.id === "novaEmptyState") continue;
-
-      const article = child.matches?.(".nova-message")
-        ? child
-        : child.querySelector?.(".nova-message");
-
-      const container = article || child;
-      let role = getMessageRoleFromNode(container);
-
-      if (!role) {
-        const raw = normalizeText(container.textContent);
-        if (raw.startsWith("You")) role = "user";
-        if (raw.startsWith("Nova")) role = "assistant";
-      }
-
-      if (role !== "user" && role !== "assistant") continue;
-
-      let content = getMessageContentFromNode(container);
-
-      if (!content) {
-        const text = normalizeText(container.textContent);
-        const lines = text
-          .split("\n")
-          .map((line) => normalizeText(line))
-          .filter(Boolean);
-
-        if (lines.length > 1) {
-          const first = getRoleFromText(lines[0]);
-          if (first) {
-            lines.shift();
-          }
-          if (lines.length && /^\d{1,2}:\d{2}/.test(lines[0])) {
-            lines.shift();
-          }
-          content = normalizeText(lines.join("\n"));
-        }
-      }
-
-      if (!content) continue;
-
-      items.push({ role, content });
-    }
-
-    return dedupeSequentialHistory(items).slice(-MAX_HISTORY_MESSAGES);
-  }
-
-  function collectHistoryFromDom() {
-    const { messages } = getEls();
-    if (!messages) return [];
-
-    const rich = collectHistoryFromRichNodes(messages);
-    if (rich.length) {
-      window.NovaHistoryCollectorUsed = "rich";
-      window.NovaLastCollectedHistory = rich;
-      return rich;
-    }
-
-    const direct = collectHistoryFromDirectChildren(messages);
-    window.NovaHistoryCollectorUsed = "direct";
-    window.NovaLastCollectedHistory = direct;
-    return direct;
+    const out = dedupeSequentialHistory(items).slice(-MAX_HISTORY_MESSAGES);
+    window.NovaLastCollectedHistory = out;
+    return out;
   }
 
   function collectHistory() {
-    const domHistory = collectHistoryFromDom();
-    return domHistory.slice(-MAX_HISTORY_MESSAGES);
-  }
-
-  function appendFallbackMessage(role, content, meta = {}) {
-    const { messages } = getEls();
-    if (!messages) return null;
-
-    hideEmptyState();
-
-    const wrap = document.createElement("div");
-    wrap.className = "nova-message-wrap";
-    wrap.setAttribute("data-role", role);
-
-    const article = document.createElement("article");
-    article.className = `nova-message nova-message-${role}`;
-    article.setAttribute("data-role", role);
-
-    const inner = document.createElement("div");
-    inner.className = "nova-message-inner";
-
-    const head = document.createElement("div");
-    head.className = "nova-message-head";
-
-    const roleEl = document.createElement("div");
-    roleEl.className = "nova-message-role";
-    roleEl.textContent = role === "user" ? "You" : "Nova";
-
-    const timeEl = document.createElement("div");
-    timeEl.className = "nova-message-time";
-    try {
-      timeEl.textContent = new Date().toLocaleTimeString([], {
-        hour: "numeric",
-        minute: "2-digit",
-      });
-    } catch (_err) {
-      timeEl.textContent = "";
-    }
-
-    head.appendChild(roleEl);
-    head.appendChild(timeEl);
-
-    const markdown = document.createElement("div");
-    markdown.className = "nova-message-markdown";
-    markdown.innerHTML = escapeHtml(content).replace(/\n/g, "<br>");
-
-    inner.appendChild(head);
-
-    if (meta && typeof meta === "object") {
-      const badges = [];
-
-      if (meta.used_fallback === true) badges.push("Fallback");
-      if (meta.history_included === true || Number(meta.history_count || 0) > 0) {
-        badges.push(`History ${Number(meta.history_count || 0)}`);
-      }
-      if (meta.chat_service_version) badges.push(String(meta.chat_service_version));
-
-      if (badges.length) {
-        const badgeRow = document.createElement("div");
-        badgeRow.className = "nova-message-badges";
-        badgeRow.style.display = "flex";
-        badgeRow.style.flexWrap = "wrap";
-        badgeRow.style.gap = "6px";
-        badgeRow.style.marginBottom = "10px";
-
-        for (const badgeText of badges) {
-          const badge = document.createElement("span");
-          badge.className = "nova-badge";
-          badge.textContent = badgeText;
-          badgeRow.appendChild(badge);
-        }
-
-        inner.appendChild(badgeRow);
-      }
-    }
-
-    inner.appendChild(markdown);
-    article.appendChild(inner);
-    wrap.appendChild(article);
-    messages.appendChild(wrap);
-    scrollMessagesToBottom();
-    return wrap;
-  }
-
-  function renderMessage(role, content, payload = {}) {
-    hideEmptyState();
-
-    if (window.NovaRender && typeof window.NovaRender.appendMessage === "function") {
-      try {
-        window.NovaRender.appendMessage(
-          {
-            role,
-            content,
-            created_at: new Date().toISOString(),
-            meta: payload.meta || {},
-            attachments: payload.attachments || [],
-          },
-          {
-            debug: payload.debug || {},
-          }
-        );
-        scrollMessagesToBottom();
-        return;
-      } catch (err) {
-        console.warn("NovaRender.appendMessage failed, using fallback DOM render.", err);
-      }
-    }
-
-    appendFallbackMessage(role, content, payload.meta || payload.debug || {});
-  }
-
-  function renderUserMessage(content) {
-    renderMessage("user", content, {});
-  }
-
-  function renderAssistantMessage(responsePayload) {
-    const assistant = responsePayload && responsePayload.assistant_message
-      ? responsePayload.assistant_message
-      : null;
-
-    const content = normalizeText(
-      (assistant && assistant.content) ||
-      (responsePayload && responsePayload.message) ||
-      ""
-    );
-
-    renderMessage("assistant", content, {
-      assistant_message: assistant,
-      message: (responsePayload && responsePayload.message) || content,
-      debug: (responsePayload && responsePayload.debug) || {},
-      meta: (assistant && assistant.meta) || {},
-      attachments: Array.isArray(assistant && assistant.attachments) ? assistant.attachments : [],
-    });
+    return collectHistoryFromDom();
   }
 
   function renderAttachmentTray() {
@@ -479,6 +275,55 @@
       chip.appendChild(removeBtn);
       tray.appendChild(chip);
     });
+  }
+
+  function renderUserMessage(content) {
+    if (window.NovaRender && typeof window.NovaRender.appendUserMessage === "function") {
+      window.NovaRender.appendUserMessage(content, new Date().toISOString());
+      scrollMessagesToBottom();
+      return;
+    }
+
+    if (window.NovaRender && typeof window.NovaRender.appendMessage === "function") {
+      window.NovaRender.appendMessage({
+        role: "user",
+        content,
+        created_at: new Date().toISOString(),
+        attachments: [],
+        meta: {},
+      });
+      scrollMessagesToBottom();
+    }
+  }
+
+  function renderAssistantMessage(responsePayload) {
+    if (window.NovaRender && typeof window.NovaRender.appendAssistantResponse === "function") {
+      window.NovaRender.appendAssistantResponse(responsePayload);
+      scrollMessagesToBottom();
+      return;
+    }
+
+    const content = normalizeText(
+      responsePayload?.assistant_message?.content ||
+      responsePayload?.message ||
+      ""
+    );
+
+    if (window.NovaRender && typeof window.NovaRender.appendMessage === "function") {
+      window.NovaRender.appendMessage(
+        {
+          role: "assistant",
+          content,
+          created_at: new Date().toISOString(),
+          attachments: responsePayload?.assistant_message?.attachments || [],
+          meta: responsePayload?.assistant_message?.meta || {},
+        },
+        {
+          debug: responsePayload?.debug || {},
+        }
+      );
+      scrollMessagesToBottom();
+    }
   }
 
   async function uploadFiles(fileList) {
@@ -528,11 +373,49 @@
     window.NovaOutgoingPayload = payload;
     window.NovaOutgoingHistory = history;
 
-    console.log("Nova history collector used:", window.NovaHistoryCollectorUsed);
     console.log("Nova outgoing payload", payload);
     console.log("Nova outgoing history", history);
 
     return payload;
+  }
+
+  async function restoreSessionOnLoad() {
+    if (state.restored) return;
+    state.restored = true;
+
+    try {
+      const response = await fetch(`/api/state?session_id=${encodeURIComponent(state.sessionId)}`, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+        },
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.ok) {
+        throw new Error(data?.message || data?.error || "State load failed");
+      }
+
+      const activeMessages = Array.isArray(data.active_messages) ? data.active_messages : [];
+
+      if (window.NovaRender && typeof window.NovaRender.renderMessages === "function") {
+        window.NovaRender.renderMessages(activeMessages);
+      }
+
+      if (activeMessages.length) {
+        hideEmptyState();
+        scrollMessagesToBottom();
+      }
+
+      window.NovaRestoredState = data;
+      console.log("Nova restored session", {
+        session_id: state.sessionId,
+        messages: activeMessages.length,
+      });
+    } catch (err) {
+      console.warn("Nova session restore failed", err);
+      window.NovaRestoreError = String(err?.message || err);
+    }
   }
 
   async function sendCurrentMessage() {
@@ -581,14 +464,37 @@
     } catch (err) {
       console.error("Chat send failed:", err);
 
-      renderMessage("assistant", `Request failed: ${err.message || err}`, {
-        debug: {
-          used_fallback: true,
-          fallback_reason: String(err.message || err),
-          history_included: Array.isArray(payload.history) && payload.history.length > 0,
-          history_count: Array.isArray(payload.history) ? payload.history.length : 0,
-          chat_service_version: "frontend-request-failed",
+      window.NovaLastChatDebug = {
+        used_fallback: true,
+        fallback_reason: String(err.message || err),
+        history_included: Array.isArray(payload.history) && payload.history.length > 0,
+        history_count: Array.isArray(payload.history) ? payload.history.length : 0,
+        chat_service_version: "frontend-request-failed",
+      };
+
+      window.NovaLastChatResponse = {
+        ok: false,
+        message: `Request failed: ${err.message || err}`,
+        debug: window.NovaLastChatDebug,
+      };
+
+      renderAssistantMessage({
+        ok: false,
+        message: `Request failed: ${err.message || err}`,
+        assistant_message: {
+          role: "assistant",
+          content: `Request failed: ${err.message || err}`,
+          created_at: new Date().toISOString(),
+          attachments: [],
+          meta: {
+            used_fallback: true,
+            fallback_reason: String(err.message || err),
+            history_included: Array.isArray(payload.history) && payload.history.length > 0,
+            history_count: Array.isArray(payload.history) ? payload.history.length : 0,
+            chat_service_version: "frontend-request-failed",
+          },
         },
+        debug: window.NovaLastChatDebug,
       });
     } finally {
       setBusy(false);
@@ -645,7 +551,7 @@
     }
   }
 
-  function init() {
+  async function init() {
     bindInputAutoResize();
     bindSend();
     bindUploads();
@@ -656,20 +562,22 @@
       state,
       collectHistory,
       collectHistoryFromDom,
-      collectHistoryFromRichNodes,
-      collectHistoryFromDirectChildren,
       buildPayload,
+      restoreSessionOnLoad,
       sendCurrentMessage,
       uploadFiles,
       renderAttachmentTray,
     };
 
     log(BUNDLE_VERSION);
+    await restoreSessionOnLoad();
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init, { once: true });
+    document.addEventListener("DOMContentLoaded", function () {
+      void init();
+    }, { once: true });
   } else {
-    init();
+    void init();
   }
 })();
