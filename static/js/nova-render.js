@@ -1,640 +1,438 @@
 (function () {
   "use strict";
 
-  const RENDER_VERSION = "history-hooks-2026-03-31-001";
-
-  function $(id) {
-    return document.getElementById(id);
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
-  function nl2br(text) {
-    return escapeHtml(text).replace(/\r?\n/g, "<br>");
-  }
-
-  function formatTime(value) {
-    if (!value) return "";
-    try {
-      const d = new Date(value);
-      if (Number.isNaN(d.getTime())) return "";
-      return d.toLocaleTimeString([], {
-        hour: "numeric",
-        minute: "2-digit",
-      });
-    } catch (_err) {
-      return "";
-    }
-  }
-
-  function safeArray(value) {
-    return Array.isArray(value) ? value : [];
-  }
-
-  function safeObject(value) {
-    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-  }
-
-  function textFromMessage(message) {
-    if (!message) return "";
-    if (typeof message === "string") return message;
-    if (typeof message.content === "string") return message.content;
-    if (typeof message.message === "string") return message.message;
-    return "";
-  }
-
-  function pick(obj, path, fallback) {
-    try {
-      let cur = obj;
-      for (const key of path) {
-        if (cur == null) return fallback;
-        cur = cur[key];
-      }
-      return cur ?? fallback;
-    } catch (_err) {
-      return fallback;
-    }
-  }
-
-  function coerceBool(value, fallback = false) {
-    if (typeof value === "boolean") return value;
-    if (value === "true") return true;
-    if (value === "false") return false;
-    return fallback;
-  }
-
-  function coerceNumber(value, fallback = 0) {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : fallback;
-  }
-
-  function normalizeText(value) {
-    if (value == null) return "";
-    return String(value).replace(/\r\n/g, "\n").trim();
-  }
-
-  function getAttachmentList(message) {
-    if (!message) return [];
-    return safeArray(message.attachments);
-  }
-
-  function renderAttachments(message) {
-    const attachments = getAttachmentList(message);
-    if (!attachments.length) return "";
-
-    const chips = attachments
-      .map((item) => {
-        const obj = safeObject(item);
-        const name = obj.name || obj.filename || obj.title || "attachment";
-        const url = obj.url || obj.file_url || obj.src || "";
-        const kind = obj.kind || obj.type || "";
-
-        if (url) {
-          return `
-            <a class="nova-attachment-chip" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">
-              ${escapeHtml(name)}
-            </a>
-          `;
-        }
-
-        return `
-          <span class="nova-attachment-chip" title="${escapeHtml(kind)}">
-            ${escapeHtml(name)}
-          </span>
-        `;
-      })
-      .join("");
-
-    return `<div class="nova-message-attachments">${chips}</div>`;
-  }
-
-  function buildBadge(label, className, title) {
-    return `
-      <span class="nova-badge ${escapeHtml(className || "")}"${title ? ` title="${escapeHtml(title)}"` : ""}>
-        ${escapeHtml(label)}
-      </span>
-    `;
-  }
-
-  function collectBadges(message, options = {}) {
-    const role = message?.role || "assistant";
-    const meta = safeObject(message?.meta);
-    const debug = safeObject(options.debug);
-    const badges = [];
-
-    if (role !== "assistant") {
-      return badges;
-    }
-
-    const usedFallback = coerceBool(
-      meta.used_fallback,
-      coerceBool(debug.used_fallback, false)
-    );
-    if (usedFallback) {
-      badges.push(buildBadge("Fallback", "is-fallback"));
-    }
-
-    const artifactSaved =
-      meta.artifact_saved ??
-      debug.artifact_saved ??
-      false;
-
-    const artifactSaveReason =
-      meta.artifact_save_reason ??
-      debug.artifact_save_reason ??
-      "";
-
-    const artifactId =
-      meta.artifact_id ??
-      debug.artifact_id ??
-      null;
-
-    const hasArtifactDecision =
-      Object.prototype.hasOwnProperty.call(meta, "artifact_saved") ||
-      Object.prototype.hasOwnProperty.call(meta, "artifact_save_reason") ||
-      Object.prototype.hasOwnProperty.call(debug, "artifact_saved") ||
-      Object.prototype.hasOwnProperty.call(debug, "artifact_save_reason");
-
-    if (coerceBool(artifactSaved, false)) {
-      let title = artifactSaveReason || "saved";
-      if (artifactId) {
-        title += ` | ${artifactId}`;
-      }
-      badges.push(buildBadge("Artifact Saved", "is-artifact-saved", title));
-    } else if (hasArtifactDecision) {
-      badges.push(
-        buildBadge(
-          "Artifact Skipped",
-          "is-artifact-skipped",
-          artifactSaveReason || "not saved"
-        )
-      );
-    }
-
-    const historyIncluded = coerceBool(
-      meta.history_included,
-      coerceBool(debug.history_included, false)
-    );
-    const historyCount = coerceNumber(
-      meta.history_count ??
-      debug.history_count ??
-      0,
-      0
-    );
-
-    if (historyIncluded || historyCount > 0) {
-      badges.push(
-        buildBadge(
-          `History ${historyCount}`,
-          "is-history",
-          historyIncluded
-            ? `${historyCount} recent chat message(s) sent to backend`
-            : "history badge present but backend did not mark inclusion"
-        )
-      );
-    }
-
-    const memoryUsed = coerceBool(
-      meta.memory_used,
-      coerceBool(debug.memory_used, false)
-    );
-
-    const memorySelected = coerceNumber(
-      meta.memory_selected_count ??
-      debug.memory_selected_count ??
-      debug.memory_count ??
-      0,
-      0
-    );
-
-    if (memoryUsed || memorySelected > 0) {
-      const memoryTitles = safeArray(debug.memory_titles).filter(Boolean);
-      const title =
-        memoryTitles.length > 0
-          ? memoryTitles.join(" • ")
-          : `${memorySelected} memory item(s) used`;
-
-      badges.push(buildBadge(`Memory ${memorySelected}`, "is-memory", title));
-    }
-
-    const pinnedCount = coerceNumber(
-      meta.memory_pinned_count ??
-      debug.memory_pinned_count ??
-      0,
-      0
-    );
-
-    if (pinnedCount > 0) {
-      badges.push(buildBadge(`Pinned ${pinnedCount}`, "is-pinned", `${pinnedCount} pinned item(s)`));
-    }
-
-    const artifactRecallCount = coerceNumber(
-      meta.artifact_recall_count ??
-      debug.artifact_recall_count ??
-      debug.memory_relevant_count ??
-      debug.artifact_context_count ??
-      0,
-      0
-    );
-
-    if (artifactRecallCount > 0) {
-      const recallTitles = safeArray(
-        debug.artifact_recall_titles ??
-        debug.memory_titles ??
-        debug.document_names ??
-        []
-      ).filter(Boolean);
-
-      badges.push(
-        buildBadge(
-          `Recall ${artifactRecallCount}`,
-          "is-recall",
-          recallTitles.length ? recallTitles.join(" • ") : `${artifactRecallCount} saved artifact(s) recalled`
-        )
-      );
-    }
-
-    const webUsed = coerceBool(
-      debug.web_used,
-      coerceBool(pick(debug, ["web", "used"], false), false)
-    );
-    if (webUsed) {
-      badges.push(buildBadge("Web", "is-web"));
-    }
-
-    const documentUsed = coerceBool(
-      debug.document_used,
-      coerceBool(pick(debug, ["documents", "used"], false), false)
-    );
-    if (documentUsed) {
-      badges.push(buildBadge("Docs", "is-docs"));
-    }
-
-    const serviceVersion =
-      meta.chat_service_version ||
-      debug.chat_service_version ||
-      "";
-
-    if (serviceVersion) {
-      badges.push(buildBadge(serviceVersion, "is-service-version", "chat service version"));
-    }
-
-    return badges;
-  }
-
-  function renderMessageBody(message) {
-    const text = textFromMessage(message);
-    if (!text) {
-      return `<div class="nova-message-markdown" data-message-content=""></div>`;
-    }
-
-    return `<div class="nova-message-markdown" data-message-content="${escapeHtml(normalizeText(text))}">${nl2br(text)}</div>`;
-  }
-
-  function normalizeMessage(message, roleFallback = "assistant") {
-    const source = safeObject(message);
-    const content = normalizeText(textFromMessage(source));
-    const role = normalizeText(source.role || roleFallback).toLowerCase() === "user" ? "user" : "assistant";
-    const createdAt = normalizeText(source.created_at) || new Date().toISOString();
-    const id = normalizeText(source.id) || "";
-    const meta = safeObject(source.meta);
-    const attachments = safeArray(source.attachments);
-
-    return {
-      id,
-      role,
-      content,
-      created_at: createdAt,
-      meta,
-      attachments,
-    };
-  }
-
-  function renderMessageCard(message, options = {}) {
-    const normalized = normalizeMessage(message, message?.role || "assistant");
-    const role = normalized.role;
-    const createdAt = normalized.created_at || options.created_at || "";
-    const time = formatTime(createdAt);
-    const badgeHtml = collectBadges(normalized, options).join("");
-    const roleLabel = role === "user" ? "You" : "Nova";
-    const rawText = normalizeText(normalized.content);
-
-    return `
-      <article
-        class="nova-message nova-message-${escapeHtml(role)}"
-        data-role="${escapeHtml(role)}"
-        data-message-id="${escapeHtml(normalized.id || "")}"
-        data-created-at="${escapeHtml(createdAt)}"
-        data-message-text="${escapeHtml(rawText)}"
-      >
-        <div
-          class="nova-message-inner"
-          data-role="${escapeHtml(role)}"
-          data-message-id="${escapeHtml(normalized.id || "")}"
-          data-created-at="${escapeHtml(createdAt)}"
-          data-message-text="${escapeHtml(rawText)}"
-        >
-          <div class="nova-message-topline">
-            <div class="nova-message-author">${escapeHtml(roleLabel)}</div>
-            ${time ? `<div class="nova-message-time">${escapeHtml(time)}</div>` : ""}
-          </div>
-          ${badgeHtml ? `<div class="nova-message-badges">${badgeHtml}</div>` : ""}
-          ${renderMessageBody(normalized)}
-          ${renderAttachments(normalized)}
-        </div>
-      </article>
-    `;
-  }
-
-  function normalizeIncomingResponse(payload) {
-    const root = safeObject(payload);
-    const assistant = safeObject(root.assistant_message);
-    const rootDebug = safeObject(root.debug);
-    const assistantMeta = safeObject(assistant.meta);
-
-    const content =
-      typeof assistant.content === "string"
-        ? assistant.content
-        : typeof root.message === "string"
-          ? root.message
-          : typeof root.content === "string"
-            ? root.content
-            : "";
-
-    const normalizedMeta = {
-      ...assistantMeta,
-      artifact_saved:
-        assistantMeta.artifact_saved ??
-        rootDebug.artifact_saved ??
-        false,
-      artifact_save_reason:
-        assistantMeta.artifact_save_reason ??
-        rootDebug.artifact_save_reason ??
-        "",
-      artifact_id:
-        assistantMeta.artifact_id ??
-        rootDebug.artifact_id ??
-        null,
-      used_fallback:
-        assistantMeta.used_fallback ??
-        rootDebug.used_fallback ??
-        false,
-      history_included:
-        assistantMeta.history_included ??
-        rootDebug.history_included ??
-        false,
-      history_count:
-        assistantMeta.history_count ??
-        rootDebug.history_count ??
-        0,
-      memory_used:
-        assistantMeta.memory_used ??
-        rootDebug.memory_used ??
-        false,
-      memory_selected_count:
-        assistantMeta.memory_selected_count ??
-        rootDebug.memory_selected_count ??
-        rootDebug.memory_count ??
-        0,
-      memory_pinned_count:
-        assistantMeta.memory_pinned_count ??
-        rootDebug.memory_pinned_count ??
-        0,
-      artifact_recall_count:
-        assistantMeta.artifact_recall_count ??
-        rootDebug.artifact_recall_count ??
-        rootDebug.memory_relevant_count ??
-        rootDebug.artifact_context_count ??
-        0,
-    };
-
-    const normalizedMessage = normalizeMessage(
-      {
-        id: assistant.id || root.message_id || root.id || null,
-        role: assistant.role || "assistant",
-        content,
-        created_at: assistant.created_at || root.created_at || new Date().toISOString(),
-        meta: normalizedMeta,
-        attachments: safeArray(assistant.attachments),
-      },
-      "assistant"
-    );
-
-    const normalizedDebug = {
-      ...rootDebug,
-      artifact_saved:
-        normalizedMeta.artifact_saved === true ||
-        normalizedMeta.artifact_saved === "true",
-      artifact_save_reason: String(normalizedMeta.artifact_save_reason || ""),
-      artifact_id: normalizedMeta.artifact_id || null,
-      used_fallback:
-        normalizedMeta.used_fallback === true ||
-        normalizedMeta.used_fallback === "true",
-      history_included:
-        normalizedMeta.history_included === true ||
-        normalizedMeta.history_included === "true",
-      history_count: coerceNumber(normalizedMeta.history_count || 0, 0),
-      memory_used:
-        normalizedMeta.memory_used === true ||
-        normalizedMeta.memory_used === "true",
-      memory_selected_count: coerceNumber(normalizedMeta.memory_selected_count || 0, 0),
-      memory_pinned_count: coerceNumber(normalizedMeta.memory_pinned_count || 0, 0),
-      artifact_recall_count: coerceNumber(normalizedMeta.artifact_recall_count || 0, 0),
-      render_version: RENDER_VERSION,
-    };
-
-    return {
-      ok: root.ok !== false,
-      message: normalizedMessage.content,
-      assistant_message: normalizedMessage,
-      debug: normalizedDebug,
-    };
-  }
-
-  function dispatchAssistantResponse(normalizedPayload) {
-    try {
-      window.dispatchEvent(
-        new CustomEvent("nova:assistant-response", {
-          detail: normalizedPayload,
-        })
-      );
-    } catch (err) {
-      console.warn("Failed to dispatch nova:assistant-response", err);
-    }
-  }
-
   const NovaRender = {
-    messagesEl: null,
-    emptyStateEl: null,
+    state: {
+      messageContainer: null,
+      emptyState: null,
+    },
 
     init() {
-      this.messagesEl = $("messages");
-      this.emptyStateEl = $("novaEmptyState");
-      console.log("nova-render loaded", RENDER_VERSION);
-      return this;
+      this.state.messageContainer = document.getElementById("messages");
+      this.state.emptyState = document.getElementById("novaEmptyState");
+      this.bindGlobalHelpers();
+      this.refreshEmptyState();
+      console.log("nova-render loaded");
     },
 
-    ensureReady() {
-      if (!this.messagesEl) {
-        this.messagesEl = $("messages");
+    bindGlobalHelpers() {
+      window.NovaRender = this;
+    },
+
+    normalizeText(value) {
+      return String(value == null ? "" : value).replace(/\r\n/g, "\n");
+    },
+
+    escapeHtml(value) {
+      return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    },
+
+    slug(value) {
+      return String(value || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "file";
+    },
+
+    isImageType(type, mimeType, url, filename) {
+      const t = String(type || "").toLowerCase();
+      const m = String(mimeType || "").toLowerCase();
+      const probe = `${url || ""} ${filename || ""}`.toLowerCase();
+      return (
+        t === "image" ||
+        m.startsWith("image/") ||
+        /\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)/i.test(probe)
+      );
+    },
+
+    isVideoType(type, mimeType, url, filename) {
+      const t = String(type || "").toLowerCase();
+      const m = String(mimeType || "").toLowerCase();
+      const probe = `${url || ""} ${filename || ""}`.toLowerCase();
+      return (
+        t === "video" ||
+        m.startsWith("video/") ||
+        /\.(mp4|webm|mov|m4v|avi|mkv)(\?|#|$)/i.test(probe)
+      );
+    },
+
+    isAudioType(type, mimeType, url, filename) {
+      const t = String(type || "").toLowerCase();
+      const m = String(mimeType || "").toLowerCase();
+      const probe = `${url || ""} ${filename || ""}`.toLowerCase();
+      return (
+        t === "audio" ||
+        m.startsWith("audio/") ||
+        /\.(mp3|wav|m4a|ogg|flac|aac)(\?|#|$)/i.test(probe)
+      );
+    },
+
+    normalizeAttachment(input) {
+      if (!input) return null;
+
+      if (typeof input === "string") {
+        return {
+          id: `att-${Math.random().toString(36).slice(2, 10)}`,
+          type: "file",
+          filename: "",
+          stored_name: "",
+          mime_type: "",
+          url: input,
+          source: "unknown",
+          title: input,
+          alt: input,
+          size: null,
+        };
       }
-      if (!this.emptyStateEl) {
-        this.emptyStateEl = $("novaEmptyState");
+
+      const attachment = {
+        id:
+          input.id ||
+          `att-${Math.random().toString(36).slice(2, 10)}`,
+        type: String(input.type || input.kind || "file").toLowerCase(),
+        filename: input.filename || input.name || input.title || "",
+        stored_name: input.stored_name || input.stored_filename || "",
+        mime_type: input.mime_type || input.content_type || input.mime || "",
+        url: input.url || input.src || input.href || "",
+        source: input.source || "unknown",
+        title: input.title || input.filename || input.name || "",
+        alt: input.alt || input.caption || input.filename || input.title || "",
+        size: input.size ?? null,
+      };
+
+      if (!attachment.type || attachment.type === "unknown") {
+        if (this.isImageType("", attachment.mime_type, attachment.url, attachment.filename)) {
+          attachment.type = "image";
+        } else if (this.isVideoType("", attachment.mime_type, attachment.url, attachment.filename)) {
+          attachment.type = "video";
+        } else if (this.isAudioType("", attachment.mime_type, attachment.url, attachment.filename)) {
+          attachment.type = "audio";
+        } else {
+          attachment.type = "file";
+        }
       }
+
+      return attachment.url || attachment.filename ? attachment : null;
     },
 
-    ensureEmptyStateMounted() {
-      this.ensureReady();
-      if (!this.messagesEl || !this.emptyStateEl) return;
+    normalizeAttachments(value) {
+      if (!value) return [];
+      const raw = Array.isArray(value) ? value : [value];
+      return raw
+        .map((item) => this.normalizeAttachment(item))
+        .filter(Boolean);
+    },
 
-      if (!this.emptyStateEl.parentElement || this.emptyStateEl.parentElement !== this.messagesEl) {
-        this.messagesEl.prepend(this.emptyStateEl);
+    fileLabel(att) {
+      return (
+        att.filename ||
+        att.title ||
+        att.alt ||
+        att.url ||
+        `${att.type || "file"} attachment`
+      );
+    },
+
+    formatBytes(size) {
+      const value = Number(size);
+      if (!Number.isFinite(value) || value <= 0) return "";
+      const units = ["B", "KB", "MB", "GB"];
+      let amount = value;
+      let unitIndex = 0;
+      while (amount >= 1024 && unitIndex < units.length - 1) {
+        amount /= 1024;
+        unitIndex += 1;
       }
+      return `${amount.toFixed(amount >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
     },
 
-    getMessageWrappers() {
-      this.ensureReady();
-      if (!this.messagesEl) return [];
-      return Array.from(this.messagesEl.querySelectorAll(".nova-message-wrap"));
+    renderMarkdown(text) {
+      let html = this.escapeHtml(this.normalizeText(text));
+
+      html = html.replace(/^### (.*)$/gm, "<h3>$1</h3>");
+      html = html.replace(/^## (.*)$/gm, "<h2>$1</h2>");
+      html = html.replace(/^# (.*)$/gm, "<h1>$1</h1>");
+
+      html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+      html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+
+      html = html.replace(
+        /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+      );
+
+      const lines = html.split("\n");
+      const out = [];
+      let inList = false;
+
+      for (const line of lines) {
+        if (/^\s*[-*]\s+/.test(line)) {
+          if (!inList) {
+            out.push("<ul>");
+            inList = true;
+          }
+          out.push(`<li>${line.replace(/^\s*[-*]\s+/, "")}</li>`);
+        } else {
+          if (inList) {
+            out.push("</ul>");
+            inList = false;
+          }
+          if (line.trim()) {
+            out.push(`<p>${line}</p>`);
+          }
+        }
+      }
+
+      if (inList) out.push("</ul>");
+
+      return out.join("");
     },
 
-    toggleEmptyState() {
-      this.ensureReady();
-      this.ensureEmptyStateMounted();
-      if (!this.messagesEl || !this.emptyStateEl) return;
+    buildAttachmentCard(att) {
+      const safeTitle = this.escapeHtml(this.fileLabel(att));
+      const safeUrl = this.escapeHtml(att.url || "");
+      const safeMime = this.escapeHtml(att.mime_type || "");
+      const safeAlt = this.escapeHtml(att.alt || this.fileLabel(att));
+      const typeClass = `attachment-type-${this.slug(att.type)}`;
+      const metaBits = [
+        att.type ? att.type.toUpperCase() : "",
+        att.mime_type || "",
+        this.formatBytes(att.size),
+      ].filter(Boolean);
 
-      const hasMessages = this.getMessageWrappers().length > 0;
-      this.emptyStateEl.style.display = hasMessages ? "none" : "";
+      if (this.isImageType(att.type, att.mime_type, att.url, att.filename)) {
+        return `
+          <figure class="nova-attachment-card nova-attachment-media ${typeClass}" data-attachment-id="${this.escapeHtml(att.id)}">
+            <div class="nova-attachment-media-frame">
+              <img
+                class="nova-attachment-image"
+                src="${safeUrl}"
+                alt="${safeAlt}"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+              />
+            </div>
+            <figcaption class="nova-attachment-caption">
+              <div class="nova-attachment-title-row">
+                <span class="nova-attachment-kind-pill">IMAGE</span>
+                <a class="nova-attachment-open" href="${safeUrl}" target="_blank" rel="noopener noreferrer">Open</a>
+              </div>
+              <div class="nova-attachment-title">${safeTitle}</div>
+              ${metaBits.length ? `<div class="nova-attachment-meta">${this.escapeHtml(metaBits.join(" • "))}</div>` : ""}
+            </figcaption>
+          </figure>
+        `;
+      }
+
+      if (this.isVideoType(att.type, att.mime_type, att.url, att.filename)) {
+        return `
+          <figure class="nova-attachment-card nova-attachment-media ${typeClass}" data-attachment-id="${this.escapeHtml(att.id)}">
+            <div class="nova-attachment-media-frame">
+              <video
+                class="nova-attachment-video"
+                controls
+                preload="metadata"
+                playsinline
+                src="${safeUrl}"
+              ></video>
+            </div>
+            <figcaption class="nova-attachment-caption">
+              <div class="nova-attachment-title-row">
+                <span class="nova-attachment-kind-pill">VIDEO</span>
+                <a class="nova-attachment-open" href="${safeUrl}" target="_blank" rel="noopener noreferrer">Open</a>
+              </div>
+              <div class="nova-attachment-title">${safeTitle}</div>
+              ${metaBits.length ? `<div class="nova-attachment-meta">${this.escapeHtml(metaBits.join(" • "))}</div>` : ""}
+            </figcaption>
+          </figure>
+        `;
+      }
+
+      if (this.isAudioType(att.type, att.mime_type, att.url, att.filename)) {
+        return `
+          <figure class="nova-attachment-card nova-attachment-audio ${typeClass}" data-attachment-id="${this.escapeHtml(att.id)}">
+            <figcaption class="nova-attachment-caption">
+              <div class="nova-attachment-title-row">
+                <span class="nova-attachment-kind-pill">AUDIO</span>
+                <a class="nova-attachment-open" href="${safeUrl}" target="_blank" rel="noopener noreferrer">Open</a>
+              </div>
+              <div class="nova-attachment-title">${safeTitle}</div>
+              ${metaBits.length ? `<div class="nova-attachment-meta">${this.escapeHtml(metaBits.join(" • "))}</div>` : ""}
+            </figcaption>
+            <audio class="nova-attachment-audio-player" controls preload="none" src="${safeUrl}"></audio>
+          </figure>
+        `;
+      }
+
+      return `
+        <div class="nova-attachment-card nova-attachment-file ${typeClass}" data-attachment-id="${this.escapeHtml(att.id)}">
+          <div class="nova-attachment-file-top">
+            <span class="nova-attachment-kind-pill">${this.escapeHtml((att.type || "file").toUpperCase())}</span>
+            ${safeUrl ? `<a class="nova-attachment-open" href="${safeUrl}" target="_blank" rel="noopener noreferrer">Open</a>` : ""}
+          </div>
+          <div class="nova-attachment-title">${safeTitle}</div>
+          ${metaBits.length ? `<div class="nova-attachment-meta">${this.escapeHtml(metaBits.join(" • "))}</div>` : ""}
+        </div>
+      `;
+    },
+
+    renderAttachments(attachments, options = {}) {
+      const normalized = this.normalizeAttachments(attachments);
+      if (!normalized.length) return "";
+
+      const compact = Boolean(options.compact);
+      const modeClass = compact ? " compact" : "";
+
+      return `
+        <div class="nova-attachments${modeClass}">
+          ${normalized.map((att) => this.buildAttachmentCard(att)).join("")}
+        </div>
+      `;
+    },
+
+    getRoleLabel(role) {
+      return String(role || "assistant").toLowerCase() === "user" ? "You" : "Nova";
+    },
+
+    buildBadges(message) {
+      const meta = message && message.meta ? message.meta : {};
+      const debug = message && message.debug ? message.debug : {};
+      const badges = [];
+
+      if (meta.fallback_reason || debug.fallback_reason) {
+        badges.push('<span class="nova-message-badge">Fallback</span>');
+      }
+
+      const attachments = this.normalizeAttachments(message && message.attachments);
+      if (attachments.length) {
+        badges.push(`<span class="nova-message-badge">Media ${attachments.length}</span>`);
+      }
+
+      if (meta.artifact_saved || debug.artifact_saved) {
+        badges.push('<span class="nova-message-badge">Artifact Saved</span>');
+      }
+
+      return badges.join("");
+    },
+
+    buildMessageHtml(message) {
+      const role = String(message.role || "assistant").toLowerCase();
+      const contentHtml = this.renderMarkdown(message.content || "");
+      const attachmentsHtml = this.renderAttachments(message.attachments || []);
+      const createdAt = message.created_at
+        ? this.escapeHtml(new Date(message.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))
+        : "";
+
+      return `
+        <article class="nova-message nova-message-${this.slug(role)}" data-message-id="${this.escapeHtml(message.id || "")}">
+          <div class="nova-message-inner">
+            <div class="nova-message-header">
+              <div class="nova-message-author">${this.escapeHtml(this.getRoleLabel(role))}</div>
+              ${createdAt ? `<div class="nova-message-time">${createdAt}</div>` : ""}
+            </div>
+            <div class="nova-message-badges">${this.buildBadges(message)}</div>
+            <div class="nova-message-markdown">${contentHtml}</div>
+            ${attachmentsHtml}
+          </div>
+        </article>
+      `;
+    },
+
+    appendMessage(message) {
+      if (!this.state.messageContainer) return null;
+
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = this.buildMessageHtml(message);
+      const node = wrapper.firstElementChild;
+      if (!node) return null;
+
+      this.state.messageContainer.appendChild(node);
+      this.refreshEmptyState();
+      this.scrollToBottom();
+      return node;
+    },
+
+    prependMessage(message) {
+      if (!this.state.messageContainer) return null;
+
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = this.buildMessageHtml(message);
+      const node = wrapper.firstElementChild;
+      if (!node) return null;
+
+      this.state.messageContainer.insertBefore(node, this.state.messageContainer.firstChild);
+      this.refreshEmptyState();
+      return node;
+    },
+
+    renderMessages(messages) {
+      if (!this.state.messageContainer) return;
+      const list = Array.isArray(messages) ? messages : [];
+      this.state.messageContainer.innerHTML = list.map((msg) => this.buildMessageHtml(msg)).join("");
+      this.refreshEmptyState();
+      this.scrollToBottom();
     },
 
     clearMessages() {
-      this.ensureReady();
-      if (!this.messagesEl) return;
+      if (!this.state.messageContainer) return;
+      this.state.messageContainer.innerHTML = "";
+      this.refreshEmptyState();
+    },
 
-      const emptyState = this.emptyStateEl || $("novaEmptyState");
-      this.messagesEl.innerHTML = "";
+    normalizeIncomingResponse(payload) {
+      const data = payload && typeof payload === "object" ? payload : {};
+      const assistant =
+        data.assistant_message ||
+        data.message ||
+        data.assistant ||
+        null;
 
-      if (emptyState) {
-        this.emptyStateEl = emptyState;
-        this.messagesEl.appendChild(emptyState);
+      if (assistant && !assistant.attachments && Array.isArray(data.attachments)) {
+        assistant.attachments = data.attachments;
       }
 
-      this.toggleEmptyState();
+      if (assistant && assistant.meta && !assistant.attachments) {
+        assistant.attachments = assistant.meta.attachments || [];
+      }
+
+      return {
+        ok: Boolean(data.ok !== false),
+        assistant_message: assistant
+          ? {
+              id: assistant.id || `msg-${Math.random().toString(36).slice(2, 10)}`,
+              role: assistant.role || "assistant",
+              content: assistant.content || "",
+              attachments: this.normalizeAttachments(assistant.attachments || []),
+              created_at: assistant.created_at || new Date().toISOString(),
+              meta: assistant.meta || {},
+            }
+          : null,
+        session: data.session || null,
+        debug: data.debug || {},
+      };
+    },
+
+    refreshEmptyState() {
+      if (!this.state.emptyState || !this.state.messageContainer) return;
+      const hasMessages = this.state.messageContainer.children.length > 0;
+      this.state.emptyState.style.display = hasMessages ? "none" : "";
     },
 
     scrollToBottom() {
-      this.ensureReady();
-      if (!this.messagesEl) return;
-      this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+      if (!this.state.messageContainer) return;
+      const scroller =
+        this.state.messageContainer.closest(".nova-chat-scroll") ||
+        this.state.messageContainer.parentElement ||
+        this.state.messageContainer;
+      scroller.scrollTop = scroller.scrollHeight;
     },
-
-    appendMessage(message, options = {}) {
-      this.ensureReady();
-      if (!this.messagesEl) return null;
-
-      const normalized = normalizeMessage(message, message?.role || "assistant");
-      const wrapper = document.createElement("div");
-
-      wrapper.className = "nova-message-wrap";
-      wrapper.setAttribute("data-role", normalized.role);
-      wrapper.setAttribute("data-message-id", normalized.id || "");
-      wrapper.setAttribute("data-created-at", normalized.created_at || "");
-      wrapper.setAttribute("data-message-text", normalized.content);
-      wrapper.innerHTML = renderMessageCard(normalized, options);
-
-      this.messagesEl.appendChild(wrapper);
-      this.toggleEmptyState();
-      this.scrollToBottom();
-      return wrapper;
-    },
-
-    appendUserMessage(text, createdAt) {
-      return this.appendMessage(
-        {
-          role: "user",
-          content: String(text || ""),
-          created_at: createdAt || new Date().toISOString(),
-          attachments: [],
-          meta: {},
-        },
-        {}
-      );
-    },
-
-    appendAssistantResponse(payload) {
-      const normalized = normalizeIncomingResponse(payload);
-      const wrapper = this.appendMessage(normalized.assistant_message, {
-        debug: normalized.debug,
-      });
-
-      dispatchAssistantResponse(normalized);
-      return wrapper;
-    },
-
-    renderMessages(items) {
-      this.ensureReady();
-      if (!this.messagesEl) return;
-
-      this.clearMessages();
-
-      safeArray(items).forEach((item) => {
-        const msg = normalizeMessage(item, safeObject(item).role || "assistant");
-
-        this.appendMessage(
-          {
-            id: msg.id || null,
-            role: msg.role,
-            content: msg.content,
-            created_at: msg.created_at || new Date().toISOString(),
-            attachments: safeArray(msg.attachments),
-            meta: safeObject(msg.meta),
-          },
-          {
-            debug: safeObject(safeObject(item).debug),
-          }
-        );
-      });
-
-      this.toggleEmptyState();
-      this.scrollToBottom();
-    },
-
-    replaceLastAssistantMessage(payload) {
-      this.ensureReady();
-      if (!this.messagesEl) {
-        return this.appendAssistantResponse(payload);
-      }
-
-      const wraps = this.messagesEl.querySelectorAll(".nova-message-wrap");
-      for (let i = wraps.length - 1; i >= 0; i -= 1) {
-        const node = wraps[i];
-        const role =
-          node.getAttribute("data-role") ||
-          node.querySelector(".nova-message")?.getAttribute("data-role");
-        if (role === "assistant") {
-          node.remove();
-          break;
-        }
-      }
-
-      return this.appendAssistantResponse(payload);
-    },
-
-    renderChatResponse(payload) {
-      return this.appendAssistantResponse(payload);
-    },
-
-    normalizeIncomingResponse,
   };
-
-  window.NovaRender = NovaRender;
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
