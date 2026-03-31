@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nova Ultimate 2026</title>
 
-  <link rel="stylesheet" href="/static/css/nova-main.css?v=session-rail-2026-03-31-001" />
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=session-rail-2026-03-31-002" />
 
   <style>
     :root {
@@ -73,9 +73,25 @@
       gap: 10px;
     }
 
+    .nova-left-rail-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
     .nova-left-rail-title {
       font-size: 14px;
       font-weight: 700;
+    }
+
+    .nova-session-count {
+      font-size: 11px;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: rgba(255,255,255,0.04);
     }
 
     .nova-session-toolbar {
@@ -116,10 +132,12 @@
       margin-bottom: 10px;
       cursor: pointer;
       display: block;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
     }
 
     .nova-session-card:hover {
       background: rgba(255,255,255,0.07);
+      transform: translateY(-1px);
     }
 
     .nova-session-card.is-active {
@@ -205,6 +223,10 @@
       color: #dcecff;
       border: 1px solid var(--line);
       background: rgba(255,255,255,0.05);
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .nova-rail-tabs {
@@ -557,7 +579,10 @@
   <div class="nova-app-shell" id="novaAppShell">
     <aside class="nova-left-rail" id="sessionsRail">
       <div class="nova-left-rail-head">
-        <div class="nova-left-rail-title">Sessions</div>
+        <div class="nova-left-rail-title-row">
+          <div class="nova-left-rail-title">Sessions</div>
+          <div class="nova-session-count" id="sessionCountBadge">0</div>
+        </div>
 
         <div class="nova-session-toolbar">
           <button id="newChatBtn" type="button">New Chat</button>
@@ -653,7 +678,7 @@
   </div>
 
   <script>
-    window.NOVA_BUILD = "session-rail-2026-03-31-001";
+    window.NOVA_BUILD = "session-rail-2026-03-31-002";
 
     (function () {
       const panelToggles = {
@@ -705,7 +730,7 @@
 
   <script src="/static/js/nova-render.js?v=history-hooks-2026-03-31-001"></script>
   <script src="/static/js/nova-artifacts.js?v=historybadge-2026-03-30-001"></script>
-  <script src="/static/js/nova-panels.js?v=session-rail-2026-03-31-001"></script>
-  <script src="/static/js/nova-composer-bundle.js?v=session-rail-2026-03-31-001"></script>
+  <script src="/static/js/nova-panels.js?v=session-rail-2026-03-31-002"></script>
+  <script src="/static/js/nova-composer-bundle.js?v=session-rail-2026-03-31-002"></script>
 </body>
 </html>
