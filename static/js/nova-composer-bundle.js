@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUNDLE_VERSION = "session-rail-2026-03-31-001";
+  const BUNDLE_VERSION = "session-rail-2026-03-31-002";
   const MAX_HISTORY_MESSAGES = 12;
 
   const state = {
@@ -9,7 +9,6 @@
     stagedAttachments: [],
     sessionId: loadSessionId(),
     restored: false,
-    sessions: [],
   };
 
   function log(...args) {
@@ -32,10 +31,6 @@
     try {
       localStorage.setItem("nova_session_id", state.sessionId);
     } catch (_err) {}
-  }
-
-  function createNewSessionId() {
-    return crypto && crypto.randomUUID ? crypto.randomUUID() : `session-${Date.now()}`;
   }
 
   function qs(selector, root = document) {
@@ -384,43 +379,34 @@
     return payload;
   }
 
-  function updatePanelsFromState(data) {
-    const sessions = Array.isArray(data?.sessions) ? data.sessions : [];
-    state.sessions = sessions;
-
-    if (window.NovaPanels && typeof window.NovaPanels.renderSessionList === "function") {
-      window.NovaPanels.renderSessionList(sessions, state.sessionId);
-    }
-  }
-
-  async function fetchState(sessionId) {
-    const response = await fetch(`/api/state?session_id=${encodeURIComponent(sessionId)}`, {
-      method: "GET",
-      headers: {
-        "Accept": "application/json",
-      },
-    });
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok) {
-      throw new Error(data?.message || data?.error || "State load failed");
-    }
-    return data;
-  }
-
   async function restoreSessionOnLoad() {
     if (state.restored) return;
     state.restored = true;
 
     try {
-      const data = await fetchState(state.sessionId);
+      if (window.NovaPanels && typeof window.NovaPanels.refreshSessions === "function") {
+        const data = await window.NovaPanels.refreshSessions(state.sessionId);
+        window.NovaRestoredState = data;
+        return;
+      }
+
+      const response = await fetch(`/api/state?session_id=${encodeURIComponent(state.sessionId)}`, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+        },
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.ok) {
+        throw new Error(data?.message || data?.error || "State load failed");
+      }
+
       const activeMessages = Array.isArray(data.active_messages) ? data.active_messages : [];
 
       if (window.NovaRender && typeof window.NovaRender.renderMessages === "function") {
         window.NovaRender.renderMessages(activeMessages);
       }
-
-      updatePanelsFromState(data);
 
       if (activeMessages.length) {
         hideEmptyState();
@@ -435,78 +421,6 @@
     } catch (err) {
       console.warn("Nova session restore failed", err);
       window.NovaRestoreError = String(err?.message || err);
-    }
-  }
-
-  async function refreshSessions() {
-    try {
-      const data = await fetchState(state.sessionId);
-      updatePanelsFromState(data);
-      window.NovaRestoredState = data;
-      return data;
-    } catch (err) {
-      console.warn("Nova refresh sessions failed", err);
-      return null;
-    }
-  }
-
-  async function switchSession(sessionId) {
-    const nextId = normalizeText(sessionId);
-    if (!nextId) return;
-
-    saveSessionId(nextId);
-    state.stagedAttachments = [];
-    renderAttachmentTray();
-
-    try {
-      const data = await fetchState(nextId);
-      const activeMessages = Array.isArray(data.active_messages) ? data.active_messages : [];
-
-      if (window.NovaRender && typeof window.NovaRender.renderMessages === "function") {
-        window.NovaRender.renderMessages(activeMessages);
-      }
-
-      updatePanelsFromState(data);
-
-      if (activeMessages.length) {
-        hideEmptyState();
-        scrollMessagesToBottom();
-      }
-
-      window.NovaRestoredState = data;
-      console.log("Nova switched session", {
-        session_id: nextId,
-        messages: activeMessages.length,
-      });
-    } catch (err) {
-      console.warn("Nova switch session failed", err);
-    }
-  }
-
-  async function createNewChat() {
-    const newId = createNewSessionId();
-    saveSessionId(newId);
-    state.stagedAttachments = [];
-    renderAttachmentTray();
-
-    if (window.NovaRender && typeof window.NovaRender.renderMessages === "function") {
-      window.NovaRender.renderMessages([]);
-    }
-
-    const { input } = getEls();
-    if (input) {
-      input.value = "";
-      input.style.height = "";
-      input.focus();
-    }
-
-    try {
-      const data = await fetchState(newId);
-      updatePanelsFromState(data);
-      window.NovaRestoredState = data;
-      console.log("Nova new chat created", { session_id: newId });
-    } catch (err) {
-      console.warn("Nova new chat failed", err);
     }
   }
 
@@ -554,7 +468,13 @@
       window.NovaLastChatDebug = data.debug || {};
       window.NovaLastChatResponse = data;
 
-      await refreshSessions();
+      if (window.NovaPanels && typeof window.NovaPanels.refreshSessions === "function") {
+        try {
+          await window.NovaPanels.refreshSessions(state.sessionId);
+        } catch (refreshErr) {
+          console.warn("Session rail refresh after send failed:", refreshErr);
+        }
+      }
     } catch (err) {
       console.error("Chat send failed:", err);
 
@@ -612,13 +532,15 @@
   function bindSend() {
     const { sendBtn, input } = getEls();
 
-    if (sendBtn) {
+    if (sendBtn && sendBtn.dataset.bound !== "true") {
+      sendBtn.dataset.bound = "true";
       sendBtn.addEventListener("click", () => {
         sendCurrentMessage();
       });
     }
 
-    if (input) {
+    if (input && input.dataset.bound !== "true") {
+      input.dataset.bound = "true";
       input.addEventListener("keydown", (event) => {
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
@@ -631,35 +553,18 @@
   function bindUploads() {
     const { uploadBtn, fileInput } = getEls();
 
-    if (uploadBtn && fileInput) {
+    if (uploadBtn && fileInput && uploadBtn.dataset.bound !== "true") {
+      uploadBtn.dataset.bound = "true";
       uploadBtn.addEventListener("click", () => {
         fileInput.click();
       });
     }
 
-    if (fileInput) {
+    if (fileInput && fileInput.dataset.bound !== "true") {
+      fileInput.dataset.bound = "true";
       fileInput.addEventListener("change", async (event) => {
         const files = event.target && event.target.files ? event.target.files : [];
         await uploadFiles(files);
-      });
-    }
-  }
-
-  function bindSessionRail() {
-    if (window.NovaPanels && typeof window.NovaPanels.bindSessionClicks === "function") {
-      window.NovaPanels.bindSessionClicks((sessionId) => {
-        void switchSession(sessionId);
-      });
-    }
-
-    if (window.NovaPanels && typeof window.NovaPanels.bindToolbar === "function") {
-      window.NovaPanels.bindToolbar({
-        onNewChat: () => {
-          void createNewChat();
-        },
-        onRefresh: () => {
-          void refreshSessions();
-        },
       });
     }
   }
@@ -668,7 +573,6 @@
     bindInputAutoResize();
     bindSend();
     bindUploads();
-    bindSessionRail();
     renderAttachmentTray();
 
     window.NovaComposerBundle = {
@@ -681,9 +585,7 @@
       sendCurrentMessage,
       uploadFiles,
       renderAttachmentTray,
-      refreshSessions,
-      switchSession,
-      createNewChat,
+      saveSessionId,
     };
 
     log(BUNDLE_VERSION);
