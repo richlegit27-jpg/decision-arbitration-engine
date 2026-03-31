@@ -1,448 +1,428 @@
-(() => {
+(function () {
   "use strict";
 
-  const BUNDLE_VERSION = "session-rail-2026-03-31-002";
-  const MAX_HISTORY_MESSAGES = 12;
+  console.log("nova-composer-bundle loaded");
+
+  const CHAT_URL = "/api/chat";
+  const STATE_URL = "/api/state";
+  const DEFAULT_SESSION_ID = "default-session";
 
   const state = {
-    isSending: false,
-    stagedAttachments: [],
-    sessionId: loadSessionId(),
-    restored: false,
+    sessionId: DEFAULT_SESSION_ID,
+    sending: false,
+    restoredOnce: false,
+    restoring: false,
+    restoreToken: 0,
+    sendToken: 0,
+    messagesById: new Set(),
   };
 
-  function log(...args) {
-    console.log("nova-composer-bundle loaded", ...args);
+  function el(id) {
+    return document.getElementById(id);
   }
 
-  function loadSessionId() {
-    try {
-      const saved = localStorage.getItem("nova_session_id");
-      if (saved && String(saved).trim()) {
-        return String(saved).trim();
-      }
-    } catch (_err) {}
-    return crypto && crypto.randomUUID ? crypto.randomUUID() : `session-${Date.now()}`;
+  function qs(selector, root) {
+    return (root || document).querySelector(selector);
   }
 
-  function saveSessionId(sessionId) {
-    if (!sessionId || !String(sessionId).trim()) return;
-    state.sessionId = String(sessionId).trim();
-    try {
-      localStorage.setItem("nova_session_id", state.sessionId);
-    } catch (_err) {}
+  function qsa(selector, root) {
+    return Array.from((root || document).querySelectorAll(selector));
   }
 
-  function qs(selector, root = document) {
-    return root.querySelector(selector);
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
-  function qsa(selector, root = document) {
-    return Array.from(root.querySelectorAll(selector));
+  function nl2br(value) {
+    return escapeHtml(value).replace(/\n/g, "<br>");
   }
 
-  function normalizeText(value) {
-    if (value == null) return "";
-    return String(value).replace(/\r\n/g, "\n").trim();
+  function getMessagesEl() {
+    return el("messages");
   }
 
-  function getEls() {
-    return {
-      input: qs("#chatInput"),
-      sendBtn: qs("#sendBtn"),
-      uploadBtn: qs("#uploadBtn"),
-      fileInput: qs("#fileInput"),
-      messages: qs("#messages"),
-      emptyState: qs("#novaEmptyState"),
-      composer: qs(".nova-composer") || qs(".nova-composer-shell") || document.body,
-      attachmentsTray:
-        qs("#composerAttachments") ||
-        qs("#stagedAttachments") ||
-        qs("#novaPendingFiles") ||
-        qs(".nova-composer-attachments") ||
-        qs(".nova-pending-files"),
-    };
+  function getInputEl() {
+    return el("chatInput");
   }
 
-  function ensureTray() {
-    const els = getEls();
-    if (els.attachmentsTray) return els.attachmentsTray;
+  function getSendBtn() {
+    return el("sendBtn");
+  }
 
-    const tray = document.createElement("div");
-    tray.id = "composerAttachments";
-    tray.className = "nova-composer-attachments";
-    tray.style.display = "flex";
-    tray.style.flexWrap = "wrap";
-    tray.style.gap = "8px";
-    tray.style.marginTop = "10px";
+  function getEmptyStateEl() {
+    return el("novaEmptyState");
+  }
 
-    if (els.input && els.input.parentElement) {
-      els.input.parentElement.appendChild(tray);
-    } else if (els.composer) {
-      els.composer.appendChild(tray);
+  function getSessionStatusEl() {
+    return el("sessionStatus");
+  }
+
+  function getSessionTitleEl() {
+    return el("sessionTitleText");
+  }
+
+  function getSessionMetaEl() {
+    return el("activeSessionMeta");
+  }
+
+  function setStatus(text, tone) {
+    const node = getSessionStatusEl();
+    if (!node) return;
+    node.textContent = text || "Ready";
+    node.dataset.tone = tone || "muted";
+  }
+
+  function getSessionId() {
+    const fromWindow =
+      window.NovaSessionRail &&
+      typeof window.NovaSessionRail.getCurrentSessionId === "function"
+        ? window.NovaSessionRail.getCurrentSessionId()
+        : null;
+
+    const fromBody = document.body?.dataset?.sessionId || null;
+    const fromStorage = localStorage.getItem("nova_active_session_id") || null;
+
+    const resolved = fromWindow || fromBody || fromStorage || DEFAULT_SESSION_ID;
+    state.sessionId = resolved;
+    return resolved;
+  }
+
+  function setSessionId(sessionId) {
+    const resolved = String(sessionId || DEFAULT_SESSION_ID).trim() || DEFAULT_SESSION_ID;
+    state.sessionId = resolved;
+    document.body.dataset.sessionId = resolved;
+    localStorage.setItem("nova_active_session_id", resolved);
+  }
+
+  function formatTime(value) {
+    const date = value ? new Date(value) : new Date();
+    if (Number.isNaN(date.getTime())) {
+      return new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  function updateEmptyState() {
+    const messagesEl = getMessagesEl();
+    const emptyEl = getEmptyStateEl();
+    if (!messagesEl || !emptyEl) return;
+    emptyEl.style.display = messagesEl.children.length > 0 ? "none" : "";
+  }
+
+  function scrollToBottom() {
+    const messagesEl = getMessagesEl();
+    if (!messagesEl) return;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function setSending(isSending) {
+    state.sending = !!isSending;
+
+    const input = getInputEl();
+    const sendBtn = getSendBtn();
+
+    if (input) input.disabled = !!isSending;
+    if (sendBtn) sendBtn.disabled = !!isSending;
+
+    if (isSending) {
+      setStatus("Sending...", "muted");
     } else {
-      document.body.appendChild(tray);
-    }
-
-    return tray;
-  }
-
-  function setBusy(isBusy) {
-    state.isSending = !!isBusy;
-    const { sendBtn, input, uploadBtn } = getEls();
-
-    if (sendBtn) {
-      sendBtn.disabled = state.isSending;
-      sendBtn.dataset.busy = state.isSending ? "true" : "false";
-    }
-
-    if (input) {
-      input.disabled = state.isSending;
-      input.dataset.busy = state.isSending ? "true" : "false";
-    }
-
-    if (uploadBtn) {
-      uploadBtn.disabled = state.isSending;
-      uploadBtn.dataset.busy = state.isSending ? "true" : "false";
+      setStatus("Ready", "ok");
     }
   }
 
-  function hideEmptyState() {
-    const { emptyState } = getEls();
-    if (emptyState) {
-      emptyState.style.display = "none";
-    }
-  }
+  function buildBadgesHtml(debug) {
+    const badges = [];
+    const safeDebug = debug || {};
 
-  function scrollMessagesToBottom() {
-    const { messages } = getEls();
-    if (!messages) return;
-    messages.scrollTop = messages.scrollHeight;
-  }
-
-  function getRoleFromText(value) {
-    const text = normalizeText(value).toLowerCase();
-    if (text === "you" || text === "user") return "user";
-    if (text === "nova" || text === "assistant") return "assistant";
-    return "";
-  }
-
-  function getMessageRoleFromNode(node) {
-    if (!node) return "";
-
-    const dataRole =
-      normalizeText(node.getAttribute?.("data-role")).toLowerCase() ||
-      normalizeText(node.dataset?.role).toLowerCase();
-
-    if (dataRole === "user" || dataRole === "assistant") {
-      return dataRole;
+    if (safeDebug.used_fallback) {
+      badges.push('<span class="nova-badge nova-badge-warning">Fallback</span>');
     }
 
-    const cls = String(node.className || "");
-    if (/nova-message-user/i.test(cls)) return "user";
-    if (/nova-message-assistant/i.test(cls)) return "assistant";
+    if (safeDebug.memory_used) {
+      const count = Number(safeDebug.memory_selected_count || 0);
+      badges.push(`<span class="nova-badge">Memory ${escapeHtml(String(count))}</span>`);
+    }
 
-    const author =
-      qs(".nova-message-author", node) ||
-      qs(".nova-message-role", node) ||
-      qs(".message-role", node) ||
-      qs(".role", node);
+    if (safeDebug.artifact_saved === true) {
+      badges.push('<span class="nova-badge nova-badge-soft">Artifact Saved</span>');
+    } else if (safeDebug.artifact_saved === false) {
+      badges.push('<span class="nova-badge">Artifact Skipped</span>');
+    }
 
-    return getRoleFromText(author ? author.textContent : "");
+    if (safeDebug.web_used || (safeDebug.web && safeDebug.web.used)) {
+      badges.push('<span class="nova-badge">Web</span>');
+    }
+
+    return badges.join("");
   }
 
-  function getMessageContentFromNode(node) {
-    if (!node) return "";
+  function createMessageNode(role, content, options) {
+    const opts = options || {};
+    const node = document.createElement("div");
+    node.className = `nova-message nova-message-${role}`;
+    node.dataset.role = role;
 
-    const explicit = normalizeText(node.getAttribute?.("data-message-text"));
-    if (explicit) return explicit;
-
-    const innerExplicit = normalizeText(qs(".nova-message", node)?.getAttribute?.("data-message-text"));
-    if (innerExplicit) return innerExplicit;
-
-    const candidates = [
-      ".nova-message-markdown",
-      ".nova-message-text",
-      ".message-content",
-      ".nova-message-body",
-      ".content",
-    ];
-
-    for (const selector of candidates) {
-      const el = qs(selector, node);
-      const text = normalizeText(el ? el.getAttribute?.("data-message-content") || el.textContent : "");
-      if (text) return text;
+    if (opts.messageId) {
+      node.dataset.messageId = opts.messageId;
     }
 
-    const inner = qs(".nova-message-inner", node);
-    if (inner) {
-      const clone = inner.cloneNode(true);
-      qsa(
-        ".nova-message-topline, .nova-message-head, .nova-message-badges, .nova-message-attachments, .nova-message-time, .nova-message-author, .nova-message-role",
-        clone
-      ).forEach((el) => el.remove());
-      const text = normalizeText(clone.textContent);
-      if (text) return text;
+    if (opts.pending === true) {
+      node.dataset.pending = "true";
     }
 
-    return normalizeText(node.textContent);
+    if (opts.sessionId) {
+      node.dataset.sessionId = opts.sessionId;
+    }
+
+    const inner = document.createElement("div");
+    inner.className = "nova-message-inner";
+
+    inner.innerHTML = `
+      <div class="nova-message-header">
+        <div class="nova-message-role">${role === "user" ? "You" : "Nova"}</div>
+        <div class="nova-message-time">${escapeHtml(opts.timeText || formatTime(opts.createdAt))}</div>
+      </div>
+      <div class="nova-message-badges">${opts.badgesHtml || ""}</div>
+      <div class="nova-message-markdown">${nl2br(content || "")}</div>
+    `;
+
+    node.appendChild(inner);
+    return node;
   }
 
-  function dedupeSequentialHistory(items) {
-    const deduped = [];
-    for (const item of items) {
-      const last = deduped[deduped.length - 1];
-      if (
-        last &&
-        last.role === item.role &&
-        normalizeText(last.content) === normalizeText(item.content)
-      ) {
-        continue;
-      }
-      deduped.push(item);
+  function appendMessage(role, content, options) {
+    const messagesEl = getMessagesEl();
+    if (!messagesEl) return null;
+
+    const node = createMessageNode(role, content, options || {});
+    messagesEl.appendChild(node);
+    updateEmptyState();
+    scrollToBottom();
+
+    if (options && options.messageId) {
+      state.messagesById.add(options.messageId);
     }
-    return deduped;
+
+    return node;
+  }
+
+  function replaceMessageContent(node, content, debug, messageId) {
+    if (!node) return;
+
+    if (messageId) {
+      node.dataset.messageId = messageId;
+      state.messagesById.add(messageId);
+    }
+
+    delete node.dataset.pending;
+
+    const body = qs(".nova-message-markdown", node);
+    const badges = qs(".nova-message-badges", node);
+
+    if (body) {
+      body.innerHTML = nl2br(content || "");
+    }
+
+    if (badges) {
+      badges.innerHTML = buildBadgesHtml(debug || {});
+    }
+
+    scrollToBottom();
+  }
+
+  function clearMessages() {
+    const messagesEl = getMessagesEl();
+    if (!messagesEl) return;
+    messagesEl.innerHTML = "";
+    state.messagesById.clear();
+    updateEmptyState();
+  }
+
+  function removePendingMessages() {
+    qsa('.nova-message[data-pending="true"]', getMessagesEl()).forEach((node) => node.remove());
+    updateEmptyState();
   }
 
   function collectHistoryFromDom() {
-    const { messages } = getEls();
-    if (!messages) return [];
+    const messagesEl = getMessagesEl();
+    if (!messagesEl) return [];
 
-    const nodes = qsa(".nova-message-wrap, .nova-message, [data-role]", messages);
-    const items = [];
-
-    for (const node of nodes) {
-      let target = node;
-      if (!String(node.className || "").includes("nova-message")) {
-        const nested = qs(".nova-message", node);
-        if (nested) target = nested;
-      }
-
-      const role = getMessageRoleFromNode(target) || getMessageRoleFromNode(node);
-      if (role !== "user" && role !== "assistant") continue;
-
-      const content = getMessageContentFromNode(target) || getMessageContentFromNode(node);
-      if (!content) continue;
-
-      items.push({ role, content });
-    }
-
-    const out = dedupeSequentialHistory(items).slice(-MAX_HISTORY_MESSAGES);
-    window.NovaLastCollectedHistory = out;
-    return out;
+    return qsa(".nova-message", messagesEl)
+      .map((node) => {
+        const role = node.dataset.role || "assistant";
+        const content = qs(".nova-message-markdown", node)?.innerText?.trim() || "";
+        if (!content) return null;
+        return { role, content };
+      })
+      .filter(Boolean);
   }
 
-  function collectHistory() {
-    return collectHistoryFromDom();
+  function buildPayload(userContent) {
+    return {
+      content: String(userContent || "").trim(),
+      session_id: getSessionId(),
+      history: collectHistoryFromDom(),
+    };
   }
 
-  function renderAttachmentTray() {
-    const tray = ensureTray();
-    tray.innerHTML = "";
+  async function fetchJson(url, options) {
+    const response = await fetch(url, options || {});
+    const text = await response.text();
 
-    if (!state.stagedAttachments.length) {
-      tray.style.display = "none";
-      return;
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (error) {
+      throw new Error(`Invalid JSON from ${url}: ${text.slice(0, 300)}`);
     }
 
-    tray.style.display = "flex";
+    if (!response.ok) {
+      throw new Error(data?.message || data?.error || `HTTP ${response.status}`);
+    }
 
-    state.stagedAttachments.forEach((file, index) => {
-      const chip = document.createElement("div");
-      chip.className = "nova-attachment-chip";
-      chip.style.display = "inline-flex";
-      chip.style.alignItems = "center";
-      chip.style.gap = "8px";
+    return data;
+  }
 
-      const label = document.createElement("span");
-      label.className = "nova-attachment-chip-label";
-      label.textContent = file.name || `file-${index + 1}`;
-      label.style.whiteSpace = "nowrap";
-      label.style.overflow = "hidden";
-      label.style.textOverflow = "ellipsis";
-      label.style.maxWidth = "280px";
+  function updateTopbarFromSession(session) {
+    const titleEl = getSessionTitleEl();
+    const metaEl = getSessionMetaEl();
 
-      const removeBtn = document.createElement("button");
-      removeBtn.type = "button";
-      removeBtn.className = "nova-attachment-chip-remove";
-      removeBtn.textContent = "×";
-      removeBtn.addEventListener("click", () => {
-        state.stagedAttachments.splice(index, 1);
-        renderAttachmentTray();
+    if (titleEl) {
+      titleEl.textContent = session?.title || "New Chat";
+    }
+
+    if (metaEl) {
+      const count = Number(session?.message_count || 0);
+      const pinned = session?.pinned ? " • pinned" : "";
+      metaEl.textContent = `${count} msg${count === 1 ? "" : "s"}${pinned}`;
+    }
+  }
+
+  function renderMessagesFromState(session) {
+    const messages = Array.isArray(session?.messages) ? session.messages : [];
+    clearMessages();
+
+    messages.forEach((message) => {
+      const role = message?.role === "user" ? "user" : "assistant";
+      const content = message?.content || "";
+      const messageId = message?.id || null;
+      const createdAt = message?.created_at || null;
+      const debug = message?.debug || message?.meta || {};
+
+      appendMessage(role, content, {
+        messageId,
+        createdAt,
+        sessionId: state.sessionId,
+        badgesHtml: role === "assistant" ? buildBadgesHtml(debug) : "",
       });
-
-      chip.appendChild(label);
-      chip.appendChild(removeBtn);
-      tray.appendChild(chip);
     });
+
+    updateTopbarFromSession(session);
+    updateEmptyState();
+    scrollToBottom();
   }
 
-  function renderUserMessage(content) {
-    if (window.NovaRender && typeof window.NovaRender.appendUserMessage === "function") {
-      window.NovaRender.appendUserMessage(content, new Date().toISOString());
-      scrollMessagesToBottom();
-      return;
-    }
+  async function restoreSessionState(forceSessionId) {
+    const requestedSessionId =
+      String(forceSessionId || getSessionId() || DEFAULT_SESSION_ID).trim() || DEFAULT_SESSION_ID;
 
-    if (window.NovaRender && typeof window.NovaRender.appendMessage === "function") {
-      window.NovaRender.appendMessage({
-        role: "user",
-        content,
-        created_at: new Date().toISOString(),
-        attachments: [],
-        meta: {},
-      });
-      scrollMessagesToBottom();
-    }
-  }
-
-  function renderAssistantMessage(responsePayload) {
-    if (window.NovaRender && typeof window.NovaRender.appendAssistantResponse === "function") {
-      window.NovaRender.appendAssistantResponse(responsePayload);
-      scrollMessagesToBottom();
-      return;
-    }
-
-    const content = normalizeText(
-      responsePayload?.assistant_message?.content ||
-      responsePayload?.message ||
-      ""
-    );
-
-    if (window.NovaRender && typeof window.NovaRender.appendMessage === "function") {
-      window.NovaRender.appendMessage(
-        {
-          role: "assistant",
-          content,
-          created_at: new Date().toISOString(),
-          attachments: responsePayload?.assistant_message?.attachments || [],
-          meta: responsePayload?.assistant_message?.meta || {},
-        },
-        {
-          debug: responsePayload?.debug || {},
-        }
-      );
-      scrollMessagesToBottom();
-    }
-  }
-
-  async function uploadFiles(fileList) {
-    const files = Array.from(fileList || []);
-    if (!files.length) return;
-
-    const formData = new FormData();
-    files.forEach((file) => formData.append("files", file));
-
-    setBusy(true);
+    state.restoreToken += 1;
+    const token = state.restoreToken;
+    state.restoring = true;
 
     try {
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+      setStatus("Loading session...", "muted");
+      removePendingMessages();
 
-      const data = await response.json().catch(() => ({}));
+      const data = await fetchJson(`${STATE_URL}?session_id=${encodeURIComponent(requestedSessionId)}`);
+      if (token !== state.restoreToken) return;
 
-      if (!response.ok || !data?.ok) {
-        throw new Error(data?.message || data?.error || "Upload failed");
+      const resolvedSessionId =
+        data?.active_session_id ||
+        data?.session?.id ||
+        requestedSessionId;
+
+      setSessionId(resolvedSessionId);
+      renderMessagesFromState(data?.session || {});
+      state.restoredOnce = true;
+
+      document.dispatchEvent(
+        new CustomEvent("nova:state-restored", {
+          detail: {
+            session_id: resolvedSessionId,
+            state: data,
+          },
+        })
+      );
+
+      if (window.NovaArtifacts && typeof window.NovaArtifacts.refresh === "function") {
+        try {
+          await window.NovaArtifacts.refresh({
+            reason: "state_restored",
+            session_id: resolvedSessionId,
+          });
+        } catch (err) {
+          console.warn("NovaArtifacts.refresh failed after restore:", err);
+        }
       }
 
-      const savedFiles = Array.isArray(data.files) ? data.files : [];
-      state.stagedAttachments = state.stagedAttachments.concat(savedFiles);
-      renderAttachmentTray();
-    } catch (err) {
-      console.error("Upload failed:", err);
-      alert(`Upload failed: ${err.message || err}`);
+      setStatus("Session loaded", "ok");
+    } catch (error) {
+      if (token !== state.restoreToken) return;
+      console.error("restoreSessionState failed:", error);
+      setStatus(`State load failed: ${error.message || error}`, "error");
     } finally {
-      setBusy(false);
-      const { fileInput } = getEls();
-      if (fileInput) fileInput.value = "";
+      if (token === state.restoreToken) {
+        state.restoring = false;
+        updateEmptyState();
+        scrollToBottom();
+      }
     }
   }
 
-  function buildPayload(content) {
-    const history = collectHistory();
+  async function sendMessage(rawValue) {
+    const content = String(rawValue || "").trim();
+    if (!content) return;
+    if (state.sending) return;
+    if (state.restoring) return;
 
+    const input = getInputEl();
+    const sessionIdAtSend = getSessionId();
     const payload = {
       content,
-      session_id: state.sessionId || "default-session",
-      history,
-      attachments: state.stagedAttachments.slice(),
+      session_id: sessionIdAtSend,
+      history: collectHistoryFromDom(),
     };
 
-    window.NovaOutgoingPayload = payload;
-    window.NovaOutgoingHistory = history;
+    const currentSendToken = ++state.sendToken;
 
-    console.log("Nova outgoing payload", payload);
-    console.log("Nova outgoing history", history);
+    appendMessage("user", content, {
+      createdAt: new Date().toISOString(),
+      sessionId: sessionIdAtSend,
+    });
 
-    return payload;
-  }
-
-  async function restoreSessionOnLoad() {
-    if (state.restored) return;
-    state.restored = true;
-
-    try {
-      if (window.NovaPanels && typeof window.NovaPanels.refreshSessions === "function") {
-        const data = await window.NovaPanels.refreshSessions(state.sessionId);
-        window.NovaRestoredState = data;
-        return;
-      }
-
-      const response = await fetch(`/api/state?session_id=${encodeURIComponent(state.sessionId)}`, {
-        method: "GET",
-        headers: {
-          "Accept": "application/json",
-        },
-      });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data?.ok) {
-        throw new Error(data?.message || data?.error || "State load failed");
-      }
-
-      const activeMessages = Array.isArray(data.active_messages) ? data.active_messages : [];
-
-      if (window.NovaRender && typeof window.NovaRender.renderMessages === "function") {
-        window.NovaRender.renderMessages(activeMessages);
-      }
-
-      if (activeMessages.length) {
-        hideEmptyState();
-        scrollMessagesToBottom();
-      }
-
-      window.NovaRestoredState = data;
-      console.log("Nova restored session", {
-        session_id: state.sessionId,
-        messages: activeMessages.length,
-      });
-    } catch (err) {
-      console.warn("Nova session restore failed", err);
-      window.NovaRestoreError = String(err?.message || err);
+    if (input) {
+      input.value = "";
+      input.style.height = "";
     }
-  }
 
-  async function sendCurrentMessage() {
-    const { input } = getEls();
-    if (!input || state.isSending) return;
+    const pendingNode = appendMessage("assistant", "Thinking...", {
+      badgesHtml: '<span class="nova-badge">Pending</span>',
+      createdAt: new Date().toISOString(),
+      pending: true,
+      sessionId: sessionIdAtSend,
+    });
 
-    const content = normalizeText(input.value);
-    if (!content && !state.stagedAttachments.length) return;
-
-    const payload = buildPayload(content);
-
-    renderUserMessage(content || "Uploaded attachment(s)");
-    input.value = "";
-    input.style.height = "";
-    hideEmptyState();
-    scrollMessagesToBottom();
-
-    setBusy(true);
+    setSending(true);
 
     try {
-      const response = await fetch("/api/chat", {
+      const data = await fetchJson(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -450,153 +430,147 @@
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json().catch(() => ({}));
+      const activeSessionNow = getSessionId();
+      const returnedSessionId =
+        data?.active_session_id ||
+        data?.session?.id ||
+        sessionIdAtSend;
 
-      if (!response.ok || !data?.ok) {
-        throw new Error(data?.message || data?.error || "Chat request failed");
+      if (currentSendToken !== state.sendToken) return;
+
+      if (activeSessionNow !== sessionIdAtSend) {
+        pendingNode?.remove();
+        updateEmptyState();
+        return;
       }
 
-      if (data.session_id) {
-        saveSessionId(data.session_id);
-      }
+      const assistantMessage = data?.assistant_message || {};
+      const assistantContent =
+        assistantMessage?.content ||
+        data?.message ||
+        "No reply returned.";
 
-      renderAssistantMessage(data);
+      const debug = data?.debug || assistantMessage?.debug || {};
 
-      state.stagedAttachments = [];
-      renderAttachmentTray();
+      setSessionId(returnedSessionId);
 
-      window.NovaLastChatDebug = data.debug || {};
-      window.NovaLastChatResponse = data;
+      replaceMessageContent(
+        pendingNode,
+        assistantContent,
+        debug,
+        assistantMessage?.id || null
+      );
 
-      if (window.NovaPanels && typeof window.NovaPanels.refreshSessions === "function") {
+      updateTopbarFromSession(data?.session || {});
+
+      document.dispatchEvent(
+        new CustomEvent("nova:assistant-reply", {
+          detail: {
+            session_id: getSessionId(),
+            assistant_message: assistantMessage,
+            debug,
+            raw: data,
+          },
+        })
+      );
+
+      if (window.NovaArtifacts && typeof window.NovaArtifacts.refresh === "function") {
         try {
-          await window.NovaPanels.refreshSessions(state.sessionId);
-        } catch (refreshErr) {
-          console.warn("Session rail refresh after send failed:", refreshErr);
+          await window.NovaArtifacts.refresh({
+            reason: "assistant_reply",
+            session_id: getSessionId(),
+            reply: data,
+            debug,
+          });
+        } catch (err) {
+          console.warn("NovaArtifacts.refresh failed after reply:", err);
         }
       }
-    } catch (err) {
-      console.error("Chat send failed:", err);
 
-      window.NovaLastChatDebug = {
-        used_fallback: true,
-        fallback_reason: String(err.message || err),
-        history_included: Array.isArray(payload.history) && payload.history.length > 0,
-        history_count: Array.isArray(payload.history) ? payload.history.length : 0,
-        chat_service_version: "frontend-request-failed",
-      };
+      setStatus("Reply received", "ok");
+    } catch (error) {
+      console.error("sendMessage failed:", error);
 
-      window.NovaLastChatResponse = {
-        ok: false,
-        message: `Request failed: ${err.message || err}`,
-        debug: window.NovaLastChatDebug,
-      };
+      const activeSessionNow = getSessionId();
+      if (activeSessionNow !== sessionIdAtSend) {
+        pendingNode?.remove();
+        updateEmptyState();
+        return;
+      }
 
-      renderAssistantMessage({
-        ok: false,
-        message: `Request failed: ${err.message || err}`,
-        assistant_message: {
-          role: "assistant",
-          content: `Request failed: ${err.message || err}`,
-          created_at: new Date().toISOString(),
-          attachments: [],
-          meta: {
-            used_fallback: true,
-            fallback_reason: String(err.message || err),
-            history_included: Array.isArray(payload.history) && payload.history.length > 0,
-            history_count: Array.isArray(payload.history) ? payload.history.length : 0,
-            chat_service_version: "frontend-request-failed",
-          },
-        },
-        debug: window.NovaLastChatDebug,
-      });
+      replaceMessageContent(
+        pendingNode,
+        `Request failed: ${error.message || error}`,
+        { used_fallback: true },
+        null
+      );
+      setStatus(`Send failed: ${error.message || error}`, "error");
     } finally {
-      setBusy(false);
-      input.focus();
+      setSending(false);
+      updateEmptyState();
+      scrollToBottom();
     }
   }
 
-  function bindInputAutoResize() {
-    const { input } = getEls();
+  function autosizeTextarea() {
+    const input = getInputEl();
     if (!input) return;
-
-    const resize = () => {
-      input.style.height = "auto";
-      input.style.height = `${Math.min(input.scrollHeight, 240)}px`;
-    };
-
-    input.addEventListener("input", resize);
-    resize();
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 220)}px`;
   }
 
-  function bindSend() {
-    const { sendBtn, input } = getEls();
+  function bindComposer() {
+    const input = getInputEl();
+    const sendBtn = getSendBtn();
 
-    if (sendBtn && sendBtn.dataset.bound !== "true") {
-      sendBtn.dataset.bound = "true";
-      sendBtn.addEventListener("click", () => {
-        sendCurrentMessage();
-      });
-    }
+    if (input && !input.dataset.boundNovaComposer) {
+      input.dataset.boundNovaComposer = "true";
 
-    if (input && input.dataset.bound !== "true") {
-      input.dataset.bound = "true";
-      input.addEventListener("keydown", (event) => {
+      input.addEventListener("input", autosizeTextarea);
+
+      input.addEventListener("keydown", function (event) {
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
-          sendCurrentMessage();
+          sendMessage(input.value);
         }
       });
     }
-  }
 
-  function bindUploads() {
-    const { uploadBtn, fileInput } = getEls();
-
-    if (uploadBtn && fileInput && uploadBtn.dataset.bound !== "true") {
-      uploadBtn.dataset.bound = "true";
-      uploadBtn.addEventListener("click", () => {
-        fileInput.click();
+    if (sendBtn && !sendBtn.dataset.boundNovaComposer) {
+      sendBtn.dataset.boundNovaComposer = "true";
+      sendBtn.addEventListener("click", function () {
+        sendMessage(input ? input.value : "");
       });
     }
 
-    if (fileInput && fileInput.dataset.bound !== "true") {
-      fileInput.dataset.bound = "true";
-      fileInput.addEventListener("change", async (event) => {
-        const files = event.target && event.target.files ? event.target.files : [];
-        await uploadFiles(files);
-      });
-    }
+    document.addEventListener("nova:session-changed", function (event) {
+      const nextId = String(event?.detail?.session_id || "").trim();
+      if (!nextId) return;
+      setSessionId(nextId);
+      restoreSessionState(nextId);
+    });
   }
 
-  async function init() {
-    bindInputAutoResize();
-    bindSend();
-    bindUploads();
-    renderAttachmentTray();
-
-    window.NovaComposerBundle = {
-      version: BUNDLE_VERSION,
-      state,
-      collectHistory,
-      collectHistoryFromDom,
-      buildPayload,
-      restoreSessionOnLoad,
-      sendCurrentMessage,
-      uploadFiles,
-      renderAttachmentTray,
-      saveSessionId,
-    };
-
-    log(BUNDLE_VERSION);
-    await restoreSessionOnLoad();
+  function init() {
+    setSessionId(getSessionId());
+    bindComposer();
+    updateEmptyState();
+    restoreSessionState(getSessionId());
   }
+
+  window.NovaComposerBundle = {
+    init,
+    sendMessage,
+    restoreSessionState,
+    collectHistoryFromDom,
+    buildPayload,
+    getSessionId,
+    setSessionId,
+  };
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () {
-      void init();
-    }, { once: true });
+    document.addEventListener("DOMContentLoaded", init);
   } else {
-    void init();
+    init();
   }
 })();

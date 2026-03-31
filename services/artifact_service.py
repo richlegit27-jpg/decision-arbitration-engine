@@ -1,310 +1,235 @@
 from __future__ import annotations
 
 import json
-import re
 import uuid
-from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-
-
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from typing import Any
 
 
 class ArtifactService:
-    def __init__(self, data_dir: Optional[str] = None) -> None:
-        base_dir = Path(data_dir or Path(__file__).resolve().parents[1] / "data")
-        base_dir.mkdir(parents=True, exist_ok=True)
-        self.data_dir = base_dir
-        self.artifacts_path = self.data_dir / "nova_artifacts.json"
-        self._ensure_file()
+    def __init__(self, artifacts_file: Path, sessions_file: Path | None = None) -> None:
+        self.artifacts_file = Path(artifacts_file)
+        self.sessions_file = Path(sessions_file) if sessions_file else None
+        self.artifacts_file.parent.mkdir(parents=True, exist_ok=True)
 
-    def _ensure_file(self) -> None:
-        if not self.artifacts_path.exists():
-            self._write_json([])
+    @staticmethod
+    def utc_now() -> str:
+        return datetime.now(timezone.utc).isoformat()
 
-    def _read_json(self) -> List[Dict[str, Any]]:
-        self._ensure_file()
+    def _read_json_file(self, path: Path, default: Any) -> Any:
         try:
-            with self.artifacts_path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-            return data if isinstance(data, list) else []
+            if not path.exists():
+                return default
+            raw = path.read_text(encoding="utf-8").strip()
+            if not raw:
+                return default
+            return json.loads(raw)
         except Exception:
-            return []
+            return default
 
-    def _write_json(self, data: List[Dict[str, Any]]) -> None:
-        self.artifacts_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.artifacts_path.open("w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+    def _write_json_file(self, path: Path, data: Any) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    def _normalize_content(self, value: Any) -> str:
-        if value is None:
-            return ""
-        if isinstance(value, str):
-            return value
-        try:
-            return json.dumps(value, indent=2, ensure_ascii=False)
-        except Exception:
-            return str(value)
+    def _read_artifacts(self) -> list[dict[str, Any]]:
+        data = self._read_json_file(self.artifacts_file, [])
+        if isinstance(data, list):
+            return [self._normalize_artifact(item) for item in data if isinstance(item, dict)]
+        if isinstance(data, dict) and isinstance(data.get("artifacts"), list):
+            return [
+                self._normalize_artifact(item)
+                for item in data.get("artifacts", [])
+                if isinstance(item, dict)
+            ]
+        return []
 
-    def _normalize_tags(self, tags: List[Any]) -> List[str]:
-        out: List[str] = []
-        seen = set()
-        for tag in tags:
-            text = str(tag).strip()
-            if not text:
-                continue
-            lower = text.lower()
-            if lower in seen:
-                continue
-            seen.add(lower)
-            out.append(text)
-        return out
+    def _write_artifacts(self, artifacts: list[dict[str, Any]]) -> None:
+        normalized = [self._normalize_artifact(item) for item in artifacts if isinstance(item, dict)]
+        self._write_json_file(self.artifacts_file, normalized)
 
-    def _normalize_meta(self, meta: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        meta = meta or {}
-        if not isinstance(meta, dict):
-            return {"raw_meta": self._normalize_content(meta)}
-
-        cleaned: Dict[str, Any] = {}
-        for key, value in meta.items():
-            cleaned[str(key)] = self._safe_json_value(value)
-        return cleaned
-
-    def _safe_json_value(self, value: Any) -> Any:
-        if value is None or isinstance(value, (str, int, float, bool)):
-            return value
-        if isinstance(value, dict):
-            return {str(k): self._safe_json_value(v) for k, v in value.items()}
-        if isinstance(value, list):
-            return [self._safe_json_value(v) for v in value]
-        return self._normalize_content(value)
-
-    def list_artifacts(
-        self,
-        session_id: Optional[str] = None,
-        limit: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
-        items = self._read_json()
-        if session_id:
-            items = [x for x in items if x.get("session_id") == session_id]
-        items.sort(
-            key=lambda x: x.get("updated_at") or x.get("created_at") or "",
-            reverse=True,
-        )
-        if limit is not None:
-            items = items[:limit]
-        return items
-
-    def get_artifacts(
-        self,
-        session_id: Optional[str] = None,
-        limit: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
-        return self.list_artifacts(session_id=session_id, limit=limit)
-
-    def get_artifact(self, artifact_id: str) -> Optional[Dict[str, Any]]:
-        for item in self._read_json():
-            if str(item.get("id")) == str(artifact_id):
-                return item
-        return None
-
-    def save_artifact(
-        self,
-        *,
-        title: str,
-        content: Any,
-        kind: str = "chat",
-        session_id: str = "default-session",
-        tags: Optional[List[str]] = None,
-        meta: Optional[Dict[str, Any]] = None,
-        pinned: bool = False,
-        artifact_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        items = self._read_json()
-        now = utc_now_iso()
+    def _normalize_artifact(self, artifact: dict[str, Any]) -> dict[str, Any]:
+        artifact = dict(artifact or {})
+        created_at = str(artifact.get("created_at") or self.utc_now())
+        updated_at = str(artifact.get("updated_at") or created_at)
 
         normalized = {
-            "id": artifact_id or str(uuid.uuid4()),
-            "title": (title or "Untitled artifact").strip(),
-            "content": self._normalize_content(content),
-            "kind": (kind or "chat").strip(),
-            "session_id": session_id or "default-session",
-            "tags": self._normalize_tags(tags or []),
-            "meta": self._normalize_meta(meta),
-            "pinned": bool(pinned),
-            "created_at": now,
-            "updated_at": now,
+            "id": str(artifact.get("id") or uuid.uuid4()),
+            "session_id": str(artifact.get("session_id") or "default-session"),
+            "title": str(artifact.get("title") or artifact.get("name") or "Untitled artifact"),
+            "content": str(
+                artifact.get("content")
+                or artifact.get("text")
+                or artifact.get("body")
+                or ""
+            ),
+            "kind": str(artifact.get("kind") or artifact.get("type") or "artifact"),
+            "pinned": bool(artifact.get("pinned", False)),
+            "created_at": created_at,
+            "updated_at": updated_at,
+            "meta": artifact.get("meta") if isinstance(artifact.get("meta"), dict) else {},
         }
-
-        for index, item in enumerate(items):
-            if str(item.get("id")) == normalized["id"]:
-                normalized["created_at"] = item.get("created_at") or now
-                items[index] = normalized
-                self._write_json(items)
-                return normalized
-
-        items.append(normalized)
-        self._write_json(items)
         return normalized
 
-    def delete_artifact(self, artifact_id: str) -> bool:
-        items = self._read_json()
-        before = len(items)
-        items = [x for x in items if str(x.get("id")) != str(artifact_id)]
-        if len(items) == before:
-            return False
-        self._write_json(items)
-        return True
+    def _sort_artifacts(self, artifacts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        def key(item: dict[str, Any]):
+            pinned_rank = 0 if item.get("pinned") else 1
+            updated_at = item.get("updated_at") or item.get("created_at") or ""
+            return (pinned_rank, updated_at)
 
-    def _tokenize(self, text: str) -> List[str]:
-        raw = re.findall(r"[a-zA-Z0-9_]{2,}", text.lower())
-        stop = {
-            "the", "and", "for", "that", "with", "this", "from", "what", "when",
-            "where", "were", "your", "have", "will", "into", "about", "then",
-            "than", "them", "they", "just", "want", "need", "work", "next",
-            "last", "save", "used", "using", "make", "made", "been", "more",
-            "like", "does", "did", "done", "chat", "artifact", "artifacts",
-            "reply", "continue",
-        }
-        return [x for x in raw if x not in stop]
+        return sorted(artifacts, key=key)
 
-    def _score_item(self, item: Dict[str, Any], tokens: List[str]) -> float:
-        title = (item.get("title") or "").lower()
-        kind = (item.get("kind") or "").lower()
-        content = self._normalize_content(item.get("content")).lower()
-        tags = " ".join(str(x).lower() for x in item.get("tags") or [])
-        meta = self._normalize_content(item.get("meta")).lower()
-        blob = f"{title}\n{kind}\n{tags}\n{content}\n{meta}"
+    def _sort_artifacts_desc_within_groups(self, artifacts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        pinned = [item for item in artifacts if item.get("pinned")]
+        unpinned = [item for item in artifacts if not item.get("pinned")]
 
-        score = 0.0
-        for token in tokens:
-            if token in title:
-                score += 8.0
-            if token in tags:
-                score += 5.0
-            if token in kind:
-                score += 2.0
-            count = blob.count(token)
-            if count > 0:
-                score += min(count, 8) * 1.5
-
-        if item.get("pinned"):
-            score += 1.25
-
-        updated_at = item.get("updated_at") or item.get("created_at") or ""
-        if updated_at:
-            score += 0.25
-
-        return score
-
-    def _truncate(self, text: str, limit: int) -> str:
-        if len(text) <= limit:
-            return text
-        return text[: limit - 1].rstrip() + "…"
-
-    def _make_snippet(self, item: Dict[str, Any], tokens: List[str], window: int = 1100) -> str:
-        text = self._normalize_content(item.get("content"))
-        lower = text.lower()
-
-        positions = []
-        for token in tokens:
-            pos = lower.find(token)
-            if pos >= 0:
-                positions.append(pos)
-
-        if not positions:
-            return self._truncate(text, window)
-
-        start = max(0, min(positions) - 180)
-        end = min(len(text), start + window)
-        snippet = text[start:end].strip()
-
-        if start > 0:
-            snippet = "… " + snippet
-        if end < len(text):
-            snippet = snippet + " …"
-        return snippet
-
-    def search_artifacts(
-        self,
-        query: str,
-        *,
-        session_id: Optional[str] = None,
-        limit: int = 5,
-    ) -> List[Dict[str, Any]]:
-        query = (query or "").strip()
-        if not query:
-            return []
-
-        tokens = self._tokenize(query)
-        if not tokens:
-            return []
-
-        ranked: List[Dict[str, Any]] = []
-        for item in self.list_artifacts(session_id=session_id):
-            score = self._score_item(item, tokens)
-            if score <= 0:
-                continue
-            ranked.append(
-                {
-                    "score": score,
-                    "artifact": item,
-                    "snippet": self._make_snippet(item, tokens),
-                }
-            )
-
-        ranked.sort(
-            key=lambda x: (
-                x["score"],
-                x["artifact"].get("updated_at") or x["artifact"].get("created_at") or "",
-            ),
+        pinned = sorted(
+            pinned,
+            key=lambda item: item.get("updated_at") or item.get("created_at") or "",
             reverse=True,
         )
-        return ranked[: max(1, limit)]
+        unpinned = sorted(
+            unpinned,
+            key=lambda item: item.get("updated_at") or item.get("created_at") or "",
+            reverse=True,
+        )
+        return pinned + unpinned
 
-    def retrieve_for_prompt(
+    def list_artifacts(self, session_id: str | None = None) -> list[dict[str, Any]]:
+        artifacts = self._read_artifacts()
+        normalized_session_id = str(session_id).strip() if session_id else None
+
+        if normalized_session_id:
+            artifacts = [
+                item for item in artifacts if str(item.get("session_id") or "") == normalized_session_id
+            ]
+
+        return self._sort_artifacts_desc_within_groups(artifacts)
+
+    def create_artifact(
         self,
-        query: str,
-        *,
-        session_id: Optional[str] = None,
-        limit: int = 3,
-        max_chars_per_artifact: int = 1400,
-    ) -> Dict[str, Any]:
-        matches = self.search_artifacts(query, session_id=session_id, limit=limit)
-        selected: List[Dict[str, Any]] = []
+        session_id: str,
+        title: str,
+        content: str,
+        kind: str = "artifact",
+        meta: dict[str, Any] | None = None,
+        pinned: bool = False,
+    ) -> dict[str, Any] | None:
+        session_id = str(session_id or "default-session").strip() or "default-session"
+        title = str(title or "").strip() or "Untitled artifact"
+        content = str(content or "").strip()
 
-        for row in matches:
-            artifact = deepcopy(row["artifact"])
-            artifact["retrieval_score"] = row["score"]
-            artifact["retrieval_snippet"] = self._truncate(
-                row["snippet"],
-                max_chars_per_artifact,
+        if not content:
+            return None
+
+        now = self.utc_now()
+        artifact = self._normalize_artifact(
+            {
+                "id": str(uuid.uuid4()),
+                "session_id": session_id,
+                "title": title,
+                "content": content,
+                "kind": kind,
+                "pinned": pinned,
+                "created_at": now,
+                "updated_at": now,
+                "meta": meta or {},
+            }
+        )
+
+        artifacts = self._read_artifacts()
+        artifacts.append(artifact)
+        self._write_artifacts(artifacts)
+        return artifact
+
+    def get_artifact(self, artifact_id: str) -> dict[str, Any] | None:
+        artifact_id = str(artifact_id or "").strip()
+        if not artifact_id:
+            return None
+
+        for artifact in self._read_artifacts():
+            if str(artifact.get("id")) == artifact_id:
+                return artifact
+        return None
+
+    def set_pinned(self, artifact_id: str, pinned: bool) -> dict[str, Any] | None:
+        artifact_id = str(artifact_id or "").strip()
+        if not artifact_id:
+            return None
+
+        artifacts = self._read_artifacts()
+        updated = None
+        now = self.utc_now()
+
+        for idx, artifact in enumerate(artifacts):
+            if str(artifact.get("id")) == artifact_id:
+                artifact["pinned"] = bool(pinned)
+                artifact["updated_at"] = now
+                artifacts[idx] = self._normalize_artifact(artifact)
+                updated = artifacts[idx]
+                break
+
+        if updated is None:
+            return None
+
+        self._write_artifacts(artifacts)
+        return updated
+
+    def delete_artifact(self, artifact_id: str) -> bool:
+        artifact_id = str(artifact_id or "").strip()
+        if not artifact_id:
+            return False
+
+        artifacts = self._read_artifacts()
+        kept = [item for item in artifacts if str(item.get("id")) != artifact_id]
+
+        if len(kept) == len(artifacts):
+            return False
+
+        self._write_artifacts(kept)
+        return True
+
+    def purge_session_artifacts(self, session_id: str) -> int:
+        session_id = str(session_id or "").strip()
+        if not session_id:
+            return 0
+
+        artifacts = self._read_artifacts()
+        kept = [item for item in artifacts if str(item.get("session_id") or "") != session_id]
+        removed = len(artifacts) - len(kept)
+
+        if removed:
+            self._write_artifacts(kept)
+
+        return removed
+
+    def dedupe_session_artifacts(self, session_id: str) -> int:
+        session_id = str(session_id or "").strip()
+        if not session_id:
+            return 0
+
+        artifacts = self._read_artifacts()
+        seen: set[tuple[str, str, str]] = set()
+        kept: list[dict[str, Any]] = []
+        removed = 0
+
+        for artifact in self._sort_artifacts_desc_within_groups(artifacts):
+            key = (
+                str(artifact.get("session_id") or ""),
+                str(artifact.get("title") or ""),
+                str(artifact.get("content") or ""),
             )
-            selected.append(artifact)
 
-        joined_blocks: List[str] = []
-        for idx, item in enumerate(selected, start=1):
-            joined_blocks.append(
-                "\n".join(
-                    [
-                        f"[artifact {idx}]",
-                        f"title: {item.get('title', '')}",
-                        f"kind: {item.get('kind', '')}",
-                        f"updated_at: {item.get('updated_at', '')}",
-                        f"score: {item.get('retrieval_score', 0)}",
-                        "content:",
-                        self._truncate(
-                            item.get("retrieval_snippet") or item.get("content") or "",
-                            max_chars_per_artifact,
-                        ),
-                    ]
-                )
-            )
+            if artifact.get("session_id") == session_id and key in seen:
+                removed += 1
+                continue
 
-        return {
-            "items": selected,
-            "context_text": "\n\n".join(joined_blocks).strip(),
-        }
+            if artifact.get("session_id") == session_id:
+                seen.add(key)
+
+            kept.append(artifact)
+
+        if removed:
+            self._write_artifacts(kept)
+
+        return removed

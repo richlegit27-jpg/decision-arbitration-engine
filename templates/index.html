@@ -1,676 +1,905 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nova Ultimate 2026</title>
-
-  <link rel="stylesheet" href="/static/css/nova-main.css?v=session-rail-2026-03-31-002" />
-
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=session-left-right-wiring-2026-03-31-013">
   <style>
     :root {
-      --bg: #07111f;
-      --bg-2: #0b1730;
-      --panel: rgba(12, 20, 37, 0.94);
-      --panel-2: rgba(16, 27, 49, 0.97);
-      --line: rgba(130, 158, 222, 0.14);
-      --line-strong: rgba(130, 158, 222, 0.24);
-      --text: #eef4ff;
-      --muted: #9cafcf;
-      --accent: #6ea8ff;
-      --accent-soft: rgba(110, 168, 255, 0.16);
-      --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
-      --left-rail-w: 300px;
-      --right-rail-w: 430px;
+      --nova-bg: #07111f;
+      --nova-bg-2: #0c1730;
+      --nova-panel: rgba(13, 20, 37, 0.94);
+      --nova-panel-2: rgba(15, 25, 44, 0.98);
+      --nova-line: rgba(130, 158, 222, 0.14);
+      --nova-line-strong: rgba(130, 158, 222, 0.22);
+      --nova-text: #eef4ff;
+      --nova-muted: #9eb1d1;
+      --nova-accent: #6ea8ff;
+      --nova-accent-2: #4e89ff;
+      --nova-danger: #ff7b96;
+      --nova-warning: #ffca6a;
+      --nova-ok: #79e1b0;
+      --nova-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+      --sidebar-w: 320px;
+      --sidebar-collapsed-w: 84px;
+      --right-rail-w: 420px;
     }
 
     * {
       box-sizing: border-box;
     }
 
-    html,
-    body {
+    html, body {
       margin: 0;
       padding: 0;
-      width: 100%;
       height: 100%;
-      overflow: hidden;
-      background: linear-gradient(180deg, var(--bg), var(--bg-2));
-      color: var(--text);
-      font-family: "Segoe UI", sans-serif;
-    }
-
-    button,
-    input,
-    textarea {
-      font: inherit;
+      background:
+        radial-gradient(circle at top right, rgba(78, 137, 255, 0.14), transparent 22%),
+        radial-gradient(circle at bottom left, rgba(121, 225, 176, 0.10), transparent 20%),
+        linear-gradient(180deg, var(--nova-bg), var(--nova-bg-2));
+      color: var(--nova-text);
+      font-family: Inter, Segoe UI, Arial, sans-serif;
     }
 
     .nova-app-shell {
       display: grid;
-      grid-template-columns: var(--left-rail-w) minmax(0, 1fr) var(--right-rail-w);
-      width: 100%;
-      height: 100vh;
-      overflow: hidden;
+      grid-template-columns: var(--sidebar-w) minmax(0, 1fr) 0;
+      min-height: 100vh;
+      transition: grid-template-columns 0.18s ease;
     }
 
-    .nova-left-rail {
+    body.sidebar-collapsed .nova-app-shell {
+      grid-template-columns: var(--sidebar-collapsed-w) minmax(0, 1fr) 0;
+    }
+
+    .nova-app-shell.rail-open {
+      grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--right-rail-w);
+    }
+
+    body.sidebar-collapsed .nova-app-shell.rail-open {
+      grid-template-columns: var(--sidebar-collapsed-w) minmax(0, 1fr) var(--right-rail-w);
+    }
+
+    .nova-sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      background: var(--nova-panel);
+      border-right: 1px solid var(--nova-line);
+      backdrop-filter: blur(18px);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      box-shadow: var(--nova-shadow);
+      overflow: hidden;
+      transition: width 0.18s ease, min-width 0.18s ease;
+      position: relative;
+    }
+
+    body.sidebar-collapsed .nova-sidebar {
+      width: var(--sidebar-collapsed-w);
+      min-width: var(--sidebar-collapsed-w);
+    }
+
+    .sidebar-top {
+      padding: 18px 18px 12px;
+      border-bottom: 1px solid var(--nova-line);
+      display: grid;
+      gap: 12px;
+    }
+
+    .sidebar-brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
       min-width: 0;
-      min-height: 0;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      background: linear-gradient(135deg, var(--nova-accent), var(--nova-ok));
+      color: #07111f;
+      box-shadow: 0 14px 32px rgba(78, 137, 255, 0.28);
+      flex: 0 0 auto;
+    }
+
+    .brand-copy {
+      min-width: 0;
+    }
+
+    .brand-title {
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
+
+    .brand-subtitle {
+      color: var(--nova-muted);
+      font-size: 0.85rem;
+      margin-top: 2px;
+    }
+
+    .icon-btn,
+    .nova-btn,
+    .rail-tab,
+    .collapsed-open-btn,
+    .collapsed-mini-btn {
+      border: 1px solid var(--nova-line-strong);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--nova-text);
+      border-radius: 14px;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
+
+    .icon-btn:hover,
+    .nova-btn:hover,
+    .rail-tab:hover,
+    .collapsed-open-btn:hover,
+    .collapsed-mini-btn:hover {
+      border-color: rgba(110, 168, 255, 0.42);
+      background: rgba(110, 168, 255, 0.10);
+      transform: translateY(-1px);
+    }
+
+    .icon-btn {
+      width: 42px;
+      height: 42px;
+      font-size: 1.1rem;
+      flex: 0 0 auto;
+    }
+
+    .nova-btn {
+      min-height: 42px;
+      padding: 0 14px;
+      font-weight: 700;
+    }
+
+    .nova-btn-primary {
+      background: linear-gradient(135deg, rgba(110, 168, 255, 0.20), rgba(121, 225, 176, 0.12));
+      border-color: rgba(110, 168, 255, 0.36);
+    }
+
+    .sidebar-heading-copy {
+      color: var(--nova-muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .sidebar-section {
+      padding: 14px 14px 12px;
       display: flex;
       flex-direction: column;
-      border-right: 1px solid var(--line);
-      background: rgba(255,255,255,0.025);
+      gap: 12px;
+      min-height: 0;
+      flex: 1 1 auto;
       overflow: hidden;
     }
 
-    .nova-left-rail-head {
-      flex: 0 0 auto;
-      padding: 16px;
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .nova-left-rail-title-row {
+    .sidebar-section-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
     }
 
-    .nova-left-rail-title {
-      font-size: 14px;
+    .sidebar-label {
+      font-size: 0.9rem;
       font-weight: 700;
+      color: var(--nova-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
 
-    .nova-session-count {
-      font-size: 11px;
-      color: var(--muted);
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 4px 8px;
-      background: rgba(255,255,255,0.04);
+    .session-controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
     }
 
-    .nova-session-toolbar {
-      display: flex;
-      gap: 8px;
+    .session-controls #deleteSessionBtn {
+      grid-column: 1 / -1;
     }
 
-    .nova-session-toolbar button {
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.06);
-      color: var(--text);
-      border-radius: 10px;
-      padding: 10px 12px;
-      cursor: pointer;
-      flex: 1 1 auto;
-    }
-
-    .nova-session-toolbar button:hover {
-      background: rgba(255,255,255,0.10);
-    }
-
-    .nova-session-list {
-      flex: 1 1 auto;
+    .session-list {
       min-height: 0;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding: 12px;
+      overflow: auto;
+      display: grid;
+      gap: 10px;
+      padding-right: 4px;
     }
 
-    .nova-session-card {
+    .session-item,
+    .session-empty {
       width: 100%;
+      border-radius: 16px;
+      border: 1px solid var(--nova-line);
+      background: rgba(255, 255, 255, 0.025);
+      color: var(--nova-text);
       text-align: left;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.035);
-      color: var(--text);
-      border-radius: 14px;
-      padding: 12px;
-      margin-bottom: 10px;
-      cursor: pointer;
-      display: block;
-      transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+      padding: 12px 14px;
     }
 
-    .nova-session-card:hover {
-      background: rgba(255,255,255,0.07);
+    .session-item {
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
+
+    .session-item:hover {
+      border-color: rgba(110, 168, 255, 0.34);
+      background: rgba(110, 168, 255, 0.08);
       transform: translateY(-1px);
     }
 
-    .nova-session-card.is-active {
-      border-color: rgba(110,168,255,0.42);
-      background: rgba(110,168,255,0.12);
-      box-shadow: 0 0 0 1px rgba(110,168,255,0.16) inset;
+    .session-item.is-active {
+      border-color: rgba(110, 168, 255, 0.48);
+      background: rgba(110, 168, 255, 0.12);
+      box-shadow: inset 0 0 0 1px rgba(110, 168, 255, 0.18);
     }
 
-    .nova-session-title {
-      font-size: 13px;
+    .session-item-top,
+    .session-item-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .session-item-title {
       font-weight: 700;
-      margin-bottom: 6px;
       line-height: 1.35;
-      word-break: break-word;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
-    .nova-session-meta {
-      font-size: 11px;
-      color: var(--muted);
-      margin-bottom: 6px;
+    .session-item-bottom {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: var(--nova-muted);
     }
 
-    .nova-session-preview {
-      font-size: 12px;
-      line-height: 1.45;
-      color: #d7e6ff;
-      white-space: pre-wrap;
-      word-break: break-word;
-      opacity: 0.92;
+    .session-pin-indicator {
+      color: var(--nova-warning);
+      flex: 0 0 auto;
     }
 
-    .nova-session-empty {
-      color: var(--muted);
-      font-size: 13px;
-      padding: 8px 4px;
+    .session-empty {
+      color: var(--nova-muted);
+      text-align: center;
+    }
+
+    .collapsed-sidebar-actions {
+      display: none;
+      padding: 12px 8px 14px;
+      gap: 10px;
+      flex-direction: column;
+      align-items: center;
+      border-top: 1px solid var(--nova-line);
+      margin-top: auto;
+    }
+
+    .collapsed-open-btn {
+      width: 100%;
+      min-height: 48px;
+      font-weight: 800;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(110, 168, 255, 0.20), rgba(121, 225, 176, 0.12));
+      border-color: rgba(110, 168, 255, 0.36);
+    }
+
+    .collapsed-mini-btn {
+      width: 100%;
+      min-height: 42px;
+      font-weight: 800;
+      border-radius: 14px;
+    }
+
+    body.sidebar-collapsed .sidebar-label,
+    body.sidebar-collapsed .session-controls,
+    body.sidebar-collapsed .session-item-title,
+    body.sidebar-collapsed .session-item-bottom,
+    body.sidebar-collapsed .sidebar-heading-copy,
+    body.sidebar-collapsed .brand-copy,
+    body.sidebar-collapsed .sidebar-section-header {
+      display: none;
+    }
+
+    body.sidebar-collapsed .session-item {
+      padding: 12px;
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    body.sidebar-collapsed .session-list {
+      padding-right: 0;
+    }
+
+    body.sidebar-collapsed .session-pin-indicator {
+      display: none;
+    }
+
+    body.sidebar-collapsed .collapsed-sidebar-actions {
+      display: flex;
     }
 
     .nova-main {
       min-width: 0;
-      min-height: 0;
       display: flex;
       flex-direction: column;
-      border-right: 1px solid var(--line);
+      min-height: 100vh;
       overflow: hidden;
     }
 
     .nova-topbar {
-      flex: 0 0 auto;
+      padding: 18px 22px 14px;
+      border-bottom: 1px solid var(--nova-line);
+      background: rgba(7, 17, 31, 0.52);
+      backdrop-filter: blur(12px);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 16px 18px;
-      border-bottom: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.02);
-      backdrop-filter: blur(10px);
     }
 
-    .nova-topbar-copy {
+    .topbar-copy {
       min-width: 0;
     }
 
-    .nova-title {
-      font-size: 18px;
-      font-weight: 700;
-      margin: 0;
+    .topbar-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      line-height: 1.2;
     }
 
-    .nova-subtitle {
-      font-size: 12px;
-      color: var(--muted);
+    .topbar-meta {
       margin-top: 4px;
+      color: var(--nova-muted);
+      font-size: 0.88rem;
+      line-height: 1.4;
     }
 
-    .nova-session-chip {
-      margin-top: 8px;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      font-size: 11px;
-      color: #dcecff;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.05);
-      max-width: 100%;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .nova-rail-tabs {
+    .topbar-actions {
       display: flex;
+      align-items: center;
+      gap: 10px;
       flex-wrap: wrap;
-      gap: 8px;
+      justify-content: flex-end;
     }
 
-    .nova-rail-tab {
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.05);
-      color: var(--text);
-      border-radius: 999px;
-      padding: 8px 12px;
-      cursor: pointer;
+    .topbar-status {
+      color: var(--nova-muted);
+      font-size: 0.86rem;
+      white-space: nowrap;
     }
 
-    .nova-rail-tab.is-active {
-      background: var(--accent-soft);
-      border-color: rgba(110, 168, 255, 0.35);
-      color: #dcecff;
+    .topbar-status[data-tone="ok"] {
+      color: var(--nova-ok);
+    }
+
+    .topbar-status[data-tone="error"] {
+      color: var(--nova-danger);
     }
 
     .nova-chat-wrap {
       flex: 1 1 auto;
       min-height: 0;
-      min-width: 0;
-      position: relative;
-      overflow: hidden;
       display: flex;
       flex-direction: column;
+      padding: 22px;
+      gap: 18px;
+      overflow: hidden;
     }
 
-    .nova-chat-panel {
+    .nova-messages {
       flex: 1 1 auto;
       min-height: 0;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding: 18px;
-      padding-bottom: 28px;
-      scroll-behavior: smooth;
-    }
-
-    .nova-empty-state {
-      padding: 20px 18px 0 18px;
-      color: var(--muted);
-      font-size: 14px;
+      overflow: auto;
+      display: grid;
+      gap: 16px;
+      padding-right: 6px;
     }
 
     .nova-message {
-      margin-bottom: 14px;
+      display: flex;
+    }
+
+    .nova-message-user {
+      justify-content: flex-end;
+    }
+
+    .nova-message-assistant {
+      justify-content: flex-start;
     }
 
     .nova-message-inner {
-      background: rgba(255,255,255,0.035);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 14px;
-      box-shadow: var(--shadow);
+      width: min(860px, 100%);
+      border: 1px solid var(--nova-line);
+      background: var(--nova-panel-2);
+      border-radius: 22px;
+      padding: 16px 18px;
+      box-shadow: var(--nova-shadow);
     }
 
     .nova-message-user .nova-message-inner {
-      background: rgba(110, 168, 255, 0.08);
+      background: linear-gradient(180deg, rgba(78, 137, 255, 0.13), rgba(78, 137, 255, 0.07));
+      border-color: rgba(78, 137, 255, 0.28);
+    }
+
+    .nova-message-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .nova-message-role {
+      font-size: 0.82rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--nova-muted);
     }
 
     .nova-message-time {
-      font-size: 12px;
-      color: var(--muted);
+      font-size: 0.76rem;
+      color: var(--nova-muted);
+    }
+
+    .nova-message-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .nova-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: var(--nova-text);
+      background: rgba(110, 168, 255, 0.12);
+      border: 1px solid rgba(110, 168, 255, 0.24);
+    }
+
+    .nova-badge-warning {
+      color: #2b1a00;
+      background: rgba(255, 202, 106, 0.92);
+      border-color: rgba(255, 202, 106, 0.92);
+    }
+
+    .nova-badge-soft {
+      background: rgba(121, 225, 176, 0.12);
+      border-color: rgba(121, 225, 176, 0.22);
     }
 
     .nova-message-markdown {
-      white-space: pre-wrap;
+      line-height: 1.65;
+      font-size: 0.98rem;
       word-break: break-word;
-      line-height: 1.55;
-      font-size: 14px;
     }
 
-    .nova-message-attachments {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 12px;
+    .nova-empty-state {
+      margin: auto;
+      max-width: 560px;
+      text-align: center;
+      border: 1px dashed var(--nova-line-strong);
+      border-radius: 24px;
+      padding: 40px 28px;
+      background: rgba(255, 255, 255, 0.02);
     }
 
-    .nova-attachment-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.05);
-      color: var(--text);
-      text-decoration: none;
-      font-size: 12px;
-    }
-
-    .nova-attachment-chip-remove {
-      border: 0;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      font-size: 16px;
-      line-height: 1;
-      padding: 0;
-    }
-
-    .nova-composer-wrap {
-      flex: 0 0 auto;
-      border-top: 1px solid var(--line);
-      padding: 14px;
-      background: rgba(255,255,255,0.02);
-    }
-
-    .nova-pending-files {
-      display: none;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .nova-composer {
-      display: flex;
-      gap: 10px;
-      align-items: flex-end;
-    }
-
-    #chatInput {
-      flex: 1;
-      min-height: 54px;
-      max-height: 180px;
-      resize: vertical;
-      border-radius: 14px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.05);
-      color: var(--text);
-      padding: 12px 14px;
-      outline: none;
-    }
-
-    #sendBtn,
-    #uploadBtn {
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.06);
-      color: var(--text);
-      border-radius: 14px;
-      padding: 12px 14px;
-      cursor: pointer;
-      min-width: 72px;
-      flex: 0 0 auto;
-    }
-
-    #sendBtn:hover,
-    #uploadBtn:hover,
-    .nova-rail-tab:hover {
-      background: rgba(255,255,255,0.10);
-    }
-
-    .nova-right-rail {
-      min-width: 0;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-      background: rgba(255,255,255,0.02);
-      overflow: hidden;
-    }
-
-    .nova-right-rail-head {
-      flex: 0 0 auto;
-      padding: 16px 18px;
-      border-bottom: 1px solid var(--line);
-      font-size: 14px;
-      font-weight: 700;
-    }
-
-    .nova-right-rail-panels {
-      flex: 1 1 auto;
-      min-height: 0;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .nova-rail-panel {
-      position: absolute;
-      inset: 0;
-      display: none;
-      min-height: 0;
-      min-width: 0;
-      background: transparent;
-    }
-
-    .nova-rail-panel.is-active {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .nova-rail-panel-body {
-      flex: 1 1 auto;
-      min-height: 0;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding: 12px;
-    }
-
-    .nova-panel-empty {
-      color: var(--muted);
-      font-size: 13px;
-      padding: 10px 4px;
-    }
-
-    .nova-panel-block {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 12px;
-      margin-bottom: 10px;
-    }
-
-    .nova-panel-block-title {
-      font-size: 13px;
-      font-weight: 700;
-      margin-bottom: 6px;
-    }
-
-    .nova-panel-block-meta {
-      font-size: 11px;
-      color: var(--muted);
+    .nova-empty-state-title {
+      font-size: 1.2rem;
+      font-weight: 800;
       margin-bottom: 8px;
     }
 
-    .nova-panel-block-content {
-      font-size: 13px;
-      line-height: 1.5;
-      white-space: pre-wrap;
-      word-break: break-word;
+    .nova-empty-state-copy {
+      color: var(--nova-muted);
+      line-height: 1.55;
     }
 
-    #artifactsPanel {
-      min-height: 0;
+    .nova-composer {
+      border: 1px solid var(--nova-line);
+      border-radius: 24px;
+      background: var(--nova-panel);
+      box-shadow: var(--nova-shadow);
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .composer-input {
+      width: 100%;
+      resize: none;
+      min-height: 56px;
+      max-height: 220px;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--nova-text);
+      font: inherit;
+      line-height: 1.55;
+    }
+
+    .composer-input::placeholder {
+      color: var(--nova-muted);
+    }
+
+    .composer-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .composer-help {
+      color: var(--nova-muted);
+      font-size: 0.82rem;
+    }
+
+    .composer-send {
+      min-width: 120px;
+    }
+
+    .nova-right-rail {
+      width: 0;
       min-width: 0;
       overflow: hidden;
-    }
-
-    .nova-artifacts-toolbar {
-      flex: 0 0 auto;
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--line);
+      border-left: 0 solid transparent;
+      background: var(--nova-panel);
+      backdrop-filter: blur(18px);
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      transition: width 0.18s ease, border-left-width 0.18s ease;
     }
 
-    #artifactSearch {
-      width: 100%;
-      border-radius: 10px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.05);
-      color: var(--text);
-      padding: 10px 12px;
-      outline: none;
+    .nova-app-shell.rail-open .nova-right-rail {
+      width: var(--right-rail-w);
+      min-width: var(--right-rail-w);
+      border-left: 1px solid var(--nova-line);
     }
 
-    .nova-artifacts-toolbar-row {
+    .rail-top {
+      padding: 16px;
+      border-bottom: 1px solid var(--nova-line);
+      display: grid;
+      gap: 12px;
+    }
+
+    .rail-header {
       display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .rail-title {
+      font-size: 0.95rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--nova-muted);
+    }
+
+    .rail-close-btn {
+      min-height: 38px;
+      padding: 0 12px;
+      font-weight: 800;
+    }
+
+    .rail-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 8px;
-      flex-wrap: wrap;
     }
 
-    #artifactPinnedOnly,
-    #artifactRefreshBtn,
-    #artifactCleanBtn {
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.06);
-      color: var(--text);
-      border-radius: 10px;
-      padding: 8px 10px;
-      cursor: pointer;
+    .rail-tab {
+      min-height: 42px;
+      padding: 0 12px;
+      font-weight: 800;
     }
 
-    .nova-artifacts-split {
+    .rail-tab.is-active {
+      background: rgba(110, 168, 255, 0.14);
+      border-color: rgba(110, 168, 255, 0.42);
+    }
+
+    .rail-panel-wrap {
       flex: 1 1 auto;
       min-height: 0;
-      display: grid;
-      grid-template-columns: 42% 58%;
       overflow: hidden;
+      position: relative;
     }
 
-    #artifactList {
-      min-height: 0;
-      overflow-y: auto;
-      overflow-x: hidden;
-      border-right: 1px solid var(--line);
-      padding: 12px;
+    .rail-panel {
+      display: none;
+      height: 100%;
+      overflow: auto;
+      padding: 16px;
     }
 
-    #artifactViewer {
-      min-height: 0;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding: 12px;
+    .rail-panel.is-active {
+      display: grid;
+      gap: 14px;
+      align-content: start;
     }
 
-    @media (max-width: 1350px) {
-      .nova-app-shell {
-        grid-template-columns: 260px minmax(0, 1fr) 380px;
+    .panel-card {
+      border: 1px solid var(--nova-line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.025);
+      padding: 14px;
+      box-shadow: var(--nova-shadow);
+    }
+
+    .panel-card-title {
+      font-size: 0.92rem;
+      font-weight: 800;
+      margin-bottom: 10px;
+      color: var(--nova-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .panel-empty {
+      border: 1px dashed var(--nova-line-strong);
+      border-radius: 18px;
+      padding: 18px;
+      color: var(--nova-muted);
+      text-align: center;
+    }
+
+    .artifact-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .artifact-viewer {
+      min-height: 180px;
+      white-space: pre-wrap;
+      line-height: 1.55;
+      color: var(--nova-text);
+    }
+
+    .rail-meta {
+      color: var(--nova-muted);
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 1380px) {
+      :root {
+        --right-rail-w: 360px;
       }
     }
 
     @media (max-width: 1100px) {
-      html,
-      body {
-        overflow: auto;
-      }
-
-      .nova-app-shell {
+      .nova-app-shell,
+      .nova-app-shell.rail-open,
+      body.sidebar-collapsed .nova-app-shell,
+      body.sidebar-collapsed .nova-app-shell.rail-open {
         grid-template-columns: 1fr;
-        grid-template-rows: 260px minmax(0, 1fr) 360px;
-        height: auto;
-        min-height: 100vh;
       }
 
-      .nova-left-rail {
+      .nova-sidebar,
+      body.sidebar-collapsed .nova-sidebar,
+      .nova-app-shell.rail-open .nova-right-rail {
+        width: 100%;
+        min-width: 0;
+        min-height: auto;
         border-right: 0;
-        border-bottom: 1px solid var(--line);
-        min-height: 260px;
+        border-left: 0;
+        border-bottom: 1px solid var(--nova-line);
       }
 
-      .nova-main {
-        min-height: 70vh;
-        border-right: 0;
+      .session-list {
+        max-height: 240px;
       }
 
       .nova-right-rail {
-        border-top: 1px solid var(--line);
-        min-height: 360px;
+        width: 100%;
+        min-width: 0;
+        min-height: 320px;
       }
 
-      .nova-artifacts-split {
+      body.sidebar-collapsed .sidebar-label,
+      body.sidebar-collapsed .session-controls,
+      body.sidebar-collapsed .session-item-title,
+      body.sidebar-collapsed .session-item-bottom,
+      body.sidebar-collapsed .sidebar-heading-copy,
+      body.sidebar-collapsed .brand-copy,
+      body.sidebar-collapsed .sidebar-section-header {
+        display: initial;
+      }
+
+      body.sidebar-collapsed .collapsed-sidebar-actions {
+        display: none;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .nova-topbar,
+      .nova-chat-wrap,
+      .sidebar-top,
+      .sidebar-section,
+      .rail-top,
+      .rail-panel {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      .session-controls {
         grid-template-columns: 1fr;
       }
 
-      #artifactList {
-        border-right: 0;
-        border-bottom: 1px solid var(--line);
+      .composer-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .topbar-actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .topbar-status {
+        white-space: normal;
+      }
+
+      .rail-tabs {
+        grid-template-columns: 1fr;
       }
     }
   </style>
 </head>
 <body>
-  <div class="nova-app-shell" id="novaAppShell">
-    <aside class="nova-left-rail" id="sessionsRail">
-      <div class="nova-left-rail-head">
-        <div class="nova-left-rail-title-row">
-          <div class="nova-left-rail-title">Sessions</div>
-          <div class="nova-session-count" id="sessionCountBadge">0</div>
+  <div id="novaAppShell" class="nova-app-shell">
+    <aside id="novaSidebar" class="nova-sidebar">
+      <div class="sidebar-top">
+        <div class="sidebar-brand-row">
+          <div class="sidebar-brand">
+            <div class="brand-mark">N</div>
+            <div class="brand-copy">
+              <div class="brand-title">Nova Ultimate 2026</div>
+              <div class="brand-subtitle">Stateful chat + live session rail</div>
+            </div>
+          </div>
+          <button id="sidebarToggle" class="icon-btn" type="button" title="Toggle sidebar">☰</button>
         </div>
-
-        <div class="nova-session-toolbar">
-          <button id="newChatBtn" type="button">New Chat</button>
-          <button id="refreshSessionsBtn" type="button">Refresh</button>
+        <div class="sidebar-heading-copy">
+          Sessions now load from your backend and persist to <code>nova_sessions.json</code>.
         </div>
       </div>
 
-      <div class="nova-session-list" id="sessionList">
-        <div class="nova-session-empty">No sessions loaded yet.</div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <div class="sidebar-label">Sessions</div>
+          <button id="newSessionBtn" class="nova-btn nova-btn-primary" type="button">+ New</button>
+        </div>
+
+        <div class="session-controls">
+          <button id="renameSessionBtn" class="nova-btn" type="button">Rename</button>
+          <button id="pinSessionBtn" class="nova-btn" type="button">Pin</button>
+          <button id="deleteSessionBtn" class="nova-btn" type="button">Delete</button>
+        </div>
+
+        <div id="sessionsList" class="session-list"></div>
+      </div>
+
+      <div class="collapsed-sidebar-actions">
+        <button id="collapsedSidebarOpenBtn" class="collapsed-open-btn" type="button" title="Open sessions">Open</button>
+        <button id="collapsedSidebarNewBtn" class="collapsed-mini-btn" type="button" title="New session">＋</button>
       </div>
     </aside>
 
     <main class="nova-main">
       <div class="nova-topbar">
-        <div class="nova-topbar-copy">
-          <div class="nova-title">Nova Ultimate 2026</div>
-          <div class="nova-subtitle">Stateful chat • artifacts • brain retrieval • web</div>
-          <div class="nova-session-chip" id="activeSessionChip">Session: loading...</div>
+        <div class="topbar-copy">
+          <div id="sessionTitleText" class="topbar-title">New Chat</div>
+          <div id="activeSessionMeta" class="topbar-meta">0 msgs</div>
         </div>
 
-        <div class="nova-rail-tabs">
-          <button id="memoryPanelToggle" class="nova-rail-tab" type="button">Memory</button>
-          <button id="artifactsPanelToggle" class="nova-rail-tab is-active" type="button">Artifacts</button>
-          <button id="webPanelToggle" class="nova-rail-tab" type="button">Web</button>
+        <div class="topbar-actions">
+          <button id="leftRailToggle" class="nova-btn" type="button">Sessions</button>
+          <button id="rightRailToggle" class="nova-btn" type="button">Right Rail</button>
+          <button id="memoryPanelToggle" class="nova-btn" type="button">Memory</button>
+          <button id="artifactsPanelToggle" class="nova-btn" type="button">Artifacts</button>
+          <button id="webPanelToggle" class="nova-btn" type="button">Web</button>
+          <div id="sessionStatus" class="topbar-status" data-tone="muted">Ready</div>
         </div>
       </div>
 
       <div class="nova-chat-wrap">
-        <div class="nova-chat-panel" id="messages">
-          <div id="novaEmptyState" class="nova-empty-state">Nova is ready. Type a message.</div>
+        <div id="novaEmptyState" class="nova-empty-state">
+          <div class="nova-empty-state-title">Hi — what can I help you with?</div>
+          <div class="nova-empty-state-copy">
+            Your session rail is live again. The right rail now includes memory, artifacts, and web panels.
+          </div>
         </div>
-      </div>
 
-      <div class="nova-composer-wrap">
-        <div id="novaPendingFiles" class="nova-pending-files"></div>
+        <div id="messages" class="nova-messages"></div>
 
         <div class="nova-composer">
-          <textarea id="chatInput" placeholder="Type your message..."></textarea>
-          <button id="uploadBtn" type="button">Upload</button>
-          <button id="sendBtn" type="button">Send</button>
+          <textarea
+            id="chatInput"
+            class="composer-input"
+            placeholder="Message Nova..."
+            rows="1"
+          ></textarea>
 
-          <input
-            type="file"
-            id="fileInput"
-            style="display:none"
-            multiple
-            accept=".txt,.md,.log,.json,.csv,.pdf,image/*"
-          />
+          <div class="composer-actions">
+            <div class="composer-help">Enter to send • Shift+Enter for newline</div>
+            <button id="sendBtn" class="nova-btn nova-btn-primary composer-send" type="button">Send</button>
+          </div>
         </div>
       </div>
     </main>
 
-    <aside class="nova-right-rail" id="rightRail">
-      <div class="nova-right-rail-head">Nova Right Rail</div>
+    <aside id="rightRail" class="nova-right-rail">
+      <div class="rail-top">
+        <div class="rail-header">
+          <div class="rail-title">Right Rail</div>
+          <button id="rightRailCloseBtn" class="nova-btn rail-close-btn" type="button">Close</button>
+        </div>
 
-      <div class="nova-right-rail-panels">
-        <section id="memoryPanel" class="nova-rail-panel">
-          <div class="nova-rail-panel-body">
-            <div id="memoryList">
-              <div class="nova-panel-empty">No memory loaded yet.</div>
-            </div>
+        <div class="rail-tabs">
+          <button id="railTabMemory" class="rail-tab is-active" type="button" data-panel="memory">Memory</button>
+          <button id="railTabArtifacts" class="rail-tab" type="button" data-panel="artifacts">Artifacts</button>
+          <button id="railTabWeb" class="rail-tab" type="button" data-panel="web">Web</button>
+        </div>
+
+        <div class="rail-meta">
+          Use the topbar buttons or tabs to switch panels.
+        </div>
+      </div>
+
+      <div class="rail-panel-wrap">
+        <section id="memoryPanel" class="rail-panel is-active">
+          <div class="panel-card">
+            <div class="panel-card-title">Memory</div>
+            <div id="memoryPanelBody" class="panel-empty">No memory loaded yet.</div>
           </div>
         </section>
 
-        <section id="artifactsPanel" class="nova-rail-panel is-active">
-          <div class="nova-artifacts-toolbar">
-            <input id="artifactSearch" type="text" placeholder="Search artifacts..." />
-
-            <div class="nova-artifacts-toolbar-row">
-              <button id="artifactPinnedOnly" type="button">Pinned</button>
-              <button id="artifactRefreshBtn" type="button">Refresh</button>
-              <button id="artifactCleanBtn" type="button">Clean</button>
-            </div>
+        <section id="artifactsPanel" class="rail-panel">
+          <div class="panel-card">
+            <div class="panel-card-title">Artifacts</div>
+            <div id="artifactList" class="artifact-list"></div>
           </div>
 
-          <div class="nova-artifacts-split">
-            <div id="artifactList"></div>
-            <div id="artifactViewer">
-              <div class="nova-panel-empty">Select an artifact to view it here.</div>
-            </div>
+          <div class="panel-card">
+            <div class="panel-card-title">Artifact Viewer</div>
+            <div id="artifactViewer" class="artifact-viewer">Select an artifact.</div>
           </div>
         </section>
 
-        <section id="webPanel" class="nova-rail-panel">
-          <div class="nova-rail-panel-body">
-            <div id="webPreviewList">
-              <div class="nova-panel-empty">No web preview yet.</div>
-            </div>
+        <section id="webPanel" class="rail-panel">
+          <div class="panel-card">
+            <div class="panel-card-title">Web</div>
+            <div id="webPanelBody" class="panel-empty">No web data yet.</div>
           </div>
         </section>
       </div>
@@ -678,59 +907,160 @@
   </div>
 
   <script>
-    window.NOVA_BUILD = "session-rail-2026-03-31-002";
-
     (function () {
-      const panelToggles = {
+      const body = document.body;
+      const appShell = document.getElementById("novaAppShell");
+      const sidebarToggle = document.getElementById("sidebarToggle");
+      const leftRailToggle = document.getElementById("leftRailToggle");
+      const rightRailToggle = document.getElementById("rightRailToggle");
+      const rightRailCloseBtn = document.getElementById("rightRailCloseBtn");
+      const collapsedSidebarOpenBtn = document.getElementById("collapsedSidebarOpenBtn");
+      const collapsedSidebarNewBtn = document.getElementById("collapsedSidebarNewBtn");
+
+      const panelButtons = {
         memory: document.getElementById("memoryPanelToggle"),
         artifacts: document.getElementById("artifactsPanelToggle"),
-        web: document.getElementById("webPanelToggle")
+        web: document.getElementById("webPanelToggle"),
+      };
+
+      const tabButtons = {
+        memory: document.getElementById("railTabMemory"),
+        artifacts: document.getElementById("railTabArtifacts"),
+        web: document.getElementById("railTabWeb"),
       };
 
       const panels = {
         memory: document.getElementById("memoryPanel"),
         artifacts: document.getElementById("artifactsPanel"),
-        web: document.getElementById("webPanel")
+        web: document.getElementById("webPanel"),
       };
 
-      function openPanel(name) {
+      function getActivePanelName() {
+        const active = Object.keys(panels).find((key) => panels[key] && panels[key].classList.contains("is-active"));
+        return active || "memory";
+      }
+
+      function openLeftRail() {
+        body.classList.remove("sidebar-collapsed");
+      }
+
+      function closeLeftRail() {
+        body.classList.add("sidebar-collapsed");
+      }
+
+      function toggleLeftRail() {
+        body.classList.toggle("sidebar-collapsed");
+      }
+
+      function setActivePanel(name) {
+        const valid = panels[name] ? name : "memory";
+        appShell.classList.add("rail-open");
+
         Object.keys(panels).forEach((key) => {
-          const panel = panels[key];
-          const toggle = panelToggles[key];
-          if (panel) {
-            panel.classList.toggle("is-active", key === name);
+          panels[key].classList.toggle("is-active", key === valid);
+          tabButtons[key].classList.toggle("is-active", key === valid);
+        });
+      }
+
+      function togglePanel(name) {
+        const isOpen = appShell.classList.contains("rail-open");
+        const isSame = panels[name] && panels[name].classList.contains("is-active");
+
+        if (isOpen && isSame) {
+          appShell.classList.remove("rail-open");
+          return;
+        }
+
+        setActivePanel(name);
+      }
+
+      function toggleRightRail() {
+        if (appShell.classList.contains("rail-open")) {
+          appShell.classList.remove("rail-open");
+          return;
+        }
+        setActivePanel(getActivePanelName());
+      }
+
+      if (sidebarToggle) {
+        sidebarToggle.addEventListener("click", toggleLeftRail);
+      }
+
+      if (leftRailToggle) {
+        leftRailToggle.addEventListener("click", openLeftRail);
+      }
+
+      if (collapsedSidebarOpenBtn) {
+        collapsedSidebarOpenBtn.addEventListener("click", openLeftRail);
+      }
+
+      if (collapsedSidebarNewBtn) {
+        collapsedSidebarNewBtn.addEventListener("click", function () {
+          openLeftRail();
+          document.getElementById("newSessionBtn")?.click();
+        });
+      }
+
+      if (rightRailToggle) {
+        rightRailToggle.addEventListener("click", toggleRightRail);
+      }
+
+      if (rightRailCloseBtn) {
+        rightRailCloseBtn.addEventListener("click", function () {
+          appShell.classList.remove("rail-open");
+        });
+      }
+
+      Object.keys(panelButtons).forEach((key) => {
+        const btn = panelButtons[key];
+        if (btn) {
+          btn.addEventListener("click", function () {
+            togglePanel(key);
+          });
+        }
+      });
+
+      Object.keys(tabButtons).forEach((key) => {
+        const btn = tabButtons[key];
+        if (btn) {
+          btn.addEventListener("click", function () {
+            setActivePanel(key);
+          });
+        }
+      });
+
+      window.NovaPanels = {
+        open(name) {
+          setActivePanel(name);
+        },
+        close() {
+          appShell.classList.remove("rail-open");
+        },
+        toggle(name) {
+          if (!name) {
+            toggleRightRail();
+            return;
           }
-          if (toggle) {
-            toggle.classList.toggle("is-active", key === name);
-          }
-        });
-      }
+          togglePanel(name);
+        }
+      };
 
-      if (panelToggles.memory) {
-        panelToggles.memory.addEventListener("click", function () {
-          openPanel("memory");
-        });
-      }
-
-      if (panelToggles.artifacts) {
-        panelToggles.artifacts.addEventListener("click", function () {
-          openPanel("artifacts");
-        });
-      }
-
-      if (panelToggles.web) {
-        panelToggles.web.addEventListener("click", function () {
-          openPanel("web");
-        });
-      }
-
-      openPanel("artifacts");
+      window.NovaSidebar = {
+        open() {
+          openLeftRail();
+        },
+        close() {
+          closeLeftRail();
+        },
+        toggle() {
+          toggleLeftRail();
+        }
+      };
     })();
   </script>
 
-  <script src="/static/js/nova-render.js?v=history-hooks-2026-03-31-001"></script>
-  <script src="/static/js/nova-artifacts.js?v=historybadge-2026-03-30-001"></script>
-  <script src="/static/js/nova-panels.js?v=session-rail-2026-03-31-002"></script>
-  <script src="/static/js/nova-composer-bundle.js?v=session-rail-2026-03-31-002"></script>
+  <script src="/static/js/nova-session-rail.js?v=session-rail-wiring-2026-03-31-010"></script>
+  <script src="/static/js/nova-composer-bundle.js?v=session-rail-wiring-2026-03-31-010"></script>
+  <script src="/static/js/nova-artifacts.js?v=session-rail-wiring-2026-03-31-010"></script>
 </body>
 </html>
