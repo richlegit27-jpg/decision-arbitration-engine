@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUNDLE_VERSION = "history-pass-through-2026-03-30-001";
+  const BUNDLE_VERSION = "history-dom-force-2026-03-30-002";
   const MAX_HISTORY_MESSAGES = 12;
 
   const state = {
@@ -66,7 +66,9 @@
       attachmentsTray:
         qs("#composerAttachments") ||
         qs("#stagedAttachments") ||
-        qs(".nova-composer-attachments"),
+        qs("#novaPendingFiles") ||
+        qs(".nova-composer-attachments") ||
+        qs(".nova-pending-files"),
     };
   }
 
@@ -127,18 +129,27 @@
   }
 
   function getMessageRoleFromNode(node) {
-    const roleFromData = normalizeText(node.getAttribute("data-role")).toLowerCase();
+    const roleFromData =
+      normalizeText(node.getAttribute("data-role")).toLowerCase() ||
+      normalizeText(node.dataset?.role).toLowerCase();
+
     if (roleFromData === "user" || roleFromData === "assistant") {
       return roleFromData;
     }
 
-    const cls = node.className || "";
-    if (/user/i.test(cls)) return "user";
-    if (/assistant/i.test(cls) || /nova/i.test(cls)) return "assistant";
+    const cls = String(node.className || "");
+    if (/nova-message-user/i.test(cls)) return "user";
+    if (/nova-message-assistant/i.test(cls)) return "assistant";
 
-    const badge = qs(".nova-message-role,.message-role,.role", node);
-    const badgeText = normalizeText(badge ? badge.textContent : "").toLowerCase();
-    if (badgeText === "user" || badgeText === "assistant") return badgeText;
+    const roleLabel =
+      qs(".nova-message-author", node) ||
+      qs(".nova-message-role", node) ||
+      qs(".message-role", node) ||
+      qs(".role", node);
+
+    const roleText = normalizeText(roleLabel ? roleLabel.textContent : "").toLowerCase();
+    if (roleText === "you" || roleText === "user") return "user";
+    if (roleText === "nova" || roleText === "assistant") return "assistant";
 
     return "";
   }
@@ -162,18 +173,43 @@
     return normalizeText(node.textContent);
   }
 
+  function dedupeSequentialHistory(items) {
+    const deduped = [];
+    for (const item of items) {
+      const last = deduped[deduped.length - 1];
+      if (
+        last &&
+        last.role === item.role &&
+        normalizeText(last.content) === normalizeText(item.content)
+      ) {
+        continue;
+      }
+      deduped.push(item);
+    }
+    return deduped;
+  }
+
   function collectHistoryFromDom() {
     const { messages } = getEls();
     if (!messages) return [];
 
-    const nodes = qsa(".nova-message,[data-role]", messages);
+    const nodes = qsa(".nova-message, .nova-message-wrap, [data-role]", messages);
     const items = [];
 
     for (const node of nodes) {
-      const role = getMessageRoleFromNode(node);
+      let target = node;
+
+      if (!String(node.className || "").includes("nova-message")) {
+        const nested = qs(".nova-message", node);
+        if (nested) {
+          target = nested;
+        }
+      }
+
+      const role = getMessageRoleFromNode(target);
       if (role !== "user" && role !== "assistant") continue;
 
-      let content = getMessageContentFromNode(node);
+      let content = getMessageContentFromNode(target);
       if (!content) continue;
 
       content = content.replace(/\s+\n/g, "\n").trim();
@@ -182,27 +218,14 @@
       items.push({ role, content });
     }
 
-    if (items.length > MAX_HISTORY_MESSAGES) {
-      return items.slice(-MAX_HISTORY_MESSAGES);
-    }
-
-    return items;
+    const deduped = dedupeSequentialHistory(items);
+    return deduped.slice(-MAX_HISTORY_MESSAGES);
   }
 
   function collectHistory() {
-    if (Array.isArray(window.NovaChatHistory) && window.NovaChatHistory.length) {
-      const cleaned = window.NovaChatHistory
-        .filter((item) => item && (item.role === "user" || item.role === "assistant"))
-        .map((item) => ({
-          role: item.role,
-          content: normalizeText(item.content || item.message || item.text),
-        }))
-        .filter((item) => item.content);
-
-      return cleaned.slice(-MAX_HISTORY_MESSAGES);
-    }
-
-    return collectHistoryFromDom();
+    const domHistory = collectHistoryFromDom();
+    window.NovaLastCollectedHistory = domHistory;
+    return domHistory;
   }
 
   function appendFallbackMessage(role, content, meta = {}) {
@@ -212,23 +235,50 @@
     hideEmptyState();
 
     const wrap = document.createElement("div");
-    wrap.className = `nova-message nova-message-${role}`;
+    wrap.className = "nova-message-wrap";
     wrap.setAttribute("data-role", role);
+
+    const article = document.createElement("article");
+    article.className = `nova-message nova-message-${role}`;
+    article.setAttribute("data-role", role);
 
     const inner = document.createElement("div");
     inner.className = "nova-message-inner";
+
+    const head = document.createElement("div");
+    head.className = "nova-message-head";
+
+    const roleEl = document.createElement("div");
+    roleEl.className = "nova-message-role";
+    roleEl.textContent = role === "user" ? "You" : "Nova";
+
+    const timeEl = document.createElement("div");
+    timeEl.className = "nova-message-time";
+    try {
+      timeEl.textContent = new Date().toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    } catch (_err) {
+      timeEl.textContent = "";
+    }
+
+    head.appendChild(roleEl);
+    head.appendChild(timeEl);
 
     const markdown = document.createElement("div");
     markdown.className = "nova-message-markdown";
     markdown.innerHTML = escapeHtml(content).replace(/\n/g, "<br>");
 
-    inner.appendChild(markdown);
+    inner.appendChild(head);
 
     if (meta && typeof meta === "object") {
       const badges = [];
 
       if (meta.used_fallback === true) badges.push("Fallback");
-      if (meta.history_included === true) badges.push(`History ${meta.history_count || 0}`);
+      if (meta.history_included === true || Number(meta.history_count || 0) > 0) {
+        badges.push(`History ${Number(meta.history_count || 0)}`);
+      }
       if (meta.chat_service_version) badges.push(String(meta.chat_service_version));
 
       if (badges.length) {
@@ -237,7 +287,7 @@
         badgeRow.style.display = "flex";
         badgeRow.style.flexWrap = "wrap";
         badgeRow.style.gap = "6px";
-        badgeRow.style.marginTop = "8px";
+        badgeRow.style.marginBottom = "10px";
 
         for (const badgeText of badges) {
           const badge = document.createElement("span");
@@ -250,7 +300,9 @@
       }
     }
 
-    wrap.appendChild(inner);
+    inner.appendChild(markdown);
+    article.appendChild(inner);
+    wrap.appendChild(article);
     messages.appendChild(wrap);
     scrollMessagesToBottom();
     return wrap;
@@ -261,14 +313,18 @@
 
     if (window.NovaRender && typeof window.NovaRender.appendMessage === "function") {
       try {
-        window.NovaRender.appendMessage({
-          role,
-          content,
-          message: payload.assistant_message || payload.message || content,
-          debug: payload.debug || {},
-          meta: payload.meta || {},
-          attachments: payload.attachments || [],
-        });
+        window.NovaRender.appendMessage(
+          {
+            role,
+            content,
+            created_at: new Date().toISOString(),
+            meta: payload.meta || {},
+            attachments: payload.attachments || [],
+          },
+          {
+            debug: payload.debug || {},
+          }
+        );
         scrollMessagesToBottom();
         return;
       } catch (err) {
@@ -299,17 +355,17 @@
       : null;
 
     const content = normalizeText(
-      assistant?.content ||
-        responsePayload?.message ||
-        ""
+      (assistant && assistant.content) ||
+      (responsePayload && responsePayload.message) ||
+      ""
     );
 
     renderMessage("assistant", content, {
       assistant_message: assistant,
-      message: responsePayload?.message || content,
-      debug: responsePayload?.debug || {},
-      meta: assistant?.meta || {},
-      attachments: Array.isArray(assistant?.attachments) ? assistant.attachments : [],
+      message: (responsePayload && responsePayload.message) || content,
+      debug: (responsePayload && responsePayload.debug) || {},
+      meta: (assistant && assistant.meta) || {},
+      attachments: Array.isArray(assistant && assistant.attachments) ? assistant.attachments : [],
     });
   }
 
@@ -330,11 +386,6 @@
       chip.style.display = "inline-flex";
       chip.style.alignItems = "center";
       chip.style.gap = "8px";
-      chip.style.padding = "8px 10px";
-      chip.style.border = "1px solid rgba(255,255,255,0.12)";
-      chip.style.borderRadius = "999px";
-      chip.style.background = "rgba(255,255,255,0.04)";
-      chip.style.maxWidth = "100%";
 
       const label = document.createElement("span");
       label.className = "nova-attachment-chip-label";
@@ -348,11 +399,6 @@
       removeBtn.type = "button";
       removeBtn.className = "nova-attachment-chip-remove";
       removeBtn.textContent = "×";
-      removeBtn.style.cursor = "pointer";
-      removeBtn.style.border = "none";
-      removeBtn.style.background = "transparent";
-      removeBtn.style.color = "inherit";
-      removeBtn.style.fontSize = "16px";
       removeBtn.addEventListener("click", () => {
         state.stagedAttachments.splice(index, 1);
         renderAttachmentTray();
@@ -529,6 +575,7 @@
       version: BUNDLE_VERSION,
       state,
       collectHistory,
+      collectHistoryFromDom,
       sendCurrentMessage,
       uploadFiles,
       renderAttachmentTray,
