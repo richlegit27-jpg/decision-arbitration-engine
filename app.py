@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import traceback
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -41,7 +42,7 @@ ALLOWED_UPLOAD_EXTENSIONS = {
     "yml",
 }
 
-ROUTE_BUILD = "clean-chat-pipeline-2026-03-30-004"
+ROUTE_BUILD = "clean-chat-pipeline-2026-03-31-005"
 
 app = Flask(
     __name__,
@@ -127,6 +128,10 @@ def read_json_file(path: Path, default: Any) -> Any:
         return default
 
 
+def write_json_file(path: Path, value: Any) -> None:
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def allowed_file(filename: str) -> bool:
     if not filename or "." not in filename:
         return False
@@ -167,20 +172,16 @@ def normalize_response(result: Any, session_id: str, content: str) -> dict[str, 
             fixed_assistant.update(assistant_message)
             assistant_message = fixed_assistant
 
-        assistant_meta = assistant_message.get("meta")
-        if not isinstance(assistant_meta, dict):
+        if not isinstance(assistant_message.get("meta"), dict):
             assistant_message["meta"] = {}
 
-        assistant_attachments = assistant_message.get("attachments")
-        if not isinstance(assistant_attachments, list):
+        if not isinstance(assistant_message.get("attachments"), list):
             assistant_message["attachments"] = []
 
-        assistant_role = normalize_text(assistant_message.get("role"), "").strip()
-        if not assistant_role:
+        if not normalize_text(assistant_message.get("role"), "").strip():
             assistant_message["role"] = "assistant"
 
-        assistant_content = normalize_text(assistant_message.get("content"), "").strip()
-        if not assistant_content:
+        if not normalize_text(assistant_message.get("content"), "").strip():
             assistant_message["content"] = normalize_text(
                 merged.get("message"),
                 fallback_message,
@@ -191,19 +192,16 @@ def normalize_response(result: Any, session_id: str, content: str) -> dict[str, 
 
         merged["assistant_message"] = assistant_message
 
-        debug = merged.get("debug")
-        if not isinstance(debug, dict):
+        if not isinstance(merged.get("debug"), dict):
             merged["debug"] = {}
 
-        message = normalize_text(merged.get("message"), "").strip()
-        if not message:
+        if not normalize_text(merged.get("message"), "").strip():
             merged["message"] = normalize_text(
                 merged["assistant_message"].get("content"),
                 fallback_message,
             )
 
-        resolved_session = normalize_text(merged.get("session_id"), "").strip()
-        if not resolved_session:
+        if not normalize_text(merged.get("session_id"), "").strip():
             merged["session_id"] = session_id or "default-session"
 
         ok_value = merged.get("ok")
@@ -238,14 +236,18 @@ def get_chat_service():
         raise RuntimeError("ChatService instance missing callable send_message")
     return service
 
+
 def get_chat_service_debug() -> dict[str, Any]:
     try:
-        module = __import__("services.chat_service", fromlist=[
-            "ChatService",
-            "CHAT_SERVICE_VERSION",
-            "MODEL_STAGE_REAL",
-            "MODEL_STAGE_FALLBACK",
-        ])
+        module = __import__(
+            "services.chat_service",
+            fromlist=[
+                "ChatService",
+                "CHAT_SERVICE_VERSION",
+                "MODEL_STAGE_REAL",
+                "MODEL_STAGE_FALLBACK",
+            ],
+        )
         service = module.ChatService()
 
         return {
@@ -263,6 +265,7 @@ def get_chat_service_debug() -> dict[str, Any]:
         return {
             "chat_service_probe_error": f"{type(exc).__name__}: {exc}",
         }
+
 
 def call_send_message(
     service: Any,
@@ -284,8 +287,149 @@ def call_send_message(
     )
 
 
-def try_get_state() -> dict[str, Any]:
+def normalize_message_for_session(message: Any, *, role_fallback: str) -> dict[str, Any]:
+    msg = message if isinstance(message, dict) else {}
+    content = normalize_text(msg.get("content"), "").strip()
+
+    return {
+        "id": normalize_text(msg.get("id"), "") or str(uuid.uuid4()),
+        "role": normalize_text(msg.get("role"), role_fallback) or role_fallback,
+        "content": content,
+        "created_at": normalize_text(msg.get("created_at"), "") or utc_now_iso(),
+        "attachments": msg.get("attachments", []) if isinstance(msg.get("attachments"), list) else [],
+        "meta": msg.get("meta", {}) if isinstance(msg.get("meta"), dict) else {},
+    }
+
+
+def load_sessions() -> list[dict[str, Any]]:
     sessions = read_json_file(SESSIONS_FILE, [])
+    return sessions if isinstance(sessions, list) else []
+
+
+def save_sessions(sessions: list[dict[str, Any]]) -> None:
+    write_json_file(SESSIONS_FILE, sessions)
+
+
+def ensure_session_record(session_id: str) -> dict[str, Any]:
+    sessions = load_sessions()
+    now = utc_now_iso()
+
+    for session in sessions:
+        if normalize_text(session.get("id"), "") == session_id:
+            if not isinstance(session.get("messages"), list):
+                session["messages"] = []
+            session["updated_at"] = now
+            save_sessions(sessions)
+            return session
+
+    new_session = {
+        "id": session_id,
+        "title": "New Chat",
+        "created_at": now,
+        "updated_at": now,
+        "pinned": False,
+        "message_count": 0,
+        "last_message_preview": "",
+        "messages": [],
+    }
+    sessions.append(new_session)
+    save_sessions(sessions)
+    return new_session
+
+
+def get_session_messages(session_id: str) -> list[dict[str, Any]]:
+    sessions = load_sessions()
+    for session in sessions:
+        if normalize_text(session.get("id"), "") == session_id:
+            messages = session.get("messages", [])
+            return messages if isinstance(messages, list) else []
+    return []
+
+
+def persist_chat_exchange(
+    session_id: str,
+    user_content: str,
+    assistant_message: dict[str, Any],
+) -> None:
+    sessions = load_sessions()
+    now = utc_now_iso()
+    target_session: dict[str, Any] | None = None
+
+    for session in sessions:
+        if normalize_text(session.get("id"), "") == session_id:
+            target_session = session
+            break
+
+    if target_session is None:
+        target_session = {
+            "id": session_id,
+            "title": user_content[:60] or "New Chat",
+            "created_at": now,
+            "updated_at": now,
+            "pinned": False,
+            "message_count": 0,
+            "last_message_preview": "",
+            "messages": [],
+        }
+        sessions.append(target_session)
+
+    if not isinstance(target_session.get("messages"), list):
+        target_session["messages"] = []
+
+    user_message = {
+        "id": str(uuid.uuid4()),
+        "role": "user",
+        "content": user_content,
+        "created_at": now,
+        "attachments": [],
+        "meta": {},
+    }
+
+    assistant_normalized = normalize_message_for_session(
+        assistant_message,
+        role_fallback="assistant",
+    )
+
+    messages: list[dict[str, Any]] = target_session["messages"]
+
+    should_add_user = True
+    if messages:
+        last = messages[-1]
+        if (
+            normalize_text(last.get("role"), "") == "user"
+            and normalize_text(last.get("content"), "") == normalize_text(user_content, "")
+        ):
+            should_add_user = False
+
+    if should_add_user and normalize_text(user_content, ""):
+        messages.append(user_message)
+
+    should_add_assistant = True
+    if messages:
+        last = messages[-1]
+        if (
+            normalize_text(last.get("role"), "") == "assistant"
+            and normalize_text(last.get("content"), "") == normalize_text(assistant_normalized.get("content"), "")
+        ):
+            should_add_assistant = False
+
+    if should_add_assistant and normalize_text(assistant_normalized.get("content"), ""):
+        messages.append(assistant_normalized)
+
+    target_session["updated_at"] = now
+    target_session["message_count"] = len(messages)
+    target_session["last_message_preview"] = normalize_text(
+        assistant_normalized.get("content"),
+        user_content,
+    )[:160]
+    if not normalize_text(target_session.get("title"), ""):
+        target_session["title"] = (user_content[:60] or "New Chat").strip()
+
+    save_sessions(sessions)
+
+
+def try_get_state() -> dict[str, Any]:
+    sessions = load_sessions()
     memory = read_json_file(MEMORY_FILE, [])
     artifacts = read_json_file(ARTIFACTS_FILE, [])
 
@@ -375,7 +519,16 @@ def api_health():
 @app.get("/api/state")
 def api_state():
     try:
-        return jsonify(try_get_state())
+        session_id = normalize_text(request.args.get("session_id"), "").strip()
+        state = try_get_state()
+
+        if session_id:
+            state["active_session_id"] = session_id
+            state["active_messages"] = get_session_messages(session_id)
+            state["debug"]["active_session_id"] = session_id
+            state["debug"]["active_messages_count"] = len(state["active_messages"])
+
+        return jsonify(state)
     except Exception as exc:
         return safe_error_response(route="/api/state", exc=exc)
 
@@ -486,6 +639,12 @@ def api_chat():
         raw_attachments = payload.get("attachments", [])
         attachments = raw_attachments if isinstance(raw_attachments, list) else []
 
+        ensure_session_record(session_id)
+
+        if "history" not in payload or not isinstance(payload.get("history"), list) or not payload.get("history"):
+            existing_messages = get_session_messages(session_id)
+            payload["history"] = existing_messages[-12:] if isinstance(existing_messages, list) else []
+
         debug_in = {
             "route": "/api/chat",
             "request_content_type": request.content_type,
@@ -526,6 +685,12 @@ def api_chat():
 
         if not isinstance(response_payload["assistant_message"].get("attachments"), list):
             response_payload["assistant_message"]["attachments"] = []
+
+        persist_chat_exchange(
+            session_id=session_id,
+            user_content=content,
+            assistant_message=response_payload["assistant_message"],
+        )
 
         response_payload["debug"]["request_debug"] = debug_in
         response_payload["debug"]["route_shielded"] = True

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUNDLE_VERSION = "history-dom-force-2026-03-30-002";
+  const BUNDLE_VERSION = "history-hard-fallback-2026-03-30-004";
   const MAX_HISTORY_MESSAGES = 12;
 
   const state = {
@@ -128,9 +128,18 @@
     messages.scrollTop = messages.scrollHeight;
   }
 
+  function getRoleFromText(value) {
+    const text = normalizeText(value).toLowerCase();
+    if (text === "you" || text === "user") return "user";
+    if (text === "nova" || text === "assistant") return "assistant";
+    return "";
+  }
+
   function getMessageRoleFromNode(node) {
+    if (!node) return "";
+
     const roleFromData =
-      normalizeText(node.getAttribute("data-role")).toLowerCase() ||
+      normalizeText(node.getAttribute?.("data-role")).toLowerCase() ||
       normalizeText(node.dataset?.role).toLowerCase();
 
     if (roleFromData === "user" || roleFromData === "assistant") {
@@ -141,32 +150,43 @@
     if (/nova-message-user/i.test(cls)) return "user";
     if (/nova-message-assistant/i.test(cls)) return "assistant";
 
-    const roleLabel =
+    const author =
       qs(".nova-message-author", node) ||
       qs(".nova-message-role", node) ||
       qs(".message-role", node) ||
       qs(".role", node);
 
-    const roleText = normalizeText(roleLabel ? roleLabel.textContent : "").toLowerCase();
-    if (roleText === "you" || roleText === "user") return "user";
-    if (roleText === "nova" || roleText === "assistant") return "assistant";
+    const authorRole = getRoleFromText(author ? author.textContent : "");
+    if (authorRole) return authorRole;
 
     return "";
   }
 
   function getMessageContentFromNode(node) {
+    if (!node) return "";
+
     const candidates = [
       ".nova-message-markdown",
       ".nova-message-text",
       ".message-content",
       ".nova-message-body",
-      ".nova-message-inner",
       ".content",
     ];
 
     for (const selector of candidates) {
       const el = qs(selector, node);
       const text = normalizeText(el ? el.textContent : "");
+      if (text) return text;
+    }
+
+    const inner = qs(".nova-message-inner", node);
+    if (inner) {
+      const clone = inner.cloneNode(true);
+      qsa(
+        ".nova-message-topline, .nova-message-head, .nova-message-badges, .nova-message-attachments, .nova-message-time, .nova-message-author, .nova-message-role",
+        clone
+      ).forEach((el) => el.remove());
+      const text = normalizeText(clone.textContent);
       if (text) return text;
     }
 
@@ -189,11 +209,8 @@
     return deduped;
   }
 
-  function collectHistoryFromDom() {
-    const { messages } = getEls();
-    if (!messages) return [];
-
-    const nodes = qsa(".nova-message, .nova-message-wrap, [data-role]", messages);
+  function collectHistoryFromRichNodes(messagesEl) {
+    const nodes = qsa(".nova-message, .nova-message-wrap, [data-role]", messagesEl);
     const items = [];
 
     for (const node of nodes) {
@@ -201,9 +218,7 @@
 
       if (!String(node.className || "").includes("nova-message")) {
         const nested = qs(".nova-message", node);
-        if (nested) {
-          target = nested;
-        }
+        if (nested) target = nested;
       }
 
       const role = getMessageRoleFromNode(target);
@@ -218,14 +233,80 @@
       items.push({ role, content });
     }
 
-    const deduped = dedupeSequentialHistory(items);
-    return deduped.slice(-MAX_HISTORY_MESSAGES);
+    return dedupeSequentialHistory(items).slice(-MAX_HISTORY_MESSAGES);
+  }
+
+  function collectHistoryFromDirectChildren(messagesEl) {
+    const items = [];
+    const children = Array.from(messagesEl.children || []);
+
+    for (const child of children) {
+      if (child.id === "novaEmptyState") continue;
+
+      const article = child.matches?.(".nova-message")
+        ? child
+        : child.querySelector?.(".nova-message");
+
+      const container = article || child;
+      let role = getMessageRoleFromNode(container);
+
+      if (!role) {
+        const raw = normalizeText(container.textContent);
+        if (raw.startsWith("You")) role = "user";
+        if (raw.startsWith("Nova")) role = "assistant";
+      }
+
+      if (role !== "user" && role !== "assistant") continue;
+
+      let content = getMessageContentFromNode(container);
+
+      if (!content) {
+        const text = normalizeText(container.textContent);
+        const lines = text
+          .split("\n")
+          .map((line) => normalizeText(line))
+          .filter(Boolean);
+
+        if (lines.length > 1) {
+          const first = getRoleFromText(lines[0]);
+          if (first) {
+            lines.shift();
+          }
+          if (lines.length && /^\d{1,2}:\d{2}/.test(lines[0])) {
+            lines.shift();
+          }
+          content = normalizeText(lines.join("\n"));
+        }
+      }
+
+      if (!content) continue;
+
+      items.push({ role, content });
+    }
+
+    return dedupeSequentialHistory(items).slice(-MAX_HISTORY_MESSAGES);
+  }
+
+  function collectHistoryFromDom() {
+    const { messages } = getEls();
+    if (!messages) return [];
+
+    const rich = collectHistoryFromRichNodes(messages);
+    if (rich.length) {
+      window.NovaHistoryCollectorUsed = "rich";
+      window.NovaLastCollectedHistory = rich;
+      return rich;
+    }
+
+    const direct = collectHistoryFromDirectChildren(messages);
+    window.NovaHistoryCollectorUsed = "direct";
+    window.NovaLastCollectedHistory = direct;
+    return direct;
   }
 
   function collectHistory() {
     const domHistory = collectHistoryFromDom();
-    window.NovaLastCollectedHistory = domHistory;
-    return domHistory;
+    return domHistory.slice(-MAX_HISTORY_MESSAGES);
   }
 
   function appendFallbackMessage(role, content, meta = {}) {
@@ -329,16 +410,6 @@
         return;
       } catch (err) {
         console.warn("NovaRender.appendMessage failed, using fallback DOM render.", err);
-      }
-    }
-
-    if (window.NovaRender && typeof window.NovaRender.addMessage === "function") {
-      try {
-        window.NovaRender.addMessage(role, content, payload.debug || {});
-        scrollMessagesToBottom();
-        return;
-      } catch (err) {
-        console.warn("NovaRender.addMessage failed, using fallback DOM render.", err);
       }
     }
 
@@ -447,12 +518,21 @@
   function buildPayload(content) {
     const history = collectHistory();
 
-    return {
+    const payload = {
       content,
       session_id: state.sessionId || "default-session",
       history,
       attachments: state.stagedAttachments.slice(),
     };
+
+    window.NovaOutgoingPayload = payload;
+    window.NovaOutgoingHistory = history;
+
+    console.log("Nova history collector used:", window.NovaHistoryCollectorUsed);
+    console.log("Nova outgoing payload", payload);
+    console.log("Nova outgoing history", history);
+
+    return payload;
   }
 
   async function sendCurrentMessage() {
@@ -576,6 +656,9 @@
       state,
       collectHistory,
       collectHistoryFromDom,
+      collectHistoryFromRichNodes,
+      collectHistoryFromDirectChildren,
+      buildPayload,
       sendCurrentMessage,
       uploadFiles,
       renderAttachmentTray,
