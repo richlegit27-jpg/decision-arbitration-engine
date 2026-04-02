@@ -276,7 +276,7 @@
           </div>
         </div>
 
-        <button id="sidebarToggle" class="nova-shell-btn" type="button" title="Collapse or expand sidebar">☰</button>
+        <button id="sidebarToggle" class="nova-shell-btn" type="button" title="Collapse or expand sidebar">â˜°</button>
       </div>
 
       <div class="nova-session-actions">
@@ -286,7 +286,7 @@
       <div class="nova-session-list-wrap">
         <div class="nova-session-list-head">
           <div class="nova-session-list-title">Sessions</div>
-          <button id="refreshSessionsBtn" class="nova-shell-btn" type="button" title="Refresh sessions">↻</button>
+          <button id="refreshSessionsBtn" class="nova-shell-btn" type="button" title="Refresh sessions">â†»</button>
         </div>
 
         <div id="sessionList" class="nova-session-list" aria-live="polite"></div>
@@ -298,7 +298,7 @@
     <main class="nova-main">
       <header class="nova-main-topbar">
         <div class="nova-main-topbar-left">
-          <button id="mobileSidebarToggle" class="nova-shell-btn" type="button" title="Open sidebar">☰</button>
+          <button id="mobileSidebarToggle" class="nova-shell-btn" type="button" title="Open sidebar">â˜°</button>
 
           <div class="nova-main-title-wrap">
             <div id="activeSessionTitle" class="nova-main-title">New Chat</div>
@@ -312,9 +312,32 @@
             <span id="connectionStatus">Ready</span>
           </div>
 
-          <button id="memoryPanelToggle" class="nova-panel-tab" type="button">Memory</button>
-          <button id="artifactsPanelToggle" class="nova-panel-tab" type="button">Artifacts</button>
-          <button id="webPanelToggle" class="nova-panel-tab" type="button">Web</button>
+          <button
+            id="memoryPanelToggle"
+            class="nova-panel-tab"
+            type="button"
+            data-panel-toggle="memory"
+            aria-controls="memoryPanel"
+            aria-expanded="false"
+          >Memory</button>
+
+          <button
+            id="artifactsPanelToggle"
+            class="nova-panel-tab"
+            type="button"
+            data-panel-toggle="artifacts"
+            aria-controls="artifactsPanel"
+            aria-expanded="false"
+          >Artifacts</button>
+
+          <button
+            id="webPanelToggle"
+            class="nova-panel-tab"
+            type="button"
+            data-panel-toggle="web"
+            aria-controls="webPanel"
+            aria-expanded="false"
+          >Web</button>
         </div>
       </header>
 
@@ -360,13 +383,13 @@
                   <textarea
                     id="chatInput"
                     class="nova-composer-textarea"
-                    placeholder="Message Nova…"
+                    placeholder="Message Novaâ€¦"
                     spellcheck="true"
                   ></textarea>
 
                   <div class="nova-composer-footer">
                     <div class="nova-composer-hint">
-                      Enter sends • Shift+Enter newline • Upload stages files before send
+                      Enter sends â€¢ Shift+Enter newline â€¢ Upload stages files before send
                     </div>
 
                     <div class="nova-composer-actions">
@@ -394,22 +417,82 @@
             <div id="rightRailTitle" class="nova-right-rail-title">Right Rail</div>
 
             <div class="nova-panel-tabs">
-              <button id="memoryTabBtn" class="nova-panel-tab" type="button">Memory</button>
-              <button id="artifactsTabBtn" class="nova-panel-tab" type="button">Artifacts</button>
-              <button id="webTabBtn" class="nova-panel-tab" type="button">Web</button>
-              <button id="closeRailBtn" class="nova-shell-btn" type="button" title="Close rail">×</button>
+              <button
+                id="memoryTabBtn"
+                class="nova-panel-tab"
+                type="button"
+                data-panel-toggle="memory"
+                aria-controls="memoryPanel"
+                aria-expanded="false"
+              >Memory</button>
+
+              <button
+                id="artifactsTabBtn"
+                class="nova-panel-tab"
+                type="button"
+                data-panel-toggle="artifacts"
+                aria-controls="artifactsPanel"
+                aria-expanded="false"
+              >Artifacts</button>
+
+              <button
+                id="webTabBtn"
+                class="nova-panel-tab"
+                type="button"
+                data-panel-toggle="web"
+                aria-controls="webPanel"
+                aria-expanded="false"
+              >Web</button>
+
+              <button id="closeRailBtn" class="nova-shell-btn" type="button" title="Close rail">Ã—</button>
             </div>
           </div>
 
           <div class="nova-right-rail-body">
-            <section id="memoryPanel" class="nova-right-panel" aria-label="Memory panel">
-              <div class="nova-panel-toolbar">
-                <button id="memoryRefreshBtn" class="nova-shell-btn" type="button" title="Refresh memory">↻</button>
+            <section
+              id="memoryPanel"
+              class="nova-right-panel nova-memory-panel"
+              data-panel="memory"
+              data-role="memory-panel"
+              aria-label="Memory panel"
+              aria-hidden="true"
+              hidden
+            >
+              <div class="nova-panel-header nova-memory-header" data-role="memory-header">
+                <div class="nova-memory-title" data-role="memory-title">Memory</div>
+
+                <div class="nova-memory-controls" data-role="memory-controls">
+                  <button
+                    id="memoryRefreshBtn"
+                    class="nova-shell-btn nova-chip-btn"
+                    type="button"
+                    title="Refresh memory"
+                    data-role="memory-refresh"
+                  >â†»</button>
+                </div>
+
+                <div class="nova-memory-meta" data-role="memory-meta">
+                  Memory not loaded yet.
+                </div>
               </div>
-              <div id="memoryPanelScroll" class="nova-panel-scroll"></div>
+
+              <div
+                id="memoryPanelScroll"
+                class="nova-panel-scroll nova-panel-body nova-memory-body"
+                data-role="memory-body"
+              >
+                <div class="nova-memory-list" data-role="memory-list">
+                  <div class="nova-memory-empty" data-role="memory-empty">
+                    <div class="nova-memory-empty-title">No memory yet</div>
+                    <div class="nova-memory-empty-copy">
+                      Open the panel or press refresh to load memory items.
+                    </div>
+                  </div>
+                </div>
+              </div>
             </section>
 
-            <section id="artifactsPanel" class="nova-right-panel" aria-label="Artifacts panel">
+            <section id="artifactsPanel" class="nova-right-panel" aria-label="Artifacts panel" aria-hidden="true" hidden>
               <div class="nova-panel-toolbar">
                 <input id="artifactSearch" type="text" placeholder="Search artifacts" autocomplete="off">
                 <select id="artifactFilter" title="Artifact filter">
@@ -418,11 +501,11 @@
                   <option value="media">Media</option>
                   <option value="chat_reply">Chat Reply</option>
                 </select>
-                <button id="artifactRefresh" class="nova-shell-btn" type="button" title="Refresh artifacts">↻</button>
+                <button id="artifactRefresh" class="nova-shell-btn" type="button" title="Refresh artifacts">â†»</button>
               </div>
 
               <div class="nova-panel-scroll">
-                <div id="artifactList"></div>
+                <div id="artifactsList"></div>
                 <div id="artifactEmpty" class="nova-artifacts-empty" style="display:none;">No artifacts yet.</div>
 
                 <section id="artifactViewer" class="nova-artifact-viewer" data-empty="true" aria-label="Artifact viewer">
@@ -438,9 +521,9 @@
               </div>
             </section>
 
-            <section id="webPanel" class="nova-right-panel" aria-label="Web panel">
+            <section id="webPanel" class="nova-right-panel" aria-label="Web panel" aria-hidden="true" hidden>
               <div class="nova-panel-toolbar">
-                <button id="webRefreshBtn" class="nova-shell-btn" type="button" title="Refresh web panel">↻</button>
+                <button id="webRefreshBtn" class="nova-shell-btn" type="button" title="Refresh web panel">â†»</button>
               </div>
               <div id="webPanelScroll" class="nova-panel-scroll"></div>
             </section>
@@ -455,7 +538,7 @@
             <div class="nova-debug-actions">
               <button id="debugRefreshBtn" class="nova-shell-btn" type="button">Refresh</button>
               <button id="debugCopyBtn" class="nova-shell-btn" type="button">Copy</button>
-              <button id="debugCloseBtn" class="nova-shell-btn" type="button">×</button>
+              <button id="debugCloseBtn" class="nova-shell-btn" type="button">Ã—</button>
             </div>
           </div>
 
@@ -494,16 +577,22 @@
       const panels = {
         memory: document.getElementById("memoryPanel"),
         artifacts: document.getElementById("artifactsPanel"),
-        web: document.getElementById("webPanel"),
+        web: document.getElementById("webPanel")
       };
 
       const panelButtons = {
         memory: [memoryPanelToggle, memoryTabBtn],
         artifacts: [artifactsPanelToggle, artifactsTabBtn],
-        web: [webPanelToggle, webTabBtn],
+        web: [webPanelToggle, webTabBtn]
       };
 
       let activePanel = "";
+
+      function dispatch(name, detail) {
+        try {
+          window.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
+        } catch (_) {}
+      }
 
       function setSidebarCollapsed(forceValue) {
         const next =
@@ -527,38 +616,60 @@
         shell.classList.toggle("mobile-sidebar-open", next);
       }
 
+      function blurFocusedInside(panel) {
+        if (!panel) return;
+        const active = document.activeElement;
+        if (active && panel.contains(active) && typeof active.blur === "function") {
+          active.blur();
+        }
+      }
+
+      function applyPanelState(name) {
+        Object.keys(panels).forEach(function (key) {
+          const panel = panels[key];
+          const isActive = key === name && !!name;
+
+          if (panel) {
+            if (!isActive) {
+              blurFocusedInside(panel);
+            }
+
+            panel.classList.toggle("is-active", isActive);
+            panel.hidden = !isActive;
+            panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+            panel.style.display = isActive ? "" : "none";
+          }
+
+          (panelButtons[key] || []).forEach(function (btn) {
+            if (!btn) return;
+            btn.classList.toggle("is-active", isActive);
+            btn.setAttribute("aria-expanded", isActive ? "true" : "false");
+          });
+        });
+      }
+
       function openPanel(name) {
         if (!panels[name]) return;
 
         activePanel = name;
         shell.classList.add("rail-open");
-
-        Object.keys(panels).forEach(function (key) {
-          const isActive = key === name;
-          panels[key].classList.toggle("is-active", isActive);
-          (panelButtons[key] || []).forEach(function (btn) {
-            if (btn) btn.classList.toggle("is-active", isActive);
-          });
-        });
+        applyPanelState(name);
 
         rightRailTitle.textContent =
           name === "memory" ? "Memory" :
           name === "artifacts" ? "Artifacts" :
           name === "web" ? "Web" : "Right Rail";
+
+        dispatch("nova:right-panel-opened", { kind: name });
       }
 
       function closePanel() {
+        const previous = activePanel;
         activePanel = "";
         shell.classList.remove("rail-open");
-
-        Object.keys(panels).forEach(function (key) {
-          panels[key].classList.remove("is-active");
-          (panelButtons[key] || []).forEach(function (btn) {
-            if (btn) btn.classList.remove("is-active");
-          });
-        });
-
+        applyPanelState("");
         rightRailTitle.textContent = "Right Rail";
+        dispatch("nova:right-panel-closed", { kind: previous || "" });
       }
 
       function togglePanel(name) {
@@ -627,7 +738,7 @@
         open(name) { openPanel(name); },
         close() { closePanel(); },
         toggle(name) { togglePanel(name); },
-        getActivePanel() { return activePanel; },
+        getActivePanel() { return activePanel; }
       };
 
       try {
@@ -636,6 +747,9 @@
           shell.classList.add("sidebar-collapsed");
         }
       } catch (_) {}
+
+      applyPanelState("");
+      console.log("[NovaPanels] controller ready");
     })();
   </script>
 
@@ -740,7 +854,7 @@
               '</div>' +
               thumb +
               '<div class="nova-staged-chip-title">' + escapeHtml(name) + '</div>' +
-              '<div class="nova-staged-chip-meta">' + escapeHtml([item.mime_type || item.mime || "", formatSize(item.size)].filter(Boolean).join(" • ")) + '</div>' +
+              '<div class="nova-staged-chip-meta">' + escapeHtml([item.mime_type || item.mime || "", formatSize(item.size)].filter(Boolean).join(" â€¢ ")) + '</div>' +
             '</div>'
           );
         }).join("");

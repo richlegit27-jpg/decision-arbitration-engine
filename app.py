@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import base64
 import json
-import mimetypes
 import os
-import traceback
+import re
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -12,9 +13,10 @@ from typing import Any
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
 
-from services.artifact_service import ArtifactService
-from services.chat_service import ChatService
-from services.memory_service import MemoryService
+try:
+    from openai import OpenAI
+except Exception:  # pragma: no cover
+    OpenAI = None
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -23,488 +25,513 @@ UPLOADS_DIR = BASE_DIR / "uploads"
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-
 SESSIONS_FILE = DATA_DIR / "nova_sessions.json"
-MEMORY_FILE = DATA_DIR / "nova_memory.json"
 ARTIFACTS_FILE = DATA_DIR / "nova_artifacts.json"
+MEMORY_FILE = DATA_DIR / "nova_memory.json"
 
-MAX_CONTENT_LENGTH = 64 * 1024 * 1024
+APP_HOST = os.getenv("NOVA_HOST", os.getenv("APP_HOST", "127.0.0.1"))
+APP_PORT = int(os.getenv("NOVA_PORT", os.getenv("APP_PORT", "5001")))
+CHAT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4")
+IMAGE_MODEL = os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1.5")
+IMAGE_SIZE = os.getenv("NOVA_IMAGE_SIZE", "1024x1024")
 
 ALLOWED_UPLOAD_EXTENSIONS = {
-    "png", "jpg", "jpeg", "gif", "webp", "bmp", "svg",
-    "mp4", "webm", "mov", "m4v", "avi", "mkv",
-    "mp3", "wav", "m4a", "ogg", "flac", "aac",
-    "pdf", "txt", "log", "md", "json", "csv", "html", "htm", "xml", "yaml", "yml",
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg",
+    ".mp4", ".webm", ".mov", ".m4v", ".avi", ".mkv",
+    ".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac",
+    ".pdf", ".txt", ".log", ".md", ".json", ".csv", ".html", ".htm", ".xml", ".yaml", ".yml"
 }
 
 
-def utc_now() -> str:
+def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def safe_trace(label: str, exc: Exception) -> str:
-    tb = traceback.format_exc()
-    print("\n" + "=" * 100)
-    print(f"[{utc_now()}] APP ERROR: {label}")
-    print(f"{type(exc).__name__}: {exc}")
-    print(tb)
-    print("=" * 100 + "\n")
-    return tb
+def ensure_dirs() -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    if not SESSIONS_FILE.exists():
+        write_json(SESSIONS_FILE, [])
+    if not ARTIFACTS_FILE.exists():
+        write_json(ARTIFACTS_FILE, [])
+    if not MEMORY_FILE.exists():
+        write_json(MEMORY_FILE, [])
 
 
-def read_json_file(path: Path, default: Any) -> Any:
+def read_json(path: Path, default: Any) -> Any:
     try:
-        if not path.exists():
-            return default
-        raw = path.read_text(encoding="utf-8").strip()
-        if not raw:
-            return default
-        return json.loads(raw)
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
     except Exception:
         return default
 
 
-def write_json_file(path: Path, payload: Any) -> None:
+def write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        json.dump(value, f, indent=2, ensure_ascii=False)
+    tmp.replace(path)
 
 
-def allowed_file(filename: str) -> bool:
-    if "." not in filename:
-        return False
-    return filename.rsplit(".", 1)[-1].lower() in ALLOWED_UPLOAD_EXTENSIONS
+def truncate_text(value: str, limit: int = 120) -> str:
+    text = re.sub(r"\s+", " ", (value or "").strip())
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "…"
 
 
-def guess_attachment_type(filename: str = "", mime_type: str = "") -> str:
-    name = (filename or "").lower()
-    mime = (mime_type or "").lower()
+def safe_filename(name: str) -> str:
+    cleaned = secure_filename(name or "file")
+    return cleaned or f"file-{uuid.uuid4().hex}"
 
-    if mime.startswith("image/") or name.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg")):
+
+def ext_for_filename(name: str, fallback: str = ".bin") -> str:
+    suffix = Path(name or "").suffix.lower()
+    return suffix if suffix else fallback
+
+
+def guess_media_type(filename: str) -> str:
+    suffix = Path(filename).suffix.lower()
+    if suffix in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}:
         return "image"
-    if mime.startswith("video/") or name.endswith((".mp4", ".webm", ".mov", ".m4v", ".avi", ".mkv")):
+    if suffix in {".mp4", ".webm", ".mov", ".m4v", ".avi", ".mkv"}:
         return "video"
-    if mime.startswith("audio/") or name.endswith((".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac")):
+    if suffix in {".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac"}:
         return "audio"
     return "file"
 
 
-def build_upload_url(stored_name: str) -> str:
-    return f"/api/uploads/{stored_name}"
+@dataclass
+class JsonStore:
+    path: Path
+
+    def load(self, default: Any) -> Any:
+        return read_json(self.path, default)
+
+    def save(self, value: Any) -> None:
+        write_json(self.path, value)
 
 
-def normalize_attachment(raw: Any, source: str = "unknown") -> dict[str, Any] | None:
-    if not isinstance(raw, dict):
+class ArtifactService:
+    def __init__(self, artifacts_file: Path) -> None:
+        self.store = JsonStore(artifacts_file)
+
+    def list_artifacts(self) -> list[dict[str, Any]]:
+        items = self.store.load([])
+        if not isinstance(items, list):
+            return []
+        items.sort(key=lambda a: a.get("created_at", ""), reverse=True)
+        return items
+
+    def get_artifact(self, artifact_id: str) -> dict[str, Any] | None:
+        for item in self.list_artifacts():
+            if item.get("id") == artifact_id:
+                return item
         return None
 
-    filename = str(raw.get("filename") or raw.get("name") or raw.get("title") or "")
-    stored_name = str(raw.get("stored_name") or raw.get("stored_filename") or raw.get("path") or "")
-    mime_type = str(raw.get("mime_type") or raw.get("content_type") or raw.get("mime") or "")
-    url = str(raw.get("url") or raw.get("src") or raw.get("href") or "")
+    def save_artifact(self, artifact: dict[str, Any]) -> dict[str, Any]:
+        items = self.list_artifacts()
+        updated = False
+        for index, item in enumerate(items):
+            if item.get("id") == artifact.get("id"):
+                items[index] = artifact
+                updated = True
+                break
+        if not updated:
+            items.append(artifact)
+        items.sort(key=lambda a: a.get("created_at", ""), reverse=True)
+        self.store.save(items)
+        return artifact
 
-    if not mime_type and filename:
-        guessed, _ = mimetypes.guess_type(filename)
-        mime_type = guessed or ""
+    def create_artifact(
+        self,
+        *,
+        session_id: str,
+        title: str,
+        kind: str,
+        content: str,
+        attachments: list[dict[str, Any]] | None = None,
+        meta: dict[str, Any] | None = None,
+        pinned: bool = False,
+    ) -> dict[str, Any]:
+        ts = now_iso()
+        artifact = {
+            "id": str(uuid.uuid4()),
+            "session_id": session_id,
+            "title": title,
+            "kind": kind,
+            "content": content,
+            "attachments": attachments or [],
+            "created_at": ts,
+            "updated_at": ts,
+            "pinned": bool(pinned),
+            "meta": meta or {},
+        }
+        return self.save_artifact(artifact)
 
-    att_type = str(raw.get("type") or raw.get("kind") or guess_attachment_type(filename, mime_type)).lower()
-    if att_type not in {"image", "video", "audio", "file"}:
-        att_type = guess_attachment_type(filename, mime_type)
 
-    if not url and stored_name:
-        url = stored_name if stored_name.startswith(("http://", "https://", "/api/")) else build_upload_url(stored_name)
+class SessionService:
+    def __init__(self, sessions_file: Path) -> None:
+        self.store = JsonStore(sessions_file)
 
-    item = {
-        "id": str(raw.get("id") or uuid.uuid4()),
-        "type": att_type,
-        "filename": filename,
-        "stored_name": stored_name,
-        "mime_type": mime_type,
-        "url": url,
-        "size": raw.get("size"),
-        "source": str(raw.get("source") or source),
-        "title": raw.get("title") or filename or att_type.title(),
-        "alt": raw.get("alt") or raw.get("caption") or filename or att_type.title(),
-    }
+    def list_sessions(self) -> list[dict[str, Any]]:
+        items = self.store.load([])
+        if not isinstance(items, list):
+            return []
+        items.sort(key=lambda s: s.get("updated_at", ""), reverse=True)
+        return items
 
-    if not item["url"] and not item["filename"]:
+    def get_session(self, session_id: str) -> dict[str, Any] | None:
+        for item in self.list_sessions():
+            if item.get("id") == session_id:
+                return item
         return None
-    return item
+
+    def ensure_session(self, session_id: str | None = None, title: str | None = None) -> dict[str, Any]:
+        items = self.list_sessions()
+        if session_id:
+            for item in items:
+                if item.get("id") == session_id:
+                    return item
+
+        ts = now_iso()
+        session = {
+            "id": session_id or str(uuid.uuid4()),
+            "title": title or "New Chat",
+            "created_at": ts,
+            "updated_at": ts,
+            "pinned": False,
+            "message_count": 0,
+            "last_message_preview": "",
+            "messages": [],
+        }
+        items.append(session)
+        self.store.save(items)
+        return session
+
+    def update_session(self, session: dict[str, Any]) -> dict[str, Any]:
+        items = self.list_sessions()
+        updated = False
+        for index, item in enumerate(items):
+            if item.get("id") == session.get("id"):
+                items[index] = session
+                updated = True
+                break
+        if not updated:
+            items.append(session)
+        items.sort(key=lambda s: s.get("updated_at", ""), reverse=True)
+        self.store.save(items)
+        return session
+
+    def append_message(self, session_id: str, message: dict[str, Any]) -> dict[str, Any]:
+        session = self.ensure_session(session_id)
+        messages = session.get("messages") or []
+        if not isinstance(messages, list):
+            messages = []
+        messages.append(message)
+        session["messages"] = messages
+        session["message_count"] = len(messages)
+        session["updated_at"] = now_iso()
+        session["last_message_preview"] = truncate_text(message.get("content", ""))
+        if session.get("title") in {"", "New Chat"} and message.get("role") == "user":
+            session["title"] = truncate_text(message.get("content", ""), 40) or "New Chat"
+        return self.update_session(session)
 
 
-def normalize_attachments(value: Any, source: str = "unknown") -> list[dict[str, Any]]:
-    if not value:
-        return []
-    if isinstance(value, dict):
-        value = [value]
-    if not isinstance(value, list):
-        return []
+class ChatEngine:
+    def __init__(self) -> None:
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if (OpenAI and os.getenv("OPENAI_API_KEY")) else None
 
-    out: list[dict[str, Any]] = []
-    for raw in value:
-        item = normalize_attachment(raw, source=source)
-        if item:
-            out.append(item)
-    return out
+    def _assistant_text(self, user_text: str, attachments: list[dict[str, Any]]) -> str:
+        if not self.client:
+            if user_text.strip().startswith("/image "):
+                prompt = user_text.strip()[7:].strip()
+                return f"Generated image requested for: {prompt}"
+            return "Nova is running. Set OPENAI_API_KEY for real model replies."
+
+        if user_text.strip().startswith("/image "):
+            prompt = user_text.strip()[7:].strip()
+            return f"Generated image requested for: {prompt}"
+
+        prompt = user_text.strip() or "Hello"
+        attachment_lines: list[str] = []
+        for item in attachments:
+            attachment_lines.append(
+                f"- {item.get('filename','attachment')} ({item.get('mime_type') or item.get('type') or 'file'})"
+            )
+
+        system = (
+            "You are Nova, a direct helpful local assistant inside a web app. "
+            "Be concise, clear, and practical. "
+            "If attachments are present, acknowledge them naturally."
+        )
+        user = prompt
+        if attachment_lines:
+            user += "\n\nAttachments:\n" + "\n".join(attachment_lines)
+
+        try:
+            resp = self.client.responses.create(
+                model=CHAT_MODEL,
+                input=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            )
+            text = getattr(resp, "output_text", "") or ""
+            return text.strip() or "Done."
+        except Exception as exc:
+            return f"Nova hit an API error: {exc}"
+
+    def generate_image(self, prompt: str) -> dict[str, Any]:
+        prompt = (prompt or "").strip()
+        if not prompt:
+            raise ValueError("Image prompt is required.")
+
+        if not self.client:
+            raise RuntimeError("OPENAI_API_KEY is not set.")
+
+        try:
+            result = self.client.images.generate(
+                model=IMAGE_MODEL,
+                prompt=prompt,
+                size=IMAGE_SIZE,
+            )
+        except Exception as exc:
+            raise RuntimeError(str(exc)) from exc
+
+        data = getattr(result, "data", None) or []
+        if not data:
+            raise RuntimeError("No image data returned.")
+
+        item = data[0]
+        b64 = getattr(item, "b64_json", None)
+        image_url = getattr(item, "url", None)
+
+        if b64:
+            raw = base64.b64decode(b64)
+            filename = f"generated_{uuid.uuid4().hex}.png"
+            path = UPLOADS_DIR / filename
+            path.write_bytes(raw)
+            return {
+                "type": "image",
+                "filename": filename,
+                "url": f"/api/uploads/{filename}",
+                "mime_type": "image/png",
+                "size": len(raw),
+                "prompt": prompt,
+            }
+
+        if image_url:
+            return {
+                "type": "image",
+                "filename": "",
+                "url": image_url,
+                "mime_type": "image/png",
+                "size": 0,
+                "prompt": prompt,
+            }
+
+        raise RuntimeError("No supported image payload returned.")
 
 
-def normalize_message(message: dict[str, Any]) -> dict[str, Any]:
-    item = dict(message or {})
-    item["attachments"] = normalize_attachments(item.get("attachments"), source="message")
-    item["meta"] = item.get("meta") or {}
-    return item
-
-
-def normalize_session(session: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not session:
-        return None
-    item = dict(session)
-    item["messages"] = [normalize_message(m) for m in (item.get("messages") or []) if isinstance(m, dict)]
-    return item
-
-
-def normalize_artifact(artifact: dict[str, Any]) -> dict[str, Any]:
-    item = dict(artifact or {})
-    item["attachments"] = normalize_attachments(item.get("attachments"), source="artifact")
-    item["meta"] = item.get("meta") if isinstance(item.get("meta"), dict) else {}
-    return item
-
-
-def list_artifacts_raw() -> list[dict[str, Any]]:
-    data = read_json_file(ARTIFACTS_FILE, [])
-    return data if isinstance(data, list) else []
-
-
-def write_artifacts_raw(items: list[dict[str, Any]]) -> None:
-    write_json_file(ARTIFACTS_FILE, items)
-
-
-def list_memory_raw() -> list[dict[str, Any]]:
-    data = read_json_file(MEMORY_FILE, [])
-    return data if isinstance(data, list) else []
-
-
-def build_frontend_session_payload(session: dict[str, Any]) -> dict[str, Any]:
-    normalized = normalize_session(session) or {}
-    messages = normalized.get("messages") or []
-    return {
-        "id": normalized.get("id"),
-        "title": normalized.get("title") or "New Chat",
-        "created_at": normalized.get("created_at"),
-        "updated_at": normalized.get("updated_at"),
-        "pinned": bool(normalized.get("pinned", False)),
-        "message_count": int(normalized.get("message_count", len(messages))),
-        "last_message_preview": normalized.get("last_message_preview") or "",
-        "messages": messages,
-    }
+ensure_dirs()
+artifact_service = ArtifactService(ARTIFACTS_FILE)
+session_service = SessionService(SESSIONS_FILE)
+chat_engine = ChatEngine()
 
 
 def create_app() -> Flask:
-    app = Flask(
-        __name__,
-        template_folder=str(TEMPLATES_DIR),
-        static_folder=str(STATIC_DIR),
-    )
-    app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
-
-    chat_service = ChatService(SESSIONS_FILE, ARTIFACTS_FILE, MEMORY_FILE)
-    memory_service = MemoryService(MEMORY_FILE)
-    artifact_service = ArtifactService(ARTIFACTS_FILE)
-
-    @app.after_request
-    def add_no_cache_headers(response):
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
-        return response
+    app = Flask(__name__, template_folder=str(TEMPLATES_DIR), static_folder=str(STATIC_DIR))
+    app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024
 
     @app.get("/")
     def index():
         return render_template("index.html")
 
     @app.get("/api/health")
-    def api_health():
+    def health():
         return jsonify(
             {
                 "ok": True,
-                "message": "healthy",
                 "debug": {
-                    "timestamp": utc_now(),
                     "cwd": str(BASE_DIR),
-                    "uploads_dir": str(UPLOADS_DIR),
-                    "data_dir": str(DATA_DIR),
-                    "sessions_file": str(SESSIONS_FILE),
-                    "memory_file": str(MEMORY_FILE),
-                    "artifacts_file": str(ARTIFACTS_FILE),
-                    "route_build": "chat-failure-hardening-2026-03-31-001",
-                    "chat_service_class": chat_service.__class__.__name__,
-                    "chat_service_module": chat_service.__class__.__module__,
+                    "chat_model": CHAT_MODEL,
+                    "image_model": IMAGE_MODEL,
+                    "image_size": IMAGE_SIZE,
+                    "has_openai_api_key": bool(os.getenv("OPENAI_API_KEY")),
+                    "route_build": "artifact-image-reuse-lock-2026-04-02-001",
+                    "timestamp": now_iso(),
                 },
             }
         )
 
+    @app.get("/api/uploads/<path:filename>")
+    def uploaded_file(filename: str):
+        return send_from_directory(UPLOADS_DIR, filename)
+
     @app.get("/api/state")
     def api_state():
-        try:
-            sessions = [build_frontend_session_payload(s) for s in chat_service.list_sessions()]
-            artifacts = [normalize_artifact(a) for a in list_artifacts_raw()]
-            memory = list_memory_raw()
-            return jsonify(
-                {
-                    "ok": True,
-                    "sessions": sessions,
-                    "artifacts": artifacts,
-                    "memory": memory,
-                    "debug": {
-                        "sessions_count": len(sessions),
-                        "artifacts_count": len(artifacts),
-                        "memory_count": len(memory),
-                    },
-                }
-            )
-        except Exception as exc:
-            trace = safe_trace("api_state", exc)
-            return jsonify({"ok": False, "message": str(exc), "debug": {"trace": trace}}), 500
+        sessions = session_service.list_sessions()
+        return jsonify(
+            {
+                "ok": True,
+                "sessions": sessions,
+                "memory": read_json(MEMORY_FILE, []),
+                "debug": {
+                    "session_count": len(sessions),
+                    "artifact_count": len(artifact_service.list_artifacts()),
+                },
+            }
+        )
 
-    @app.get("/api/uploads/<path:filename>")
-    def api_uploads(filename: str):
-        return send_from_directory(UPLOADS_DIR, filename, as_attachment=False)
+    @app.get("/api/artifacts")
+    def api_artifacts():
+        artifacts = artifact_service.list_artifacts()
+        media_count = 0
+        for artifact in artifacts:
+            for item in ((artifact.get("meta") or {}).get("media") or []):
+                if isinstance(item, dict) and item.get("type") in {"image", "video", "audio"}:
+                    media_count += 1
+        return jsonify(
+            {
+                "ok": True,
+                "artifacts": artifacts,
+                "debug": {
+                    "count": len(artifacts),
+                    "media_count": media_count,
+                },
+            }
+        )
+
+    @app.get("/api/artifacts/<artifact_id>")
+    def api_artifact_read(artifact_id: str):
+        artifact = artifact_service.get_artifact(artifact_id)
+        if not artifact:
+            return jsonify({"ok": False, "error": "Artifact not found."}), 404
+        return jsonify({"ok": True, "artifact": artifact})
 
     @app.post("/api/upload")
     def api_upload():
-        try:
-            uploaded_files = request.files.getlist("files")
-            if not uploaded_files:
-                maybe_one = request.files.get("file")
-                if maybe_one:
-                    uploaded_files = [maybe_one]
+        files = request.files.getlist("files")
+        saved: list[dict[str, Any]] = []
 
-            if not uploaded_files:
-                return jsonify({"ok": False, "message": "No files uploaded"}), 400
+        for file in files:
+            if not file or not file.filename:
+                continue
+            original_name = file.filename
+            suffix = Path(original_name).suffix.lower()
+            if suffix not in ALLOWED_UPLOAD_EXTENSIONS:
+                continue
 
-            saved: list[dict[str, Any]] = []
+            filename = f"{uuid.uuid4().hex}{suffix}"
+            path = UPLOADS_DIR / filename
+            file.save(path)
 
-            for file in uploaded_files:
-                if not file or not file.filename:
-                    continue
-
-                original_name = secure_filename(file.filename)
-                if not original_name:
-                    continue
-
-                if not allowed_file(original_name):
-                    return jsonify({"ok": False, "message": f"File type not allowed: {original_name}"}), 400
-
-                stored_name = f"{uuid.uuid4().hex}_{original_name}"
-                target = UPLOADS_DIR / stored_name
-                file.save(target)
-
-                mime_type = file.mimetype or mimetypes.guess_type(original_name)[0] or "application/octet-stream"
-                item = {
-                    "id": str(uuid.uuid4()),
-                    "type": guess_attachment_type(original_name, mime_type),
-                    "filename": original_name,
-                    "stored_name": stored_name,
-                    "mime_type": mime_type,
-                    "url": build_upload_url(stored_name),
-                    "size": target.stat().st_size if target.exists() else None,
-                    "source": "upload",
-                    "title": original_name,
-                    "alt": original_name,
-                }
-                saved.append(item)
-
-            if not saved:
-                return jsonify({"ok": False, "message": "No valid files uploaded"}), 400
-
-            return jsonify(
+            saved.append(
                 {
-                    "ok": True,
-                    "files": saved,
-                    "attachments": saved,
-                    "debug": {
-                        "uploaded_count": len(saved),
-                        "types": [x.get("type") for x in saved],
-                    },
+                    "id": str(uuid.uuid4()),
+                    "filename": original_name,
+                    "stored_filename": filename,
+                    "url": f"/api/uploads/{filename}",
+                    "mime_type": file.mimetype or "",
+                    "size": path.stat().st_size,
+                    "type": guess_media_type(original_name),
                 }
             )
-        except Exception as exc:
-            trace = safe_trace("api_upload", exc)
-            return jsonify({"ok": False, "message": str(exc), "debug": {"trace": trace}}), 500
+
+        return jsonify({"ok": True, "files": saved, "count": len(saved)})
 
     @app.post("/api/chat")
     def api_chat():
-        try:
-            payload = request.get_json(silent=True) or {}
-            content = str(payload.get("content") or payload.get("message") or payload.get("text") or "").strip()
-            session_id = payload.get("session_id") or payload.get("sessionId")
-            attachments = payload.get("attachments") or []
-            route_meta = payload.get("route_meta") or payload.get("routeMeta") or {}
+        payload = request.get_json(silent=True) or {}
+        content = str(payload.get("content") or payload.get("message") or "").strip()
+        session_id = str(payload.get("session_id") or "").strip() or str(uuid.uuid4())
+        incoming_attachments = payload.get("attachments") or []
+        attachments = incoming_attachments if isinstance(incoming_attachments, list) else []
 
-            if not content and not attachments:
-                return jsonify(
-                    {
-                        "ok": False,
-                        "message": "Message content or attachments required",
-                        "assistant_message": None,
-                        "session": None,
-                        "debug": {"route_contract": "ok-assistant_message-session-debug"},
-                    }
-                ), 400
+        session = session_service.ensure_session(session_id)
 
-            result = chat_service.send_message(
-                content=content,
-                session_id=session_id,
-                attachments=attachments,
-                route_meta=route_meta,
-            )
+        user_message = {
+            "id": str(uuid.uuid4()),
+            "role": "user",
+            "content": content,
+            "attachments": attachments,
+            "created_at": now_iso(),
+        }
+        session_service.append_message(session["id"], user_message)
 
-            assistant_message = normalize_message(result.get("assistant_message") or {})
-            session = build_frontend_session_payload(result.get("session") or {})
-            debug = result.get("debug") or {}
+        generated_media: list[dict[str, Any]] = []
+        assistant_text = ""
 
-            return jsonify(
-                {
-                    "ok": True,
-                    "assistant_message": assistant_message,
-                    "session": session,
-                    "debug": {
-                        **debug,
-                        "route_contract": "ok-assistant_message-session-debug",
-                    },
-                }
-            )
-        except Exception as exc:
-            trace = safe_trace("api_chat", exc)
-            return jsonify(
-                {
-                    "ok": False,
-                    "message": str(exc),
-                    "assistant_message": None,
-                    "session": None,
-                    "debug": {
-                        "trace": trace,
-                        "route_contract": "ok-assistant_message-session-debug",
-                    },
-                }
-            ), 500
+        if content.startswith("/image "):
+            prompt = content[7:].strip()
+            try:
+                image_item = chat_engine.generate_image(prompt)
+                generated_media.append(image_item)
+                assistant_text = f"![generated image]({image_item['url']})\n\nGenerated from prompt: {prompt}"
+            except Exception as exc:
+                assistant_text = f"Image generation failed: {exc}"
+        else:
+            assistant_text = chat_engine._assistant_text(content, attachments)
 
-    @app.get("/api/sessions")
-    def api_sessions_list():
-        try:
-            sessions = [build_frontend_session_payload(s) for s in chat_service.list_sessions()]
-            return jsonify({"ok": True, "sessions": sessions})
-        except Exception as exc:
-            trace = safe_trace("api_sessions_list", exc)
-            return jsonify({"ok": False, "message": str(exc), "debug": {"trace": trace}}), 500
+        assistant_message = {
+            "id": str(uuid.uuid4()),
+            "role": "assistant",
+            "content": assistant_text,
+            "attachments": generated_media,
+            "created_at": now_iso(),
+        }
+        session = session_service.append_message(session["id"], assistant_message)
 
-    @app.post("/api/sessions")
-    def api_sessions_create():
-        try:
-            payload = request.get_json(silent=True) or {}
-            title = payload.get("title") or "New Chat"
-            session = chat_service.create_session(title=title)
-            return jsonify({"ok": True, "session": build_frontend_session_payload(session)})
-        except Exception as exc:
-            trace = safe_trace("api_sessions_create", exc)
-            return jsonify({"ok": False, "message": str(exc), "debug": {"trace": trace}}), 500
+        artifact_meta: dict[str, Any] = {
+            "role": "assistant",
+            "message_id": assistant_message["id"],
+            "model": CHAT_MODEL,
+            "artifact_source": "chat_service_autosave",
+            "attachments_count": len(generated_media),
+        }
+        if generated_media:
+            artifact_meta["media"] = generated_media
+            artifact_meta["document_used"] = False
+            artifact_meta["web"] = {"used": False}
 
-    @app.get("/api/sessions/<session_id>")
-    def api_sessions_read(session_id: str):
-        try:
-            session = chat_service.get_session(session_id)
-            if not session:
-                return jsonify({"ok": False, "message": "Session not found"}), 404
-            return jsonify({"ok": True, "session": build_frontend_session_payload(session)})
-        except Exception as exc:
-            trace = safe_trace("api_sessions_read", exc)
-            return jsonify({"ok": False, "message": str(exc), "debug": {"trace": trace}}), 500
+        artifact_kind = "generated_image" if generated_media else "chat_reply"
+        artifact_title = (
+            f"Generated Image - {truncate_text(content[7:].strip(), 64)}"
+            if generated_media
+            else f"Chat Reply - {truncate_text(assistant_text, 64) or 'Assistant'}"
+        )
 
-    @app.patch("/api/sessions/<session_id>")
-    def api_sessions_update(session_id: str):
-        try:
-            payload = request.get_json(silent=True) or {}
-            changes: dict[str, Any] = {}
-            if "title" in payload:
-                changes["title"] = payload.get("title")
-            if "pinned" in payload:
-                changes["pinned"] = payload.get("pinned")
+        artifact = artifact_service.create_artifact(
+            session_id=session["id"],
+            title=artifact_title,
+            kind=artifact_kind,
+            content=assistant_text,
+            attachments=generated_media,
+            meta=artifact_meta,
+        )
 
-            session = chat_service.update_session(session_id, **changes)
-            if not session:
-                return jsonify({"ok": False, "message": "Session not found"}), 404
-
-            session = chat_service.get_session(session_id)
-            return jsonify({"ok": True, "session": build_frontend_session_payload(session)})
-        except Exception as exc:
-            trace = safe_trace("api_sessions_update", exc)
-            return jsonify({"ok": False, "message": str(exc), "debug": {"trace": trace}}), 500
-
-    @app.delete("/api/sessions/<session_id>")
-    def api_sessions_delete(session_id: str):
-        try:
-            ok = chat_service.delete_session(session_id)
-            if not ok:
-                return jsonify({"ok": False, "message": "Session not found"}), 404
-            sessions = [build_frontend_session_payload(s) for s in chat_service.list_sessions()]
-            return jsonify({"ok": True, "deleted": True, "sessions": sessions})
-        except Exception as exc:
-            trace = safe_trace("api_sessions_delete", exc)
-            return jsonify({"ok": False, "message": str(exc), "debug": {"trace": trace}}), 500
-
-    @app.get("/api/artifacts")
-    def api_artifacts_list():
-        try:
-            artifacts = [normalize_artifact(a) for a in list_artifacts_raw()]
-            artifacts.sort(key=lambda x: (bool(x.get("pinned")), x.get("updated_at") or x.get("created_at") or ""), reverse=True)
-            return jsonify(
-                {
-                    "ok": True,
-                    "artifacts": artifacts,
-                    "debug": {
-                        "count": len(artifacts),
-                        "media_count": sum(1 for a in artifacts if a.get("attachments")),
-                    },
-                }
-            )
-        except Exception as exc:
-            trace = safe_trace("api_artifacts_list", exc)
-            return jsonify({"ok": False, "message": str(exc), "debug": {"trace": trace}}), 500
-
-    @app.get("/api/artifacts/<artifact_id>")
-    def api_artifacts_read(artifact_id: str):
-        try:
-            artifact = next((a for a in list_artifacts_raw() if str(a.get("id")) == artifact_id), None)
-            if not artifact:
-                return jsonify({"ok": False, "message": "Artifact not found"}), 404
-            return jsonify({"ok": True, "artifact": normalize_artifact(artifact)})
-        except Exception as exc:
-            trace = safe_trace("api_artifacts_read", exc)
-            return jsonify({"ok": False, "message": str(exc), "debug": {"trace": trace}}), 500
-
-    @app.get("/api/memory")
-    def api_memory_list():
-        try:
-            items = list_memory_raw()
-            return jsonify({"ok": True, "memory": items, "count": len(items)})
-        except Exception as exc:
-            trace = safe_trace("api_memory_list", exc)
-            return jsonify({"ok": False, "message": str(exc), "debug": {"trace": trace}}), 500
-
-    @app.errorhandler(413)
-    def handle_too_large(_exc):
-        return jsonify({"ok": False, "message": "Upload too large"}), 413
-
-    @app.errorhandler(Exception)
-    def handle_unexpected_error(exc):
-        trace = safe_trace("unhandled_exception", exc)
-        return jsonify({"ok": False, "message": str(exc), "debug": {"trace": trace}}), 500
+        return jsonify(
+            {
+                "ok": True,
+                "message": assistant_message,
+                "assistant_message": assistant_message,
+                "session": session,
+                "artifacts": artifact_service.list_artifacts(),
+                "debug": {
+                    "generated_media_count": len(generated_media),
+                    "artifact_id": artifact["id"],
+                    "route_build": "artifact-image-reuse-lock-2026-04-02-001",
+                },
+            }
+        )
 
     return app
 
 
+app = create_app()
+
 if __name__ == "__main__":
-    app = create_app()
-    host = os.getenv("NOVA_HOST") or os.getenv("APP_HOST") or "127.0.0.1"
-    port = 5001
-    app.run(host=host, port=port, debug=False, use_reloader=False)
+    print(f"Nova running on http://{APP_HOST}:{APP_PORT}")
+    app.run(host=APP_HOST, port=APP_PORT, debug=False, use_reloader=False)
