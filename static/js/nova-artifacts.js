@@ -18,7 +18,8 @@
     activeArtifact: null,
     filterText: "",
     eventsBound: false,
-    refreshTimer: null
+    refreshTimer: null,
+    stylesInjected: false
   };
 
   function log() {
@@ -95,13 +96,17 @@
         null,
       refreshBtn:
         document.querySelector("#refreshArtifactsBtn") ||
+        document.querySelector("#artifactRefresh") ||
         document.querySelector("[data-action='refresh-artifacts']") ||
         null,
       searchInput:
         document.querySelector("#artifactSearchInput") ||
         document.querySelector("#artifactsSearchInput") ||
+        document.querySelector("#artifactSearch") ||
         document.querySelector("[data-role='artifact-search']") ||
         null,
+      filterSelect:
+        document.querySelector("#artifactFilter") || null,
       copyBtn:
         document.querySelector("#copyArtifactBtn") ||
         document.querySelector("[data-action='copy-artifact']") ||
@@ -184,6 +189,10 @@
     return item && item.meta && typeof item.meta === "object" ? item.meta : null;
   }
 
+  function artifactPinned(item) {
+    return !!(item && (item.pinned || item.is_pinned || item.pin));
+  }
+
   function extractArtifacts(payload) {
     if (!payload) return [];
     if (Array.isArray(payload.artifacts)) return payload.artifacts;
@@ -194,15 +203,70 @@
     return [];
   }
 
+  function kindLabel(kind) {
+    const raw = safeText(kind).trim().toLowerCase();
+    if (!raw) return "Artifact";
+    if (raw === "chat_reply") return "Chat Reply";
+    if (raw === "web_result") return "Web Result";
+    if (raw === "doc_analysis") return "Document Analysis";
+    return raw
+      .split(/[_\-\s]+/)
+      .filter(Boolean)
+      .map(function (part) {
+        return part.charAt(0).toUpperCase() + part.slice(1);
+      })
+      .join(" ");
+  }
+
+  function cleanTitle(raw) {
+    let title = safeText(raw).trim();
+    if (!title) return "Untitled Artifact";
+
+    title = title.replace(/\s+/g, " ").trim();
+
+    if (/^chat reply\s*-\s*/i.test(title)) {
+      title = title.replace(/^chat reply\s*-\s*/i, "").trim();
+    }
+
+    if (!title) return "Chat Reply";
+    if (title.length > 92) return title.slice(0, 92).trim() + "…";
+    return title;
+  }
+
+  function cleanPreviewText(text) {
+    let value = safeText(text);
+
+    value = value.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function (_, alt) {
+      const label = safeText(alt).trim();
+      return label ? "[image: " + label + "]" : "[image]";
+    });
+
+    value = value.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1");
+    value = value.replace(/`([^`]+)`/g, "$1");
+    value = value.replace(/\*\*([^*]+)\*\*/g, "$1");
+    value = value.replace(/\*([^*]+)\*/g, "$1");
+    value = value.replace(/^#+\s*/gm, "");
+    value = value.replace(/^\s*-\s+/gm, "• ");
+    value = value.replace(/\n{3,}/g, "\n\n");
+    value = value.replace(/[ \t]+\n/g, "\n");
+    value = value.trim();
+
+    return value;
+  }
+
   function artifactPreview(item) {
-    const content = artifactContent(item).trim().replace(/\s+/g, " ");
+    const content = cleanPreviewText(artifactContent(item)).replace(/\s+/g, " ").trim();
     if (!content) return "No content";
-    if (content.length <= 140) return content;
-    return content.slice(0, 140).trim() + "…";
+    if (content.length <= 160) return content;
+    return content.slice(0, 160).trim() + "…";
   }
 
   function sortArtifacts(items) {
     return (Array.isArray(items) ? items : []).slice().sort((a, b) => {
+      const aPinned = artifactPinned(a) ? 1 : 0;
+      const bPinned = artifactPinned(b) ? 1 : 0;
+      if (aPinned !== bPinned) return bPinned - aPinned;
+
       const aTs = new Date(artifactUpdatedAt(a)).getTime() || 0;
       const bTs = new Date(artifactUpdatedAt(b)).getTime() || 0;
       return bTs - aTs;
@@ -223,16 +287,244 @@
     }
   }
 
+  function injectStylesOnce() {
+    if (state.stylesInjected) return;
+    state.stylesInjected = true;
+
+    const style = document.createElement("style");
+    style.textContent = `
+      #artifactList {
+        display: grid;
+        gap: 10px;
+      }
+
+      .nova-artifact-item {
+        display: block;
+      }
+
+      .nova-artifact-main {
+        width: 100%;
+        text-align: left;
+        appearance: none;
+        border: 1px solid rgba(130,158,222,0.12);
+        background: rgba(255,255,255,0.03);
+        color: var(--text);
+        border-radius: 16px;
+        padding: 12px;
+        cursor: pointer;
+        transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+      }
+
+      .nova-artifact-main:hover {
+        transform: translateY(-1px);
+        border-color: rgba(110,168,255,0.24);
+        box-shadow: 0 16px 28px rgba(0,0,0,0.18);
+        background: rgba(255,255,255,0.045);
+      }
+
+      .nova-artifact-item.active .nova-artifact-main {
+        border-color: rgba(110,168,255,0.34);
+        background: rgba(110,168,255,0.09);
+        box-shadow: 0 16px 32px rgba(0,0,0,0.20);
+      }
+
+      .nova-artifact-item-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .nova-artifact-item-title {
+        min-width: 0;
+        font-weight: 800;
+        font-size: 13px;
+        line-height: 1.35;
+        color: var(--text);
+        word-break: break-word;
+      }
+
+      .nova-artifact-item-preview {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+        word-break: break-word;
+      }
+
+      .nova-artifact-item-bottom {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .nova-artifact-viewer {
+        margin-top: 14px;
+        border: 1px solid rgba(130,158,222,0.12);
+        border-radius: 18px;
+        background: rgba(255,255,255,0.03);
+        overflow: hidden;
+      }
+
+      .nova-artifact-viewer-top {
+        padding: 14px 14px 10px;
+        border-bottom: 1px solid rgba(130,158,222,0.10);
+        background: rgba(255,255,255,0.02);
+      }
+
+      .nova-artifact-viewer-title {
+        font-size: 14px;
+        font-weight: 900;
+        line-height: 1.35;
+        color: var(--text);
+        word-break: break-word;
+      }
+
+      .nova-artifact-viewer-meta {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.45;
+        word-break: break-word;
+      }
+
+      .nova-artifact-viewer-body {
+        padding: 14px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .nova-artifact-view-kind-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .nova-artifact-empty-view {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .nova-artifact-content {
+        color: var(--text);
+        font-size: 13px;
+        line-height: 1.65;
+        word-break: break-word;
+      }
+
+      .nova-artifact-content p {
+        margin: 0 0 12px;
+      }
+
+      .nova-artifact-content p:last-child {
+        margin-bottom: 0;
+      }
+
+      .nova-artifact-content ul,
+      .nova-artifact-content ol {
+        margin: 0 0 12px 18px;
+        padding: 0;
+      }
+
+      .nova-artifact-content li {
+        margin: 0 0 6px;
+      }
+
+      .nova-artifact-content code {
+        padding: 1px 6px;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.08);
+        font-size: 12px;
+      }
+
+      .nova-artifact-content pre {
+        margin: 0 0 12px;
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(130,158,222,0.10);
+        background: rgba(7,14,28,0.88);
+        color: #dbe6ff;
+        font-size: 12px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow: auto;
+      }
+
+      .nova-artifact-content pre:last-child {
+        margin-bottom: 0;
+      }
+
+      .nova-artifact-content a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      .nova-artifact-content strong {
+        font-weight: 800;
+      }
+
+      .nova-artifact-meta-block {
+        border: 1px solid rgba(130,158,222,0.10);
+        border-radius: 14px;
+        background: rgba(255,255,255,0.02);
+        overflow: hidden;
+      }
+
+      .nova-artifact-meta-block summary {
+        cursor: pointer;
+        list-style: none;
+        padding: 12px 14px;
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--muted);
+      }
+
+      .nova-artifact-meta-block summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .nova-artifact-meta-block pre {
+        margin: 0;
+        padding: 0 14px 14px;
+        color: #cfdcff;
+        font-size: 12px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow: auto;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  function activeFilterValue() {
+    const { filterSelect } = getEls();
+    return safeText(filterSelect && filterSelect.value).trim().toLowerCase() || "all";
+  }
+
+  function passesKindFilter(item) {
+    const value = activeFilterValue();
+    if (!value || value === "all") return true;
+    if (value === "pinned") return artifactPinned(item);
+    if (value === "media") {
+      const kind = artifactKind(item).toLowerCase();
+      return kind.indexOf("image") !== -1 || kind.indexOf("video") !== -1 || kind.indexOf("audio") !== -1 || kind.indexOf("media") !== -1;
+    }
+    return artifactKind(item).toLowerCase() === value;
+  }
+
   function applyFilter() {
     const needle = safeText(state.filterText).trim().toLowerCase();
     const sorted = sortArtifacts(state.artifacts);
 
-    if (!needle) {
-      state.filtered = sorted;
-      return;
-    }
+    state.filtered = sorted.filter(function (item) {
+      if (!passesKindFilter(item)) return false;
+      if (!needle) return true;
 
-    state.filtered = sorted.filter((item) => {
       const haystack = [
         artifactTitle(item),
         artifactKind(item),
@@ -257,18 +549,25 @@
 
     if (!state.filtered.length) {
       list.innerHTML = "";
-      if (empty) empty.hidden = false;
+      if (empty) {
+        empty.style.display = "";
+        empty.hidden = false;
+        empty.textContent = "No artifacts found.";
+      }
       return;
     }
 
-    if (empty) empty.hidden = true;
+    if (empty) {
+      empty.style.display = "none";
+      empty.hidden = true;
+    }
 
     list.innerHTML = state.filtered
       .map((item) => {
         const id = artifactId(item);
         const active = id === state.activeArtifactId;
-        const title = artifactTitle(item);
-        const kind = artifactKind(item);
+        const title = cleanTitle(artifactTitle(item));
+        const kind = kindLabel(artifactKind(item));
         const preview = artifactPreview(item);
         const created = formatDate(artifactCreatedAt(item));
 
@@ -293,6 +592,107 @@
       .join("");
 
     bindListEvents();
+  }
+
+  function convertInlineMarkdown(text) {
+    let value = escapeHtml(text);
+    value = value.replace(/`([^`]+)`/g, "<code>$1</code>");
+    value = value.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    value = value.replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
+    value = value.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_, label, href) {
+      return '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(label) + "</a>";
+    });
+    return value;
+  }
+
+  function renderMarkdownLike(text) {
+    const raw = safeText(text).replace(/\r\n/g, "\n");
+    if (!raw.trim()) return '<div class="nova-artifact-empty-view">No content.</div>';
+
+    const lines = raw.split("\n");
+    const html = [];
+    let inList = false;
+    let inCode = false;
+    let codeLines = [];
+
+    function closeList() {
+      if (!inList) return;
+      html.push("</ul>");
+      inList = false;
+    }
+
+    function closeCode() {
+      if (!inCode) return;
+      html.push("<pre>" + escapeHtml(codeLines.join("\n")) + "</pre>");
+      inCode = false;
+      codeLines = [];
+    }
+
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      if (/^```/.test(trimmed)) {
+        closeList();
+        if (inCode) {
+          closeCode();
+        } else {
+          inCode = true;
+          codeLines = [];
+        }
+        continue;
+      }
+
+      if (inCode) {
+        codeLines.push(line);
+        continue;
+      }
+
+      if (!trimmed) {
+        closeList();
+        continue;
+      }
+
+      const imageOnly = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+      if (imageOnly) {
+        closeList();
+        const alt = safeText(imageOnly[1]).trim() || "attachment";
+        const src = safeText(imageOnly[2]).trim();
+        html.push(
+          '<p><strong>Image:</strong> <code>' +
+            escapeHtml(alt) +
+            "</code> <span style=\"color:var(--muted);\">(" +
+            escapeHtml(src) +
+            ")</span></p>"
+        );
+        continue;
+      }
+
+      const bullet = trimmed.match(/^[-*]\s+(.*)$/);
+      if (bullet) {
+        if (!inList) {
+          html.push("<ul>");
+          inList = true;
+        }
+        html.push("<li>" + convertInlineMarkdown(bullet[1]) + "</li>");
+        continue;
+      }
+
+      closeList();
+
+      if (/^#{1,6}\s+/.test(trimmed)) {
+        const headingText = trimmed.replace(/^#{1,6}\s+/, "");
+        html.push("<p><strong>" + convertInlineMarkdown(headingText) + "</strong></p>");
+        continue;
+      }
+
+      html.push("<p>" + convertInlineMarkdown(trimmed) + "</p>");
+    }
+
+    closeList();
+    closeCode();
+
+    return html.join("");
   }
 
   function renderViewer() {
@@ -323,18 +723,14 @@
       if (viewerTitle) viewerTitle.textContent = "No artifact selected";
       if (viewerMeta) viewerMeta.textContent = "";
       if (viewerBody) {
-        viewerBody.innerHTML = `
-          <div class="nova-artifact-empty-view">
-            Select an artifact to view it here.
-          </div>
-        `;
+        viewerBody.innerHTML = '<div class="nova-artifact-empty-view">Select an artifact to view it here.</div>';
       }
       if (viewer) viewer.setAttribute("data-empty", "true");
       return;
     }
 
-    const title = artifactTitle(item);
-    const kind = artifactKind(item);
+    const title = cleanTitle(artifactTitle(item));
+    const kind = kindLabel(artifactKind(item));
     const sessionId = artifactSessionId(item);
     const created = formatDate(artifactCreatedAt(item));
     const updated = formatDate(artifactUpdatedAt(item));
@@ -346,9 +742,10 @@
     if (viewerMeta) {
       const parts = [];
       parts.push(kind);
-      if (sessionId) parts.push("session " + sessionId);
-      if (created) parts.push("created " + created);
+      if (created) parts.push(created);
       if (updated && updated !== created) parts.push("updated " + updated);
+      if (artifactPinned(item)) parts.push("Pinned");
+      if (sessionId) parts.push("session linked");
       viewerMeta.textContent = parts.join(" • ");
     }
 
@@ -368,7 +765,7 @@
           <div class="nova-artifact-view-kind-row">
             <span class="nova-badge">${escapeHtml(kind)}</span>
           </div>
-          <pre class="nova-artifact-view-content">${escapeHtml(content || "")}</pre>
+          <div class="nova-artifact-content">${renderMarkdownLike(content || "")}</div>
           ${metaBlock}
         </div>
       `;
@@ -515,7 +912,7 @@
   }
 
   function wireTopControls() {
-    const { refreshBtn, searchInput, copyBtn, openBtn, deleteBtn } = getEls();
+    const { refreshBtn, searchInput, filterSelect, copyBtn, openBtn, deleteBtn } = getEls();
 
     if (refreshBtn && refreshBtn.dataset.novaBound !== "1") {
       refreshBtn.dataset.novaBound = "1";
@@ -530,6 +927,13 @@
       searchInput.dataset.novaBound = "1";
       searchInput.addEventListener("input", function () {
         state.filterText = safeText(searchInput.value);
+        renderSoon();
+      });
+    }
+
+    if (filterSelect && filterSelect.dataset.novaBound !== "1") {
+      filterSelect.dataset.novaBound = "1";
+      filterSelect.addEventListener("change", function () {
         renderSoon();
       });
     }
@@ -584,6 +988,7 @@
     if (state.booted) return;
     state.booted = true;
 
+    injectStylesOnce();
     wireTopControls();
     wireEvents();
     loadArtifacts("boot");
