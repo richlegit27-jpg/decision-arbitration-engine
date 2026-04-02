@@ -1,5 +1,62 @@
 [
   {
+    "id": "5da5606e-6e27-4a4f-8142-5aa1b72ea6d9",
+    "session_id": "10519295-5e22-4370-9876-471f98a2fd5b",
+    "title": "Chat Reply - I don’t have live sports data in this chat.",
+    "kind": "chat_reply",
+    "content": "I don’t have live sports data in this chat.\n\nIf you mean the **Los Angeles Lakers’ current season record**, I can still help if you want one of these:\n- tell me the **season/year**\n- ask for their **all-time franchise record**\n- or I can show you **where to check it quickly**",
+    "attachments": [],
+    "created_at": "2026-04-02T07:58:34.880421+00:00",
+    "updated_at": "2026-04-02T07:58:34.880429+00:00",
+    "pinned": false,
+    "meta": {
+      "role": "assistant",
+      "message_id": "ad2e1c4c-3e4a-4d1c-828a-f38d1427aa50",
+      "model": "gpt-5.4",
+      "fallback_reason": null,
+      "attachments_count": 0,
+      "artifact_source": "chat_service_autosave"
+    }
+  },
+  {
+    "id": "1af04459-bb3b-47f7-a2c2-5b6bacd27947",
+    "session_id": "10519295-5e22-4370-9876-471f98a2fd5b",
+    "title": "Chat Reply - I’ll inspect the attached image to identify what it is.",
+    "kind": "chat_reply",
+    "content": "I’ll inspect the attached image to identify what it is.",
+    "attachments": [],
+    "created_at": "2026-04-02T07:50:01.850934+00:00",
+    "updated_at": "2026-04-02T07:50:01.850942+00:00",
+    "pinned": false,
+    "meta": {
+      "role": "assistant",
+      "message_id": "8c4559fe-2b95-42a4-86e0-3ea1895d8b49",
+      "model": "gpt-5.4",
+      "fallback_reason": null,
+      "attachments_count": 0,
+      "artifact_source": "chat_service_autosave"
+    }
+  },
+  {
+    "id": "9db42203-a397-4926-b81a-8199dbe6cfc8",
+    "session_id": "f7a6c14b-dc3e-4046-bff9-9e0392106a83",
+    "title": "Chat Reply - ![dog](attachment://dog.png)",
+    "kind": "chat_reply",
+    "content": "![dog](attachment://dog.png)\n\n**attachments**\n- `dog.png`",
+    "attachments": [],
+    "created_at": "2026-04-02T07:48:52.763801+00:00",
+    "updated_at": "2026-04-02T07:48:52.763811+00:00",
+    "pinned": false,
+    "meta": {
+      "role": "assistant",
+      "message_id": "15d06735-2752-49d8-b4db-b4d5781c4429",
+      "model": "gpt-5.4",
+      "fallback_reason": null,
+      "attachments_count": 0,
+      "artifact_source": "chat_service_autosave"
+    }
+  },
+  {
     "id": "45ab6ca1-57b0-4ca4-bade-6cde1cc64dd2",
     "session_id": "f7a6c14b-dc3e-4046-bff9-9e0392106a83",
     "title": "Chat Reply - Hi! How can I help?",

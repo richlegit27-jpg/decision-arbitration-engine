@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Nova Ultimate 2026</title>
 
-  <link rel="stylesheet" href="/static/css/nova-main.css?v=page-recover-2026-03-31-001">
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=stable-2026-04-02-001">
 
   <style>
     html, body {
@@ -423,8 +423,18 @@
 
               <div class="nova-panel-scroll">
                 <div id="artifactList"></div>
-                <div id="artifactEmpty" class="nova-artifacts-empty" style="display:none;"></div>
-                <div id="artifactViewer"></div>
+                <div id="artifactEmpty" class="nova-artifacts-empty" style="display:none;">No artifacts yet.</div>
+
+                <section id="artifactViewer" class="nova-artifact-viewer" data-empty="true" aria-label="Artifact viewer">
+                  <div class="nova-artifact-viewer-top">
+                    <div id="artifactViewerTitle" class="nova-artifact-viewer-title">No artifact selected</div>
+                    <div id="artifactViewerMeta" class="nova-artifact-viewer-meta"></div>
+                  </div>
+
+                  <div id="artifactViewerBody" class="nova-artifact-viewer-body">
+                    <div class="nova-artifact-empty-view">Select an artifact to view it here.</div>
+                  </div>
+                </section>
               </div>
             </section>
 
@@ -629,9 +639,9 @@
     })();
   </script>
 
-  <script src="/static/js/nova-render.js?v=page-recover-2026-03-31-001"></script>
-  <script src="/static/js/nova-composer-bundle.js?v=page-recover-2026-03-31-001"></script>
-  <script src="/static/js/nova-artifacts.js?v=page-recover-2026-03-31-001"></script>
+  <script src="/static/js/nova-render.js?v=stable-2026-04-02-001"></script>
+  <script src="/static/js/nova-composer-bundle.js?v=stable-2026-04-02-001"></script>
+  <script src="/static/js/nova-artifacts.js?v=artifacts-stable-2026-04-02-001"></script>
 
   <script>
     (function () {
