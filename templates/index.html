@@ -4,907 +4,128 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Nova Ultimate 2026</title>
-
-  <link rel="stylesheet" href="/static/css/nova-main.css?v=stable-2026-04-02-001">
-
-  <style>
-    html, body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      overflow: hidden;
-    }
-
-    #novaAppShell {
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    #messages {
-      min-height: 0;
-    }
-
-    #messages > * {
-      max-width: 100%;
-    }
-
-    .nova-status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      min-height: 34px;
-      padding: 0 12px;
-      border-radius: 999px;
-      border: 1px solid rgba(110,168,255,0.18);
-      background: rgba(110,168,255,0.08);
-      color: var(--text);
-      font-size: 12px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-
-    .nova-status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: var(--ok);
-      box-shadow: 0 0 0 4px rgba(121,225,176,0.14);
-      flex: 0 0 auto;
-    }
-
-    .nova-main-topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      min-width: 0;
-    }
-
-    .nova-main-topbar-left,
-    .nova-main-topbar-right {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-width: 0;
-      flex-wrap: wrap;
-    }
-
-    .nova-main-title-wrap {
-      min-width: 0;
-    }
-
-    .nova-main-title {
-      font-size: 15px;
-      font-weight: 800;
-      line-height: 1.2;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .nova-main-subtitle {
-      font-size: 11px;
-      color: var(--muted);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .nova-composer-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .nova-upload-btn,
-    .nova-send-btn,
-    .nova-voice-btn {
-      appearance: none;
-      min-height: 46px;
-      border-radius: 16px;
-      border: 1px solid rgba(130,158,222,0.16);
-      padding: 0 16px;
-      font-weight: 800;
-      color: var(--text);
-      cursor: pointer;
-      transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
-    }
-
-    .nova-upload-btn,
-    .nova-voice-btn {
-      background: rgba(255,255,255,0.04);
-    }
-
-    .nova-send-btn {
-      background: linear-gradient(180deg, rgba(110,168,255,0.22), rgba(79,143,255,0.10));
-      border-color: rgba(110,168,255,0.28);
-      min-width: 116px;
-    }
-
-    .nova-upload-btn:hover,
-    .nova-send-btn:hover,
-    .nova-voice-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 14px 28px rgba(0,0,0,0.18);
-    }
-
-    .nova-debug-fab {
-      position: absolute;
-      right: 18px;
-      bottom: 18px;
-      z-index: 6;
-      appearance: none;
-      border: 1px solid rgba(110,168,255,0.24);
-      background: rgba(8,15,28,0.88);
-      color: var(--text);
-      border-radius: 999px;
-      min-height: 42px;
-      padding: 0 14px;
-      font-size: 12px;
-      font-weight: 800;
-      box-shadow: 0 18px 34px rgba(0,0,0,0.22);
-      cursor: pointer;
-    }
-
-    .nova-debug-panel {
-      position: absolute;
-      right: 18px;
-      bottom: 70px;
-      z-index: 6;
-      width: min(560px, calc(100vw - 120px));
-      max-height: 52vh;
-      border: 1px solid rgba(130,158,222,0.16);
-      border-radius: 18px;
-      background: rgba(8,15,28,0.96);
-      box-shadow: 0 24px 50px rgba(0,0,0,0.34);
-      backdrop-filter: blur(18px);
-      display: none;
-      overflow: hidden;
-    }
-
-    .nova-debug-panel.is-open {
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
-    }
-
-    .nova-debug-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 12px 14px;
-      border-bottom: 1px solid rgba(130,158,222,0.10);
-    }
-
-    .nova-debug-title {
-      font-size: 12px;
-      font-weight: 900;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      text-transform: uppercase;
-    }
-
-    .nova-debug-actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .nova-debug-body {
-      min-height: 0;
-      overflow: auto;
-      padding: 14px;
-      display: grid;
-      gap: 12px;
-    }
-
-    .nova-debug-block {
-      display: grid;
-      gap: 8px;
-    }
-
-    .nova-debug-block-title {
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    .nova-debug-pre {
-      margin: 0;
-      padding: 12px;
-      border-radius: 14px;
-      border: 1px solid rgba(130,158,222,0.14);
-      background: rgba(7,14,28,0.94);
-      color: #d8e5ff;
-      font-size: 12px;
-      line-height: 1.55;
-      overflow: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .sr-only {
-      position: absolute !important;
-      width: 1px !important;
-      height: 1px !important;
-      padding: 0 !important;
-      margin: -1px !important;
-      overflow: hidden !important;
-      clip: rect(0,0,0,0) !important;
-      white-space: nowrap !important;
-      border: 0 !important;
-    }
-
-    @media (max-width: 720px) {
-      .nova-main-topbar-right {
-        display: none;
-      }
-
-      .nova-composer-actions {
-        width: 100%;
-      }
-
-      .nova-upload-btn,
-      .nova-voice-btn,
-      .nova-send-btn {
-        flex: 1 1 auto;
-      }
-    }
-
-    @media (max-width: 640px) {
-      .nova-debug-panel {
-        right: 10px;
-        left: 10px;
-        width: auto;
-        bottom: 64px;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=index-restore-lock-2026-04-02-001">
 </head>
-<body>
+<body data-active-session-id="" data-api-base="">
+  <script>
+    (function () {
+      "use strict";
+
+      function trimSlash(value) {
+        return String(value || "").replace(/\/+$/, "");
+      }
+
+      function inferApiBase() {
+        var explicit =
+          window.NOVA_API_BASE ||
+          document.documentElement.getAttribute("data-api-base") ||
+          document.body.getAttribute("data-api-base") ||
+          "";
+
+        if (explicit) return trimSlash(explicit);
+        return trimSlash(window.location.origin);
+      }
+
+      window.NOVA_API_BASE = inferApiBase();
+      document.documentElement.setAttribute("data-api-base", window.NOVA_API_BASE);
+      document.body.setAttribute("data-api-base", window.NOVA_API_BASE);
+    })();
+  </script>
+
   <div id="novaAppShell" class="nova-app-shell">
-    <aside id="novaSidebar" class="nova-sidebar" aria-label="Sessions">
+    <aside id="novaSidebar" class="nova-sidebar">
       <div class="nova-sidebar-top">
-        <div class="nova-brand">
-          <div class="nova-brand-mark">N</div>
-          <div class="nova-brand-text">
-            <div class="nova-brand-title">Nova Ultimate 2026</div>
-            <div class="nova-brand-subtitle">Phase 3 stable shell</div>
-          </div>
-        </div>
-
-        <button id="sidebarToggle" class="nova-shell-btn" type="button" title="Collapse or expand sidebar">â˜°</button>
+        <div class="nova-brand">Nova Ultimate 2026</div>
+        <button id="sidebarToggle" class="nova-icon-btn" type="button" aria-label="Toggle sidebar">☰</button>
       </div>
 
-      <div class="nova-session-actions">
-        <button id="newSessionBtn" class="nova-new-chat-btn" type="button">+ New Chat</button>
+      <div class="nova-sidebar-actions">
+        <button id="newSessionBtn" class="nova-btn" type="button">New</button>
+        <button id="refreshSessionsBtn" class="nova-btn nova-btn-secondary" type="button">Refresh</button>
       </div>
 
-      <div class="nova-session-list-wrap">
-        <div class="nova-session-list-head">
-          <div class="nova-session-list-title">Sessions</div>
-          <button id="refreshSessionsBtn" class="nova-shell-btn" type="button" title="Refresh sessions">â†»</button>
-        </div>
-
-        <div id="sessionList" class="nova-session-list" aria-live="polite"></div>
-      </div>
-
-      <div id="collapsedSessionRail" class="nova-collapsed-strip" aria-label="Collapsed session rail"></div>
+      <div id="sessionsList" class="nova-sessions-list"></div>
     </aside>
 
     <main class="nova-main">
-      <header class="nova-main-topbar">
-        <div class="nova-main-topbar-left">
-          <button id="mobileSidebarToggle" class="nova-shell-btn" type="button" title="Open sidebar">â˜°</button>
-
-          <div class="nova-main-title-wrap">
-            <div id="activeSessionTitle" class="nova-main-title">New Chat</div>
-            <div class="nova-main-subtitle">Stable UI shell</div>
-          </div>
+      <header class="nova-topbar">
+        <div class="nova-topbar-left">
+          <button id="memoryPanelToggle" class="nova-btn nova-btn-secondary" type="button">Memory</button>
+          <button id="artifactsPanelToggle" class="nova-btn nova-btn-secondary" type="button">Artifacts</button>
+          <button id="webPanelToggle" class="nova-btn nova-btn-secondary" type="button">Web</button>
         </div>
 
-        <div class="nova-main-topbar-right">
-          <div class="nova-status-pill">
-            <span class="nova-status-dot"></span>
-            <span id="connectionStatus">Ready</span>
-          </div>
-
-          <button
-            id="memoryPanelToggle"
-            class="nova-panel-tab"
-            type="button"
-            data-panel-toggle="memory"
-            aria-controls="memoryPanel"
-            aria-expanded="false"
-          >Memory</button>
-
-          <button
-            id="artifactsPanelToggle"
-            class="nova-panel-tab"
-            type="button"
-            data-panel-toggle="artifacts"
-            aria-controls="artifactsPanel"
-            aria-expanded="false"
-          >Artifacts</button>
-
-          <button
-            id="webPanelToggle"
-            class="nova-panel-tab"
-            type="button"
-            data-panel-toggle="web"
-            aria-controls="webPanel"
-            aria-expanded="false"
-          >Web</button>
+        <div class="nova-topbar-right">
+          <button id="closeRightRailBtn" class="nova-btn nova-btn-secondary" type="button">Close</button>
         </div>
       </header>
 
-      <section class="nova-main-stage">
-        <div class="nova-main-content">
-          <div class="nova-chat-scroll">
-            <div class="nova-chat-stack">
-              <section id="novaEmptyState" class="nova-empty-state">
-                <div class="nova-empty-state-title">Nova is live.</div>
-                <div class="nova-empty-state-copy">
-                  Chat is working. This page is now stripped back to the stable shell.
-                </div>
+      <section id="messagesWrap" class="nova-messages-wrap">
+        <div id="novaEmptyState" class="nova-empty-state">
+          <div class="nova-empty-title">Nova is ready.</div>
+          <div class="nova-empty-copy">Type a message, upload a file, or use commands like /image and /web.</div>
+        </div>
+        <div id="messages" class="nova-messages"></div>
+      </section>
 
-                <div class="nova-empty-state-grid">
-                  <div class="nova-empty-state-card">
-                    <div class="nova-empty-state-card-title">Chat</div>
-                    <div class="nova-empty-state-card-copy">Send path is working.</div>
-                  </div>
+      <footer class="nova-composer">
+        <div id="stagedFiles" class="nova-staged-files"></div>
 
-                  <div class="nova-empty-state-card">
-                    <div class="nova-empty-state-card-title">Uploads</div>
-                    <div class="nova-empty-state-card-copy">Files stage before send.</div>
-                  </div>
-
-                  <div class="nova-empty-state-card">
-                    <div class="nova-empty-state-card-title">Artifacts</div>
-                    <div class="nova-empty-state-card-copy">Artifact rail stays available.</div>
-                  </div>
-                </div>
-              </section>
-
-              <div id="messages" aria-live="polite"></div>
-            </div>
-          </div>
-
-          <div class="nova-composer-wrap">
-            <div class="nova-composer">
-              <div id="stagedAttachments" class="nova-staged-attachments" aria-live="polite"></div>
-
-              <div class="nova-composer-row">
-                <div class="nova-composer-input-wrap">
-                  <label class="sr-only" for="chatInput">Message</label>
-                  <textarea
-                    id="chatInput"
-                    class="nova-composer-textarea"
-                    placeholder="Message Novaâ€¦"
-                    spellcheck="true"
-                  ></textarea>
-
-                  <div class="nova-composer-footer">
-                    <div class="nova-composer-hint">
-                      Enter sends â€¢ Shift+Enter newline â€¢ Upload stages files before send
-                    </div>
-
-                    <div class="nova-composer-actions">
-                      <input
-                        id="fileInput"
-                        type="file"
-                        multiple
-                        hidden
-                        accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.mp4,.webm,.mov,.m4v,.avi,.mkv,.mp3,.wav,.m4a,.ogg,.flac,.aac,.pdf,.txt,.log,.md,.json,.csv,.html,.htm,.xml,.yaml,.yml"
-                      >
-
-                      <button id="uploadBtn" class="nova-upload-btn" type="button" title="Upload files">Upload</button>
-                      <button id="voiceBtn" class="nova-voice-btn" type="button" title="Voice input">Voice</button>
-                      <button id="sendBtn" class="nova-send-btn" type="button" title="Send message">Send</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div class="nova-composer-row">
+          <textarea
+            id="chatInput"
+            class="nova-input"
+            placeholder="Type a message or /web https://example.com"
+            rows="3"
+          ></textarea>
         </div>
 
-        <aside id="rightRail" class="nova-right-rail" aria-label="Right rail">
-          <div class="nova-right-rail-top">
-            <div id="rightRailTitle" class="nova-right-rail-title">Right Rail</div>
-
-            <div class="nova-panel-tabs">
-              <button
-                id="memoryTabBtn"
-                class="nova-panel-tab"
-                type="button"
-                data-panel-toggle="memory"
-                aria-controls="memoryPanel"
-                aria-expanded="false"
-              >Memory</button>
-
-              <button
-                id="artifactsTabBtn"
-                class="nova-panel-tab"
-                type="button"
-                data-panel-toggle="artifacts"
-                aria-controls="artifactsPanel"
-                aria-expanded="false"
-              >Artifacts</button>
-
-              <button
-                id="webTabBtn"
-                class="nova-panel-tab"
-                type="button"
-                data-panel-toggle="web"
-                aria-controls="webPanel"
-                aria-expanded="false"
-              >Web</button>
-
-              <button id="closeRailBtn" class="nova-shell-btn" type="button" title="Close rail">Ã—</button>
-            </div>
-          </div>
-
-          <div class="nova-right-rail-body">
-            <section
-              id="memoryPanel"
-              class="nova-right-panel nova-memory-panel"
-              data-panel="memory"
-              data-role="memory-panel"
-              aria-label="Memory panel"
-              aria-hidden="true"
-              hidden
-            >
-              <div class="nova-panel-header nova-memory-header" data-role="memory-header">
-                <div class="nova-memory-title" data-role="memory-title">Memory</div>
-
-                <div class="nova-memory-controls" data-role="memory-controls">
-                  <button
-                    id="memoryRefreshBtn"
-                    class="nova-shell-btn nova-chip-btn"
-                    type="button"
-                    title="Refresh memory"
-                    data-role="memory-refresh"
-                  >â†»</button>
-                </div>
-
-                <div class="nova-memory-meta" data-role="memory-meta">
-                  Memory not loaded yet.
-                </div>
-              </div>
-
-              <div
-                id="memoryPanelScroll"
-                class="nova-panel-scroll nova-panel-body nova-memory-body"
-                data-role="memory-body"
-              >
-                <div class="nova-memory-list" data-role="memory-list">
-                  <div class="nova-memory-empty" data-role="memory-empty">
-                    <div class="nova-memory-empty-title">No memory yet</div>
-                    <div class="nova-memory-empty-copy">
-                      Open the panel or press refresh to load memory items.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section id="artifactsPanel" class="nova-right-panel" aria-label="Artifacts panel" aria-hidden="true" hidden>
-              <div class="nova-panel-toolbar">
-                <input id="artifactSearch" type="text" placeholder="Search artifacts" autocomplete="off">
-                <select id="artifactFilter" title="Artifact filter">
-                  <option value="all">All</option>
-                  <option value="pinned">Pinned</option>
-                  <option value="media">Media</option>
-                  <option value="chat_reply">Chat Reply</option>
-                </select>
-                <button id="artifactRefresh" class="nova-shell-btn" type="button" title="Refresh artifacts">â†»</button>
-              </div>
-
-              <div class="nova-panel-scroll">
-                <div id="artifactsList"></div>
-                <div id="artifactEmpty" class="nova-artifacts-empty" style="display:none;">No artifacts yet.</div>
-
-                <section id="artifactViewer" class="nova-artifact-viewer" data-empty="true" aria-label="Artifact viewer">
-                  <div class="nova-artifact-viewer-top">
-                    <div id="artifactViewerTitle" class="nova-artifact-viewer-title">No artifact selected</div>
-                    <div id="artifactViewerMeta" class="nova-artifact-viewer-meta"></div>
-                  </div>
-
-                  <div id="artifactViewerBody" class="nova-artifact-viewer-body">
-                    <div class="nova-artifact-empty-view">Select an artifact to view it here.</div>
-                  </div>
-                </section>
-              </div>
-            </section>
-
-            <section id="webPanel" class="nova-right-panel" aria-label="Web panel" aria-hidden="true" hidden>
-              <div class="nova-panel-toolbar">
-                <button id="webRefreshBtn" class="nova-shell-btn" type="button" title="Refresh web panel">â†»</button>
-              </div>
-              <div id="webPanelScroll" class="nova-panel-scroll"></div>
-            </section>
-          </div>
-        </aside>
-
-        <button id="debugToggle" class="nova-debug-fab" type="button">Debug</button>
-
-        <section id="debugPanel" class="nova-debug-panel" aria-label="Debug panel">
-          <div class="nova-debug-top">
-            <div class="nova-debug-title">Debug Panel</div>
-            <div class="nova-debug-actions">
-              <button id="debugRefreshBtn" class="nova-shell-btn" type="button">Refresh</button>
-              <button id="debugCopyBtn" class="nova-shell-btn" type="button">Copy</button>
-              <button id="debugCloseBtn" class="nova-shell-btn" type="button">Ã—</button>
-            </div>
-          </div>
-
-          <div class="nova-debug-body">
-            <div class="nova-debug-block">
-              <div class="nova-debug-block-title">Last Request</div>
-              <pre id="debugLastRequest" class="nova-debug-pre">{}</pre>
-            </div>
-
-            <div class="nova-debug-block">
-              <div class="nova-debug-block-title">Last Response</div>
-              <pre id="debugLastResponse" class="nova-debug-pre">{}</pre>
-            </div>
-          </div>
-        </section>
-      </section>
+        <div class="nova-composer-actions">
+          <input id="fileInput" type="file" multiple hidden>
+          <button id="uploadBtn" class="nova-btn nova-btn-secondary" type="button">Upload</button>
+          <button id="sendBtn" class="nova-btn" type="button">Send</button>
+        </div>
+      </footer>
     </main>
+
+    <aside id="rightRail" class="nova-right-rail is-collapsed" aria-hidden="true">
+      <section id="memoryPanel" class="nova-right-panel" hidden aria-hidden="true">
+        <div class="nova-panel-head">
+          <h2>Memory</h2>
+        </div>
+        <div class="nova-panel-scroll">
+          <div id="memoryStatus" class="nova-panel-status">Loading memory…</div>
+          <div id="memoryList" class="nova-memory-list"></div>
+        </div>
+      </section>
+
+      <section id="artifactsPanel" class="nova-right-panel" hidden aria-hidden="true">
+        <div class="nova-panel-head">
+          <h2>Artifacts</h2>
+        </div>
+        <div class="nova-panel-scroll">
+          <div class="nova-artifact-toolbar">
+            <input id="artifactSearchInput" class="nova-input" type="text" placeholder="Search artifacts">
+            <div id="artifactStatus" class="nova-panel-status">Artifacts ready.</div>
+          </div>
+          <div id="artifactList" class="nova-artifact-list"></div>
+          <div id="artifactViewer" class="nova-artifact-viewer"></div>
+        </div>
+      </section>
+
+      <section id="webPanel" class="nova-right-panel" hidden aria-hidden="true">
+        <div class="nova-panel-head">
+          <h2>Web</h2>
+        </div>
+        <div class="nova-panel-scroll">
+          <div id="webStatus" class="nova-panel-status">Loading web results…</div>
+          <div id="webResults" class="nova-web-results"></div>
+        </div>
+      </section>
+    </aside>
   </div>
 
-  <script>
-    (function () {
-      "use strict";
-
-      const shell = document.getElementById("novaAppShell");
-      const sidebarToggle = document.getElementById("sidebarToggle");
-      const mobileSidebarToggle = document.getElementById("mobileSidebarToggle");
-      const closeRailBtn = document.getElementById("closeRailBtn");
-      const memoryPanelToggle = document.getElementById("memoryPanelToggle");
-      const artifactsPanelToggle = document.getElementById("artifactsPanelToggle");
-      const webPanelToggle = document.getElementById("webPanelToggle");
-      const memoryTabBtn = document.getElementById("memoryTabBtn");
-      const artifactsTabBtn = document.getElementById("artifactsTabBtn");
-      const webTabBtn = document.getElementById("webTabBtn");
-      const rightRailTitle = document.getElementById("rightRailTitle");
-
-      const panels = {
-        memory: document.getElementById("memoryPanel"),
-        artifacts: document.getElementById("artifactsPanel"),
-        web: document.getElementById("webPanel")
-      };
-
-      const panelButtons = {
-        memory: [memoryPanelToggle, memoryTabBtn],
-        artifacts: [artifactsPanelToggle, artifactsTabBtn],
-        web: [webPanelToggle, webTabBtn]
-      };
-
-      let activePanel = "";
-
-      function dispatch(name, detail) {
-        try {
-          window.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
-        } catch (_) {}
-      }
-
-      function setSidebarCollapsed(forceValue) {
-        const next =
-          typeof forceValue === "boolean"
-            ? forceValue
-            : !shell.classList.contains("sidebar-collapsed");
-
-        shell.classList.toggle("sidebar-collapsed", next);
-
-        try {
-          localStorage.setItem("nova.sidebarCollapsed", next ? "1" : "0");
-        } catch (_) {}
-      }
-
-      function setMobileSidebarOpen(forceValue) {
-        const next =
-          typeof forceValue === "boolean"
-            ? forceValue
-            : !shell.classList.contains("mobile-sidebar-open");
-
-        shell.classList.toggle("mobile-sidebar-open", next);
-      }
-
-      function blurFocusedInside(panel) {
-        if (!panel) return;
-        const active = document.activeElement;
-        if (active && panel.contains(active) && typeof active.blur === "function") {
-          active.blur();
-        }
-      }
-
-      function applyPanelState(name) {
-        Object.keys(panels).forEach(function (key) {
-          const panel = panels[key];
-          const isActive = key === name && !!name;
-
-          if (panel) {
-            if (!isActive) {
-              blurFocusedInside(panel);
-            }
-
-            panel.classList.toggle("is-active", isActive);
-            panel.hidden = !isActive;
-            panel.setAttribute("aria-hidden", isActive ? "false" : "true");
-            panel.style.display = isActive ? "" : "none";
-          }
-
-          (panelButtons[key] || []).forEach(function (btn) {
-            if (!btn) return;
-            btn.classList.toggle("is-active", isActive);
-            btn.setAttribute("aria-expanded", isActive ? "true" : "false");
-          });
-        });
-      }
-
-      function openPanel(name) {
-        if (!panels[name]) return;
-
-        activePanel = name;
-        shell.classList.add("rail-open");
-        applyPanelState(name);
-
-        rightRailTitle.textContent =
-          name === "memory" ? "Memory" :
-          name === "artifacts" ? "Artifacts" :
-          name === "web" ? "Web" : "Right Rail";
-
-        dispatch("nova:right-panel-opened", { kind: name });
-      }
-
-      function closePanel() {
-        const previous = activePanel;
-        activePanel = "";
-        shell.classList.remove("rail-open");
-        applyPanelState("");
-        rightRailTitle.textContent = "Right Rail";
-        dispatch("nova:right-panel-closed", { kind: previous || "" });
-      }
-
-      function togglePanel(name) {
-        if (activePanel === name && shell.classList.contains("rail-open")) {
-          closePanel();
-          return;
-        }
-        openPanel(name);
-      }
-
-      if (sidebarToggle) {
-        sidebarToggle.addEventListener("click", function () {
-          setSidebarCollapsed();
-        });
-      }
-
-      if (mobileSidebarToggle) {
-        mobileSidebarToggle.addEventListener("click", function () {
-          setMobileSidebarOpen();
-        });
-      }
-
-      if (closeRailBtn) {
-        closeRailBtn.addEventListener("click", function () {
-          closePanel();
-        });
-      }
-
-      if (memoryPanelToggle) {
-        memoryPanelToggle.addEventListener("click", function () {
-          togglePanel("memory");
-        });
-      }
-
-      if (artifactsPanelToggle) {
-        artifactsPanelToggle.addEventListener("click", function () {
-          togglePanel("artifacts");
-        });
-      }
-
-      if (webPanelToggle) {
-        webPanelToggle.addEventListener("click", function () {
-          togglePanel("web");
-        });
-      }
-
-      if (memoryTabBtn) {
-        memoryTabBtn.addEventListener("click", function () {
-          togglePanel("memory");
-        });
-      }
-
-      if (artifactsTabBtn) {
-        artifactsTabBtn.addEventListener("click", function () {
-          togglePanel("artifacts");
-        });
-      }
-
-      if (webTabBtn) {
-        webTabBtn.addEventListener("click", function () {
-          togglePanel("web");
-        });
-      }
-
-      window.NovaPanels = {
-        open(name) { openPanel(name); },
-        close() { closePanel(); },
-        toggle(name) { togglePanel(name); },
-        getActivePanel() { return activePanel; }
-      };
-
-      try {
-        const collapsed = localStorage.getItem("nova.sidebarCollapsed") === "1";
-        if (collapsed) {
-          shell.classList.add("sidebar-collapsed");
-        }
-      } catch (_) {}
-
-      applyPanelState("");
-      console.log("[NovaPanels] controller ready");
-    })();
-  </script>
-
-  <script src="/static/js/nova-render.js?v=stable-2026-04-02-001"></script>
-  <script src="/static/js/nova-composer-bundle.js?v=stable-2026-04-02-001"></script>
-  <script src="/static/js/nova-artifacts.js?v=artifacts-stable-2026-04-02-001"></script>
-
-  <script>
-    (function () {
-      "use strict";
-
-      const debugToggle = document.getElementById("debugToggle");
-      const debugPanel = document.getElementById("debugPanel");
-      const debugCloseBtn = document.getElementById("debugCloseBtn");
-      const debugRefreshBtn = document.getElementById("debugRefreshBtn");
-      const debugCopyBtn = document.getElementById("debugCopyBtn");
-      const debugLastRequest = document.getElementById("debugLastRequest");
-      const debugLastResponse = document.getElementById("debugLastResponse");
-      const stagedAttachments = document.getElementById("stagedAttachments");
-      const fileInput = document.getElementById("fileInput");
-
-      function closeDebug() {
-        debugPanel.classList.remove("is-open");
-      }
-
-      function toggleDebug() {
-        debugPanel.classList.toggle("is-open");
-      }
-
-      function refreshDebug() {
-        debugLastRequest.textContent = JSON.stringify(window.__novaLastRequest || {}, null, 2);
-        debugLastResponse.textContent = JSON.stringify(window.__novaLastResponse || {}, null, 2);
-      }
-
-      async function copyDebug() {
-        const text =
-          "LAST REQUEST\n" +
-          JSON.stringify(window.__novaLastRequest || {}, null, 2) +
-          "\n\nLAST RESPONSE\n" +
-          JSON.stringify(window.__novaLastResponse || {}, null, 2);
-
-        try {
-          await navigator.clipboard.writeText(text);
-        } catch (_) {}
-      }
-
-      function escapeHtml(value) {
-        return String(value == null ? "" : value)
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#39;");
-      }
-
-      function formatSize(size) {
-        const value = Number(size);
-        if (!Number.isFinite(value) || value <= 0) return "";
-        const units = ["B", "KB", "MB", "GB"];
-        let amount = value;
-        let index = 0;
-        while (amount >= 1024 && index < units.length - 1) {
-          amount /= 1024;
-          index += 1;
-        }
-        return amount.toFixed(amount >= 10 || index === 0 ? 0 : 1) + " " + units[index];
-      }
-
-      function normalizeType(type, name) {
-        const t = String(type || "").toLowerCase();
-        const n = String(name || "").toLowerCase();
-
-        if (t) return t;
-        if (/\.(png|jpg|jpeg|gif|webp|bmp|svg)$/.test(n)) return "image";
-        if (/\.(mp4|webm|mov|m4v|avi|mkv)$/.test(n)) return "video";
-        if (/\.(mp3|wav|m4a|ogg|flac|aac)$/.test(n)) return "audio";
-        return "file";
-      }
-
-      function renderStagedAttachments(items) {
-        const list = Array.isArray(items) ? items : [];
-        if (!list.length) {
-          stagedAttachments.classList.remove("has-items");
-          stagedAttachments.innerHTML = "";
-          return;
-        }
-
-        stagedAttachments.classList.add("has-items");
-        stagedAttachments.innerHTML = list.map(function (item, index) {
-          const name = item.filename || item.name || item.title || item.url || "attachment";
-          const type = normalizeType(item.type, name);
-          const thumb =
-            type === "image" && item.url
-              ? '<img class="nova-staged-chip-thumb" src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(name) + '" loading="lazy">'
-              : "";
-
-          return (
-            '<div class="nova-staged-chip" data-staged-index="' + index + '">' +
-              '<div class="nova-staged-chip-top">' +
-                '<div class="nova-message-badge">' + escapeHtml(type.toUpperCase()) + '</div>' +
-                '<button class="nova-chip-btn" type="button" data-remove-staged="' + index + '">Remove</button>' +
-              '</div>' +
-              thumb +
-              '<div class="nova-staged-chip-title">' + escapeHtml(name) + '</div>' +
-              '<div class="nova-staged-chip-meta">' + escapeHtml([item.mime_type || item.mime || "", formatSize(item.size)].filter(Boolean).join(" â€¢ ")) + '</div>' +
-            '</div>'
-          );
-        }).join("");
-      }
-
-      window.NovaUploadStage = {
-        items: [],
-        set(items) {
-          this.items = Array.isArray(items) ? items.slice() : [];
-          renderStagedAttachments(this.items);
-        },
-        add(items) {
-          const next = Array.isArray(items) ? items : [items];
-          this.items = this.items.concat(next.filter(Boolean));
-          renderStagedAttachments(this.items);
-        },
-        remove(index) {
-          this.items = this.items.filter(function (_, i) {
-            return i !== index;
-          });
-          renderStagedAttachments(this.items);
-        },
-        clear() {
-          this.items = [];
-          renderStagedAttachments(this.items);
-          if (fileInput) fileInput.value = "";
-        },
-        get() {
-          return this.items.slice();
-        }
-      };
-
-      if (stagedAttachments) {
-        stagedAttachments.addEventListener("click", function (event) {
-          const btn = event.target.closest("[data-remove-staged]");
-          if (!btn) return;
-          const index = Number(btn.getAttribute("data-remove-staged"));
-          window.NovaUploadStage.remove(index);
-        });
-      }
-
-      if (debugToggle) debugToggle.addEventListener("click", toggleDebug);
-      if (debugCloseBtn) debugCloseBtn.addEventListener("click", closeDebug);
-      if (debugRefreshBtn) debugRefreshBtn.addEventListener("click", refreshDebug);
-      if (debugCopyBtn) debugCopyBtn.addEventListener("click", copyDebug);
-
-      window.addEventListener("nova:debug-update", refreshDebug);
-
-      refreshDebug();
-    })();
-  </script>
+  <script src="/static/js/nova-artifacts.js?v=index-restore-lock-2026-04-02-001"></script>
+  <script src="/static/js/nova-composer-bundle.js?v=index-restore-lock-2026-04-02-001"></script>
 </body>
 </html>

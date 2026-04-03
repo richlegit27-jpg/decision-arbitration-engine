@@ -3,27 +3,27 @@
   --bg-2: #0b1730;
   --panel: rgba(12, 20, 37, 0.94);
   --panel-2: rgba(16, 27, 49, 0.97);
+  --panel-3: rgba(10, 18, 34, 0.98);
   --text: #eef4ff;
   --muted: #9cafcf;
-  --line: rgba(130, 158, 222, 0.14);
-  --line-strong: rgba(130, 158, 222, 0.24);
-  --accent: #6ea8ff;
-  --accent-2: #4f8fff;
-  --accent-soft: rgba(110, 168, 255, 0.16);
-  --danger: #ff6f91;
-  --danger-soft: rgba(255, 111, 145, 0.16);
-  --ok: #79e1b0;
-  --warn: #ffd166;
-  --left-rail-w: 296px;
-  --left-rail-collapsed: 78px;
+  --soft: #7f95bb;
+  --line: rgba(130, 158, 222, 0.18);
+  --line-2: rgba(130, 158, 222, 0.28);
+  --accent: #78a6ff;
+  --accent-2: #5c8fff;
+  --accent-3: rgba(120, 166, 255, 0.18);
+  --good: #59d39b;
+  --warn: #ffcc66;
+  --danger: #ff7c8f;
+  --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+
+  --sidebar-w: 290px;
   --right-rail-w: 420px;
   --topbar-h: 64px;
-  --composer-h: 132px;
-  --radius-xl: 24px;
-  --radius-lg: 18px;
-  --radius-md: 14px;
+  --composer-min-h: 126px;
+  --radius: 18px;
   --radius-sm: 12px;
-  --font: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius-xs: 10px;
 }
 
 * {
@@ -33,25 +33,21 @@
 html,
 body {
   margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
+  min-height: 100%;
   background:
-    radial-gradient(circle at top left, rgba(110, 168, 255, 0.10), transparent 30%),
-    radial-gradient(circle at top right, rgba(79, 143, 255, 0.10), transparent 22%),
-    linear-gradient(180deg, var(--bg), var(--bg-2));
+    radial-gradient(circle at top left, rgba(82, 129, 255, 0.12), transparent 24%),
+    radial-gradient(circle at top right, rgba(63, 196, 255, 0.08), transparent 20%),
+    linear-gradient(180deg, var(--bg-2), var(--bg));
   color: var(--text);
-  font-family: var(--font);
-  overflow: hidden;
+  font: 14px/1.45 Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 body {
-  min-height: 100vh;
+  overflow: hidden;
 }
 
 button,
 input,
-select,
 textarea {
   font: inherit;
 }
@@ -61,45 +57,50 @@ button {
 }
 
 a {
-  color: inherit;
+  color: var(--accent);
   text-decoration: none;
 }
 
-img,
-video,
-audio {
-  display: block;
+img {
   max-width: 100%;
+  display: block;
+}
+
+code {
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  font-family: Consolas, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.95em;
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 #novaAppShell,
 .nova-app-shell {
-  position: relative;
   display: grid;
-  grid-template-columns: var(--left-rail-w) minmax(0, 1fr);
-  width: 100vw;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) auto;
+  grid-template-rows: 100vh;
+  width: 100%;
   height: 100vh;
   overflow: hidden;
 }
 
-#novaAppShell.sidebar-collapsed,
-.nova-app-shell.sidebar-collapsed {
-  grid-template-columns: var(--left-rail-collapsed) minmax(0, 1fr);
-}
+/* sidebar */
 
 .nova-sidebar {
-  position: relative;
-  z-index: 4;
-  display: flex;
-  flex-direction: column;
   min-width: 0;
   height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 14px 14px;
   border-right: 1px solid var(--line);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
-    rgba(8, 15, 28, 0.92);
-  backdrop-filter: blur(18px);
-  box-shadow: inset -1px 0 0 rgba(255,255,255,0.02);
+  background: linear-gradient(180deg, rgba(9, 16, 29, 0.98), rgba(9, 16, 31, 0.94));
   overflow: hidden;
 }
 
@@ -107,468 +108,180 @@ audio {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  min-height: var(--topbar-h);
-  padding: 14px 14px 12px;
-  border-bottom: 1px solid var(--line);
+  gap: 12px;
 }
 
 .nova-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.nova-brand-mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  background: linear-gradient(180deg, rgba(110,168,255,0.95), rgba(79,143,255,0.85));
-  color: #081221;
-  box-shadow: 0 10px 28px rgba(79,143,255,0.28);
-  flex: 0 0 auto;
-}
-
-.nova-brand-text {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.nova-brand-title {
-  font-weight: 800;
-  font-size: 15px;
-  line-height: 1.15;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.nova-brand-subtitle {
-  color: var(--muted);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.nova-shell-btn {
-  appearance: none;
-  border: 1px solid var(--line);
-  background: rgba(255,255,255,0.04);
-  color: var(--text);
-  border-radius: 12px;
-  min-height: 38px;
-  min-width: 38px;
-  padding: 0 12px;
-  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
-}
-
-.nova-shell-btn:hover {
-  transform: translateY(-1px);
-  border-color: var(--line-strong);
-  background: rgba(255,255,255,0.07);
-  box-shadow: 0 12px 24px rgba(0,0,0,0.16);
-}
-
-.nova-shell-btn:active {
-  transform: translateY(0);
-}
-
-.nova-shell-btn.is-primary {
-  background: linear-gradient(180deg, rgba(110,168,255,0.20), rgba(79,143,255,0.12));
-  border-color: rgba(110,168,255,0.24);
-}
-
-.nova-shell-btn.is-danger {
-  border-color: rgba(255,111,145,0.24);
-  background: rgba(255,111,145,0.08);
-}
-
-.nova-session-actions {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  padding: 14px;
-  border-bottom: 1px solid var(--line);
-}
-
-.nova-new-chat-btn {
-  width: 100%;
-  min-height: 42px;
-  border-radius: 14px;
-  border: 1px solid rgba(110,168,255,0.24);
-  background: linear-gradient(180deg, rgba(110,168,255,0.18), rgba(79,143,255,0.08));
-  color: var(--text);
-  font-weight: 800;
-  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
-}
-
-.nova-new-chat-btn:hover {
-  transform: translateY(-1px);
-  border-color: rgba(110,168,255,0.34);
-  box-shadow: 0 14px 28px rgba(0,0,0,0.18);
-}
-
-.nova-session-list-wrap {
-  min-height: 0;
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.nova-session-list-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px 14px 10px;
-  border-bottom: 1px solid rgba(130,158,222,0.08);
-}
-
-.nova-session-list-title {
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--muted);
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
-}
-
-.nova-session-list {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  padding: 12px 12px 18px;
-  display: grid;
-  gap: 10px;
-}
-
-.nova-session-list::-webkit-scrollbar,
-.nova-chat-scroll::-webkit-scrollbar,
-.nova-panel-scroll::-webkit-scrollbar,
-.nova-debug-body::-webkit-scrollbar,
-.nova-right-rail-body::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.nova-session-list::-webkit-scrollbar-thumb,
-.nova-chat-scroll::-webkit-scrollbar-thumb,
-.nova-panel-scroll::-webkit-scrollbar-thumb,
-.nova-debug-body::-webkit-scrollbar-thumb,
-.nova-right-rail-body::-webkit-scrollbar-thumb {
-  background: rgba(130,158,222,0.22);
-  border-radius: 999px;
-}
-
-.nova-session-card {
-  width: 100%;
-  text-align: left;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0)),
-    rgba(11, 20, 37, 0.84);
-  color: var(--text);
-  padding: 12px 12px 11px;
-  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
-}
-
-.nova-session-card:hover {
-  transform: translateY(-1px);
-  border-color: rgba(110,168,255,0.22);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.024), rgba(255,255,255,0)),
-    rgba(14, 24, 43, 0.92);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.16);
-}
-
-.nova-session-card.is-active {
-  border-color: rgba(110,168,255,0.34);
-  background:
-    linear-gradient(180deg, rgba(110,168,255,0.08), rgba(110,168,255,0.02)),
-    rgba(15, 27, 48, 0.96);
-  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.22);
-}
-
-.nova-session-card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 7px;
-}
-
-.nova-session-card-title {
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1.3;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.nova-session-card-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.4;
-  margin-top: 8px;
-}
-
-.nova-session-card-preview {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
-  min-height: 17px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.nova-session-card-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-
-.nova-chip-btn,
-.nova-panel-tab {
-  appearance: none;
-  border: 1px solid rgba(130,158,222,0.14);
-  background: rgba(255,255,255,0.04);
-  color: var(--text);
-  border-radius: 10px;
-  min-height: 30px;
-  padding: 0 10px;
-  font-size: 11px;
+  font-size: 18px;
   font-weight: 700;
-}
-
-.nova-panel-tab {
-  min-height: 36px;
-  padding: 0 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.nova-panel-tab.is-active {
-  border-color: rgba(110,168,255,0.30);
-  background: rgba(110,168,255,0.12);
-}
-
-.nova-collapsed-strip {
-  display: none;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  padding: 12px 10px 18px;
-  gap: 10px;
-  flex-direction: column;
-  align-items: center;
-}
-
-.nova-collapsed-marker {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: rgba(255,255,255,0.04);
-  display: grid;
-  place-items: center;
+  letter-spacing: 0.02em;
   color: var(--text);
-  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
 }
 
-.nova-collapsed-marker:hover {
-  transform: translateY(-1px);
-  border-color: rgba(110,168,255,0.28);
-  background: rgba(110,168,255,0.08);
+.nova-sidebar-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
-.nova-collapsed-marker.is-active {
-  border-color: rgba(110,168,255,0.34);
-  background: rgba(110,168,255,0.12);
-  box-shadow: 0 12px 26px rgba(0,0,0,0.22);
+.nova-sessions-list {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding-right: 4px;
 }
 
-.nova-collapsed-marker-dot {
-  position: absolute;
-  right: 6px;
-  top: 6px;
-  width: 8px;
-  height: 8px;
+.nova-sessions-list::-webkit-scrollbar,
+.nova-messages::-webkit-scrollbar,
+.nova-panel-scroll::-webkit-scrollbar,
+.nova-artifact-list::-webkit-scrollbar,
+.nova-artifact-viewer::-webkit-scrollbar {
+  width: 10px;
+}
+
+.nova-sessions-list::-webkit-scrollbar-thumb,
+.nova-messages::-webkit-scrollbar-thumb,
+.nova-panel-scroll::-webkit-scrollbar-thumb,
+.nova-artifact-list::-webkit-scrollbar-thumb,
+.nova-artifact-viewer::-webkit-scrollbar-thumb {
+  background: rgba(126, 156, 224, 0.24);
   border-radius: 999px;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px rgba(110,168,255,0.14);
 }
 
-.nova-app-shell.sidebar-collapsed .nova-sidebar-top {
-  padding-left: 10px;
-  padding-right: 10px;
+.nova-session-item {
+  width: 100%;
+  display: block;
+  text-align: left;
+  margin-bottom: 10px;
+  padding: 13px 14px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  transition: 120ms ease;
 }
 
-.nova-app-shell.sidebar-collapsed .nova-brand-text,
-.nova-app-shell.sidebar-collapsed .nova-session-actions,
-.nova-app-shell.sidebar-collapsed .nova-session-list-wrap {
-  display: none;
+.nova-session-item:hover {
+  border-color: var(--line-2);
+  background: rgba(255, 255, 255, 0.06);
 }
 
-.nova-app-shell.sidebar-collapsed .nova-collapsed-strip {
-  display: flex;
+.nova-session-item.is-active {
+  border-color: rgba(120, 166, 255, 0.42);
+  background: linear-gradient(180deg, rgba(120, 166, 255, 0.18), rgba(120, 166, 255, 0.09));
+  box-shadow: inset 0 0 0 1px rgba(120, 166, 255, 0.15);
 }
+
+.nova-session-title {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+  word-break: break-word;
+}
+
+.nova-session-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* main */
 
 .nova-main {
-  position: relative;
   min-width: 0;
-  min-height: 0;
+  height: 100vh;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: var(--topbar-h) minmax(0, 1fr);
+  grid-template-rows: var(--topbar-h) minmax(0, 1fr) auto;
+  background: transparent;
   overflow: hidden;
 }
 
-.nova-main-stage {
-  position: relative;
-  min-height: 0;
+.nova-topbar {
   min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  overflow: hidden;
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(9, 16, 31, 0.54);
+  backdrop-filter: blur(14px);
 }
 
-.nova-main-content {
+.nova-topbar-left,
+.nova-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.nova-messages-wrap {
   min-width: 0;
   min-height: 0;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  overflow: hidden;
-}
-
-.nova-chat-scroll {
   position: relative;
-  min-height: 0;
-  overflow: auto;
-  padding: 18px 18px 12px;
-}
-
-.nova-chat-stack {
-  width: min(100%, 980px);
-  margin: 0 auto;
-  display: grid;
-  gap: 14px;
+  overflow: hidden;
 }
 
 .nova-empty-state {
-  border: 1px dashed rgba(130,158,222,0.16);
+  position: absolute;
+  inset: 24px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  border: 1px dashed rgba(126, 156, 224, 0.22);
   border-radius: 24px;
-  background:
-    radial-gradient(circle at top left, rgba(110,168,255,0.08), transparent 34%),
-    rgba(10, 18, 34, 0.56);
-  padding: 28px 24px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.02);
+  pointer-events: none;
 }
 
-.nova-empty-state-title {
+.nova-empty-title {
   font-size: 22px;
-  font-weight: 900;
-  line-height: 1.1;
+  font-weight: 700;
+  color: var(--text);
   margin-bottom: 8px;
 }
 
-.nova-empty-state-copy {
+.nova-empty-copy {
+  max-width: 520px;
+  margin: 0 auto;
   color: var(--muted);
-  font-size: 14px;
-  line-height: 1.6;
-  max-width: 760px;
 }
 
-.nova-empty-state-grid {
-  margin-top: 18px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.nova-empty-state-card {
-  border: 1px solid rgba(130,158,222,0.14);
-  border-radius: 18px;
-  padding: 14px;
-  background: rgba(255,255,255,0.03);
-}
-
-.nova-empty-state-card-title {
-  font-size: 13px;
-  font-weight: 800;
-  margin-bottom: 6px;
-}
-
-.nova-empty-state-card-copy {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-#messages {
-  display: grid;
-  gap: 14px;
+.nova-messages {
+  height: 100%;
+  overflow: auto;
+  padding: 20px 22px 18px;
+  scroll-behavior: smooth;
 }
 
 .nova-message {
-  width: 100%;
+  display: flex;
+  margin-bottom: 14px;
+}
+
+.nova-message-user {
+  justify-content: flex-end;
+}
+
+.nova-message-assistant,
+.nova-message-system {
+  justify-content: flex-start;
 }
 
 .nova-message-inner {
+  max-width: min(860px, 88%);
+  padding: 14px 16px 12px;
   border: 1px solid var(--line);
-  border-radius: 20px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
-    rgba(10, 18, 34, 0.84);
-  box-shadow: 0 16px 36px rgba(0,0,0,0.22);
-  padding: 14px;
-  overflow: hidden;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(15, 26, 47, 0.98), rgba(10, 18, 33, 0.96));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
 }
 
-.nova-message.is-user .nova-message-inner,
 .nova-message-user .nova-message-inner {
-  border-color: rgba(110,168,255,0.22);
-  background:
-    linear-gradient(180deg, rgba(110,168,255,0.06), rgba(110,168,255,0.01)),
-    rgba(12, 22, 40, 0.96);
-}
-
-.nova-message-head,
-.nova-message-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.nova-message-author {
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.nova-message-time {
-  color: var(--muted);
-  font-size: 11px;
-  white-space: nowrap;
+  background: linear-gradient(180deg, rgba(78, 117, 255, 0.22), rgba(55, 96, 235, 0.16));
+  border-color: rgba(120, 166, 255, 0.28);
 }
 
 .nova-message-badges {
@@ -578,535 +291,512 @@ audio {
   margin-bottom: 10px;
 }
 
-.nova-message-badge,
 .nova-badge {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
+  gap: 6px;
+  height: 24px;
   padding: 0 10px;
   border-radius: 999px;
-  border: 1px solid rgba(110,168,255,0.18);
-  background: rgba(110,168,255,0.08);
-  color: var(--text);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.nova-badge-artifact {
-  border-color: rgba(164,122,255,0.24);
-  background: rgba(164,122,255,0.10);
-}
-
-.nova-badge-web {
-  border-color: rgba(110,168,255,0.24);
-  background: rgba(110,168,255,0.10);
-}
-
-.nova-badge-memory {
-  border-color: rgba(121,225,176,0.24);
-  background: rgba(121,225,176,0.10);
-}
-
-.nova-badge-media {
-  border-color: rgba(84,196,255,0.24);
-  background: rgba(84,196,255,0.10);
-}
-
-.nova-badge-warn {
-  border-color: rgba(255,209,102,0.24);
-  background: rgba(255,209,102,0.10);
+  background: rgba(120, 166, 255, 0.16);
+  border: 1px solid rgba(120, 166, 255, 0.24);
+  color: #d8e6ff;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .nova-message-markdown {
-  font-size: 14px;
-  line-height: 1.65;
   color: var(--text);
   word-break: break-word;
 }
 
-.nova-message-markdown h1,
-.nova-message-markdown h2,
-.nova-message-markdown h3 {
-  margin: 0 0 10px;
-  line-height: 1.2;
+.nova-message-markdown strong {
+  font-weight: 700;
 }
 
-.nova-message-markdown p {
-  margin: 0 0 12px;
-}
-
-.nova-message-markdown ul,
-.nova-message-markdown ol {
-  margin: 0 0 12px;
-  padding-left: 18px;
-}
-
-.nova-message-markdown code {
-  border-radius: 8px;
-  padding: 1px 6px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(130,158,222,0.12);
-  font-size: 12px;
-}
-
-.nova-message-markdown a {
-  color: #9cc3ff;
-}
-
-.nova-message-media {
-  margin-top: 14px;
-}
-
-.nova-media-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.nova-media-grid.is-single {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.nova-media-stack {
-  display: grid;
-  gap: 12px;
-}
-
-.nova-media-card {
-  overflow: hidden;
-  border-radius: 18px;
-  border: 1px solid rgba(150, 176, 224, 0.18);
-  background: linear-gradient(180deg, rgba(17, 28, 50, 0.9), rgba(10, 19, 35, 0.96));
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
-}
-
-.nova-media-link {
+.nova-message-markdown br + br {
   display: block;
+  content: "";
+  margin-top: 6px;
 }
 
-.nova-media-image {
-  width: 100%;
-  height: auto;
-  max-height: 460px;
-  object-fit: contain;
-  background: rgba(4, 9, 18, 0.9);
-}
-
-.nova-media-video {
-  width: 100%;
-  max-height: 520px;
-  object-fit: contain;
-  background: #000;
-}
-
-.nova-media-audio {
-  width: 100%;
-}
-
-.nova-media-card-audio {
-  padding: 14px;
-}
-
-.nova-media-caption {
-  padding: 10px 12px 12px;
-  color: var(--muted);
+.nova-message-time {
+  margin-top: 10px;
   font-size: 12px;
-  line-height: 1.4;
-  word-break: break-word;
-}
-
-.nova-media-caption-top {
-  padding: 0 0 10px;
-  color: var(--text);
-  font-weight: 700;
-}
-
-.nova-file-chip-list {
-  display: grid;
-  gap: 10px;
-}
-
-.nova-file-chip {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  padding: 12px 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(144, 170, 220, 0.18);
-  background: linear-gradient(180deg, rgba(15, 26, 47, 0.96), rgba(10, 20, 38, 0.98));
-  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
-}
-
-.nova-file-chip:hover {
-  transform: translateY(-1px);
-  border-color: rgba(144, 170, 220, 0.30);
-}
-
-.nova-file-chip-icon {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  background: rgba(110, 168, 255, 0.14);
-  flex: 0 0 auto;
-}
-
-.nova-file-chip-body {
-  min-width: 0;
-  display: grid;
-  gap: 3px;
-}
-
-.nova-file-chip-title {
-  font-size: 14px;
-  font-weight: 700;
-  word-break: break-word;
-}
-
-.nova-file-chip-meta {
   color: var(--muted);
-  font-size: 12px;
-  word-break: break-word;
 }
 
-.nova-composer-wrap {
-  border-top: 1px solid var(--line);
-  padding: 12px 18px 18px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
-    rgba(8, 15, 28, 0.86);
-  backdrop-filter: blur(16px);
+.nova-inline-image {
+  margin-top: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  max-height: 360px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.03);
 }
+
+/* composer */
 
 .nova-composer {
-  width: min(100%, 980px);
-  margin: 0 auto;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  padding: 14px 18px 18px;
+  border-top: 1px solid var(--line);
+  background: rgba(9, 16, 31, 0.74);
+  backdrop-filter: blur(14px);
 }
 
-.nova-staged-attachments {
-  display: none;
-  gap: 10px;
+.nova-staged-files {
+  display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
-}
-
-.nova-staged-attachments.has-items {
-  display: flex;
-}
-
-.nova-staged-chip {
-  max-width: 260px;
-  display: grid;
-  gap: 6px;
-  padding: 10px;
-  border-radius: 14px;
-  border: 1px solid rgba(130,158,222,0.14);
-  background: rgba(255,255,255,0.04);
-  overflow: hidden;
-}
-
-.nova-staged-chip-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.nova-staged-chip-title {
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.35;
-  word-break: break-word;
-}
-
-.nova-staged-chip-meta {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.nova-staged-chip-thumb {
-  width: 100%;
-  max-height: 120px;
-  object-fit: cover;
-  border-radius: 10px;
-  border: 1px solid rgba(130,158,222,0.14);
-  background: rgba(0,0,0,0.2);
+  gap: 10px;
+  min-height: 0;
 }
 
 .nova-composer-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
-  align-items: end;
-}
-
-.nova-composer-input-wrap {
-  position: relative;
   min-width: 0;
-  display: grid;
-  gap: 8px;
 }
 
-.nova-composer-textarea {
-  width: 100%;
-  min-height: 78px;
-  max-height: 260px;
-  resize: vertical;
-  border-radius: 18px;
-  border: 1px solid rgba(130,158,222,0.16);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0)),
-    rgba(12, 20, 37, 0.96);
-  color: var(--text);
-  padding: 16px 16px 15px;
-  line-height: 1.55;
-  outline: none;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
-}
-
-.nova-composer-textarea:focus {
-  border-color: rgba(110,168,255,0.30);
-  box-shadow: 0 0 0 4px rgba(110,168,255,0.10);
-}
-
-.nova-composer-footer {
+.nova-composer-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
-  flex-wrap: wrap;
 }
 
-.nova-composer-hint {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.nova-right-rail {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: min(var(--right-rail-w), calc(100vw - 96px));
-  height: 100%;
-  border-left: 1px solid var(--line);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
-    rgba(8, 15, 28, 0.95);
-  backdrop-filter: blur(18px);
-  box-shadow: -20px 0 50px rgba(0,0,0,0.28);
-  transform: translateX(100%);
-  transition: transform 160ms ease;
-  z-index: 5;
-  display: grid;
-  grid-template-rows: 64px minmax(0, 1fr);
-  overflow: hidden;
-}
-
-.nova-app-shell.rail-open .nova-right-rail {
-  transform: translateX(0);
-}
-
-.nova-right-rail-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.nova-input {
+  width: 100%;
   min-width: 0;
   padding: 12px 14px;
-  border-bottom: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  outline: none;
+  transition: 120ms ease;
 }
 
-.nova-right-rail-title {
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
-  color: var(--muted);
-  min-width: 0;
+.nova-input:focus {
+  border-color: rgba(120, 166, 255, 0.42);
+  box-shadow: 0 0 0 3px rgba(120, 166, 255, 0.12);
+}
+
+.nova-input::placeholder {
+  color: var(--soft);
+}
+
+textarea.nova-input {
+  resize: vertical;
+  min-height: 66px;
+  max-height: 220px;
+}
+
+/* buttons */
+
+.nova-btn,
+.nova-icon-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  color: var(--text);
+  background: linear-gradient(180deg, rgba(94, 136, 255, 0.28), rgba(74, 118, 255, 0.18));
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-weight: 600;
+  transition: 120ms ease;
+}
+
+.nova-btn:hover,
+.nova-icon-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(120, 166, 255, 0.38);
+  background: linear-gradient(180deg, rgba(102, 142, 255, 0.36), rgba(76, 118, 255, 0.24));
+}
+
+.nova-btn:disabled,
+.nova-icon-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.nova-btn-secondary {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--line);
+}
+
+.nova-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--line-2);
+}
+
+.nova-icon-btn {
+  width: 40px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+}
+
+.nova-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nova-attachment-name {
+  max-width: 260px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.nova-panel-tabs {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.nova-right-rail-body {
-  position: relative;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.nova-right-panel {
-  position: absolute;
-  inset: 0;
-  min-height: 0;
-  display: none;
-  overflow: hidden;
-}
-
-.nova-right-panel.is-active {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-.nova-panel-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 12px 14px;
-  border-bottom: 1px solid rgba(130,158,222,0.08);
-}
-
-.nova-panel-toolbar input,
-.nova-panel-toolbar select {
-  min-height: 38px;
-  border-radius: 12px;
-  border: 1px solid rgba(130,158,222,0.14);
-  background: rgba(255,255,255,0.04);
+.nova-chip-remove {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 0;
   color: var(--text);
-  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* right rail */
+
+.nova-right-rail {
+  width: var(--right-rail-w);
+  min-width: var(--right-rail-w);
+  max-width: var(--right-rail-w);
+  height: 100vh;
+  border-left: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(10, 18, 34, 0.98), rgba(7, 13, 25, 0.98));
+  overflow: hidden;
+  transition: width 140ms ease, min-width 140ms ease, max-width 140ms ease, opacity 140ms ease;
+  opacity: 1;
+}
+
+.nova-right-rail.is-collapsed,
+#rightRail.is-collapsed {
+  width: 0;
   min-width: 0;
-  outline: none;
+  max-width: 0;
+  border-left: 0;
+  opacity: 0;
+}
+
+.nova-right-panel,
+#rightRail .nova-right-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: transparent;
+}
+
+.nova-right-panel[hidden],
+#rightRail .nova-right-panel[hidden],
+#rightRail .nova-right-panel[aria-hidden="true"] {
+  display: none !important;
+}
+
+.nova-right-panel.is-active,
+#rightRail .nova-right-panel.is-active[aria-hidden="false"] {
+  display: flex;
+}
+
+.nova-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 64px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.nova-panel-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .nova-panel-scroll {
   min-height: 0;
+  flex: 1;
   overflow: auto;
   padding: 14px;
+}
+
+.nova-panel-status {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* memory */
+
+.nova-memory-list {
   display: grid;
-  gap: 14px;
-  align-content: start;
+  gap: 12px;
+  margin-top: 12px;
 }
 
-.nova-memory-card,
-.nova-web-card {
-  border: 1px solid rgba(130,158,222,0.14);
-  border-radius: 16px;
+.nova-memory-card {
   padding: 14px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
-    rgba(11,20,37,0.84);
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.nova-memory-title,
-.nova-web-title {
+.nova-memory-card-text {
+  color: var(--text);
+  word-break: break-word;
+}
+
+.nova-memory-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* artifacts */
+
+.nova-artifact-toolbar {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.nova-artifact-list {
+  display: grid;
+  gap: 10px;
+}
+
+.nova-artifact-list.is-empty {
+  min-height: 0;
+}
+
+.nova-artifact-item {
+  width: 100%;
+  text-align: left;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  transition: 120ms ease;
+}
+
+.nova-artifact-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--line-2);
+}
+
+.nova-artifact-item.is-active {
+  border-color: rgba(120, 166, 255, 0.42);
+  background: linear-gradient(180deg, rgba(120, 166, 255, 0.18), rgba(120, 166, 255, 0.08));
+  box-shadow: inset 0 0 0 1px rgba(120, 166, 255, 0.14);
+}
+
+.nova-artifact-item-top,
+.nova-artifact-view-meta,
+.nova-web-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.nova-artifact-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.nova-artifact-title,
+.nova-artifact-view-title,
+.nova-web-card-title {
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.nova-artifact-preview,
+.nova-web-card-preview {
+  color: var(--muted);
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.nova-artifact-kind,
+.nova-artifact-session-chip,
+.nova-artifact-date,
+.nova-web-card-time,
+.nova-artifact-session {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.nova-artifact-session-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.nova-artifact-viewer {
+  margin-top: 14px;
+  min-height: 220px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.nova-artifact-view,
+.nova-artifact-empty {
+  display: flex;
+  flex-direction: column;
+  min-height: 220px;
+}
+
+.nova-artifact-view-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.nova-artifact-view-submeta,
+.nova-artifact-view-session {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.nova-artifact-view-body {
+  padding: 16px;
+}
+
+.nova-artifact-content-block {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.nova-artifact-content-empty,
+.nova-artifact-empty-copy,
+.nova-artifact-list-empty-copy,
+.nova-panel-empty-copy {
+  color: var(--muted);
+}
+
+.nova-artifact-empty,
+.nova-artifact-list-empty,
+.nova-panel-empty {
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px dashed rgba(126, 156, 224, 0.2);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.nova-artifact-empty-title,
+.nova-artifact-list-empty-title,
+.nova-panel-empty-title {
+  font-weight: 700;
+  color: var(--text);
   margin-bottom: 6px;
 }
 
-.nova-memory-copy,
-.nova-web-copy {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.55;
+/* web */
+
+.nova-web-results {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
 }
 
-.nova-artifacts-empty {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
-  border: 1px dashed rgba(130,158,222,0.14);
-  border-radius: 16px;
+.nova-web-card {
   padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.nova-web-card-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+/* utility */
+
+[hidden] {
+  display: none !important;
+}
+
+/* responsive */
+
+@media (max-width: 1380px) {
+  :root {
+    --sidebar-w: 250px;
+    --right-rail-w: 380px;
+  }
 }
 
 @media (max-width: 1100px) {
-  .nova-empty-state-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 900px) {
-  .nova-app-shell {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .nova-sidebar {
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: min(92vw, var(--left-rail-w));
-    transform: translateX(-100%);
-    transition: transform 160ms ease;
-    z-index: 7;
-  }
-
-  .nova-app-shell.mobile-sidebar-open .nova-sidebar {
-    transform: translateX(0);
-  }
-
-  .nova-app-shell.sidebar-collapsed {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .nova-chat-scroll,
-  .nova-composer-wrap {
-    padding-left: 14px;
-    padding-right: 14px;
-  }
-
-  .nova-composer-row {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 720px) {
-  .nova-composer-footer {
-    align-items: stretch;
-  }
-
-  .nova-composer-hint {
-    width: 100%;
-  }
-
-  .nova-media-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .nova-media-image,
-  .nova-media-video {
-    max-height: 320px;
-  }
-}
-
-@media (max-width: 640px) {
-  .nova-right-rail {
-    width: 100vw;
-  }
-
-  .nova-session-card-actions,
-  .nova-panel-tabs,
-  .nova-panel-toolbar {
-    gap: 6px;
-  }
-
-  .nova-chat-scroll,
-  .nova-composer-wrap {
-    padding-left: 12px;
-    padding-right: 12px;
+  :root {
+    --sidebar-w: 230px;
+    --right-rail-w: 340px;
   }
 
   .nova-message-inner {
-    padding: 12px;
-    border-radius: 18px;
+    max-width: 94%;
+  }
+}
+
+@media (max-width: 920px) {
+  #novaAppShell,
+  .nova-app-shell {
+    grid-template-columns: 1fr;
   }
 
-  .nova-empty-state {
-    padding: 20px 16px;
+  .nova-sidebar {
+    display: none;
+  }
+
+  .nova-right-rail {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 60;
+    box-shadow: var(--shadow);
+  }
+
+  .nova-right-rail.is-collapsed,
+  #rightRail.is-collapsed {
+    transform: translateX(100%);
+    width: var(--right-rail-w);
+    min-width: var(--right-rail-w);
+    max-width: var(--right-rail-w);
+    opacity: 1;
   }
 }

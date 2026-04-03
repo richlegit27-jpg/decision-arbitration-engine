@@ -1,406 +1,133 @@
-(function () {
-  "use strict";
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nova Ultimate 2026</title>
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=api-origin-lock-2026-04-02-001">
+</head>
+<body data-active-session-id="">
+  <script>
+    (function () {
+      "use strict";
 
-  const LOG = "[NovaArtifacts]";
-  const API = {
-    list: "/api/artifacts",
-    read(id) {
-      return "/api/artifacts/" + encodeURIComponent(id);
-    }
-  };
-
-  const state = {
-    artifacts: [],
-    filtered: [],
-    activeId: "",
-    active: null,
-    filter: "all",
-    search: "",
-    activeSessionId: ""
-  };
-
-  function log() {
-    try {
-      console.log(LOG, ...arguments);
-    } catch (_) {}
-  }
-
-  function qs(selector, root) {
-    return (root || document).querySelector(selector);
-  }
-
-  function qsa(selector, root) {
-    return Array.from((root || document).querySelectorAll(selector));
-  }
-
-  function safe(value) {
-    return value == null ? "" : String(value);
-  }
-
-  function esc(value) {
-    return safe(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
-  function dispatch(name, detail) {
-    try {
-      document.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
-    } catch (_) {}
-  }
-
-  function artifactMedia(a) {
-    const m = a && a.meta;
-    if (m && Array.isArray(m.media)) return m.media;
-    if (Array.isArray(a && a.attachments)) return a.attachments;
-    return [];
-  }
-
-  function artifactImage(a) {
-    return (
-      artifactMedia(a).find(function (m) {
-        return safe(m && m.type).toLowerCase() === "image" && safe(m && m.url);
-      }) || null
-    );
-  }
-
-  function containsSearch(a, query) {
-    const hay = [a && a.title, a && a.kind, a && a.content, a && a.session_id]
-      .join(" ")
-      .toLowerCase();
-    return hay.indexOf(query.toLowerCase()) >= 0;
-  }
-
-  async function loadArtifacts() {
-    try {
-      const res = await fetch(API.list, { credentials: "same-origin" });
-      const data = await res.json();
-      if (!res.ok || data.ok === false) throw new Error(data.error || "load failed");
-
-      state.artifacts = Array.isArray(data.artifacts) ? data.artifacts : [];
-      applyFilterSort();
-      render();
-    } catch (e) {
-      console.error(LOG, "load failed", e);
-    }
-  }
-
-  function applyFilterSort() {
-    let list = state.artifacts.slice();
-
-    if (state.search) {
-      list = list.filter(function (a) {
-        return containsSearch(a, state.search);
-      });
-    }
-
-    if (state.filter === "pinned") {
-      list = list.filter(function (a) {
-        return !!a.pinned;
-      });
-    } else if (state.filter === "media") {
-      list = list.filter(function (a) {
-        return artifactMedia(a).length > 0;
-      });
-    } else if (state.filter === "chat_reply") {
-      list = list.filter(function (a) {
-        return safe(a.kind) === "chat_reply";
-      });
-    } else if (state.filter === "current_session") {
-      list = list.filter(function (a) {
-        return safe(a.session_id) === safe(state.activeSessionId);
-      });
-    }
-
-    list.sort(function (a, b) {
-      return new Date(b.created_at) - new Date(a.created_at);
-    });
-
-    state.filtered = list;
-  }
-
-  function renderList() {
-    const el = qs("#artifactsList");
-    const empty = qs("#artifactEmpty");
-    if (!el) return;
-
-    if (!state.filtered.length) {
-      el.innerHTML = "";
-      if (empty) empty.style.display = "";
-      return;
-    }
-
-    if (empty) empty.style.display = "none";
-
-    el.innerHTML = state.filtered
-      .map(function (a) {
-        const id = safe(a.id);
-        const img = artifactImage(a);
-        const isActive = state.activeId === id;
-        const kind = safe(a.kind || "artifact");
-        const preview = safe(a.content || "").slice(0, 120);
-        const sessionBadge =
-          safe(a.session_id) && safe(a.session_id) === safe(state.activeSessionId)
-            ? '<span class="nova-message-badge">Current</span>'
-            : "";
-
-        return (
-          '<div class="nova-artifact-card' +
-          (isActive ? " active" : "") +
-          '" data-id="' +
-          esc(id) +
-          '">' +
-          '<div class="nova-artifact-card-top">' +
-          '<div class="nova-artifact-title">' +
-          esc(a.title || "Untitled") +
-          "</div>" +
-          '<div class="nova-artifact-badges">' +
-          '<span class="nova-message-badge">' +
-          esc(kind) +
-          "</span>" +
-          sessionBadge +
-          "</div>" +
-          "</div>" +
-          (img
-            ? '<div class="nova-artifact-thumb"><img src="' +
-              esc(img.url) +
-              '" alt="' +
-              esc(a.title || "artifact image") +
-              '" loading="lazy"></div>'
-            : "") +
-          '<div class="nova-artifact-preview">' +
-          esc(preview) +
-          "</div>" +
-          "</div>"
-        );
-      })
-      .join("");
-
-    qsa(".nova-artifact-card", el).forEach(function (card) {
-      card.onclick = function () {
-        const artifactId = safe(card.dataset.id || "");
-        if (!artifactId) return;
-
-        const artifact = state.artifacts.find(function (a) {
-          return safe(a.id) === artifactId;
-        });
-        if (!artifact) return;
-
-        const targetSessionId = safe(artifact.session_id || "");
-        const currentSessionId = safe(state.activeSessionId || "");
-
-        if (targetSessionId && targetSessionId !== currentSessionId) {
-          dispatch("nova:session-switch-request", {
-            session_id: targetSessionId
-          });
-          return;
-        }
-
-        openArtifact(artifactId);
-      };
-    });
-  }
-
-  function buildViewerTop(artifact) {
-    const img = artifactImage(artifact);
-    const created = safe(artifact.created_at);
-    const session = safe(artifact.session_id);
-    const kind = safe(artifact.kind || "artifact");
-
-    return (
-      '<div class="nova-artifact-viewer-head-row">' +
-      '<div class="nova-artifact-viewer-kind"><span class="nova-message-badge">' +
-      esc(kind) +
-      "</span></div>" +
-      '<div class="nova-artifact-viewer-session">' +
-      esc(session) +
-      "</div>" +
-      "</div>" +
-      (created ? '<div class="nova-artifact-viewer-date">' + esc(created) + "</div>" : "") +
-      (img
-        ? '<div class="nova-artifact-viewer-main-image"><img src="' +
-          esc(img.url) +
-          '" alt="' +
-          esc(artifact.title || "artifact image") +
-          '" loading="lazy"></div>'
-        : "")
-    );
-  }
-
-  function buildViewerActions(artifact) {
-    const img = artifactImage(artifact);
-    const canReuseImage = !!(artifact && artifact.kind === "generated_image" && img);
-
-    return (
-      '<div class="nova-artifact-actions">' +
-      '<button class="nova-shell-btn" type="button" data-artifact-copy="' +
-      esc(artifact.id) +
-      '">Copy</button>' +
-      (canReuseImage
-        ? '<button class="nova-shell-btn" type="button" data-artifact-reuse-image="' +
-          esc(artifact.id) +
-          '">Reuse Image</button>'
-        : "") +
-      '<button class="nova-shell-btn" type="button" data-artifact-open-session="' +
-      esc(artifact.id) +
-      '">Open Session</button>' +
-      "</div>"
-    );
-  }
-
-  function renderViewer() {
-    const titleEl = qs("#artifactViewerTitle");
-    const metaEl = qs("#artifactViewerMeta");
-    const bodyEl = qs("#artifactViewerBody");
-    const viewer = qs("#artifactViewer");
-
-    if (!titleEl || !metaEl || !bodyEl || !viewer) return;
-
-    if (!state.active) {
-      viewer.setAttribute("data-empty", "true");
-      titleEl.textContent = "No artifact selected";
-      metaEl.textContent = "";
-      bodyEl.innerHTML = '<div class="nova-artifact-empty-view">Select an artifact to view it here.</div>';
-      return;
-    }
-
-    const artifact = state.active;
-    viewer.setAttribute("data-empty", "false");
-    titleEl.textContent = safe(artifact.title || "Untitled");
-    metaEl.textContent = safe(artifact.kind || "");
-
-    bodyEl.innerHTML =
-      buildViewerTop(artifact) +
-      '<div class="nova-artifact-viewer-content">' +
-      formatContent(artifact) +
-      "</div>" +
-      buildViewerActions(artifact);
-
-    const copyBtn = qs("[data-artifact-copy]", bodyEl);
-    if (copyBtn) {
-      copyBtn.addEventListener("click", async function () {
-        try {
-          await navigator.clipboard.writeText(safe(artifact.content));
-        } catch (_) {}
-      });
-    }
-
-    const openSessionBtn = qs("[data-artifact-open-session]", bodyEl);
-    if (openSessionBtn) {
-      openSessionBtn.addEventListener("click", function () {
-        const targetSessionId = safe(artifact.session_id || "");
-        if (!targetSessionId) return;
-
-        if (targetSessionId !== safe(state.activeSessionId || "")) {
-          dispatch("nova:session-switch-request", {
-            session_id: targetSessionId
-          });
-        }
-      });
-    }
-
-    const reuseBtn = qs("[data-artifact-reuse-image]", bodyEl);
-    if (reuseBtn) {
-      reuseBtn.addEventListener("click", function () {
-        dispatch("nova:artifact-reuse-image", { artifact: artifact });
-        if (window.NovaPanels && typeof window.NovaPanels.close === "function") {
-          window.NovaPanels.close();
-        }
-      });
-    }
-  }
-
-  function formatContent(artifact) {
-    let html = esc(safe(artifact.content || ""));
-    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function (_, alt, src) {
-      return (
-        '<div class="nova-inline-image-wrap"><img class="nova-inline-image" src="' +
-        esc(src) +
-        '" alt="' +
-        esc(alt || "image") +
-        '" loading="lazy"></div>'
-      );
-    });
-    html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/\n/g, "<br>");
-    return html;
-  }
-
-  function render() {
-    renderList();
-    renderViewer();
-  }
-
-  async function openArtifact(id) {
-    if (!id) return;
-    state.activeId = id;
-
-    try {
-      const res = await fetch(API.read(id), { credentials: "same-origin" });
-      const data = await res.json();
-      if (!res.ok || data.ok === false) throw new Error(data.error || "read failed");
-
-      state.active = data.artifact || null;
-      render();
-    } catch (e) {
-      console.error(LOG, "open failed", e);
-    }
-  }
-
-  function bindControls() {
-    const search = qs("#artifactSearch");
-    const filter = qs("#artifactFilter");
-    const refresh = qs("#artifactRefresh");
-
-    if (search) {
-      search.addEventListener("input", function () {
-        state.search = safe(search.value).trim();
-        applyFilterSort();
-        render();
-      });
-    }
-
-    if (filter) {
-      filter.addEventListener("change", function () {
-        state.filter = safe(filter.value || "all");
-        applyFilterSort();
-        render();
-      });
-    }
-
-    if (refresh) {
-      refresh.addEventListener("click", function () {
-        loadArtifacts();
-      });
-    }
-
-    window.addEventListener("nova:artifacts-refreshed", function (event) {
-      const detail = event.detail || {};
-      if (Array.isArray(detail.artifacts) && detail.artifacts.length >= 0) {
-        state.artifacts = detail.artifacts.slice();
+      function trimSlash(value) {
+        return String(value || "").replace(/\/+$/, "");
       }
-      if (detail.active_session_id) {
-        state.activeSessionId = safe(detail.active_session_id);
+
+      function inferApiBase() {
+        var explicit =
+          window.NOVA_API_BASE ||
+          document.documentElement.getAttribute("data-api-base") ||
+          document.body.getAttribute("data-api-base") ||
+          "";
+
+        if (explicit) return trimSlash(explicit);
+
+        return trimSlash(window.location.origin);
       }
-      applyFilterSort();
-      render();
-    });
 
-    window.addEventListener("nova:session-activated", function (event) {
-      const detail = event.detail || {};
-      state.activeSessionId = safe(detail.session_id || "");
-      applyFilterSort();
-      render();
-    });
-  }
+      window.NOVA_API_BASE = inferApiBase();
+      document.documentElement.setAttribute("data-api-base", window.NOVA_API_BASE);
+    })();
+  </script>
 
-  function boot() {
-    bindControls();
-    loadArtifacts();
-    log("ready");
-  }
+  <div id="novaAppShell" class="nova-app-shell">
+    <aside id="novaSidebar" class="nova-sidebar">
+      <div class="nova-sidebar-top">
+        <div class="nova-brand">Nova Ultimate 2026</div>
+        <button id="sidebarToggle" class="nova-icon-btn" type="button" aria-label="Toggle sidebar">☰</button>
+      </div>
 
-  boot();
-})();
+      <div class="nova-sidebar-actions">
+        <button id="newSessionBtn" class="nova-btn" type="button">New</button>
+        <button id="refreshSessionsBtn" class="nova-btn nova-btn-secondary" type="button">Refresh</button>
+      </div>
+
+      <div id="sessionsList" class="nova-sessions-list"></div>
+    </aside>
+
+    <main class="nova-main">
+      <header class="nova-topbar">
+        <div class="nova-topbar-left">
+          <button id="memoryPanelToggle" class="nova-btn nova-btn-secondary" type="button">Memory</button>
+          <button id="artifactsPanelToggle" class="nova-btn nova-btn-secondary" type="button">Artifacts</button>
+          <button id="webPanelToggle" class="nova-btn nova-btn-secondary" type="button">Web</button>
+        </div>
+
+        <div class="nova-topbar-right">
+          <button id="closeRightRailBtn" class="nova-btn nova-btn-secondary" type="button">Close</button>
+        </div>
+      </header>
+
+      <section id="messagesWrap" class="nova-messages-wrap">
+        <div id="novaEmptyState" class="nova-empty-state">
+          <div class="nova-empty-title">Nova is ready.</div>
+          <div class="nova-empty-copy">Type a message, upload a file, or use commands like /image and /web.</div>
+        </div>
+        <div id="messages" class="nova-messages"></div>
+      </section>
+
+      <footer class="nova-composer">
+        <div id="stagedFiles" class="nova-staged-files"></div>
+
+        <div class="nova-composer-row">
+          <textarea
+            id="chatInput"
+            class="nova-input"
+            placeholder="Type a message or /web https://example.com"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <div class="nova-composer-actions">
+          <input id="fileInput" type="file" multiple hidden>
+          <button id="uploadBtn" class="nova-btn nova-btn-secondary" type="button">Upload</button>
+          <button id="sendBtn" class="nova-btn" type="button">Send</button>
+        </div>
+      </footer>
+    </main>
+
+    <aside id="rightRail" class="nova-right-rail is-collapsed" aria-hidden="true">
+      <section id="memoryPanel" class="nova-right-panel" hidden aria-hidden="true">
+        <div class="nova-panel-head">
+          <h2>Memory</h2>
+        </div>
+        <div class="nova-panel-scroll">
+          <div id="memoryStatus" class="nova-panel-status">Memory panel ready.</div>
+          <div id="memoryList"></div>
+        </div>
+      </section>
+
+      <section id="artifactsPanel" class="nova-right-panel" hidden aria-hidden="true">
+        <div class="nova-panel-head">
+          <h2>Artifacts</h2>
+        </div>
+
+        <div class="nova-panel-scroll">
+          <div class="nova-artifact-toolbar">
+            <input id="artifactSearchInput" class="nova-input" type="text" placeholder="Search artifacts">
+            <div id="artifactStatus" class="nova-panel-status">Artifacts ready.</div>
+          </div>
+
+          <div id="artifactList" class="nova-artifact-list"></div>
+          <div id="artifactViewer" class="nova-artifact-viewer"></div>
+        </div>
+      </section>
+
+      <section id="webPanel" class="nova-right-panel" hidden aria-hidden="true">
+        <div class="nova-panel-head">
+          <h2>Web</h2>
+        </div>
+        <div class="nova-panel-scroll">
+          <div id="webStatus" class="nova-panel-status">Web panel ready.</div>
+          <div id="webResults"></div>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <script src="/static/js/nova-artifacts.js?v=api-origin-lock-2026-04-02-001"></script>
+  <script src="/static/js/nova-composer-bundle.js?v=api-origin-lock-2026-04-02-001"></script>
+</body>
+</html>
