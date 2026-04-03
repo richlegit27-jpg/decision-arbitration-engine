@@ -4,10 +4,9 @@ import mimetypes
 import os
 import re
 import uuid
-from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urljoin
+from typing import Any, Dict, List, Optional
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
@@ -28,806 +27,621 @@ except Exception:
     OpenAI = None
 
 
+# =========================================================
+# paths / config
+# =========================================================
+
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 UPLOADS_DIR = BASE_DIR / "uploads"
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
 SESSIONS_FILE = DATA_DIR / "nova_sessions.json"
 ARTIFACTS_FILE = DATA_DIR / "nova_artifacts.json"
 MEMORY_FILE = DATA_DIR / "nova_memory.json"
 
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4").strip()
+NOVA_IMAGE_MODEL = os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1.5").strip()
+NOVA_IMAGE_SIZE = os.getenv("NOVA_IMAGE_SIZE", "1024x1024").strip()
+NOVA_IMAGE_QUALITY = os.getenv("NOVA_IMAGE_QUALITY", "high").strip()
+NOVA_HOST = os.getenv("APP_HOST") or os.getenv("NOVA_HOST") or "127.0.0.1"
+NOVA_PORT = int(os.getenv("APP_PORT") or os.getenv("NOVA_PORT") or "5001")
+NOVA_DEBUG = str(os.getenv("NOVA_DEBUG", "true")).lower() in {"1", "true", "yes", "on"}
 
-APP_HOST = os.getenv("NOVA_HOST") or os.getenv("APP_HOST") or "127.0.0.1"
-APP_PORT = int(os.getenv("NOVA_PORT") or os.getenv("APP_PORT") or "5001")
-APP_DEBUG = str(os.getenv("NOVA_DEBUG", "true")).lower() in {"1", "true", "yes", "on"}
-
-OPENAI_API_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
-OPENAI_MODEL = (os.getenv("OPENAI_MODEL") or "gpt-5.4").strip()
-OPENAI_VISION_MODEL = (os.getenv("OPENAI_VISION_MODEL") or OPENAI_MODEL).strip()
-OPENAI_MAX_OUTPUT_TOKENS = int(os.getenv("OPENAI_MAX_OUTPUT_TOKENS") or "900")
-OPENAI_VISION_MAX_OUTPUT_TOKENS = int(os.getenv("OPENAI_VISION_MAX_OUTPUT_TOKENS") or "500")
+MAX_CONTENT_LENGTH = 64 * 1024 * 1024
+MAX_SESSIONS = 100
+MAX_MESSAGES_PER_SESSION = 200
 
 ALLOWED_UPLOAD_EXTENSIONS = {
-    "png", "jpg", "jpeg", "gif", "webp", "bmp", "svg",
-    "mp4", "mov", "avi", "mkv", "webm", "m4v",
-    "pdf", "txt", "log", "md", "json", "csv", "html", "htm", "xml", "yaml", "yml"
+    "png", "jpg", "jpeg", "gif", "webp", "bmp",
+    "pdf", "txt", "log", "md", "json", "csv", "html", "htm",
+    "xml", "yaml", "yml", "mp4", "mov", "avi", "mkv", "webm"
 }
 
+TEXT_EXTENSIONS = {"txt", "log", "md", "json", "csv", "html", "htm", "xml", "yaml", "yml"}
+IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "bmp"}
+VIDEO_EXTENSIONS = {"mp4", "mov", "avi", "mkv", "webm"}
+
 URL_RE = re.compile(r"(https?://[^\s]+)", re.IGNORECASE)
+
+
+# =========================================================
+# app
+# =========================================================
 
 app = Flask(
     __name__,
     template_folder=str(TEMPLATES_DIR),
     static_folder=str(STATIC_DIR),
 )
+app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 
-_openai_client = None
+client = OpenAI(api_key=OPENAI_API_KEY) if (OpenAI and OPENAI_API_KEY) else None
 
 
-def utc_now_iso() -> str:
+# =========================================================
+# utilities
+# =========================================================
+
+def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def read_json(path: Path, default):
+def ensure_file(path: Path, default: Any) -> None:
     if not path.exists():
-        write_json(path, default)
-        return deepcopy(default)
+        path.write_text(json.dumps(default, indent=2), encoding="utf-8")
+
+
+def load_json(path: Path, default: Any) -> Any:
+    ensure_file(path, default)
     try:
-        with path.open("r", encoding="utf-8") as handle:
-            return json.load(handle)
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
-        return deepcopy(default)
+        return default
 
 
-def write_json(path: Path, data) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = path.with_suffix(path.suffix + ".tmp")
-    with tmp_path.open("w", encoding="utf-8") as handle:
-        json.dump(data, handle, ensure_ascii=False, indent=2)
-    tmp_path.replace(path)
+def save_json(path: Path, data: Any) -> None:
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-def load_sessions():
-    data = read_json(SESSIONS_FILE, [])
-
-    if isinstance(data, list):
-        sessions = data
-    elif isinstance(data, dict):
-        sessions = data.get("sessions", [])
-    else:
-        sessions = []
-
-    return {"sessions": sessions if isinstance(sessions, list) else []}
+def safe_str(value: Any) -> str:
+    return "" if value is None else str(value)
 
 
-def save_sessions(payload):
-    if isinstance(payload, dict):
-        sessions = payload.get("sessions", [])
-    elif isinstance(payload, list):
-        sessions = payload
-    else:
-        sessions = []
-
-    if not isinstance(sessions, list):
-        sessions = []
-
-    write_json(SESSIONS_FILE, sessions)
+def guess_ext(filename: str) -> str:
+    ext = Path(filename).suffix.lower().lstrip(".")
+    return ext
 
 
-def load_artifacts():
-    data = read_json(ARTIFACTS_FILE, [])
-
-    if isinstance(data, list):
-        artifacts = data
-    elif isinstance(data, dict):
-        artifacts = data.get("artifacts", [])
-    else:
-        artifacts = []
-
-    return {"artifacts": artifacts if isinstance(artifacts, list) else []}
+def allowed_file(filename: str) -> bool:
+    ext = guess_ext(filename)
+    return bool(ext) and ext in ALLOWED_UPLOAD_EXTENSIONS
 
 
-def save_artifacts(payload):
-    if isinstance(payload, dict):
-        artifacts = payload.get("artifacts", [])
-    elif isinstance(payload, list):
-        artifacts = payload
-    else:
-        artifacts = []
-
-    if not isinstance(artifacts, list):
-        artifacts = []
-
-    write_json(ARTIFACTS_FILE, artifacts)
+def mime_for_path(path: Path) -> str:
+    mime, _ = mimetypes.guess_type(str(path))
+    return mime or "application/octet-stream"
 
 
-def load_memory():
-    data = read_json(MEMORY_FILE, [])
-
-    if isinstance(data, list):
-        items = data
-    elif isinstance(data, dict):
-        items = data.get("items", [])
-    else:
-        items = []
-
-    return {"items": items if isinstance(items, list) else []}
+def make_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
-def save_memory(payload):
-    if isinstance(payload, dict):
-        items = payload.get("items", [])
-    elif isinstance(payload, list):
-        items = payload
-    else:
-        items = []
-
-    if not isinstance(items, list):
-        items = []
-
-    write_json(MEMORY_FILE, items)
+def truncate(text: str, limit: int) -> str:
+    text = safe_str(text).strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit].rstrip() + "…"
 
 
-def ensure_session(session_id: str | None = None):
-    sessions_payload = load_sessions()
-    sessions = sessions_payload["sessions"]
+def list_sessions() -> List[Dict[str, Any]]:
+    return load_json(SESSIONS_FILE, [])
+
+
+def save_sessions(items: List[Dict[str, Any]]) -> None:
+    save_json(SESSIONS_FILE, items[:MAX_SESSIONS])
+
+
+def list_artifacts() -> List[Dict[str, Any]]:
+    return load_json(ARTIFACTS_FILE, [])
+
+
+def save_artifacts(items: List[Dict[str, Any]]) -> None:
+    save_json(ARTIFACTS_FILE, items)
+
+
+def list_memory() -> List[Dict[str, Any]]:
+    return load_json(MEMORY_FILE, [])
+
+
+def save_memory(items: List[Dict[str, Any]]) -> None:
+    save_json(MEMORY_FILE, items)
+
+
+def get_or_create_session(session_id: Optional[str] = None) -> Dict[str, Any]:
+    sessions = list_sessions()
 
     if session_id:
-        for session in sessions:
-            if session.get("id") == session_id:
-                return sessions_payload, session
+        for sess in sessions:
+            if sess.get("id") == session_id:
+                return sess
 
-    now = utc_now_iso()
     new_session = {
-        "id": uuid.uuid4().hex[:8],
+        "id": make_id("session"),
         "title": "New chat",
-        "created_at": now,
-        "updated_at": now,
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
         "pinned": False,
         "message_count": 0,
         "last_message_preview": "",
         "messages": [],
     }
     sessions.insert(0, new_session)
-    save_sessions(sessions_payload)
-    return sessions_payload, new_session
+    save_sessions(sessions)
+    return new_session
 
 
-def update_session_summary(session: dict):
-    messages = session.get("messages", [])
-    preview = ""
-    if messages:
-        preview = str(messages[-1].get("content", "")).strip().replace("\n", " ")
-        preview = preview[:120]
-    session["updated_at"] = utc_now_iso()
-    session["message_count"] = len(messages)
-    session["last_message_preview"] = preview
-    if messages:
-        first_user = next((m for m in messages if m.get("role") == "user" and m.get("content")), None)
-        if first_user:
-            title = str(first_user.get("content", "")).strip().splitlines()[0][:48]
-            if title:
-                session["title"] = title
+def upsert_session(session: Dict[str, Any]) -> Dict[str, Any]:
+    sessions = list_sessions()
+    found = False
+    for i, sess in enumerate(sessions):
+        if sess.get("id") == session.get("id"):
+            sessions[i] = session
+            found = True
+            break
+    if not found:
+        sessions.insert(0, session)
+
+    sessions.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
+    save_sessions(sessions)
+    return session
 
 
-def append_message(session: dict, role: str, content: str, attachments=None, meta=None):
-    attachments = attachments or []
-    meta = meta or {}
-    session.setdefault("messages", []).append({
-        "id": uuid.uuid4().hex,
+def append_message(
+    session: Dict[str, Any],
+    role: str,
+    content: str,
+    kind: str = "chat",
+    attachments: Optional[List[Dict[str, Any]]] = None,
+    meta: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    msg = {
+        "id": make_id("msg"),
         "role": role,
-        "content": content,
-        "attachments": attachments,
-        "meta": meta,
-        "created_at": utc_now_iso(),
-    })
-    update_session_summary(session)
+        "content": safe_str(content),
+        "kind": kind,
+        "attachments": attachments or [],
+        "meta": meta or {},
+        "created_at": now_iso(),
+    }
+    session.setdefault("messages", []).append(msg)
+    session["messages"] = session["messages"][-MAX_MESSAGES_PER_SESSION:]
+    session["updated_at"] = now_iso()
+    session["message_count"] = len(session["messages"])
+    session["last_message_preview"] = truncate(content, 120)
+
+    if role == "user" and content.strip():
+        session["title"] = truncate(content.strip().splitlines()[0], 50)
+
+    upsert_session(session)
+    return msg
 
 
-def normalize_artifact(artifact: dict) -> dict:
-    preview = artifact.get("preview") or ""
-    content = artifact.get("content") or ""
+def normalize_artifact_viewer(artifact: Dict[str, Any]) -> Dict[str, Any]:
+    kind = artifact.get("kind", "chat_reply")
+    content = safe_str(artifact.get("content", ""))
+
     viewer = artifact.get("viewer") or {}
-    viewer_kind = viewer.get("kind") or artifact.get("kind") or "artifact"
+    preview = artifact.get("preview") or truncate(content, 400)
+
+    if kind in {"image_generation", "image_analysis"}:
+        image_url = artifact.get("file_url") or viewer.get("image_url") or ""
+        viewer.setdefault("kind", kind)
+        viewer.setdefault("title", artifact.get("title", "Image"))
+        viewer.setdefault("image_url", image_url)
+        viewer.setdefault("content", content)
+    elif kind == "web_result":
+        viewer.setdefault("kind", kind)
+        viewer.setdefault("title", artifact.get("title", "Web"))
+        viewer.setdefault("content", content)
+        viewer.setdefault("url", artifact.get("meta", {}).get("url", ""))
+    else:
+        viewer.setdefault("kind", kind)
+        viewer.setdefault("title", artifact.get("title", "Artifact"))
+        viewer.setdefault("content", content)
+
+    artifact["preview"] = preview
+    artifact["viewer"] = viewer
+    return artifact
+
+
+def create_artifact(
+    *,
+    session_id: str,
+    kind: str,
+    title: str,
+    content: str,
+    file_path: Optional[Path] = None,
+    meta: Optional[Dict[str, Any]] = None,
+    viewer: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    artifacts = list_artifacts()
+
+    file_url = ""
+    if file_path and file_path.exists():
+        file_url = f"/api/uploads/{file_path.name}"
+
+    artifact = {
+        "id": make_id("artifact"),
+        "session_id": session_id,
+        "kind": kind,
+        "title": title,
+        "content": safe_str(content),
+        "preview": truncate(content, 400),
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+        "file_name": file_path.name if file_path else "",
+        "file_url": file_url,
+        "meta": meta or {},
+        "viewer": viewer or {},
+    }
+    artifact = normalize_artifact_viewer(artifact)
+    artifacts.insert(0, artifact)
+    save_artifacts(artifacts)
+    return artifact
+
+
+def session_payload(session: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "id": session.get("id"),
+        "title": session.get("title", "New chat"),
+        "created_at": session.get("created_at"),
+        "updated_at": session.get("updated_at"),
+        "pinned": bool(session.get("pinned", False)),
+        "message_count": int(session.get("message_count", len(session.get("messages", [])))),
+        "last_message_preview": session.get("last_message_preview", ""),
+        "messages": session.get("messages", []),
+    }
+
+
+def get_memory_context(limit: int = 12) -> str:
+    items = list_memory()[:limit]
+    if not items:
+        return ""
+    lines = []
+    for item in items:
+        text = safe_str(item.get("text")).strip()
+        if text:
+            lines.append(f"- {text}")
+    return "\n".join(lines)
+
+
+def maybe_save_memory_from_user_text(text: str) -> None:
+    lowered = text.lower()
+    triggers = [
+        "remember that ",
+        "remember this ",
+        "my name is ",
+        "i prefer ",
+        "from now on ",
+    ]
+    if any(t in lowered for t in triggers):
+        items = list_memory()
+        items.insert(0, {"id": make_id("memory"), "text": text.strip(), "created_at": now_iso()})
+        save_memory(items[:200])
+
+
+def uploaded_file_record(saved_name: str, original_name: str) -> Dict[str, Any]:
+    path = UPLOADS_DIR / saved_name
+    ext = guess_ext(original_name)
+    return {
+        "id": make_id("file"),
+        "name": original_name,
+        "stored_name": saved_name,
+        "url": f"/api/uploads/{saved_name}",
+        "mime": mime_for_path(path),
+        "size": path.stat().st_size if path.exists() else 0,
+        "ext": ext,
+    }
+
+
+# =========================================================
+# web
+# =========================================================
+
+def fetch_web_page(url: str) -> Dict[str, Any]:
+    if requests is None:
+        return {
+            "ok": False,
+            "title": "Web fetch failed",
+            "content": "Python package 'requests' is not installed.",
+            "meta": {"url": url, "used_ssl_fallback": False, "warning": "requests missing"},
+        }
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Nova Local App) AppleWebKit/537.36 Chrome Safari"
+    }
+
+    used_ssl_fallback = False
+    warning = ""
+    try:
+        res = requests.get(url, timeout=15, headers=headers)
+        res.raise_for_status()
+    except requests.exceptions.SSLError:
+        used_ssl_fallback = True
+        warning = "SSL verification fallback was used."
+        try:
+            res = requests.get(url, timeout=15, headers=headers, verify=False)
+            res.raise_for_status()
+        except Exception as e:
+            return {
+                "ok": False,
+                "title": "Web fetch failed",
+                "content": str(e),
+                "meta": {"url": url, "used_ssl_fallback": True, "warning": warning},
+            }
+    except Exception as e:
+        return {
+            "ok": False,
+            "title": "Web fetch failed",
+            "content": str(e),
+            "meta": {"url": url, "used_ssl_fallback": used_ssl_fallback, "warning": warning},
+        }
+
+    html = res.text or ""
+    title = url
+    description = ""
+    text = ""
+
+    if BeautifulSoup:
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+            if soup.title and soup.title.string:
+                title = soup.title.string.strip()
+
+            desc = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", attrs={"property": "og:description"})
+            if desc and desc.get("content"):
+                description = desc.get("content").strip()
+
+            for bad in soup(["script", "style", "noscript"]):
+                bad.extract()
+
+            text = " ".join(soup.get_text(" ", strip=True).split())
+        except Exception:
+            text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip()
+    else:
+        title_match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+        if title_match:
+            title = re.sub(r"\s+", " ", title_match.group(1)).strip()
+        text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip()
+
+    summary = text[:3500].strip()
+    if description:
+        content = f"{description}\n\n{summary}".strip()
+    else:
+        content = summary
 
     return {
-        "id": artifact.get("id"),
-        "kind": artifact.get("kind", "artifact"),
-        "title": artifact.get("title") or artifact.get("kind", "Artifact").replace("_", " ").title(),
-        "session_id": artifact.get("session_id") or "",
-        "created_at": artifact.get("created_at") or utc_now_iso(),
-        "preview": preview[:400],
-        "content": content,
-        "meta": artifact.get("meta") or {},
-        "attachments": artifact.get("attachments") or [],
-        "viewer": {
-            "kind": viewer_kind,
-            "content": viewer.get("content", content),
-            "html": viewer.get("html", ""),
-            "url": viewer.get("url", ""),
-            "media": viewer.get("media", []),
-            "meta": viewer.get("meta", artifact.get("meta") or {}),
+        "ok": True,
+        "title": title or url,
+        "content": content or f"Fetched {url}",
+        "meta": {
+            "url": url,
+            "used_ssl_fallback": used_ssl_fallback,
+            "warning": warning,
+            "description": description,
         },
     }
 
 
-def create_artifact(
-    kind: str,
-    title: str,
-    session_id: str,
-    content: str,
-    preview: str = "",
-    meta: dict | None = None,
-    viewer: dict | None = None,
-    attachments: list | None = None,
-):
-    artifacts_payload = load_artifacts()
-    artifact = normalize_artifact({
-        "id": uuid.uuid4().hex,
-        "kind": kind,
-        "title": title,
-        "session_id": session_id,
-        "created_at": utc_now_iso(),
-        "content": content,
-        "preview": preview or content[:280],
-        "meta": meta or {},
-        "viewer": viewer or {},
-        "attachments": attachments or [],
-    })
-    artifacts_payload["artifacts"].insert(0, artifact)
-    save_artifacts(artifacts_payload)
-    return artifact
+# =========================================================
+# image analysis
+# =========================================================
 
-
-def get_session_messages_for_reply(session: dict, max_items: int = 10):
-    messages = session.get("messages", [])
-    trimmed = messages[-max_items:]
-    lines = []
-    for msg in trimmed:
-        role = msg.get("role", "user").upper()
-        content = str(msg.get("content", "")).strip()
-        if content:
-            lines.append(f"{role}: {content}")
-    return "\n".join(lines)
-
-
-def extract_urls(text: str):
-    return [match.group(1).rstrip(".,);]") for match in URL_RE.finditer(text or "")]
-
-
-def is_allowed_file(filename: str) -> bool:
-    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    return ext in ALLOWED_UPLOAD_EXTENSIONS
-
-
-def guess_media_kind(filename: str, content_type: str = "") -> str:
-    value = (content_type or "").lower()
-    name = (filename or "").lower()
-
-    if value.startswith("image/") or name.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg")):
-        return "image"
-    if value.startswith("video/") or name.endswith((".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v")):
-        return "video"
-    return "file"
-
-
-def absolutize_url(base_url: str, maybe_url: str) -> str:
-    value = str(maybe_url or "").strip()
-    if not value:
-        return ""
-    return urljoin(base_url, value)
-
-
-def safe_requests_get(url: str):
-    if not requests:
-        raise RuntimeError("requests is not installed")
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Nova/2026",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    }
-    try:
-        response = requests.get(url, headers=headers, timeout=15)
-        return response, {"ssl_fallback_used": False}
-    except requests.exceptions.SSLError:
-        response = requests.get(url, headers=headers, timeout=15, verify=False)
-        return response, {"ssl_fallback_used": True}
-
-
-def summarize_html(url: str):
-    response, ssl_meta = safe_requests_get(url)
-    response.raise_for_status()
-
-    html = response.text[:1_000_000]
-    title = url
-    description = ""
-    body_text = ""
-    media = []
-
-    if BeautifulSoup:
-        soup = BeautifulSoup(html, "html.parser")
-
-        title_tag = soup.find("title")
-        if title_tag and title_tag.get_text(strip=True):
-            title = title_tag.get_text(" ", strip=True)
-
-        meta_description = (
-            soup.find("meta", attrs={"name": "description"})
-            or soup.find("meta", attrs={"property": "og:description"})
-            or soup.find("meta", attrs={"name": "twitter:description"})
-        )
-        if meta_description and meta_description.get("content"):
-            description = meta_description.get("content", "").strip()
-
-        og_image = soup.find("meta", attrs={"property": "og:image"})
-        if og_image and og_image.get("content"):
-            media.append({
-                "type": "image",
-                "src": absolutize_url(url, og_image.get("content")),
-                "alt": title,
-            })
-
-        twitter_image = soup.find("meta", attrs={"name": "twitter:image"})
-        if twitter_image and twitter_image.get("content"):
-            media.append({
-                "type": "image",
-                "src": absolutize_url(url, twitter_image.get("content")),
-                "alt": title,
-            })
-
-        og_video = soup.find("meta", attrs={"property": "og:video"})
-        if og_video and og_video.get("content"):
-            media.append({
-                "type": "video",
-                "src": absolutize_url(url, og_video.get("content")),
-            })
-
-        for tag in soup(["script", "style", "noscript"]):
-            tag.decompose()
-
-        text_blocks = soup.get_text("\n", strip=True)
-        body_text = re.sub(r"\n{2,}", "\n\n", text_blocks).strip()[:6000]
-
-        seen_media = set(
-            (m.get("type", ""), m.get("src", ""))
-            for m in media
-            if m.get("src")
-        )
-
-        for img in soup.find_all("img", src=True)[:12]:
-            src = absolutize_url(url, img.get("src"))
-            key = ("image", src)
-            if src and key not in seen_media:
-                seen_media.add(key)
-                media.append({"type": "image", "src": src, "alt": img.get("alt", "")})
-
-        for video in soup.find_all("video")[:6]:
-            src = video.get("src") or ""
-            source = video.find("source")
-            if source and source.get("src"):
-                src = source.get("src")
-            src = absolutize_url(url, src)
-            key = ("video", src)
-            if src and key not in seen_media:
-                seen_media.add(key)
-                media.append({"type": "video", "src": src})
-
-        for audio in soup.find_all("audio")[:4]:
-            src = audio.get("src") or ""
-            source = audio.find("source")
-            if source and source.get("src"):
-                src = source.get("src")
-            src = absolutize_url(url, src)
-            key = ("audio", src)
-            if src and key not in seen_media:
-                seen_media.add(key)
-                media.append({"type": "audio", "src": src})
-    else:
-        body_text = re.sub(r"<[^>]+>", " ", html)
-        body_text = re.sub(r"\s+", " ", body_text).strip()[:6000]
-
-    snippet_parts = [title]
-    if description:
-        snippet_parts.append(description)
-    if body_text:
-        snippet_parts.append(body_text[:1200])
-
-    summary = "\n\n".join(part for part in snippet_parts if part).strip()
-    return {
-        "ok": True,
-        "url": url,
-        "title": title,
-        "description": description,
-        "text": body_text,
-        "summary": summary[:5000],
-        "media": media[:20],
-        "ssl_fallback_used": ssl_meta.get("ssl_fallback_used", False),
-        "status_code": response.status_code,
-    }
-
-
-def encode_file_base64(path: Path) -> str:
-    with path.open("rb") as handle:
-        return base64.b64encode(handle.read()).decode("utf-8")
-
-
-def build_data_url_for_file(path: Path, original_name: str = "") -> str:
-    guessed = mimetypes.guess_type(original_name or path.name)[0] or "application/octet-stream"
-    b64 = encode_file_base64(path)
-    return f"data:{guessed};base64,{b64}"
-
-
-def analyze_image_with_model(path: Path, original_name: str, prompt_text: str):
-    client = get_openai_client()
+def analyze_image_with_openai(user_prompt: str, image_path: Path) -> Dict[str, Any]:
     if not client:
-        raise RuntimeError("OpenAI client is not configured")
+        return {"ok": False, "content": "OpenAI is not configured."}
 
-    question = (prompt_text or "").strip() or "What is in this image?"
-    image_data_url = build_data_url_for_file(path, original_name)
+    mime = mime_for_path(image_path)
+    image_b64 = base64.b64encode(image_path.read_bytes()).decode("utf-8")
+    data_url = f"data:{mime};base64,{image_b64}"
 
-    response = client.responses.create(
-        model=OPENAI_VISION_MODEL,
-        input=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "input_text", "text": question},
-                    {
-                        "type": "input_image",
-                        "image_url": image_data_url,
-                    },
-                ],
-            }
-        ],
-        max_output_tokens=OPENAI_VISION_MAX_OUTPUT_TOKENS,
+    system_text = (
+        "You are a precise vision assistant inside a local app named Nova. "
+        "Describe what is in the image clearly and directly. "
+        "If the user asks a specific question, answer that question first."
     )
 
-    text = extract_response_text(response).strip()
-    if not text:
-        text = "I analyzed the image, but the model returned no visible text."
-
-    usage = getattr(response, "usage", None)
-    usage_data = {}
-    if usage is not None:
-        usage_data = {
-            "input_tokens": getattr(usage, "input_tokens", None),
-            "output_tokens": getattr(usage, "output_tokens", None),
-            "total_tokens": getattr(usage, "total_tokens", None),
-        }
-
-    return {
-        "text": text,
-        "model": OPENAI_VISION_MODEL,
-        "response_id": getattr(response, "id", "") or "",
-        "usage": usage_data,
-    }
-
-
-def analyze_uploaded_file(file_info: dict, prompt_text: str):
-    stored_name = file_info.get("stored_name", "")
-    original_name = file_info.get("original_name", "")
-    path = UPLOADS_DIR / stored_name
-    media_kind = guess_media_kind(original_name, file_info.get("content_type", ""))
-
-    if not path.exists():
-        return {
-            "ok": False,
-            "kind": f"{media_kind}_analysis",
-            "title": f"{media_kind.title()} analysis",
-            "text": f"Uploaded file not found: {original_name}",
-            "preview": f"Uploaded file not found: {original_name}",
-            "meta": {"file_missing": True, "original_name": original_name},
-        }
-
-    if media_kind == "image":
-        try:
-            vision = analyze_image_with_model(path, original_name, prompt_text)
-            text = vision["text"]
-
-            return {
-                "ok": True,
-                "kind": "image_analysis",
-                "title": f"Image Analysis - {original_name}",
-                "text": text,
-                "preview": text[:280],
-                "meta": {
-                    "document_used": False,
-                    "analysis_type": "vision_model_image",
-                    "original_name": original_name,
-                    "stored_name": stored_name,
-                    "model": vision["model"],
-                    "response_id": vision["response_id"],
-                    "usage": vision["usage"],
-                },
-                "viewer": {
-                    "kind": "image_analysis",
-                    "content": text,
-                    "media": [{"type": "image", "src": f"/api/uploads/{stored_name}", "alt": original_name}],
-                    "meta": {
-                        "original_name": original_name,
-                        "stored_name": stored_name,
-                        "model": vision["model"],
-                        "response_id": vision["response_id"],
-                        "usage": vision["usage"],
-                    },
-                },
-                "attachments": [{"name": original_name, "url": f"/api/uploads/{stored_name}", "type": "image"}],
-            }
-        except Exception as exc:
-            text = (
-                f"I inspected the image `{original_name}`.\n\n"
-                f"Vision model failed, so Nova fell back to first-pass analysis.\n\n"
-                f"- file type: image\n"
-                f"- stored file: {stored_name}\n"
-                f"- prompt: {prompt_text or 'what is this'}\n"
-                f"- error: {exc}\n\n"
-                f"This keeps the route alive while you verify the model supports image input."
-            )
-            return {
-                "ok": True,
-                "kind": "image_analysis",
-                "title": f"Image Analysis - {original_name}",
-                "text": text,
-                "preview": text[:280],
-                "meta": {
-                    "document_used": False,
-                    "analysis_type": "first_pass_image_fallback",
-                    "original_name": original_name,
-                    "stored_name": stored_name,
-                    "vision_error": str(exc),
-                },
-                "viewer": {
-                    "kind": "image_analysis",
-                    "content": text,
-                    "media": [{"type": "image", "src": f"/api/uploads/{stored_name}", "alt": original_name}],
-                    "meta": {
-                        "original_name": original_name,
-                        "stored_name": stored_name,
-                        "vision_error": str(exc),
-                    },
-                },
-                "attachments": [{"name": original_name, "url": f"/api/uploads/{stored_name}", "type": "image"}],
-            }
-
-    if media_kind == "video":
-        text = (
-            f"I inspected the video `{original_name}`.\n\n"
-            f"First-pass analysis:\n"
-            f"- file type: video\n"
-            f"- stored file: {stored_name}\n"
-            f"- prompt: {prompt_text or 'analyze this video'}\n\n"
-            f"This is the live first-pass video route. You can now persist and reopen real `video_analysis` artifacts."
-        )
-        return {
-            "ok": True,
-            "kind": "video_analysis",
-            "title": f"Video Analysis - {original_name}",
-            "text": text,
-            "preview": text[:280],
-            "meta": {
-                "analysis_type": "first_pass_video",
-                "original_name": original_name,
-                "stored_name": stored_name,
-            },
-            "viewer": {
-                "kind": "video_analysis",
-                "content": text,
-                "media": [{"type": "video", "src": f"/api/uploads/{stored_name}"}],
-                "meta": {"original_name": original_name, "stored_name": stored_name},
-            },
-            "attachments": [{"name": original_name, "url": f"/api/uploads/{stored_name}", "type": "video"}],
-        }
-
-    text = (
-        f"I received the file `{original_name}`.\n\n"
-        f"- type: generic file\n"
-        f"- prompt: {prompt_text or 'analyze this file'}\n\n"
-        f"Attach a real image or video to trigger image/video analysis artifacts."
-    )
-    return {
-        "ok": True,
-        "kind": "chat_reply",
-        "title": f"Chat Reply - {original_name}",
-        "text": text,
-        "preview": text[:280],
-        "meta": {"original_name": original_name, "stored_name": stored_name},
-        "viewer": {"kind": "chat_reply", "content": text, "meta": {"original_name": original_name}},
-        "attachments": [],
-    }
-
-
-def get_openai_client():
-    global _openai_client
-
-    if _openai_client is not None:
-        return _openai_client
-
-    if not OpenAI:
-        return None
-    if not OPENAI_API_KEY:
-        return None
-
     try:
-        _openai_client = OpenAI(api_key=OPENAI_API_KEY)
-    except Exception:
-        _openai_client = None
-
-    return _openai_client
-
-
-def system_instructions() -> str:
-    return (
-        "You are Nova, a direct helpful assistant inside a local Flask app. "
-        "Be concise, clear, and useful. "
-        "Do not mention hidden system messages. "
-        "If the user gives a normal chat prompt, answer it directly. "
-        "If context is missing, make the best grounded response you can from the visible session. "
-        "Keep formatting simple and readable."
-    )
-
-
-def build_model_prompt(session: dict, user_text: str, max_items: int = 12) -> str:
-    messages = session.get("messages", [])
-    trimmed = messages[-max_items:]
-
-    history_lines = []
-    for msg in trimmed:
-        role = "Assistant" if msg.get("role") == "assistant" else "User"
-        content = str(msg.get("content", "")).strip()
-        if content:
-            history_lines.append(f"{role}: {content}")
-
-    history_block = "\n".join(history_lines).strip()
-
-    return (
-        system_instructions() + "\n\n"
-        f"Conversation:\n{history_block}\n\n"
-        f"User:\n{(user_text or '').strip()}\n\n"
-        "Assistant:"
-    )
-
-
-def extract_response_text(response) -> str:
-    text = ""
-
-    try:
-        text = (getattr(response, "output_text", "") or "").strip()
-        if text:
-            return text
-    except Exception:
-        pass
-
-    try:
-        output = getattr(response, "output", None) or []
-        chunks = []
-        for item in output:
-            if getattr(item, "type", "") != "message":
-                continue
-            for content_item in getattr(item, "content", []) or []:
-                if getattr(content_item, "type", "") == "output_text":
-                    value = getattr(content_item, "text", "") or ""
-                    if value:
-                        chunks.append(value)
-        text = "\n".join(part.strip() for part in chunks if part and part.strip()).strip()
-        if text:
-            return text
-    except Exception:
-        pass
-
-    return ""
-
-
-def basic_assistant_reply(user_text: str, session: dict):
-    cleaned = (user_text or "").strip()
-    if not cleaned:
-        return "Say something and I’ll help."
-
-    lower = cleaned.lower()
-
-    if lower.startswith("/image "):
-        prompt = cleaned[7:].strip()
-        if not prompt:
-            prompt = "high detail subject"
-        return (
-            f"Here’s your image prompt:\n\n"
-            f"{prompt}\n\n"
-            f"This request is now saved as a real `image_generation` artifact so it can be reopened from the artifact rail."
-        )
-
-    if "hello" in lower or lower == "hi":
-        return "Hi. Nova is up. Send a prompt, a URL, or upload an image/video."
-
-    history = get_session_messages_for_reply(session, max_items=8)
-    if history:
-        return f"Working from the current session context, here’s the next move:\n\n{cleaned}"
-    return cleaned
-
-
-def generate_model_reply(user_text: str, session: dict):
-    client = get_openai_client()
-    if not client:
-        return {
-            "ok": False,
-            "text": basic_assistant_reply(user_text, session),
-            "meta": {
-                "provider": "fallback",
-                "reason": "missing_openai_client_or_api_key",
-                "model": OPENAI_MODEL,
-            },
-        }
-
-    try:
-        prompt = build_model_prompt(session, user_text, max_items=12)
-
         response = client.responses.create(
             model=OPENAI_MODEL,
-            input=prompt,
-            max_output_tokens=OPENAI_MAX_OUTPUT_TOKENS,
+            input=[
+                {
+                    "role": "system",
+                    "content": [{"type": "input_text", "text": system_text}],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": user_prompt or "What is in this image?"},
+                        {"type": "input_image", "image_url": data_url},
+                    ],
+                },
+            ],
+        )
+        text = getattr(response, "output_text", "") or "I analyzed the image."
+        return {"ok": True, "content": text}
+    except Exception as e:
+        return {"ok": False, "content": f"Image analysis failed.\n\n{e}"}
+
+
+# =========================================================
+# real /image generation
+# =========================================================
+
+def generate_image_with_openai(prompt: str) -> Dict[str, Any]:
+    if not client:
+        return {
+            "ok": False,
+            "content": "OpenAI is not configured. Set OPENAI_API_KEY first.",
+        }
+
+    clean_prompt = safe_str(prompt).strip()
+    if not clean_prompt:
+        return {
+            "ok": False,
+            "content": "Missing image prompt.",
+        }
+
+    try:
+        result = client.images.generate(
+            model=NOVA_IMAGE_MODEL,
+            prompt=clean_prompt,
+            size=NOVA_IMAGE_SIZE,
+            quality=NOVA_IMAGE_QUALITY,
         )
 
-        text = extract_response_text(response).strip()
-        if not text:
-            text = "I’m here. I processed that, but the model returned no visible text."
+        data = getattr(result, "data", None) or []
+        if not data:
+            return {
+                "ok": False,
+                "content": "Image generation returned no data.",
+            }
 
-        response_id = getattr(response, "id", "") or ""
-        usage = getattr(response, "usage", None)
+        first = data[0]
+        b64_json = getattr(first, "b64_json", None)
+        image_url = getattr(first, "url", None)
 
-        usage_data = {}
-        if usage is not None:
-            usage_data = {
-                "input_tokens": getattr(usage, "input_tokens", None),
-                "output_tokens": getattr(usage, "output_tokens", None),
-                "total_tokens": getattr(usage, "total_tokens", None),
+        if b64_json:
+            image_bytes = base64.b64decode(b64_json)
+            file_name = f"{uuid.uuid4().hex}.png"
+            out_path = UPLOADS_DIR / file_name
+            out_path.write_bytes(image_bytes)
+            return {
+                "ok": True,
+                "content": clean_prompt,
+                "file_path": out_path,
+                "file_url": f"/api/uploads/{file_name}",
+                "mime": "image/png",
+            }
+
+        if image_url:
+            if requests is None:
+                return {
+                    "ok": False,
+                    "content": "Image generation returned a URL, but requests is not installed to download it.",
+                }
+            img_res = requests.get(image_url, timeout=30)
+            img_res.raise_for_status()
+            ext = ".png"
+            ctype = (img_res.headers.get("content-type") or "").lower()
+            if "jpeg" in ctype or "jpg" in ctype:
+                ext = ".jpg"
+            elif "webp" in ctype:
+                ext = ".webp"
+
+            file_name = f"{uuid.uuid4().hex}{ext}"
+            out_path = UPLOADS_DIR / file_name
+            out_path.write_bytes(img_res.content)
+            return {
+                "ok": True,
+                "content": clean_prompt,
+                "file_path": out_path,
+                "file_url": f"/api/uploads/{file_name}",
+                "mime": ctype or mime_for_path(out_path),
             }
 
         return {
-            "ok": True,
-            "text": text,
-            "meta": {
-                "provider": "openai",
-                "model": OPENAI_MODEL,
-                "response_id": response_id,
-                "usage": usage_data,
-            },
+            "ok": False,
+            "content": "Image generation succeeded but returned neither b64_json nor a downloadable URL.",
         }
 
-    except Exception as exc:
+    except Exception as e:
         return {
             "ok": False,
-            "text": basic_assistant_reply(user_text, session),
+            "content": f"Image generation failed.\n\n{e}",
+        }
+
+
+# =========================================================
+# text chat
+# =========================================================
+
+def build_text_reply(user_text: str, session: Dict[str, Any]) -> Dict[str, Any]:
+    if not client:
+        return {
+            "ok": True,
+            "content": f"I heard you.\n\n{user_text}",
             "meta": {
-                "provider": "fallback",
-                "reason": "openai_request_failed",
+                "model": "fallback",
+                "memory_used": False,
+            },
+        }
+
+    memory_context = get_memory_context()
+    recent_messages = session.get("messages", [])[-10:]
+
+    input_items: List[Dict[str, Any]] = []
+    system_prompt = (
+        "You are Nova, a direct helpful assistant inside a local app. "
+        "Be concise, useful, and grounded."
+    )
+    if memory_context:
+        system_prompt += f"\n\nUseful remembered context:\n{memory_context}"
+
+    input_items.append({
+        "role": "system",
+        "content": [{"type": "input_text", "text": system_prompt}],
+    })
+
+    for msg in recent_messages:
+        role = msg.get("role", "user")
+        content = safe_str(msg.get("content", ""))
+        if not content.strip():
+            continue
+        input_items.append({
+            "role": "assistant" if role == "assistant" else "user",
+            "content": [{"type": "input_text", "text": content}],
+        })
+
+    input_items.append({
+        "role": "user",
+        "content": [{"type": "input_text", "text": user_text}],
+    })
+
+    try:
+        response = client.responses.create(
+            model=OPENAI_MODEL,
+            input=input_items,
+        )
+        text = getattr(response, "output_text", "") or "No response."
+        return {
+            "ok": True,
+            "content": text,
+            "meta": {
                 "model": OPENAI_MODEL,
-                "error": str(exc),
+                "memory_used": bool(memory_context),
+            },
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "content": f"Assistant reply failed.\n\n{e}",
+            "meta": {
+                "model": OPENAI_MODEL,
+                "memory_used": bool(memory_context),
             },
         }
 
 
-def current_web_results(session_id: str = ""):
-    artifacts = load_artifacts()["artifacts"]
-    results = []
-
-    for artifact in artifacts:
-        if artifact.get("kind") != "web_result":
-            continue
-        if session_id and artifact.get("session_id") != session_id:
-            continue
-
-        results.append({
-            "id": artifact.get("id"),
-            "title": artifact.get("title"),
-            "url": artifact.get("viewer", {}).get("url") or artifact.get("meta", {}).get("url", ""),
-            "preview": artifact.get("preview", ""),
-            "created_at": artifact.get("created_at"),
-            "ssl_fallback_used": bool(artifact.get("meta", {}).get("ssl_fallback_used")),
-        })
-
-    return results[:20]
-
+# =========================================================
+# routes
+# =========================================================
 
 @app.route("/")
 def index():
@@ -835,314 +649,418 @@ def index():
 
 
 @app.route("/api/health", methods=["GET"])
-def health():
+def api_health():
     return jsonify({
         "ok": True,
         "status": "healthy",
-        "time": utc_now_iso(),
-        "openai_configured": bool(get_openai_client()),
+        "time": now_iso(),
+        "openai_configured": bool(client),
         "openai_model": OPENAI_MODEL,
-        "openai_vision_model": OPENAI_VISION_MODEL,
+        "image_model": NOVA_IMAGE_MODEL,
     })
 
 
-@app.route("/api/uploads/<path:filename>", methods=["GET"])
-def uploaded_file(filename):
-    return send_from_directory(str(UPLOADS_DIR), filename)
+@app.route("/api/state", methods=["GET"])
+def api_state():
+    sessions = list_sessions()
+    artifacts = [normalize_artifact_viewer(a) for a in list_artifacts()]
+    memory = list_memory()
+
+    active_session_id = request.args.get("session_id", "").strip()
+    active_session = None
+
+    if active_session_id:
+        for sess in sessions:
+            if sess.get("id") == active_session_id:
+                active_session = sess
+                break
+
+    if active_session is None:
+        active_session = sessions[0] if sessions else get_or_create_session()
+
+    return jsonify({
+        "ok": True,
+        "sessions": [session_payload(s) for s in sessions],
+        "session": session_payload(active_session),
+        "memory": memory,
+        "artifacts": artifacts,
+        "web": [a for a in artifacts if a.get("kind") == "web_result"][:20],
+    })
 
 
 @app.route("/api/upload", methods=["POST"])
-def upload():
-    incoming_files = request.files.getlist("files")
-    saved = []
+def api_upload():
+    files = request.files.getlist("files")
+    if not files:
+        single = request.files.get("file")
+        if single:
+            files = [single]
 
-    for incoming in incoming_files:
-        if not incoming or not incoming.filename:
+    if not files:
+        return jsonify({"ok": False, "error": "No files uploaded."}), 400
+
+    saved: List[Dict[str, Any]] = []
+    for file in files:
+        if not file or not file.filename:
             continue
-
-        filename = secure_filename(incoming.filename)
-        if not filename or not is_allowed_file(filename):
+        original_name = secure_filename(file.filename)
+        if not allowed_file(original_name):
             continue
+        ext = Path(original_name).suffix.lower()
+        stored_name = f"{uuid.uuid4().hex}{ext}"
+        out_path = UPLOADS_DIR / stored_name
+        file.save(out_path)
+        saved.append(uploaded_file_record(stored_name, original_name))
 
-        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-        stored_name = f"{uuid.uuid4().hex}.{ext}" if ext else uuid.uuid4().hex
-        save_path = UPLOADS_DIR / stored_name
-        incoming.save(save_path)
-
-        content_type = incoming.mimetype or mimetypes.guess_type(filename)[0] or "application/octet-stream"
-        saved.append({
-            "id": uuid.uuid4().hex,
-            "original_name": filename,
-            "stored_name": stored_name,
-            "url": f"/api/uploads/{stored_name}",
-            "content_type": content_type,
-            "kind": guess_media_kind(filename, content_type),
-            "size": save_path.stat().st_size if save_path.exists() else 0,
-            "created_at": utc_now_iso(),
-        })
+    if not saved:
+        return jsonify({"ok": False, "error": "No supported files were uploaded."}), 400
 
     return jsonify({"ok": True, "files": saved})
 
 
-@app.route("/api/state", methods=["GET"])
-def state():
-    requested_session_id = str(request.args.get("session_id") or "").strip()
-    sessions_payload = load_sessions()
-    sessions = sessions_payload["sessions"]
-
-    active_session = None
-    if requested_session_id:
-        active_session = next((s for s in sessions if s.get("id") == requested_session_id), None)
-    if not active_session:
-        active_session = sessions[0] if sessions else None
-
-    active_session_id = active_session.get("id", "") if active_session else ""
-
-    state_payload = {
-        "ok": True,
-        "sessions": [
-            {
-                "id": session.get("id"),
-                "title": session.get("title"),
-                "created_at": session.get("created_at"),
-                "updated_at": session.get("updated_at"),
-                "pinned": bool(session.get("pinned")),
-                "message_count": session.get("message_count", len(session.get("messages", []))),
-                "last_message_preview": session.get("last_message_preview", ""),
-            }
-            for session in sessions
-        ],
-        "session": active_session,
-        "active_session_id": active_session_id,
-        "memory": load_memory().get("items", []),
-        "web_results": current_web_results(active_session_id),
-        "web_items": current_web_results(active_session_id),
-    }
-    return jsonify(state_payload)
+@app.route("/api/uploads/<path:filename>", methods=["GET"])
+def api_uploads(filename: str):
+    return send_from_directory(str(UPLOADS_DIR), filename, as_attachment=False)
 
 
 @app.route("/api/artifacts", methods=["GET"])
-def artifacts():
-    artifacts_payload = load_artifacts()
-    session_id = request.args.get("session_id", "").strip()
-
-    artifacts_list = artifacts_payload["artifacts"]
-    if session_id:
-        artifacts_list = [a for a in artifacts_list if a.get("session_id") == session_id]
-
-    return jsonify({"ok": True, "artifacts": artifacts_list})
+def api_artifacts():
+    artifacts = [normalize_artifact_viewer(a) for a in list_artifacts()]
+    return jsonify({"ok": True, "artifacts": artifacts})
 
 
 @app.route("/api/artifacts/<artifact_id>", methods=["GET"])
-def artifact_read(artifact_id):
-    artifacts_payload = load_artifacts()
-    artifact = next((a for a in artifacts_payload["artifacts"] if a.get("id") == artifact_id), None)
-    if not artifact:
-        return jsonify({"ok": False, "error": "Artifact not found"}), 404
-    return jsonify({"ok": True, "artifact": artifact})
+def api_artifact_read(artifact_id: str):
+    for artifact in list_artifacts():
+        if artifact.get("id") == artifact_id:
+            return jsonify({"ok": True, "artifact": normalize_artifact_viewer(artifact)})
+    return jsonify({"ok": False, "error": "Artifact not found."}), 404
 
 
 @app.route("/api/chat", methods=["POST"])
-def chat():
+def api_chat():
     payload = request.get_json(silent=True) or {}
-    user_text = str(payload.get("content") or payload.get("message") or "").strip()
-    requested_session_id = str(payload.get("session_id") or "").strip()
-    staged_files = payload.get("attachments") or payload.get("files") or []
 
-    sessions_payload, session = ensure_session(requested_session_id)
+    user_text = (
+        payload.get("content")
+        or payload.get("message")
+        or payload.get("text")
+        or ""
+    ).strip()
 
-    user_attachments = []
-    for item in staged_files:
-        if not isinstance(item, dict):
-            continue
-        user_attachments.append({
-            "name": item.get("original_name") or item.get("name") or "file",
-            "url": item.get("url") or "",
-            "type": item.get("kind") or item.get("type") or "file",
-            "stored_name": item.get("stored_name") or "",
-            "content_type": item.get("content_type") or "",
-            "original_name": item.get("original_name") or item.get("name") or "",
-        })
+    session_id = payload.get("session_id") or ""
+    attachments = payload.get("attachments") or []
+
+    session = get_or_create_session(session_id)
+    maybe_save_memory_from_user_text(user_text)
 
     append_message(
         session,
         "user",
         user_text,
-        attachments=user_attachments,
-        meta={"has_urls": bool(extract_urls(user_text))}
+        kind="user_message",
+        attachments=attachments,
+        meta={"attachment_count": len(attachments)},
     )
-    save_sessions(sessions_payload)
 
-    artifact = None
-    assistant_text = ""
-
-    debug = {
-        "mode": "auto",
-        "has_urls": False,
-        "attachment_count": len(user_attachments),
-        "artifact_created": False,
-        "artifact_kind": "",
-        "model_used": False,
-        "model_provider": "",
-        "model_name": OPENAI_MODEL,
-        "vision_model_name": OPENAI_VISION_MODEL,
+    debug: Dict[str, Any] = {
+        "latest_user_text": user_text,
+        "attachment_count": len(attachments),
+        "route": "chat",
+        "model": OPENAI_MODEL,
     }
 
-    urls = extract_urls(user_text)
-    debug["has_urls"] = bool(urls)
+    # -----------------------------------------------------
+    # explicit /image real generation
+    # -----------------------------------------------------
+    if user_text.lower().startswith("/image"):
+        prompt = user_text[6:].strip()
+        debug["route"] = "image_generation"
 
-    try:
-        if user_attachments:
-            first = user_attachments[0]
-            kind = guess_media_kind(first.get("original_name", ""), first.get("content_type", ""))
-            debug["mode"] = f"{kind}_analysis"
-
-            analysis = analyze_uploaded_file(first, user_text)
-            assistant_text = analysis["text"]
-
-            artifact = create_artifact(
-                kind=analysis["kind"],
-                title=analysis["title"],
-                session_id=session["id"],
-                content=analysis["text"],
-                preview=analysis["preview"],
-                meta=analysis["meta"],
-                viewer=analysis["viewer"],
-                attachments=analysis.get("attachments", []),
-            )
-
-        elif urls:
-            debug["mode"] = "web_auto"
-
-            url = urls[0]
-            web_data = summarize_html(url)
-            assistant_text = web_data["summary"] or web_data["title"] or url
-
-            artifact = create_artifact(
-                kind="web_result",
-                title=f"Fetched {web_data['title'][:80]}",
-                session_id=session["id"],
-                content=assistant_text,
-                preview=assistant_text[:280],
-                meta={
-                    "url": web_data["url"],
-                    "title": web_data["title"],
-                    "description": web_data["description"],
-                    "ssl_fallback_used": web_data["ssl_fallback_used"],
-                },
-                viewer={
-                    "kind": "web_result",
-                    "content": assistant_text,
-                    "url": web_data["url"],
-                    "media": web_data["media"],
-                    "meta": web_data,
-                },
-            )
-
-        elif user_text.lower().startswith("/image "):
-            debug["mode"] = "image_generation"
-
-            prompt = user_text[7:].strip() or "high detail subject"
-            assistant_text = f"Image prompt locked:\n\n{prompt}"
-
-            artifact = create_artifact(
-                kind="image_generation",
-                title=f"Image Prompt - {prompt[:60]}",
-                session_id=session["id"],
-                content=assistant_text,
-                preview=prompt[:280],
-                meta={"prompt": prompt},
-                viewer={
-                    "kind": "image_generation",
-                    "content": assistant_text,
-                    "meta": {"prompt": prompt},
-                },
-            )
-
-        else:
-            debug["mode"] = "chat"
-            model_result = generate_model_reply(user_text, session)
-            assistant_text = model_result["text"]
-            debug["model_used"] = bool(model_result.get("ok"))
-            debug["model_provider"] = model_result.get("meta", {}).get("provider", "")
-            debug["model_name"] = model_result.get("meta", {}).get("model", OPENAI_MODEL)
-
-            artifact = create_artifact(
+        result = generate_image_with_openai(prompt)
+        if not result.get("ok"):
+            assistant_text = result.get("content", "Image generation failed.")
+            append_message(
+                session,
+                "assistant",
+                assistant_text,
                 kind="chat_reply",
-                title=f"Chat Reply - {assistant_text[:40] or 'Reply'}",
-                session_id=session["id"],
-                content=assistant_text,
-                preview=assistant_text[:280],
-                meta={
-                    "reply_chars": len(assistant_text),
-                    "model": model_result.get("meta", {}),
-                },
-                viewer={
-                    "kind": "chat_reply",
-                    "content": assistant_text,
-                    "meta": {
-                        "reply_chars": len(assistant_text),
-                        "model": model_result.get("meta", {}),
-                    },
-                },
+                meta={"image_generation": False, "prompt": prompt},
             )
+            return jsonify({
+                "ok": False,
+                "assistant_message": assistant_text,
+                "message": assistant_text,
+                "session": session_payload(session),
+                "debug": debug,
+            })
 
-        if not artifact:
-            artifact = create_artifact(
-                kind="chat_reply",
-                title=f"Chat Reply - {assistant_text[:40] or 'Reply'}",
-                session_id=session["id"],
-                content=assistant_text,
-                preview=assistant_text[:280],
-                meta={"reply_chars": len(assistant_text)},
-                viewer={
-                    "kind": "chat_reply",
-                    "content": assistant_text,
-                    "meta": {"reply_chars": len(assistant_text)},
-                },
-            )
+        file_path = result["file_path"]
+        file_url = result["file_url"]
 
-        debug["artifact_created"] = True
-        debug["artifact_kind"] = artifact.get("kind")
+        assistant_text = f"![generated image]({file_url})\n\n**Prompt:** {prompt}"
+        assistant_attachments = [{
+            "name": file_path.name,
+            "url": file_url,
+            "mime": result.get("mime", mime_for_path(file_path)),
+            "kind": "image",
+        }]
 
-    except Exception as exc:
-        assistant_text = f"Request failed:\n\n{exc}"
-
-        artifact = create_artifact(
+        append_message(
+            session,
+            "assistant",
+            assistant_text,
             kind="chat_reply",
-            title="Chat Reply - Error",
-            session_id=session["id"],
-            content=assistant_text,
-            preview=assistant_text[:280],
-            meta={"error": str(exc)},
-            viewer={
-                "kind": "chat_reply",
-                "content": assistant_text,
+            attachments=assistant_attachments,
+            meta={
+                "image_generation": True,
+                "prompt": prompt,
+                "file_url": file_url,
             },
         )
+
+        artifact = create_artifact(
+            session_id=session["id"],
+            kind="image_generation",
+            title=f"Image - {truncate(prompt, 60) or 'Generated image'}",
+            content=prompt,
+            file_path=file_path,
+            meta={
+                "prompt": prompt,
+                "model": NOVA_IMAGE_MODEL,
+                "size": NOVA_IMAGE_SIZE,
+                "quality": NOVA_IMAGE_QUALITY,
+            },
+            viewer={
+                "kind": "image_generation",
+                "title": f"Image - {truncate(prompt, 60) or 'Generated image'}",
+                "image_url": file_url,
+                "content": prompt,
+            },
+        )
+
+        debug["artifact_id"] = artifact["id"]
+
+        return jsonify({
+            "ok": True,
+            "assistant_message": assistant_text,
+            "message": assistant_text,
+            "session": session_payload(session),
+            "artifact": artifact,
+            "debug": debug,
+        })
+
+    # -----------------------------------------------------
+    # attachment image analysis
+    # -----------------------------------------------------
+    if attachments:
+        first = attachments[0]
+        stored_name = first.get("stored_name") or Path(first.get("url", "")).name
+        original_name = first.get("name") or stored_name
+        ext = guess_ext(original_name)
+
+        if stored_name and ext in IMAGE_EXTENSIONS:
+            debug["route"] = "image_analysis"
+            image_path = UPLOADS_DIR / stored_name
+
+            prompt = user_text or "What is this image?"
+            result = analyze_image_with_openai(prompt, image_path)
+
+            assistant_text = result.get("content", "I analyzed the image.")
+            append_message(
+                session,
+                "assistant",
+                assistant_text,
+                kind="chat_reply",
+                attachments=[{
+                    "name": original_name,
+                    "url": f"/api/uploads/{stored_name}",
+                    "mime": mime_for_path(image_path),
+                    "kind": "image",
+                }],
+                meta={"image_analysis": bool(result.get("ok")), "prompt": prompt},
+            )
+
+            artifact = create_artifact(
+                session_id=session["id"],
+                kind="image_analysis",
+                title=f"Image analysis - {truncate(original_name, 60)}",
+                content=assistant_text,
+                file_path=image_path,
+                meta={
+                    "prompt": prompt,
+                    "source_name": original_name,
+                    "model": OPENAI_MODEL,
+                },
+                viewer={
+                    "kind": "image_analysis",
+                    "title": f"Image analysis - {truncate(original_name, 60)}",
+                    "image_url": f"/api/uploads/{stored_name}",
+                    "content": assistant_text,
+                },
+            )
+
+            debug["artifact_id"] = artifact["id"]
+
+            return jsonify({
+                "ok": bool(result.get("ok")),
+                "assistant_message": assistant_text,
+                "message": assistant_text,
+                "session": session_payload(session),
+                "artifact": artifact,
+                "debug": debug,
+            })
+
+        if stored_name and ext in VIDEO_EXTENSIONS:
+            debug["route"] = "video_analysis"
+            video_url = f"/api/uploads/{stored_name}"
+            assistant_text = (
+                "Video analysis routing is live at first pass.\n\n"
+                f"Attached video: `{original_name}`\n"
+                "Next step is deeper frame/audio extraction."
+            )
+            append_message(
+                session,
+                "assistant",
+                assistant_text,
+                kind="chat_reply",
+                attachments=[{
+                    "name": original_name,
+                    "url": video_url,
+                    "mime": mime_for_path(UPLOADS_DIR / stored_name),
+                    "kind": "video",
+                }],
+                meta={"video_analysis": True},
+            )
+
+            artifact = create_artifact(
+                session_id=session["id"],
+                kind="video_analysis",
+                title=f"Video analysis - {truncate(original_name, 60)}",
+                content=assistant_text,
+                file_path=UPLOADS_DIR / stored_name,
+                meta={"source_name": original_name},
+                viewer={
+                    "kind": "video_analysis",
+                    "title": f"Video analysis - {truncate(original_name, 60)}",
+                    "content": assistant_text,
+                    "video_url": video_url,
+                },
+            )
+
+            debug["artifact_id"] = artifact["id"]
+
+            return jsonify({
+                "ok": True,
+                "assistant_message": assistant_text,
+                "message": assistant_text,
+                "session": session_payload(session),
+                "artifact": artifact,
+                "debug": debug,
+            })
+
+    # -----------------------------------------------------
+    # /web or plain URL auto-route
+    # -----------------------------------------------------
+    web_url = ""
+    if user_text.lower().startswith("/web "):
+        web_url = user_text[5:].strip()
+    else:
+        found_urls = URL_RE.findall(user_text)
+        if found_urls:
+            web_url = found_urls[0]
+
+    if web_url:
+        debug["route"] = "web"
+
+        result = fetch_web_page(web_url)
+        assistant_text = result["content"] if result["ok"] else f"{result['title']}.\n\n{result['content']}"
+
+        append_message(
+            session,
+            "assistant",
+            assistant_text,
+            kind="chat_reply",
+            meta={"web": result.get("meta", {})},
+        )
+
+        artifact = create_artifact(
+            session_id=session["id"],
+            kind="web_result",
+            title=result.get("title", "Web"),
+            content=assistant_text,
+            meta=result.get("meta", {}),
+            viewer={
+                "kind": "web_result",
+                "title": result.get("title", "Web"),
+                "content": assistant_text,
+                "url": result.get("meta", {}).get("url", ""),
+            },
+        )
+
+        debug["artifact_id"] = artifact["id"]
+        debug["web"] = result.get("meta", {})
+
+        return jsonify({
+            "ok": bool(result.get("ok")),
+            "assistant_message": assistant_text,
+            "message": assistant_text,
+            "session": session_payload(session),
+            "artifact": artifact,
+            "debug": debug,
+        })
+
+    # -----------------------------------------------------
+    # normal chat
+    # -----------------------------------------------------
+    result = build_text_reply(user_text, session)
+    assistant_text = result.get("content", "No response.")
 
     append_message(
         session,
         "assistant",
         assistant_text,
-        attachments=artifact.get("attachments", []),
-        meta={
-            "artifact_id": artifact.get("id"),
-            "artifact_kind": artifact.get("kind"),
-            "debug": debug,
+        kind="chat_reply",
+        meta=result.get("meta", {}),
+    )
+
+    artifact = create_artifact(
+        session_id=session["id"],
+        kind="chat_reply",
+        title=f"Chat Reply - {truncate(assistant_text, 50)}",
+        content=assistant_text,
+        meta=result.get("meta", {}),
+        viewer={
+            "kind": "chat_reply",
+            "title": f"Chat Reply - {truncate(assistant_text, 50)}",
+            "content": assistant_text,
         },
     )
 
-    save_sessions(sessions_payload)
+    debug["artifact_id"] = artifact["id"]
+    debug.update(result.get("meta", {}))
 
     return jsonify({
-        "ok": True,
+        "ok": bool(result.get("ok", True)),
         "assistant_message": assistant_text,
-        "session": session,
+        "message": assistant_text,
+        "session": session_payload(session),
+        "artifact": artifact,
         "debug": debug,
-        "web_results": current_web_results(session["id"]),
     })
 
 
+# =========================================================
+# boot defaults
+# =========================================================
+
+ensure_file(SESSIONS_FILE, [])
+ensure_file(ARTIFACTS_FILE, [])
+ensure_file(MEMORY_FILE, [])
+
+if not list_sessions():
+    get_or_create_session()
+
+
 if __name__ == "__main__":
-    app.run(host=APP_HOST, port=APP_PORT, debug=APP_DEBUG)
+    app.run(host=NOVA_HOST, port=NOVA_PORT, debug=NOVA_DEBUG)
