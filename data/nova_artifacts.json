@@ -1,5 +1,267 @@
 [
   {
+    "id": "3cc584286fb048ef92b6a9b5f3249854",
+    "kind": "image_analysis",
+    "title": "Image Analysis - d4225a8c0fb54a56b6dae48509773f04.png",
+    "session_id": "27bb1964",
+    "created_at": "2026-04-03T03:27:03.309874+00:00",
+    "preview": "I inspected the image `d4225a8c0fb54a56b6dae48509773f04.png`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: d4225a8c0fb54a56b6dae48509773f04.png\n- prompt: hi\n\nThis is the live image-analysis path. If you wire a vision model next, this artifact kind is already locked as ",
+    "content": "I inspected the image `d4225a8c0fb54a56b6dae48509773f04.png`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: d4225a8c0fb54a56b6dae48509773f04.png\n- prompt: hi\n\nThis is the live image-analysis path. If you wire a vision model next, this artifact kind is already locked as `image_analysis`.",
+    "meta": {
+      "document_used": false,
+      "analysis_type": "first_pass_image",
+      "original_name": "d4225a8c0fb54a56b6dae48509773f04.png",
+      "stored_name": "d4225a8c0fb54a56b6dae48509773f04.png"
+    },
+    "attachments": [
+      {
+        "name": "d4225a8c0fb54a56b6dae48509773f04.png",
+        "url": "/api/uploads/d4225a8c0fb54a56b6dae48509773f04.png",
+        "type": "image"
+      }
+    ],
+    "viewer": {
+      "kind": "image_analysis",
+      "content": "I inspected the image `d4225a8c0fb54a56b6dae48509773f04.png`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: d4225a8c0fb54a56b6dae48509773f04.png\n- prompt: hi\n\nThis is the live image-analysis path. If you wire a vision model next, this artifact kind is already locked as `image_analysis`.",
+      "html": "",
+      "url": "",
+      "media": [
+        {
+          "type": "image",
+          "src": "/api/uploads/d4225a8c0fb54a56b6dae48509773f04.png",
+          "alt": "d4225a8c0fb54a56b6dae48509773f04.png"
+        }
+      ],
+      "meta": {
+        "original_name": "d4225a8c0fb54a56b6dae48509773f04.png",
+        "stored_name": "d4225a8c0fb54a56b6dae48509773f04.png"
+      }
+    }
+  },
+  {
+    "id": "ea79532bbcbb45e7aa1861f405778f64",
+    "kind": "chat_reply",
+    "title": "Chat Reply - Working from the current session context",
+    "session_id": "f7a6c14b-dc3e-4046-bff9-9e0392106a83",
+    "created_at": "2026-04-03T03:26:53.417862+00:00",
+    "preview": "Working from the current session context, here’s the next move:\n\nhi]",
+    "content": "Working from the current session context, here’s the next move:\n\nhi]",
+    "meta": {
+      "reply_chars": 68
+    },
+    "attachments": [],
+    "viewer": {
+      "kind": "chat_reply",
+      "content": "Working from the current session context, here’s the next move:\n\nhi]",
+      "html": "",
+      "url": "",
+      "media": [],
+      "meta": {
+        "reply_chars": 68
+      }
+    }
+  },
+  {
+    "id": "78be612f16514dd59a6544e7c3520880",
+    "kind": "image_analysis",
+    "title": "Image Analysis - c11fcd20fb604cd4b14012a4192addd9.jpg",
+    "session_id": "f7a6c14b-dc3e-4046-bff9-9e0392106a83",
+    "created_at": "2026-04-03T03:26:49.600971+00:00",
+    "preview": "I inspected the image `c11fcd20fb604cd4b14012a4192addd9.jpg`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: c11fcd20fb604cd4b14012a4192addd9.jpg\n- prompt: hi\n\nThis is the live image-analysis path. If you wire a vision model next, this artifact kind is already locked as ",
+    "content": "I inspected the image `c11fcd20fb604cd4b14012a4192addd9.jpg`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: c11fcd20fb604cd4b14012a4192addd9.jpg\n- prompt: hi\n\nThis is the live image-analysis path. If you wire a vision model next, this artifact kind is already locked as `image_analysis`.",
+    "meta": {
+      "document_used": false,
+      "analysis_type": "first_pass_image",
+      "original_name": "c11fcd20fb604cd4b14012a4192addd9.jpg",
+      "stored_name": "c11fcd20fb604cd4b14012a4192addd9.jpg"
+    },
+    "attachments": [
+      {
+        "name": "c11fcd20fb604cd4b14012a4192addd9.jpg",
+        "url": "/api/uploads/c11fcd20fb604cd4b14012a4192addd9.jpg",
+        "type": "image"
+      }
+    ],
+    "viewer": {
+      "kind": "image_analysis",
+      "content": "I inspected the image `c11fcd20fb604cd4b14012a4192addd9.jpg`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: c11fcd20fb604cd4b14012a4192addd9.jpg\n- prompt: hi\n\nThis is the live image-analysis path. If you wire a vision model next, this artifact kind is already locked as `image_analysis`.",
+      "html": "",
+      "url": "",
+      "media": [
+        {
+          "type": "image",
+          "src": "/api/uploads/c11fcd20fb604cd4b14012a4192addd9.jpg",
+          "alt": "c11fcd20fb604cd4b14012a4192addd9.jpg"
+        }
+      ],
+      "meta": {
+        "original_name": "c11fcd20fb604cd4b14012a4192addd9.jpg",
+        "stored_name": "c11fcd20fb604cd4b14012a4192addd9.jpg"
+      }
+    }
+  },
+  {
+    "id": "1dff1ccb51dc4de39156678b4411dc59",
+    "kind": "chat_reply",
+    "title": "Chat Reply - Hi. Nova is up. Send a prompt, a URL, or",
+    "session_id": "27bb1964",
+    "created_at": "2026-04-03T03:09:03.425088+00:00",
+    "preview": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+    "content": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+    "meta": {
+      "reply_chars": 63
+    },
+    "attachments": [],
+    "viewer": {
+      "kind": "chat_reply",
+      "content": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+      "html": "",
+      "url": "",
+      "media": [],
+      "meta": {
+        "reply_chars": 63
+      }
+    }
+  },
+  {
+    "id": "3d9e271bfca94469ad1d9bfc0db4f88c",
+    "kind": "chat_reply",
+    "title": "Chat Reply - Hi. Nova is up. Send a prompt, a URL, or",
+    "session_id": "10519295-5e22-4370-9876-471f98a2fd5b",
+    "created_at": "2026-04-03T03:07:29.690853+00:00",
+    "preview": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+    "content": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+    "meta": {
+      "reply_chars": 63
+    },
+    "attachments": [],
+    "viewer": {
+      "kind": "chat_reply",
+      "content": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+      "html": "",
+      "url": "",
+      "media": [],
+      "meta": {
+        "reply_chars": 63
+      }
+    }
+  },
+  {
+    "id": "2e76f3c463c248fe95f788483dcdcc3b",
+    "kind": "chat_reply",
+    "title": "Chat Reply - Hi. Nova is up. Send a prompt, a URL, or",
+    "session_id": "10519295-5e22-4370-9876-471f98a2fd5b",
+    "created_at": "2026-04-03T03:05:41.890640+00:00",
+    "preview": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+    "content": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+    "meta": {
+      "reply_chars": 63
+    },
+    "attachments": [],
+    "viewer": {
+      "kind": "chat_reply",
+      "content": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+      "html": "",
+      "url": "",
+      "media": [],
+      "meta": {
+        "reply_chars": 63
+      }
+    }
+  },
+  {
+    "id": "cb5a5b8a5ede46f48613a7f1f3339e70",
+    "kind": "chat_reply",
+    "title": "Chat Reply - Hi. Nova is up. Send a prompt, a URL, or",
+    "session_id": "10519295-5e22-4370-9876-471f98a2fd5b",
+    "created_at": "2026-04-03T03:05:36.833533+00:00",
+    "preview": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+    "content": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+    "meta": {
+      "reply_chars": 63
+    },
+    "attachments": [],
+    "viewer": {
+      "kind": "chat_reply",
+      "content": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+      "html": "",
+      "url": "",
+      "media": [],
+      "meta": {
+        "reply_chars": 63
+      }
+    }
+  },
+  {
+    "id": "cc276f26a3dd4b308cc04d8909cad5f1",
+    "kind": "chat_reply",
+    "title": "Chat Reply - Working from the current session context",
+    "session_id": "10519295-5e22-4370-9876-471f98a2fd5b",
+    "created_at": "2026-04-03T03:05:03.278413+00:00",
+    "preview": "Working from the current session context, here’s the next move:\n\njo",
+    "content": "Working from the current session context, here’s the next move:\n\njo",
+    "meta": {
+      "reply_chars": 67
+    },
+    "attachments": [],
+    "viewer": {
+      "kind": "chat_reply",
+      "content": "Working from the current session context, here’s the next move:\n\njo",
+      "html": "",
+      "url": "",
+      "media": [],
+      "meta": {
+        "reply_chars": 67
+      }
+    }
+  },
+  {
+    "id": "9b816d32f8154ab1a2fcd2df65f7b7e8",
+    "kind": "chat_reply",
+    "title": "Chat Reply - Hi. Nova is up. Send a prompt, a URL, or",
+    "session_id": "27bb1964",
+    "created_at": "2026-04-03T03:03:43.610060+00:00",
+    "preview": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+    "content": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+    "meta": {
+      "reply_chars": 63
+    },
+    "attachments": [],
+    "viewer": {
+      "kind": "chat_reply",
+      "content": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+      "html": "",
+      "url": "",
+      "media": [],
+      "meta": {
+        "reply_chars": 63
+      }
+    }
+  },
+  {
+    "id": "cad1210ab8a6457dbe0873cb5847b3f0",
+    "kind": "chat_reply",
+    "title": "Chat Reply - Hi. Nova is up. Send a prompt, a URL, or",
+    "session_id": "27bb1964",
+    "created_at": "2026-04-03T03:03:33.570044+00:00",
+    "preview": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+    "content": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+    "meta": {
+      "reply_chars": 63
+    },
+    "attachments": [],
+    "viewer": {
+      "kind": "chat_reply",
+      "content": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
+      "html": "",
+      "url": "",
+      "media": [],
+      "meta": {
+        "reply_chars": 63
+      }
+    }
+  },
+  {
     "id": "6fac67ca-a877-4a6e-9189-2418b3f424a2",
     "kind": "web_result",
     "title": "Web - Google",

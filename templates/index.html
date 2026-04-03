@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Nova Ultimate 2026</title>
-  <link rel="stylesheet" href="/static/css/nova-main.css?v=index-restore-lock-2026-04-02-001">
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=artifact-media-lock-2026-04-02-002">
 </head>
 <body data-active-session-id="" data-api-base="">
   <script>
@@ -56,7 +56,7 @@
         </div>
 
         <div class="nova-topbar-right">
-          <button id="closeRightRailBtn" class="nova-btn nova-btn-secondary" type="button">Close</button>
+          <button id="rightRailClose" class="nova-btn nova-btn-secondary" type="button" hidden>Close</button>
         </div>
       </header>
 
@@ -69,7 +69,7 @@
       </section>
 
       <footer class="nova-composer">
-        <div id="stagedFiles" class="nova-staged-files"></div>
+        <div id="attachmentTray" class="nova-staged-files"></div>
 
         <div class="nova-composer-row">
           <textarea
@@ -94,7 +94,6 @@
           <h2>Memory</h2>
         </div>
         <div class="nova-panel-scroll">
-          <div id="memoryStatus" class="nova-panel-status">Loading memory…</div>
           <div id="memoryList" class="nova-memory-list"></div>
         </div>
       </section>
@@ -105,8 +104,7 @@
         </div>
         <div class="nova-panel-scroll">
           <div class="nova-artifact-toolbar">
-            <input id="artifactSearchInput" class="nova-input" type="text" placeholder="Search artifacts">
-            <div id="artifactStatus" class="nova-panel-status">Artifacts ready.</div>
+            <input id="artifactSearch" class="nova-input" type="search" placeholder="Search artifacts">
           </div>
           <div id="artifactList" class="nova-artifact-list"></div>
           <div id="artifactViewer" class="nova-artifact-viewer"></div>
@@ -118,14 +116,13 @@
           <h2>Web</h2>
         </div>
         <div class="nova-panel-scroll">
-          <div id="webStatus" class="nova-panel-status">Loading web results…</div>
-          <div id="webResults" class="nova-web-results"></div>
+          <div id="webList" class="nova-web-results"></div>
         </div>
       </section>
     </aside>
   </div>
 
-  <script src="/static/js/nova-artifacts.js?v=index-restore-lock-2026-04-02-001"></script>
-  <script src="/static/js/nova-composer-bundle.js?v=index-restore-lock-2026-04-02-001"></script>
+  <script src="/static/js/nova-artifacts.js?v=artifact-media-lock-2026-04-02-002"></script>
+  <script src="/static/js/nova-composer-bundle.js?v=artifact-media-lock-2026-04-02-002"></script>
 </body>
 </html>

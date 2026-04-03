@@ -800,3 +800,207 @@ textarea.nova-input {
     opacity: 1;
   }
 }
+
+/* --- WEB UI UPGRADE --- */
+
+.nova-warning {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 204, 102, 0.12);
+  border: 1px solid rgba(255, 204, 102, 0.35);
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.nova-web-card {
+  padding: 14px;
+  margin-bottom: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(15, 26, 47, 0.9), rgba(10, 18, 33, 0.9));
+}
+
+.nova-web-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.nova-web-preview {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.nova-web-link {
+  font-size: 12px;
+  color: var(--accent);
+}
+
+/* ============================= */
+/* 🔥 FINAL ARTIFACT MEDIA LAYER */
+/* ============================= */
+
+.nova-artifact-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.02);
+}
+
+.nova-artifact-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nova-artifact-kind-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(120,166,255,0.16);
+  border: 1px solid rgba(120,166,255,0.28);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.nova-artifact-meta-line {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.nova-artifact-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.nova-artifact-action {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.05);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.nova-artifact-action:hover {
+  border-color: var(--line-2);
+  background: rgba(255,255,255,0.08);
+}
+
+/* media */
+
+.nova-artifact-media {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.nova-artifact-media-card {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.03);
+}
+
+.nova-artifact-media-card img {
+  width: 100%;
+  display: block;
+}
+
+.nova-artifact-media-card video {
+  width: 100%;
+  display: block;
+  background: black;
+}
+
+.nova-artifact-media-card audio {
+  width: 100%;
+}
+
+/* body */
+
+.nova-artifact-body {
+  padding: 16px;
+}
+
+.nova-artifact-text {
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* attachments */
+
+.nova-artifact-attachments {
+  padding: 14px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.nova-artifact-attachments h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* debug/meta */
+
+.nova-artifact-debug {
+  padding: 14px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.nova-meta-table {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.nova-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.nova-meta-key {
+  color: var(--muted);
+}
+
+.nova-meta-value {
+  color: var(--text);
+  word-break: break-all;
+}
+
+/* inline images in chat */
+
+.nova-inline-image {
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  margin-top: 10px;
+  max-height: 320px;
+  object-fit: contain;
+}
+
+/* smooth panel feel */
+
+.nova-artifact-viewer {
+  animation: novaFadeIn 0.15s ease;
+}
+
+@keyframes novaFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
