@@ -1,3 +1,4 @@
+import base64
 import json
 import mimetypes
 import os
@@ -21,6 +22,11 @@ try:
 except Exception:
     BeautifulSoup = None
 
+try:
+    from openai import OpenAI
+except Exception:
+    OpenAI = None
+
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -36,8 +42,14 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 APP_HOST = os.getenv("NOVA_HOST") or os.getenv("APP_HOST") or "127.0.0.1"
-APP_PORT = 5001
+APP_PORT = int(os.getenv("NOVA_PORT") or os.getenv("APP_PORT") or "5001")
 APP_DEBUG = str(os.getenv("NOVA_DEBUG", "true")).lower() in {"1", "true", "yes", "on"}
+
+OPENAI_API_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
+OPENAI_MODEL = (os.getenv("OPENAI_MODEL") or "gpt-5.4").strip()
+OPENAI_VISION_MODEL = (os.getenv("OPENAI_VISION_MODEL") or OPENAI_MODEL).strip()
+OPENAI_MAX_OUTPUT_TOKENS = int(os.getenv("OPENAI_MAX_OUTPUT_TOKENS") or "900")
+OPENAI_VISION_MAX_OUTPUT_TOKENS = int(os.getenv("OPENAI_VISION_MAX_OUTPUT_TOKENS") or "500")
 
 ALLOWED_UPLOAD_EXTENSIONS = {
     "png", "jpg", "jpeg", "gif", "webp", "bmp", "svg",
@@ -52,6 +64,8 @@ app = Flask(
     template_folder=str(TEMPLATES_DIR),
     static_folder=str(STATIC_DIR),
 )
+
+_openai_client = None
 
 
 def utc_now_iso() -> str:
@@ -435,6 +449,63 @@ def summarize_html(url: str):
     }
 
 
+def encode_file_base64(path: Path) -> str:
+    with path.open("rb") as handle:
+        return base64.b64encode(handle.read()).decode("utf-8")
+
+
+def build_data_url_for_file(path: Path, original_name: str = "") -> str:
+    guessed = mimetypes.guess_type(original_name or path.name)[0] or "application/octet-stream"
+    b64 = encode_file_base64(path)
+    return f"data:{guessed};base64,{b64}"
+
+
+def analyze_image_with_model(path: Path, original_name: str, prompt_text: str):
+    client = get_openai_client()
+    if not client:
+        raise RuntimeError("OpenAI client is not configured")
+
+    question = (prompt_text or "").strip() or "What is in this image?"
+    image_data_url = build_data_url_for_file(path, original_name)
+
+    response = client.responses.create(
+        model=OPENAI_VISION_MODEL,
+        input=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": question},
+                    {
+                        "type": "input_image",
+                        "image_url": image_data_url,
+                    },
+                ],
+            }
+        ],
+        max_output_tokens=OPENAI_VISION_MAX_OUTPUT_TOKENS,
+    )
+
+    text = extract_response_text(response).strip()
+    if not text:
+        text = "I analyzed the image, but the model returned no visible text."
+
+    usage = getattr(response, "usage", None)
+    usage_data = {}
+    if usage is not None:
+        usage_data = {
+            "input_tokens": getattr(usage, "input_tokens", None),
+            "output_tokens": getattr(usage, "output_tokens", None),
+            "total_tokens": getattr(usage, "total_tokens", None),
+        }
+
+    return {
+        "text": text,
+        "model": OPENAI_VISION_MODEL,
+        "response_id": getattr(response, "id", "") or "",
+        "usage": usage_data,
+    }
+
+
 def analyze_uploaded_file(file_info: dict, prompt_text: str):
     stored_name = file_info.get("stored_name", "")
     original_name = file_info.get("original_name", "")
@@ -452,34 +523,74 @@ def analyze_uploaded_file(file_info: dict, prompt_text: str):
         }
 
     if media_kind == "image":
-        text = (
-            f"I inspected the image `{original_name}`.\n\n"
-            f"First-pass analysis:\n"
-            f"- file type: image\n"
-            f"- stored file: {stored_name}\n"
-            f"- prompt: {prompt_text or 'what is this'}\n\n"
-            f"This is the live image-analysis path. If you wire a vision model next, this artifact kind is already locked as `image_analysis`."
-        )
-        return {
-            "ok": True,
-            "kind": "image_analysis",
-            "title": f"Image Analysis - {original_name}",
-            "text": text,
-            "preview": text[:280],
-            "meta": {
-                "document_used": False,
-                "analysis_type": "first_pass_image",
-                "original_name": original_name,
-                "stored_name": stored_name,
-            },
-            "viewer": {
+        try:
+            vision = analyze_image_with_model(path, original_name, prompt_text)
+            text = vision["text"]
+
+            return {
+                "ok": True,
                 "kind": "image_analysis",
-                "content": text,
-                "media": [{"type": "image", "src": f"/api/uploads/{stored_name}", "alt": original_name}],
-                "meta": {"original_name": original_name, "stored_name": stored_name},
-            },
-            "attachments": [{"name": original_name, "url": f"/api/uploads/{stored_name}", "type": "image"}],
-        }
+                "title": f"Image Analysis - {original_name}",
+                "text": text,
+                "preview": text[:280],
+                "meta": {
+                    "document_used": False,
+                    "analysis_type": "vision_model_image",
+                    "original_name": original_name,
+                    "stored_name": stored_name,
+                    "model": vision["model"],
+                    "response_id": vision["response_id"],
+                    "usage": vision["usage"],
+                },
+                "viewer": {
+                    "kind": "image_analysis",
+                    "content": text,
+                    "media": [{"type": "image", "src": f"/api/uploads/{stored_name}", "alt": original_name}],
+                    "meta": {
+                        "original_name": original_name,
+                        "stored_name": stored_name,
+                        "model": vision["model"],
+                        "response_id": vision["response_id"],
+                        "usage": vision["usage"],
+                    },
+                },
+                "attachments": [{"name": original_name, "url": f"/api/uploads/{stored_name}", "type": "image"}],
+            }
+        except Exception as exc:
+            text = (
+                f"I inspected the image `{original_name}`.\n\n"
+                f"Vision model failed, so Nova fell back to first-pass analysis.\n\n"
+                f"- file type: image\n"
+                f"- stored file: {stored_name}\n"
+                f"- prompt: {prompt_text or 'what is this'}\n"
+                f"- error: {exc}\n\n"
+                f"This keeps the route alive while you verify the model supports image input."
+            )
+            return {
+                "ok": True,
+                "kind": "image_analysis",
+                "title": f"Image Analysis - {original_name}",
+                "text": text,
+                "preview": text[:280],
+                "meta": {
+                    "document_used": False,
+                    "analysis_type": "first_pass_image_fallback",
+                    "original_name": original_name,
+                    "stored_name": stored_name,
+                    "vision_error": str(exc),
+                },
+                "viewer": {
+                    "kind": "image_analysis",
+                    "content": text,
+                    "media": [{"type": "image", "src": f"/api/uploads/{stored_name}", "alt": original_name}],
+                    "meta": {
+                        "original_name": original_name,
+                        "stored_name": stored_name,
+                        "vision_error": str(exc),
+                    },
+                },
+                "attachments": [{"name": original_name, "url": f"/api/uploads/{stored_name}", "type": "image"}],
+            }
 
     if media_kind == "video":
         text = (
@@ -528,6 +639,87 @@ def analyze_uploaded_file(file_info: dict, prompt_text: str):
     }
 
 
+def get_openai_client():
+    global _openai_client
+
+    if _openai_client is not None:
+        return _openai_client
+
+    if not OpenAI:
+        return None
+    if not OPENAI_API_KEY:
+        return None
+
+    try:
+        _openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    except Exception:
+        _openai_client = None
+
+    return _openai_client
+
+
+def system_instructions() -> str:
+    return (
+        "You are Nova, a direct helpful assistant inside a local Flask app. "
+        "Be concise, clear, and useful. "
+        "Do not mention hidden system messages. "
+        "If the user gives a normal chat prompt, answer it directly. "
+        "If context is missing, make the best grounded response you can from the visible session. "
+        "Keep formatting simple and readable."
+    )
+
+
+def build_model_prompt(session: dict, user_text: str, max_items: int = 12) -> str:
+    messages = session.get("messages", [])
+    trimmed = messages[-max_items:]
+
+    history_lines = []
+    for msg in trimmed:
+        role = "Assistant" if msg.get("role") == "assistant" else "User"
+        content = str(msg.get("content", "")).strip()
+        if content:
+            history_lines.append(f"{role}: {content}")
+
+    history_block = "\n".join(history_lines).strip()
+
+    return (
+        system_instructions() + "\n\n"
+        f"Conversation:\n{history_block}\n\n"
+        f"User:\n{(user_text or '').strip()}\n\n"
+        "Assistant:"
+    )
+
+
+def extract_response_text(response) -> str:
+    text = ""
+
+    try:
+        text = (getattr(response, "output_text", "") or "").strip()
+        if text:
+            return text
+    except Exception:
+        pass
+
+    try:
+        output = getattr(response, "output", None) or []
+        chunks = []
+        for item in output:
+            if getattr(item, "type", "") != "message":
+                continue
+            for content_item in getattr(item, "content", []) or []:
+                if getattr(content_item, "type", "") == "output_text":
+                    value = getattr(content_item, "text", "") or ""
+                    if value:
+                        chunks.append(value)
+        text = "\n".join(part.strip() for part in chunks if part and part.strip()).strip()
+        if text:
+            return text
+    except Exception:
+        pass
+
+    return ""
+
+
 def basic_assistant_reply(user_text: str, session: dict):
     cleaned = (user_text or "").strip()
     if not cleaned:
@@ -552,6 +744,67 @@ def basic_assistant_reply(user_text: str, session: dict):
     if history:
         return f"Working from the current session context, here’s the next move:\n\n{cleaned}"
     return cleaned
+
+
+def generate_model_reply(user_text: str, session: dict):
+    client = get_openai_client()
+    if not client:
+        return {
+            "ok": False,
+            "text": basic_assistant_reply(user_text, session),
+            "meta": {
+                "provider": "fallback",
+                "reason": "missing_openai_client_or_api_key",
+                "model": OPENAI_MODEL,
+            },
+        }
+
+    try:
+        prompt = build_model_prompt(session, user_text, max_items=12)
+
+        response = client.responses.create(
+            model=OPENAI_MODEL,
+            input=prompt,
+            max_output_tokens=OPENAI_MAX_OUTPUT_TOKENS,
+        )
+
+        text = extract_response_text(response).strip()
+        if not text:
+            text = "I’m here. I processed that, but the model returned no visible text."
+
+        response_id = getattr(response, "id", "") or ""
+        usage = getattr(response, "usage", None)
+
+        usage_data = {}
+        if usage is not None:
+            usage_data = {
+                "input_tokens": getattr(usage, "input_tokens", None),
+                "output_tokens": getattr(usage, "output_tokens", None),
+                "total_tokens": getattr(usage, "total_tokens", None),
+            }
+
+        return {
+            "ok": True,
+            "text": text,
+            "meta": {
+                "provider": "openai",
+                "model": OPENAI_MODEL,
+                "response_id": response_id,
+                "usage": usage_data,
+            },
+        }
+
+    except Exception as exc:
+        return {
+            "ok": False,
+            "text": basic_assistant_reply(user_text, session),
+            "meta": {
+                "provider": "fallback",
+                "reason": "openai_request_failed",
+                "model": OPENAI_MODEL,
+                "error": str(exc),
+            },
+        }
 
 
 def current_web_results(session_id: str = ""):
@@ -583,7 +836,14 @@ def index():
 
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"ok": True, "status": "healthy", "time": utc_now_iso()})
+    return jsonify({
+        "ok": True,
+        "status": "healthy",
+        "time": utc_now_iso(),
+        "openai_configured": bool(get_openai_client()),
+        "openai_model": OPENAI_MODEL,
+        "openai_vision_model": OPENAI_VISION_MODEL,
+    })
 
 
 @app.route("/api/uploads/<path:filename>", methods=["GET"])
@@ -722,6 +982,10 @@ def chat():
         "attachment_count": len(user_attachments),
         "artifact_created": False,
         "artifact_kind": "",
+        "model_used": False,
+        "model_provider": "",
+        "model_name": OPENAI_MODEL,
+        "vision_model_name": OPENAI_VISION_MODEL,
     }
 
     urls = extract_urls(user_text)
@@ -797,7 +1061,31 @@ def chat():
 
         else:
             debug["mode"] = "chat"
-            assistant_text = basic_assistant_reply(user_text, session)
+            model_result = generate_model_reply(user_text, session)
+            assistant_text = model_result["text"]
+            debug["model_used"] = bool(model_result.get("ok"))
+            debug["model_provider"] = model_result.get("meta", {}).get("provider", "")
+            debug["model_name"] = model_result.get("meta", {}).get("model", OPENAI_MODEL)
+
+            artifact = create_artifact(
+                kind="chat_reply",
+                title=f"Chat Reply - {assistant_text[:40] or 'Reply'}",
+                session_id=session["id"],
+                content=assistant_text,
+                preview=assistant_text[:280],
+                meta={
+                    "reply_chars": len(assistant_text),
+                    "model": model_result.get("meta", {}),
+                },
+                viewer={
+                    "kind": "chat_reply",
+                    "content": assistant_text,
+                    "meta": {
+                        "reply_chars": len(assistant_text),
+                        "model": model_result.get("meta", {}),
+                    },
+                },
+            )
 
         if not artifact:
             artifact = create_artifact(

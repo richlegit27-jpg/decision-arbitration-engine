@@ -1,5 +1,90 @@
 [
   {
+    "id": "b9bfe2ba108b480cb9028d88c965c19d",
+    "kind": "image_generation",
+    "title": "Image Prompt - car",
+    "session_id": "b0bed694",
+    "created_at": "2026-04-03T04:14:15.869790+00:00",
+    "preview": "car",
+    "content": "Image prompt locked:\n\ncar",
+    "meta": {
+      "prompt": "car"
+    },
+    "attachments": [],
+    "viewer": {
+      "kind": "image_generation",
+      "content": "Image prompt locked:\n\ncar",
+      "html": "",
+      "url": "",
+      "media": [],
+      "meta": {
+        "prompt": "car"
+      }
+    }
+  },
+  {
+    "id": "67fb2bfbe7f84310828580f6969b0e91",
+    "kind": "image_analysis",
+    "title": "Image Analysis - cf4e2b97fd0349e39f60084e069d5ae8.png",
+    "session_id": "27bb1964",
+    "created_at": "2026-04-03T03:55:58.774910+00:00",
+    "preview": "I inspected the image `cf4e2b97fd0349e39f60084e069d5ae8.png`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: cf4e2b97fd0349e39f60084e069d5ae8.png\n- prompt: what is this\n\nThis is the live image-analysis path. If you wire a vision model next, this artifact kind is already ",
+    "content": "I inspected the image `cf4e2b97fd0349e39f60084e069d5ae8.png`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: cf4e2b97fd0349e39f60084e069d5ae8.png\n- prompt: what is this\n\nThis is the live image-analysis path. If you wire a vision model next, this artifact kind is already locked as `image_analysis`.",
+    "meta": {
+      "document_used": false,
+      "analysis_type": "first_pass_image",
+      "original_name": "cf4e2b97fd0349e39f60084e069d5ae8.png",
+      "stored_name": "cf4e2b97fd0349e39f60084e069d5ae8.png"
+    },
+    "attachments": [
+      {
+        "name": "cf4e2b97fd0349e39f60084e069d5ae8.png",
+        "url": "/api/uploads/cf4e2b97fd0349e39f60084e069d5ae8.png",
+        "type": "image"
+      }
+    ],
+    "viewer": {
+      "kind": "image_analysis",
+      "content": "I inspected the image `cf4e2b97fd0349e39f60084e069d5ae8.png`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: cf4e2b97fd0349e39f60084e069d5ae8.png\n- prompt: what is this\n\nThis is the live image-analysis path. If you wire a vision model next, this artifact kind is already locked as `image_analysis`.",
+      "html": "",
+      "url": "",
+      "media": [
+        {
+          "type": "image",
+          "src": "/api/uploads/cf4e2b97fd0349e39f60084e069d5ae8.png",
+          "alt": "cf4e2b97fd0349e39f60084e069d5ae8.png"
+        }
+      ],
+      "meta": {
+        "original_name": "cf4e2b97fd0349e39f60084e069d5ae8.png",
+        "stored_name": "cf4e2b97fd0349e39f60084e069d5ae8.png"
+      }
+    }
+  },
+  {
+    "id": "6d9f71a5f95a4aaca602ad85ec2fdb24",
+    "kind": "image_generation",
+    "title": "Image Prompt - car",
+    "session_id": "27bb1964",
+    "created_at": "2026-04-03T03:55:29.137695+00:00",
+    "preview": "car",
+    "content": "Image prompt locked:\n\ncar",
+    "meta": {
+      "prompt": "car"
+    },
+    "attachments": [],
+    "viewer": {
+      "kind": "image_generation",
+      "content": "Image prompt locked:\n\ncar",
+      "html": "",
+      "url": "",
+      "media": [],
+      "meta": {
+        "prompt": "car"
+      }
+    }
+  },
+  {
     "id": "591cbb9ade3a47f48f0c3a1e3ddc472e",
     "kind": "web_result",
     "title": "Fetched Google",
