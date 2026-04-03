@@ -2,194 +2,415 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
-  />
-  <title>Nova Ultimate 2026</title>
-  <link
-    rel="stylesheet"
-    href="{{ url_for('static', filename='css/nova-main.css') }}?v=session-delete-snap-lock-2026-04-02-002"
-  />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Nova</title>
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=artifact-upgrade-2026-04-03-006" />
+  <style>
+    .nova-message-attachments {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 0 0 12px 0;
+    }
+
+    .nova-message-attachment {
+      border: 1px solid var(--border, rgba(255,255,255,0.08));
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      overflow: hidden;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .nova-message-attachment.file {
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+    }
+
+    .nova-message-attachment-icon {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.07);
+      font-size: 18px;
+    }
+
+    .nova-message-attachment.image {
+      display: block;
+    }
+
+    .nova-message-attachment-image-link {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .nova-message-attachment-image {
+      display: block;
+      width: 100%;
+      max-height: 280px;
+      object-fit: cover;
+      background: rgba(0,0,0,0.16);
+    }
+
+    .nova-message-attachment.image .nova-message-attachment-meta {
+      padding: 10px 12px 12px;
+    }
+
+    .nova-message-attachment-meta {
+      min-width: 0;
+    }
+
+    .nova-message-attachment-name {
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .nova-message-attachment-sub {
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--muted, #9ba7bb);
+      word-break: break-word;
+    }
+  </style>
 </head>
 <body>
-  <div class="nova-app-shell" id="novaAppShell">
-    <aside class="nova-sidebar" id="novaSidebar" aria-label="Sessions">
+  <div id="novaAppShell" class="nova-app-shell" data-sidebar-collapsed="false" data-rail-panel="artifacts">
+    <aside id="novaSidebar" class="nova-sidebar" aria-label="Sessions">
       <div class="nova-sidebar-top">
-        <button
-          class="nova-icon-btn"
-          id="sidebarToggle"
-          type="button"
-          title="Collapse sidebar"
-          aria-label="Collapse sidebar"
-        >
-          ☰
-        </button>
+        <button id="sidebarToggle" class="nova-icon-btn nova-sidebar-toggle" type="button" aria-label="Toggle sidebar">☰</button>
 
-        <div class="nova-brand-block">
+        <div class="nova-brand">
           <div class="nova-brand-mark">N</div>
-          <div class="nova-brand-copy">
-            <div class="nova-brand-title">Nova Ultimate 2026</div>
-            <div class="nova-brand-subtitle">Local assistant shell</div>
+          <div class="nova-brand-text">
+            <div class="nova-brand-title">Nova</div>
+            <div class="nova-brand-subtitle">Ultimate 2026</div>
           </div>
         </div>
+
+        <button id="newSessionBtn" class="nova-primary-btn nova-new-chat-btn" type="button">+ New Chat</button>
       </div>
 
-      <div class="nova-sidebar-actions">
-        <button class="nova-primary-btn" id="newChatBtn" type="button">+ New chat</button>
+      <div class="nova-sidebar-collapsed-tools">
+        <button id="newSessionMiniBtn" class="nova-icon-btn" type="button" title="New chat" aria-label="New chat">＋</button>
+        <div id="miniSessionMarkers" class="nova-mini-session-markers"></div>
       </div>
 
-      <div class="nova-sidebar-section-label">Sessions</div>
-      <div class="nova-sessions-list" id="sessionsList"></div>
+      <div class="nova-sidebar-section">
+        <div class="nova-section-heading">
+          <span>Chats</span>
+          <span id="sessionCountBadge" class="nova-count-badge">0</span>
+        </div>
+        <div id="sessionsList" class="nova-sessions-list"></div>
+      </div>
     </aside>
 
-    <main class="nova-main-shell">
+    <main class="nova-main">
       <header class="nova-topbar">
         <div class="nova-topbar-left">
-          <button
-            class="nova-icon-btn nova-hidden"
-            id="mobileSidebarToggle"
-            type="button"
-            title="Open sidebar"
-            aria-label="Open sidebar"
-          >
-            ☰
-          </button>
-
           <div class="nova-topbar-title-wrap">
-            <div>
-              <div class="nova-topbar-title">Nova</div>
-              <div class="nova-topbar-subtitle" id="topbarSubtitle">Ready</div>
-            </div>
+            <div id="activeSessionTitle" class="nova-topbar-title">Nova</div>
+            <div id="activeSessionSubtitle" class="nova-topbar-subtitle">Fast local AI workspace</div>
           </div>
         </div>
 
         <div class="nova-topbar-right">
-          <button class="nova-chip-btn" id="memoryPanelToggle" type="button">Memory</button>
-          <button class="nova-chip-btn" id="artifactsPanelToggle" type="button">Artifacts</button>
-          <button class="nova-chip-btn" id="webPanelToggle" type="button">Web</button>
+          <div class="nova-chip-row">
+            <div class="nova-chip">
+              <span class="nova-chip-label">Model</span>
+              <span id="modelChipText" class="nova-chip-value">gpt-5.4</span>
+            </div>
+            <div class="nova-chip">
+              <span class="nova-chip-label">Mode</span>
+              <span id="composerModeChip" class="nova-chip-value">Chat</span>
+            </div>
+            <div class="nova-chip">
+              <span class="nova-chip-label">Panel</span>
+              <span id="activePanelPill" class="nova-chip-value">Artifacts</span>
+            </div>
+          </div>
         </div>
       </header>
 
-      <section class="nova-chat-shell">
-        <div class="nova-messages-wrap">
-          <div class="nova-empty-state" id="novaEmptyState">
-            <div class="nova-empty-card">
-              <div class="nova-empty-kicker">Nova</div>
-              <h1>Build. Test. Ship.</h1>
-              <p>Chat, web, images, artifacts, and session control — locked into one shell.</p>
+      <section class="nova-center">
+        <div id="novaEmptyState" class="nova-empty-state is-visible">
+          <div class="nova-empty-card">
+            <div class="nova-empty-title">Nova is ready</div>
+            <div class="nova-empty-subtitle">Fast local AI workspace with memory, artifacts, and web.</div>
+            <div class="nova-empty-chips">
+              <button class="nova-empty-chip" type="button" data-fill="/web https://www.google.com">Fetch a URL</button>
+              <button class="nova-empty-chip" type="button" data-fill="/image cinematic red sports car">Generate image</button>
+              <button class="nova-empty-chip" type="button" data-fill="Summarize my last artifact">Artifact help</button>
+              <button class="nova-empty-chip" type="button" data-fill="What can you do?">Ask Nova</button>
             </div>
           </div>
-
-          <div class="nova-messages" id="messages"></div>
         </div>
+
+        <div id="messages" class="nova-messages" aria-live="polite"></div>
+      </section>
+
+      <footer class="nova-composer-wrap">
+        <div id="attachmentTray" class="nova-attachment-tray" hidden></div>
 
         <div class="nova-composer-shell">
-          <div class="nova-attachment-chips" id="attachmentChips"></div>
-
-          <div class="nova-composer-row">
-            <button class="nova-icon-btn" id="uploadBtn" type="button" title="Upload">＋</button>
-
-            <textarea
-              id="chatInput"
-              class="nova-chat-input"
-              placeholder="Type a message or /image cyberpunk wolf or /web https://example.com"
-              rows="1"
-            ></textarea>
-
-            <button class="nova-send-btn" id="sendBtn" type="button">Send</button>
+          <div class="nova-composer-toolbar">
+            <button id="attachBtn" class="nova-icon-btn" type="button" aria-label="Attach file" title="Attach">📎</button>
+            <button id="voiceBtn" class="nova-icon-btn" type="button" aria-label="Voice" title="Voice">🎤</button>
+            <button id="clearChatBtn" class="nova-icon-btn" type="button" aria-label="Clear composer" title="Clear">⌫</button>
+            <div id="composerStatus" class="nova-composer-status">Ready</div>
           </div>
 
-          <input id="fileInput" type="file" multiple hidden />
+          <div class="nova-composer-row">
+            <textarea
+              id="chatInput"
+              class="nova-composer-input"
+              rows="1"
+              placeholder="Message Nova."
+              aria-label="Message Nova"
+            ></textarea>
+            <button id="sendBtn" class="nova-send-btn" type="button" aria-label="Send">Send</button>
+          </div>
         </div>
-      </section>
+      </footer>
     </main>
 
-    <aside class="nova-right-rail is-collapsed" id="rightRail" aria-label="Right rail">
-      <div class="nova-right-rail-header">
-        <div>
-          <div class="nova-right-rail-title" id="rightRailTitle">Panel</div>
-          <div class="nova-right-rail-subtitle" id="rightRailSubtitle">Open a panel</div>
-        </div>
-
-        <button
-          class="nova-icon-btn"
-          id="rightRailClose"
-          type="button"
-          title="Close panel"
-          aria-label="Close panel"
-        >
-          ×
+    <aside class="nova-right-rail" aria-label="Workspace panels">
+      <div class="nova-rail-tabs">
+        <button id="memoryPanelToggle" class="nova-rail-tab" type="button">
+          <span>Memory</span>
+          <span id="memoryCountBadge" class="nova-count-badge">0</span>
+        </button>
+        <button id="artifactsPanelToggle" class="nova-rail-tab is-active" type="button">
+          <span>Artifacts</span>
+          <span id="artifactCountBadge" class="nova-count-badge">0</span>
+        </button>
+        <button id="webPanelToggle" class="nova-rail-tab" type="button">
+          <span>Web</span>
+          <span id="webCountBadge" class="nova-count-badge">0</span>
         </button>
       </div>
 
-      <div class="nova-right-rail-body">
-        <section class="nova-right-panel" id="memoryPanel" hidden aria-hidden="true">
-          <div class="nova-panel-head">
-            <div class="nova-panel-head-stack">
-              <div>
-                <div class="nova-panel-title">Memory</div>
-                <div class="nova-panel-subtitle">Saved memory items and recalled context.</div>
-              </div>
-            </div>
-          </div>
+      <section id="memoryPanel" class="nova-rail-panel">
+        <div class="nova-panel-title">Memory</div>
+        <div id="memoryList" class="nova-panel-list"></div>
+      </section>
 
-          <div class="nova-panel-scroll">
-            <div class="nova-memory-list" id="memoryList"></div>
+      <section id="artifactsPanel" class="nova-rail-panel is-active">
+        <div class="nova-panel-title-row">
+          <div class="nova-panel-title">Artifacts</div>
+          <div class="nova-panel-title-actions">
+            <button id="debugPanelToggle" class="nova-subtle-btn" type="button">Debug</button>
           </div>
-        </section>
+        </div>
+        <div id="artifactsMount" class="nova-panel-list">
+          <div class="nova-panel-empty">Loading artifacts…</div>
+        </div>
+      </section>
 
-        <section class="nova-right-panel" id="artifactsPanel" hidden aria-hidden="true">
-          <div class="nova-panel-head">
-            <div class="nova-panel-head-stack">
-              <div>
-                <div class="nova-panel-title">Artifacts</div>
-                <div class="nova-panel-subtitle">Generated images, web results, and saved replies.</div>
-              </div>
-
-              <div class="nova-artifact-toolbar">
-                <input
-                  class="nova-search-input"
-                  id="artifactSearchInput"
-                  type="search"
-                  placeholder="Search artifacts"
-                />
-                <select class="nova-select" id="artifactFilterSelect">
-                  <option value="all">All</option>
-                  <option value="chat_reply">Chat replies</option>
-                  <option value="image_generation">Images</option>
-                  <option value="image_analysis">Image analysis</option>
-                  <option value="video_analysis">Video analysis</option>
-                  <option value="web_result">Web</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div class="nova-panel-scroll nova-artifacts-panel-scroll">
-            <div class="nova-artifacts-list" id="artifactsList"></div>
-            <div class="nova-artifact-viewer" id="artifactViewer"></div>
-          </div>
-        </section>
-
-        <section class="nova-right-panel" id="webPanel" hidden aria-hidden="true">
-          <div class="nova-panel-head">
-            <div class="nova-panel-head-stack">
-              <div>
-                <div class="nova-panel-title">Web</div>
-                <div class="nova-panel-subtitle">Stored web fetch results and previews.</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="nova-panel-scroll">
-            <div class="nova-web-list" id="webList"></div>
-          </div>
-        </section>
-      </div>
+      <section id="webPanel" class="nova-rail-panel">
+        <div class="nova-panel-title">Web</div>
+        <div id="webList" class="nova-panel-list"></div>
+      </section>
     </aside>
   </div>
 
-  <script src="{{ url_for('static', filename='js/nova-composer-bundle.js') }}?v=session-delete-snap-lock-2026-04-02-002"></script>
+  <section id="debugPanel" class="nova-debug-panel" aria-label="Debug panel" hidden>
+    <div class="nova-debug-backdrop"></div>
+
+    <div class="nova-debug-card">
+      <div class="nova-debug-header">
+        <div>
+          <div class="nova-debug-title">Nova Debug</div>
+          <div class="nova-debug-subtitle">Live request / response / timeline without DevTools</div>
+        </div>
+
+        <div class="nova-debug-actions">
+          <button id="debugRefreshBtn" class="nova-subtle-btn" type="button">Refresh</button>
+          <button id="debugCopyBtn" class="nova-subtle-btn" type="button">Copy</button>
+          <button id="debugClearBtn" class="nova-subtle-btn" type="button">Clear</button>
+          <button id="debugCloseBtn" class="nova-subtle-btn danger" type="button">Close</button>
+        </div>
+      </div>
+
+      <div class="nova-debug-grid">
+        <div class="nova-debug-block">
+          <div class="nova-debug-label">Last action</div>
+          <pre id="debugLastAction" class="nova-debug-pre">—</pre>
+        </div>
+
+        <div class="nova-debug-block">
+          <div class="nova-debug-label">Status</div>
+          <pre id="debugStatusText" class="nova-debug-pre">—</pre>
+        </div>
+
+        <div class="nova-debug-block">
+          <div class="nova-debug-label">Last error</div>
+          <pre id="debugLastError" class="nova-debug-pre is-error">—</pre>
+        </div>
+
+        <div class="nova-debug-block">
+          <div class="nova-debug-label">Request</div>
+          <pre id="debugLastRequest" class="nova-debug-pre">—</pre>
+        </div>
+
+        <div class="nova-debug-block">
+          <div class="nova-debug-label">Response</div>
+          <pre id="debugLastResponse" class="nova-debug-pre">—</pre>
+        </div>
+
+        <div class="nova-debug-block nova-debug-block-timeline">
+          <div class="nova-debug-label">Timeline</div>
+          <div id="debugTimeline" class="nova-debug-timeline"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <input id="fileInput" type="file" multiple hidden />
+
+  <script src="/static/js/nova-artifacts.js?v=artifact-upgrade-2026-04-03-006"></script>
+  <script src="/static/js/nova-composer-bundle.js?v=artifact-upgrade-2026-04-03-006"></script>
+
+  <script>
+    (function () {
+      "use strict";
+
+      function $(id) {
+        return document.getElementById(id);
+      }
+
+      function safe(value) {
+        return value == null ? "" : String(value);
+      }
+
+      function pretty(value) {
+        if (value == null || value === "") return "—";
+        if (typeof value === "string") return value;
+        try {
+          return JSON.stringify(value, null, 2);
+        } catch (_) {
+          return safe(value);
+        }
+      }
+
+      function html(text) {
+        return safe(text)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function openDebug() {
+        const panel = $("debugPanel");
+        if (!panel) return;
+        panel.hidden = false;
+        panel.classList.add("is-open");
+        renderDebug();
+      }
+
+      function closeDebug() {
+        const panel = $("debugPanel");
+        if (!panel) return;
+        panel.classList.remove("is-open");
+        window.setTimeout(function () {
+          panel.hidden = true;
+        }, 120);
+      }
+
+      function renderTimeline(items) {
+        const box = $("debugTimeline");
+        if (!box) return;
+
+        const list = Array.isArray(items) ? items : [];
+        if (!list.length) {
+          box.innerHTML = '<div class="nova-debug-empty">No timeline yet.</div>';
+          return;
+        }
+
+        box.innerHTML = list.map(function (item) {
+          const at = html(item && item.at ? item.at : "");
+          const type = html(item && item.type ? item.type : "event");
+          const action = html(item && item.action ? item.action : "");
+          const text = html(
+            item && item.text ? item.text :
+            item && item.error ? item.error :
+            item && item.responsePreview ? item.responsePreview :
+            ""
+          );
+
+          return `
+            <div class="nova-debug-timeline-item">
+              <div class="nova-debug-timeline-top">
+                <span class="nova-debug-timeline-type">${type}</span>
+                <span class="nova-debug-timeline-at">${at}</span>
+              </div>
+              <div class="nova-debug-timeline-action">${action || "—"}</div>
+              ${text ? `<div class="nova-debug-timeline-text">${text}</div>` : ``}
+            </div>
+          `;
+        }).join("");
+      }
+
+      function renderDebug() {
+        const dbg = window.__novaDebug || {};
+        if ($("debugLastAction")) $("debugLastAction").textContent = pretty(dbg.action || "—");
+        if ($("debugStatusText")) $("debugStatusText").textContent = pretty(dbg.statusText || "—");
+        if ($("debugLastError")) $("debugLastError").textContent = pretty(dbg.error || "—");
+        if ($("debugLastRequest")) $("debugLastRequest").textContent = pretty(dbg.request || dbg.artifactRequest || "—");
+        if ($("debugLastResponse")) $("debugLastResponse").textContent = pretty(dbg.response || dbg.artifactResponse || "—");
+        renderTimeline(dbg.timeline || []);
+      }
+
+      function copyDebug() {
+        const dbg = window.__novaDebug || {};
+        const text = pretty(dbg);
+        navigator.clipboard.writeText(text).catch(function () {});
+      }
+
+      function clearDebug() {
+        window.__novaDebug = {
+          action: "",
+          request: null,
+          response: null,
+          error: "",
+          statusText: "",
+          timeline: []
+        };
+        renderDebug();
+      }
+
+      function bindDebug() {
+        const toggle = $("debugPanelToggle");
+        const close = $("debugCloseBtn");
+        const refresh = $("debugRefreshBtn");
+        const copy = $("debugCopyBtn");
+        const clear = $("debugClearBtn");
+        const backdrop = document.querySelector(".nova-debug-backdrop");
+
+        if (toggle) toggle.addEventListener("click", openDebug);
+        if (close) close.addEventListener("click", closeDebug);
+        if (refresh) refresh.addEventListener("click", renderDebug);
+        if (copy) copy.addEventListener("click", copyDebug);
+        if (clear) clear.addEventListener("click", clearDebug);
+        if (backdrop) backdrop.addEventListener("click", closeDebug);
+
+        window.addEventListener("nova:debug-updated", renderDebug);
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", bindDebug);
+      } else {
+        bindDebug();
+      }
+    })();
+  </script>
 </body>
 </html>
