@@ -715,94 +715,24 @@ def chat():
 
     artifact = None
     assistant_text = ""
+
     debug = {
-        "mode": "general",
+        "mode": "auto",
         "has_urls": False,
         "attachment_count": len(user_attachments),
         "artifact_created": False,
         "artifact_kind": "",
-        "latest_user_text": user_text[:300],
     }
 
     urls = extract_urls(user_text)
     debug["has_urls"] = bool(urls)
 
     try:
-        if user_text.lower().startswith("/web ") or urls:
-            debug["mode"] = "web"
-            url = ""
-
-            if user_text.lower().startswith("/web "):
-                remainder = user_text[5:].strip()
-                parsed_urls = extract_urls(remainder)
-                url = parsed_urls[0] if parsed_urls else remainder
-            elif urls:
-                url = urls[0]
-
-            web_data = summarize_html(url)
-            assistant_text = web_data["summary"] or web_data["title"] or url
-
-            artifact = create_artifact(
-                kind="web_result",
-                title=f"Fetched {web_data['title'][:80]}",
-                session_id=session["id"],
-                content=assistant_text,
-                preview=assistant_text[:280],
-                meta={
-                    "url": web_data["url"],
-                    "title": web_data["title"],
-                    "description": web_data["description"],
-                    "ssl_fallback_used": web_data["ssl_fallback_used"],
-                    "status_code": web_data["status_code"],
-                    "web": {
-                        "used": True,
-                        "has_urls": True,
-                        "result_count": 1,
-                        "ok_count": 1,
-                        "failed_count": 0,
-                        "urls": [web_data["url"]],
-                        "titles": [web_data["title"]],
-                        "errors": [],
-                    },
-                },
-                viewer={
-                    "kind": "web_result",
-                    "content": assistant_text,
-                    "url": web_data["url"],
-                    "media": web_data["media"],
-                    "meta": {
-                        "title": web_data["title"],
-                        "description": web_data["description"],
-                        "ssl_fallback_used": web_data["ssl_fallback_used"],
-                    },
-                },
-            )
-
-        elif user_text.lower().startswith("/image "):
-            debug["mode"] = "image_generation"
-            prompt = user_text[7:].strip() or "high detail subject"
-            assistant_text = (
-                f"Image prompt locked:\n\n{prompt}\n\n"
-                f"This request is saved as a real `image_generation` artifact."
-            )
-            artifact = create_artifact(
-                kind="image_generation",
-                title=f"Image Prompt - {prompt[:60]}",
-                session_id=session["id"],
-                content=assistant_text,
-                preview=prompt[:280],
-                meta={"prompt": prompt},
-                viewer={
-                    "kind": "image_generation",
-                    "content": assistant_text,
-                    "meta": {"prompt": prompt},
-                    "media": [],
-                },
-            )
-
-        elif user_attachments:
-            debug["mode"] = "attachment_analysis"
+        if user_attachments:
             first = user_attachments[0]
+            kind = guess_media_kind(first.get("original_name", ""), first.get("content_type", ""))
+            debug["mode"] = f"{kind}_analysis"
+
             analysis = analyze_uploaded_file(first, user_text)
             assistant_text = analysis["text"]
 
@@ -817,9 +747,59 @@ def chat():
                 attachments=analysis.get("attachments", []),
             )
 
+        elif urls:
+            debug["mode"] = "web_auto"
+
+            url = urls[0]
+            web_data = summarize_html(url)
+            assistant_text = web_data["summary"] or web_data["title"] or url
+
+            artifact = create_artifact(
+                kind="web_result",
+                title=f"Fetched {web_data['title'][:80]}",
+                session_id=session["id"],
+                content=assistant_text,
+                preview=assistant_text[:280],
+                meta={
+                    "url": web_data["url"],
+                    "title": web_data["title"],
+                    "description": web_data["description"],
+                    "ssl_fallback_used": web_data["ssl_fallback_used"],
+                },
+                viewer={
+                    "kind": "web_result",
+                    "content": assistant_text,
+                    "url": web_data["url"],
+                    "media": web_data["media"],
+                    "meta": web_data,
+                },
+            )
+
+        elif user_text.lower().startswith("/image "):
+            debug["mode"] = "image_generation"
+
+            prompt = user_text[7:].strip() or "high detail subject"
+            assistant_text = f"Image prompt locked:\n\n{prompt}"
+
+            artifact = create_artifact(
+                kind="image_generation",
+                title=f"Image Prompt - {prompt[:60]}",
+                session_id=session["id"],
+                content=assistant_text,
+                preview=prompt[:280],
+                meta={"prompt": prompt},
+                viewer={
+                    "kind": "image_generation",
+                    "content": assistant_text,
+                    "meta": {"prompt": prompt},
+                },
+            )
+
         else:
             debug["mode"] = "chat"
             assistant_text = basic_assistant_reply(user_text, session)
+
+        if not artifact:
             artifact = create_artifact(
                 kind="chat_reply",
                 title=f"Chat Reply - {assistant_text[:40] or 'Reply'}",
@@ -830,18 +810,16 @@ def chat():
                 viewer={
                     "kind": "chat_reply",
                     "content": assistant_text,
-                    "meta": {"reply_chars": len(assistant_text)}
+                    "meta": {"reply_chars": len(assistant_text)},
                 },
             )
 
-        debug["artifact_created"] = artifact is not None
-        debug["artifact_kind"] = artifact.get("kind") if artifact else ""
-        debug["artifact_id"] = artifact.get("id") if artifact else ""
+        debug["artifact_created"] = True
+        debug["artifact_kind"] = artifact.get("kind")
 
     except Exception as exc:
-        debug["mode"] = "error"
-        debug["error"] = str(exc)
-        assistant_text = f"Request failed.\n\n{exc}"
+        assistant_text = f"Request failed:\n\n{exc}"
+
         artifact = create_artifact(
             kind="chat_reply",
             title="Chat Reply - Error",
@@ -849,36 +827,33 @@ def chat():
             content=assistant_text,
             preview=assistant_text[:280],
             meta={"error": str(exc)},
-            viewer={"kind": "chat_reply", "content": assistant_text, "meta": {"error": str(exc)}},
+            viewer={
+                "kind": "chat_reply",
+                "content": assistant_text,
+            },
         )
 
-    assistant_attachments = artifact.get("attachments", []) if artifact else []
     append_message(
         session,
         "assistant",
         assistant_text,
-        attachments=assistant_attachments,
+        attachments=artifact.get("attachments", []),
         meta={
-            "artifact_id": artifact.get("id") if artifact else "",
-            "artifact_kind": artifact.get("kind") if artifact else "",
+            "artifact_id": artifact.get("id"),
+            "artifact_kind": artifact.get("kind"),
             "debug": debug,
         },
     )
+
     save_sessions(sessions_payload)
 
-    response_payload = {
+    return jsonify({
         "ok": True,
-        "message": session["messages"][-1],
-        "assistant_message": session["messages"][-1],
+        "assistant_message": assistant_text,
         "session": session,
-        "active_session_id": session["id"],
-        "artifacts": load_artifacts()["artifacts"][:100],
         "debug": debug,
-        "memory": load_memory().get("items", []),
         "web_results": current_web_results(session["id"]),
-        "web_items": current_web_results(session["id"]),
-    }
-    return jsonify(response_payload)
+    })
 
 
 if __name__ == "__main__":
