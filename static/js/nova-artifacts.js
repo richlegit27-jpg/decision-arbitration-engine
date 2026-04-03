@@ -47,7 +47,7 @@
 
   function dispatch(name, detail) {
     try {
-      window.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
+      document.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
     } catch (_) {}
   }
 
@@ -59,18 +59,17 @@
   }
 
   function artifactImage(a) {
-    return artifactMedia(a).find(function (m) {
-      return safe(m && m.type).toLowerCase() === "image" && safe(m && m.url);
-    }) || null;
+    return (
+      artifactMedia(a).find(function (m) {
+        return safe(m && m.type).toLowerCase() === "image" && safe(m && m.url);
+      }) || null
+    );
   }
 
   function containsSearch(a, query) {
-    const hay = [
-      a && a.title,
-      a && a.kind,
-      a && a.content,
-      a && a.session_id
-    ].join(" ").toLowerCase();
+    const hay = [a && a.title, a && a.kind, a && a.content, a && a.session_id]
+      .join(" ")
+      .toLowerCase();
     return hay.indexOf(query.toLowerCase()) >= 0;
   }
 
@@ -98,13 +97,17 @@
     }
 
     if (state.filter === "pinned") {
-      list = list.filter(function (a) { return !!a.pinned; });
+      list = list.filter(function (a) {
+        return !!a.pinned;
+      });
     } else if (state.filter === "media") {
       list = list.filter(function (a) {
         return artifactMedia(a).length > 0;
       });
     } else if (state.filter === "chat_reply") {
-      list = list.filter(function (a) { return safe(a.kind) === "chat_reply"; });
+      list = list.filter(function (a) {
+        return safe(a.kind) === "chat_reply";
+      });
     } else if (state.filter === "current_session") {
       list = list.filter(function (a) {
         return safe(a.session_id) === safe(state.activeSessionId);
@@ -131,38 +134,71 @@
 
     if (empty) empty.style.display = "none";
 
-    el.innerHTML = state.filtered.map(function (a) {
-      const id = safe(a.id);
-      const img = artifactImage(a);
-      const isActive = state.activeId === id;
-      const kind = safe(a.kind || "artifact");
-      const preview = safe(a.content || "").slice(0, 120);
-      const sessionBadge = safe(a.session_id) && safe(a.session_id) === safe(state.activeSessionId)
-        ? '<span class="nova-message-badge">Current</span>'
-        : "";
+    el.innerHTML = state.filtered
+      .map(function (a) {
+        const id = safe(a.id);
+        const img = artifactImage(a);
+        const isActive = state.activeId === id;
+        const kind = safe(a.kind || "artifact");
+        const preview = safe(a.content || "").slice(0, 120);
+        const sessionBadge =
+          safe(a.session_id) && safe(a.session_id) === safe(state.activeSessionId)
+            ? '<span class="nova-message-badge">Current</span>'
+            : "";
 
-      return (
-        '<div class="nova-artifact-card' + (isActive ? " active" : "") + '" data-id="' + esc(id) + '">' +
+        return (
+          '<div class="nova-artifact-card' +
+          (isActive ? " active" : "") +
+          '" data-id="' +
+          esc(id) +
+          '">' +
           '<div class="nova-artifact-card-top">' +
-            '<div class="nova-artifact-title">' + esc(a.title || "Untitled") + "</div>" +
-            '<div class="nova-artifact-badges">' +
-              '<span class="nova-message-badge">' + esc(kind) + "</span>" +
-              sessionBadge +
-            "</div>" +
+          '<div class="nova-artifact-title">' +
+          esc(a.title || "Untitled") +
           "</div>" +
-          (
-            img
-              ? '<div class="nova-artifact-thumb"><img src="' + esc(img.url) + '" alt="' + esc(a.title || "artifact image") + '" loading="lazy"></div>'
-              : ""
-          ) +
-          '<div class="nova-artifact-preview">' + esc(preview) + "</div>" +
-        "</div>"
-      );
-    }).join("");
+          '<div class="nova-artifact-badges">' +
+          '<span class="nova-message-badge">' +
+          esc(kind) +
+          "</span>" +
+          sessionBadge +
+          "</div>" +
+          "</div>" +
+          (img
+            ? '<div class="nova-artifact-thumb"><img src="' +
+              esc(img.url) +
+              '" alt="' +
+              esc(a.title || "artifact image") +
+              '" loading="lazy"></div>'
+            : "") +
+          '<div class="nova-artifact-preview">' +
+          esc(preview) +
+          "</div>" +
+          "</div>"
+        );
+      })
+      .join("");
 
     qsa(".nova-artifact-card", el).forEach(function (card) {
       card.onclick = function () {
-        openArtifact(card.dataset.id || "");
+        const artifactId = safe(card.dataset.id || "");
+        if (!artifactId) return;
+
+        const artifact = state.artifacts.find(function (a) {
+          return safe(a.id) === artifactId;
+        });
+        if (!artifact) return;
+
+        const targetSessionId = safe(artifact.session_id || "");
+        const currentSessionId = safe(state.activeSessionId || "");
+
+        if (targetSessionId && targetSessionId !== currentSessionId) {
+          dispatch("nova:session-switch-request", {
+            session_id: targetSessionId
+          });
+          return;
+        }
+
+        openArtifact(artifactId);
       };
     });
   }
@@ -175,11 +211,21 @@
 
     return (
       '<div class="nova-artifact-viewer-head-row">' +
-        '<div class="nova-artifact-viewer-kind"><span class="nova-message-badge">' + esc(kind) + "</span></div>" +
-        '<div class="nova-artifact-viewer-session">' + esc(session) + "</div>" +
+      '<div class="nova-artifact-viewer-kind"><span class="nova-message-badge">' +
+      esc(kind) +
+      "</span></div>" +
+      '<div class="nova-artifact-viewer-session">' +
+      esc(session) +
+      "</div>" +
       "</div>" +
       (created ? '<div class="nova-artifact-viewer-date">' + esc(created) + "</div>" : "") +
-      (img ? '<div class="nova-artifact-viewer-main-image"><img src="' + esc(img.url) + '" alt="' + esc(artifact.title || "artifact image") + '" loading="lazy"></div>' : "")
+      (img
+        ? '<div class="nova-artifact-viewer-main-image"><img src="' +
+          esc(img.url) +
+          '" alt="' +
+          esc(artifact.title || "artifact image") +
+          '" loading="lazy"></div>'
+        : "")
     );
   }
 
@@ -189,13 +235,17 @@
 
     return (
       '<div class="nova-artifact-actions">' +
-        '<button class="nova-shell-btn" type="button" data-artifact-copy="' + esc(artifact.id) + '">Copy</button>' +
-        (
-          canReuseImage
-            ? '<button class="nova-shell-btn" type="button" data-artifact-reuse-image="' + esc(artifact.id) + '">Reuse Image</button>'
-            : ""
-        ) +
-        '<button class="nova-shell-btn" type="button" data-artifact-open-session="' + esc(artifact.id) + '">Open Session</button>' +
+      '<button class="nova-shell-btn" type="button" data-artifact-copy="' +
+      esc(artifact.id) +
+      '">Copy</button>' +
+      (canReuseImage
+        ? '<button class="nova-shell-btn" type="button" data-artifact-reuse-image="' +
+          esc(artifact.id) +
+          '">Reuse Image</button>'
+        : "") +
+      '<button class="nova-shell-btn" type="button" data-artifact-open-session="' +
+      esc(artifact.id) +
+      '">Open Session</button>' +
       "</div>"
     );
   }
@@ -223,7 +273,9 @@
 
     bodyEl.innerHTML =
       buildViewerTop(artifact) +
-      '<div class="nova-artifact-viewer-content">' + formatContent(artifact) + "</div>" +
+      '<div class="nova-artifact-viewer-content">' +
+      formatContent(artifact) +
+      "</div>" +
       buildViewerActions(artifact);
 
     const copyBtn = qs("[data-artifact-copy]", bodyEl);
@@ -238,10 +290,14 @@
     const openSessionBtn = qs("[data-artifact-open-session]", bodyEl);
     if (openSessionBtn) {
       openSessionBtn.addEventListener("click", function () {
-        dispatch("nova:artifact-owning-session-request", {
-          artifact: artifact,
-          session_id: artifact.session_id || ""
-        });
+        const targetSessionId = safe(artifact.session_id || "");
+        if (!targetSessionId) return;
+
+        if (targetSessionId !== safe(state.activeSessionId || "")) {
+          dispatch("nova:session-switch-request", {
+            session_id: targetSessionId
+          });
+        }
       });
     }
 
@@ -259,7 +315,13 @@
   function formatContent(artifact) {
     let html = esc(safe(artifact.content || ""));
     html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function (_, alt, src) {
-      return '<div class="nova-inline-image-wrap"><img class="nova-inline-image" src="' + esc(src) + '" alt="' + esc(alt || "image") + '" loading="lazy"></div>';
+      return (
+        '<div class="nova-inline-image-wrap"><img class="nova-inline-image" src="' +
+        esc(src) +
+        '" alt="' +
+        esc(alt || "image") +
+        '" loading="lazy"></div>'
+      );
     });
     html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     html = html.replace(/\n/g, "<br>");
@@ -326,16 +388,11 @@
       render();
     });
 
-    window.addEventListener("nova:artifact-owning-session-request", function (event) {
+    window.addEventListener("nova:session-activated", function (event) {
       const detail = event.detail || {};
-      const sessionId = safe(detail.session_id);
-      if (!sessionId) return;
-
-      try {
-        localStorage.setItem("nova.activeSessionId", sessionId);
-      } catch (_) {}
-
-      window.location.reload();
+      state.activeSessionId = safe(detail.session_id || "");
+      applyFilterSort();
+      render();
     });
   }
 
