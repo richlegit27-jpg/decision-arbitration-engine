@@ -11,13 +11,12 @@
   const state = {
     sessionId: "",
     sessions: [],
-    sending: false
+    sending: false,
+    pendingArtifactOpenId: ""
   };
 
   function log() {
-    try {
-      console.log(LOG, ...arguments);
-    } catch (_) {}
+    try { console.log(LOG, ...arguments); } catch (_) {}
   }
 
   function qs(selector, root) {
@@ -52,29 +51,12 @@
     dispatch("nova:debug-update", {});
   }
 
-  function getMessagesEl() {
-    return qs("#messages");
-  }
-
-  function getInputEl() {
-    return qs("#chatInput");
-  }
-
-  function getSendBtn() {
-    return qs("#sendBtn");
-  }
-
-  function getUploadBtn() {
-    return qs("#uploadBtn");
-  }
-
-  function getFileInput() {
-    return qs("#fileInput");
-  }
-
-  function getSessionListEl() {
-    return qs("#sessionList");
-  }
+  function getMessagesEl() { return qs("#messages"); }
+  function getInputEl() { return qs("#chatInput"); }
+  function getSendBtn() { return qs("#sendBtn"); }
+  function getUploadBtn() { return qs("#uploadBtn"); }
+  function getFileInput() { return qs("#fileInput"); }
+  function getSessionListEl() { return qs("#sessionList"); }
 
   function setConnectionStatus(text) {
     const el = qs("#connectionStatus");
@@ -214,6 +196,30 @@
     return safe(session.last_message_preview || session.title || "New Chat");
   }
 
+  function activateSessionById(sessionId, options) {
+    const detail = options || {};
+    const id = safe(sessionId || "");
+    if (!id) return false;
+
+    const session = state.sessions.find(function (item) {
+      return item.id === id;
+    });
+    if (!session) return false;
+
+    state.sessionId = session.id;
+    persistSessionId();
+    setActiveSessionTitle(session.title || "New Chat");
+    setMessages(Array.isArray(session.messages) ? session.messages : []);
+    renderSessions();
+
+    dispatch("nova:session-activated", {
+      session_id: session.id,
+      reason: safe(detail.reason || "activate-session")
+    });
+
+    return true;
+  }
+
   function renderSessions() {
     const el = getSessionListEl();
     if (!el) return;
@@ -230,31 +236,17 @@
     qsa("[data-session-id]", el).forEach(function (btn) {
       btn.addEventListener("click", function () {
         const id = btn.getAttribute("data-session-id") || "";
-        const session = state.sessions.find(function (item) {
-          return item.id === id;
-        });
-        if (!session) return;
-        state.sessionId = session.id;
-        persistSessionId();
-        setActiveSessionTitle(session.title || "New Chat");
-        setMessages(Array.isArray(session.messages) ? session.messages : []);
-        renderSessions();
+        activateSessionById(id, { reason: "session-list-click" });
       });
     });
   }
 
   function persistSessionId() {
-    try {
-      localStorage.setItem("nova.activeSessionId", state.sessionId || "");
-    } catch (_) {}
+    try { localStorage.setItem("nova.activeSessionId", state.sessionId || ""); } catch (_) {}
   }
 
   function restoreSessionId() {
-    try {
-      return localStorage.getItem("nova.activeSessionId") || "";
-    } catch (_) {
-      return "";
-    }
+    try { return localStorage.getItem("nova.activeSessionId") || ""; } catch (_) { return ""; }
   }
 
   function setSending(isSending) {
@@ -267,11 +259,8 @@
   }
 
   async function refreshState() {
-    const req = { url: API.state, method: "GET" };
-    setLastDebug(req, {});
     const res = await fetch(API.state, { credentials: "same-origin" });
     const data = await res.json();
-    setLastDebug(req, data);
 
     const sessions = Array.isArray(data.sessions) ? data.sessions : [];
     state.sessions = sessions;
@@ -281,14 +270,9 @@
     const first = sessions[0];
 
     if (matched) {
-      state.sessionId = matched.id;
-      setActiveSessionTitle(matched.title || "New Chat");
-      setMessages(Array.isArray(matched.messages) ? matched.messages : []);
+      activateSessionById(matched.id);
     } else if (first) {
-      state.sessionId = first.id;
-      persistSessionId();
-      setActiveSessionTitle(first.title || "New Chat");
-      setMessages(Array.isArray(first.messages) ? first.messages : []);
+      activateSessionById(first.id);
     } else {
       state.sessionId = "";
       setActiveSessionTitle("New Chat");
@@ -296,27 +280,6 @@
     }
 
     renderSessions();
-  }
-
-  async function uploadFiles(files) {
-    const list = Array.from(files || []).filter(Boolean);
-    if (!list.length) return [];
-
-    const form = new FormData();
-    list.forEach(function (file) {
-      form.append("files", file);
-    });
-
-    const req = { url: API.upload, method: "POST", file_count: list.length };
-    const res = await fetch(API.upload, {
-      method: "POST",
-      body: form,
-      credentials: "same-origin"
-    });
-    const data = await res.json();
-    setLastDebug(req, data);
-
-    return Array.isArray(data.files) ? data.files.map(normalizeAttachment).filter(Boolean) : [];
   }
 
   async function sendMessage() {
@@ -330,43 +293,27 @@
 
     if (input) input.value = "";
     setSending(true);
-    setConnectionStatus("Working");
 
-    const userMessage = {
-      id: "local-user-" + Date.now(),
+    appendMessage({
       role: "user",
       content: text,
       attachments: attachments,
       created_at: new Date().toISOString()
-    };
-    appendMessage(userMessage);
-
-    const req = {
-      url: API.chat,
-      method: "POST",
-      payload: {
-        content: text,
-        session_id: state.sessionId || "",
-        attachments: attachments
-      }
-    };
+    });
 
     try {
-      setLastDebug(req, {});
       const res = await fetch(API.chat, {
         method: "POST",
         credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(req.payload)
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: text,
+          session_id: state.sessionId || "",
+          attachments: attachments
+        })
       });
-      const data = await res.json();
-      setLastDebug(req, data);
 
-      if (!res.ok || data.ok === false) {
-        throw new Error(data.error || "Send failed.");
-      }
+      const data = await res.json();
 
       if (data.session && data.session.id) {
         state.sessionId = data.session.id;
@@ -374,112 +321,62 @@
       }
 
       if (data.session) {
-        const existingIndex = state.sessions.findIndex(function (item) {
-          return item.id === data.session.id;
-        });
-        if (existingIndex >= 0) {
-          state.sessions[existingIndex] = data.session;
-        } else {
-          state.sessions.unshift(data.session);
-        }
+        const i = state.sessions.findIndex(s => s.id === data.session.id);
+        if (i >= 0) state.sessions[i] = data.session;
+        else state.sessions.unshift(data.session);
         renderSessions();
         setActiveSessionTitle(data.session.title || "New Chat");
       }
 
-      if (data.assistant_message) {
-        appendMessage(data.assistant_message);
-      }
+      if (data.assistant_message) appendMessage(data.assistant_message);
 
       clearStaged();
-      setConnectionStatus("Ready");
+
       dispatch("nova:artifacts-refreshed", {
-        artifacts: Array.isArray(data.artifacts) ? data.artifacts : [],
+        artifacts: data.artifacts || [],
         active_session_id: state.sessionId
       });
-    } catch (error) {
-      console.error(LOG, "send failed", error);
+
+    } catch (e) {
       appendMessage({
         role: "assistant",
-        content: "Nova error: " + safe(error && error.message || error),
-        attachments: [],
+        content: "Nova error: " + safe(e.message),
         created_at: new Date().toISOString()
       });
-      setConnectionStatus("Error");
     } finally {
       setSending(false);
     }
   }
 
-  function populateImagePromptFromArtifact(detail) {
-    const artifact = detail && detail.artifact;
-    const prompt = artifact && artifact.meta && artifact.meta.media && artifact.meta.media[0] && artifact.meta.media[0].prompt;
-    if (!prompt) return;
-    const input = getInputEl();
-    if (!input) return;
-    input.value = "/image " + prompt;
-    input.focus();
-  }
-
   function setupComposer() {
-    const sendBtn = getSendBtn();
-    const uploadBtn = getUploadBtn();
-    const fileInput = getFileInput();
-    const input = getInputEl();
+    qs("#sendBtn")?.addEventListener("click", sendMessage);
 
-    if (sendBtn) {
-      sendBtn.addEventListener("click", sendMessage);
-    }
+    qs("#chatInput")?.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
 
-    if (uploadBtn && fileInput) {
-      uploadBtn.addEventListener("click", function () {
-        fileInput.click();
-      });
+    window.addEventListener("nova:session-switch-request", function (event) {
+      const d = event.detail || {};
+      state.pendingArtifactOpenId = d.artifact_id || "";
+      activateSessionById(d.session_id, { reason: "artifact-switch" });
+    });
 
-      fileInput.addEventListener("change", async function () {
-        try {
-          const uploaded = await uploadFiles(fileInput.files);
-          if (window.NovaUploadStage && typeof window.NovaUploadStage.add === "function") {
-            window.NovaUploadStage.add(uploaded);
-          }
-        } catch (error) {
-          console.error(LOG, "upload failed", error);
-        }
-      });
-    }
-
-    if (input) {
-      input.addEventListener("keydown", function (event) {
-        if (event.key === "Enter" && !event.shiftKey) {
-          event.preventDefault();
-          sendMessage();
-        }
-      });
-    }
-
-    const newBtn = qs("#newSessionBtn");
-    if (newBtn) {
-      newBtn.addEventListener("click", function () {
-        state.sessionId = "";
-        persistSessionId();
-        setMessages([]);
-        setActiveSessionTitle("New Chat");
-        qsa(".nova-session-item.is-active").forEach(function (el) {
-          el.classList.remove("is-active");
+    window.addEventListener("nova:session-activated", function (event) {
+      if (state.pendingArtifactOpenId) {
+        const id = state.pendingArtifactOpenId;
+        state.pendingArtifactOpenId = "";
+        dispatch("nova:artifact-open-request", {
+          artifact_id: id,
+          suppress_session_switch: true
         });
-      });
-    }
+      }
 
-    const refreshBtn = qs("#refreshSessionsBtn");
-    if (refreshBtn) {
-      refreshBtn.addEventListener("click", function () {
-        refreshState().catch(function (error) {
-          console.error(LOG, "refresh state failed", error);
-        });
+      dispatch("nova:artifacts-refreshed", {
+        active_session_id: state.sessionId
       });
-    }
-
-    window.addEventListener("nova:artifact-reuse-image", function (event) {
-      populateImagePromptFromArtifact(event.detail || {});
     });
   }
 
@@ -490,8 +387,5 @@
     log("ready", { session_id: state.sessionId });
   }
 
-  boot().catch(function (error) {
-    console.error(LOG, "boot failed", error);
-    setConnectionStatus("Error");
-  });
+  boot();
 })();
