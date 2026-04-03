@@ -1,5 +1,46 @@
 [
   {
+    "id": "55434b29-9dc4-43da-a5ac-136678c48b52",
+    "session_id": "10519295-5e22-4370-9876-471f98a2fd5b",
+    "title": "Generated Image - dog",
+    "kind": "generated_image",
+    "content": "![generated image](/api/uploads/generated_b17fe772d1d14c32bf5130b23f103341.png)\n\nGenerated from prompt: dog",
+    "attachments": [
+      {
+        "type": "image",
+        "filename": "generated_b17fe772d1d14c32bf5130b23f103341.png",
+        "url": "/api/uploads/generated_b17fe772d1d14c32bf5130b23f103341.png",
+        "mime_type": "image/png",
+        "size": 1748542,
+        "prompt": "dog"
+      }
+    ],
+    "created_at": "2026-04-03T00:32:53.287685+00:00",
+    "updated_at": "2026-04-03T00:32:53.287685+00:00",
+    "pinned": false,
+    "meta": {
+      "role": "assistant",
+      "message_id": "0e351b5b-1ae2-443f-b737-2ce595db5df9",
+      "model": "gpt-5.4",
+      "artifact_source": "chat_service_autosave",
+      "attachments_count": 1,
+      "media": [
+        {
+          "type": "image",
+          "filename": "generated_b17fe772d1d14c32bf5130b23f103341.png",
+          "url": "/api/uploads/generated_b17fe772d1d14c32bf5130b23f103341.png",
+          "mime_type": "image/png",
+          "size": 1748542,
+          "prompt": "dog"
+        }
+      ],
+      "document_used": false,
+      "web": {
+        "used": false
+      }
+    }
+  },
+  {
     "id": "5da5606e-6e27-4a4f-8142-5aa1b72ea6d9",
     "session_id": "10519295-5e22-4370-9876-471f98a2fd5b",
     "title": "Chat Reply - I don’t have live sports data in this chat.",
