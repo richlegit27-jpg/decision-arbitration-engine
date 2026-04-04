@@ -26,7 +26,8 @@
     webItems: [],
     pendingUploads: [],
     activePanel: "artifacts",
-    lastUserMessage: null
+    lastUserMessage: null,
+    activeMemoryId: ""
   };
 
   const els = {};
@@ -336,6 +337,26 @@
     };
   }
 
+  function normalizeMemoryItem(item, index) {
+    const source = safe(pick(item && item.source, item && item.origin, "assistant")).toLowerCase();
+    const kind = safe(pick(item && item.kind, item && item.type, item && item.category, "note")).toLowerCase();
+    const text = safe(pick(item && item.content, item && item.text, item && item.value, item && item.summary, ""));
+    const title = safe(pick(item && item.title, item && item.key, item && item.label, kind || `Memory ${index + 1}`));
+    const createdAt = safe(pick(item && item.updated_at, item && item.created_at, item && item.timestamp, nowIso()));
+    const sessionId = safe(pick(item && item.session_id, item && item.chat_id, ""));
+
+    return {
+      id: safe(pick(item && item.id, item && item.memory_id, `memory-${index + 1}`)),
+      title: title,
+      text: text,
+      source: source || "assistant",
+      kind: kind || "note",
+      created_at: createdAt,
+      session_id: sessionId,
+      raw: item || {}
+    };
+  }
+
   function getActiveSession() {
     return state.sessions.find(function (s) {
       return s.id === state.sessionId;
@@ -374,7 +395,7 @@
       sessions: sessions,
       sessionId: safe(pick(activeSessionId, activeSession && activeSession.id)),
       messages: messages,
-      memoryItems: asArray(data.memory_items || data.memory || []),
+      memoryItems: asArray(data.memory_items || data.memory || []).map(normalizeMemoryItem).filter(Boolean),
       artifacts: asArray(data.artifacts || []),
       webItems: asArray(data.web_items || data.web || [])
     };
@@ -433,6 +454,27 @@
       const d = new Date(raw);
       if (Number.isNaN(d.getTime())) return raw;
       return d.toLocaleString();
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  function formatTimeAgo(value) {
+    const raw = safe(value);
+    if (!raw) return "";
+    try {
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return raw;
+
+      const diff = Date.now() - d.getTime();
+      const minutes = Math.floor(diff / 60000);
+      if (minutes <= 1) return "Just now";
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+      const days = Math.floor(hours / 24);
+      if (days < 7) return `${days}d ago`;
+      return d.toLocaleDateString();
     } catch (_) {
       return raw;
     }
@@ -586,24 +628,89 @@
     scrollMessagesToBottom(false);
   }
 
+  function renderMemoryLoading() {
+    if (!els.memoryList) return;
+    els.memoryList.innerHTML = `
+      <div class="nova-memory-loading">
+        <div class="nova-memory-skeleton"></div>
+        <div class="nova-memory-skeleton"></div>
+        <div class="nova-memory-skeleton"></div>
+      </div>
+    `;
+  }
+
+  function renderMemoryEmpty() {
+    if (!els.memoryList) return;
+    els.memoryList.innerHTML = `
+      <div class="nova-memory-empty">
+        <div class="nova-memory-empty-inner">
+          <div class="nova-memory-empty-icon">🧠</div>
+          <div class="nova-memory-empty-title">No memory yet</div>
+          <div class="nova-memory-empty-copy">Saved context and preferences will appear here as Nova builds memory over time.</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function memorySourceChipClass(source) {
+    const s = safe(source).toLowerCase();
+    if (s === "user") return "nova-memory-chip nova-memory-source-user";
+    if (s === "assistant") return "nova-memory-chip nova-memory-source-assistant";
+    return "nova-memory-chip";
+  }
+
+  function memoryCardHtml(item) {
+    const isActive = safe(item.id) === safe(state.activeMemoryId);
+    const chips = [];
+
+    if (item.kind) {
+      chips.push(`<span class="nova-memory-kind">${esc(item.kind)}</span>`);
+    }
+    if (item.source) {
+      chips.push(`<span class="${memorySourceChipClass(item.source)}">${esc(item.source)}</span>`);
+    }
+    if (item.session_id) {
+      chips.push(`<span class="nova-memory-chip">session</span>`);
+    }
+
+    return `
+      <article class="nova-memory-card ${isActive ? "is-active" : ""}" data-memory-id="${esc(item.id)}">
+        <div class="nova-memory-card-inner">
+          <div class="nova-memory-card-top">
+            <div class="nova-memory-card-top-left">
+              <div class="nova-memory-icon">🧠</div>
+              <div class="nova-memory-title-stack">
+                ${item.kind ? `<div class="nova-memory-kind">${esc(item.kind)}</div>` : `<div class="nova-memory-kind">note</div>`}
+              </div>
+            </div>
+            <div class="nova-memory-time" title="${esc(formatTime(item.created_at))}">${esc(formatTimeAgo(item.created_at))}</div>
+          </div>
+
+          <p class="nova-memory-text">${esc(item.text || item.title || "—")}</p>
+
+          ${chips.length ? `<div class="nova-memory-meta">${chips.join("")}</div>` : ``}
+        </div>
+      </article>
+    `;
+  }
+
   function renderMemoryPanel() {
     if (!els.memoryList) return;
 
     const items = asArray(state.memoryItems);
     if (els.memoryCountBadge) els.memoryCountBadge.textContent = String(items.length);
 
-    els.memoryList.innerHTML = items.length
-      ? items.map(function (item, index) {
-          const title = safe(item && (item.title || item.key || item.label || `Memory ${index + 1}`));
-          const text = safe(item && (item.content || item.text || item.value || item.summary || ""));
-          return `
-            <div class="nova-panel-card">
-              <div class="nova-panel-card-title">${esc(title)}</div>
-              ${text ? `<div class="nova-panel-card-text">${esc(text)}</div>` : ``}
-            </div>
-          `;
-        }).join("")
-      : `<div class="nova-panel-empty">No memory yet.</div>`;
+    if (!items.length) {
+      state.activeMemoryId = "";
+      renderMemoryEmpty();
+      return;
+    }
+
+    if (!state.activeMemoryId || !items.some(function (item) { return safe(item.id) === safe(state.activeMemoryId); })) {
+      state.activeMemoryId = safe(items[0].id);
+    }
+
+    els.memoryList.innerHTML = items.map(memoryCardHtml).join("");
   }
 
   function renderWebPanel() {
@@ -796,6 +903,10 @@
     const requestedSessionId = safe(opts && opts.sessionId) || safe(state.sessionId);
     const url = requestedSessionId ? `${API.state}?session_id=${encodeURIComponent(requestedSessionId)}` : API.state;
 
+    if (state.activePanel === "memory" && (!state.memoryItems || !state.memoryItems.length)) {
+      renderMemoryLoading();
+    }
+
     setStatus("Refreshing…", "warn");
 
     try {
@@ -841,6 +952,7 @@
       state.memoryItems = next.memoryItems;
       state.artifacts = next.artifacts;
       state.webItems = next.webItems;
+      state.activeMemoryId = "";
 
       clearDraftText(state.sessionId);
       clearPendingUploads(state.sessionId);
@@ -901,6 +1013,7 @@
       clearDraftText(id);
       clearPendingUploads(id);
       state.sessionId = nextId || "";
+      state.activeMemoryId = "";
       await refreshState({ sessionId: nextId });
       setStatus("Chat deleted.", "ok");
     } catch (e) {
@@ -1016,6 +1129,88 @@
       els.webPanelToggle.addEventListener("click", function () { setAppShellPanel("web"); });
     }
   }
+
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getRouteMeta(message) {
+  if (!message || typeof message !== "object") return null;
+
+  const raw = message.raw && typeof message.raw === "object" ? message.raw : {};
+  const metaFromRaw = raw.meta && typeof raw.meta === "object" ? raw.meta : {};
+  const metaDirect = message.meta && typeof message.meta === "object" ? message.meta : {};
+  const meta = Object.keys(metaFromRaw).length ? metaFromRaw : metaDirect;
+
+  const route = meta.route && typeof meta.route === "object" ? meta.route : null;
+  if (!route) return null;
+
+  return {
+    mode: String(route.mode || "general").trim().toLowerCase() || "general",
+    reason: String(route.reason || "").trim(),
+    matched_keywords: Array.isArray(route.matched_keywords) ? route.matched_keywords : [],
+    build: String(route.build || "").trim()
+  };
+}
+
+function titleCaseRouteMode(value) {
+  const raw = String(value || "general").trim().toLowerCase();
+  if (!raw) return "General";
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+function messageHtml(msg) {
+  const role = safe(msg.role || "assistant");
+  const attachments = asArray(msg.attachments);
+  const time = formatTime(msg.created_at);
+  const routeMetaHtml = role === "assistant" ? renderRouteMetaBadge(msg) : "";
+
+  return `
+    <article class="nova-message ${role}">
+      <div class="nova-message-inner">
+        ${attachments.length ? `<div class="nova-message-attachments">${attachments.map(attachmentHtml).join("")}</div>` : ``}
+        ${routeMetaHtml}
+        <div class="nova-message-markdown">${nl2br(msg.content || "")}</div>
+        <div class="nova-message-meta-row">
+          <div class="nova-message-time">${esc(time)}</div>
+          ${role === "assistant" ? `
+            <div class="nova-message-actions">
+              <button class="nova-subtle-btn" type="button" data-copy-message="${esc(msg.id)}">Copy</button>
+              <button class="nova-subtle-btn" type="button" data-regenerate-message="${esc(msg.id)}">Regenerate</button>
+            </div>
+          ` : ``}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderRouteMetaBadge(message) {
+  const route = getRouteMeta(message);
+  if (!route) return "";
+
+  const modeLabel = titleCaseRouteMode(route.mode);
+  const reason = route.reason ? escapeHtml(route.reason) : "No route reason saved";
+  const keywordText = route.matched_keywords.length
+    ? `<div class="nova-route-meta-keywords">${escapeHtml(route.matched_keywords.join(", "))}</div>`
+    : "";
+
+  return `
+    <div class="nova-route-meta" data-mode="${escapeHtml(route.mode)}">
+      <div class="nova-route-meta-row">
+        <span class="nova-route-meta-pill">${escapeHtml(modeLabel)}</span>
+        <span class="nova-route-meta-reason">${reason}</span>
+      </div>
+      ${keywordText}
+    </div>
+  `;
+}
+
 
   function bindDom() {
     els.appShell = qs("#novaAppShell");
@@ -1182,6 +1377,13 @@
       const regenBtn = event.target.closest("[data-regenerate-message]");
       if (regenBtn) {
         regenerateLastUserMessage();
+        return;
+      }
+
+      const memoryCard = event.target.closest("[data-memory-id]");
+      if (memoryCard) {
+        state.activeMemoryId = safe(memoryCard.getAttribute("data-memory-id"));
+        renderMemoryPanel();
       }
     });
 
