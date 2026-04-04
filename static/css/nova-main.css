@@ -1819,3 +1819,27 @@ audio {
   border-color: rgba(255,255,255,0.12);
   color: #dfe7f5;
 }
+
+
+.nova-message-markdown.is-streaming {
+  position: relative;
+}
+
+.nova-message-markdown.is-streaming::after {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.85;
+  animation: novaStreamingCursor 0.9s steps(1) infinite;
+}
+
+@keyframes novaStreamingCursor {
+  0%, 49% { opacity: 0.9; }
+  50%, 100% { opacity: 0.15; }
+}
+

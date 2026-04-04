@@ -528,7 +528,7 @@
     const time = formatTime(msg.created_at);
 
     return `
-      <article class="nova-message ${role}">
+      <article class="nova-message ${role}" data-message-id="${esc(msg.id)}" data-role="${esc(role)}">
         <div class="nova-message-inner">
           ${attachments.length ? `<div class="nova-message-attachments">${attachments.map(attachmentHtml).join("")}</div>` : ``}
           <div class="nova-message-markdown">${nl2br(msg.content || "")}</div>
@@ -625,8 +625,7 @@
     }
 
     if (els.novaEmptyState) els.novaEmptyState.classList.remove("is-visible");
-    els.messages.innerHTML = items.map(messageHtml).join("");
-    scrollMessagesToBottom(false);
+    els.messages.innerHTML = items.map(messageHtml).join("");`r`n    hydrateAssistantStreaming();`r`n    scrollMessagesToBottom(false);
   }
 
   function renderMemoryLoading() {
@@ -1200,7 +1199,7 @@ function messageHtml(msg) {
   const routeMetaHtml = role === "assistant" ? renderRouteMetaBadge(msg) : "";
 
   return `
-    <article class="nova-message ${role}">
+    <article class="nova-message ${role}" data-message-id="${esc(msg.id)}" data-role="${esc(role)}">
       <div class="nova-message-inner">
         ${attachments.length ? `<div class="nova-message-attachments">${attachments.map(attachmentHtml).join("")}</div>` : ``}
         ${routeMetaHtml}
@@ -1478,3 +1477,4 @@ function renderRouteMetaBadge(message) {
     boot();
   }
 })();
+
