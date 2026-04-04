@@ -1,14 +1,423 @@
 {
   "artifacts": [
     {
+      "id": "6e7fbcfe52",
+      "artifact_id": "6e7fbcfe52",
+      "session_id": "66ad011e",
+      "kind": "chat",
+      "title": "/web https://www.google.com",
+      "content": "The **Los Angeles Lakers’ 2024–25 regular-season record** was **50–32**, which earned them the **No. 3 seed in the Western Conference**. ([en.wikipedia.org](https://en.wikipedia.org/wiki/2024%E2%80%9325_Los_Angeles_Lakers_season?utm_source=chatgpt.com))\n\nAs of the current date (**April 4, 2026**), the **2025–26 season is still ongoing**, and official standings update frequently. I don’t have live access here.\n\nIf you want, I can also give you:\n- their **current season record** if you tell me what season you mean\n- their **all-time franchise record**\n- their **playoff record**",
+      "summary": "The **Los Angeles Lakers’ 2024–25 regular-season record** was **50–32**, which earned them the **No. 3 seed in the Western Conference**. ([en.wikipedia.org](https://en.wikipedia.org/wiki/2024%E2%80%9325_Los_Angeles_Laker",
+      "preview": "The **Los Angeles Lakers’ 2024–25 regular-season record** was **50–32**, which earned them the **No. 3 seed in the Western Conference**. ([en.wikipedia.org](https://en.wikipedia.org/wiki/2024%E2%80%9325_Los_Angeles_Laker",
+      "pinned": false,
+      "created_at": "2026-04-04T00:36:54.104257+00:00",
+      "updated_at": "2026-04-04T00:36:54.104257+00:00",
+      "meta": {
+        "message_count": 16
+      },
+      "web": null,
+      "debug": {
+        "source": "api_chat",
+        "route": "chat"
+      },
+      "extra": null,
+      "image_url": ""
+    },
+    {
+      "id": "b4de4f18d9",
+      "artifact_id": "b4de4f18d9",
+      "session_id": "66ad011e",
+      "kind": "generated_image",
+      "title": "Generated Image - gay",
+      "content": "![generated image](/api/uploads/generated_4cd21c1929fc4fc2b733e76eaf2cb736.png)\n\nGenerated from prompt: gay",
+      "summary": "Generated from prompt: gay",
+      "preview": "Generated from prompt: gay",
+      "pinned": true,
+      "created_at": "2026-04-04T00:36:10.846175+00:00",
+      "updated_at": "2026-04-04T00:36:34.184618+00:00",
+      "meta": {
+        "prompt": "gay",
+        "image_url": "/api/uploads/generated_4cd21c1929fc4fc2b733e76eaf2cb736.png",
+        "preview": "Generated from prompt: gay",
+        "summary": "Generated from prompt: gay",
+        "media": [
+          {
+            "filename": "generated_4cd21c1929fc4fc2b733e76eaf2cb736.png",
+            "mime_type": "image/png",
+            "prompt": "gay",
+            "type": "image",
+            "url": "/api/uploads/generated_4cd21c1929fc4fc2b733e76eaf2cb736.png"
+          }
+        ]
+      },
+      "web": null,
+      "debug": {
+        "source": "api_chat",
+        "route": "image",
+        "image_model": "gpt-image-1.5"
+      },
+      "extra": {
+        "image_url": "/api/uploads/generated_4cd21c1929fc4fc2b733e76eaf2cb736.png",
+        "prompt": "gay",
+        "media": [
+          {
+            "filename": "generated_4cd21c1929fc4fc2b733e76eaf2cb736.png",
+            "mime_type": "image/png",
+            "prompt": "gay",
+            "type": "image",
+            "url": "/api/uploads/generated_4cd21c1929fc4fc2b733e76eaf2cb736.png"
+          }
+        ]
+      },
+      "image_url": "/api/uploads/generated_4cd21c1929fc4fc2b733e76eaf2cb736.png"
+    },
+    {
+      "id": "12be561b44",
+      "artifact_id": "12be561b44",
+      "session_id": "e93a7337",
+      "kind": "generated_image",
+      "title": "Generated Image - car",
+      "content": "![generated image](/api/uploads/generated_bdc6cc5f5f4b4cd5b58c27a8c2e6a6c4.png)\n\nGenerated from prompt: car",
+      "summary": "Generated from prompt: car",
+      "preview": "Generated from prompt: car",
+      "pinned": false,
+      "created_at": "2026-04-04T00:35:58.369416+00:00",
+      "updated_at": "2026-04-04T00:35:58.369416+00:00",
+      "meta": {
+        "prompt": "car",
+        "image_url": "/api/uploads/generated_bdc6cc5f5f4b4cd5b58c27a8c2e6a6c4.png",
+        "preview": "Generated from prompt: car",
+        "summary": "Generated from prompt: car",
+        "media": [
+          {
+            "filename": "generated_bdc6cc5f5f4b4cd5b58c27a8c2e6a6c4.png",
+            "mime_type": "image/png",
+            "prompt": "car",
+            "type": "image",
+            "url": "/api/uploads/generated_bdc6cc5f5f4b4cd5b58c27a8c2e6a6c4.png"
+          }
+        ]
+      },
+      "web": null,
+      "debug": {
+        "source": "api_chat",
+        "route": "image",
+        "image_model": "gpt-image-1.5"
+      },
+      "extra": {
+        "image_url": "/api/uploads/generated_bdc6cc5f5f4b4cd5b58c27a8c2e6a6c4.png",
+        "prompt": "car",
+        "media": [
+          {
+            "filename": "generated_bdc6cc5f5f4b4cd5b58c27a8c2e6a6c4.png",
+            "mime_type": "image/png",
+            "prompt": "car",
+            "type": "image",
+            "url": "/api/uploads/generated_bdc6cc5f5f4b4cd5b58c27a8c2e6a6c4.png"
+          }
+        ]
+      },
+      "image_url": "/api/uploads/generated_bdc6cc5f5f4b4cd5b58c27a8c2e6a6c4.png"
+    },
+    {
+      "id": "062f52205f",
+      "artifact_id": "062f52205f",
+      "session_id": "66ad011e",
+      "kind": "chat",
+      "title": "/web https://www.google.com",
+      "content": "Yes — if Ben Shapiro has personally said **5'9\"**, that would generally be a better source for **what he claims** than third-party aggregator sites.\n\nA careful way to put it would be:\n\n- **Ben Shapiro reportedly claims to be 5'9\".**\n- **He is also commonly listed online as 5'7\".**\n- Without a verifiable measurement, the exact number is uncertain.\n\nIf you want, I can help you phrase this as:\n- a neutral fact-check\n- a concise correction\n- a source-based comparison between self-report and public listings",
+      "summary": "Yes — if Ben Shapiro has personally said **5'9\"**, that would generally be a better source for **what he claims** than third-party aggregator sites.\n\nA careful way to put it would be:\n\n- **Ben Shapiro reportedly claims t",
+      "preview": "Yes — if Ben Shapiro has personally said **5'9\"**, that would generally be a better source for **what he claims** than third-party aggregator sites.\n\nA careful way to put it would be:\n\n- **Ben Shapiro reportedly claims t",
+      "pinned": false,
+      "created_at": "2026-04-04T00:33:18.126670+00:00",
+      "updated_at": "2026-04-04T00:33:18.126670+00:00",
+      "meta": {
+        "message_count": 12
+      },
+      "web": null,
+      "debug": {
+        "source": "api_chat",
+        "route": "chat"
+      },
+      "extra": null,
+      "image_url": ""
+    },
+    {
+      "id": "db55e47360",
+      "artifact_id": "db55e47360",
+      "session_id": "66ad011e",
+      "kind": "chat",
+      "title": "/web https://www.google.com",
+      "content": "I didn’t cite a specific source in that reply. That height is a **commonly repeated figure** from public biographical sites and media references, but I should have been clearer that I wasn’t providing a verified primary source.\n\nIf you want, I can:\n- give you the **most commonly cited public sources**\n- help find a **primary/interview-based source**\n- rephrase the answer more cautiously, like: **“He is widely reported to be around 5'7\".”**",
+      "summary": "I didn’t cite a specific source in that reply. That height is a **commonly repeated figure** from public biographical sites and media references, but I should have been clearer that I wasn’t providing a verified primary",
+      "preview": "I didn’t cite a specific source in that reply. That height is a **commonly repeated figure** from public biographical sites and media references, but I should have been clearer that I wasn’t providing a verified primary",
+      "pinned": false,
+      "created_at": "2026-04-04T00:32:47.551087+00:00",
+      "updated_at": "2026-04-04T00:32:47.551087+00:00",
+      "meta": {
+        "message_count": 10
+      },
+      "web": null,
+      "debug": {
+        "source": "api_chat",
+        "route": "chat"
+      },
+      "extra": null,
+      "image_url": ""
+    },
+    {
+      "id": "95af670704",
+      "artifact_id": "95af670704",
+      "session_id": "66ad011e",
+      "kind": "chat",
+      "title": "/web https://www.google.com",
+      "content": "Ben Shapiro is commonly reported to be about **5 ft 7 in (170 cm)**.",
+      "summary": "Ben Shapiro is commonly reported to be about **5 ft 7 in (170 cm)**.",
+      "preview": "Ben Shapiro is commonly reported to be about **5 ft 7 in (170 cm)**.",
+      "pinned": false,
+      "created_at": "2026-04-04T00:32:26.707011+00:00",
+      "updated_at": "2026-04-04T00:32:26.707011+00:00",
+      "meta": {
+        "message_count": 8
+      },
+      "web": null,
+      "debug": {
+        "source": "api_chat",
+        "route": "chat"
+      },
+      "extra": null,
+      "image_url": ""
+    },
+    {
+      "id": "97fd730c4a",
+      "artifact_id": "97fd730c4a",
+      "session_id": "66ad011e",
+      "kind": "chat",
+      "title": "/web https://www.google.com",
+      "content": "I can’t generate or fetch images directly with `/image` here.\n\nIf you want, I can help in one of these ways:\n- write an image prompt for “car”\n- describe different car styles for image generation\n- help you search for car images\n- generate ASCII art of a car\n\nExample prompt:\n“Photorealistic red sports car on a coastal highway at sunset, cinematic lighting, ultra-detailed, motion blur, 4k”",
+      "summary": "I can’t generate or fetch images directly with `/image` here.\n\nIf you want, I can help in one of these ways:\n- write an image prompt for “car”\n- describe different car styles for image generation\n- help you search for ca",
+      "preview": "I can’t generate or fetch images directly with `/image` here.\n\nIf you want, I can help in one of these ways:\n- write an image prompt for “car”\n- describe different car styles for image generation\n- help you search for ca",
+      "pinned": false,
+      "created_at": "2026-04-04T00:29:53.677613+00:00",
+      "updated_at": "2026-04-04T00:29:53.677613+00:00",
+      "meta": {
+        "message_count": 6
+      },
+      "web": null,
+      "debug": {
+        "source": "api_chat",
+        "route": "chat"
+      },
+      "extra": null,
+      "image_url": ""
+    },
+    {
+      "id": "15959a6756",
+      "artifact_id": "15959a6756",
+      "session_id": "66ad011e",
+      "kind": "web",
+      "title": "Google",
+      "content": "Google",
+      "summary": "Google",
+      "preview": "Google",
+      "pinned": false,
+      "created_at": "2026-04-04T00:28:48.014873+00:00",
+      "updated_at": "2026-04-04T00:28:48.014873+00:00",
+      "meta": {
+        "summary": "",
+        "preview": "",
+        "title": "Google",
+        "source_url": "https://www.google.com/",
+        "domain": "google.com",
+        "site_name": "google.com",
+        "body": "",
+        "bullets": []
+      },
+      "web": {
+        "title": "Google",
+        "site_name": "google.com",
+        "domain": "google.com",
+        "url": "https://www.google.com/",
+        "source_url": "https://www.google.com/",
+        "description": "",
+        "summary": "",
+        "body": "",
+        "bullets": [],
+        "status_code": 200,
+        "ssl_verified": true,
+        "fetched_at": "2026-04-04T00:28:48.003749+00:00"
+      },
+      "debug": {
+        "route": "web_fetch",
+        "ssl_verified": true,
+        "status_code": 200
+      },
+      "extra": null,
+      "image_url": ""
+    },
+    {
+      "id": "2a0c6823e9",
+      "artifact_id": "2a0c6823e9",
+      "session_id": "66ad011e",
+      "kind": "chat",
+      "title": "/web https://www.google.com",
+      "content": "I can’t browse the web directly from here.\n\nIf you want, I can still help by:\n- summarizing or analyzing a page if you paste the text\n- helping you find something specific on Google\n- suggesting search queries\n- explaining what a website is for\n\nIf your `/web` command is meant to fetch a page, that tool isn’t available in this chat.",
+      "summary": "I can’t browse the web directly from here.\n\nIf you want, I can still help by:\n- summarizing or analyzing a page if you paste the text\n- helping you find something specific on Google\n- suggesting search queries\n- explaini",
+      "preview": "I can’t browse the web directly from here.\n\nIf you want, I can still help by:\n- summarizing or analyzing a page if you paste the text\n- helping you find something specific on Google\n- suggesting search queries\n- explaini",
+      "pinned": false,
+      "created_at": "2026-04-04T00:21:14.527499+00:00",
+      "updated_at": "2026-04-04T00:21:14.527499+00:00",
+      "meta": {
+        "message_count": 2
+      },
+      "web": null,
+      "debug": {
+        "source": "api_chat"
+      },
+      "extra": null,
+      "image_url": ""
+    },
+    {
+      "id": "7056cc6739",
+      "artifact_id": "7056cc6739",
+      "session_id": "4cf9f8f9",
+      "kind": "chat",
+      "title": "/web https://www.google.com",
+      "content": "I can’t open or browse websites directly from here.\n\nIf you want, I can still help by:\n- summarizing a page if you paste the text,\n- explaining what Google is,\n- helping you search for something,\n- or analyzing a URL you provide.\n\nIf you were trying to test web access, the URL you gave is:\n`https://www.google.com`",
+      "summary": "I can’t open or browse websites directly from here.\n\nIf you want, I can still help by:\n- summarizing a page if you paste the text,\n- explaining what Google is,\n- helping you search for something,\n- or analyzing a URL you",
+      "preview": "I can’t open or browse websites directly from here.\n\nIf you want, I can still help by:\n- summarizing a page if you paste the text,\n- explaining what Google is,\n- helping you search for something,\n- or analyzing a URL you",
+      "pinned": false,
+      "created_at": "2026-04-04T00:19:00.151291+00:00",
+      "updated_at": "2026-04-04T00:19:00.151291+00:00",
+      "meta": {
+        "message_count": 2
+      },
+      "web": null,
+      "debug": {
+        "source": "api_chat"
+      },
+      "extra": null,
+      "image_url": ""
+    },
+    {
+      "id": "41530e913f",
+      "artifact_id": "41530e913f",
+      "session_id": "8cbae406",
+      "kind": "chat",
+      "title": "/web https://www.google.com",
+      "content": "The user issued \"/web https://www.google.com\". Likely wants browsing or opening URL. We cannot actually browse unless tools? No tools specified. Need explain cannot access web directly and offer help with pasted content or summarize if they provide text.I can’t open websites directly from that command here.\n\nIf you want, I can still help by:\n\n- summarizing a page if you paste the text\n- answering questions about Google\n- helping you navigate or troubleshoot something on google.com\n- extracting information from a URL if web access is enabled in your environment\n\nIf you meant “please visit this site and tell me what’s there,” send me the page content or tell me what you want to know.",
+      "summary": "The user issued \"/web https://www.google.com\". Likely wants browsing or opening URL. We cannot actually browse unless tools? No tools specified. Need explain cannot access web directly and offer help with pasted content",
+      "preview": "The user issued \"/web https://www.google.com\". Likely wants browsing or opening URL. We cannot actually browse unless tools? No tools specified. Need explain cannot access web directly and offer help with pasted content",
+      "pinned": false,
+      "created_at": "2026-04-04T00:04:38.927559+00:00",
+      "updated_at": "2026-04-04T00:04:38.927559+00:00",
+      "meta": {
+        "message_count": 2
+      },
+      "web": null,
+      "debug": {
+        "source": "api_chat"
+      },
+      "extra": null,
+      "image_url": ""
+    },
+    {
+      "id": "cb05aa7bfb",
+      "artifact_id": "cb05aa7bfb",
+      "session_id": "2824aebe",
+      "kind": "chat",
+      "title": "/image iphone",
+      "content": "I can’t browse websites directly here. If you want, paste the page text or tell me what you want to know about Google, and I’ll help.",
+      "summary": "I can’t browse websites directly here. If you want, paste the page text or tell me what you want to know about Google, and I’ll help.",
+      "preview": "I can’t browse websites directly here. If you want, paste the page text or tell me what you want to know about Google, and I’ll help.",
+      "pinned": false,
+      "created_at": "2026-04-03T23:57:45.588272+00:00",
+      "updated_at": "2026-04-03T23:57:45.588272+00:00",
+      "meta": {
+        "message_count": 46
+      },
+      "web": null,
+      "debug": {
+        "source": "api_chat"
+      },
+      "extra": null,
+      "image_url": ""
+    },
+    {
+      "id": "a42c9e221f",
+      "artifact_id": "a42c9e221f",
+      "session_id": "2824aebe",
+      "kind": "chat",
+      "title": "/image iphone",
+      "content": "Nice to meet you again, Richard.",
+      "summary": "Nice to meet you again, Richard.",
+      "preview": "Nice to meet you again, Richard.",
+      "pinned": false,
+      "created_at": "2026-04-03T23:43:57.135641+00:00",
+      "updated_at": "2026-04-03T23:43:57.135641+00:00",
+      "meta": {
+        "message_count": 44
+      },
+      "web": null,
+      "debug": {
+        "source": "api_chat"
+      },
+      "extra": null,
+      "image_url": ""
+    },
+    {
+      "id": "5009d0eeee",
+      "artifact_id": "5009d0eeee",
+      "session_id": "2824aebe",
+      "kind": "chat",
+      "title": "/image iphone",
+      "content": "/uploads/e4ca0bc7a7c4474bbf5150859356675a.png",
+      "summary": "/uploads/e4ca0bc7a7c4474bbf5150859356675a.png",
+      "preview": "/uploads/e4ca0bc7a7c4474bbf5150859356675a.png",
+      "pinned": false,
+      "created_at": "2026-04-03T23:42:07.941765+00:00",
+      "updated_at": "2026-04-03T23:42:07.941765+00:00",
+      "meta": {
+        "message_count": 42
+      },
+      "web": null,
+      "debug": {
+        "source": "api_chat"
+      },
+      "extra": null,
+      "image_url": ""
+    },
+    {
+      "id": "899f941d04",
+      "artifact_id": "899f941d04",
+      "session_id": "2824aebe",
+      "kind": "chat",
+      "title": "/image iphone",
+      "content": "Hi Richard!",
+      "summary": "Hi Richard!",
+      "preview": "Hi Richard!",
+      "pinned": false,
+      "created_at": "2026-04-03T23:38:03.536263+00:00",
+      "updated_at": "2026-04-03T23:38:03.536263+00:00",
+      "meta": {
+        "message_count": 40
+      },
+      "web": null,
+      "debug": {
+        "source": "api_chat"
+      },
+      "extra": null,
+      "image_url": ""
+    },
+    {
       "id": "e6546580bf",
       "artifact_id": "e6546580bf",
       "session_id": "2824aebe",
       "kind": "chat",
       "title": "/image iphone",
       "content": "That’s a website URL: **www.google.com**\n\nIf you want, I can help you:\n- format it properly: **https://www.google.com**\n- explain what it is\n- show how to open it\n- extract the domain from a URL\n- turn plain text into a clickable link in HTML/Markdown\n\nIf your goal was to have me visit it, I can’t open websites from this chat unless web access is enabled.",
-      "summary": "That’s a website URL: **www.google.com**\n\nIf you want, I can help you:\n- format it properly: **https://www.google.com**\n- explain what it is\n- show how to open it\n- extract the domain from a URL\n- turn plain text into a ",
-      "preview": "That’s a website URL: **www.google.com**\n\nIf you want, I can help you:\n- format it properly: **https://www.google.com**\n- explain what it is\n- show how to open it\n- extract the domain from a URL\n- turn plain text into a ",
+      "summary": "That’s a website URL: **www.google.com**\n\nIf you want, I can help you:\n- format it properly: **https://www.google.com**\n- explain what it is\n- show how to open it\n- extract the domain from a URL\n- turn plain text into a",
+      "preview": "That’s a website URL: **www.google.com**\n\nIf you want, I can help you:\n- format it properly: **https://www.google.com**\n- explain what it is\n- show how to open it\n- extract the domain from a URL\n- turn plain text into a",
       "pinned": false,
       "created_at": "2026-04-03T22:36:35.630663+00:00",
       "updated_at": "2026-04-03T22:36:35.630663+00:00",
@@ -19,7 +428,8 @@
       "debug": {
         "source": "api_chat"
       },
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "469be94fda",
@@ -40,7 +450,8 @@
       "debug": {
         "source": "api_chat"
       },
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "6ed689241e",
@@ -61,7 +472,8 @@
       "debug": {
         "source": "api_chat"
       },
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "d09106a5-0486-436d-91f2-8355634e78fc",
@@ -80,7 +492,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "270ad965-7725-4cab-be3b-fe9d52e55d4a",
@@ -99,7 +512,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "df1be1c8-d625-4040-9543-34058a2e985c",
@@ -118,7 +532,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "864ea431-ec12-46e1-8e97-97a9bb8a5abf",
@@ -137,7 +552,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_e4763586c53cf53c",
@@ -161,7 +577,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_b5fcd2aa39e51396",
@@ -185,7 +602,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_37d9ffe8a9915e0d",
@@ -209,7 +627,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_9000fdeb7db5ec61",
@@ -233,7 +652,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_cde2070c161cdb4f",
@@ -257,7 +677,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_9e80110fc3d6b9aa",
@@ -281,7 +702,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_febb4ec57582253b",
@@ -305,7 +727,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_dfc35f806c4937d3",
@@ -329,7 +752,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_91e3a1f06b9fa57c",
@@ -353,7 +777,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_9800a170e585b3fa",
@@ -377,7 +802,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_82d5f42bcec607c2",
@@ -401,7 +827,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_642d186ae3b2dca2",
@@ -425,7 +852,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_bb86ff6b7593ab9a",
@@ -449,7 +877,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_746679bf293a8769",
@@ -473,7 +902,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_c4d74278be18864c",
@@ -497,7 +927,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_cc9bfb9bd63076ec",
@@ -517,7 +948,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_f936d8ab4fb65907",
@@ -541,7 +973,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_f5c4fbf16e0034f6",
@@ -565,7 +998,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_f3abc13fe6e1d74a",
@@ -585,7 +1019,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_e6ecf728965424cb",
@@ -609,7 +1044,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_79d7732454967502",
@@ -633,7 +1069,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_ca7240c4210c2527",
@@ -653,7 +1090,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_b0a6efe58137b599",
@@ -673,7 +1111,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_8106cfda6ed332b5",
@@ -697,7 +1136,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_de39ead023234efe",
@@ -721,7 +1161,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_1c9ecc84fe1d1dfc",
@@ -745,7 +1186,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_0a7a32ffdc132e8d",
@@ -769,7 +1211,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_2a89aad20adf65ab",
@@ -793,7 +1236,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_1412848ed2ec3b2d",
@@ -817,7 +1261,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_ef24bdec41bafa26",
@@ -841,7 +1286,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_9065545dfad0ee79",
@@ -865,7 +1311,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_ce9e128c35e7eacf",
@@ -889,7 +1336,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_54dcb34a8e6eaf51",
@@ -909,7 +1357,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_36a4255bb98269c8",
@@ -933,7 +1382,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_9df3b085e8805276",
@@ -957,7 +1407,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_521656d6fa2f45cd",
@@ -981,7 +1432,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_e330ba26a223",
@@ -1002,7 +1454,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "artifact_66ebe18d3859",
@@ -1024,7 +1477,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "b9bfe2ba108b480cb9028d88c965c19d",
@@ -1043,7 +1497,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "67fb2bfbe7f84310828580f6969b0e91",
@@ -1065,7 +1520,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "6d9f71a5f95a4aaca602ad85ec2fdb24",
@@ -1084,7 +1540,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "591cbb9ade3a47f48f0c3a1e3ddc472e",
@@ -1106,7 +1563,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "acb74158370c437eabce4b5c8ee9367c",
@@ -1125,7 +1583,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "3cc584286fb048ef92b6a9b5f3249854",
@@ -1147,7 +1606,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "1dff1ccb51dc4de39156678b4411dc59",
@@ -1166,7 +1626,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "9b816d32f8154ab1a2fcd2df65f7b7e8",
@@ -1185,7 +1646,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "cad1210ab8a6457dbe0873cb5847b3f0",
@@ -1204,7 +1666,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "6fac67ca-a877-4a6e-9189-2418b3f424a2",
@@ -1236,7 +1699,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "93d6a7f2-3c16-42cf-aedf-aaa300ece54a",
@@ -1264,7 +1728,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "d837c45b-7c4b-4372-af3c-d5ca8e49ff25",
@@ -1292,7 +1757,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "600b76b9-7ec3-4837-bafb-4e1293e982f4",
@@ -1320,7 +1786,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "3cc238e3-1df7-400d-9959-e55dfdbf5079",
@@ -1348,7 +1815,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "6b98b99a-77a3-4542-9470-14a86bb3f3e1",
@@ -1376,7 +1844,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "1eef51fd-83fa-444c-8156-f654ab8a42bf",
@@ -1404,7 +1873,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "6452fb6d-dd0b-4730-89ca-b5988bfdea24",
@@ -1432,7 +1902,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "f3c1f99b-606d-430c-966b-6ae57f874bbe",
@@ -1460,7 +1931,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "5e2edf71-03d8-4e22-ae12-b8f8916afbad",
@@ -1488,7 +1960,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "30d27045-690b-4be1-8b60-8c5deaaedf3e",
@@ -1516,7 +1989,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "4ece18db-7c04-4477-be77-8e93228e7eef",
@@ -1544,7 +2018,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "77ab5b0c-a64e-47dc-a17f-a35b2a9fe277",
@@ -1572,7 +2047,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "72a6790d-aea5-4b48-bed2-d73700ec1b7d",
@@ -1600,7 +2076,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "68c43409-28f5-4816-8a98-6f2f5163f907",
@@ -1628,7 +2105,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "053f7ab5-83ed-4684-a4ca-9d3caf082449",
@@ -1656,7 +2134,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "66e2f021-7f40-4691-b2b0-da862f44cbcd",
@@ -1699,7 +2178,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": "/api/uploads/generated_11cdb13857024e3280e7b21a7c707d86.png"
     },
     {
       "id": "b39bd689-8186-4e9e-9081-4a280a5599ec",
@@ -1734,7 +2214,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "48e2642c-79c8-4743-a1e5-2bd1a892f811",
@@ -1762,7 +2243,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "8befd37b-a130-4f94-9cec-989c528fe2ee",
@@ -1790,7 +2272,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "eaa3c493-2727-469c-81d9-796b83751922",
@@ -1818,7 +2301,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "68a71490-4092-40cb-b5f9-b164bd8ad447",
@@ -1853,7 +2337,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "c4d70c26-4007-4bc9-b181-c5b3ac5c5f79",
@@ -1881,7 +2366,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "f8db446a-81be-4598-bd4b-26bc56dc1395",
@@ -1909,7 +2395,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": ""
     },
     {
       "id": "d49e8330-7791-467d-b9d8-66c08705428d",
@@ -1946,7 +2433,8 @@
       },
       "web": null,
       "debug": null,
-      "extra": null
+      "extra": null,
+      "image_url": "/api/uploads/generated_bd29a1aee09c46519f15d7a377ee878d.png"
     }
   ]
 }
