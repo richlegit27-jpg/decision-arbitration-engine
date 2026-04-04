@@ -310,14 +310,95 @@ def save_artifacts_payload(payload: dict[str, list[dict[str, Any]]]) -> None:
     write_json(ARTIFACTS_FILE, {"artifacts": payload.get("artifacts", [])})
 
 
-def list_memory_items() -> list[dict[str, Any]]:
+def normalize_memory_item(item: Any) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        return None
+
+    memory_id = safe_str(item.get("id") or item.get("memory_id"))
+    if not memory_id:
+        memory_id = uuid.uuid4().hex[:10]
+
+    title = safe_str(item.get("title") or item.get("key") or item.get("label"))
+    text = safe_str(item.get("content") or item.get("text") or item.get("value") or item.get("summary"))
+    kind = safe_str(item.get("kind") or item.get("type") or item.get("category") or "note").lower()
+    source = safe_str(item.get("source") or item.get("origin") or "user").lower()
+    created_at = safe_str(item.get("created_at") or item.get("updated_at") or item.get("timestamp") or now_iso())
+    updated_at = safe_str(item.get("updated_at") or created_at)
+    session_id = safe_str(item.get("session_id") or item.get("chat_id"))
+
+    if not title:
+        title = kind or "note"
+
+    return {
+        "id": memory_id,
+        "memory_id": memory_id,
+        "title": title,
+        "content": text,
+        "text": text,
+        "value": text,
+        "kind": kind or "note",
+        "source": source or "user",
+        "session_id": session_id,
+        "created_at": created_at,
+        "updated_at": updated_at,
+    }
+
+
+def load_memory_payload() -> dict[str, list[dict[str, Any]]]:
     raw = read_json(MEMORY_FILE, {"items": []})
+
     if isinstance(raw, list):
-        return []
-    if not isinstance(raw, dict):
-        return []
-    items = raw.get("items", [])
-    return items if isinstance(items, list) else []
+        items_raw = raw
+    elif isinstance(raw, dict):
+        maybe_items = raw.get("items", [])
+        items_raw = maybe_items if isinstance(maybe_items, list) else []
+    else:
+        items_raw = []
+
+    items = [m for m in (normalize_memory_item(x) for x in items_raw) if m]
+    items.sort(key=lambda m: safe_str(m.get("updated_at")), reverse=True)
+    return {"items": items}
+
+
+def save_memory_payload(payload: dict[str, list[dict[str, Any]]]) -> None:
+    write_json(MEMORY_FILE, {"items": payload.get("items", [])})
+
+
+def list_memory_items() -> list[dict[str, Any]]:
+    return load_memory_payload()["items"]
+
+
+def add_memory_item(*, title: str, text: str, kind: str = "note", source: str = "user", session_id: str = "") -> dict[str, Any]:
+    payload = load_memory_payload()
+    ts = now_iso()
+
+    item = normalize_memory_item(
+        {
+            "id": uuid.uuid4().hex[:10],
+            "title": safe_str(title) or safe_str(kind) or "note",
+            "content": safe_str(text),
+            "kind": safe_str(kind) or "note",
+            "source": safe_str(source) or "user",
+            "session_id": safe_str(session_id),
+            "created_at": ts,
+            "updated_at": ts,
+        }
+    )
+    assert item is not None
+
+    items = payload["items"]
+    items.insert(0, item)
+    save_memory_payload({"items": items})
+    return item
+
+
+def delete_memory_item(memory_id: str) -> tuple[list[dict[str, Any]], str]:
+    payload = load_memory_payload()
+    items = payload["items"]
+    next_items = [m for m in items if safe_str(m.get("id")) != safe_str(memory_id)]
+    next_memory_id = safe_str(next_items[0]["id"]) if next_items else ""
+    save_memory_payload({"items": next_items})
+    return next_items, next_memory_id
 
 
 def build_state(session_id: str = "") -> dict[str, Any]:
@@ -715,7 +796,7 @@ def api_health():
         openai_configured=bool(client),
         openai_model=OPENAI_MODEL,
         image_model=IMAGE_MODEL,
-        route_build="REAL-APP-PY-WEB-IMAGE-LOCK-2026-04-03-004",
+        route_build="REAL-APP-PY-MEMORY-MANAGER-LOCK-2026-04-03-005",
         time=now_iso(),
     )
 
@@ -803,6 +884,55 @@ def api_session_delete():
         return jsonify(payload)
     except Exception as exc:
         return _error(f"Delete failed: {exc}", status=500)
+
+
+@app.route("/api/memory/add", methods=["POST"])
+def api_memory_add():
+    ensure_storage()
+    data = request.get_json(silent=True) or {}
+
+    text = safe_str(data.get("text") or data.get("content") or data.get("value"))
+    title = safe_str(data.get("title") or data.get("key") or data.get("label"))
+    kind = safe_str(data.get("kind") or "note").lower()
+    source = safe_str(data.get("source") or "user").lower()
+    session_id = safe_str(data.get("session_id"))
+
+    if not text:
+        return _error("Missing memory text.", status=400)
+
+    try:
+        item = add_memory_item(
+            title=title or kind or "note",
+            text=text,
+            kind=kind or "note",
+            source=source or "user",
+            session_id=session_id,
+        )
+        payload = build_state(session_id=session_id)
+        payload["memory_item"] = item
+        return jsonify(payload)
+    except Exception as exc:
+        return _error(f"Memory add failed: {exc}", status=500)
+
+
+@app.route("/api/memory/delete", methods=["POST"])
+def api_memory_delete():
+    ensure_storage()
+    data = request.get_json(silent=True) or {}
+    memory_id = safe_str(data.get("memory_id") or data.get("id"))
+    session_id = safe_str(data.get("session_id"))
+
+    if not memory_id:
+        return _error("Missing memory_id.", status=400)
+
+    try:
+        items, next_memory_id = delete_memory_item(memory_id)
+        payload = build_state(session_id=session_id)
+        payload["next_memory_id"] = next_memory_id
+        payload["memory_items"] = items
+        return jsonify(payload)
+    except Exception as exc:
+        return _error(f"Memory delete failed: {exc}", status=500)
 
 
 @app.route("/api/upload", methods=["POST"])
