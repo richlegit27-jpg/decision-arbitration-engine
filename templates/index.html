@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Nova</title>
-  <link rel="stylesheet" href="/static/css/nova-main.css?v=artifact-upgrade-2026-04-03-006" />
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=route-debug-20260403-215233" />
   <style>
     .nova-message-attachments {
       display: flex;
@@ -85,7 +85,7 @@
   <div id="novaAppShell" class="nova-app-shell" data-sidebar-collapsed="false" data-rail-panel="artifacts">
     <aside id="novaSidebar" class="nova-sidebar" aria-label="Sessions">
       <div class="nova-sidebar-top">
-        <button id="sidebarToggle" class="nova-icon-btn nova-sidebar-toggle" type="button" aria-label="Toggle sidebar">☰</button>
+        <button id="sidebarToggle" class="nova-icon-btn nova-sidebar-toggle" type="button" aria-label="Toggle sidebar">â˜°</button>
 
         <div class="nova-brand">
           <div class="nova-brand-mark">N</div>
@@ -99,7 +99,7 @@
       </div>
 
       <div class="nova-sidebar-collapsed-tools">
-        <button id="newSessionMiniBtn" class="nova-icon-btn" type="button" title="New chat" aria-label="New chat">＋</button>
+        <button id="newSessionMiniBtn" class="nova-icon-btn" type="button" title="New chat" aria-label="New chat">ï¼‹</button>
         <div id="miniSessionMarkers" class="nova-mini-session-markers"></div>
       </div>
 
@@ -114,30 +114,42 @@
 
     <main class="nova-main">
       <header class="nova-topbar">
-        <div class="nova-topbar-left">
-          <div class="nova-topbar-title-wrap">
-            <div id="activeSessionTitle" class="nova-topbar-title">Nova</div>
-            <div id="activeSessionSubtitle" class="nova-topbar-subtitle">Fast local AI workspace</div>
-          </div>
-        </div>
+  <div class="nova-topbar-left">
+    <div class="nova-topbar-title-wrap">
+      <div id="activeSessionTitle" class="nova-topbar-title">Nova</div>
+      <div id="activeSessionSubtitle" class="nova-topbar-subtitle">Fast local AI workspace</div>
+    </div>
+  </div>
 
-        <div class="nova-topbar-right">
-          <div class="nova-chip-row">
-            <div class="nova-chip">
-              <span class="nova-chip-label">Model</span>
-              <span id="modelChipText" class="nova-chip-value">gpt-5.4</span>
-            </div>
-            <div class="nova-chip">
-              <span class="nova-chip-label">Mode</span>
-              <span id="composerModeChip" class="nova-chip-value">Chat</span>
-            </div>
-            <div class="nova-chip">
-              <span class="nova-chip-label">Panel</span>
-              <span id="activePanelPill" class="nova-chip-value">Artifacts</span>
-            </div>
-          </div>
-        </div>
-      </header>
+  <div class="nova-topbar-right">
+    <div class="nova-topbar-actions">
+      <button
+        id="routeDebugToggle"
+        class="nova-topbar-btn is-active"
+        type="button"
+        aria-pressed="true"
+        title="Toggle route debug"
+      >
+        Route Debug: On
+      </button>
+    </div>
+
+    <div class="nova-chip-row">
+      <div class="nova-chip">
+        <span class="nova-chip-label">Model</span>
+        <span id="modelChipText" class="nova-chip-value">gpt-5.4</span>
+      </div>
+      <div class="nova-chip">
+        <span class="nova-chip-label">Mode</span>
+        <span id="composerModeChip" class="nova-chip-value">Chat</span>
+      </div>
+      <div class="nova-chip">
+        <span class="nova-chip-label">Panel</span>
+        <span id="activePanelPill" class="nova-chip-value">Artifacts</span>
+      </div>
+    </div>
+  </div>
+</header>
 
       <section class="nova-center">
         <div id="novaEmptyState" class="nova-empty-state is-visible">
@@ -161,9 +173,9 @@
 
         <div class="nova-composer-shell">
           <div class="nova-composer-toolbar">
-            <button id="attachBtn" class="nova-icon-btn" type="button" aria-label="Attach file" title="Attach">📎</button>
-            <button id="voiceBtn" class="nova-icon-btn" type="button" aria-label="Voice" title="Voice">🎤</button>
-            <button id="clearChatBtn" class="nova-icon-btn" type="button" aria-label="Clear composer" title="Clear">⌫</button>
+            <button id="attachBtn" class="nova-icon-btn" type="button" aria-label="Attach file" title="Attach">ðŸ“Ž</button>
+            <button id="voiceBtn" class="nova-icon-btn" type="button" aria-label="Voice" title="Voice">ðŸŽ¤</button>
+            <button id="clearChatBtn" class="nova-icon-btn" type="button" aria-label="Clear composer" title="Clear">âŒ«</button>
             <div id="composerStatus" class="nova-composer-status">Ready</div>
           </div>
 
@@ -210,7 +222,7 @@
           </div>
         </div>
         <div id="artifactsMount" class="nova-panel-list">
-          <div class="nova-panel-empty">Loading artifacts…</div>
+          <div class="nova-panel-empty">Loading artifactsâ€¦</div>
         </div>
       </section>
 
@@ -242,27 +254,27 @@
       <div class="nova-debug-grid">
         <div class="nova-debug-block">
           <div class="nova-debug-label">Last action</div>
-          <pre id="debugLastAction" class="nova-debug-pre">—</pre>
+          <pre id="debugLastAction" class="nova-debug-pre">â€”</pre>
         </div>
 
         <div class="nova-debug-block">
           <div class="nova-debug-label">Status</div>
-          <pre id="debugStatusText" class="nova-debug-pre">—</pre>
+          <pre id="debugStatusText" class="nova-debug-pre">â€”</pre>
         </div>
 
         <div class="nova-debug-block">
           <div class="nova-debug-label">Last error</div>
-          <pre id="debugLastError" class="nova-debug-pre is-error">—</pre>
+          <pre id="debugLastError" class="nova-debug-pre is-error">â€”</pre>
         </div>
 
         <div class="nova-debug-block">
           <div class="nova-debug-label">Request</div>
-          <pre id="debugLastRequest" class="nova-debug-pre">—</pre>
+          <pre id="debugLastRequest" class="nova-debug-pre">â€”</pre>
         </div>
 
         <div class="nova-debug-block">
           <div class="nova-debug-label">Response</div>
-          <pre id="debugLastResponse" class="nova-debug-pre">—</pre>
+          <pre id="debugLastResponse" class="nova-debug-pre">â€”</pre>
         </div>
 
         <div class="nova-debug-block nova-debug-block-timeline">
@@ -276,7 +288,7 @@
   <input id="fileInput" type="file" multiple hidden />
 
   <script src="/static/js/nova-artifacts.js?v=artifact-upgrade-2026-04-03-006"></script>
-  <script src="/static/js/nova-composer-bundle.js?v=artifact-upgrade-2026-04-03-006"></script>
+  <script src="/static/js/nova-composer-bundle.js?v=route-debug-20260403-215233"></script>
 
   <script>
     (function () {
@@ -291,7 +303,7 @@
       }
 
       function pretty(value) {
-        if (value == null || value === "") return "—";
+        if (value == null || value === "") return "â€”";
         if (typeof value === "string") return value;
         try {
           return JSON.stringify(value, null, 2);
@@ -352,7 +364,7 @@
                 <span class="nova-debug-timeline-type">${type}</span>
                 <span class="nova-debug-timeline-at">${at}</span>
               </div>
-              <div class="nova-debug-timeline-action">${action || "—"}</div>
+              <div class="nova-debug-timeline-action">${action || "â€”"}</div>
               ${text ? `<div class="nova-debug-timeline-text">${text}</div>` : ``}
             </div>
           `;
@@ -361,11 +373,11 @@
 
       function renderDebug() {
         const dbg = window.__novaDebug || {};
-        if ($("debugLastAction")) $("debugLastAction").textContent = pretty(dbg.action || "—");
-        if ($("debugStatusText")) $("debugStatusText").textContent = pretty(dbg.statusText || "—");
-        if ($("debugLastError")) $("debugLastError").textContent = pretty(dbg.error || "—");
-        if ($("debugLastRequest")) $("debugLastRequest").textContent = pretty(dbg.request || dbg.artifactRequest || "—");
-        if ($("debugLastResponse")) $("debugLastResponse").textContent = pretty(dbg.response || dbg.artifactResponse || "—");
+        if ($("debugLastAction")) $("debugLastAction").textContent = pretty(dbg.action || "â€”");
+        if ($("debugStatusText")) $("debugStatusText").textContent = pretty(dbg.statusText || "â€”");
+        if ($("debugLastError")) $("debugLastError").textContent = pretty(dbg.error || "â€”");
+        if ($("debugLastRequest")) $("debugLastRequest").textContent = pretty(dbg.request || dbg.artifactRequest || "â€”");
+        if ($("debugLastResponse")) $("debugLastResponse").textContent = pretty(dbg.response || dbg.artifactResponse || "â€”");
         renderTimeline(dbg.timeline || []);
       }
 
@@ -414,3 +426,6 @@
   </script>
 </body>
 </html>
+
+
+

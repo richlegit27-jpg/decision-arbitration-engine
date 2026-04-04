@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const LOG = "[NovaComposerBundle]";
@@ -27,8 +27,9 @@
     pendingUploads: [],
     activePanel: "artifacts",
     lastUserMessage: null,
-    activeMemoryId: ""
-  };
+    activeMemoryId: "",
+    routeDebugVisible: true
+};
 
   const els = {};
 
@@ -485,7 +486,7 @@
     const max = typeof limit === "number" ? limit : 180;
     if (!text) return "";
     if (text.length <= max) return text;
-    return text.slice(0, max) + "…";
+    return text.slice(0, max) + "â€¦";
   }
 
   function attachmentHtml(item) {
@@ -504,7 +505,7 @@
           </a>
           <div class="nova-message-attachment-meta">
             <div class="nova-message-attachment-name">${esc(a.name)}</div>
-            ${subParts.length ? `<div class="nova-message-attachment-sub">${esc(subParts.join(" • "))}</div>` : ``}
+            ${subParts.length ? `<div class="nova-message-attachment-sub">${esc(subParts.join(" â€¢ "))}</div>` : ``}
           </div>
         </div>
       `;
@@ -512,10 +513,10 @@
 
     return `
       <a class="nova-message-attachment file" href="${esc(a.url || "#")}" target="_blank" rel="noopener noreferrer">
-        <div class="nova-message-attachment-icon">${a.kind === "video" ? "🎬" : a.kind === "audio" ? "🎧" : "📄"}</div>
+        <div class="nova-message-attachment-icon">${a.kind === "video" ? "ðŸŽ¬" : a.kind === "audio" ? "ðŸŽ§" : "ðŸ“„"}</div>
         <div class="nova-message-attachment-meta">
           <div class="nova-message-attachment-name">${esc(a.name)}</div>
-          ${subParts.length ? `<div class="nova-message-attachment-sub">${esc(subParts.join(" • "))}</div>` : ``}
+          ${subParts.length ? `<div class="nova-message-attachment-sub">${esc(subParts.join(" â€¢ "))}</div>` : ``}
         </div>
       </a>
     `;
@@ -570,7 +571,7 @@
         <button class="nova-session-main" type="button" data-session-open="${esc(session.id)}">
           <div class="nova-session-title">${esc(session.title || "New chat")}</div>
           <div class="nova-panel-card-sub">
-            ${session.pinned ? "Pinned • " : ""}${esc(formatTime(session.updated_at) || "")}
+            ${session.pinned ? "Pinned â€¢ " : ""}${esc(formatTime(session.updated_at) || "")}
           </div>
           ${session.last_message_preview ? `<div class="nova-panel-card-text">${esc(summarizeText(session.last_message_preview, 120))}</div>` : ``}
         </button>
@@ -644,7 +645,7 @@
     els.memoryList.innerHTML = `
       <div class="nova-memory-empty">
         <div class="nova-memory-empty-inner">
-          <div class="nova-memory-empty-icon">🧠</div>
+          <div class="nova-memory-empty-icon">ðŸ§ </div>
           <div class="nova-memory-empty-title">No memory yet</div>
           <div class="nova-memory-empty-copy">Saved context and preferences will appear here as Nova builds memory over time.</div>
         </div>
@@ -678,7 +679,7 @@
         <div class="nova-memory-card-inner">
           <div class="nova-memory-card-top">
             <div class="nova-memory-card-top-left">
-              <div class="nova-memory-icon">🧠</div>
+              <div class="nova-memory-icon">ðŸ§ </div>
               <div class="nova-memory-title-stack">
                 ${item.kind ? `<div class="nova-memory-kind">${esc(item.kind)}</div>` : `<div class="nova-memory-kind">note</div>`}
               </div>
@@ -686,7 +687,7 @@
             <div class="nova-memory-time" title="${esc(formatTime(item.created_at))}">${esc(formatTimeAgo(item.created_at))}</div>
           </div>
 
-          <p class="nova-memory-text">${esc(item.text || item.title || "—")}</p>
+          <p class="nova-memory-text">${esc(item.text || item.title || "â€”")}</p>
 
           ${chips.length ? `<div class="nova-memory-meta">${chips.join("")}</div>` : ``}
         </div>
@@ -753,7 +754,7 @@
       return `
         <div class="nova-attachment-chip">
           <div class="nova-attachment-chip-main">
-            <span class="nova-attachment-chip-icon">${a.kind === "image" ? "🖼️" : a.kind === "video" ? "🎬" : a.kind === "audio" ? "🎧" : "📄"}</span>
+            <span class="nova-attachment-chip-icon">${a.kind === "image" ? "ðŸ–¼ï¸" : a.kind === "video" ? "ðŸŽ¬" : a.kind === "audio" ? "ðŸŽ§" : "ðŸ“„"}</span>
             <span class="nova-attachment-chip-name">${esc(a.name)}</span>
           </div>
           <button class="nova-subtle-btn" type="button" data-remove-upload="${esc(a.id)}">Remove</button>
@@ -827,7 +828,7 @@
     if (!files.length) return;
 
     setUploading(true);
-    setStatus("Uploading…", "warn");
+    setStatus("Uploadingâ€¦", "warn");
 
     try {
       const form = new FormData();
@@ -907,7 +908,7 @@
       renderMemoryLoading();
     }
 
-    setStatus("Refreshing…", "warn");
+    setStatus("Refreshingâ€¦", "warn");
 
     try {
       const payload = await apiGet(url);
@@ -942,7 +943,7 @@
 
   async function createNewSession() {
     try {
-      setStatus("Creating chat…", "warn");
+      setStatus("Creating chatâ€¦", "warn");
       const data = await apiPost(API.newSession, {});
       const next = inferStatePayload(data);
 
@@ -974,7 +975,7 @@
     if (title == null) return;
 
     try {
-      setStatus("Renaming chat…", "warn");
+      setStatus("Renaming chatâ€¦", "warn");
       await apiPost(API.renameSession, {
         session_id: id,
         title: safe(title).trim()
@@ -991,7 +992,7 @@
     if (!id) return;
 
     try {
-      setStatus("Saving pin…", "warn");
+      setStatus("Saving pinâ€¦", "warn");
       await apiPost(API.pinSession, { session_id: id });
       await refreshState({ sessionId: state.sessionId || id });
       setStatus("Pin saved.", "ok");
@@ -1006,7 +1007,7 @@
     if (!window.confirm("Delete this chat?")) return;
 
     try {
-      setStatus("Deleting chat…", "warn");
+      setStatus("Deleting chatâ€¦", "warn");
       const data = await apiPost(API.deleteSession, { session_id: id });
       const nextId = safe(data && (data.next_session_id || data.active_session_id || ""));
 
@@ -1036,7 +1037,7 @@
     if (state.sending || state.uploading) return;
 
     setBusy(true);
-    setStatus("Sending…", "working");
+    setStatus("Sendingâ€¦", "working");
 
     try {
       const result = await apiPost(API.chat, {
@@ -1164,6 +1165,34 @@ function titleCaseRouteMode(value) {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
+function loadRouteDebugPreference() {
+  try {
+    const saved = localStorage.getItem("nova.routeDebugVisible");
+    if (saved === "0") state.routeDebugVisible = false;
+    if (saved === "1") state.routeDebugVisible = true;
+  } catch (_) {}
+}
+
+function saveRouteDebugPreference() {
+  try {
+    localStorage.setItem("nova.routeDebugVisible", state.routeDebugVisible ? "1" : "0");
+  } catch (_) {}
+}
+
+function updateRouteDebugToggleUi() {
+  if (!els.routeDebugToggle) return;
+  els.routeDebugToggle.setAttribute("aria-pressed", state.routeDebugVisible ? "true" : "false");
+  els.routeDebugToggle.classList.toggle("is-active", !!state.routeDebugVisible);
+  els.routeDebugToggle.textContent = state.routeDebugVisible ? "Route Debug: On" : "Route Debug: Off";
+}
+
+function toggleRouteDebugVisible() {
+  state.routeDebugVisible = !state.routeDebugVisible;
+  saveRouteDebugPreference();
+  updateRouteDebugToggleUi();
+  renderMessages();
+}
+
 function messageHtml(msg) {
   const role = safe(msg.role || "assistant");
   const attachments = asArray(msg.attachments);
@@ -1191,6 +1220,8 @@ function messageHtml(msg) {
 }
 
 function renderRouteMetaBadge(message) {
+  if (!state.routeDebugVisible) return "";
+
   const route = getRouteMeta(message);
   if (!route) return "";
 
@@ -1224,6 +1255,7 @@ function renderRouteMetaBadge(message) {
     els.activeSessionTitle = qs("#activeSessionTitle");
     els.activeSessionSubtitle = qs("#activeSessionSubtitle");
     els.activePanelPill = qs("#activePanelPill");
+    els.routeDebugToggle = qs("#routeDebugToggle");
 
     els.novaEmptyState = qs("#novaEmptyState");
     els.messages = qs("#messages");
@@ -1264,6 +1296,10 @@ function renderRouteMetaBadge(message) {
 
   function bindEvents() {
     bindPanelButtons();
+
+    if (els.routeDebugToggle) {
+      els.routeDebugToggle.addEventListener("click", toggleRouteDebugVisible);
+    }
 
     if (els.sidebarToggle) {
       els.sidebarToggle.addEventListener("click", toggleSidebarCollapsed);
@@ -1410,6 +1446,8 @@ function renderRouteMetaBadge(message) {
     log("boot start");
     bindDom();
     bindEvents();
+    loadRouteDebugPreference();
+    updateRouteDebugToggleUi();
     autoGrowTextarea();
     applyShellState();
     setAppShellPanel("artifacts");
