@@ -81,6 +81,30 @@
     return safe(item && (item.id || item.artifact_id || item._id || ""));
   }
 
+  function artifactRefToId(value) {
+    if (value == null) return "";
+
+    if (typeof value === "string" || typeof value === "number") {
+      return safe(value);
+    }
+
+    if (typeof value === "object") {
+      if (value.artifact_id || value.id || value._id) {
+        return safe(value.artifact_id || value.id || value._id);
+      }
+
+      if (value.artifact && typeof value.artifact === "object") {
+        return artifactId(value.artifact);
+      }
+
+      if (value.detail && typeof value.detail === "object") {
+        return artifactRefToId(value.detail);
+      }
+    }
+
+    return "";
+  }
+
   function artifactSessionId(item) {
     return safe(item && (item.session_id || item.sessionId || item.chat_session_id || ""));
   }
@@ -101,15 +125,19 @@
   }
 
   function artifactContent(item) {
-    return safe(item && (
-      item.content ||
-      item.text ||
-      item.body ||
-      item.preview ||
-      item.summary ||
-      item.description ||
-      ""
-    ));
+    const viewer = item && item.viewer && typeof item.viewer === "object" ? item.viewer : null;
+    return safe(
+      (viewer && (viewer.body || viewer.analysis_text)) ||
+      (item && (
+        item.content ||
+        item.text ||
+        item.body ||
+        item.preview ||
+        item.summary ||
+        item.description ||
+        ""
+      ))
+    );
   }
 
   function artifactPinned(item) {
@@ -121,6 +149,46 @@
     return item.meta && typeof item.meta === "object" ? item.meta : {};
   }
 
+  function artifactViewer(item) {
+    return item && item.viewer && typeof item.viewer === "object" ? item.viewer : {};
+  }
+
+  function artifactImageUrl(item) {
+    const viewer = artifactViewer(item);
+    const meta = artifactMeta(item);
+    const raw = safe(
+      viewer.image_url ||
+      item.image_url ||
+      meta.image_url ||
+      item.url ||
+      meta.url ||
+      ""
+    );
+    return normalizePossibleMediaUrl(raw);
+  }
+
+  function artifactSourceUrl(item) {
+    const viewer = artifactViewer(item);
+    const meta = artifactMeta(item);
+    return safe(
+      viewer.source_url ||
+      item.source_url ||
+      meta.source_url ||
+      item.url ||
+      meta.url ||
+      ""
+    );
+  }
+
+  function normalizePossibleMediaUrl(value) {
+    const raw = safe(value);
+    if (!raw) return "";
+    if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("/")) {
+      return raw;
+    }
+    return "/api/uploads/" + raw.replace(/^uploads[\\/]/, "");
+  }
+
   function formatTime(value) {
     const raw = safe(value);
     if (!raw) return "";
@@ -128,6 +196,27 @@
       const d = new Date(raw);
       if (Number.isNaN(d.getTime())) return raw;
       return d.toLocaleString();
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  function formatTimeAgo(value) {
+    const raw = safe(value);
+    if (!raw) return "";
+    try {
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return raw;
+
+      const diff = Date.now() - d.getTime();
+      const minutes = Math.floor(diff / 60000);
+      if (minutes <= 1) return "Just now";
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+      const days = Math.floor(hours / 24);
+      if (days < 7) return `${days}d ago`;
+      return d.toLocaleDateString();
     } catch (_) {
       return raw;
     }
@@ -146,25 +235,55 @@
     return !!text && (
       /^https?:\/\//i.test(text) ||
       text.startsWith("/uploads/") ||
+      text.startsWith("/api/uploads/") ||
       text.startsWith("uploads/")
     ) && /\.(png|jpg|jpeg|gif|webp|bmp|svg)(\?.*)?$/i.test(text);
   }
 
-  function contentHtml(text) {
-    const raw = safe(text);
-    if (!raw) {
-      return '<div class="nova-artifact-empty">No content in this artifact yet.</div>';
-    }
+  function viewerEmptyHtml() {
+    return `
+      <div class="nova-artifact-viewer-empty">
+        <div class="nova-artifact-viewer-empty-inner">
+          <div class="nova-artifact-viewer-empty-icon">◫</div>
+          <div class="nova-artifact-viewer-empty-title">Open an artifact</div>
+          <div class="nova-artifact-viewer-empty-copy">Inspect saved replies, web fetches, images, and backend meta here.</div>
+        </div>
+      </div>
+    `;
+  }
 
-    if (isImageUrl(raw)) {
+  function listEmptyHtml() {
+    return `
+      <div class="nova-artifact-empty">
+        <div class="nova-artifact-empty-inner">
+          <div class="nova-artifact-empty-icon">◫</div>
+          <div class="nova-artifact-empty-title">No artifacts found</div>
+          <div class="nova-artifact-empty-copy">Try another filter, switch chats, or generate a new result.</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function contentHtml(item) {
+    const raw = artifactContent(item);
+    const imageUrl = artifactImageUrl(item);
+    const sourceUrl = artifactSourceUrl(item);
+
+    if (imageUrl && isImageUrl(imageUrl)) {
       return `
         <div class="nova-artifact-image-wrap">
-          <img class="nova-artifact-image" src="${esc(raw)}" alt="Artifact image" />
+          <img class="nova-artifact-image" src="${esc(imageUrl)}" alt="Artifact image" />
           <div class="nova-artifact-image-actions">
-            <a class="nova-subtle-btn" href="${esc(raw)}" target="_blank" rel="noopener noreferrer">Open image</a>
+            <a class="nova-subtle-btn" href="${esc(imageUrl)}" target="_blank" rel="noopener noreferrer">Open image</a>
+            <a class="nova-subtle-btn" href="${esc(imageUrl)}" download>Download</a>
+            ${sourceUrl ? `<a class="nova-subtle-btn" href="${esc(sourceUrl)}" target="_blank" rel="noopener noreferrer">Open source</a>` : ``}
           </div>
         </div>
       `;
+    }
+
+    if (!raw) {
+      return `<div class="nova-artifact-empty">No content in this artifact yet.</div>`;
     }
 
     return `<pre class="nova-artifact-content-pre">${esc(raw)}</pre>`;
@@ -211,7 +330,7 @@
           <div id="artifactListPane" class="nova-artifact-list"></div>
         </div>
         <div id="artifactViewerPane" class="nova-artifact-viewer-pane">
-          <div class="nova-artifact-viewer-empty">Click an artifact to inspect content, meta, and debug.</div>
+          ${viewerEmptyHtml()}
         </div>
       </div>
     `;
@@ -238,19 +357,27 @@
   function cardHtml(item) {
     const id = artifactId(item);
     const active = id && id === state.activeArtifactId ? " active" : "";
+    const imageUrl = artifactImageUrl(item);
+    const previewText = artifactContent(item);
+    const sessionId = artifactSessionId(item);
+
     return `
       <button class="nova-artifact-card${active}" type="button" data-artifact-id="${esc(id)}">
         <div class="nova-artifact-card-top">
           <span class="nova-artifact-kind">${esc(artifactKind(item))}</span>
           <div class="nova-artifact-card-top-right">
             ${artifactPinned(item) ? `<span class="nova-artifact-session-chip is-pinned">Pinned</span>` : ``}
-            <span class="nova-artifact-time">${esc(formatTime(item.updated_at || item.created_at || ""))}</span>
+            <span class="nova-artifact-time" title="${esc(formatTime(item.updated_at || item.created_at || ""))}">${esc(formatTimeAgo(item.updated_at || item.created_at || ""))}</span>
           </div>
         </div>
         <div class="nova-artifact-card-title">${esc(artifactTitle(item))}</div>
-        ${artifactContent(item) ? `<div class="nova-artifact-card-preview">${esc(summarizeText(artifactContent(item), 180))}</div>` : ``}
+        ${imageUrl && isImageUrl(imageUrl)
+          ? `<div class="nova-artifact-card-preview">Image artifact ready to open.</div>`
+          : previewText
+            ? `<div class="nova-artifact-card-preview">${esc(summarizeText(previewText, 180))}</div>`
+            : ``}
         <div class="nova-artifact-card-bottom">
-          <span class="nova-artifact-session-chip">${esc(artifactSessionId(item) || "no session")}</span>
+          <span class="nova-artifact-session-chip">${esc(sessionId || "no session")}</span>
         </div>
       </button>
     `;
@@ -258,7 +385,7 @@
 
   function viewerHtml(item) {
     if (!item) {
-      return `<div class="nova-artifact-viewer-empty">Click an artifact to inspect content, meta, and debug.</div>`;
+      return viewerEmptyHtml();
     }
 
     const id = artifactId(item);
@@ -267,6 +394,7 @@
     const sessionId = artifactSessionId(item);
     const pinned = artifactPinned(item);
     const meta = artifactMeta(item);
+    const sourceUrl = artifactSourceUrl(item);
     const rawMeta = {
       id: item.id,
       kind: item.kind,
@@ -276,6 +404,7 @@
       created_at: item.created_at,
       updated_at: item.updated_at,
       meta: item.meta || {},
+      viewer: item.viewer || null,
       web: item.web || null,
       debug: item.debug || null,
       extra: item.extra || null
@@ -295,6 +424,7 @@
               ${item.created_at ? `<span>Created: ${esc(formatTime(item.created_at))}</span>` : ``}
               ${item.updated_at ? `<span>Updated: ${esc(formatTime(item.updated_at))}</span>` : ``}
               ${sessionId ? `<span>Session: ${esc(sessionId)}</span>` : ``}
+              ${sourceUrl ? `<a href="${esc(sourceUrl)}" target="_blank" rel="noopener noreferrer">Source</a>` : ``}
             </div>
           </div>
 
@@ -311,7 +441,7 @@
         <div class="nova-artifact-viewer-grid">
           <div class="nova-artifact-viewer-block nova-artifact-viewer-block-content">
             <div class="nova-artifact-viewer-block-title">Content</div>
-            <div class="nova-artifact-viewer-content">${contentHtml(artifactContent(item))}</div>
+            <div class="nova-artifact-viewer-content">${contentHtml(item)}</div>
           </div>
 
           <div class="nova-artifact-viewer-block">
@@ -349,6 +479,18 @@
     });
   }
 
+  function renderListLoading() {
+    const pane = $("artifactListPane");
+    if (!pane) return;
+    pane.innerHTML = `
+      <div class="nova-artifact-list-loading">
+        <div class="nova-artifact-skeleton"></div>
+        <div class="nova-artifact-skeleton"></div>
+        <div class="nova-artifact-skeleton"></div>
+      </div>
+    `;
+  }
+
   function renderList() {
     renderFilterSummary();
 
@@ -357,7 +499,7 @@
 
     const markup = state.filtered.length
       ? state.filtered.map(cardHtml).join("")
-      : `<div class="nova-artifact-empty">No artifacts match your filters.</div>`;
+      : listEmptyHtml();
 
     if (markup !== state.lastListMarkup) {
       pane.innerHTML = markup;
@@ -389,7 +531,14 @@
       const fresh = state.artifacts.find(function (item) {
         return artifactId(item) === state.activeArtifactId;
       });
-      if (fresh) state.activeArtifact = fresh;
+      if (fresh) {
+        state.activeArtifact = fresh;
+      }
+    }
+
+    if (!state.activeArtifact && state.artifacts.length) {
+      state.activeArtifact = state.artifacts[0];
+      state.activeArtifactId = artifactId(state.activeArtifact);
     }
 
     renderList();
@@ -423,6 +572,7 @@
     state.isLoadingList = true;
 
     if (!opts.silent) setComposerStatus("Loading artifacts…");
+    renderListLoading();
 
     try {
       const res = await fetch(API.list, { method: "GET" });
@@ -439,6 +589,13 @@
     } catch (e) {
       error("loadArtifacts failed", e);
       if (!opts.silent) setComposerStatus(safe(e.message || "Artifact load failed."));
+      state.filtered = [];
+      state.lastListMarkup = "";
+      renderList();
+      state.activeArtifact = null;
+      state.activeArtifactId = "";
+      state.lastViewerMarkup = "";
+      renderViewer();
     } finally {
       state.isLoadingList = false;
     }
@@ -446,8 +603,13 @@
 
   async function openArtifact(id, options) {
     const opts = options || {};
-    const wanted = safe(id);
-    if (!wanted) return;
+    const wanted = artifactRefToId(id);
+
+    if (!wanted) {
+      error("openArtifact received invalid id", id);
+      if (!opts.silent) setComposerStatus("Artifact open failed: invalid artifact id");
+      return;
+    }
 
     if (!opts.force && state.activeArtifactId === wanted && state.activeArtifact) {
       renderViewer();
@@ -564,6 +726,12 @@
     mount.addEventListener("click", function (event) {
       const target = event.target;
       if (!target) return;
+
+      const artifactCard = target.closest(".nova-artifact-card");
+      if (artifactCard) {
+        openArtifact(artifactCard.dataset.artifactId || artifactCard.getAttribute("data-artifact-id"));
+        return;
+      }
 
       const card = target.closest("[data-artifact-id]");
       if (card) {

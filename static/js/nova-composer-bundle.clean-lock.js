@@ -3,17 +3,16 @@
 
   const LOG = "[NovaComposerBundle]";
   const API = {
-  state: "/api/state",
-  chat: "/api/chat",
-  streamChat: "/api/chat/stream",
-  upload: "/api/upload",
-  newSession: "/api/session/new",
-  renameSession: "/api/session/rename",
-  pinSession: "/api/session/pin",
-  deleteSession: "/api/session/delete",
-  memoryCreate: "/api/memory/create",
-  memoryDelete: "/api/memory/delete"
-};
+    state: "/api/state",
+    chat: "/api/chat",
+    upload: "/api/upload",
+    newSession: "/api/session/new",
+    renameSession: "/api/session/rename",
+    pinSession: "/api/session/pin",
+    deleteSession: "/api/session/delete",
+    memoryCreate: "/api/memory/create",
+    memoryDelete: "/api/memory/delete"
+  };
 
   const state = {
     booted: false,
@@ -115,135 +114,6 @@
 
     return data;
   }
-
-function renderStreamingAssistant(text) {
-  if (!els.chatMessages) return;
-
-  let groups = groupMessages(state.messages);
-
-  let lastGroup = groups[groups.length - 1];
-
-  if (!lastGroup || lastGroup.role !== "assistant") {
-    // create temp assistant group
-    groups.push({
-      role: "assistant",
-      items: [{
-        raw: { content: text },
-        role: "assistant"
-      }],
-      hasImage: false,
-      hasRouteMeta: false
-    });
-  } else {
-    // replace last message text live
-    lastGroup.items[lastGroup.items.length - 1].raw.content = text;
-  }
-
-  els.chatMessages.innerHTML = groups.map(function (group) {
-    const role = group.role;
-
-    const parts = group.items.map(function (entry) {
-      const message = entry.raw;
-      const txt = escapeHtml(messageText(message));
-      return '<div class="nova-message-part">' + txt + '</div>';
-    }).join("");
-
-    return [
-      '<div class="nova-message ' + escapeHtml(role) + '">',
-      '  <div class="nova-message-inner">',
-      parts,
-      "  </div>",
-      "</div>"
-    ].join("");
-  }).join("");
-
-  requestAnimationFrame(function () {
-    if (els.chatScroll) {
-      els.chatScroll.scrollTop = els.chatScroll.scrollHeight;
-    }
-  });
-}
-
-function clearStreamingAssistant() {
-  // do nothing — grouping handles final render
-}
-async function streamChat(payload) {
-  const res = await fetch(API.streamChat, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  if (!res.ok || !res.body) {
-    throw new Error("Streaming failed");
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-
-  let buffer = "";
-  let full = "";
-
-  while (true) {
-    const { value, done } = await reader.read();
-    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-
-    let idx;
-    while ((idx = buffer.indexOf("\n\n")) !== -1) {
-      const chunk = buffer.slice(0, idx).trim();
-      buffer = buffer.slice(idx + 2);
-
-      if (!chunk) continue;
-
-      let event = "";
-      let dataLine = "";
-
-      chunk.split("\n").forEach(function (line) {
-        if (line.startsWith("event:")) event = line.replace("event:", "").trim();
-        if (line.startsWith("data:")) dataLine = line.replace("data:", "").trim();
-      });
-
-      if (!dataLine) continue;
-
-      const data = JSON.parse(dataLine);
-
-      if (event === "delta") {
-        full += data.text || "";
-
-        // 🔥 update state live
-        let last = state.messages[state.messages.length - 1];
-
-        if (!last || last.role !== "assistant") {
-        last = {
-        id: "stream_temp",
-        role: "assistant",
-        content: ""
-      };
-      state.messages.push(last);
-    }
-
-    last.content = full;
-
-    renderMessages(); // now uses grouping + real state
-  }
- 
-     if (event === "done") {
-       if (data && data.assistant_message) {
-         state.messages[state.messages.length - 1] = data.assistant_message;
-       }
-       return data;
-   }
-
-      if (event === "error") {
-        throw new Error(data.error || "Stream error");
-      }
-    }
-
-    if (done) break;
-  }
-
-  throw new Error("Stream ended early");
-}
 
   function normalizeMessages(messages) {
     return Array.isArray(messages) ? messages : [];
@@ -545,53 +415,6 @@ async function streamChat(payload) {
     }).join("");
   }
 
-function groupMessages(messages) {
-  const source = Array.isArray(messages) ? messages : [];
-  const groups = [];
-
-  source.forEach(function (message, index) {
-    const role = String(message.role || message.author || (index % 2 ? "assistant" : "user")).toLowerCase();
-    const text = messageText(message);
-    const routeMeta = getRouteMeta(message);
-    const imageUrl =
-      message.image_url ||
-      (message.artifact && message.artifact.image_url) ||
-      (message.viewer && message.viewer.image_url) ||
-      "";
-
-    const normalized = {
-      raw: message,
-      role: role,
-      text: text,
-      id: getMessageId(message, index),
-      routeMeta: routeMeta,
-      imageUrl: imageUrl
-    };
-
-    const prev = groups.length ? groups[groups.length - 1] : null;
-    const canMerge =
-      prev &&
-      prev.role === normalized.role &&
-      !normalized.imageUrl &&
-      !prev.hasImage &&
-      !normalized.routeMeta &&
-      !prev.hasRouteMeta;
-
-    if (canMerge) {
-      prev.items.push(normalized);
-    } else {
-      groups.push({
-        role: normalized.role,
-        items: [normalized],
-        hasImage: !!normalized.imageUrl,
-        hasRouteMeta: !!normalized.routeMeta
-      });
-    }
-  });
-
-  return groups;
-}
-
   function renderMessages() {
     if (!els.chatMessages) return;
 
@@ -605,25 +428,64 @@ function groupMessages(messages) {
       return;
     }
 
-const groups = groupMessages(state.messages);
+    els.chatMessages.innerHTML = state.messages.map(function (message, index) {
+      const role = String(message.role || message.author || (index % 2 ? "assistant" : "user")).toLowerCase();
+      const text = escapeHtml(messageText(message));
+      const id = escapeHtml(getMessageId(message, index));
+      const routeMeta = getRouteMeta(message);
+      const routeMode = routeMeta ? escapeHtml(getRouteMode(message)) : "";
+      const hasArtifact = !!(message.artifact_id || message.artifact || (message.meta && message.meta.artifact_id));
+      const hasWeb = !!(message.web_result || (message.meta && message.meta.web_result) || (routeMeta && String(getRouteMode(message)).toLowerCase() === "web"));
+      const imageUrl =
+        message.image_url ||
+        (message.artifact && message.artifact.image_url) ||
+        (message.viewer && message.viewer.image_url) ||
+        "";
 
-els.chatMessages.innerHTML = groups.map(function (group) {
-  const role = group.role;
+      const badges = [];
+      if (routeMeta && role === "assistant") {
+        badges.push(
+          '<button class="nova-badge nova-badge-route" type="button" data-open-route="' + id + '">' +
+          "Route: " + routeMode +
+          "</button>"
+        );
+      }
+      if (hasArtifact) {
+        badges.push('<span class="nova-badge nova-badge-artifact">Artifact</span>');
+      }
+      if (hasWeb) {
+        badges.push('<span class="nova-badge nova-badge-web">Web</span>');
+      }
 
-  const parts = group.items.map(function (entry) {
-    const message = entry.raw;
-    const text = escapeHtml(messageText(message));
-    return '<div class="nova-message-part">' + text + '</div>';
-  }).join("");
+      const actions = role === "assistant"
+        ? [
+            '<div class="nova-message-actions">',
+            '  <button class="nova-btn nova-btn-ghost" type="button" data-copy-message="' + id + '">Copy</button>',
+            '  <button class="nova-btn nova-btn-ghost" type="button" data-regenerate-message="' + id + '">Regenerate</button>',
+            "</div>"
+          ].join("")
+        : "";
 
-  return [
-    '<div class="nova-message ' + escapeHtml(role) + '">',
-    '  <div class="nova-message-inner">',
-    parts,
-    "  </div>",
-    "</div>"
-  ].join("");
-}).join("");
+      const imageBlock = imageUrl
+        ? [
+            '<div class="nova-artifact-image">',
+            '  <img src="' + escapeHtml(imageUrl) + '" alt="Generated image" />',
+            "</div>"
+          ].join("")
+        : "";
+
+      return [
+        '<div class="nova-message ' + escapeHtml(role) + '">',
+        '  <div class="nova-message-inner">',
+        '    <div class="nova-message-role">' + escapeHtml(role) + "</div>",
+        '    <div class="nova-message-text">' + text + "</div>",
+        imageBlock,
+        (badges.length ? '    <div class="nova-message-badges">' + badges.join("") + "</div>" : ""),
+        actions,
+        "  </div>",
+        "</div>"
+      ].join("");
+    }).join("");
 
     requestAnimationFrame(function () {
       if (els.chatScroll) {
@@ -1062,74 +924,75 @@ els.chatMessages.innerHTML = groups.map(function (group) {
   }
 
   async function sendMessage(overrideText) {
-  if (state.sending) return;
+    if (state.sending) return;
 
-  const userText = (overrideText != null ? String(overrideText) : String(els.chatInput.value || "")).trim();
-  if (!userText && !state.pendingUploads.length) return;
+    const userText = (overrideText != null ? String(overrideText) : String(els.chatInput.value || "")).trim();
+    if (!userText && !state.pendingUploads.length) return;
 
-  state.sending = true;
-  renderTopbar();
-  setComposerStatus("Sending...", false);
+    state.sending = true;
+    renderTopbar();
+    setComposerStatus("Sending...", false);
 
-  const payload = {
-    session_id: state.sessionId || "",
-    user_text: userText,
-    attachments: state.pendingUploads.map(function (item) {
-      return {
-        id: item.id || "",
-        name: item.name || "",
-        url: item.url || "",
-        mime_type: item.mime_type || ""
-      };
-    })
-  };
+    const payload = {
+      session_id: state.sessionId || "",
+      user_text: userText,
+      attachments: state.pendingUploads.map(function (item) {
+        return {
+          id: item.id || "",
+          name: item.name || "",
+          url: item.url || "",
+          mime_type: item.mime_type || ""
+        };
+      })
+    };
 
-  state.lastUserMessage = userText || null;
-
-  try {
-    let data = null;
+    state.lastUserMessage = userText || null;
 
     try {
-      data = await streamChat(payload);
-    } catch (e) {
-      warn("Streaming failed, fallback → JSON", e);
-      clearStreamingAssistant();
+      let data = null;
 
-      data = await requestJson(API.chat, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      try {
+        data = await requestJson(API.chat, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      } catch (streamingFallbackError) {
+        warn("Streaming failed, falling back to JSON chat.", streamingFallbackError);
+        data = await requestJson(API.chat, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      if (data.session && data.session.id) {
+        state.sessionId = String(data.session.id);
+      } else if (data.session_id) {
+        state.sessionId = String(data.session_id);
+      }
+
+      state.pendingUploads = [];
+      clearInput();
+      renderPendingUploads();
+
+      await refreshState({ force: true, sessionId: state.sessionId, keepStatus: true });
+
+      const latestRouteMessage = findLatestAssistantRouteMessage();
+      if (latestRouteMessage && state.activePanel === "route") {
+        state.activeRouteInspectMessageId = getMessageId(latestRouteMessage, state.messages.indexOf(latestRouteMessage));
+      }
+
+      renderRouteInspector();
+      setComposerStatus("Sent", false);
+    } catch (error) {
+      err("sendMessage failed", error);
+      setComposerStatus(error.message || "Send failed", true);
+    } finally {
+      state.sending = false;
+      renderTopbar();
     }
-
-    if (data.session && data.session.id) {
-      state.sessionId = String(data.session.id);
-    } else if (data.session_id) {
-      state.sessionId = String(data.session_id);
-    }
-
-    state.pendingUploads = [];
-    clearInput();
-    renderPendingUploads();
-
-    await refreshState({ force: true, sessionId: state.sessionId, keepStatus: true });
-
-    const latestRouteMessage = findLatestAssistantRouteMessage();
-    if (latestRouteMessage && state.activePanel === "route") {
-      state.activeRouteInspectMessageId = getMessageId(latestRouteMessage, state.messages.indexOf(latestRouteMessage));
-    }
-
-    renderRouteInspector();
-    setComposerStatus("Sent", false);
-  } catch (error) {
-    err("sendMessage failed", error);
-    clearStreamingAssistant();
-    setComposerStatus(error.message || "Send failed", true);
-  } finally {
-    state.sending = false;
-    renderTopbar();
   }
-}
 
   async function regenerateFromMessage(messageId) {
     const message = findMessageById(messageId);
@@ -1451,6 +1314,4 @@ els.chatMessages.innerHTML = groups.map(function (group) {
   }
 
   document.addEventListener("DOMContentLoaded", boot);
-
 })();
-

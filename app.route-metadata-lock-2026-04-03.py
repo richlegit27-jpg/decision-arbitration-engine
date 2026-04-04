@@ -1,4 +1,4 @@
-﻿import base64
+import base64
 import json
 import mimetypes
 import os
@@ -11,7 +11,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import requests
-from flask import Flask, jsonify, render_template, request, send_from_directory, Response
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
 try:
     from bs4 import BeautifulSoup
@@ -483,185 +483,6 @@ def add_artifact(
     save_artifacts_payload({"artifacts": items})
     return artifact
 
-
-
-ROUTE_INTELLIGENCE_BUILD = "route-intelligence-2026-04-03-001"
-
-def _route_meta(route: str, mode: str, reason: str, matched_keywords: list[str] | None = None) -> dict[str, Any]:
-    return {
-        "route": safe_str(route) or "chat",
-        "mode": safe_str(mode) or "general",
-        "reason": safe_str(reason),
-        "matched_keywords": matched_keywords or [],
-        "build": ROUTE_INTELLIGENCE_BUILD,
-    }
-
-
-def route_request(content: str, attachments: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    text = safe_str(content)
-    lowered = text.lower()
-    matched: list[str] = []
-    attachments = attachments or []
-
-    explicit_web = lowered.startswith("/web ")
-    explicit_image = lowered.startswith("/image ")
-    detected_url = extract_first_url(text)
-
-    if explicit_web or detected_url:
-        reason = "Explicit /web command." if explicit_web else "Detected URL in request."
-        if explicit_web:
-            matched.append("/web")
-        if detected_url:
-            matched.append("url")
-        return _route_meta("web", "analysis", reason, matched)
-
-    if explicit_image:
-        return _route_meta("image", "writing", "Explicit /image command.", ["/image"])
-
-    coding_keywords = [
-        "python", "javascript", "js", "typescript", "ts", "flask", "fastapi", "react",
-        "bug", "debug", "fix", "error", "traceback", "exception", "stack", "route",
-        "api", "json", "regex", "function", "class", "refactor", "patch", "code",
-        "app.py", "index.html", "css", "html"
-    ]
-    planning_keywords = [
-        "plan", "roadmap", "phase", "next", "architecture", "design", "strategy",
-        "system", "workflow", "build order", "milestone", "checkpoint"
-    ]
-    writing_keywords = [
-        "write", "rewrite", "polish", "improve wording", "email", "post", "caption",
-        "copy", "bio", "story", "book"
-    ]
-    analysis_keywords = [
-        "analyze", "compare", "why", "reason", "explain", "inspect", "evaluate",
-        "review", "break down", "thought process"
-    ]
-
-    def _hits(keywords: list[str]) -> list[str]:
-        found: list[str] = []
-        for keyword in keywords:
-            if keyword in lowered:
-                found.append(keyword)
-        return found
-
-    coding_hits = _hits(coding_keywords)
-    planning_hits = _hits(planning_keywords)
-    writing_hits = _hits(writing_keywords)
-    analysis_hits = _hits(analysis_keywords)
-
-    if coding_hits:
-        matched.extend(coding_hits[:6])
-        return _route_meta("chat", "coding", "Matched coding/debug request keywords.", matched[:6])
-
-    if planning_hits:
-        matched.extend(planning_hits[:6])
-        return _route_meta("chat", "planning", "Matched planning/architecture request keywords.", matched[:6])
-
-    if writing_hits:
-        matched.extend(writing_hits[:6])
-        return _route_meta("chat", "writing", "Matched writing/polish request keywords.", matched[:6])
-
-    if analysis_hits:
-        matched.extend(analysis_hits[:6])
-        return _route_meta("chat", "analysis", "Matched analysis/explanation request keywords.", matched[:6])
-
-    if attachments:
-        attachment_names = [
-            safe_str(a.get("name") or a.get("filename") or "")
-            for a in attachments
-            if isinstance(a, dict)
-        ]
-        attachment_names = [x for x in attachment_names if x]
-        if attachment_names:
-            return _route_meta("chat", "analysis", "Attachments detected; favoring analysis mode.", attachment_names[:4])
-
-    return _route_meta("chat", "general", "Default conversational route.", [])
-
-
-def get_relevant_memory_lines(session_id: str = "", limit: int = 6) -> list[str]:
-    lines: list[str] = []
-    for item in list_memory_items():
-        text = safe_str(item.get("text") or item.get("content") or item.get("value"))
-        if not text:
-            continue
-        item_session_id = safe_str(item.get("session_id"))
-        if session_id and item_session_id and item_session_id != safe_str(session_id):
-            continue
-        lines.append(f"- {text}")
-        if len(lines) >= limit:
-            break
-    return lines
-
-
-def build_mode_instructions(route_meta: dict[str, Any]) -> str:
-    mode = safe_str(route_meta.get("mode") or "general").lower()
-
-    if mode == "coding":
-        return (
-            "You are Nova in coding mode. Be direct, technical, and solution-first. "
-            "Prioritize concrete fixes, implementation details, and debugging clarity."
-        )
-    if mode == "planning":
-        return (
-            "You are Nova in planning mode. Organize the response into the best next moves, "
-            "phases, priorities, and tradeoffs. Keep it practical."
-        )
-    if mode == "writing":
-        return (
-            "You are Nova in writing mode. Improve clarity, tone, and structure while keeping the user's intent."
-        )
-    if mode == "analysis":
-        return (
-            "You are Nova in analysis mode. Explain the reasoning clearly, compare options, and make the answer easy to follow."
-        )
-
-    return (
-        "You are Nova in general mode. Be helpful, concise, and practical."
-    )
-
-
-def build_model_messages(
-    *,
-    session: dict[str, Any],
-    content: str,
-    attachments: list[dict[str, Any]] | None,
-    route_meta: dict[str, Any],
-    session_id: str = "",
-) -> list[dict[str, str]]:
-    model_messages: list[dict[str, str]] = []
-
-    memory_lines = get_relevant_memory_lines(session_id=session_id, limit=6)
-    system_parts = [build_mode_instructions(route_meta)]
-
-    if memory_lines:
-        system_parts.append("Relevant memory:\n" + "\n".join(memory_lines))
-
-    model_messages.append(
-        {
-            "role": "system",
-            "content": "\n\n".join(system_parts).strip(),
-        }
-    )
-
-    for msg in session.get("messages", [])[-12:]:
-        role = safe_str(msg.get("role") or "user")
-        content_text = safe_str(msg.get("content"))
-        if content_text:
-            model_messages.append({"role": role, "content": content_text})
-
-    if attachments:
-        model_messages.append(
-            {
-                "role": "user",
-                "content": "Attached files:\n" + "\n".join(
-                    f"- {safe_str(a.get('name') or a.get('filename') or 'attachment')}"
-                    for a in attachments
-                    if isinstance(a, dict)
-                ),
-            }
-        )
-
-    return model_messages
 
 def call_model(messages: list[dict[str, str]]) -> str:
     if not client:
@@ -1160,104 +981,23 @@ def api_upload():
     except Exception as exc:
         return _error(f"Upload failed: {exc}", status=500)
 
-def sse_pack(event: str, data: dict[str, Any]) -> str:
-    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 @app.route("/api/uploads/<path:filename>", methods=["GET"])
 def api_uploads(filename: str):
     return send_from_directory(str(UPLOADS_DIR), filename)
 
+
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
-    try:
-        payload = request.get_json(silent=True) or {}
+    ensure_storage()
+    data = request.get_json(silent=True) or {}
 
-        # ✅ normalize ALL frontend formats
-        content = (
-            safe_str(payload.get("content"))
-            or safe_str(payload.get("message"))
-            or safe_str(payload.get("user_text"))
-            or safe_str(payload.get("text"))
-        )
+    content = safe_str(data.get("content") or data.get("message") or data.get("text"))
+    session_id = safe_str(data.get("session_id"))
+    attachments = data.get("attachments") if isinstance(data.get("attachments"), list) else []
 
-        session_id = safe_str(payload.get("session_id") or payload.get("sessionId"))
-        attachments = payload.get("attachments") if isinstance(payload.get("attachments"), list) else []
-        route_meta = payload.get("route_meta") or payload.get("routeMeta") or {}
-
-        if not content and not attachments:
-            return _error("Missing content.", status=400)
-
-        ensure_storage()
-
-        # get or create session
-        session = get_session(session_id)
-        if not session:
-            session = create_session()
-            session_id = session["id"]
-
-        # add user message
-        user_msg = {
-            "id": uuid.uuid4().hex[:8],
-            "role": "user",
-            "content": content,
-            "created_at": now_iso(),
-            "attachments": attachments,
-        }
-        session["messages"].append(user_msg)
-
-        # route (fallback if not passed)
-        if not route_meta:
-            route_meta = route_request(content, attachments)
-
-        # build model input
-        model_messages = build_model_messages(
-            session=session,
-            content=content,
-            attachments=attachments,
-            route_meta=route_meta,
-            session_id=session_id,
-        )
-
-        # call model
-        reply_text = call_model(model_messages)
-
-        # add assistant message
-        assistant_msg = {
-            "id": uuid.uuid4().hex[:8],
-            "role": "assistant",
-            "content": reply_text,
-            "created_at": now_iso(),
-        }
-        session["messages"].append(assistant_msg)
-
-        # update session
-        session["updated_at"] = now_iso()
-        session["message_count"] = len(session["messages"])
-        session["last_message_preview"] = reply_text[:160]
-
-        upsert_session(session)
-
-        return jsonify({
-            "ok": True,
-            "assistant_message": assistant_msg,
-            "session": {
-                "id": session["id"],
-                "title": session["title"],
-                "messages": session["messages"],
-            },
-            "debug": {
-                "route": route_meta,
-                "content_length": len(content),
-            }
-        })
-
-    except Exception as e:
-        return jsonify({
-            "ok": False,
-            "error": str(e),
-            "assistant_message": None,
-            "session": None
-        }), 500
+    if not content and not attachments:
+        return _error("Missing content.", status=400)
 
     try:
         sessions_payload = load_sessions_payload()
@@ -1279,8 +1019,7 @@ def api_chat():
         }
         session["messages"].append(user_message)
 
-        route_meta = route_request(content, attachments)
-        route = safe_str(route_meta.get("route") or "chat")
+        route = "chat"
         stripped = content.strip()
         lowered = stripped.lower()
         explicit_web = lowered.startswith("/web ")
@@ -1444,13 +1183,24 @@ def api_chat():
             }
             return jsonify(payload)
 
-        model_messages = build_model_messages(
-            session=session,
-            content=content,
-            attachments=attachments,
-            route_meta=route_meta,
-            session_id=session_id,
-        )
+        model_messages = []
+        for msg in session["messages"][-12:]:
+            role = safe_str(msg.get("role") or "user")
+            content_text = safe_str(msg.get("content"))
+            if content_text:
+                model_messages.append({"role": role, "content": content_text})
+
+        if attachments:
+            model_messages.append(
+                {
+                    "role": "user",
+                    "content": "Attached files:\n" + "\n".join(
+                        f"- {safe_str(a.get('name') or a.get('filename') or 'attachment')}"
+                        for a in attachments
+                        if isinstance(a, dict)
+                    ),
+                }
+            )
 
         assistant_text = call_model(model_messages)
 
@@ -1479,7 +1229,7 @@ def api_chat():
             title=session["title"],
             content=assistant_text,
             meta={"message_count": session["message_count"]},
-            debug={"source": "api_chat", "route": route, "route_meta": route_meta},
+            debug={"source": "api_chat", "route": route},
         )
 
         payload = build_state(session_id=session_id)
@@ -1571,106 +1321,6 @@ def api_artifact_delete():
     except Exception as exc:
         return _error(f"Artifact delete failed: {exc}", status=500)
 
-from flask import Response, stream_with_context
-import json
-
-@app.route("/api/chat/stream", methods=["POST"])
-def api_chat_stream():
-    try:
-        payload = request.get_json(silent=True) or {}
-
-        content = (
-            safe_str(payload.get("content"))
-            or safe_str(payload.get("message"))
-            or safe_str(payload.get("user_text"))
-            or safe_str(payload.get("text"))
-        )
-
-        session_id = safe_str(payload.get("session_id") or payload.get("sessionId"))
-        attachments = payload.get("attachments") if isinstance(payload.get("attachments"), list) else []
-        route_meta = payload.get("route_meta") or payload.get("routeMeta") or {}
-
-        if not content and not attachments:
-            return _error("Missing content.", status=400)
-
-        ensure_storage()
-
-        session = get_session(session_id)
-        if not session:
-            session = create_session()
-            session_id = session["id"]
-
-        user_msg = {
-            "id": uuid.uuid4().hex[:8],
-            "role": "user",
-            "content": content,
-            "created_at": now_iso(),
-            "attachments": attachments,
-        }
-        session["messages"].append(user_msg)
-
-        if not route_meta:
-            route_meta = route_request(content, attachments)
-
-        def generate():
-            try:
-                yield sse_pack("status", {"ok": True})
-
-                model_messages = build_model_messages(
-                    session=session,
-                    content=content,
-                    attachments=attachments,
-                    route_meta=route_meta,
-                    session_id=session_id,
-                )
-
-                reply_text = call_model(model_messages)
-
-                # 🔥 chunk streaming (stable)
-                chunk_size = 80
-                for i in range(0, len(reply_text), chunk_size):
-                    yield sse_pack("delta", {"text": reply_text[i:i+chunk_size]})
-
-                assistant_msg = {
-                    "id": uuid.uuid4().hex[:8],
-                    "role": "assistant",
-                    "content": reply_text,
-                    "created_at": now_iso(),
-                }
-
-                session["messages"].append(assistant_msg)
-
-                session["updated_at"] = now_iso()
-                session["message_count"] = len(session["messages"])
-                session["last_message_preview"] = reply_text[:160]
-
-                upsert_session(session)
-
-                add_artifact(
-                    session_id=session_id,
-                    kind="chat",
-                    title=session["title"],
-                    content=reply_text,
-                )
-
-                yield sse_pack("done", {
-                    "ok": True,
-                    "assistant_message": assistant_msg,
-                    "session": {
-                        "id": session_id,
-                        "title": session["title"],
-                        "messages": session["messages"],
-                    },
-                    "route_meta": route_meta,
-                })
-
-            except Exception as e:
-                yield sse_pack("error", {"error": str(e)})
-
-        return Response(generate(), mimetype="text/event-stream")
-
-    except Exception as e:
-        return _error(str(e), status=500)
 
 if __name__ == "__main__":
     ensure_storage()
@@ -1678,4 +1328,3 @@ if __name__ == "__main__":
     port = int(os.getenv("APP_PORT") or os.getenv("NOVA_PORT") or "5001")
     debug = safe_str(os.getenv("NOVA_DEBUG", "1")).lower() not in {"0", "false", "no"}
     app.run(host=host, port=port, debug=debug)
-
