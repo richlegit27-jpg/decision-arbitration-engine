@@ -1,19 +1,16 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const LOG = "[NovaComposerBundle]";
   const API = {
-  state: "/api/state",
-  chat: "/api/chat",
-  streamChat: "/api/chat/stream",
-  upload: "/api/upload",
-  newSession: "/api/session/new",
-  renameSession: "/api/session/rename",
-  pinSession: "/api/session/pin",
-  deleteSession: "/api/session/delete",
-  memoryCreate: "/api/memory/create",
-  memoryDelete: "/api/memory/delete"
-};
+    state: "/api/state",
+    chat: "/api/chat",
+    upload: "/api/upload",
+    newSession: "/api/session/new",
+    renameSession: "/api/session/rename",
+    pinSession: "/api/session/pin",
+    deleteSession: "/api/session/delete"
+  };
 
   const state = {
     booted: false,
@@ -30,40 +27,34 @@
     pendingUploads: [],
     activePanel: "artifacts",
     lastUserMessage: null,
-    activeRouteInspectMessageId: "",
-    lastStatePayload: null
-  };
+    activeMemoryId: "",
+    routeDebugVisible: true
+};
 
   const els = {};
 
   function log() {
-    try {
-      console.log(LOG, ...arguments);
-    } catch (_) {}
+    try { console.log(LOG, ...arguments); } catch (_) {}
   }
 
   function warn() {
-    try {
-      console.warn(LOG, ...arguments);
-    } catch (_) {}
+    try { console.warn(LOG, ...arguments); } catch (_) {}
   }
 
   function err() {
-    try {
-      console.error(LOG, ...arguments);
-    } catch (_) {}
+    try { console.error(LOG, ...arguments); } catch (_) {}
   }
 
   function qs(selector, root) {
     return (root || document).querySelector(selector);
   }
 
-  function qsa(selector, root) {
-    return Array.from((root || document).querySelectorAll(selector));
+  function safe(value) {
+    return value == null ? "" : String(value);
   }
 
-  function escapeHtml(value) {
-    return String(value == null ? "" : value)
+  function esc(value) {
+    return safe(value)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
@@ -71,1232 +62,1294 @@
       .replace(/'/g, "&#39;");
   }
 
-  function fmtDate(value) {
+  function nl2br(value) {
+    return esc(value).replace(/\n/g, "<br>");
+  }
+
+  function asArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function nowIso() {
+    try { return new Date().toISOString(); } catch (_) { return ""; }
+  }
+
+  function shortId() {
+    return Math.random().toString(36).slice(2, 10);
+  }
+
+  function pick() {
+    for (let i = 0; i < arguments.length; i += 1) {
+      const value = arguments[i];
+      if (value != null && value !== "") return value;
+    }
+    return "";
+  }
+
+  function bytesLabel(size) {
+    const n = Number(size || 0);
+    if (!n) return "";
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(n / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  }
+
+  function isImageLike(name, mime) {
+    const n = safe(name).toLowerCase();
+    const m = safe(mime).toLowerCase();
+    return m.startsWith("image/") || /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(n);
+  }
+
+  function isVideoLike(name, mime) {
+    const n = safe(name).toLowerCase();
+    const m = safe(mime).toLowerCase();
+    return m.startsWith("video/") || /\.(mp4|webm|mov|m4v|avi|mkv)$/i.test(n);
+  }
+
+  function isAudioLike(name, mime) {
+    const n = safe(name).toLowerCase();
+    const m = safe(mime).toLowerCase();
+    return m.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(n);
+  }
+
+  function normalizeUrl(url) {
+    const value = safe(url);
     if (!value) return "";
+    if (
+      value.startsWith("http://") ||
+      value.startsWith("https://") ||
+      value.startsWith("/")
+    ) {
+      return value;
+    }
+    return `/api/uploads/${value}`;
+  }
+
+  function debugEnsure() {
     try {
-      const d = new Date(value);
-      if (Number.isNaN(d.getTime())) return String(value);
-      return d.toLocaleString();
+      if (!window.__novaDebug) {
+        window.__novaDebug = {
+          action: "",
+          request: null,
+          response: null,
+          error: "",
+          statusText: "",
+          timeline: []
+        };
+      }
+      return window.__novaDebug;
     } catch (_) {
-      return String(value);
-    }
-  }
-
-  function shortText(value, max) {
-    const s = String(value || "").trim();
-    if (!s) return "";
-    return s.length > max ? s.slice(0, max - 1) + "…" : s;
-  }
-
-  function setComposerStatus(text, isError) {
-    if (!els.composerStatus) return;
-    els.composerStatus.textContent = text || "";
-    els.composerStatus.style.color = isError ? "var(--danger)" : "";
-  }
-
-  async function requestJson(url, options) {
-    const res = await fetch(url, options || {});
-    const contentType = res.headers.get("content-type") || "";
-    let data = null;
-
-    if (contentType.includes("application/json")) {
-      data = await res.json();
-    } else {
-      const raw = await res.text();
-      data = { ok: res.ok, raw: raw };
-    }
-
-    if (!res.ok) {
-      const message =
-        (data && (data.error || data.message || data.raw)) ||
-        ("Request failed: " + res.status);
-      throw new Error(message);
-    }
-
-    return data;
-  }
-
-function renderStreamingAssistant(text) {
-  if (!els.chatMessages) return;
-
-  let groups = groupMessages(state.messages);
-
-  let lastGroup = groups[groups.length - 1];
-
-  if (!lastGroup || lastGroup.role !== "assistant") {
-    // create temp assistant group
-    groups.push({
-      role: "assistant",
-      items: [{
-        raw: { content: text },
-        role: "assistant"
-      }],
-      hasImage: false,
-      hasRouteMeta: false
-    });
-  } else {
-    // replace last message text live
-    lastGroup.items[lastGroup.items.length - 1].raw.content = text;
-  }
-
-  els.chatMessages.innerHTML = groups.map(function (group) {
-    const role = group.role;
-
-    const parts = group.items.map(function (entry) {
-      const message = entry.raw;
-      const txt = escapeHtml(messageText(message));
-      return '<div class="nova-message-part">' + txt + '</div>';
-    }).join("");
-
-    return [
-      '<div class="nova-message ' + escapeHtml(role) + '">',
-      '  <div class="nova-message-inner">',
-      parts,
-      "  </div>",
-      "</div>"
-    ].join("");
-  }).join("");
-
-  requestAnimationFrame(function () {
-    if (els.chatScroll) {
-      els.chatScroll.scrollTop = els.chatScroll.scrollHeight;
-    }
-  });
-}
-
-function clearStreamingAssistant() {
-  // do nothing — grouping handles final render
-}
-async function streamChat(payload) {
-  const res = await fetch(API.streamChat, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  if (!res.ok || !res.body) {
-    throw new Error("Streaming failed");
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-
-  let buffer = "";
-  let full = "";
-
-  while (true) {
-    const { value, done } = await reader.read();
-    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-
-    let idx;
-    while ((idx = buffer.indexOf("\n\n")) !== -1) {
-      const chunk = buffer.slice(0, idx).trim();
-      buffer = buffer.slice(idx + 2);
-
-      if (!chunk) continue;
-
-      let event = "";
-      let dataLine = "";
-
-      chunk.split("\n").forEach(function (line) {
-        if (line.startsWith("event:")) event = line.replace("event:", "").trim();
-        if (line.startsWith("data:")) dataLine = line.replace("data:", "").trim();
-      });
-
-      if (!dataLine) continue;
-
-      const data = JSON.parse(dataLine);
-
-      if (event === "delta") {
-        full += data.text || "";
-
-        // 🔥 update state live
-        let last = state.messages[state.messages.length - 1];
-
-        if (!last || last.role !== "assistant") {
-        last = {
-        id: "stream_temp",
-        role: "assistant",
-        content: ""
+      return {
+        action: "",
+        request: null,
+        response: null,
+        error: "",
+        statusText: "",
+        timeline: []
       };
-      state.messages.push(last);
     }
-
-    last.content = full;
-
-    renderMessages(); // now uses grouping + real state
   }
- 
-     if (event === "done") {
-       if (data && data.assistant_message) {
-         state.messages[state.messages.length - 1] = data.assistant_message;
-       }
-       return data;
-   }
 
-      if (event === "error") {
-        throw new Error(data.error || "Stream error");
-      }
+  function debugPush(type, action, payload) {
+    try {
+      const dbg = debugEnsure();
+      dbg.action = action || dbg.action || "";
+      if (type === "request") dbg.request = payload || null;
+      if (type === "response") dbg.response = payload || null;
+      if (type === "error") dbg.error = safe((payload && payload.message) || payload || "");
+      dbg.timeline = asArray(dbg.timeline);
+      dbg.timeline.unshift({
+        at: new Date().toLocaleTimeString(),
+        type: safe(type || "event"),
+        action: safe(action || ""),
+        text: typeof payload === "string" ? payload : "",
+        responsePreview: payload && typeof payload === "object" ? JSON.stringify(payload, null, 2).slice(0, 900) : "",
+        error: type === "error" ? safe((payload && payload.message) || payload || "") : ""
+      });
+      dbg.timeline = dbg.timeline.slice(0, 60);
+      window.__novaDebug = dbg;
+      window.dispatchEvent(new CustomEvent("nova:debug-updated"));
+    } catch (_) {}
+  }
+
+  function setStatus(text, mode) {
+    const value = safe(text);
+    if (els.composerStatus) {
+      els.composerStatus.textContent = value;
+      els.composerStatus.dataset.mode = safe(mode || "");
     }
-
-    if (done) break;
+    try {
+      const dbg = debugEnsure();
+      dbg.statusText = value;
+      window.__novaDebug = dbg;
+      window.dispatchEvent(new CustomEvent("nova:debug-updated"));
+    } catch (_) {}
   }
 
-  throw new Error("Stream ended early");
-}
-
-  function normalizeMessages(messages) {
-    return Array.isArray(messages) ? messages : [];
+  function dispatch(name, detail) {
+    try {
+      window.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
+    } catch (_) {}
   }
 
-  function normalizeSessions(sessions) {
-    return Array.isArray(sessions) ? sessions : [];
+  function setBusy(flag) {
+    state.sending = !!flag;
+    if (els.sendBtn) els.sendBtn.disabled = !!flag || state.uploading;
+    document.body.dataset.novaSending = flag ? "true" : "false";
   }
 
-  function normalizeMemory(items) {
-    return Array.isArray(items) ? items : [];
+  function setUploading(flag) {
+    state.uploading = !!flag;
+    if (els.attachBtn) els.attachBtn.disabled = !!flag;
+    if (els.sendBtn) els.sendBtn.disabled = !!flag || state.sending;
+    document.body.dataset.novaUploading = flag ? "true" : "false";
   }
 
-  function normalizeArtifacts(items) {
-    return Array.isArray(items) ? items : [];
+  function draftTextKey(sessionId) {
+    return `nova_draft_text:${safe(sessionId) || "default"}`;
   }
 
-  function normalizeWebItems(items, artifacts) {
-    if (Array.isArray(items) && items.length) return items;
-    return (Array.isArray(artifacts) ? artifacts : []).filter(function (item) {
-      const kind = String(item && (item.kind || (item.viewer && item.viewer.kind) || "")).toLowerCase();
-      return kind.includes("web");
-    });
+  function draftAttachmentsKey(sessionId) {
+    return `nova_draft_attachments:${safe(sessionId) || "default"}`;
   }
 
-  function activeSession() {
-    return state.sessions.find(function (s) {
-      return String(s.id || "") === String(state.sessionId || "");
-    }) || null;
+  function saveDraftText() {
+    try {
+      if (!els.chatInput) return;
+      localStorage.setItem(draftTextKey(state.sessionId), safe(els.chatInput.value));
+    } catch (_) {}
   }
 
-  function messageText(message) {
-    return (
-      message.content ||
-      message.text ||
-      message.body ||
-      (message.parts && Array.isArray(message.parts) ? message.parts.join("\n") : "") ||
-      ""
+  function loadDraftText() {
+    try {
+      if (!els.chatInput) return;
+      els.chatInput.value = safe(localStorage.getItem(draftTextKey(state.sessionId)));
+      autoGrowTextarea();
+    } catch (_) {}
+  }
+
+  function clearDraftText(sessionId) {
+    try { localStorage.removeItem(draftTextKey(sessionId || state.sessionId)); } catch (_) {}
+  }
+
+  function savePendingUploads() {
+    try {
+      localStorage.setItem(draftAttachmentsKey(state.sessionId), JSON.stringify(asArray(state.pendingUploads)));
+    } catch (e) {
+      warn("savePendingUploads failed", e);
+    }
+  }
+
+  function loadPendingUploads() {
+    try {
+      const raw = localStorage.getItem(draftAttachmentsKey(state.sessionId));
+      state.pendingUploads = asArray(JSON.parse(raw || "[]")).map(normalizeAttachment).filter(Boolean);
+    } catch (e) {
+      warn("loadPendingUploads failed", e);
+      state.pendingUploads = [];
+    }
+  }
+
+  function clearPendingUploads(sessionId) {
+    try { localStorage.removeItem(draftAttachmentsKey(sessionId || state.sessionId)); } catch (_) {}
+    state.pendingUploads = [];
+    renderAttachmentTray();
+  }
+
+  function normalizeAttachment(input) {
+    if (!input || typeof input !== "object") return null;
+
+    const id = pick(input.id, input.attachment_id, input.file_id, input.upload_id, shortId());
+    const name = pick(input.name, input.filename, input.original_filename, input.original_name, "attachment");
+    const storedName = pick(
+      input.stored_name,
+      input.stored_filename,
+      input.saved_as,
+      input.server_filename,
+      input.path && safe(input.path).split(/[\\/]/).pop()
     );
-  }
-
-  function getMessageId(message, index) {
-    return String(
-      (message && (message.id || message.message_id || message.uuid)) ||
-      ("msg_" + index)
+    const mime = pick(input.mime_type, input.content_type, input.mimetype, input.type);
+    const rawUrl = pick(input.url, input.file_url, input.upload_url, input.preview_url, input.src, storedName);
+    const kind = pick(
+      input.kind,
+      isImageLike(name, mime) ? "image" :
+      isVideoLike(name, mime) ? "video" :
+      isAudioLike(name, mime) ? "audio" : "file"
     );
-  }
-
-  function getRouteMeta(message) {
-    if (!message || typeof message !== "object") return null;
-
-    const directCandidates = [
-      message.route_meta,
-      message.route,
-      message.routeMeta,
-      message.meta && message.meta.route_meta,
-      message.meta && message.meta.route,
-      message.debug && message.debug.route,
-      message.debug && message.debug.route_meta,
-      message.metadata && message.metadata.route_meta,
-      message.metadata && message.metadata.route
-    ];
-
-    for (let i = 0; i < directCandidates.length; i += 1) {
-      const candidate = directCandidates[i];
-      if (candidate && typeof candidate === "object") {
-        return candidate;
-      }
-    }
-
-    const mode =
-      message.route_mode ||
-      (message.meta && message.meta.route_mode) ||
-      (message.metadata && message.metadata.route_mode);
-
-    if (!mode) return null;
 
     return {
-      mode: mode,
-      reason:
-        message.route_reason ||
-        (message.meta && message.meta.route_reason) ||
-        (message.metadata && message.metadata.route_reason) ||
-        "",
-      matched_keywords:
-        message.route_keywords ||
-        (message.meta && message.meta.route_keywords) ||
-        (message.metadata && message.metadata.route_keywords) ||
-        [],
-      build:
-        message.route_build ||
-        (message.meta && message.meta.route_build) ||
-        (message.metadata && message.metadata.route_build) ||
-        ""
+      id: safe(id),
+      name: safe(name),
+      stored_name: safe(storedName),
+      url: safe(normalizeUrl(rawUrl)),
+      preview_url: safe(normalizeUrl(pick(input.preview_url, rawUrl))),
+      mime_type: safe(mime),
+      size: Number(pick(input.size, input.file_size, input.bytes, 0)) || 0,
+      kind: safe(kind),
+      uploaded_at: safe(pick(input.uploaded_at, input.created_at, nowIso()))
     };
   }
 
-  function getRouteMode(message) {
-    const meta = getRouteMeta(message);
-    const mode = meta && (meta.mode || meta.route || meta.name);
-    return mode ? String(mode) : "";
+  function normalizeAttachmentList(value) {
+    return []
+      .concat(asArray(value))
+      .concat(asArray(value && value.files))
+      .concat(asArray(value && value.attachments))
+      .concat(asArray(value && value.uploads))
+      .map(normalizeAttachment)
+      .filter(Boolean);
   }
 
-  function getRouteReason(meta) {
-    if (!meta) return "";
-    return (
-      meta.reason ||
-      meta.why ||
-      meta.explanation ||
-      meta.route_reason ||
-      ""
-    );
+  function normalizeMessageAttachments(message) {
+    return []
+      .concat(asArray(message.attachments))
+      .concat(asArray(message.files))
+      .concat(asArray(message.uploads))
+      .concat(asArray(message.images))
+      .concat(asArray(message.media))
+      .concat(asArray(message.meta && message.meta.attachments))
+      .concat(asArray(message.debug && message.debug.attachments))
+      .map(normalizeAttachment)
+      .filter(Boolean);
   }
 
-  function getRouteKeywords(meta) {
-    if (!meta) return [];
-    const raw =
-      meta.matched_keywords ||
-      meta.keywords ||
-      meta.matched ||
-      meta.route_keywords ||
-      [];
-    if (Array.isArray(raw)) return raw.filter(Boolean).map(String);
-    if (typeof raw === "string") {
-      return raw
-        .split(",")
-        .map(function (part) { return part.trim(); })
-        .filter(Boolean);
-    }
-    return [];
+  function normalizeMessage(input) {
+    if (!input || typeof input !== "object") return null;
+    return {
+      id: safe(pick(input.id, input.message_id, shortId())),
+      role: safe(pick(input.role, input.sender, input.type, "assistant")).toLowerCase(),
+      content: safe(pick(input.content, input.text, input.message, input.body)),
+      created_at: safe(pick(input.created_at, input.timestamp, input.time, nowIso())),
+      attachments: normalizeMessageAttachments(input),
+      raw: input
+    };
   }
 
-  function getRouteBuild(meta) {
-    if (!meta) return "";
-    return String(
-      meta.build ||
-      meta.route_build ||
-      meta.router_build ||
-      meta.version ||
-      ""
-    );
+  function normalizeSession(session) {
+    if (!session || typeof session !== "object") return null;
+    return {
+      id: safe(pick(session.id, session.session_id)),
+      title: safe(pick(session.title, session.name, "New chat")),
+      pinned: !!session.pinned,
+      updated_at: safe(pick(session.updated_at, session.created_at, nowIso())),
+      message_count: Number(pick(session.message_count, 0)) || 0,
+      last_message_preview: safe(pick(session.last_message_preview, ""))
+    };
   }
 
-  function getRouteTimestamp(meta, message) {
-    return (
-      (meta && (meta.timestamp || meta.created_at || meta.time)) ||
-      message.created_at ||
-      message.timestamp ||
-      ""
-    );
+  function normalizeMemoryItem(item, index) {
+    const source = safe(pick(item && item.source, item && item.origin, "assistant")).toLowerCase();
+    const kind = safe(pick(item && item.kind, item && item.type, item && item.category, "note")).toLowerCase();
+    const text = safe(pick(item && item.content, item && item.text, item && item.value, item && item.summary, ""));
+    const title = safe(pick(item && item.title, item && item.key, item && item.label, kind || `Memory ${index + 1}`));
+    const createdAt = safe(pick(item && item.updated_at, item && item.created_at, item && item.timestamp, nowIso()));
+    const sessionId = safe(pick(item && item.session_id, item && item.chat_id, ""));
+
+    return {
+      id: safe(pick(item && item.id, item && item.memory_id, `memory-${index + 1}`)),
+      title: title,
+      text: text,
+      source: source || "assistant",
+      kind: kind || "note",
+      created_at: createdAt,
+      session_id: sessionId,
+      raw: item || {}
+    };
   }
 
-  function getRouteRaw(meta) {
-    try {
-      return JSON.stringify(meta || {}, null, 2);
-    } catch (_) {
-      return "{}";
-    }
-  }
-
-  function findMessageById(messageId) {
-    return state.messages.find(function (message, index) {
-      return getMessageId(message, index) === String(messageId || "");
+  function getActiveSession() {
+    return state.sessions.find(function (s) {
+      return s.id === state.sessionId;
     }) || null;
   }
 
-  function hasRouteMeta(message) {
-    return !!getRouteMeta(message);
-  }
+  function inferStatePayload(payload) {
+    const data = payload && typeof payload === "object" ? payload : {};
+    const sessions = asArray(data.sessions).map(normalizeSession).filter(Boolean);
 
-  function setActivePanel(panel) {
-    state.activePanel = panel || "artifacts";
+    const activeSessionId = safe(
+      pick(
+        data.active_session_id,
+        data.session_id,
+        data.current_session_id,
+        data.session && data.session.id,
+        state.sessionId,
+        sessions[0] && sessions[0].id
+      )
+    );
 
-    const titles = {
-      artifacts: ["Artifacts", "Saved outputs tied to this session"],
-      memory: ["Memory", "Saved notes and preferences"],
-      web: ["Web", "Fetched links and web results"],
-      route: ["Route Inspector", "Inspect saved routing metadata"]
-    };
-
-    const pair = titles[state.activePanel] || titles.artifacts;
-    if (els.rightRailTitle) els.rightRailTitle.textContent = pair[0];
-    if (els.rightRailSubtitle) els.rightRailSubtitle.textContent = pair[1];
-
-    qsa(".nova-rail-tab").forEach(function (tab) {
-      const isActive = tab.dataset.panel === state.activePanel;
-      tab.classList.toggle("is-active", isActive);
-    });
-
-    const panels = {
-      artifacts: els.panelArtifacts,
-      memory: els.panelMemory,
-      web: els.panelWeb,
-      route: els.panelRoute
-    };
-
-    Object.keys(panels).forEach(function (key) {
-      if (panels[key]) panels[key].classList.toggle("is-active", key === state.activePanel);
-    });
-
-    if (els.rightRail) {
-      els.rightRail.dataset.open = "true";
-      els.rightRail.style.display = "";
+    let activeSession = null;
+    if (activeSessionId) {
+      activeSession = sessions.find(function (s) { return s.id === activeSessionId; }) || null;
     }
+    if (!activeSession && sessions.length) activeSession = sessions[0];
+
+    const sessionRoot = data.session || activeSession || {};
+    const messages = []
+      .concat(asArray(sessionRoot.messages))
+      .concat(asArray(data.messages))
+      .map(normalizeMessage)
+      .filter(Boolean);
+
+    return {
+      sessions: sessions,
+      sessionId: safe(pick(activeSessionId, activeSession && activeSession.id)),
+      messages: messages,
+      memoryItems: asArray(data.memory_items || data.memory || []).map(normalizeMemoryItem).filter(Boolean),
+      artifacts: asArray(data.artifacts || []),
+      webItems: asArray(data.web_items || data.web || [])
+    };
   }
 
-  function toggleSidebar() {
-    state.sidebarCollapsed = !state.sidebarCollapsed;
-    if (!els.novaSidebar) return;
-    els.novaSidebar.dataset.collapsed = state.sidebarCollapsed ? "true" : "false";
+  async function readJson(res) {
+    try { return await res.json(); } catch (_) { return null; }
+  }
+
+  async function apiGet(url) {
+    debugPush("request", `GET ${url}`, { method: "GET", url: url });
+    const res = await fetch(url, { method: "GET" });
+    const data = await readJson(res);
+    debugPush("response", `GET ${url}`, { status: res.status, ok: res.ok, data: data });
+
+    if (!res.ok) {
+      const e = new Error(safe(data && (data.error || data.message)) || `Request failed (${res.status})`);
+      e.response = data;
+      debugPush("error", `GET ${url}`, e);
+      throw e;
+    }
+
+    return data || {};
+  }
+
+  async function apiPost(url, body) {
+    debugPush("request", `POST ${url}`, { method: "POST", url: url, body: body || {} });
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {})
+    });
+    const data = await readJson(res);
+    debugPush("response", `POST ${url}`, { status: res.status, ok: res.ok, data: data });
+
+    if (!res.ok) {
+      const e = new Error(safe(data && (data.error || data.message)) || `Request failed (${res.status})`);
+      e.response = data;
+      debugPush("error", `POST ${url}`, e);
+      throw e;
+    }
+
+    return data || {};
   }
 
   function autoGrowTextarea() {
     if (!els.chatInput) return;
     els.chatInput.style.height = "auto";
-    els.chatInput.style.height = Math.min(220, Math.max(58, els.chatInput.scrollHeight)) + "px";
+    els.chatInput.style.height = `${Math.min(els.chatInput.scrollHeight, 240)}px`;
   }
 
-  function renderAll() {
-    renderTopbar();
-    renderSessions();
-    renderMessages();
-    renderPendingUploads();
-    renderMemory();
-    renderArtifacts();
-    renderWeb();
-    renderRouteInspector();
+  function formatTime(value) {
+    const raw = safe(value);
+    if (!raw) return "";
+    try {
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return raw;
+      return d.toLocaleString();
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  function formatTimeAgo(value) {
+    const raw = safe(value);
+    if (!raw) return "";
+    try {
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return raw;
+
+      const diff = Date.now() - d.getTime();
+      const minutes = Math.floor(diff / 60000);
+      if (minutes <= 1) return "Just now";
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+      const days = Math.floor(hours / 24);
+      if (days < 7) return `${days}d ago`;
+      return d.toLocaleDateString();
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  function summarizeText(value, limit) {
+    const text = safe(value).trim();
+    const max = typeof limit === "number" ? limit : 180;
+    if (!text) return "";
+    if (text.length <= max) return text;
+    return text.slice(0, max) + "â€¦";
+  }
+
+  function attachmentHtml(item) {
+    const a = normalizeAttachment(item);
+    if (!a) return "";
+
+    const subParts = [];
+    if (a.mime_type) subParts.push(a.mime_type);
+    if (a.size) subParts.push(bytesLabel(a.size));
+
+    if (a.kind === "image") {
+      return `
+        <div class="nova-message-attachment image">
+          <a class="nova-message-attachment-image-link" href="${esc(a.url || a.preview_url)}" target="_blank" rel="noopener noreferrer">
+            <img class="nova-message-attachment-image" src="${esc(a.preview_url || a.url)}" alt="${esc(a.name)}" />
+          </a>
+          <div class="nova-message-attachment-meta">
+            <div class="nova-message-attachment-name">${esc(a.name)}</div>
+            ${subParts.length ? `<div class="nova-message-attachment-sub">${esc(subParts.join(" â€¢ "))}</div>` : ``}
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <a class="nova-message-attachment file" href="${esc(a.url || "#")}" target="_blank" rel="noopener noreferrer">
+        <div class="nova-message-attachment-icon">${a.kind === "video" ? "ðŸŽ¬" : a.kind === "audio" ? "ðŸŽ§" : "ðŸ“„"}</div>
+        <div class="nova-message-attachment-meta">
+          <div class="nova-message-attachment-name">${esc(a.name)}</div>
+          ${subParts.length ? `<div class="nova-message-attachment-sub">${esc(subParts.join(" â€¢ "))}</div>` : ``}
+        </div>
+      </a>
+    `;
+  }
+
+  function messageHtml(msg) {
+    const role = safe(msg.role || "assistant");
+    const attachments = asArray(msg.attachments);
+    const time = formatTime(msg.created_at);
+
+    return `
+      <article class="nova-message ${role}">
+        <div class="nova-message-inner">
+          ${attachments.length ? `<div class="nova-message-attachments">${attachments.map(attachmentHtml).join("")}</div>` : ``}
+          <div class="nova-message-markdown">${nl2br(msg.content || "")}</div>
+          <div class="nova-message-meta-row">
+            <div class="nova-message-time">${esc(time)}</div>
+            ${role === "assistant" ? `
+              <div class="nova-message-actions">
+                <button class="nova-subtle-btn" type="button" data-copy-message="${esc(msg.id)}">Copy</button>
+                <button class="nova-subtle-btn" type="button" data-regenerate-message="${esc(msg.id)}">Regenerate</button>
+              </div>
+            ` : ``}
+          </div>
+        </div>
+      </article>
+    `;
   }
 
   function renderTopbar() {
-    const session = activeSession();
-    const title =
-      (session && (session.title || session.name)) ||
-      "Nova";
-
-    const subtitle = session
-      ? ((session.message_count != null ? String(session.message_count) : String(state.messages.length)) + " messages")
-      : "Fast local AI workspace";
-
-    if (els.sessionTitle) els.sessionTitle.textContent = title;
-    if (els.sessionSubtitle) els.sessionSubtitle.textContent = subtitle;
-
-    const model =
-      (state.lastStatePayload && (state.lastStatePayload.chat_model || state.lastStatePayload.openai_model || state.lastStatePayload.model)) ||
-      "gpt-5.4";
-    if (els.modelChip) els.modelChip.textContent = model;
-
-    if (els.statusChip) {
-      els.statusChip.textContent = state.sending
-        ? "Sending"
-        : state.uploading
-          ? "Uploading"
-          : "Ready";
+    const active = getActiveSession();
+    if (els.activeSessionTitle) {
+      els.activeSessionTitle.textContent = safe(active && active.title) || "Nova";
     }
+    if (els.activeSessionSubtitle) {
+      els.activeSessionSubtitle.textContent = active
+        ? `${safe(active.message_count || state.messages.length)} message${Number(active.message_count || state.messages.length) === 1 ? "" : "s"}`
+        : "Fast local AI workspace";
+    }
+    if (els.activePanelPill) {
+      const name = state.activePanel === "memory" ? "Memory" : state.activePanel === "web" ? "Web" : "Artifacts";
+      els.activePanelPill.textContent = name;
+    }
+  }
+
+  function renderSessionCard(session) {
+    const isActive = safe(session.id) === safe(state.sessionId);
+    const pinText = session.pinned ? "Unpin" : "Pin";
+
+    return `
+      <div class="nova-session-item ${isActive ? "is-active" : ""}">
+        <button class="nova-session-main" type="button" data-session-open="${esc(session.id)}">
+          <div class="nova-session-title">${esc(session.title || "New chat")}</div>
+          <div class="nova-panel-card-sub">
+            ${session.pinned ? "Pinned â€¢ " : ""}${esc(formatTime(session.updated_at) || "")}
+          </div>
+          ${session.last_message_preview ? `<div class="nova-panel-card-text">${esc(summarizeText(session.last_message_preview, 120))}</div>` : ``}
+        </button>
+        <div class="nova-session-actions">
+          <button class="nova-subtle-btn" type="button" data-session-rename="${esc(session.id)}">Rename</button>
+          <button class="nova-subtle-btn" type="button" data-session-pin="${esc(session.id)}">${esc(pinText)}</button>
+          <button class="nova-subtle-btn danger" type="button" data-session-delete="${esc(session.id)}">Delete</button>
+        </div>
+      </div>
+    `;
   }
 
   function renderSessions() {
-    if (!els.sessionList) return;
+    const items = asArray(state.sessions).slice().sort(function (a, b) {
+      if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+      return safe(b.updated_at).localeCompare(safe(a.updated_at));
+    });
 
-    if (!state.sessions.length) {
-      els.sessionList.innerHTML = [
-        '<div class="nova-empty-state">',
-        '  <div class="nova-empty-title">No sessions yet</div>',
-        '  <div class="nova-empty-text">Start a new chat to create your first session.</div>',
-        '</div>'
-      ].join("");
-      if (els.sessionCount) els.sessionCount.textContent = "0 sessions";
+    if (els.sessionCountBadge) els.sessionCountBadge.textContent = String(items.length);
+
+    if (els.sessionsList) {
+      els.sessionsList.innerHTML = items.length
+        ? items.map(renderSessionCard).join("")
+        : `<div class="nova-panel-empty">No chats yet.</div>`;
+    }
+
+    if (els.miniSessionMarkers) {
+      els.miniSessionMarkers.innerHTML = items.slice(0, 24).map(function (session) {
+        const active = safe(session.id) === safe(state.sessionId);
+        return `
+          <button
+            class="nova-mini-session-marker ${active ? "is-active" : ""}"
+            type="button"
+            title="${esc(session.title || "Chat")}"
+            aria-label="${esc(session.title || "Chat")}"
+            data-session-open="${esc(session.id)}">
+          </button>
+        `;
+      }).join("");
+    }
+  }
+
+  function renderMessages() {
+    if (!els.messages) return;
+
+    const items = asArray(state.messages);
+    if (!items.length) {
+      els.messages.innerHTML = "";
+      if (els.novaEmptyState) els.novaEmptyState.classList.add("is-visible");
       return;
     }
 
-    if (els.sessionCount) {
-      els.sessionCount.textContent = state.sessions.length + " session" + (state.sessions.length === 1 ? "" : "s");
+    if (els.novaEmptyState) els.novaEmptyState.classList.remove("is-visible");
+    els.messages.innerHTML = items.map(messageHtml).join("");
+    scrollMessagesToBottom(false);
+  }
+
+  function renderMemoryLoading() {
+    if (!els.memoryList) return;
+    els.memoryList.innerHTML = `
+      <div class="nova-memory-loading">
+        <div class="nova-memory-skeleton"></div>
+        <div class="nova-memory-skeleton"></div>
+        <div class="nova-memory-skeleton"></div>
+      </div>
+    `;
+  }
+
+  function renderMemoryEmpty() {
+    if (!els.memoryList) return;
+    els.memoryList.innerHTML = `
+      <div class="nova-memory-empty">
+        <div class="nova-memory-empty-inner">
+          <div class="nova-memory-empty-icon">ðŸ§ </div>
+          <div class="nova-memory-empty-title">No memory yet</div>
+          <div class="nova-memory-empty-copy">Saved context and preferences will appear here as Nova builds memory over time.</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function memorySourceChipClass(source) {
+    const s = safe(source).toLowerCase();
+    if (s === "user") return "nova-memory-chip nova-memory-source-user";
+    if (s === "assistant") return "nova-memory-chip nova-memory-source-assistant";
+    return "nova-memory-chip";
+  }
+
+  function memoryCardHtml(item) {
+    const isActive = safe(item.id) === safe(state.activeMemoryId);
+    const chips = [];
+
+    if (item.kind) {
+      chips.push(`<span class="nova-memory-kind">${esc(item.kind)}</span>`);
+    }
+    if (item.source) {
+      chips.push(`<span class="${memorySourceChipClass(item.source)}">${esc(item.source)}</span>`);
+    }
+    if (item.session_id) {
+      chips.push(`<span class="nova-memory-chip">session</span>`);
     }
 
-    els.sessionList.innerHTML = state.sessions.map(function (session) {
-      const isActive = String(session.id || "") === String(state.sessionId || "");
-      const title = escapeHtml(session.title || session.name || "Untitled session");
-      const preview = escapeHtml(shortText(session.last_message_preview || session.preview || "", 110));
-      const updated = escapeHtml(fmtDate(session.updated_at || session.created_at || ""));
-      const count = session.message_count != null ? String(session.message_count) : "";
-      const pinGlyph = session.pinned ? "★" : "☆";
+    return `
+      <article class="nova-memory-card ${isActive ? "is-active" : ""}" data-memory-id="${esc(item.id)}">
+        <div class="nova-memory-card-inner">
+          <div class="nova-memory-card-top">
+            <div class="nova-memory-card-top-left">
+              <div class="nova-memory-icon">ðŸ§ </div>
+              <div class="nova-memory-title-stack">
+                ${item.kind ? `<div class="nova-memory-kind">${esc(item.kind)}</div>` : `<div class="nova-memory-kind">note</div>`}
+              </div>
+            </div>
+            <div class="nova-memory-time" title="${esc(formatTime(item.created_at))}">${esc(formatTimeAgo(item.created_at))}</div>
+          </div>
 
-      return [
-        '<div class="nova-session-card' + (isActive ? ' is-active' : '') + '" data-session-id="' + escapeHtml(session.id || "") + '">',
-        '  <div class="nova-session-top">',
-        '    <div class="nova-session-card-main">',
-        '      <div class="nova-session-title">' + title + "</div>",
-        (preview ? '      <div class="nova-session-preview">' + preview + "</div>" : ""),
-        '      <div class="nova-session-meta">' + escapeHtml(count ? count + " msgs" : "") + (updated ? (count ? " · " : "") + updated : "") + "</div>",
-        "    </div>",
-        '    <div class="nova-session-actions">',
-        '      <button class="nova-icon-btn" type="button" data-action="pin" data-session-id="' + escapeHtml(session.id || "") + '" aria-label="Pin session">' + pinGlyph + "</button>",
-        '      <button class="nova-icon-btn" type="button" data-action="rename" data-session-id="' + escapeHtml(session.id || "") + '" aria-label="Rename session">✎</button>',
-        '      <button class="nova-icon-btn" type="button" data-action="delete" data-session-id="' + escapeHtml(session.id || "") + '" aria-label="Delete session">×</button>',
-        "    </div>",
-        "  </div>",
-        "</div>"
-      ].join("");
+          <p class="nova-memory-text">${esc(item.text || item.title || "â€”")}</p>
+
+          ${chips.length ? `<div class="nova-memory-meta">${chips.join("")}</div>` : ``}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderMemoryPanel() {
+    if (!els.memoryList) return;
+
+    const items = asArray(state.memoryItems);
+    if (els.memoryCountBadge) els.memoryCountBadge.textContent = String(items.length);
+
+    if (!items.length) {
+      state.activeMemoryId = "";
+      renderMemoryEmpty();
+      return;
+    }
+
+    if (!state.activeMemoryId || !items.some(function (item) { return safe(item.id) === safe(state.activeMemoryId); })) {
+      state.activeMemoryId = safe(items[0].id);
+    }
+
+    els.memoryList.innerHTML = items.map(memoryCardHtml).join("");
+  }
+
+  function renderWebPanel() {
+    if (!els.webList) return;
+
+    const items = asArray(state.webItems);
+    if (els.webCountBadge) els.webCountBadge.textContent = String(items.length);
+
+    els.webList.innerHTML = items.length
+      ? items.map(function (item) {
+          const title = safe(item && (item.title || item.url || "Web result"));
+          const sub = safe(item && (item.url || item.site_name || ""));
+          const preview = safe(item && (item.summary || item.content || item.preview || "")).slice(0, 220);
+
+          return `
+            <div class="nova-panel-card">
+              <div class="nova-panel-card-title">${esc(title)}</div>
+              ${sub ? `<div class="nova-panel-card-sub">${esc(sub)}</div>` : ""}
+              ${preview ? `<div class="nova-panel-card-text">${esc(preview)}</div>` : ""}
+            </div>
+          `;
+        }).join("")
+      : `<div class="nova-panel-empty">No web results yet.</div>`;
+  }
+
+  function renderAttachmentTray() {
+    if (!els.attachmentTray) return;
+
+    const items = asArray(state.pendingUploads);
+    if (!items.length) {
+      els.attachmentTray.hidden = true;
+      els.attachmentTray.innerHTML = "";
+      return;
+    }
+
+    els.attachmentTray.hidden = false;
+    els.attachmentTray.innerHTML = items.map(function (item) {
+      const a = normalizeAttachment(item);
+      if (!a) return "";
+      return `
+        <div class="nova-attachment-chip">
+          <div class="nova-attachment-chip-main">
+            <span class="nova-attachment-chip-icon">${a.kind === "image" ? "ðŸ–¼ï¸" : a.kind === "video" ? "ðŸŽ¬" : a.kind === "audio" ? "ðŸŽ§" : "ðŸ“„"}</span>
+            <span class="nova-attachment-chip-name">${esc(a.name)}</span>
+          </div>
+          <button class="nova-subtle-btn" type="button" data-remove-upload="${esc(a.id)}">Remove</button>
+        </div>
+      `;
     }).join("");
   }
 
-function groupMessages(messages) {
-  const source = Array.isArray(messages) ? messages : [];
-  const groups = [];
-
-  source.forEach(function (message, index) {
-    const role = String(message.role || message.author || (index % 2 ? "assistant" : "user")).toLowerCase();
-    const text = messageText(message);
-    const routeMeta = getRouteMeta(message);
-    const imageUrl =
-      message.image_url ||
-      (message.artifact && message.artifact.image_url) ||
-      (message.viewer && message.viewer.image_url) ||
-      "";
-
-    const normalized = {
-      raw: message,
-      role: role,
-      text: text,
-      id: getMessageId(message, index),
-      routeMeta: routeMeta,
-      imageUrl: imageUrl
-    };
-
-    const prev = groups.length ? groups[groups.length - 1] : null;
-    const canMerge =
-      prev &&
-      prev.role === normalized.role &&
-      !normalized.imageUrl &&
-      !prev.hasImage &&
-      !normalized.routeMeta &&
-      !prev.hasRouteMeta;
-
-    if (canMerge) {
-      prev.items.push(normalized);
-    } else {
-      groups.push({
-        role: normalized.role,
-        items: [normalized],
-        hasImage: !!normalized.imageUrl,
-        hasRouteMeta: !!normalized.routeMeta
-      });
+  function renderArtifactCountOnly() {
+    if (els.artifactCountBadge) {
+      els.artifactCountBadge.textContent = String(asArray(state.artifacts).length);
     }
-  });
+  }
 
-  return groups;
-}
+  function renderAll() {
+    renderSessions();
+    renderTopbar();
+    renderMessages();
+    renderMemoryPanel();
+    renderWebPanel();
+    renderAttachmentTray();
+    renderArtifactCountOnly();
+    applyShellState();
 
-  function renderMessages() {
-    if (!els.chatMessages) return;
-
-    if (!state.messages.length) {
-      els.chatMessages.innerHTML = [
-        '<div class="nova-empty-state">',
-        '  <div class="nova-empty-title">Nova is live</div>',
-        '  <div class="nova-empty-text">Chat is working. Uploads stage before send. Artifacts rail stays available.</div>',
-        "</div>"
-      ].join("");
-      return;
-    }
-
-const groups = groupMessages(state.messages);
-
-els.chatMessages.innerHTML = groups.map(function (group) {
-  const role = group.role;
-
-  const parts = group.items.map(function (entry) {
-    const message = entry.raw;
-    const text = escapeHtml(messageText(message));
-    return '<div class="nova-message-part">' + text + '</div>';
-  }).join("");
-
-  return [
-    '<div class="nova-message ' + escapeHtml(role) + '">',
-    '  <div class="nova-message-inner">',
-    parts,
-    "  </div>",
-    "</div>"
-  ].join("");
-}).join("");
-
-    requestAnimationFrame(function () {
-      if (els.chatScroll) {
-        els.chatScroll.scrollTop = els.chatScroll.scrollHeight;
-      }
+    dispatch("nova:composer-state", {
+      session_id: state.sessionId,
+      sessions: state.sessions,
+      messages: state.messages,
+      artifacts: state.artifacts,
+      memory_items: state.memoryItems,
+      web_items: state.webItems
     });
   }
 
-  function renderPendingUploads() {
-    if (!els.pendingUploads) return;
-    if (!state.pendingUploads.length) {
-      els.pendingUploads.innerHTML = "";
-      return;
+  function scrollMessagesToBottom(smooth) {
+    if (!els.messages) return;
+    try {
+      els.messages.scrollTo({
+        top: els.messages.scrollHeight,
+        behavior: smooth ? "smooth" : "auto"
+      });
+    } catch (_) {
+      els.messages.scrollTop = els.messages.scrollHeight;
     }
-
-    els.pendingUploads.innerHTML = state.pendingUploads.map(function (item, index) {
-      const name = escapeHtml(item.name || ("file-" + index));
-      return [
-        '<div class="nova-upload-chip">',
-        "  <span>" + name + "</span>",
-        '  <button class="nova-link-btn" type="button" data-remove-upload="' + index + '">remove</button>',
-        "</div>"
-      ].join("");
-    }).join("");
   }
 
-  function renderMemory() {
-    if (!els.memoryList) return;
+  function addPendingUploads(items) {
+    const next = asArray(items).map(normalizeAttachment).filter(Boolean);
 
-    if (!state.memoryItems.length) {
-      els.memoryList.innerHTML = [
-        '<div class="nova-empty-state">',
-        '  <div class="nova-empty-title">No memory items</div>',
-        '  <div class="nova-empty-text">Save notes and preferences here.</div>',
-        "</div>"
-      ].join("");
-      return;
-    }
+    next.forEach(function (item) {
+      const exists = state.pendingUploads.some(function (current) {
+        return current.id === item.id || (current.name === item.name && current.url === item.url);
+      });
+      if (!exists) state.pendingUploads.push(item);
+    });
 
-    els.memoryList.innerHTML = state.memoryItems.map(function (item) {
-      const id = escapeHtml(item.id || "");
-      const title = escapeHtml(item.kind || "memory");
-      const body = escapeHtml(item.text || item.preview || "");
-      const meta = escapeHtml(fmtDate(item.updated_at || item.created_at || ""));
-      return [
-        '<div class="nova-rail-card">',
-        '  <div class="nova-rail-card-title">' + title + "</div>",
-        (meta ? '  <div class="nova-rail-card-meta">' + meta + "</div>" : ""),
-        '  <div class="nova-rail-card-body">' + body + "</div>",
-        '  <div class="nova-message-actions">',
-        '    <button class="nova-btn nova-btn-ghost" type="button" data-delete-memory="' + id + '">Delete</button>',
-        "  </div>",
-        "</div>"
-      ].join("");
-    }).join("");
+    savePendingUploads();
+    renderAttachmentTray();
   }
 
-  function renderArtifacts() {
-    if (!els.artifactList) return;
-
-    if (!state.artifacts.length) {
-      els.artifactList.innerHTML = [
-        '<div class="nova-empty-state">',
-        '  <div class="nova-empty-title">No artifacts yet</div>',
-        '  <div class="nova-empty-text">Saved chat replies, web results, images, and analysis will show here.</div>',
-        "</div>"
-      ].join("");
-      return;
-    }
-
-    els.artifactList.innerHTML = state.artifacts.map(function (item) {
-      const id = escapeHtml(item.id || "");
-      const viewer = item.viewer || {};
-      const title = escapeHtml(item.title || viewer.title || item.kind || viewer.kind || "Artifact");
-      const meta = escapeHtml([
-        item.kind || viewer.kind || "",
-        fmtDate(item.updated_at || item.created_at || "")
-      ].filter(Boolean).join(" · "));
-      const body = escapeHtml(
-        shortText(
-          item.preview ||
-          viewer.body ||
-          item.body ||
-          item.summary ||
-          item.notes ||
-          "",
-          220
-        )
-      );
-      return [
-        '<button class="nova-rail-card" type="button" data-open-artifact="' + id + '">',
-        '  <div class="nova-rail-card-title">' + title + "</div>",
-        (meta ? '  <div class="nova-rail-card-meta">' + meta + "</div>" : ""),
-        (body ? '  <div class="nova-rail-card-body">' + body + "</div>" : ""),
-        "</button>"
-      ].join("");
-    }).join("");
+  function removePendingUploadById(id) {
+    state.pendingUploads = state.pendingUploads.filter(function (item) {
+      return safe(item.id) !== safe(id);
+    });
+    savePendingUploads();
+    renderAttachmentTray();
   }
 
-  function renderWeb() {
-    if (!els.webList) return;
+  async function uploadFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
 
-    if (!state.webItems.length) {
-      els.webList.innerHTML = [
-        '<div class="nova-empty-state">',
-        '  <div class="nova-empty-title">No web results</div>',
-        '  <div class="nova-empty-text">Fetched pages and saved web artifacts will appear here.</div>',
-        "</div>"
-      ].join("");
-      return;
-    }
-
-    els.webList.innerHTML = state.webItems.map(function (item) {
-      const viewer = item.viewer || {};
-      const title = escapeHtml(item.title || viewer.title || item.domain || "Web result");
-      const url = item.source_url || viewer.source_url || item.url || "";
-      const meta = escapeHtml([
-        item.domain || "",
-        fmtDate(item.updated_at || item.created_at || item.fetched_at || "")
-      ].filter(Boolean).join(" · "));
-      const body = escapeHtml(
-        shortText(
-          item.preview ||
-          viewer.body ||
-          item.summary ||
-          item.description ||
-          "",
-          220
-        )
-      );
-
-      return [
-        '<div class="nova-rail-card">',
-        '  <div class="nova-rail-card-title">' + title + "</div>",
-        (meta ? '  <div class="nova-rail-card-meta">' + meta + "</div>" : ""),
-        (body ? '  <div class="nova-rail-card-body">' + body + "</div>" : ""),
-        (url ? '  <div class="nova-rail-card-meta"><a href="' + escapeHtml(url) + '" target="_blank" rel="noreferrer">Open source</a></div>' : ""),
-        "</div>"
-      ].join("");
-    }).join("");
-  }
-
-  function renderRouteInspector() {
-    if (!els.routeInspector) return;
-
-    const message = state.activeRouteInspectMessageId
-      ? findMessageById(state.activeRouteInspectMessageId)
-      : findLatestAssistantRouteMessage();
-
-    if (!message || !hasRouteMeta(message)) {
-      els.routeInspector.innerHTML = [
-        '<div class="nova-empty-state">',
-        '  <div class="nova-empty-title">Route Inspector</div>',
-        '  <div class="nova-empty-text">No route metadata saved for this message yet. Click a route badge on an assistant message after a routed response lands.</div>',
-        "</div>"
-      ].join("");
-      return;
-    }
-
-    const meta = getRouteMeta(message);
-    const mode = escapeHtml(getRouteMode(message) || "unknown");
-    const reason = escapeHtml(getRouteReason(meta) || "No reason saved");
-    const keywords = getRouteKeywords(meta);
-    const build = escapeHtml(getRouteBuild(meta) || "n/a");
-    const timestamp = escapeHtml(fmtDate(getRouteTimestamp(meta, message) || ""));
-    const messageId = escapeHtml(getMessageId(message, state.messages.indexOf(message)));
-    const sessionId = escapeHtml(state.sessionId || "");
-    const raw = escapeHtml(getRouteRaw(meta));
-
-    els.routeInspector.innerHTML = [
-      '<div class="nova-route-card">',
-      '  <div class="nova-route-card-head">',
-      '    <div class="nova-route-card-title">Saved route metadata</div>',
-      '    <button class="nova-btn nova-btn-ghost" type="button" data-clear-route-inspector="1">Clear</button>',
-      "  </div>",
-
-      '  <div class="nova-route-section">',
-      '    <div class="nova-route-section-label">Mode</div>',
-      '    <div class="nova-route-chip-row">',
-      '      <span class="nova-route-chip mode">' + mode + "</span>",
-      "    </div>",
-      "  </div>",
-
-      '  <div class="nova-route-section">',
-      '    <div class="nova-route-section-label">Reason</div>',
-      '    <div class="nova-route-value">' + reason + "</div>",
-      "  </div>",
-
-      '  <div class="nova-route-section">',
-      '    <div class="nova-route-section-label">Matched keywords</div>',
-      (
-        keywords.length
-          ? ('<div class="nova-route-chip-row">' + keywords.map(function (kw) {
-              return '<span class="nova-route-chip keyword">' + escapeHtml(kw) + "</span>";
-            }).join("") + "</div>")
-          : '<div class="nova-route-value">No keywords saved</div>'
-      ),
-      "  </div>",
-
-      '  <div class="nova-route-section">',
-      '    <div class="nova-route-grid">',
-      '      <div class="nova-route-mini">',
-      '        <div class="nova-route-mini-label">Build</div>',
-      '        <div class="nova-route-mini-value">' + build + "</div>",
-      "      </div>",
-      '      <div class="nova-route-mini">',
-      '        <div class="nova-route-mini-label">Timestamp</div>',
-      '        <div class="nova-route-mini-value">' + timestamp + "</div>",
-      "      </div>",
-      '      <div class="nova-route-mini">',
-      '        <div class="nova-route-mini-label">Session</div>',
-      '        <div class="nova-route-mini-value">' + sessionId + "</div>",
-      "      </div>",
-      '      <div class="nova-route-mini">',
-      '        <div class="nova-route-mini-label">Message</div>',
-      '        <div class="nova-route-mini-value">' + messageId + "</div>",
-      "      </div>",
-      "    </div>",
-      "  </div>",
-
-      '  <div class="nova-route-section">',
-      '    <div class="nova-route-section-label">Raw metadata</div>',
-      '    <pre class="nova-code-block">' + raw + "</pre>",
-      "  </div>",
-      "</div>"
-    ].join("");
-  }
-
-  function findLatestAssistantRouteMessage() {
-    for (let i = state.messages.length - 1; i >= 0; i -= 1) {
-      const message = state.messages[i];
-      const role = String(message.role || message.author || "").toLowerCase();
-      if (role === "assistant" && hasRouteMeta(message)) {
-        return message;
-      }
-    }
-    return null;
-  }
-
-  function openRouteInspectorForMessage(messageId) {
-    state.activeRouteInspectMessageId = String(messageId || "");
-    setActivePanel("route");
-    renderRouteInspector();
-  }
-
-  async function refreshState(options) {
-    options = options || {};
-    if (state.refreshing && !options.force) return;
-    state.refreshing = true;
+    setUploading(true);
+    setStatus("Uploadingâ€¦", "warn");
 
     try {
-      const payload = await requestJson(API.state);
-      state.lastStatePayload = payload || {};
+      const form = new FormData();
+      files.forEach(function (file) {
+        form.append("files", file);
+      });
 
-      const sessions = normalizeSessions(payload.sessions);
-      state.sessions = sessions;
+      debugPush("request", "POST /api/upload", { file_count: files.length, names: files.map(function (f) { return f.name; }) });
 
-      const explicitSessionId =
-        payload.active_session_id ||
-        payload.session_id ||
-        (payload.active_session && payload.active_session.id) ||
-        "";
+      const res = await fetch(API.upload, { method: "POST", body: form });
+      const data = await readJson(res);
+      debugPush("response", "POST /api/upload", { status: res.status, ok: res.ok, data: data });
 
-      if (options.sessionId) {
-        state.sessionId = String(options.sessionId);
-      } else if (explicitSessionId) {
-        state.sessionId = String(explicitSessionId);
-      } else if (!state.sessionId && sessions.length) {
-        state.sessionId = String(sessions[0].id || "");
+      if (!res.ok) {
+        throw new Error(safe(data && (data.error || data.message)) || `Upload failed (${res.status})`);
       }
 
-      const selectedSession =
-        sessions.find(function (s) { return String(s.id || "") === String(state.sessionId || ""); }) ||
-        payload.active_session ||
-        null;
+      const uploaded = normalizeAttachmentList(data && (data.files || data.attachments || data.uploads || data.items || data));
+      addPendingUploads(uploaded);
+      setStatus(`Uploaded ${uploaded.length || files.length} file(s).`, "ok");
+    } catch (e) {
+      debugPush("error", "POST /api/upload", e);
+      setStatus(safe(e.message || "Upload failed."), "error");
+    } finally {
+      if (els.fileInput) els.fileInput.value = "";
+      setUploading(false);
+    }
+  }
 
-      if (selectedSession) {
-        state.messages = normalizeMessages(selectedSession.messages || payload.messages || []);
-      } else {
-        state.messages = normalizeMessages(payload.messages || []);
-      }
+  function applyShellState() {
+    if (els.appShell) {
+      els.appShell.dataset.sidebarCollapsed = state.sidebarCollapsed ? "true" : "false";
+      els.appShell.dataset.railPanel = state.activePanel;
+    }
 
-      state.memoryItems = normalizeMemory(payload.memory || payload.memory_items || []);
-      state.artifacts = normalizeArtifacts(payload.artifacts || []);
-      state.webItems = normalizeWebItems(payload.web || payload.web_items || [], state.artifacts);
+    const panels = {
+      memory: els.memoryPanel,
+      artifacts: els.artifactsPanel,
+      web: els.webPanel
+    };
 
+    Object.keys(panels).forEach(function (key) {
+      const el = panels[key];
+      if (el) el.classList.toggle("is-active", key === state.activePanel);
+    });
+
+    [
+      ["memory", els.memoryPanelToggle],
+      ["artifacts", els.artifactsPanelToggle],
+      ["web", els.webPanelToggle]
+    ].forEach(function (pair) {
+      const key = pair[0];
+      const btn = pair[1];
+      if (btn) btn.classList.toggle("is-active", key === state.activePanel);
+    });
+  }
+
+  function setAppShellPanel(panel) {
+    state.activePanel = panel === "memory" || panel === "web" ? panel : "artifacts";
+    applyShellState();
+    renderTopbar();
+  }
+
+  function toggleSidebarCollapsed() {
+    state.sidebarCollapsed = !state.sidebarCollapsed;
+    applyShellState();
+  }
+
+  async function refreshState(opts) {
+    if (state.refreshing) return;
+    state.refreshing = true;
+
+    const requestedSessionId = safe(opts && opts.sessionId) || safe(state.sessionId);
+    const url = requestedSessionId ? `${API.state}?session_id=${encodeURIComponent(requestedSessionId)}` : API.state;
+
+    if (state.activePanel === "memory" && (!state.memoryItems || !state.memoryItems.length)) {
+      renderMemoryLoading();
+    }
+
+    setStatus("Refreshingâ€¦", "warn");
+
+    try {
+      const payload = await apiGet(url);
+      const next = inferStatePayload(payload);
+
+      state.sessions = next.sessions;
+      state.sessionId = next.sessionId;
+      state.messages = next.messages;
+      state.memoryItems = next.memoryItems;
+      state.artifacts = next.artifacts;
+      state.webItems = next.webItems;
+
+      loadDraftText();
+      loadPendingUploads();
       renderAll();
-      if (!options.keepStatus) setComposerStatus("Ready", false);
-    } catch (error) {
-      err("refreshState failed", error);
-      setComposerStatus(error.message || "Failed to load state", true);
+      setStatus("Ready", "ok");
+      return payload;
     } finally {
       state.refreshing = false;
     }
   }
 
-  async function createNewSession() {
-    try {
-      setComposerStatus("Creating session...", false);
-      const data = await requestJson(API.newSession, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({})
-      });
+  async function switchSession(sessionId) {
+    const id = safe(sessionId);
+    if (!id || id === state.sessionId) return;
 
-      const nextId =
-        data.session_id ||
-        (data.session && data.session.id) ||
-        data.id ||
-        "";
-
-      if (nextId) {
-        state.sessionId = String(nextId);
-      }
-
-      await refreshState({ force: true, sessionId: state.sessionId, keepStatus: true });
-      setComposerStatus("New session created", false);
-    } catch (error) {
-      err("createNewSession failed", error);
-      setComposerStatus(error.message || "Failed to create session", true);
-    }
+    saveDraftText();
+    savePendingUploads();
+    state.sessionId = id;
+    await refreshState({ sessionId: id });
   }
 
-  async function switchSession(sessionId) {
-    state.sessionId = String(sessionId || "");
-    await refreshState({ force: true, sessionId: state.sessionId, keepStatus: true });
+  async function createNewSession() {
+    try {
+      setStatus("Creating chatâ€¦", "warn");
+      const data = await apiPost(API.newSession, {});
+      const next = inferStatePayload(data);
+
+      state.sessions = next.sessions;
+      state.sessionId = next.sessionId;
+      state.messages = next.messages;
+      state.memoryItems = next.memoryItems;
+      state.artifacts = next.artifacts;
+      state.webItems = next.webItems;
+      state.activeMemoryId = "";
+
+      clearDraftText(state.sessionId);
+      clearPendingUploads(state.sessionId);
+      renderAll();
+
+      if (els.chatInput) els.chatInput.focus();
+      setStatus("New chat created.", "ok");
+    } catch (e) {
+      setStatus(safe(e.message || "New chat failed."), "error");
+    }
   }
 
   async function renameSession(sessionId) {
-    const session = state.sessions.find(function (item) {
-      return String(item.id || "") === String(sessionId || "");
-    });
-    const currentTitle = (session && (session.title || session.name)) || "Untitled session";
-    const nextTitle = window.prompt("Rename session", currentTitle);
-    if (!nextTitle) return;
+    const id = safe(sessionId);
+    if (!id) return;
+
+    const current = state.sessions.find(function (s) { return s.id === id; });
+    const title = window.prompt("Rename chat", safe(current && current.title) || "New chat");
+    if (title == null) return;
 
     try {
-      await requestJson(API.renameSession, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, title: nextTitle })
+      setStatus("Renaming chatâ€¦", "warn");
+      await apiPost(API.renameSession, {
+        session_id: id,
+        title: safe(title).trim()
       });
-      await refreshState({ force: true, keepStatus: true });
-      setComposerStatus("Session renamed", false);
-    } catch (error) {
-      err("renameSession failed", error);
-      setComposerStatus(error.message || "Failed to rename session", true);
+      await refreshState({ sessionId: id });
+      setStatus("Chat renamed.", "ok");
+    } catch (e) {
+      setStatus(safe(e.message || "Rename failed."), "error");
     }
   }
 
-  async function pinSession(sessionId) {
+  async function togglePinSession(sessionId) {
+    const id = safe(sessionId);
+    if (!id) return;
+
     try {
-      await requestJson(API.pinSession, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId })
-      });
-      await refreshState({ force: true, keepStatus: true });
-      setComposerStatus("Session updated", false);
-    } catch (error) {
-      err("pinSession failed", error);
-      setComposerStatus(error.message || "Failed to pin session", true);
+      setStatus("Saving pinâ€¦", "warn");
+      await apiPost(API.pinSession, { session_id: id });
+      await refreshState({ sessionId: state.sessionId || id });
+      setStatus("Pin saved.", "ok");
+    } catch (e) {
+      setStatus(safe(e.message || "Pin failed."), "error");
     }
   }
 
   async function deleteSession(sessionId) {
-    if (!window.confirm("Delete this session?")) return;
+    const id = safe(sessionId);
+    if (!id) return;
+    if (!window.confirm("Delete this chat?")) return;
 
     try {
-      const data = await requestJson(API.deleteSession, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId })
-      });
+      setStatus("Deleting chatâ€¦", "warn");
+      const data = await apiPost(API.deleteSession, { session_id: id });
+      const nextId = safe(data && (data.next_session_id || data.active_session_id || ""));
 
-      const nextSessionId =
-        data.next_session_id ||
-        data.session_id ||
-        state.sessionId;
-
-      state.sessionId = String(nextSessionId || "");
-      await refreshState({ force: true, sessionId: state.sessionId, keepStatus: true });
-      setComposerStatus("Session deleted", false);
-    } catch (error) {
-      err("deleteSession failed", error);
-      setComposerStatus(error.message || "Failed to delete session", true);
+      clearDraftText(id);
+      clearPendingUploads(id);
+      state.sessionId = nextId || "";
+      state.activeMemoryId = "";
+      await refreshState({ sessionId: nextId });
+      setStatus("Chat deleted.", "ok");
+    } catch (e) {
+      setStatus(safe(e.message || "Delete failed."), "error");
     }
   }
 
-  async function stageFiles(fileList) {
-    const files = Array.from(fileList || []);
-    if (!files.length) return;
+  async function sendMessage(options) {
+    const opts = options || {};
+    const text = safe(opts.text != null ? opts.text : (els.chatInput && els.chatInput.value)).trim();
+    const attachments = asArray(opts.attachments != null ? opts.attachments : state.pendingUploads)
+      .map(normalizeAttachment)
+      .filter(Boolean);
 
-    state.uploading = true;
-    renderTopbar();
-    setComposerStatus("Uploading...", false);
+    if (!text && !attachments.length) {
+      setStatus("Nothing to send.", "warn");
+      return;
+    }
+
+    if (state.sending || state.uploading) return;
+
+    setBusy(true);
+    setStatus("Sendingâ€¦", "working");
 
     try {
-      for (const file of files) {
-        const form = new FormData();
-        form.append("file", file);
+      const result = await apiPost(API.chat, {
+        session_id: state.sessionId,
+        content: text,
+        attachments: attachments
+      });
 
-        const res = await fetch(API.upload, {
-          method: "POST",
-          body: form
-        });
+      const next = inferStatePayload(result);
+      state.sessions = next.sessions;
+      state.sessionId = next.sessionId || state.sessionId;
+      state.messages = next.messages;
+      state.memoryItems = next.memoryItems;
+      state.artifacts = next.artifacts;
+      state.webItems = next.webItems;
 
-        const data = await res.json();
-        if (!res.ok || !data.ok) {
-          throw new Error((data && (data.error || data.message)) || "Upload failed");
-        }
-
-        state.pendingUploads.push({
-          id: data.id || data.file_id || data.upload_id || "",
-          name: data.name || data.filename || file.name,
-          url: data.url || data.file_url || "",
-          mime_type: data.mime_type || file.type || ""
-        });
+      if (els.chatInput) {
+        els.chatInput.value = "";
+        autoGrowTextarea();
       }
 
-      renderPendingUploads();
-      setComposerStatus("Upload staged", false);
-    } catch (error) {
-      err("stageFiles failed", error);
-      setComposerStatus(error.message || "Upload failed", true);
+      clearDraftText(state.sessionId);
+      clearPendingUploads(state.sessionId);
+      renderAll();
+
+      state.lastUserMessage = {
+        content: text,
+        attachments: attachments
+      };
+
+      setStatus("Sent.", "ok");
+    } catch (e) {
+      err("sendMessage failed", e);
+      setStatus(safe((e.response && (e.response.error || e.response.message)) || e.message || "Send failed."), "error");
     } finally {
-      state.uploading = false;
-      renderTopbar();
+      setBusy(false);
     }
   }
 
-  function clearInput() {
-    if (!els.chatInput) return;
-    els.chatInput.value = "";
-    autoGrowTextarea();
+  async function regenerateLastUserMessage() {
+    if (!state.lastUserMessage) {
+      setStatus("No user message to regenerate.", "warn");
+      return;
+    }
+
+    const text = safe(state.lastUserMessage.content);
+    const attachments = asArray(state.lastUserMessage.attachments).map(normalizeAttachment).filter(Boolean);
+
+    if (els.chatInput) {
+      els.chatInput.value = text;
+      autoGrowTextarea();
+    }
+
+    state.pendingUploads = attachments.slice();
+    savePendingUploads();
+    renderAttachmentTray();
+
+    await sendMessage({
+      text: text,
+      attachments: attachments
+    });
   }
 
-  async function sendMessage(overrideText) {
-  if (state.sending) return;
+  async function copyMessageById(messageId) {
+    const match = state.messages.find(function (msg) {
+      return safe(msg.id) === safe(messageId);
+    });
 
-  const userText = (overrideText != null ? String(overrideText) : String(els.chatInput.value || "")).trim();
-  if (!userText && !state.pendingUploads.length) return;
-
-  state.sending = true;
-  renderTopbar();
-  setComposerStatus("Sending...", false);
-
-  const payload = {
-    session_id: state.sessionId || "",
-    user_text: userText,
-    attachments: state.pendingUploads.map(function (item) {
-      return {
-        id: item.id || "",
-        name: item.name || "",
-        url: item.url || "",
-        mime_type: item.mime_type || ""
-      };
-    })
-  };
-
-  state.lastUserMessage = userText || null;
-
-  try {
-    let data = null;
+    if (!match) {
+      setStatus("Message not found.", "warn");
+      return;
+    }
 
     try {
-      data = await streamChat(payload);
-    } catch (e) {
-      warn("Streaming failed, fallback → JSON", e);
-      clearStreamingAssistant();
-
-      data = await requestJson(API.chat, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      await navigator.clipboard.writeText(safe(match.content));
+      setStatus("Copied.", "ok");
+    } catch (_) {
+      setStatus("Copy failed.", "error");
     }
-
-    if (data.session && data.session.id) {
-      state.sessionId = String(data.session.id);
-    } else if (data.session_id) {
-      state.sessionId = String(data.session_id);
-    }
-
-    state.pendingUploads = [];
-    clearInput();
-    renderPendingUploads();
-
-    await refreshState({ force: true, sessionId: state.sessionId, keepStatus: true });
-
-    const latestRouteMessage = findLatestAssistantRouteMessage();
-    if (latestRouteMessage && state.activePanel === "route") {
-      state.activeRouteInspectMessageId = getMessageId(latestRouteMessage, state.messages.indexOf(latestRouteMessage));
-    }
-
-    renderRouteInspector();
-    setComposerStatus("Sent", false);
-  } catch (error) {
-    err("sendMessage failed", error);
-    clearStreamingAssistant();
-    setComposerStatus(error.message || "Send failed", true);
-  } finally {
-    state.sending = false;
-    renderTopbar();
   }
+
+  function bindPanelButtons() {
+    if (els.memoryPanelToggle) {
+      els.memoryPanelToggle.addEventListener("click", function () { setAppShellPanel("memory"); });
+    }
+    if (els.artifactsPanelToggle) {
+      els.artifactsPanelToggle.addEventListener("click", function () { setAppShellPanel("artifacts"); });
+    }
+    if (els.webPanelToggle) {
+      els.webPanelToggle.addEventListener("click", function () { setAppShellPanel("web"); });
+    }
+  }
+
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
-  async function regenerateFromMessage(messageId) {
-    const message = findMessageById(messageId);
-    if (!message) return;
+function getRouteMeta(message) {
+  if (!message || typeof message !== "object") return null;
 
-    let seed = "";
-    const idx = state.messages.indexOf(message);
-    for (let i = idx - 1; i >= 0; i -= 1) {
-      const prev = state.messages[i];
-      const role = String(prev.role || prev.author || "").toLowerCase();
-      if (role === "user") {
-        seed = messageText(prev);
-        break;
-      }
+  const raw = message.raw && typeof message.raw === "object" ? message.raw : {};
+  const metaFromRaw = raw.meta && typeof raw.meta === "object" ? raw.meta : {};
+  const metaDirect = message.meta && typeof message.meta === "object" ? message.meta : {};
+  const meta = Object.keys(metaFromRaw).length ? metaFromRaw : metaDirect;
+
+  const route = meta.route && typeof meta.route === "object" ? meta.route : null;
+  if (!route) return null;
+
+  return {
+    mode: String(route.mode || "general").trim().toLowerCase() || "general",
+    reason: String(route.reason || "").trim(),
+    matched_keywords: Array.isArray(route.matched_keywords) ? route.matched_keywords : [],
+    build: String(route.build || "").trim()
+  };
+}
+
+function titleCaseRouteMode(value) {
+  const raw = String(value || "general").trim().toLowerCase();
+  if (!raw) return "General";
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+function loadRouteDebugPreference() {
+  try {
+    const saved = localStorage.getItem("nova.routeDebugVisible");
+    if (saved === "0") state.routeDebugVisible = false;
+    if (saved === "1") state.routeDebugVisible = true;
+  } catch (_) {}
+}
+
+function saveRouteDebugPreference() {
+  try {
+    localStorage.setItem("nova.routeDebugVisible", state.routeDebugVisible ? "1" : "0");
+  } catch (_) {}
+}
+
+function updateRouteDebugToggleUi() {
+  if (!els.routeDebugToggle) return;
+  els.routeDebugToggle.setAttribute("aria-pressed", state.routeDebugVisible ? "true" : "false");
+  els.routeDebugToggle.classList.toggle("is-active", !!state.routeDebugVisible);
+  els.routeDebugToggle.textContent = state.routeDebugVisible ? "Route Debug: On" : "Route Debug: Off";
+}
+
+function toggleRouteDebugVisible() {
+  state.routeDebugVisible = !state.routeDebugVisible;
+  saveRouteDebugPreference();
+  updateRouteDebugToggleUi();
+  renderMessages();
+}
+
+function messageHtml(msg) {
+  const role = safe(msg.role || "assistant");
+  const attachments = asArray(msg.attachments);
+  const time = formatTime(msg.created_at);
+  const routeMetaHtml = role === "assistant" ? renderRouteMetaBadge(msg) : "";
+
+  return `
+    <article class="nova-message ${role}">
+      <div class="nova-message-inner">
+        ${attachments.length ? `<div class="nova-message-attachments">${attachments.map(attachmentHtml).join("")}</div>` : ``}
+        ${routeMetaHtml}
+        <div class="nova-message-markdown">${nl2br(msg.content || "")}</div>
+        <div class="nova-message-meta-row">
+          <div class="nova-message-time">${esc(time)}</div>
+          ${role === "assistant" ? `
+            <div class="nova-message-actions">
+              <button class="nova-subtle-btn" type="button" data-copy-message="${esc(msg.id)}">Copy</button>
+              <button class="nova-subtle-btn" type="button" data-regenerate-message="${esc(msg.id)}">Regenerate</button>
+            </div>
+          ` : ``}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderRouteMetaBadge(message) {
+  if (!state.routeDebugVisible) return "";
+
+  const route = getRouteMeta(message);
+  if (!route) return "";
+
+  const modeLabel = titleCaseRouteMode(route.mode);
+  const reason = route.reason ? escapeHtml(route.reason) : "No route reason saved";
+  const keywordText = route.matched_keywords.length
+    ? `<div class="nova-route-meta-keywords">${escapeHtml(route.matched_keywords.join(", "))}</div>`
+    : "";
+
+  return `
+    <div class="nova-route-meta" data-mode="${escapeHtml(route.mode)}">
+      <div class="nova-route-meta-row">
+        <span class="nova-route-meta-pill">${escapeHtml(modeLabel)}</span>
+        <span class="nova-route-meta-reason">${reason}</span>
+      </div>
+      ${keywordText}
+    </div>
+  `;
+}
+
+
+  function bindDom() {
+    els.appShell = qs("#novaAppShell");
+    els.sidebarToggle = qs("#sidebarToggle");
+    els.newSessionBtn = qs("#newSessionBtn");
+    els.newSessionMiniBtn = qs("#newSessionMiniBtn");
+    els.sessionsList = qs("#sessionsList");
+    els.sessionCountBadge = qs("#sessionCountBadge");
+    els.miniSessionMarkers = qs("#miniSessionMarkers");
+
+    els.activeSessionTitle = qs("#activeSessionTitle");
+    els.activeSessionSubtitle = qs("#activeSessionSubtitle");
+    els.activePanelPill = qs("#activePanelPill");
+    els.routeDebugToggle = qs("#routeDebugToggle");
+
+    els.novaEmptyState = qs("#novaEmptyState");
+    els.messages = qs("#messages");
+
+    els.attachmentTray = qs("#attachmentTray");
+    els.attachBtn = qs("#attachBtn");
+    els.voiceBtn = qs("#voiceBtn");
+    els.clearChatBtn = qs("#clearChatBtn");
+    els.composerStatus = qs("#composerStatus");
+    els.chatInput = qs("#chatInput");
+    els.sendBtn = qs("#sendBtn");
+
+    els.memoryPanelToggle = qs("#memoryPanelToggle");
+    els.artifactsPanelToggle = qs("#artifactsPanelToggle");
+    els.webPanelToggle = qs("#webPanelToggle");
+
+    els.memoryPanel = qs("#memoryPanel");
+    els.artifactsPanel = qs("#artifactsPanel");
+    els.webPanel = qs("#webPanel");
+
+    els.memoryList = qs("#memoryList");
+    els.artifactCountBadge = qs("#artifactCountBadge");
+    els.webList = qs("#webList");
+
+    els.memoryCountBadge = qs("#memoryCountBadge");
+    els.webCountBadge = qs("#webCountBadge");
+
+    els.fileInput = qs("#fileInput");
+    if (!els.fileInput) {
+      els.fileInput = document.createElement("input");
+      els.fileInput.type = "file";
+      els.fileInput.multiple = true;
+      els.fileInput.hidden = true;
+      els.fileInput.id = "novaHiddenFileInput";
+      document.body.appendChild(els.fileInput);
     }
-
-    if (!seed && state.lastUserMessage) {
-      seed = state.lastUserMessage;
-    }
-    if (!seed) return;
-
-    await sendMessage(seed);
-  }
-
-  async function addMemory() {
-    const value = String((els.memoryInput && els.memoryInput.value) || "").trim();
-    if (!value) return;
-
-    if (!API.memoryCreate) {
-      state.memoryItems.unshift({
-        id: "local-" + Date.now(),
-        text: value,
-        kind: "note",
-        created_at: new Date().toISOString()
-      });
-      if (els.memoryInput) els.memoryInput.value = "";
-      renderMemory();
-      setComposerStatus("Memory added locally", false);
-      return;
-    }
-
-    try {
-      await requestJson(API.memoryCreate, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: value })
-      });
-      if (els.memoryInput) els.memoryInput.value = "";
-      await refreshState({ force: true, keepStatus: true });
-      setComposerStatus("Memory saved", false);
-    } catch (error) {
-      err("addMemory failed", error);
-      setComposerStatus(error.message || "Failed to save memory", true);
-    }
-  }
-
-  async function deleteMemory(id) {
-    if (!API.memoryDelete) {
-      state.memoryItems = state.memoryItems.filter(function (item) {
-        return String(item.id || "") !== String(id || "");
-      });
-      renderMemory();
-      return;
-    }
-
-    try {
-      await requestJson(API.memoryDelete, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: id })
-      });
-      await refreshState({ force: true, keepStatus: true });
-      setComposerStatus("Memory deleted", false);
-    } catch (error) {
-      err("deleteMemory failed", error);
-      setComposerStatus(error.message || "Failed to delete memory", true);
-    }
-  }
-
-  function copyMessage(messageId) {
-    const message = findMessageById(messageId);
-    if (!message) return;
-    const text = messageText(message);
-
-    navigator.clipboard.writeText(text).then(function () {
-      setComposerStatus("Copied", false);
-    }).catch(function (error) {
-      err("copyMessage failed", error);
-      setComposerStatus("Copy failed", true);
-    });
-  }
-
-  function openArtifact(artifactId) {
-    const artifact = state.artifacts.find(function (item) {
-      return String(item.id || "") === String(artifactId || "");
-    });
-    if (!artifact) return;
-
-    if (window.NovaArtifacts && typeof window.NovaArtifacts.openArtifact === "function") {
-      try {
-        window.NovaArtifacts.openArtifact(artifact);
-        setActivePanel("artifacts");
-        return;
-      } catch (error) {
-        warn("NovaArtifacts.openArtifact failed", error);
-      }
-    }
-
-    setActivePanel("artifacts");
   }
 
   function bindEvents() {
+    bindPanelButtons();
+
+    if (els.routeDebugToggle) {
+      els.routeDebugToggle.addEventListener("click", toggleRouteDebugVisible);
+    }
+
     if (els.sidebarToggle) {
-      els.sidebarToggle.addEventListener("click", toggleSidebar);
+      els.sidebarToggle.addEventListener("click", toggleSidebarCollapsed);
     }
 
-    if (els.collapsedNewChatBtn) {
-      els.collapsedNewChatBtn.addEventListener("click", createNewSession);
+    if (els.newSessionBtn) {
+      els.newSessionBtn.addEventListener("click", createNewSession);
     }
 
-    if (els.newChatBtn) {
-      els.newChatBtn.addEventListener("click", createNewSession);
+    if (els.newSessionMiniBtn) {
+      els.newSessionMiniBtn.addEventListener("click", createNewSession);
     }
 
-    if (els.routeInspectorBtn) {
-      els.routeInspectorBtn.addEventListener("click", function () {
-        const latest = findLatestAssistantRouteMessage();
-        if (latest) {
-          state.activeRouteInspectMessageId = getMessageId(latest, state.messages.indexOf(latest));
+    if (els.attachBtn) {
+      els.attachBtn.addEventListener("click", function () {
+        if (els.fileInput) els.fileInput.click();
+      });
+    }
+
+    if (els.fileInput) {
+      els.fileInput.addEventListener("change", function (event) {
+        uploadFiles(event.target.files);
+      });
+    }
+
+    if (els.clearChatBtn) {
+      els.clearChatBtn.addEventListener("click", function () {
+        if (els.chatInput) {
+          els.chatInput.value = "";
+          autoGrowTextarea();
         }
-        setActivePanel("route");
-        renderRouteInspector();
+        state.pendingUploads = [];
+        savePendingUploads();
+        renderAttachmentTray();
+        setStatus("Composer cleared.", "ok");
       });
-    }
-
-    if (els.rightRailCloseBtn) {
-      els.rightRailCloseBtn.addEventListener("click", function () {
-        if (els.rightRail) {
-          els.rightRail.style.display = "none";
-        }
-      });
-    }
-
-    qsa(".nova-rail-tab").forEach(function (tab) {
-      tab.addEventListener("click", function () {
-        setActivePanel(tab.dataset.panel || "artifacts");
-      });
-    });
-
-    if (els.sendBtn) {
-      els.sendBtn.addEventListener("click", function () {
-        sendMessage();
-      });
-    }
-
-    if (els.clearInputBtn) {
-      els.clearInputBtn.addEventListener("click", clearInput);
     }
 
     if (els.voiceBtn) {
       els.voiceBtn.addEventListener("click", function () {
-        setComposerStatus("Voice is not wired yet", false);
+        setStatus("Voice not wired yet.", "warn");
       });
     }
 
     if (els.chatInput) {
-      els.chatInput.addEventListener("input", autoGrowTextarea);
+      els.chatInput.addEventListener("input", function () {
+        autoGrowTextarea();
+        saveDraftText();
+      });
+
       els.chatInput.addEventListener("keydown", function (event) {
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
@@ -1305,152 +1358,123 @@ els.chatMessages.innerHTML = groups.map(function (group) {
       });
     }
 
-    if (els.fileInput) {
-      els.fileInput.addEventListener("change", function (event) {
-        stageFiles(event.target.files);
-        event.target.value = "";
-      });
-    }
-
-    if (els.memoryAddBtn) {
-      els.memoryAddBtn.addEventListener("click", addMemory);
-    }
-
-    if (els.memoryInput) {
-      els.memoryInput.addEventListener("keydown", function (event) {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          addMemory();
-        }
+    if (els.sendBtn) {
+      els.sendBtn.addEventListener("click", function () {
+        sendMessage();
       });
     }
 
     document.addEventListener("click", function (event) {
-      const sessionCard = event.target.closest(".nova-session-card");
-      if (sessionCard && !event.target.closest("[data-action]")) {
-        switchSession(sessionCard.dataset.sessionId || "");
+      const openBtn = event.target.closest("[data-session-open]");
+      if (openBtn) {
+        switchSession(openBtn.getAttribute("data-session-open"));
         return;
       }
 
-      const actionButton = event.target.closest("[data-action]");
-      if (actionButton) {
-        const action = actionButton.dataset.action || "";
-        const sessionId = actionButton.dataset.sessionId || "";
-        if (action === "rename") renameSession(sessionId);
-        if (action === "pin") pinSession(sessionId);
-        if (action === "delete") deleteSession(sessionId);
+      const renameBtn = event.target.closest("[data-session-rename]");
+      if (renameBtn) {
+        renameSession(renameBtn.getAttribute("data-session-rename"));
+        return;
+      }
+
+      const pinBtn = event.target.closest("[data-session-pin]");
+      if (pinBtn) {
+        togglePinSession(pinBtn.getAttribute("data-session-pin"));
+        return;
+      }
+
+      const deleteBtn = event.target.closest("[data-session-delete]");
+      if (deleteBtn) {
+        deleteSession(deleteBtn.getAttribute("data-session-delete"));
+        return;
+      }
+
+      const fillBtn = event.target.closest("[data-fill]");
+      if (fillBtn && els.chatInput) {
+        els.chatInput.value = safe(fillBtn.getAttribute("data-fill"));
+        autoGrowTextarea();
+        els.chatInput.focus();
+        saveDraftText();
         return;
       }
 
       const removeUploadBtn = event.target.closest("[data-remove-upload]");
       if (removeUploadBtn) {
-        const index = Number(removeUploadBtn.dataset.removeUpload || "-1");
-        if (index >= 0) {
-          state.pendingUploads.splice(index, 1);
-          renderPendingUploads();
-        }
+        removePendingUploadById(removeUploadBtn.getAttribute("data-remove-upload"));
         return;
       }
 
       const copyBtn = event.target.closest("[data-copy-message]");
       if (copyBtn) {
-        copyMessage(copyBtn.dataset.copyMessage || "");
+        copyMessageById(copyBtn.getAttribute("data-copy-message"));
         return;
       }
 
       const regenBtn = event.target.closest("[data-regenerate-message]");
       if (regenBtn) {
-        regenerateFromMessage(regenBtn.dataset.regenerateMessage || "");
+        regenerateLastUserMessage();
         return;
       }
 
-      const routeBtn = event.target.closest("[data-open-route]");
-      if (routeBtn) {
-        openRouteInspectorForMessage(routeBtn.dataset.openRoute || "");
-        return;
-      }
-
-      const deleteMemoryBtn = event.target.closest("[data-delete-memory]");
-      if (deleteMemoryBtn) {
-        deleteMemory(deleteMemoryBtn.dataset.deleteMemory || "");
-        return;
-      }
-
-      const openArtifactBtn = event.target.closest("[data-open-artifact]");
-      if (openArtifactBtn) {
-        openArtifact(openArtifactBtn.dataset.openArtifact || "");
-        return;
-      }
-
-      const clearRouteBtn = event.target.closest("[data-clear-route-inspector]");
-      if (clearRouteBtn) {
-        state.activeRouteInspectMessageId = "";
-        renderRouteInspector();
+      const memoryCard = event.target.closest("[data-memory-id]");
+      if (memoryCard) {
+        state.activeMemoryId = safe(memoryCard.getAttribute("data-memory-id"));
+        renderMemoryPanel();
       }
     });
-  }
 
-  function cacheElements() {
-    els.novaSidebar = qs("#novaSidebar");
-    els.sidebarToggle = qs("#sidebarToggle");
-    els.newChatBtn = qs("#newChatBtn");
-    els.collapsedNewChatBtn = qs("#collapsedNewChatBtn");
+    window.addEventListener("beforeunload", function () {
+      saveDraftText();
+      savePendingUploads();
+    });
 
-    els.sessionList = qs("#sessionList");
-    els.sessionCount = qs("#sessionCount");
-    els.sessionTitle = qs("#sessionTitle");
-    els.sessionSubtitle = qs("#sessionSubtitle");
-    els.modelChip = qs("#modelChip");
-    els.statusChip = qs("#statusChip");
+    window.addEventListener("nova:jump-to-session", function (event) {
+      const sessionId = safe(event && event.detail && event.detail.session_id);
+      if (sessionId) switchSession(sessionId);
+    });
 
-    els.chatScroll = qs("#chatScroll");
-    els.chatMessages = qs("#chatMessages");
-
-    els.pendingUploads = qs("#pendingUploads");
-    els.fileInput = qs("#fileInput");
-    els.voiceBtn = qs("#voiceBtn");
-    els.clearInputBtn = qs("#clearInputBtn");
-    els.chatInput = qs("#chatInput");
-    els.sendBtn = qs("#sendBtn");
-    els.composerStatus = qs("#composerStatus");
-
-    els.rightRail = qs("#rightRail");
-    els.rightRailCloseBtn = qs("#rightRailCloseBtn");
-    els.rightRailTitle = qs("#rightRailTitle");
-    els.rightRailSubtitle = qs("#rightRailSubtitle");
-    els.panelArtifacts = qs("#panelArtifacts");
-    els.panelMemory = qs("#panelMemory");
-    els.panelWeb = qs("#panelWeb");
-    els.panelRoute = qs("#panelRoute");
-
-    els.artifactList = qs("#artifactList");
-    els.memoryList = qs("#memoryList");
-    els.memoryInput = qs("#memoryInput");
-    els.memoryAddBtn = qs("#memoryAddBtn");
-    els.webList = qs("#webList");
-    els.routeInspector = qs("#routeInspector");
-    els.routeInspectorBtn = qs("#routeInspectorBtn");
+    window.addEventListener("nova:artifact-count-changed", function (event) {
+      const count = Number(event && event.detail && event.detail.count) || 0;
+      if (els.artifactCountBadge) els.artifactCountBadge.textContent = String(count);
+    });
   }
 
   async function boot() {
     if (state.booted) return;
     state.booted = true;
 
+    log("boot start");
+    bindDom();
+    bindEvents();
+    loadRouteDebugPreference();
+    updateRouteDebugToggleUi();
+    autoGrowTextarea();
+    applyShellState();
+    setAppShellPanel("artifacts");
+
     try {
-      log("boot start");
-      cacheElements();
-      bindEvents();
-      autoGrowTextarea();
-      setActivePanel(state.activePanel);
-      await refreshState({ force: true });
-      log("boot complete");
-    } catch (error) {
-      err("boot failed", error);
-      setComposerStatus(error.message || "Boot failed", true);
+      await refreshState({ sessionId: state.sessionId });
+      setStatus("Ready", "ok");
+    } catch (e) {
+      err("boot failed", e);
+      setStatus(safe((e.response && (e.response.error || e.response.message)) || e.message || "Boot failed."), "error");
     }
+
+    log("boot complete");
   }
 
-  document.addEventListener("DOMContentLoaded", boot);
+  window.NovaComposerBundle = {
+    state: state,
+    refreshState: refreshState,
+    sendMessage: sendMessage,
+    switchSession: switchSession,
+    createNewSession: createNewSession,
+    setPanel: setAppShellPanel
+  };
 
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
 })();
-
