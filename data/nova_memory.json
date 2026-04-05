@@ -1,42 +1,56 @@
-[
-  {
-    "id": "6179aaeb-260b-4d18-83d0-bf207b239432",
-    "text": "remember i got homework to do",
-    "content": "remember i got homework to do",
-    "created_at": "2026-04-03T02:15:17.216374+00:00",
-    "updated_at": "2026-04-03T02:15:17.216374+00:00",
-    "source": "user",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "pinned": false
-  },
-  {
-    "id": "691e635e-bfff-4df9-8079-682b36745208",
-    "text": "can you remember that",
-    "content": "can you remember that",
-    "created_at": "2026-04-03T02:14:42.858784+00:00",
-    "updated_at": "2026-04-03T02:14:42.858784+00:00",
-    "source": "user",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "pinned": false
-  },
-  {
-    "id": "b84c4a36-54f2-4b99-9b96-7ae4fd9535f5",
-    "text": "remember i am going to the gym later",
-    "content": "remember i am going to the gym later",
-    "created_at": "2026-04-03T02:14:16.803013+00:00",
-    "updated_at": "2026-04-03T02:14:16.803013+00:00",
-    "source": "user",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "pinned": false
-  },
-  {
-    "id": "25c63082-3c11-46d7-88e3-5133bce1c210",
-    "text": "remember my name is richard",
-    "content": "remember my name is richard",
-    "created_at": "2026-04-03T02:08:41.113518+00:00",
-    "updated_at": "2026-04-03T02:08:41.113518+00:00",
-    "source": "user",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "pinned": false
-  }
-]
+{
+  "items": [
+    {
+      "id": "4811810bc3",
+      "memory_id": "4811810bc3",
+      "title": "note",
+      "content": "i'm going to watch a movie later",
+      "text": "i'm going to watch a movie later",
+      "value": "i'm going to watch a movie later",
+      "kind": "note",
+      "source": "user",
+      "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
+      "created_at": "2026-04-05T00:08:35.318792+00:00",
+      "updated_at": "2026-04-05T00:08:35.318792+00:00"
+    },
+    {
+      "id": "6179aaeb-260b-4d18-83d0-bf207b239432",
+      "memory_id": "6179aaeb-260b-4d18-83d0-bf207b239432",
+      "title": "note",
+      "content": "remember i got homework to do",
+      "text": "remember i got homework to do",
+      "value": "remember i got homework to do",
+      "kind": "note",
+      "source": "user",
+      "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
+      "created_at": "2026-04-03T02:15:17.216374+00:00",
+      "updated_at": "2026-04-03T02:15:17.216374+00:00"
+    },
+    {
+      "id": "b84c4a36-54f2-4b99-9b96-7ae4fd9535f5",
+      "memory_id": "b84c4a36-54f2-4b99-9b96-7ae4fd9535f5",
+      "title": "note",
+      "content": "remember i am going to the gym later",
+      "text": "remember i am going to the gym later",
+      "value": "remember i am going to the gym later",
+      "kind": "note",
+      "source": "user",
+      "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
+      "created_at": "2026-04-03T02:14:16.803013+00:00",
+      "updated_at": "2026-04-03T02:14:16.803013+00:00"
+    },
+    {
+      "id": "25c63082-3c11-46d7-88e3-5133bce1c210",
+      "memory_id": "25c63082-3c11-46d7-88e3-5133bce1c210",
+      "title": "note",
+      "content": "remember my name is richard",
+      "text": "remember my name is richard",
+      "value": "remember my name is richard",
+      "kind": "note",
+      "source": "user",
+      "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
+      "created_at": "2026-04-03T02:08:41.113518+00:00",
+      "updated_at": "2026-04-03T02:08:41.113518+00:00"
+    }
+  ]
+}

@@ -11,7 +11,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import requests
-from flask import Flask, jsonify, render_template, request, send_from_directory, Response
+from flask import Flask, Response, jsonify, render_template, request, send_from_directory
 
 try:
     from bs4 import BeautifulSoup
@@ -53,6 +53,8 @@ USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/146.0.0.0 Safari/537.36"
 )
+
+ROUTE_INTELLIGENCE_BUILD = "route-intelligence-2026-04-04-chat-fallback-lock-001"
 
 
 def now_iso() -> str:
@@ -105,6 +107,17 @@ def ensure_storage() -> None:
     ensure_file(MEMORY_FILE, {"items": []})
 
 
+def normalize_possible_media_url(value: str) -> str:
+    raw = safe_str(value)
+    if not raw:
+        return ""
+    if raw.startswith("http://") or raw.startswith("https://") or raw.startswith("/"):
+        return raw
+    raw = raw.replace("\\", "/")
+    raw = re.sub(r"^uploads/", "", raw)
+    return f"/api/uploads/{raw}"
+
+
 def normalize_session_message(message: Any) -> dict[str, Any] | None:
     if not isinstance(message, dict):
         return None
@@ -113,6 +126,7 @@ def normalize_session_message(message: Any) -> dict[str, Any] | None:
     content = safe_str(message.get("content") or message.get("text") or message.get("message") or "")
     created_at = safe_str(message.get("created_at") or message.get("timestamp") or now_iso())
     attachments = message.get("attachments") if isinstance(message.get("attachments"), list) else []
+    route_meta = message.get("route_meta") if isinstance(message.get("route_meta"), dict) else {}
 
     return {
         "id": safe_str(message.get("id") or uuid.uuid4().hex[:8]),
@@ -120,6 +134,7 @@ def normalize_session_message(message: Any) -> dict[str, Any] | None:
         "content": content,
         "created_at": created_at,
         "attachments": attachments,
+        "route_meta": route_meta,
     }
 
 
@@ -240,6 +255,35 @@ def create_session(title: str = "New Chat") -> dict[str, Any]:
     }
 
 
+def build_artifact_viewer(
+    *,
+    kind: str,
+    title: str,
+    content: str = "",
+    image_url: str = "",
+    source_url: str = "",
+    analysis_text: str = "",
+    body: str = "",
+) -> dict[str, Any]:
+    normalized_image_url = normalize_possible_media_url(image_url)
+    normalized_source_url = safe_str(source_url)
+
+    viewer_kind = "artifact"
+    if normalized_image_url:
+        viewer_kind = "image"
+    elif kind in {"web", "web_result", "web_fetch"}:
+        viewer_kind = "web"
+
+    return {
+        "kind": viewer_kind,
+        "title": safe_str(title),
+        "body": safe_str(body or content),
+        "analysis_text": safe_str(analysis_text or content),
+        "image_url": normalized_image_url,
+        "source_url": normalized_source_url,
+    }
+
+
 def normalize_artifact(item: Any) -> dict[str, Any] | None:
     if not isinstance(item, dict):
         return None
@@ -252,9 +296,11 @@ def normalize_artifact(item: Any) -> dict[str, Any] | None:
     web = item.get("web") if isinstance(item.get("web"), dict) else None
     debug = item.get("debug") if isinstance(item.get("debug"), dict) else None
     extra = item.get("extra") if isinstance(item.get("extra"), dict) else None
+    viewer = item.get("viewer") if isinstance(item.get("viewer"), dict) else {}
 
     image_url = safe_str(
-        item.get("image_url")
+        viewer.get("image_url")
+        or item.get("image_url")
         or meta.get("image_url")
         or (extra.get("image_url") if isinstance(extra, dict) else "")
         or (
@@ -268,16 +314,42 @@ def normalize_artifact(item: Any) -> dict[str, Any] | None:
             else ""
         )
     )
+    image_url = normalize_possible_media_url(image_url)
+
+    source_url = safe_str(
+        viewer.get("source_url")
+        or item.get("source_url")
+        or meta.get("source_url")
+        or (web.get("source_url") if isinstance(web, dict) else "")
+        or (web.get("url") if isinstance(web, dict) else "")
+        or item.get("url")
+    )
+
+    title = safe_str(item.get("title") or item.get("name") or item.get("kind") or "Untitled artifact")
+    content = safe_str(
+        item.get("content") or item.get("text") or item.get("body") or item.get("preview") or item.get("summary") or ""
+    )
+    kind = safe_str(item.get("kind") or item.get("type") or "artifact")
+
+    normalized_viewer = build_artifact_viewer(
+        kind=kind,
+        title=title,
+        content=content,
+        image_url=image_url,
+        source_url=source_url,
+        analysis_text=safe_str(viewer.get("analysis_text") or content),
+        body=safe_str(viewer.get("body") or content),
+    )
 
     return {
         "id": artifact_id,
         "artifact_id": artifact_id,
         "session_id": safe_str(item.get("session_id")),
-        "kind": safe_str(item.get("kind") or item.get("type") or "artifact"),
-        "title": safe_str(item.get("title") or item.get("name") or item.get("kind") or "Untitled artifact"),
-        "content": safe_str(item.get("content") or item.get("text") or item.get("body") or item.get("preview") or ""),
+        "kind": kind,
+        "title": title,
+        "content": content,
         "summary": safe_str(item.get("summary") or meta.get("summary") or ""),
-        "preview": safe_str(item.get("preview") or item.get("content") or item.get("summary") or "")[:220],
+        "preview": safe_str(item.get("preview") or item.get("content") or item.get("summary") or content)[:220],
         "pinned": bool(item.get("pinned", False)),
         "created_at": safe_str(item.get("created_at") or now_iso()),
         "updated_at": safe_str(item.get("updated_at") or item.get("created_at") or now_iso()),
@@ -286,6 +358,8 @@ def normalize_artifact(item: Any) -> dict[str, Any] | None:
         "debug": debug,
         "extra": extra,
         "image_url": image_url,
+        "source_url": source_url,
+        "viewer": normalized_viewer,
     }
 
 
@@ -414,6 +488,7 @@ def build_state(session_id: str = "") -> dict[str, Any]:
     artifacts = load_artifacts_payload()["artifacts"]
     memory_items = list_memory_items()
     session_messages = active_session.get("messages", []) if active_session else []
+    web_items = [a for a in artifacts if safe_str(a.get("kind")) in {"web", "web_result", "web_fetch"}]
 
     return {
         "ok": True,
@@ -439,7 +514,9 @@ def build_state(session_id: str = "") -> dict[str, Any]:
         "messages": session_messages,
         "memory_items": memory_items,
         "artifacts": artifacts,
-        "web_items": [a for a in artifacts if safe_str(a.get("kind")) in {"web", "web_result"}],
+        "web_items": web_items,
+        "memory": memory_items,
+        "web": web_items,
     }
 
 
@@ -454,9 +531,14 @@ def add_artifact(
     debug: dict[str, Any] | None = None,
     extra: dict[str, Any] | None = None,
     image_url: str = "",
+    source_url: str = "",
+    viewer: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     payload = load_artifacts_payload()
     ts = now_iso()
+
+    normalized_image_url = normalize_possible_media_url(image_url or (meta or {}).get("image_url") or "")
+    normalized_source_url = safe_str(source_url or (meta or {}).get("source_url") or (web or {}).get("source_url") or "")
 
     artifact = {
         "id": uuid.uuid4().hex[:10],
@@ -474,18 +556,25 @@ def add_artifact(
         "web": web or None,
         "debug": debug or None,
         "extra": extra or None,
-        "image_url": safe_str(image_url),
+        "image_url": normalized_image_url,
+        "source_url": normalized_source_url,
+        "viewer": viewer or build_artifact_viewer(
+            kind=safe_str(kind or "artifact"),
+            title=safe_str(title or "Untitled artifact"),
+            content=safe_str(content),
+            image_url=normalized_image_url,
+            source_url=normalized_source_url,
+            analysis_text=safe_str(content),
+            body=safe_str(content),
+        ),
     }
     artifact["artifact_id"] = artifact["id"]
 
     items = payload["artifacts"]
     items.insert(0, artifact)
     save_artifacts_payload({"artifacts": items})
-    return artifact
+    return normalize_artifact(artifact) or artifact
 
-
-
-ROUTE_INTELLIGENCE_BUILD = "route-intelligence-2026-04-03-001"
 
 def _route_meta(route: str, mode: str, reason: str, matched_keywords: list[str] | None = None) -> dict[str, Any]:
     return {
@@ -504,7 +593,7 @@ def route_request(content: str, attachments: list[dict[str, Any]] | None = None)
     attachments = attachments or []
 
     explicit_web = lowered.startswith("/web ")
-    explicit_image = lowered.startswith("/image ")
+    explicit_image = lowered.startswith("/image")
     detected_url = extract_first_url(text)
 
     if explicit_web or detected_url:
@@ -615,9 +704,7 @@ def build_mode_instructions(route_meta: dict[str, Any]) -> str:
             "You are Nova in analysis mode. Explain the reasoning clearly, compare options, and make the answer easy to follow."
         )
 
-    return (
-        "You are Nova in general mode. Be helpful, concise, and practical."
-    )
+    return "You are Nova in general mode. Be helpful, concise, and practical."
 
 
 def build_model_messages(
@@ -661,11 +748,39 @@ def build_model_messages(
             }
         )
 
+    model_messages.append({"role": "user", "content": safe_str(content)})
     return model_messages
 
-def call_model(messages: list[dict[str, str]]) -> str:
+
+def fallback_assistant_text(content: str, route_meta: dict[str, Any], attachments: list[dict[str, Any]] | None = None, error_text: str = "") -> str:
+    mode = safe_str(route_meta.get("mode") or "general")
+    route = safe_str(route_meta.get("route") or "chat")
+    attachment_count = len(attachments or [])
+    prompt = safe_str(content)
+
+    parts: list[str] = []
+
+    if prompt:
+        parts.append(f"Nova safe reply ({mode}/{route})")
+        if route == "chat":
+            parts.append(f"You said: {prompt[:1200]}")
+        else:
+            parts.append(prompt[:1200] if prompt else "")
+    else:
+        parts.append("Nova safe reply")
+
+    if attachment_count:
+        parts.append(f"Attachments received: {attachment_count}")
+
+    if error_text:
+        parts.append(f"Model fallback used: {error_text[:300]}")
+
+    return "\n\n".join([p for p in parts if p]).strip()
+
+
+def call_model(messages: list[dict[str, str]], fallback_text: str = "") -> str:
     if not client:
-        return "Nova fallback reply: backend is live, but no OpenAI key is configured."
+        return safe_str(fallback_text) or "Nova safe reply: backend is live, but no OpenAI key is configured."
 
     try:
         response = client.responses.create(
@@ -673,9 +788,12 @@ def call_model(messages: list[dict[str, str]]) -> str:
             input=messages,
         )
         text = getattr(response, "output_text", "") or ""
-        return safe_str(text) or "Nova returned an empty response."
+        text = safe_str(text)
+        if text:
+            return text
+        return safe_str(fallback_text) or "Nova safe reply: model returned an empty response."
     except Exception as exc:
-        return f"Nova fallback reply: model call failed. {exc}"
+        return safe_str(fallback_text) or f"Nova safe reply: model call failed. {exc}"
 
 
 def normalize_url(candidate: str) -> str:
@@ -872,7 +990,7 @@ def fetch_web_result(url: str) -> dict[str, Any]:
     preview = description or summary or body[:220]
 
     return {
-        "kind": "web",
+        "kind": "web_result",
         "title": title or domain or "Web result",
         "content": body or description or title,
         "summary": summary,
@@ -963,6 +1081,10 @@ def generate_image(prompt: str) -> dict[str, Any]:
     }
 
 
+def sse_pack(event: str, data: dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
 @app.route("/", methods=["GET"])
 def index():
     return render_template("index.html")
@@ -975,7 +1097,7 @@ def api_health():
         openai_configured=bool(client),
         openai_model=OPENAI_MODEL,
         image_model=IMAGE_MODEL,
-        route_build="REAL-APP-PY-MEMORY-MANAGER-LOCK-2026-04-03-005",
+        route_build="REAL-APP-PY-CHAT-FALLBACK-LOCK-2026-04-04-001",
         time=now_iso(),
     )
 
@@ -1089,6 +1211,8 @@ def api_memory_add():
         )
         payload = build_state(session_id=session_id)
         payload["memory_item"] = item
+        payload["memory_items"] = list_memory_items()
+        payload["memory"] = payload["memory_items"]
         return jsonify(payload)
     except Exception as exc:
         return _error(f"Memory add failed: {exc}", status=500)
@@ -1109,6 +1233,7 @@ def api_memory_delete():
         payload = build_state(session_id=session_id)
         payload["next_memory_id"] = next_memory_id
         payload["memory_items"] = items
+        payload["memory"] = items
         return jsonify(payload)
     except Exception as exc:
         return _error(f"Memory delete failed: {exc}", status=500)
@@ -1160,345 +1285,97 @@ def api_upload():
     except Exception as exc:
         return _error(f"Upload failed: {exc}", status=500)
 
-def sse_pack(event: str, data: dict[str, Any]) -> str:
-    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 @app.route("/api/uploads/<path:filename>", methods=["GET"])
 def api_uploads(filename: str):
     return send_from_directory(str(UPLOADS_DIR), filename)
 
-@app.route("/api/chat", methods=["POST"])
-def api_chat():
+
+@app.route("/api/web/fetch", methods=["POST"])
+def api_web_fetch():
+    ensure_storage()
     try:
         payload = request.get_json(silent=True) or {}
-
-        # ✅ normalize ALL frontend formats
-        content = (
-            safe_str(payload.get("content"))
-            or safe_str(payload.get("message"))
-            or safe_str(payload.get("user_text"))
-            or safe_str(payload.get("text"))
-        )
-
+        url = safe_str(payload.get("url") or payload.get("content") or payload.get("message") or payload.get("text"))
         session_id = safe_str(payload.get("session_id") or payload.get("sessionId"))
-        attachments = payload.get("attachments") if isinstance(payload.get("attachments"), list) else []
-        route_meta = payload.get("route_meta") or payload.get("routeMeta") or {}
 
-        if not content and not attachments:
-            return _error("Missing content.", status=400)
+        if not url:
+            return _error("Missing URL.", status=400)
 
-        ensure_storage()
-
-        # get or create session
         session = get_session(session_id)
         if not session:
             session = create_session()
             session_id = session["id"]
 
-        # add user message
+        web_result = fetch_web_result(url)
+        assistant_text = build_web_assistant_text(web_result)
+
         user_msg = {
             "id": uuid.uuid4().hex[:8],
             "role": "user",
-            "content": content,
+            "content": url,
             "created_at": now_iso(),
-            "attachments": attachments,
+            "attachments": [],
+            "route_meta": _route_meta("web", "analysis", "Explicit web fetch route.", ["url"]),
         }
-        session["messages"].append(user_msg)
-
-        # route (fallback if not passed)
-        if not route_meta:
-            route_meta = route_request(content, attachments)
-
-        # build model input
-        model_messages = build_model_messages(
-            session=session,
-            content=content,
-            attachments=attachments,
-            route_meta=route_meta,
-            session_id=session_id,
-        )
-
-        # call model
-        reply_text = call_model(model_messages)
-
-        # add assistant message
         assistant_msg = {
-            "id": uuid.uuid4().hex[:8],
-            "role": "assistant",
-            "content": reply_text,
-            "created_at": now_iso(),
-        }
-        session["messages"].append(assistant_msg)
-
-        # update session
-        session["updated_at"] = now_iso()
-        session["message_count"] = len(session["messages"])
-        session["last_message_preview"] = reply_text[:160]
-
-        upsert_session(session)
-
-        return jsonify({
-            "ok": True,
-            "assistant_message": assistant_msg,
-            "session": {
-                "id": session["id"],
-                "title": session["title"],
-                "messages": session["messages"],
-            },
-            "debug": {
-                "route": route_meta,
-                "content_length": len(content),
-            }
-        })
-
-    except Exception as e:
-        return jsonify({
-            "ok": False,
-            "error": str(e),
-            "assistant_message": None,
-            "session": None
-        }), 500
-
-    try:
-        sessions_payload = load_sessions_payload()
-
-        session = None
-        if session_id:
-            session = next((s for s in sessions_payload["sessions"] if safe_str(s.get("id")) == session_id), None)
-
-        if session is None:
-            session = create_session()
-            session_id = session["id"]
-
-        user_message = {
-            "id": uuid.uuid4().hex[:8],
-            "role": "user",
-            "content": content,
-            "created_at": now_iso(),
-            "attachments": attachments,
-        }
-        session["messages"].append(user_message)
-
-        route_meta = route_request(content, attachments)
-        route = safe_str(route_meta.get("route") or "chat")
-        stripped = content.strip()
-        lowered = stripped.lower()
-        explicit_web = lowered.startswith("/web ")
-        explicit_image = lowered.startswith("/image ")
-        detected_url = extract_first_url(stripped)
-
-        if explicit_web or detected_url:
-            route = "web"
-            target_url = normalize_url(stripped[5:].strip()) if explicit_web else detected_url
-            web_result = fetch_web_result(target_url)
-            assistant_text = build_web_assistant_text(web_result)
-
-            assistant_message = {
-                "id": uuid.uuid4().hex[:8],
-                "role": "assistant",
-                "content": assistant_text,
-                "created_at": now_iso(),
-                "attachments": [],
-            }
-            session["messages"].append(assistant_message)
-
-            if not safe_str(session.get("title")) or safe_str(session.get("title")) == "New Chat":
-                first_user = next((m for m in session["messages"] if m["role"] == "user" and m["content"]), None)
-                if first_user:
-                    session["title"] = first_user["content"][:48].rstrip() or "New Chat"
-
-            session["updated_at"] = now_iso()
-            session["message_count"] = len(session["messages"])
-            session["last_message_preview"] = assistant_text[:160] or content[:160]
-            upsert_session(session)
-
-            add_artifact(
-                session_id=session_id,
-                kind="web",
-                title=web_result["title"],
-                content=web_result["content"],
-                meta={
-                    "summary": web_result["summary"],
-                    "preview": web_result["preview"],
-                    "title": web_result["title"],
-                    "source_url": safe_str(web_result["web"].get("source_url")),
-                    "domain": safe_str(web_result["web"].get("domain")),
-                    "site_name": safe_str(web_result["web"].get("site_name")),
-                    "body": safe_str(web_result["web"].get("body")),
-                    "bullets": web_result["web"].get("bullets", []),
-                },
-                web=web_result["web"],
-                debug=web_result["debug"],
-            )
-
-            payload = build_state(session_id=session_id)
-            payload["message"] = assistant_text
-            payload["assistant_message"] = assistant_text
-            payload["session"] = {
-                "id": session_id,
-                "title": session["title"],
-                "messages": session["messages"],
-            }
-            payload["debug"] = {
-                "model": OPENAI_MODEL,
-                "openai_configured": bool(client),
-                "attachment_count": len(attachments),
-                "route": route,
-            }
-            return jsonify(payload)
-
-        if explicit_image:
-            route = "image"
-            prompt = safe_str(stripped[7:].strip())
-            if not prompt:
-                return _error("Missing image prompt.", status=400)
-
-            image_result = generate_image(prompt)
-            image_url = safe_str(image_result["image_url"])
-            assistant_text = f"![generated image]({image_url})\n\nGenerated from prompt: {prompt}"
-
-            assistant_message = {
-                "id": uuid.uuid4().hex[:8],
-                "role": "assistant",
-                "content": assistant_text,
-                "created_at": now_iso(),
-                "attachments": [
-                    {
-                        "id": uuid.uuid4().hex[:8],
-                        "name": Path(image_url).name,
-                        "url": image_url,
-                        "preview_url": image_url,
-                        "mime_type": "image/png",
-                        "kind": "image",
-                        "uploaded_at": now_iso(),
-                    }
-                ],
-            }
-            session["messages"].append(assistant_message)
-
-            if not safe_str(session.get("title")) or safe_str(session.get("title")) == "New Chat":
-                first_user = next((m for m in session["messages"] if m["role"] == "user" and m["content"]), None)
-                if first_user:
-                    session["title"] = first_user["content"][:48].rstrip() or "New Chat"
-
-            session["updated_at"] = now_iso()
-            session["message_count"] = len(session["messages"])
-            session["last_message_preview"] = f"Generated image: {prompt[:120]}"
-            upsert_session(session)
-
-            add_artifact(
-                session_id=session_id,
-                kind="generated_image",
-                title=f"Generated Image - {prompt[:80]}",
-                content=assistant_text,
-                meta={
-                    "prompt": prompt,
-                    "image_url": image_url,
-                    "preview": f"Generated from prompt: {prompt}"[:220],
-                    "summary": f"Generated from prompt: {prompt}"[:220],
-                    "media": [
-                        {
-                            "filename": Path(image_url).name,
-                            "mime_type": "image/png",
-                            "prompt": prompt,
-                            "type": "image",
-                            "url": image_url,
-                        }
-                    ],
-                },
-                debug={
-                    "source": "api_chat",
-                    "route": route,
-                    "image_model": IMAGE_MODEL,
-                },
-                extra={
-                    "image_url": image_url,
-                    "prompt": prompt,
-                    "media": [
-                        {
-                            "filename": Path(image_url).name,
-                            "mime_type": "image/png",
-                            "prompt": prompt,
-                            "type": "image",
-                            "url": image_url,
-                        }
-                    ],
-                },
-                image_url=image_url,
-            )
-
-            payload = build_state(session_id=session_id)
-            payload["message"] = assistant_text
-            payload["assistant_message"] = assistant_text
-            payload["session"] = {
-                "id": session_id,
-                "title": session["title"],
-                "messages": session["messages"],
-            }
-            payload["debug"] = {
-                "model": OPENAI_MODEL,
-                "openai_configured": bool(client),
-                "attachment_count": len(attachments),
-                "route": route,
-                "image_model": IMAGE_MODEL,
-            }
-            return jsonify(payload)
-
-        model_messages = build_model_messages(
-            session=session,
-            content=content,
-            attachments=attachments,
-            route_meta=route_meta,
-            session_id=session_id,
-        )
-
-        assistant_text = call_model(model_messages)
-
-        assistant_message = {
             "id": uuid.uuid4().hex[:8],
             "role": "assistant",
             "content": assistant_text,
             "created_at": now_iso(),
             "attachments": [],
+            "route_meta": _route_meta("web", "analysis", "Web fetch result.", ["url"]),
         }
-        session["messages"].append(assistant_message)
 
-        if not safe_str(session.get("title")) or safe_str(session.get("title")) == "New Chat":
-            first_user = next((m for m in session["messages"] if m["role"] == "user" and m["content"]), None)
-            if first_user:
-                session["title"] = first_user["content"][:48].rstrip() or "New Chat"
-
+        session["messages"].append(user_msg)
+        session["messages"].append(assistant_msg)
         session["updated_at"] = now_iso()
         session["message_count"] = len(session["messages"])
-        session["last_message_preview"] = assistant_text[:160] or content[:160]
+        session["last_message_preview"] = assistant_text[:160]
+
+        if safe_str(session.get("title")) in {"", "New Chat"}:
+            session["title"] = safe_str(web_result.get("title") or "Web fetch")[:48]
+
         upsert_session(session)
 
-        add_artifact(
+        artifact = add_artifact(
             session_id=session_id,
-            kind="chat",
-            title=session["title"],
+            kind="web_result",
+            title=safe_str(web_result.get("title") or "Web result"),
             content=assistant_text,
-            meta={"message_count": session["message_count"]},
-            debug={"source": "api_chat", "route": route, "route_meta": route_meta},
+            meta={
+                "summary": safe_str(web_result.get("summary")),
+                "preview": safe_str(web_result.get("preview")),
+                "source_url": safe_str((web_result.get("web") or {}).get("source_url")),
+            },
+            web=web_result.get("web") if isinstance(web_result.get("web"), dict) else None,
+            debug=web_result.get("debug") if isinstance(web_result.get("debug"), dict) else None,
+            source_url=safe_str((web_result.get("web") or {}).get("source_url")),
+            viewer=build_artifact_viewer(
+                kind="web_result",
+                title=safe_str(web_result.get("title") or "Web result"),
+                content=assistant_text,
+                source_url=safe_str((web_result.get("web") or {}).get("source_url")),
+                body=safe_str((web_result.get("web") or {}).get("body") or assistant_text),
+            ),
         )
 
-        payload = build_state(session_id=session_id)
-        payload["message"] = assistant_text
-        payload["assistant_message"] = assistant_text
-        payload["session"] = {
-            "id": session_id,
-            "title": session["title"],
-            "messages": session["messages"],
-        }
-        payload["debug"] = {
-            "model": OPENAI_MODEL,
-            "openai_configured": bool(client),
-            "attachment_count": len(attachments),
-            "route": route,
-        }
-        return jsonify(payload)
+        state_payload = build_state(session_id=session_id)
+        return _ok(
+            assistant_message=assistant_text,
+            artifact=artifact,
+            session=state_payload.get("session"),
+            sessions=state_payload.get("sessions"),
+            messages=state_payload.get("messages"),
+            artifacts=state_payload.get("artifacts"),
+            memory_items=state_payload.get("memory_items"),
+            web_items=state_payload.get("web_items"),
+            memory=state_payload.get("memory"),
+            web=state_payload.get("web"),
+            route_meta=_route_meta("web", "analysis", "Explicit web fetch route.", ["url"]),
+        )
     except Exception as exc:
-        return _error(f"Chat failed: {exc}", status=500)
+        return _error(f"Web fetch failed: {exc}", status=500)
 
 
 @app.route("/api/artifacts", methods=["GET"])
@@ -1541,7 +1418,7 @@ def api_artifact_pin():
             if safe_str(item.get("id")) == artifact_id:
                 item["pinned"] = not bool(item.get("pinned"))
                 item["updated_at"] = now_iso()
-                found = item
+                found = normalize_artifact(item)
                 break
 
         if not found:
@@ -1567,12 +1444,10 @@ def api_artifact_delete():
         items = [a for a in payload["artifacts"] if safe_str(a.get("id")) != artifact_id]
         next_artifact_id = safe_str(items[0]["id"]) if items else ""
         save_artifacts_payload({"artifacts": items})
-        return _ok(message="Artifact deleted.", next_artifact_id=next_artifact_id, artifacts=items)
+        return _ok(message="Artifact deleted.", next_artifact_id=next_artifact_id, artifacts=load_artifacts_payload()["artifacts"])
     except Exception as exc:
         return _error(f"Artifact delete failed: {exc}", status=500)
 
-from flask import Response, stream_with_context
-import json
 
 @app.route("/api/chat/stream", methods=["POST"])
 def api_chat_stream():
@@ -1606,6 +1481,7 @@ def api_chat_stream():
             "content": content,
             "created_at": now_iso(),
             "attachments": attachments,
+            "route_meta": route_meta if isinstance(route_meta, dict) else {},
         }
         session["messages"].append(user_msg)
 
@@ -1616,6 +1492,145 @@ def api_chat_stream():
             try:
                 yield sse_pack("status", {"ok": True})
 
+                if safe_str(route_meta.get("route")) == "image":
+                    prompt = content.replace("/image", "", 1).strip() or "image"
+                    image_result = generate_image(prompt)
+                    image_url = safe_str(image_result.get("image_url"))
+                    revised_prompt = safe_str(image_result.get("revised_prompt"))
+                    final_prompt = revised_prompt or prompt
+                    reply_text = f"![Generated image]({image_url})"
+
+                    artifact = add_artifact(
+                        session_id=session_id,
+                        kind="image_generation",
+                        title=final_prompt[:60] or "Generated image",
+                        content=final_prompt,
+                        meta={
+                            "image_url": image_url,
+                            "summary": final_prompt[:220],
+                            "preview": final_prompt[:220],
+                        },
+                        image_url=image_url,
+                        viewer=build_artifact_viewer(
+                            kind="image_generation",
+                            title=final_prompt[:60] or "Generated image",
+                            content=final_prompt,
+                            image_url=image_url,
+                            body=final_prompt,
+                        ),
+                    )
+
+                    yield sse_pack("delta", {"text": reply_text})
+
+                    assistant_msg = {
+                        "id": uuid.uuid4().hex[:8],
+                        "role": "assistant",
+                        "content": reply_text,
+                        "created_at": now_iso(),
+                        "attachments": [],
+                        "route_meta": route_meta,
+                    }
+
+                    session["messages"].append(assistant_msg)
+                    session["updated_at"] = now_iso()
+                    session["message_count"] = len(session["messages"])
+                    session["last_message_preview"] = final_prompt[:160]
+
+                    if safe_str(session.get("title")) in {"", "New Chat"}:
+                        session["title"] = final_prompt[:48] or "Image"
+
+                    upsert_session(session)
+
+                    state_payload = build_state(session_id=session_id)
+                    yield sse_pack("done", {
+                        "ok": True,
+                        "assistant_message": assistant_msg,
+                        "image_url": image_url,
+                        "artifact": artifact,
+                        "session": state_payload.get("session"),
+                        "sessions": state_payload.get("sessions"),
+                        "messages": state_payload.get("messages"),
+                        "artifacts": state_payload.get("artifacts"),
+                        "memory_items": state_payload.get("memory_items"),
+                        "web_items": state_payload.get("web_items"),
+                        "memory": state_payload.get("memory"),
+                        "web": state_payload.get("web"),
+                        "route_meta": route_meta,
+                    })
+                    return
+
+                if safe_str(route_meta.get("route")) == "web":
+                    target_url = extract_first_url(content)
+                    if not target_url and content.lower().startswith("/web "):
+                        target_url = normalize_url(content[5:].strip())
+                    if not target_url:
+                        raise ValueError("No URL detected for web fetch.")
+
+                    web_result = fetch_web_result(target_url)
+                    reply_text = build_web_assistant_text(web_result)
+
+                    chunk_size = 80
+                    for i in range(0, len(reply_text), chunk_size):
+                        yield sse_pack("delta", {"text": reply_text[i:i + chunk_size]})
+
+                    artifact = add_artifact(
+                        session_id=session_id,
+                        kind="web_result",
+                        title=safe_str(web_result.get("title") or "Web result"),
+                        content=reply_text,
+                        meta={
+                            "summary": safe_str(web_result.get("summary")),
+                            "preview": safe_str(web_result.get("preview")),
+                            "source_url": safe_str((web_result.get("web") or {}).get("source_url")),
+                        },
+                        web=web_result.get("web") if isinstance(web_result.get("web"), dict) else None,
+                        debug=web_result.get("debug") if isinstance(web_result.get("debug"), dict) else None,
+                        source_url=safe_str((web_result.get("web") or {}).get("source_url")),
+                        viewer=build_artifact_viewer(
+                            kind="web_result",
+                            title=safe_str(web_result.get("title") or "Web result"),
+                            content=reply_text,
+                            source_url=safe_str((web_result.get("web") or {}).get("source_url")),
+                            body=safe_str((web_result.get("web") or {}).get("body") or reply_text),
+                        ),
+                    )
+
+                    assistant_msg = {
+                        "id": uuid.uuid4().hex[:8],
+                        "role": "assistant",
+                        "content": reply_text,
+                        "created_at": now_iso(),
+                        "attachments": [],
+                        "route_meta": route_meta,
+                    }
+
+                    session["messages"].append(assistant_msg)
+                    session["updated_at"] = now_iso()
+                    session["message_count"] = len(session["messages"])
+                    session["last_message_preview"] = reply_text[:160]
+
+                    if safe_str(session.get("title")) in {"", "New Chat"}:
+                        session["title"] = safe_str(web_result.get("title") or "Web fetch")[:48]
+
+                    upsert_session(session)
+
+                    state_payload = build_state(session_id=session_id)
+                    yield sse_pack("done", {
+                        "ok": True,
+                        "assistant_message": assistant_msg,
+                        "artifact": artifact,
+                        "session": state_payload.get("session"),
+                        "sessions": state_payload.get("sessions"),
+                        "messages": state_payload.get("messages"),
+                        "artifacts": state_payload.get("artifacts"),
+                        "memory_items": state_payload.get("memory_items"),
+                        "web_items": state_payload.get("web_items"),
+                        "memory": state_payload.get("memory"),
+                        "web": state_payload.get("web"),
+                        "route_meta": route_meta,
+                    })
+                    return
+
                 model_messages = build_model_messages(
                     session=session,
                     content=content,
@@ -1624,58 +1639,532 @@ def api_chat_stream():
                     session_id=session_id,
                 )
 
-                reply_text = call_model(model_messages)
+                safe_reply = fallback_assistant_text(content, route_meta, attachments)
+                reply_text = call_model(model_messages, fallback_text=safe_reply)
 
-                # 🔥 chunk streaming (stable)
                 chunk_size = 80
                 for i in range(0, len(reply_text), chunk_size):
-                    yield sse_pack("delta", {"text": reply_text[i:i+chunk_size]})
+                    yield sse_pack("delta", {"text": reply_text[i:i + chunk_size]})
 
                 assistant_msg = {
                     "id": uuid.uuid4().hex[:8],
                     "role": "assistant",
                     "content": reply_text,
                     "created_at": now_iso(),
+                    "attachments": [],
+                    "route_meta": route_meta,
                 }
 
                 session["messages"].append(assistant_msg)
-
                 session["updated_at"] = now_iso()
                 session["message_count"] = len(session["messages"])
                 session["last_message_preview"] = reply_text[:160]
 
+                if safe_str(session.get("title")) in {"", "New Chat"}:
+                    for msg in session["messages"]:
+                        if safe_str(msg.get("role")) == "user" and safe_str(msg.get("content")):
+                            session["title"] = safe_str(msg.get("content"))[:48]
+                            break
+
                 upsert_session(session)
 
-                add_artifact(
+                artifact = add_artifact(
                     session_id=session_id,
                     kind="chat",
                     title=session["title"],
                     content=reply_text,
+                    meta={"message_count": session["message_count"]},
+                    debug={"source": "api_chat_stream", "route": "chat", "route_meta": route_meta},
+                    viewer=build_artifact_viewer(
+                        kind="chat",
+                        title=session["title"],
+                        content=reply_text,
+                        body=reply_text,
+                    ),
                 )
 
+                state_payload = build_state(session_id=session_id)
                 yield sse_pack("done", {
                     "ok": True,
                     "assistant_message": assistant_msg,
-                    "session": {
-                        "id": session_id,
-                        "title": session["title"],
-                        "messages": session["messages"],
-                    },
+                    "artifact": artifact,
+                    "session": state_payload.get("session"),
+                    "sessions": state_payload.get("sessions"),
+                    "messages": state_payload.get("messages"),
+                    "artifacts": state_payload.get("artifacts"),
+                    "memory_items": state_payload.get("memory_items"),
+                    "web_items": state_payload.get("web_items"),
+                    "memory": state_payload.get("memory"),
+                    "web": state_payload.get("web"),
                     "route_meta": route_meta,
                 })
+            except Exception as exc:
+                safe_reply = fallback_assistant_text(content, route_meta if isinstance(route_meta, dict) else {}, attachments, error_text=str(exc))
+                yield sse_pack("delta", {"text": safe_reply})
 
-            except Exception as e:
-                yield sse_pack("error", {"error": str(e)})
+                assistant_msg = {
+                    "id": uuid.uuid4().hex[:8],
+                    "role": "assistant",
+                    "content": safe_reply,
+                    "created_at": now_iso(),
+                    "attachments": [],
+                    "route_meta": route_meta if isinstance(route_meta, dict) else {},
+                }
 
-        return Response(generate(), mimetype="text/event-stream")
+                session["messages"].append(assistant_msg)
+                session["updated_at"] = now_iso()
+                session["message_count"] = len(session["messages"])
+                session["last_message_preview"] = safe_reply[:160]
 
-    except Exception as e:
-        return _error(str(e), status=500)
+                if safe_str(session.get("title")) in {"", "New Chat"}:
+                    for msg in session["messages"]:
+                        if safe_str(msg.get("role")) == "user" and safe_str(msg.get("content")):
+                            session["title"] = safe_str(msg.get("content"))[:48]
+                            break
+
+                upsert_session(session)
+
+                artifact = add_artifact(
+                    session_id=session_id,
+                    kind="chat",
+                    title=session["title"],
+                    content=safe_reply,
+                    meta={"message_count": session["message_count"]},
+                    debug={"source": "api_chat_stream", "route": "chat-fallback", "error": str(exc)},
+                    viewer=build_artifact_viewer(
+                        kind="chat",
+                        title=session["title"],
+                        content=safe_reply,
+                        body=safe_reply,
+                    ),
+                )
+
+                state_payload = build_state(session_id=session_id)
+                yield sse_pack("done", {
+                    "ok": True,
+                    "assistant_message": assistant_msg,
+                    "artifact": artifact,
+                    "session": state_payload.get("session"),
+                    "sessions": state_payload.get("sessions"),
+                    "messages": state_payload.get("messages"),
+                    "artifacts": state_payload.get("artifacts"),
+                    "memory_items": state_payload.get("memory_items"),
+                    "web_items": state_payload.get("web_items"),
+                    "memory": state_payload.get("memory"),
+                    "web": state_payload.get("web"),
+                    "route_meta": route_meta if isinstance(route_meta, dict) else {},
+                    "debug": {"stream_fallback_error": str(exc)},
+                })
+
+        return Response(
+            generate(),
+            mimetype="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+    except Exception as exc:
+        return _error(f"Streaming failed: {exc}", status=500)
+
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    try:
+        payload = request.get_json(silent=True) or {}
+
+        content = (
+            safe_str(payload.get("content"))
+            or safe_str(payload.get("message"))
+            or safe_str(payload.get("user_text"))
+            or safe_str(payload.get("text"))
+        )
+
+        session_id = safe_str(payload.get("session_id") or payload.get("sessionId"))
+        attachments = payload.get("attachments") if isinstance(payload.get("attachments"), list) else []
+        route_meta = payload.get("route_meta") or payload.get("routeMeta") or {}
+
+        if not content and not attachments:
+            return _error("Missing content.", status=400)
+
+        ensure_storage()
+
+        session = get_session(session_id)
+        if not session:
+            session = create_session()
+            session_id = session["id"]
+
+        if not route_meta:
+            route_meta = route_request(content, attachments)
+
+        user_msg = {
+            "id": uuid.uuid4().hex[:8],
+            "role": "user",
+            "content": content,
+            "created_at": now_iso(),
+            "attachments": attachments,
+            "route_meta": route_meta if isinstance(route_meta, dict) else {},
+        }
+        session["messages"].append(user_msg)
+
+        route_name = safe_str(route_meta.get("route"))
+
+        if route_name == "image":
+            prompt = content.replace("/image", "", 1).strip() or "image"
+            image_result = generate_image(prompt)
+            image_url = safe_str(image_result.get("image_url"))
+            revised_prompt = safe_str(image_result.get("revised_prompt"))
+            final_prompt = revised_prompt or prompt
+            reply_text = f"![Generated image]({image_url})"
+
+            assistant_msg = {
+                "id": uuid.uuid4().hex[:8],
+                "role": "assistant",
+                "content": reply_text,
+                "created_at": now_iso(),
+                "attachments": [
+                    {
+                        "id": uuid.uuid4().hex[:8],
+                        "name": Path(image_url).name,
+                        "url": image_url,
+                        "preview_url": image_url,
+                        "mime_type": "image/png",
+                        "kind": "image",
+                        "uploaded_at": now_iso(),
+                    }
+                ],
+                "route_meta": route_meta,
+            }
+
+            session["messages"].append(assistant_msg)
+            session["updated_at"] = now_iso()
+            session["message_count"] = len(session["messages"])
+            session["last_message_preview"] = f"Generated image: {final_prompt[:120]}"
+
+            if safe_str(session.get("title")) in {"", "New Chat"}:
+                for msg in session["messages"]:
+                    if safe_str(msg.get("role")) == "user" and safe_str(msg.get("content")):
+                        session["title"] = safe_str(msg.get("content"))[:48].rstrip() or "New Chat"
+                        break
+
+            upsert_session(session)
+
+            artifact = add_artifact(
+                session_id=session_id,
+                kind="generated_image",
+                title=f"Generated Image - {final_prompt[:80]}",
+                content=reply_text,
+                meta={
+                    "prompt": final_prompt,
+                    "image_url": image_url,
+                    "preview": f"Generated from prompt: {final_prompt}"[:220],
+                    "summary": f"Generated from prompt: {final_prompt}"[:220],
+                    "media": [
+                        {
+                            "filename": Path(image_url).name,
+                            "mime_type": "image/png",
+                            "prompt": final_prompt,
+                            "type": "image",
+                            "url": image_url,
+                        }
+                    ],
+                },
+                debug={
+                    "source": "api_chat",
+                    "route": route_name,
+                    "image_model": IMAGE_MODEL,
+                },
+                extra={
+                    "image_url": image_url,
+                    "prompt": final_prompt,
+                    "media": [
+                        {
+                            "filename": Path(image_url).name,
+                            "mime_type": "image/png",
+                            "prompt": final_prompt,
+                            "type": "image",
+                            "url": image_url,
+                        }
+                    ],
+                },
+                image_url=image_url,
+                viewer=build_artifact_viewer(
+                    kind="generated_image",
+                    title=f"Generated Image - {final_prompt[:80]}",
+                    content=reply_text,
+                    image_url=image_url,
+                    body=f"Generated from prompt: {final_prompt}",
+                ),
+            )
+
+            state_payload = build_state(session_id=session_id)
+            return _ok(
+                message=reply_text,
+                assistant_message=reply_text,
+                image_url=image_url,
+                artifact=artifact,
+                session=state_payload.get("session"),
+                sessions=state_payload.get("sessions"),
+                messages=state_payload.get("messages"),
+                artifacts=state_payload.get("artifacts"),
+                memory_items=state_payload.get("memory_items"),
+                web_items=state_payload.get("web_items"),
+                memory=state_payload.get("memory"),
+                web=state_payload.get("web"),
+                debug={
+                    "model": OPENAI_MODEL,
+                    "openai_configured": bool(client),
+                    "attachment_count": len(attachments),
+                    "route": route_name,
+                    "image_model": IMAGE_MODEL,
+                },
+                route_meta=route_meta,
+            )
+
+        if route_name == "web":
+            target_url = extract_first_url(content)
+            if not target_url and content.lower().startswith("/web "):
+                target_url = normalize_url(content[5:].strip())
+            if not target_url:
+                return _error("No URL detected for web fetch.", status=400)
+
+            web_result = fetch_web_result(target_url)
+            reply_text = build_web_assistant_text(web_result)
+
+            assistant_msg = {
+                "id": uuid.uuid4().hex[:8],
+                "role": "assistant",
+                "content": reply_text,
+                "created_at": now_iso(),
+                "attachments": [],
+                "route_meta": route_meta,
+            }
+
+            session["messages"].append(assistant_msg)
+            session["updated_at"] = now_iso()
+            session["message_count"] = len(session["messages"])
+            session["last_message_preview"] = reply_text[:160]
+
+            if safe_str(session.get("title")) in {"", "New Chat"}:
+                for msg in session["messages"]:
+                    if safe_str(msg.get("role")) == "user" and safe_str(msg.get("content")):
+                        session["title"] = safe_str(msg.get("content"))[:48].rstrip() or "New Chat"
+                        break
+
+            upsert_session(session)
+
+            artifact = add_artifact(
+                session_id=session_id,
+                kind="web_result",
+                title=safe_str(web_result.get("title") or "Web result"),
+                content=reply_text,
+                meta={
+                    "summary": safe_str(web_result.get("summary")),
+                    "preview": safe_str(web_result.get("preview")),
+                    "source_url": safe_str((web_result.get("web") or {}).get("source_url")),
+                },
+                web=web_result.get("web") if isinstance(web_result.get("web"), dict) else None,
+                debug=web_result.get("debug") if isinstance(web_result.get("debug"), dict) else None,
+                source_url=safe_str((web_result.get("web") or {}).get("source_url")),
+                viewer=build_artifact_viewer(
+                    kind="web_result",
+                    title=safe_str(web_result.get("title") or "Web result"),
+                    content=reply_text,
+                    source_url=safe_str((web_result.get("web") or {}).get("source_url")),
+                    body=safe_str((web_result.get("web") or {}).get("body") or reply_text),
+                ),
+            )
+
+            state_payload = build_state(session_id=session_id)
+            return _ok(
+                message=reply_text,
+                assistant_message=reply_text,
+                artifact=artifact,
+                session=state_payload.get("session"),
+                sessions=state_payload.get("sessions"),
+                messages=state_payload.get("messages"),
+                artifacts=state_payload.get("artifacts"),
+                memory_items=state_payload.get("memory_items"),
+                web_items=state_payload.get("web_items"),
+                memory=state_payload.get("memory"),
+                web=state_payload.get("web"),
+                debug={
+                    "model": OPENAI_MODEL,
+                    "openai_configured": bool(client),
+                    "attachment_count": len(attachments),
+                    "route": route_name,
+                },
+                route_meta=route_meta,
+            )
+
+        model_messages = build_model_messages(
+            session=session,
+            content=content,
+            attachments=attachments,
+            route_meta=route_meta,
+            session_id=session_id,
+        )
+
+        safe_reply = fallback_assistant_text(content, route_meta, attachments)
+        assistant_text = call_model(model_messages, fallback_text=safe_reply)
+
+        assistant_message = {
+            "id": uuid.uuid4().hex[:8],
+            "role": "assistant",
+            "content": assistant_text,
+            "created_at": now_iso(),
+            "attachments": [],
+            "route_meta": route_meta,
+        }
+        session["messages"].append(assistant_message)
+
+        if safe_str(session.get("title")) in {"", "New Chat"}:
+            first_user = next((m for m in session["messages"] if m["role"] == "user" and m["content"]), None)
+            if first_user:
+                session["title"] = first_user["content"][:48].rstrip() or "New Chat"
+
+        session["updated_at"] = now_iso()
+        session["message_count"] = len(session["messages"])
+        session["last_message_preview"] = assistant_text[:160] or content[:160]
+        upsert_session(session)
+
+        artifact = add_artifact(
+            session_id=session_id,
+            kind="chat",
+            title=session["title"],
+            content=assistant_text,
+            meta={"message_count": session["message_count"]},
+            debug={"source": "api_chat", "route": "chat", "route_meta": route_meta},
+            viewer=build_artifact_viewer(
+                kind="chat",
+                title=session["title"],
+                content=assistant_text,
+                body=assistant_text,
+            ),
+        )
+
+        state_payload = build_state(session_id=session_id)
+        return _ok(
+            message=assistant_text,
+            assistant_message=assistant_text,
+            artifact=artifact,
+            session=state_payload.get("session"),
+            sessions=state_payload.get("sessions"),
+            messages=state_payload.get("messages"),
+            artifacts=state_payload.get("artifacts"),
+            memory_items=state_payload.get("memory_items"),
+            web_items=state_payload.get("web_items"),
+            memory=state_payload.get("memory"),
+            web=state_payload.get("web"),
+            debug={
+                "model": OPENAI_MODEL,
+                "openai_configured": bool(client),
+                "attachment_count": len(attachments),
+                "route": "chat",
+            },
+            route_meta=route_meta,
+        )
+    except Exception as exc:
+        try:
+            ensure_storage()
+
+            payload = request.get_json(silent=True) or {}
+            content = (
+                safe_str(payload.get("content"))
+                or safe_str(payload.get("message"))
+                or safe_str(payload.get("user_text"))
+                or safe_str(payload.get("text"))
+            )
+            session_id = safe_str(payload.get("session_id") or payload.get("sessionId"))
+            attachments = payload.get("attachments") if isinstance(payload.get("attachments"), list) else []
+            route_meta = payload.get("route_meta") or payload.get("routeMeta") or {}
+            if not route_meta:
+                route_meta = _route_meta("chat", "general", "Safe exception fallback.", [])
+
+            session = get_session(session_id)
+            if not session:
+                session = create_session()
+                session_id = session["id"]
+
+            if not session.get("messages") or not (
+                session["messages"]
+                and safe_str(session["messages"][-1].get("role")) == "user"
+                and safe_str(session["messages"][-1].get("content")) == safe_str(content)
+            ):
+                session["messages"].append(
+                    {
+                        "id": uuid.uuid4().hex[:8],
+                        "role": "user",
+                        "content": content,
+                        "created_at": now_iso(),
+                        "attachments": attachments,
+                        "route_meta": route_meta if isinstance(route_meta, dict) else {},
+                    }
+                )
+
+            safe_reply = fallback_assistant_text(content, route_meta if isinstance(route_meta, dict) else {}, attachments, error_text=str(exc))
+
+            assistant_message = {
+                "id": uuid.uuid4().hex[:8],
+                "role": "assistant",
+                "content": safe_reply,
+                "created_at": now_iso(),
+                "attachments": [],
+                "route_meta": route_meta if isinstance(route_meta, dict) else {},
+            }
+            session["messages"].append(assistant_message)
+
+            if safe_str(session.get("title")) in {"", "New Chat"}:
+                first_user = next((m for m in session["messages"] if m["role"] == "user" and m["content"]), None)
+                if first_user:
+                    session["title"] = first_user["content"][:48].rstrip() or "New Chat"
+
+            session["updated_at"] = now_iso()
+            session["message_count"] = len(session["messages"])
+            session["last_message_preview"] = safe_reply[:160]
+            upsert_session(session)
+
+            artifact = add_artifact(
+                session_id=session_id,
+                kind="chat",
+                title=session["title"],
+                content=safe_reply,
+                meta={"message_count": session["message_count"]},
+                debug={"source": "api_chat_exception", "route": "chat-fallback", "error": str(exc)},
+                viewer=build_artifact_viewer(
+                    kind="chat",
+                    title=session["title"],
+                    content=safe_reply,
+                    body=safe_reply,
+                ),
+            )
+
+            state_payload = build_state(session_id=session_id)
+            return _ok(
+                message=safe_reply,
+                assistant_message=safe_reply,
+                artifact=artifact,
+                session=state_payload.get("session"),
+                sessions=state_payload.get("sessions"),
+                messages=state_payload.get("messages"),
+                artifacts=state_payload.get("artifacts"),
+                memory_items=state_payload.get("memory_items"),
+                web_items=state_payload.get("web_items"),
+                memory=state_payload.get("memory"),
+                web=state_payload.get("web"),
+                debug={
+                    "model": OPENAI_MODEL,
+                    "openai_configured": bool(client),
+                    "route": "chat-fallback",
+                    "error": str(exc),
+                },
+                route_meta=route_meta if isinstance(route_meta, dict) else {},
+            )
+        except Exception as fallback_exc:
+            return _error(f"Chat failed: {exc}; fallback failed: {fallback_exc}", status=500)
+
 
 if __name__ == "__main__":
     ensure_storage()
-    host = os.getenv("APP_HOST") or os.getenv("NOVA_HOST") or "127.0.0.1"
-    port = int(os.getenv("APP_PORT") or os.getenv("NOVA_PORT") or "5001")
-    debug = safe_str(os.getenv("NOVA_DEBUG", "1")).lower() not in {"0", "false", "no"}
-    app.run(host=host, port=port, debug=debug)
-
+    app.run(host="127.0.0.1", port=5001, debug=True)
