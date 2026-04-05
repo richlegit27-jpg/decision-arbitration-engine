@@ -8,6 +8,7 @@
     streamChat: "/api/chat/stream",
     upload: "/api/upload",
     newSession: "/api/session/new",
+    switchSession: "/api/session/switch",
     renameSession: "/api/session/rename",
     pinSession: "/api/session/pin",
     deleteSession: "/api/session/delete",
@@ -30,6 +31,7 @@
     webItems: [],
     pendingUploads: [],
     activePanel: "artifacts",
+    activeArtifactId: "",
     lastUserMessage: null,
     activeRouteInspectMessageId: "",
     lastStatePayload: null,
@@ -98,7 +100,7 @@
     const s = safe(value).trim();
     const limit = typeof max === "number" ? max : 180;
     if (!s) return "";
-    return s.length > limit ? s.slice(0, limit - 1) + "..." : s;
+    return s.length > limit ? s.slice(0, limit - 3) + "..." : s;
   }
 
   function hash(value) {
@@ -143,7 +145,10 @@
   function normalizeUrl(value) {
     const raw = safe(value).trim();
     if (!raw) return "";
-    if (/^https?:\/\//i.test(raw) || raw.startsWith("/")) return raw;
+    if (/^(https?:|mailto:|tel:|data:|blob:)/i.test(raw)) return raw;
+    if (raw.startsWith("//")) return "https:" + raw;
+    if (raw.startsWith("/")) return raw;
+    if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(raw)) return "https://" + raw;
     return raw;
   }
 
@@ -174,7 +179,7 @@
         {},
       meta: item.meta && typeof item.meta === "object" ? item.meta : {},
       badges: asArray(item.badges),
-      image_url: safe(item.image_url || "")
+      image_url: normalizeUrl(item.image_url || "")
     };
   }
 
@@ -186,6 +191,7 @@
       session_id: safe(item.session_id || item.id || ""),
       title: safe(item.title || item.name || item.label || "New Chat"),
       pinned: !!item.pinned,
+      active: !!item.active,
       created_at: safe(item.created_at || item.createdAt || ""),
       updated_at: safe(item.updated_at || item.updatedAt || ""),
       message_count: Number(item.message_count || item.messageCount || messages.length || 0),
@@ -316,6 +322,12 @@
     }) || null;
   }
 
+  function activeArtifact() {
+    return state.artifacts.find(function (artifact) {
+      return String(artifact.id || "") === String(state.activeArtifactId || "");
+    }) || null;
+  }
+
   function messageText(message) {
     return safe(
       message &&
@@ -435,7 +447,7 @@
     els.emptyState = qs(".nova-empty-state, .nova-center-hero, [data-role='empty-state']");
   }
 
-    function applyShellState() {
+  function applyShellState() {
     const hasMessages = asArray(state.messages).length > 0;
 
     if (els.body) {
@@ -445,6 +457,7 @@
       els.body.setAttribute("data-active-panel", toPanelKey(state.activePanel));
       els.body.classList.toggle("has-messages", hasMessages);
       els.body.classList.toggle("is-empty-chat", !hasMessages);
+      els.body.classList.toggle("has-artifact-viewer", !!state.activeArtifactId);
     }
 
     if (els.sidebar) {
@@ -490,7 +503,7 @@
     state.sending = !!flag;
     if (els.sendBtn) els.sendBtn.disabled = !!flag;
     if (els.body) els.body.classList.toggle("is-sending", !!flag);
-    if (els.readyStatus) els.readyStatus.textContent = flag ? "Working..." : "Ready";
+    if (els.readyStatus) els.readyStatus.textContent = flag ? "Thinking..." : "Ready";
   }
 
   function setUploading(flag) {
@@ -499,8 +512,16 @@
     if (els.body) els.body.classList.toggle("is-uploading", !!flag);
   }
 
-  function scrollMessagesToBottom() {
+  function scrollMessagesToBottom(force) {
     if (!els.messages) return;
+
+    const threshold = 120;
+    const distanceFromBottom =
+      els.messages.scrollHeight - els.messages.scrollTop - els.messages.clientHeight;
+
+    const shouldStick = !!force || distanceFromBottom <= threshold;
+    if (!shouldStick) return;
+
     requestAnimationFrame(function () {
       try {
         els.messages.scrollTop = els.messages.scrollHeight;
@@ -508,13 +529,13 @@
     });
   }
 
-  function routeBadgeHtml(message) {
+  function routeBadgeHtml(message, renderIndex) {
     const meta = getRouteMeta(message);
     const mode = safe(getRouteMode(message));
     if (!meta || !mode) return "";
 
     const activeId = state.activeRouteInspectMessageId;
-    const messageId = getMessageId(message, 0);
+    const messageId = getMessageId(message, renderIndex);
     const isActive = activeId && activeId === messageId;
 
     return (
@@ -557,8 +578,8 @@
     );
   }
 
-  function messageHtml(message, index) {
-    const item = normalizeMessage(message, index);
+  function messageHtml(message, renderIndex) {
+    const item = normalizeMessage(message, renderIndex);
     const role = item.role === "user" ? "user" : "assistant";
     const text = messageText(item);
     const createdAt = fmtDate(item.created_at);
@@ -574,11 +595,11 @@
       .join("");
 
     return (
-      '<article class="nova-message nova-message-' + escapeHtml(role) + '" data-message-id="' + escapeHtml(item.id) + '">' +
+      '<article class="nova-message nova-message-' + escapeHtml(role) + '" data-message-id="' + escapeHtml(getMessageId(item, renderIndex)) + '">' +
       '<div class="nova-message-head">' +
       '<div class="nova-message-role">' + escapeHtml(role === "user" ? "You" : "Nova") + "</div>" +
       '<div class="nova-message-head-right">' +
-      routeBadgeHtml(item) +
+      routeBadgeHtml(item, renderIndex) +
       (createdAt ? '<div class="nova-message-time">' + escapeHtml(createdAt) + "</div>" : "") +
       "</div>" +
       "</div>" +
@@ -599,6 +620,51 @@
     );
   }
 
+  function groupMessages(messages) {
+    const groups = [];
+    let current = null;
+
+    asArray(messages).forEach(function (msg, index) {
+      const item = normalizeMessage(msg, index);
+      const role = item.role === "user" ? "user" : "assistant";
+
+      if (!current || current.role !== role) {
+        current = { role: role, items: [] };
+        groups.push(current);
+      }
+
+      current.items.push({
+        renderIndex: index,
+        message: item
+      });
+    });
+
+    return groups;
+  }
+
+  function ensureThinkingMessage() {
+    const exists = (state.messages || []).some(function (m) {
+      return m && m.id === "__nova_thinking__";
+    });
+
+    if (exists) return;
+
+    state.messages.push({
+      id: "__nova_thinking__",
+      role: "assistant",
+      content: "Thinking...",
+      created_at: new Date().toISOString(),
+      attachments: [],
+      badges: ["thinking"]
+    });
+  }
+
+  function removeThinkingMessage() {
+    state.messages = (state.messages || []).filter(function (m) {
+      return m && m.id !== "__nova_thinking__";
+    });
+  }
+
   function renderMessages() {
     if (!els.messages) return;
 
@@ -614,13 +680,26 @@
       return;
     }
 
-    els.messages.innerHTML = messages.map(messageHtml).join("");
+    const groups = groupMessages(messages);
+
+    els.messages.innerHTML = groups
+      .map(function (group) {
+        return (
+          '<section class="nova-message-group nova-message-group-' + escapeHtml(group.role) + '">' +
+          group.items
+            .map(function (entry) {
+              return messageHtml(entry.message, entry.renderIndex);
+            })
+            .join("") +
+          "</section>"
+        );
+      })
+      .join("");
+
     applyShellState();
     renderRouteInspector();
-    scrollMessagesToBottom();
-  } 
-
-    
+    scrollMessagesToBottom(false);
+  }
 
   function renderSessions() {
     if (!els.sessionsList) return;
@@ -701,7 +780,7 @@
       .map(function (item) {
         const viewer = item.viewer || {};
         return (
-          '<div class="nova-rail-card nova-artifact-card" data-artifact-id="' + escapeHtml(item.id) + '">' +
+          '<div class="nova-rail-card nova-artifact-card' + (String(item.id) === String(state.activeArtifactId) ? " is-active" : "") + '" data-artifact-id="' + escapeHtml(item.id) + '">' +
           '<div class="nova-rail-card-top">' +
           '<div class="nova-rail-card-title">' + escapeHtml(item.title || item.kind || "Artifact") + "</div>" +
           '<div class="nova-rail-card-kind">' + escapeHtml(item.kind || viewer.kind || "artifact") + "</div>" +
@@ -735,7 +814,7 @@
         const sourceUrl = item.source_url || (item.viewer && item.viewer.source_url) || "";
 
         return (
-          '<div class="nova-rail-card nova-web-card">' +
+          '<div class="nova-rail-card nova-web-card' + (String(item.id) === String(state.activeArtifactId) ? " is-active" : "") + '">' +
           '<div class="nova-rail-card-top">' +
           '<div class="nova-rail-card-title">' + escapeHtml(title) + "</div>" +
           '<div class="nova-rail-card-kind">web</div>' +
@@ -749,6 +828,35 @@
         );
       })
       .join("");
+  }
+
+  function renderArtifactViewer() {
+    if (!els.railContent) return;
+
+    const item = activeArtifact();
+    if (!item) {
+      els.railContent.innerHTML = "";
+      els.railContent.style.display = "none";
+      return;
+    }
+
+    const viewer = item.viewer || {};
+    const title = viewer.title || item.title || "Artifact";
+    const body = viewer.body || viewer.analysis_text || item.summary || item.content || item.preview || "";
+    const imageUrl = viewer.image_url || item.image_url || "";
+    const sourceUrl = viewer.source_url || item.source_url || "";
+
+    els.railContent.style.display = "";
+    els.railContent.innerHTML =
+      '<div class="nova-artifact-viewer">' +
+      '<div class="nova-artifact-viewer-top">' +
+      '<div class="nova-artifact-viewer-title">' + escapeHtml(title) + "</div>" +
+      '<button type="button" data-action="close-artifact-viewer">Close</button>' +
+      "</div>" +
+      (imageUrl ? '<div class="nova-artifact-viewer-media"><img src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(title) + '"></div>' : "") +
+      '<div class="nova-artifact-viewer-body">' + nl2br(body) + "</div>" +
+      (sourceUrl ? '<div class="nova-artifact-viewer-actions"><a href="' + escapeHtml(sourceUrl) + '" target="_blank" rel="noreferrer">Open source</a></div>' : "") +
+      "</div>";
   }
 
   function renderRailHeader() {
@@ -775,13 +883,14 @@
       btn.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
 
-    if (els.memoryList) els.memoryList.style.display = panel === "memory" ? "block" : "none";
-    if (els.artifactsList) els.artifactsList.style.display = panel === "artifacts" ? "block" : "none";
-    if (els.webList) els.webList.style.display = panel === "web" ? "block" : "none";
+    const viewerOpen = !!state.activeArtifactId;
+    if (els.memoryList) els.memoryList.style.display = panel === "memory" && !viewerOpen ? "block" : "none";
+    if (els.artifactsList) els.artifactsList.style.display = panel === "artifacts" && !viewerOpen ? "block" : "none";
+    if (els.webList) els.webList.style.display = panel === "web" && !viewerOpen ? "block" : "none";
 
+    renderArtifactViewer();
     applyShellState();
   }
-  
 
   function renderActiveSessionMeta() {
     const session = activeSession();
@@ -915,6 +1024,15 @@
     state.artifacts = getArtifactListFromPayload(raw).map(normalizeArtifact);
     state.webItems = getWebListFromPayload(raw, state.artifacts).map(normalizeArtifact);
 
+    if (state.activeArtifactId) {
+      const stillExists = state.artifacts.some(function (artifact) {
+        return String(artifact.id) === String(state.activeArtifactId);
+      });
+      if (!stillExists) {
+        state.activeArtifactId = "";
+      }
+    }
+
     state.lastRefreshHash = hash({
       sessionId: state.sessionId,
       sessions: state.sessions.map(function (session) {
@@ -957,8 +1075,9 @@
       setComposerStatus("Creating session...", false);
       const payload = await requestJson(API.newSession, { method: "POST" });
       const newId = safe(payload && (payload.session_id || payload.id || (payload.session && payload.session.id)));
-      await refreshState({ force: true });
       if (newId) state.sessionId = newId;
+      state.activeArtifactId = "";
+      await refreshState({ force: true });
       renderAll();
       if (els.chatInput) els.chatInput.focus();
       setComposerStatus("New chat ready", false);
@@ -1022,6 +1141,10 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: targetId })
       });
+      if (String(state.sessionId) === String(targetId)) {
+        state.sessionId = "";
+        state.activeArtifactId = "";
+      }
       await refreshState({ force: true });
       setComposerStatus("Session deleted", false);
     } catch (error) {
@@ -1040,8 +1163,38 @@
 
     state.sessionId = targetId;
     state.messages = selected ? asArray(selected.messages) : [];
+    state.activeRouteInspectMessageId = "";
     renderAll();
-    scrollMessagesToBottom();
+    scrollMessagesToBottom(true);
+  }
+
+  async function switchSession(sessionId, options) {
+    const targetId = safe(sessionId);
+    const opts = options || {};
+    if (!targetId) return;
+    if (String(targetId) === String(state.sessionId) && !opts.force) {
+      switchSessionLocal(targetId);
+      return;
+    }
+
+    setComposerStatus("Opening session...", false);
+
+    try {
+      await requestJson(API.switchSession, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: targetId })
+      });
+      state.sessionId = targetId;
+      state.activeRouteInspectMessageId = "";
+      await refreshState({ force: true });
+      scrollMessagesToBottom(true);
+      setComposerStatus("Session ready", false);
+    } catch (error) {
+      warn("switchSession backend failed, local fallback", error);
+      switchSessionLocal(targetId);
+      setComposerStatus("Session switched locally", false);
+    }
   }
 
   async function addMemoryItem() {
@@ -1154,6 +1307,31 @@
     });
   }
 
+  function findMessageById(messageId) {
+    return state.messages.find(function (message) {
+      return message && message.id === messageId;
+    }) || null;
+  }
+
+  function upsertStreamingAssistant(localMessageId, fullText, routeMeta) {
+    const target = findMessageById(localMessageId);
+    if (target) {
+      target.content = fullText;
+      if (routeMeta) target.route_meta = routeMeta;
+      return;
+    }
+
+    state.messages.push(
+      normalizeMessage({
+        id: localMessageId,
+        role: "assistant",
+        content: fullText,
+        created_at: new Date().toISOString(),
+        route_meta: routeMeta || {}
+      })
+    );
+  }
+
   async function apiStreamChat(payload) {
     const res = await fetch(API.streamChat, {
       method: "POST",
@@ -1218,19 +1396,13 @@
 
         if (delta) {
           full += delta;
-          const target = state.messages.find(function (message) {
-            return message.id === localMessageId;
-          });
-          if (target) {
-            target.content = full;
-            if (routeMeta) target.route_meta = routeMeta;
-          }
+          upsertStreamingAssistant(localMessageId, full, routeMeta);
           renderMessages();
         }
       }
     }
 
-    return { assistant_message: full, route_meta: routeMeta };
+    return { assistant_message: full, route_meta: routeMeta, local_message_id: localMessageId };
   }
 
   async function apiJsonChat(payload) {
@@ -1259,21 +1431,48 @@
     return payload.route_meta || (payload.assistant && payload.assistant.route_meta) || (payload.message_data && payload.message_data.route_meta) || null;
   }
 
-  async function finalizePostSend(sendNonce, response) {
+  function messagesContainContent(messages, text) {
+    const target = safe(text).trim();
+    if (!target) return false;
+
+    return asArray(messages).some(function (message) {
+      return messageText(message).trim() === target;
+    });
+  }
+
+  async function finalizePostSend(sendNonce, response, optimisticAssistantText) {
     const responseSessionId = safe(response && (response.session_id || response.active_session_id || (response.session && response.session.id)));
     if (responseSessionId) {
       state.sessionId = responseSessionId;
     }
 
-    await refreshState({ force: true });
+    const optimisticSnapshot = asArray(state.messages).map(function (message, index) {
+      return normalizeMessage(message, index);
+    });
+
+    try {
+      await refreshState({ force: true });
+    } catch (_) {}
 
     if (sendNonce !== state.lastSendNonce) {
       log("finalizePostSend skipped: newer send exists");
       return;
     }
 
+    if (
+      optimisticAssistantText &&
+      !messagesContainContent(state.messages, optimisticAssistantText) &&
+      messagesContainContent(optimisticSnapshot, optimisticAssistantText)
+    ) {
+      state.messages = optimisticSnapshot;
+      renderAll();
+      scrollMessagesToBottom(true);
+      setComposerStatus("Sent", false);
+      return;
+    }
+
     renderAll();
-    scrollMessagesToBottom();
+    scrollMessagesToBottom(true);
     setComposerStatus("Sent", false);
   }
 
@@ -1295,7 +1494,11 @@
     state.lastUserMessage = localUser;
     state.messages = state.messages.concat([localUser]);
     renderMessages();
-    scrollMessagesToBottom();
+    scrollMessagesToBottom(true);
+
+    ensureThinkingMessage();
+    renderMessages();
+    scrollMessagesToBottom(true);
 
     if (els.chatInput) {
       els.chatInput.value = "";
@@ -1318,39 +1521,46 @@
     try {
       let response = null;
       let streamed = false;
+      let optimisticAssistantText = "";
 
       try {
         response = await apiStreamChat(payload);
         streamed = true;
+        optimisticAssistantText = extractAssistantMessage(response);
       } catch (streamError) {
         warn("Streaming failed, fallback -> JSON", streamError);
+        removeThinkingMessage();
         response = await apiJsonChat(payload);
       }
 
       if (!streamed) {
         const assistantText = extractAssistantMessage(response);
         const routeMeta = extractRouteMeta(response);
+        optimisticAssistantText = assistantText;
+
         if (assistantText) {
           state.messages = state.messages.concat([createLocalAssistantMessage(assistantText, routeMeta)]);
           renderMessages();
-          scrollMessagesToBottom();
+          scrollMessagesToBottom(true);
         }
       }
 
-      await finalizePostSend(sendNonce, response);
+      removeThinkingMessage();
+      await finalizePostSend(sendNonce, response, optimisticAssistantText);
     } catch (error) {
       err("sendMessage failed", error);
+      removeThinkingMessage();
       setComposerStatus("Send failed: " + safe(error && error.message), true);
       await refreshState({ force: true });
       renderAll();
-      scrollMessagesToBottom();
+      scrollMessagesToBottom(true);
     } finally {
       setBusy(false);
       if (els.chatInput) els.chatInput.focus();
     }
   }
 
-  function openArtifactFromState(artifactId) {
+  async function openArtifactFromState(artifactId) {
     const id = safe(artifactId);
     if (!id) return;
 
@@ -1363,46 +1573,30 @@
       return;
     }
 
+    state.activeArtifactId = id;
     state.activePanel = isWebArtifact(item) ? "web" : "artifacts";
     state.rightRailOpen = true;
     renderRailHeader();
-
-    const viewer = item.viewer || {};
-    const title = viewer.title || item.title || "Artifact";
-    const body = viewer.body || viewer.analysis_text || item.summary || item.content || item.preview || "";
-    const imageUrl = viewer.image_url || item.image_url || "";
-    const sourceUrl = viewer.source_url || item.source_url || "";
-
-    if (els.railContent) {
-      els.railContent.innerHTML =
-        '<div class="nova-artifact-viewer">' +
-        '<div class="nova-artifact-viewer-top">' +
-        '<div class="nova-artifact-viewer-title">' + escapeHtml(title) + "</div>" +
-        '<button type="button" data-action="close-artifact-viewer">Close</button>' +
-        "</div>" +
-        (imageUrl ? '<div class="nova-artifact-viewer-media"><img src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(title) + '"></div>' : "") +
-        '<div class="nova-artifact-viewer-body">' + nl2br(body) + "</div>" +
-        (sourceUrl ? '<div class="nova-artifact-viewer-actions"><a href="' + escapeHtml(sourceUrl) + '" target="_blank" rel="noreferrer">Open source</a></div>' : "") +
-        "</div>";
-    }
-
     applyShellState();
 
-    if (item.session_id) {
-      switchSessionLocal(item.session_id);
+    if (item.session_id && String(item.session_id) !== String(state.sessionId)) {
+      await switchSession(item.session_id);
     }
   }
 
   function closeArtifactViewer() {
+    state.activeArtifactId = "";
     if (els.railContent) {
       els.railContent.innerHTML = "";
+      els.railContent.style.display = "none";
     }
+    renderRailHeader();
   }
 
   function setActivePanel(panel) {
     state.activePanel = toPanelKey(panel);
     state.rightRailOpen = true;
-    closeArtifactViewer();
+    state.activeArtifactId = "";
     renderRailHeader();
     applyShellState();
   }
@@ -1469,7 +1663,7 @@
         break;
       case "switch-session":
         event.preventDefault();
-        switchSessionLocal(button.getAttribute("data-session-id"));
+        switchSession(button.getAttribute("data-session-id"));
         break;
       case "rename-session":
         event.preventDefault();
@@ -1576,7 +1770,7 @@
     refreshState: refreshState,
     sendMessage: sendMessage,
     createNewSession: createNewSession,
-    switchSession: switchSessionLocal,
+    switchSession: switchSession,
     addMemoryItem: addMemoryItem,
     deleteMemoryItem: deleteMemoryItem,
     openArtifact: openArtifactFromState,
