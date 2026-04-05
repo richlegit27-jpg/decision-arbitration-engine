@@ -1008,7 +1008,7 @@ def api_health():
     ensure_storage()
     return _ok(
         status="ok",
-        route_build="session-switch-lock-2026-04-04-001",
+        route_build="session-family-lock-2026-04-04-001",
         openai_model=OPENAI_MODEL,
         image_model=NOVA_IMAGE_MODEL,
         has_openai_api_key=bool(OPENAI_API_KEY),
@@ -1114,6 +1114,160 @@ def api_session_switch():
             "error": str(e)
         }), 500
 
+@app.route("/api/session/rename", methods=["POST"])
+def api_session_rename():
+    ensure_storage()
+    try:
+        payload = request.get_json(silent=True) or {}
+        session_id = safe_str(payload.get("session_id") or payload.get("id") or payload.get("sessionId"))
+        title = safe_str(payload.get("title") or payload.get("name") or payload.get("label"))
+
+        if not session_id:
+            return _error("session_id is required", status=400)
+        if not title:
+            return _error("title is required", status=400)
+
+        store = load_sessions_payload()
+        sessions = store.get("sessions") or []
+
+        idx = -1
+        for i, session in enumerate(sessions):
+            if safe_str(session.get("id")) == session_id:
+                idx = i
+                break
+
+        if idx < 0:
+            return _error("Session not found", status=404)
+
+        sessions[idx]["title"] = title
+        sessions[idx]["updated_at"] = now_iso()
+        store["sessions"] = sessions
+
+        if not safe_str(store.get("active_session_id")):
+            store["active_session_id"] = session_id
+
+        _mark_active_session(store, safe_str(store.get("active_session_id")))
+        save_sessions_payload(store)
+
+        state_payload = build_state(session_id=safe_str(store.get("active_session_id")))
+        return _ok(
+            session_id=safe_str(store.get("active_session_id")),
+            active_session_id=safe_str(store.get("active_session_id")),
+            session=next((s for s in state_payload.get("sessions", []) if safe_str(s.get("id")) == session_id), None),
+            sessions=state_payload.get("sessions"),
+            messages=state_payload.get("messages"),
+            artifacts=state_payload.get("artifacts"),
+            memory_items=state_payload.get("memory_items"),
+            web_items=state_payload.get("web_items"),
+            memory=state_payload.get("memory"),
+            web=state_payload.get("web"),
+        )
+    except Exception as exc:
+        return _error(f"Rename failed: {exc}", status=500)
+
+
+@app.route("/api/session/pin", methods=["POST"])
+def api_session_pin():
+    ensure_storage()
+    try:
+        payload = request.get_json(silent=True) or {}
+        session_id = safe_str(payload.get("session_id") or payload.get("id") or payload.get("sessionId"))
+
+        if not session_id:
+            return _error("session_id is required", status=400)
+
+        store = load_sessions_payload()
+        sessions = store.get("sessions") or []
+
+        idx = -1
+        for i, session in enumerate(sessions):
+            if safe_str(session.get("id")) == session_id:
+                idx = i
+                break
+
+        if idx < 0:
+            return _error("Session not found", status=404)
+
+        sessions[idx]["pinned"] = not bool(sessions[idx].get("pinned"))
+        sessions[idx]["updated_at"] = now_iso()
+
+        sessions.sort(key=lambda s: safe_str(s.get("updated_at")), reverse=True)
+        sessions.sort(key=lambda s: 1 if s.get("pinned") else 0, reverse=True)
+
+        store["sessions"] = sessions
+        if not safe_str(store.get("active_session_id")):
+            store["active_session_id"] = session_id
+
+        _mark_active_session(store, safe_str(store.get("active_session_id")))
+        save_sessions_payload(store)
+
+        state_payload = build_state(session_id=safe_str(store.get("active_session_id")))
+        return _ok(
+            session_id=safe_str(store.get("active_session_id")),
+            active_session_id=safe_str(store.get("active_session_id")),
+            session=next((s for s in state_payload.get("sessions", []) if safe_str(s.get("id")) == session_id), None),
+            sessions=state_payload.get("sessions"),
+            messages=state_payload.get("messages"),
+            artifacts=state_payload.get("artifacts"),
+            memory_items=state_payload.get("memory_items"),
+            web_items=state_payload.get("web_items"),
+            memory=state_payload.get("memory"),
+            web=state_payload.get("web"),
+        )
+    except Exception as exc:
+        return _error(f"Pin failed: {exc}", status=500)
+
+
+@app.route("/api/session/delete", methods=["POST"])
+def api_session_delete():
+    ensure_storage()
+    try:
+        payload = request.get_json(silent=True) or {}
+        session_id = safe_str(payload.get("session_id") or payload.get("id") or payload.get("sessionId"))
+
+        if not session_id:
+            return _error("session_id is required", status=400)
+
+        store = load_sessions_payload()
+        sessions = store.get("sessions") or []
+
+        idx = -1
+        for i, session in enumerate(sessions):
+            if safe_str(session.get("id")) == session_id:
+                idx = i
+                break
+
+        if idx < 0:
+            return _error("Session not found", status=404)
+
+        deleting_active = safe_str(store.get("active_session_id")) == session_id
+        del sessions[idx]
+        store["sessions"] = sessions
+
+        if deleting_active:
+            store["active_session_id"] = safe_str(sessions[0].get("id")) if sessions else ""
+        elif not safe_str(store.get("active_session_id")) and sessions:
+            store["active_session_id"] = safe_str(sessions[0].get("id"))
+
+        _mark_active_session(store, safe_str(store.get("active_session_id")))
+        save_sessions_payload(store)
+
+        state_payload = build_state(session_id=safe_str(store.get("active_session_id")))
+        return _ok(
+            deleted_session_id=session_id,
+            session_id=safe_str(store.get("active_session_id")),
+            active_session_id=safe_str(store.get("active_session_id")),
+            session=state_payload.get("session"),
+            sessions=state_payload.get("sessions"),
+            messages=state_payload.get("messages"),
+            artifacts=state_payload.get("artifacts"),
+            memory_items=state_payload.get("memory_items"),
+            web_items=state_payload.get("web_items"),
+            memory=state_payload.get("memory"),
+            web=state_payload.get("web"),
+        )
+    except Exception as exc:
+        return _error(f"Delete failed: {exc}", status=500)
 
 @app.route("/api/artifacts", methods=["GET"])
 def api_artifacts():
