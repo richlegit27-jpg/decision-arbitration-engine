@@ -1,6 +1,75 @@
 {
   "artifacts": [
     {
+      "id": "2eca453fc3",
+      "artifact_id": "2eca453fc3",
+      "session_id": "2d911fb0",
+      "kind": "chat",
+      "title": "Chat Reply",
+      "content": "Hey Richard. What do you need?",
+      "summary": "Hey Richard. What do you need?",
+      "preview": "Hey Richard. What do you need?",
+      "image_url": "",
+      "source_url": "",
+      "created_at": "2026-04-06T10:02:52.110150+00:00",
+      "updated_at": "2026-04-06T10:02:52.110150+00:00",
+      "pinned": false,
+      "meta": {},
+      "viewer": {
+        "kind": "chat",
+        "title": "Chat Reply",
+        "body": "Hey Richard. What do you need?",
+        "image_url": "",
+        "source_url": ""
+      }
+    },
+    {
+      "id": "5ca4dce200",
+      "artifact_id": "5ca4dce200",
+      "session_id": "2d911fb0",
+      "kind": "chat",
+      "title": "Chat Reply",
+      "content": "Hi Richard. How can I help?",
+      "summary": "Hi Richard. How can I help?",
+      "preview": "Hi Richard. How can I help?",
+      "image_url": "",
+      "source_url": "",
+      "created_at": "2026-04-06T07:42:18.920957+00:00",
+      "updated_at": "2026-04-06T07:42:18.920957+00:00",
+      "pinned": false,
+      "viewer": {
+        "kind": "chat",
+        "title": "Chat Reply",
+        "body": "Hi Richard. How can I help?",
+        "image_url": "",
+        "source_url": ""
+      },
+      "meta": {}
+    },
+    {
+      "id": "6776a8f247",
+      "artifact_id": "6776a8f247",
+      "session_id": "3b930eb8",
+      "kind": "chat",
+      "title": "Chat Reply",
+      "content": "Hi Richard. What do you need?",
+      "summary": "Hi Richard. What do you need?",
+      "preview": "Hi Richard. What do you need?",
+      "image_url": "",
+      "source_url": "",
+      "created_at": "2026-04-06T07:42:08.720188+00:00",
+      "updated_at": "2026-04-06T07:42:08.720188+00:00",
+      "pinned": false,
+      "viewer": {
+        "kind": "chat",
+        "title": "Chat Reply",
+        "body": "Hi Richard. What do you need?",
+        "image_url": "",
+        "source_url": ""
+      },
+      "meta": {}
+    },
+    {
       "id": "e4477867a7",
       "artifact_id": "e4477867a7",
       "session_id": "3b930eb8",
@@ -14,14 +83,14 @@
       "created_at": "2026-04-06T06:02:05.383219+00:00",
       "updated_at": "2026-04-06T06:02:05.383219+00:00",
       "pinned": false,
-      "meta": {},
       "viewer": {
         "kind": "chat",
         "title": "Chat Reply",
         "body": "Hi Richard. Want a quick plan for homework, gym, and your movie later?",
         "image_url": "",
         "source_url": ""
-      }
+      },
+      "meta": {}
     },
     {
       "id": "4551f2be61",

@@ -3,18 +3,18 @@
 
   if (window.NovaComposerArtifacts) return;
 
-  function log() {
-    try {
-      console.log("[NovaComposerArtifacts]", ...arguments);
-    } catch (_) {}
-  }
-
   function bootModule() {
     const core = window.NovaComposerCore;
     if (!core) return false;
 
     const state = core.state;
     const els = core.els;
+
+    function log() {
+      try {
+        console.log("[NovaComposerArtifacts]", ...arguments);
+      } catch (_) {}
+    }
 
     function getArtifacts() {
       return Array.isArray(state.artifacts) ? state.artifacts.slice() : [];
@@ -203,7 +203,7 @@
       card.appendChild(bottom);
 
       card.onclick = function () {
-        openArtifact(artifactId);
+        openArtifact(artifactId, { scrollViewer: true });
       };
 
       return card;
@@ -242,7 +242,8 @@
 
       const subtitle = document.createElement("div");
       subtitle.className = "nova-artifact-viewer-subtitle";
-      subtitle.textContent = `${viewer.kind || getArtifactKind(item)}${getArtifactUpdatedAt(item) ? " · " + getArtifactUpdatedAt(item) : ""}`;
+      subtitle.textContent =
+        `${viewer.kind || getArtifactKind(item)}${getArtifactUpdatedAt(item) ? " · " + getArtifactUpdatedAt(item) : ""}`;
 
       left.appendChild(title);
       left.appendChild(subtitle);
@@ -380,6 +381,7 @@
 
       const panel = document.createElement("div");
       panel.className = "nova-artifact-viewer";
+      panel.setAttribute("data-active-artifact-viewer", "true");
 
       panel.appendChild(buildViewerHeader(item, viewer));
       panel.appendChild(buildViewerMedia(viewer));
@@ -424,13 +426,34 @@
       viewerWrap.appendChild(buildViewer(item));
     }
 
-    function openArtifact(artifactId) {
+    function scrollViewerIntoView() {
+      const viewerWrap = getViewerWrap();
+      const viewer = viewerWrap && viewerWrap.querySelector("[data-active-artifact-viewer]");
+      if (!viewer) return;
+
+      try {
+        viewer.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } catch (_) {}
+    }
+
+    function openArtifact(artifactId, options) {
       const id = String(artifactId || "").trim();
       if (!id) return;
+
+      if (String(state.activeArtifactId || "") === id) {
+        if (options && options.scrollViewer) {
+          scrollViewerIntoView();
+        }
+        return;
+      }
 
       state.activeArtifactId = id;
       renderArtifactList();
       renderArtifactViewer();
+
+      if (options && options.scrollViewer) {
+        scrollViewerIntoView();
+      }
 
       const item = getArtifacts().find((entry) => getArtifactId(entry) === id);
       if (item) {
@@ -462,6 +485,18 @@
 
       document.addEventListener("nova:artifact-close", function () {
         closeArtifactViewer();
+      });
+
+      document.addEventListener("nova:session-changed", function () {
+        const currentId = String(state.activeArtifactId || "");
+        if (!currentId) return;
+
+        const stillExists = getArtifacts().some((entry) => getArtifactId(entry) === currentId);
+        if (!stillExists) {
+          state.activeArtifactId = "";
+        }
+
+        render();
       });
     }
 

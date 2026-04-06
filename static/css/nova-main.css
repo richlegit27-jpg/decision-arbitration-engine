@@ -1379,3 +1379,307 @@ html, body {
   0%, 50%, 100% { opacity: 1; }
   25%, 75% { opacity: 0; }
 }
+
+/* =========================================
+   SESSION ACTIONS POLISH
+   cleaner hover / stronger alignment / less jank
+========================================= */
+
+.nova-session-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.nova-session-card-main {
+  position: relative;
+  z-index: 1;
+}
+
+.nova-session-card-top {
+  align-items: flex-start;
+}
+
+.nova-session-card-title {
+  padding-top: 1px;
+}
+
+.nova-session-card-badges {
+  margin-left: auto;
+}
+
+.nova-session-card-bottom {
+  min-height: 30px;
+}
+
+.nova-session-card-actions {
+  opacity: 0.18;
+  transform: translateY(1px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.nova-session-card:hover .nova-session-card-actions,
+.nova-session-card:focus-within .nova-session-card-actions,
+.nova-session-card.is-active .nova-session-card-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.nova-session-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.025);
+  color: var(--text-dim);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.nova-session-action-btn:hover {
+  border-color: var(--border-strong);
+  background: rgba(255,255,255,0.06);
+  color: var(--text-main);
+  transform: translateY(-1px);
+}
+
+.nova-session-action-btn:active {
+  transform: translateY(0);
+}
+
+.nova-session-action-btn:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(91,124,255,0.28);
+}
+
+.nova-session-action-btn.is-danger {
+  color: rgba(255,92,108,0.82);
+}
+
+.nova-session-action-btn.is-danger:hover {
+  border-color: rgba(255,92,108,0.38);
+  background: rgba(255,92,108,0.09);
+  color: #ffd7dc;
+}
+
+.nova-session-card.is-active .nova-session-action-btn {
+  background: rgba(255,255,255,0.035);
+}
+
+.nova-session-card.is-active .nova-session-action-btn:hover {
+  background: rgba(255,255,255,0.07);
+}
+
+.nova-session-card.is-pinned .nova-session-action-btn[title*="Pin"],
+.nova-session-card.is-pinned .nova-session-action-btn[title*="pin"] {
+  color: #ffd76a;
+}
+
+.nova-session-mini-badge {
+  min-height: 19px;
+  padding: 0 6px;
+  font-size: 10px;
+  letter-spacing: 0.01em;
+}
+
+.nova-session-card-updated {
+  max-width: 120px;
+}
+
+.nova-session-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  opacity: 0;
+  background: rgba(91,124,255,0.9);
+  transition: opacity 140ms ease;
+}
+
+.nova-session-card.is-active::before {
+  opacity: 1;
+}
+
+.nova-session-empty-btn,
+.nova-new-chat-btn {
+  white-space: nowrap;
+}
+
+.nova-session-list.is-busy .nova-session-card {
+  filter: saturate(0.9);
+}
+
+.nova-session-list.is-busy .nova-session-action-btn,
+.nova-session-list.is-busy .nova-session-card {
+  cursor: wait;
+}
+
+.nova-app-shell.is-sidebar-collapsed .nova-session-card-actions {
+  display: none;
+}
+
+.nova-app-shell.is-sidebar-collapsed .nova-session-card-top {
+  justify-content: center;
+}
+
+.nova-app-shell.is-sidebar-collapsed .nova-session-card-badges {
+  display: none;
+}
+
+.nova-app-shell.is-sidebar-collapsed .nova-session-card-title {
+  text-align: center;
+  width: 100%;
+}
+
+/* =========================================
+   ARTIFACT OPEN FLOW TIGHTEN
+   better selection / cleaner open state
+========================================= */
+
+.nova-artifact-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.nova-artifact-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  opacity: 0;
+  background: rgba(91,124,255,0.9);
+  transition: opacity 140ms ease;
+}
+
+.nova-artifact-card.is-active::before {
+  opacity: 1;
+}
+
+.nova-artifact-card-bottom {
+  min-height: 28px;
+}
+
+.nova-artifact-open-session-btn {
+  opacity: 0.78;
+  transition:
+    opacity 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.nova-artifact-card:hover .nova-artifact-open-session-btn,
+.nova-artifact-card.is-active .nova-artifact-open-session-btn {
+  opacity: 1;
+}
+
+.nova-artifact-viewer {
+  position: relative;
+}
+
+.nova-artifact-viewer::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: rgba(91,124,255,0.9);
+  opacity: 0.9;
+}
+
+.nova-artifact-viewer-header-right .nova-secondary-btn {
+  min-width: 88px;
+}
+
+.nova-artifact-viewer-empty {
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.nova-artifact-list-wrap {
+  scroll-margin-top: 8px;
+}
+
+.nova-artifact-viewer-wrap {
+  scroll-margin-top: 8px;
+}
+
+/* =========================================
+   ARTIFACT OPEN FLOW TIGHTEN
+   better selection / cleaner open state
+========================================= */
+
+.nova-artifact-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.nova-artifact-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  opacity: 0;
+  background: rgba(91,124,255,0.9);
+  transition: opacity 140ms ease;
+}
+
+.nova-artifact-card.is-active::before {
+  opacity: 1;
+}
+
+.nova-artifact-card-bottom {
+  min-height: 28px;
+}
+
+.nova-artifact-open-session-btn {
+  opacity: 0.78;
+  transition:
+    opacity 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.nova-artifact-card:hover .nova-artifact-open-session-btn,
+.nova-artifact-card.is-active .nova-artifact-open-session-btn {
+  opacity: 1;
+}
+
+.nova-artifact-viewer {
+  position: relative;
+}
+
+.nova-artifact-viewer::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: rgba(91,124,255,0.9);
+  opacity: 0.9;
+}
+
+.nova-artifact-viewer-header-right .nova-secondary-btn {
+  min-width: 88px;
+}
+
+.nova-artifact-viewer-empty {
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.nova-artifact-list-wrap {
+  scroll-margin-top: 8px;
+}
+
+.nova-artifact-viewer-wrap {
+  scroll-margin-top: 8px;
+}

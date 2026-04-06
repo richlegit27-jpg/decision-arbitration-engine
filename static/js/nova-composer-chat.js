@@ -23,7 +23,7 @@
     }
 
     function getChatThread() {
-      return els.chatThread || els.chat || document.querySelector("[data-chat-thread]");
+      return els.chatThread || document.querySelector("[data-chat-thread]");
     }
 
     function scrollToBottom() {
@@ -53,25 +53,46 @@
     function setSending(flag) {
       state.sending = !!flag;
 
+      const sendBtn = document.querySelector('[data-action="send"]');
+      if (sendBtn) sendBtn.disabled = !!flag;
+      if (els.chatInput) els.chatInput.disabled = !!flag;
+
       if (typeof core.renderTopbar === "function") {
         core.renderTopbar();
       }
+    }
 
-      const sendBtn =
-        els.sendBtn ||
-        document.querySelector('[data-action="send"]');
+    async function sendNonStreaming(text) {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          message: text,
+          session_id: state.activeSessionId || state.sessionId || "",
+          attachments: Array.isArray(state.pendingUploads) ? state.pendingUploads : []
+        })
+      });
 
-      if (sendBtn) {
-        sendBtn.disabled = !!flag;
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload && payload.error ? payload.error : "Send failed.");
       }
 
-      if (els.chatInput) {
-        els.chatInput.disabled = !!flag;
+      if (typeof core.applyState === "function") {
+        core.applyState(payload);
+      }
+
+      if (typeof core.renderAll === "function") {
+        core.renderAll();
       }
     }
 
     async function streamMessage(text) {
-      const userNode = createMessageNode("user", text);
+      createMessageNode("user", text);
+
       const assistantNode = createMessageNode("assistant", "");
       if (assistantNode && assistantNode.wrap) {
         assistantNode.wrap.classList.add("is-streaming");
@@ -91,7 +112,11 @@
       });
 
       if (!response.ok || !response.body) {
-        throw new Error("Streaming request failed.");
+        if (assistantNode && assistantNode.wrap) {
+          assistantNode.wrap.remove();
+        }
+        await sendNonStreaming(text);
+        return;
       }
 
       const reader = response.body.getReader();
@@ -126,12 +151,7 @@
             continue;
           }
 
-          if (eventData.delta && assistantNode && assistantNode.body) {
-            assistantNode.body.textContent += eventData.delta;
-            scrollToBottom();
-          }
-
-          if (eventData.route_meta) {
+          if (eventData.phase === "start" && eventData.route_meta) {
             state.lastResponse = Object.assign({}, state.lastResponse || {}, {
               route_meta: eventData.route_meta
             });
@@ -140,12 +160,17 @@
             }
           }
 
-          if (eventData.done) {
-            finalPayload = eventData;
+          if (eventData.delta && assistantNode && assistantNode.body) {
+            assistantNode.body.textContent += eventData.delta;
+            scrollToBottom();
           }
 
           if (eventData.error) {
             throw new Error(eventData.error);
+          }
+
+          if (eventData.done) {
+            finalPayload = eventData;
           }
         }
       }
@@ -169,9 +194,9 @@
       if (!els.chatInput || state.sending) return;
 
       const text = String(els.chatInput.value || "").trim();
-      if (!text && !(Array.isArray(state.pendingUploads) && state.pendingUploads.length)) {
-        return;
-      }
+      const hasUploads = Array.isArray(state.pendingUploads) && state.pendingUploads.length > 0;
+
+      if (!text && !hasUploads) return;
 
       setSending(true);
 
