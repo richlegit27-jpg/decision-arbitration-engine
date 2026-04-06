@@ -1280,7 +1280,6 @@ def process_chat_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "dominant_memory": get_dominant_memories(limit=8),
     }
 
-# ------------------ ROUTES ------------------
 
 # ------------------ ROUTES ------------------
 
@@ -1376,25 +1375,161 @@ def api_chat():
 
 @app.route("/api/chat/stream", methods=["POST"])
 def api_chat_stream():
-    payload = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True) or {}
+    user_text = (
+        data.get("message")
+        or data.get("content")
+        or data.get("user_text")
+        or ""
+    ).strip()
+    session_id = str(data.get("session_id") or "").strip()
+    attachments = data.get("attachments") or []
 
-    @stream_with_context
+    if not user_text and not attachments:
+        return jsonify({"ok": False, "error": "Message required."}), 400
+
+    def sse(event):
+        return f"data: {json.dumps(event)}\n\n"
+
     def generate():
+        assistant_text = ""
+        assistant_message = None
+
         try:
-            yield sse_pack("status", {"phase": "start"})
-            result = process_chat_payload(payload)
+            route_meta = {}
+            try:
+                if "route_request" in globals():
+                    route_meta = route_request(user_text=user_text, attachments=attachments) or {}
+            except Exception:
+                route_meta = {}
 
-            text = safe_str(result.get("assistant_text"))
+            yield sse({
+                "ok": True,
+                "phase": "start",
+                "session_id": session_id,
+                "route_meta": route_meta,
+            })
 
-            for i in range(0, len(text), 80):
-                yield sse_pack("delta", {"text": text[i:i+80]})
+            current_session = None
+            try:
+                if "chat_service" in globals() and hasattr(chat_service, "ensure_session"):
+                    current_session = chat_service.ensure_session(session_id=session_id)
+                elif "ensure_session" in globals():
+                    current_session = ensure_session(session_id)
+            except Exception:
+                current_session = None
 
-            yield sse_pack("done", result)
+            if isinstance(current_session, dict):
+                session_id_local = str(
+                    current_session.get("id")
+                    or current_session.get("session_id")
+                    or session_id
+                    or ""
+                )
+            else:
+                session_id_local = session_id
 
-        except Exception as e:
-            yield sse_pack("error", {"error": str(e)})
+            try:
+                if "chat_service" in globals() and hasattr(chat_service, "append_message"):
+                    chat_service.append_message(
+                        session_id=session_id_local,
+                        role="user",
+                        content=user_text,
+                        attachments=attachments,
+                    )
+                elif "append_message" in globals():
+                    append_message(session_id_local, {
+                        "role": "user",
+                        "content": user_text,
+                        "attachments": attachments,
+                    })
+            except Exception:
+                pass
 
-    return Response(generate(), mimetype="text/event-stream")
+            if OpenAI is None:
+                assistant_text = "Streaming unavailable: OpenAI SDK not loaded."
+                yield sse({"delta": assistant_text})
+            else:
+                client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+                model_name = os.getenv("OPENAI_MODEL", "gpt-5.4")
+
+                messages = [
+                    {"role": "system", "content": "You are Nova. Be helpful, direct, and concise."},
+                    {"role": "user", "content": user_text},
+                ]
+
+                stream = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    stream=True,
+                )
+
+                for chunk in stream:
+                    try:
+                        delta = chunk.choices[0].delta.content or ""
+                    except Exception:
+                        delta = ""
+
+                    if not delta:
+                        continue
+
+                    assistant_text += delta
+                    yield sse({"delta": delta})
+
+            try:
+                if "chat_service" in globals() and hasattr(chat_service, "append_message"):
+                    assistant_message = chat_service.append_message(
+                        session_id=session_id_local,
+                        role="assistant",
+                        content=assistant_text,
+                    )
+                elif "append_message" in globals():
+                    assistant_message = append_message(session_id_local, {
+                        "role": "assistant",
+                        "content": assistant_text,
+                    })
+            except Exception:
+                assistant_message = {
+                    "role": "assistant",
+                    "content": assistant_text,
+                }
+
+            payload = {
+                "ok": True,
+                "done": True,
+                "assistant_message": assistant_message or {
+                    "role": "assistant",
+                    "content": assistant_text,
+                },
+                "session_id": session_id_local,
+                "route_meta": route_meta,
+            }
+
+            try:
+                if "build_state_payload" in globals():
+                    state_payload = build_state_payload(session_id_local)
+                    if isinstance(state_payload, dict):
+                        payload.update(state_payload)
+                elif "chat_service" in globals() and hasattr(chat_service, "build_state_payload"):
+                    state_payload = chat_service.build_state_payload(session_id_local)
+                    if isinstance(state_payload, dict):
+                        payload.update(state_payload)
+            except Exception:
+                pass
+
+            yield sse(payload)
+
+        except Exception as exc:
+            yield sse({
+                "ok": False,
+                "error": str(exc),
+                "done": True,
+            })
+
+    response = Response(stream_with_context(generate()), mimetype="text/event-stream")
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["X-Accel-Buffering"] = "no"
+    return response
 
 
 # ------------------ WEB ------------------
@@ -1453,3 +1588,4 @@ def serve_upload(filename):
 if __name__ == "__main__":
     ensure_storage()
     app.run(host="127.0.0.1", port=5001, debug=True, threaded=True)
+
