@@ -151,6 +151,75 @@ def safe_int(x: Any, default: int = 0) -> int:
 
 # ------------------ MEMORY ------------------
 
+# ------------------ MEMORY ------------------
+
+MEMORY_PATTERNS = [
+    r"^\s*remember\s+that\s+(.+)$",
+    r"^\s*remember\s+(.+)$",
+    r"^\s*from\s+now\s+on[:,]?\s*(.+)$",
+    r"^\s*i\s+prefer\s+(.+)$",
+    r"^\s*always\s+(.+)$",
+    r"^\s*my\s+project\s+is\s+(.+)$",
+    r"^\s*my\s+ports?\s+(?:are|is)\s+(.+)$",
+    r"^\s*use\s+this\s+path[:,]?\s*(.+)$",
+    r"^\s*keep\s+(.+)$",
+]
+
+MEMORY_BAD_SUBSTRINGS = [
+    "traceback",
+    "error:",
+    "exception",
+    "stack trace",
+    "console.log",
+    "uncaught",
+    "failed to load",
+    "http://127.0.0.1",
+    "https://127.0.0.1",
+]
+
+MEMORY_CONFLICT_RULES = [
+    {
+        "name": "response_style_full_file",
+        "patterns": [
+            r"\bfull file\b",
+            r"\bfull files\b",
+            r"\bsmff\b",
+            r"\bfull file replacements?\b",
+        ],
+        "kind": "preference",
+    },
+    {
+        "name": "response_style_no_partials",
+        "patterns": [
+            r"\bno partials?\b",
+            r"\bdon't give me partials?\b",
+            r"\bnot partials?\b",
+            r"\bonly full\b",
+        ],
+        "kind": "preference",
+    },
+    {
+        "name": "architecture_modular_backend",
+        "patterns": [
+            r"\bmodular\b",
+            r"\bbackend split\b",
+            r"\bstay modular\b",
+            r"\bsplit modular structure\b",
+        ],
+        "kind": "project",
+    },
+    {
+        "name": "ports_config",
+        "patterns": [
+            r"\bports?\b",
+            r"\b8744\b",
+            r"\b8743\b",
+            r"\b5001\b",
+        ],
+        "kind": "project",
+    },
+]
+
 def load_memory_payload() -> dict[str, list[dict[str, Any]]]:
     raw = read_json(MEMORY_FILE, {"items": []})
     items = raw.get("items", []) if isinstance(raw, dict) else []
@@ -158,9 +227,282 @@ def load_memory_payload() -> dict[str, list[dict[str, Any]]]:
         items = []
     return {"items": items}
 
-
 def save_memory_payload(payload: dict[str, list[dict[str, Any]]]) -> None:
     write_json(MEMORY_FILE, {"items": payload.get("items", [])})
+
+def normalize_memory_text(text: str) -> str:
+    value = safe_str(text)
+    value = re.sub(r"\s+", " ", value).strip(" .,-:\t\r\n")
+    return value
+
+def memory_exists(items: list[dict[str, Any]], text: str) -> bool:
+    target = normalize_memory_text(text).lower()
+    if not target:
+        return True
+
+    for item in items:
+        existing = normalize_memory_text(item.get("text", "")).lower()
+        if existing == target:
+            return True
+
+    return False
+
+def classify_memory_text(text: str) -> str:
+    lowered = normalize_memory_text(text).lower()
+
+    if any(x in lowered for x in ["prefer", "always", "from now on", "use this path", "keep "]):
+        return "preference"
+
+    if any(x in lowered for x in ["project", "ports", "path", "backend", "frontend", "nova"]):
+        return "project"
+
+    return "note"
+
+def extract_memory_candidates(content: str) -> list[str]:
+    text = safe_str(content)
+    if not text:
+        return []
+
+    stripped = text.strip()
+    lowered = stripped.lower()
+
+    if len(stripped) < 8 or len(stripped) > 220:
+        return []
+
+    if "\n" in stripped and len(stripped.splitlines()) > 3:
+        return []
+
+    if any(bad in lowered for bad in MEMORY_BAD_SUBSTRINGS):
+        return []
+
+    candidates: list[str] = []
+
+    for pattern in MEMORY_PATTERNS:
+        match = re.match(pattern, stripped, re.IGNORECASE)
+        if match:
+            captured = normalize_memory_text(match.group(1))
+            if captured:
+                candidates.append(captured)
+
+    if not candidates:
+        direct_prefixes = [
+            "i prefer ",
+            "from now on ",
+            "my project is ",
+            "my ports are ",
+            "my port is ",
+            "use this path ",
+            "always ",
+            "keep ",
+        ]
+        if any(lowered.startswith(prefix) for prefix in direct_prefixes):
+            cleaned = normalize_memory_text(stripped)
+            if cleaned:
+                candidates.append(cleaned)
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+
+    for candidate in candidates:
+        key = candidate.lower()
+        if key not in seen:
+            seen.add(key)
+            deduped.append(candidate)
+
+    return deduped[:3]
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+def parse_iso_datetime(value: str | None) -> datetime:
+    raw = safe_str(value)
+    if not raw:
+        return utc_now()
+
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except Exception:
+        return utc_now()
+
+def memory_conflict_key(text: str, kind: str = "") -> str:
+    clean = normalize_memory_text(text).lower()
+    clean_kind = safe_str(kind).lower()
+
+    for rule in MEMORY_CONFLICT_RULES:
+        rule_kind = safe_str(rule.get("kind"))
+        if rule_kind and rule_kind != clean_kind:
+            continue
+
+        for pattern in rule.get("patterns", []):
+            try:
+                if re.search(pattern, clean, re.IGNORECASE):
+                    return safe_str(rule.get("name"))
+            except re.error:
+                continue
+
+    if clean_kind == "preference":
+        if clean.startswith("i prefer "):
+            return "pref:" + clean.split("i prefer ", 1)[1][:80]
+        if clean.startswith("from now on "):
+            return "pref:" + clean.split("from now on ", 1)[1][:80]
+
+    if clean_kind == "project":
+        if "port" in clean:
+            return "project:ports"
+        if "path" in clean:
+            return "project:path"
+        if "backend" in clean and "split" in clean:
+            return "project:backend-split"
+
+    return ""
+
+def memory_priority_score(item: dict[str, Any]) -> int:
+    text = normalize_memory_text(item.get("text", "")).lower()
+    kind = safe_str(item.get("kind")).lower()
+    source = safe_str(item.get("source")).lower()
+
+    score = 0
+
+    if kind == "preference":
+        score += 100
+    elif kind == "project":
+        score += 80
+    else:
+        score += 50
+
+    if source == "manual":
+        score += 25
+    elif source == "auto":
+        score += 10
+
+    if len(text) <= 120:
+        score += 10
+
+    if any(x in text for x in ["always", "from now on", "prefer", "must", "only"]):
+        score += 20
+
+    if any(x in text for x in ["nova", "backend", "split", "smff", "full file"]):
+        score += 15
+
+    age_seconds = max(0, int((utc_now() - parse_iso_datetime(item.get("updated_at"))).total_seconds()))
+    age_days = age_seconds // 86400
+
+    if age_days <= 1:
+        score += 30
+    elif age_days <= 7:
+        score += 20
+    elif age_days <= 30:
+        score += 10
+
+    return score
+
+def replace_conflicting_memory(items: list[dict[str, Any]], new_item: dict[str, Any]) -> list[dict[str, Any]]:
+    new_key = memory_conflict_key(new_item.get("text", ""), new_item.get("kind", ""))
+    if not new_key:
+        return items
+
+    filtered: list[dict[str, Any]] = []
+    for item in items:
+        old_key = memory_conflict_key(item.get("text", ""), item.get("kind", ""))
+        if old_key and old_key == new_key and safe_str(item.get("id")) != safe_str(new_item.get("id")):
+            continue
+        filtered.append(item)
+
+    return filtered
+
+def save_memory_item_dominant(
+    *,
+    text: str,
+    kind: str = "note",
+    source: str = "auto",
+    session_id: str = "",
+) -> dict[str, Any] | None:
+    clean = normalize_memory_text(text)
+    if not clean:
+        return None
+
+    payload = load_memory_payload()
+    items = payload.get("items", [])
+
+    if memory_exists(items, clean):
+        return None
+
+    item = {
+        "id": uuid.uuid4().hex[:10],
+        "text": clean,
+        "kind": safe_str(kind) or "note",
+        "source": safe_str(source) or "auto",
+        "session_id": safe_str(session_id),
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+        "preview": clean[:160],
+    }
+
+    items.insert(0, item)
+    items = replace_conflicting_memory(items, item)
+
+    items = sorted(
+        items,
+        key=lambda x: (
+            -memory_priority_score(x),
+            -int(parse_iso_datetime(x.get("updated_at")).timestamp()),
+        ),
+    )[:300]
+
+    payload["items"] = items
+    save_memory_payload(payload)
+    return item
+
+def auto_learn_memory_dominant(content: str, session_id: str = "") -> list[dict[str, Any]]:
+    learned: list[dict[str, Any]] = []
+
+    for candidate in extract_memory_candidates(content):
+        item = save_memory_item_dominant(
+            text=candidate,
+            kind=classify_memory_text(candidate),
+            source="auto",
+            session_id=session_id,
+        )
+        if item:
+            learned.append(item)
+
+    return learned
+
+def get_dominant_memories(limit: int = 8) -> list[dict[str, Any]]:
+    payload = load_memory_payload()
+    items = payload.get("items", [])
+
+    ranked = sorted(
+        items,
+        key=lambda x: (
+            -memory_priority_score(x),
+            -int(parse_iso_datetime(x.get("updated_at")).timestamp()),
+        ),
+    )
+
+    return ranked[:max(1, limit)]
+
+def build_memory_system_prompt(limit: int = 8) -> str:
+    top_items = get_dominant_memories(limit=limit)
+    if not top_items:
+        return ""
+
+    lines = ["Persistent user memory (highest priority):"]
+
+    for item in top_items:
+        kind = safe_str(item.get("kind") or "note").strip()
+        text = normalize_memory_text(item.get("text", ""))
+        if not text:
+            continue
+        lines.append(f"- [{kind}] {text}")
+
+    if len(lines) == 1:
+        return ""
+
+    return "\n".join(lines)
 
 
 # ------------------ SESSIONS ------------------
@@ -789,19 +1131,14 @@ def build_state(session_id: str = "") -> dict[str, Any]:
         "openai_model": OPENAI_MODEL,
         "chat_model": OPENAI_MODEL,
         "model": OPENAI_MODEL,
-    }
+         }
 
-
+                  
 # ------------------ CHAT CORE ------------------
+
 
 def process_chat_payload(payload: dict[str, Any]) -> dict[str, Any]:
     ensure_storage()
-
-    session = None
-    session_id = ""
-    content = ""
-    attachments: list[dict[str, Any]] = []
-    route_meta: dict[str, Any] = {"route": "chat", "mode": "general", "reason": "Default conversational route.", "matched_keywords": []}
 
     content = (
         safe_str(payload.get("content"))
@@ -829,6 +1166,10 @@ def process_chat_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
     route_meta = route_request(content, attachments)
 
+    learned_memory_items = []
+    if not regenerate and route_meta.get("route") == "chat":
+        learned_memory_items = auto_learn_memory_dominant(content, session_id=session_id)
+
     if route_meta.get("route") == "image":
         prompt = safe_str(content)
         if prompt.lower().startswith("/image"):
@@ -838,109 +1179,65 @@ def process_chat_payload(payload: dict[str, Any]) -> dict[str, Any]:
         image_url = safe_str(image_result.get("image_url"))
 
         if not regenerate:
-            session["messages"].append(
-                {
-                    "id": uuid.uuid4().hex[:8],
-                    "role": "user",
-                    "content": content,
-                    "created_at": now_iso(),
-                    "attachments": attachments,
-                    "route_meta": route_meta,
-                }
-            )
-
-        assistant_text = f"Generated image for: {prompt}" if prompt else "Generated image."
-
-        assistant_attachments = []
-        if image_url:
-            guessed_name = Path(urlparse(image_url).path).name or "generated.png"
-            assistant_attachments.append(
-                {
-                    "id": uuid.uuid4().hex[:8],
-                    "name": guessed_name,
-                    "filename": guessed_name,
-                    "url": image_url,
-                    "preview_url": image_url,
-                    "path": image_url,
-                    "mime_type": "image/png" if image_url.lower().endswith(".png") else "text/plain",
-                    "kind": "image" if image_url.lower().endswith(".png") else "file",
-                    "size": 0,
-                    "uploaded_at": now_iso(),
-                }
-            )
-
-        assistant_message = {
-            "id": uuid.uuid4().hex[:8],
-            "role": "assistant",
-            "content": assistant_text,
-            "created_at": now_iso(),
-            "attachments": assistant_attachments,
-            "route_meta": route_meta,
-        }
-        session["messages"].append(assistant_message)
-
-        artifact = create_artifact(
-            session_id=session_id,
-            kind="image",
-            title="Generated Image",
-            content=assistant_text,
-            summary=prompt[:220],
-            image_url=image_url,
-            meta=image_result,
-        )
-
-        if safe_str(session.get("title")) in {"", "New Chat"}:
-            session["title"] = (prompt[:48].rstrip() if prompt else "New Chat") or "New Chat"
-
-        persist_session(session, assistant_text=assistant_text, fallback_preview=content, make_active=True)
-
-        state_payload = build_state(session_id=session_id)
-        return {
-            "ok": True,
-            "message": assistant_text,
-            "assistant_message": assistant_message,
-            "assistant_text": assistant_text,
-            "session_id": session_id,
-            "session": state_payload.get("session"),
-            "sessions": state_payload.get("sessions"),
-            "messages": state_payload.get("messages"),
-            "artifacts": state_payload.get("artifacts"),
-            "memory_items": state_payload.get("memory_items"),
-            "web_items": state_payload.get("web_items"),
-            "memory": state_payload.get("memory"),
-            "web": state_payload.get("web"),
-            "image_url": image_url,
-            "artifact": artifact,
-            "route_meta": route_meta,
-            "debug": {
-                "model": OPENAI_MODEL,
-                "image_model": NOVA_IMAGE_MODEL,
-                "openai_configured": bool(client),
-                "attachment_count": len(attachments),
-                "route": route_meta.get("route"),
-                "mode": route_meta.get("mode"),
-            },
-        }
-
-    if not regenerate:
-        session["messages"].append(
-            {
+            session["messages"].append({
                 "id": uuid.uuid4().hex[:8],
                 "role": "user",
                 "content": content,
                 "created_at": now_iso(),
                 "attachments": attachments,
                 "route_meta": route_meta,
-            }
-        )
+            })
 
-    safe_reply = fallback_assistant_text(content, attachments)
+        assistant_text = f"Generated image for: {prompt}" if prompt else "Generated image."
+
+        assistant_message = {
+            "id": uuid.uuid4().hex[:8],
+            "role": "assistant",
+            "content": assistant_text,
+            "created_at": now_iso(),
+            "attachments": [],
+            "route_meta": route_meta,
+        }
+
+        session["messages"].append(assistant_message)
+
+        persist_session(session, assistant_text=assistant_text, fallback_preview=content, make_active=True)
+
+        return {
+            "ok": True,
+            "assistant_message": assistant_message,
+            "assistant_text": assistant_text,
+            "session_id": session_id,
+            "learned_memory_items": learned_memory_items,
+            "dominant_memory": get_dominant_memories(limit=8),
+        }
+
+    if not regenerate:
+        session["messages"].append({
+            "id": uuid.uuid4().hex[:8],
+            "role": "user",
+            "content": content,
+            "created_at": now_iso(),
+            "attachments": attachments,
+            "route_meta": route_meta,
+        })
+
+    fallback = fallback_assistant_text(content, attachments)
+
     model_messages = build_model_messages(
         session=session,
         content=content,
         attachments=attachments,
     )
-    assistant_text = call_model(model_messages, fallback_text=safe_reply)
+
+    memory_prompt = build_memory_system_prompt(limit=8)
+    if memory_prompt:
+        model_messages.insert(0, {
+            "role": "system",
+            "content": memory_prompt
+        })
+
+    assistant_text = call_model(model_messages, fallback_text=fallback)
 
     assistant_message = {
         "id": uuid.uuid4().hex[:8],
@@ -950,9 +1247,10 @@ def process_chat_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "attachments": [],
         "route_meta": route_meta,
     }
+
     session["messages"].append(assistant_message)
 
-    artifact = create_artifact(
+    create_artifact(
         session_id=session_id,
         kind="chat",
         title="Chat Reply",
@@ -961,399 +1259,119 @@ def process_chat_payload(payload: dict[str, Any]) -> dict[str, Any]:
     )
 
     if safe_str(session.get("title")) in {"", "New Chat"}:
-        first_user = next((m for m in session["messages"] if m["role"] == "user" and m["content"]), None)
-        if first_user:
-            session["title"] = first_user["content"][:48].rstrip() or "New Chat"
+        session["title"] = content[:48].rstrip() or "New Chat"
 
     persist_session(session, assistant_text=assistant_text, fallback_preview=content, make_active=True)
 
-    state_payload = build_state(session_id=session_id)
+    state = build_state(session_id=session_id)
+
     return {
         "ok": True,
-        "message": assistant_text,
         "assistant_message": assistant_message,
         "assistant_text": assistant_text,
         "session_id": session_id,
-        "session": state_payload.get("session"),
-        "sessions": state_payload.get("sessions"),
-        "messages": state_payload.get("messages"),
-        "artifacts": state_payload.get("artifacts"),
-        "memory_items": state_payload.get("memory_items"),
-        "web_items": state_payload.get("web_items"),
-        "memory": state_payload.get("memory"),
-        "web": state_payload.get("web"),
-        "artifact": artifact,
-        "route_meta": route_meta,
-        "debug": {
-            "model": OPENAI_MODEL,
-            "image_model": NOVA_IMAGE_MODEL,
-            "openai_configured": bool(client),
-            "attachment_count": len(attachments),
-            "route": route_meta.get("route"),
-            "mode": route_meta.get("mode"),
-        },
+        "session": state.get("session"),
+        "sessions": state.get("sessions"),
+        "messages": state.get("messages"),
+        "artifacts": state.get("artifacts"),
+        "memory_items": state.get("memory_items"),
+        "web_items": state.get("web_items"),
+        "learned_memory_items": learned_memory_items,
+        "dominant_memory": get_dominant_memories(limit=8),
     }
 
+# ------------------ ROUTES ------------------
 
 # ------------------ ROUTES ------------------
 
 @app.route("/")
 def index():
-    ensure_storage()
     return render_template("index.html")
 
 
 @app.route("/api/health", methods=["GET"])
 def api_health():
-    ensure_storage()
-    return _ok(
-        status="ok",
-        route_build="session-family-lock-2026-04-04-001",
-        openai_model=OPENAI_MODEL,
-        image_model=NOVA_IMAGE_MODEL,
-        has_openai_api_key=bool(OPENAI_API_KEY),
-        openai_configured=bool(client),
-        timestamp=now_iso(),
-    )
+    return jsonify({
+        "ok": True,
+        "chat_model": OPENAI_MODEL,
+        "model": OPENAI_MODEL,
+    })
 
 
 @app.route("/api/state", methods=["GET"])
 def api_state():
     ensure_storage()
-    session_id = safe_str(request.args.get("session_id"))
-    return jsonify(build_state(session_id=session_id))
+    state = build_state()
+    return jsonify({"ok": True, **state})
 
+
+# ------------------ SESSION FAMILY ------------------
 
 @app.route("/api/session/new", methods=["POST"])
 def api_session_new():
     ensure_storage()
-    try:
-        payload = request.get_json(silent=True) or {}
-        title = safe_str(
-            payload.get("title")
-            or payload.get("name")
-            or payload.get("session_title")
-        ) or "New Chat"
-
-        session = create_session(title=title)
-        upsert_session(session, make_active=True)
-
-        state_payload = build_state(session_id=session["id"])
-        return _ok(
-            session_id=session["id"],
-            active_session_id=session["id"],
-            session=state_payload.get("session"),
-            sessions=state_payload.get("sessions"),
-            messages=state_payload.get("messages"),
-            artifacts=state_payload.get("artifacts"),
-            memory_items=state_payload.get("memory_items"),
-            web_items=state_payload.get("web_items"),
-            memory=state_payload.get("memory"),
-            web=state_payload.get("web"),
-        )
-    except Exception as exc:
-        return _error(f"New chat failed: {exc}", status=500)
+    session = create_session()
+    upsert_session(session, make_active=True)
+    state = build_state(session_id=session["id"])
+    return jsonify({"ok": True, **state})
 
 
 @app.route("/api/session/switch", methods=["POST"])
 def api_session_switch():
-    ensure_storage()
+    payload = request.get_json(silent=True) or {}
+    session_id = safe_str(payload.get("session_id"))
 
-    try:
-        payload = request.get_json(silent=True) or {}
-        session_id = str(
-            payload.get("session_id")
-            or payload.get("id")
-            or payload.get("sessionId")
-            or ""
-        ).strip()
+    if not session_id:
+        return jsonify({"ok": False, "error": "session_id required"}), 400
 
-        if not session_id:
-            return jsonify({
-                "ok": False,
-                "error": "session_id is required"
-            }), 400
+    store = load_sessions_payload()
+    _mark_active_session(store, session_id)
+    save_sessions_payload(store)
 
-        store = load_sessions_payload()
-        sessions = store.get("sessions") or []
+    state = build_state(session_id=session_id)
+    return jsonify({"ok": True, **state})
 
-        target = None
-        for session in sessions:
-            sid = _session_id_of(session)
-            if sid == session_id:
-                target = session
-                break
-
-        if not target:
-            return jsonify({
-                "ok": False,
-                "error": "Session not found",
-                "session_id": session_id
-            }), 404
-
-        active_session = _mark_active_session(store, session_id)
-        save_sessions_payload(store)
-
-        state_payload = build_state(session_id=session_id)
-        return jsonify({
-            "ok": True,
-            "session_id": store.get("active_session_id") or session_id,
-            "active_session_id": store.get("active_session_id") or session_id,
-            "session": active_session or target,
-            "sessions": state_payload.get("sessions"),
-            "messages": state_payload.get("messages"),
-            "artifacts": state_payload.get("artifacts"),
-            "memory_items": state_payload.get("memory_items"),
-            "web_items": state_payload.get("web_items"),
-            "memory": state_payload.get("memory"),
-            "web": state_payload.get("web"),
-        })
-    except Exception as e:
-        return jsonify({
-            "ok": False,
-            "error": str(e)
-        }), 500
 
 @app.route("/api/session/rename", methods=["POST"])
 def api_session_rename():
-    ensure_storage()
-    try:
-        payload = request.get_json(silent=True) or {}
-        session_id = safe_str(payload.get("session_id") or payload.get("id") or payload.get("sessionId"))
-        title = safe_str(payload.get("title") or payload.get("name") or payload.get("label"))
+    payload = request.get_json(silent=True) or {}
+    session_id = safe_str(payload.get("session_id"))
+    title = safe_str(payload.get("title"))
 
-        if not session_id:
-            return _error("session_id is required", status=400)
-        if not title:
-            return _error("title is required", status=400)
+    store = load_sessions_payload()
 
-        store = load_sessions_payload()
-        sessions = store.get("sessions") or []
+    for s in store["sessions"]:
+        if safe_str(s["id"]) == session_id:
+            s["title"] = title
+            s["updated_at"] = now_iso()
 
-        idx = -1
-        for i, session in enumerate(sessions):
-            if safe_str(session.get("id")) == session_id:
-                idx = i
-                break
+    save_sessions_payload(store)
 
-        if idx < 0:
-            return _error("Session not found", status=404)
-
-        sessions[idx]["title"] = title
-        sessions[idx]["updated_at"] = now_iso()
-        store["sessions"] = sessions
-
-        if not safe_str(store.get("active_session_id")):
-            store["active_session_id"] = session_id
-
-        _mark_active_session(store, safe_str(store.get("active_session_id")))
-        save_sessions_payload(store)
-
-        state_payload = build_state(session_id=safe_str(store.get("active_session_id")))
-        return _ok(
-            session_id=safe_str(store.get("active_session_id")),
-            active_session_id=safe_str(store.get("active_session_id")),
-            session=next((s for s in state_payload.get("sessions", []) if safe_str(s.get("id")) == session_id), None),
-            sessions=state_payload.get("sessions"),
-            messages=state_payload.get("messages"),
-            artifacts=state_payload.get("artifacts"),
-            memory_items=state_payload.get("memory_items"),
-            web_items=state_payload.get("web_items"),
-            memory=state_payload.get("memory"),
-            web=state_payload.get("web"),
-        )
-    except Exception as exc:
-        return _error(f"Rename failed: {exc}", status=500)
-
-
-@app.route("/api/session/pin", methods=["POST"])
-def api_session_pin():
-    ensure_storage()
-    try:
-        payload = request.get_json(silent=True) or {}
-        session_id = safe_str(payload.get("session_id") or payload.get("id") or payload.get("sessionId"))
-
-        if not session_id:
-            return _error("session_id is required", status=400)
-
-        store = load_sessions_payload()
-        sessions = store.get("sessions") or []
-
-        idx = -1
-        for i, session in enumerate(sessions):
-            if safe_str(session.get("id")) == session_id:
-                idx = i
-                break
-
-        if idx < 0:
-            return _error("Session not found", status=404)
-
-        sessions[idx]["pinned"] = not bool(sessions[idx].get("pinned"))
-        sessions[idx]["updated_at"] = now_iso()
-
-        sessions.sort(key=lambda s: safe_str(s.get("updated_at")), reverse=True)
-        sessions.sort(key=lambda s: 1 if s.get("pinned") else 0, reverse=True)
-
-        store["sessions"] = sessions
-        if not safe_str(store.get("active_session_id")):
-            store["active_session_id"] = session_id
-
-        _mark_active_session(store, safe_str(store.get("active_session_id")))
-        save_sessions_payload(store)
-
-        state_payload = build_state(session_id=safe_str(store.get("active_session_id")))
-        return _ok(
-            session_id=safe_str(store.get("active_session_id")),
-            active_session_id=safe_str(store.get("active_session_id")),
-            session=next((s for s in state_payload.get("sessions", []) if safe_str(s.get("id")) == session_id), None),
-            sessions=state_payload.get("sessions"),
-            messages=state_payload.get("messages"),
-            artifacts=state_payload.get("artifacts"),
-            memory_items=state_payload.get("memory_items"),
-            web_items=state_payload.get("web_items"),
-            memory=state_payload.get("memory"),
-            web=state_payload.get("web"),
-        )
-    except Exception as exc:
-        return _error(f"Pin failed: {exc}", status=500)
+    state = build_state(session_id=session_id)
+    return jsonify({"ok": True, **state})
 
 
 @app.route("/api/session/delete", methods=["POST"])
 def api_session_delete():
-    ensure_storage()
-    try:
-        payload = request.get_json(silent=True) or {}
-        session_id = safe_str(payload.get("session_id") or payload.get("id") or payload.get("sessionId"))
+    payload = request.get_json(silent=True) or {}
+    session_id = safe_str(payload.get("session_id"))
 
-        if not session_id:
-            return _error("session_id is required", status=400)
+    store = load_sessions_payload()
+    store["sessions"] = [s for s in store["sessions"] if safe_str(s["id"]) != session_id]
 
-        store = load_sessions_payload()
-        sessions = store.get("sessions") or []
+    save_sessions_payload(store)
 
-        idx = -1
-        for i, session in enumerate(sessions):
-            if safe_str(session.get("id")) == session_id:
-                idx = i
-                break
-
-        if idx < 0:
-            return _error("Session not found", status=404)
-
-        deleting_active = safe_str(store.get("active_session_id")) == session_id
-        del sessions[idx]
-        store["sessions"] = sessions
-
-        if deleting_active:
-            store["active_session_id"] = safe_str(sessions[0].get("id")) if sessions else ""
-        elif not safe_str(store.get("active_session_id")) and sessions:
-            store["active_session_id"] = safe_str(sessions[0].get("id"))
-
-        _mark_active_session(store, safe_str(store.get("active_session_id")))
-        save_sessions_payload(store)
-
-        state_payload = build_state(session_id=safe_str(store.get("active_session_id")))
-        return _ok(
-            deleted_session_id=session_id,
-            session_id=safe_str(store.get("active_session_id")),
-            active_session_id=safe_str(store.get("active_session_id")),
-            session=state_payload.get("session"),
-            sessions=state_payload.get("sessions"),
-            messages=state_payload.get("messages"),
-            artifacts=state_payload.get("artifacts"),
-            memory_items=state_payload.get("memory_items"),
-            web_items=state_payload.get("web_items"),
-            memory=state_payload.get("memory"),
-            web=state_payload.get("web"),
-        )
-    except Exception as exc:
-        return _error(f"Delete failed: {exc}", status=500)
-
-@app.route("/api/artifacts", methods=["GET"])
-def api_artifacts():
-    ensure_storage()
-    session_id = safe_str(request.args.get("session_id"))
-    payload = load_artifacts_payload()
-    artifacts = payload["artifacts"]
-
-    if session_id:
-        artifacts = [a for a in artifacts if safe_str(a.get("session_id")) == session_id]
-
-    return _ok(artifacts=artifacts, items=artifacts, count=len(artifacts))
+    state = build_state()
+    return jsonify({"ok": True, **state})
 
 
-@app.route("/api/artifacts/<artifact_id>", methods=["GET"])
-def api_artifact_detail(artifact_id: str):
-    ensure_storage()
-    artifact = get_artifact(artifact_id)
-    if not artifact:
-        return _error("Artifact not found.", status=404)
-    return _ok(artifact=artifact, item=artifact)
-
-
-@app.route("/api/uploads/<path:filename>", methods=["GET"])
-def api_uploads(filename: str):
-    return send_from_directory(str(UPLOADS_DIR), filename)
-
-
-@app.route("/api/upload", methods=["POST"])
-def api_upload():
-    ensure_storage()
-
-    if "file" not in request.files:
-        return _error("Missing file.", status=400)
-
-    file = request.files["file"]
-    original_name = safe_str(file.filename)
-    if not original_name:
-        return _error("Missing filename.", status=400)
-
-    ext = Path(original_name).suffix
-    stored_name = f"{uuid.uuid4().hex}{ext}"
-    target = UPLOADS_DIR / stored_name
-    file.save(str(target))
-
-    mime_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
-    size = target.stat().st_size if target.exists() else 0
-    url = f"/api/uploads/{stored_name}"
-
-    attachment = {
-        "id": uuid.uuid4().hex[:8],
-        "name": original_name,
-        "filename": original_name,
-        "stored_name": stored_name,
-        "url": url,
-        "preview_url": url,
-        "path": url,
-        "mime_type": mime_type,
-        "kind": guess_kind_from_mime(mime_type),
-        "size": size,
-        "uploaded_at": now_iso(),
-    }
-
-    return _ok(
-        message="Upload saved.",
-        attachment=attachment,
-        file=attachment,
-        upload=attachment,
-        id=attachment["id"],
-        filename=original_name,
-        url=url,
-        path=url,
-        mime_type=mime_type,
-    )
-
+# ------------------ CHAT ------------------
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
-    try:
-        payload = request.get_json(silent=True) or {}
-        result = process_chat_payload(payload)
-        return jsonify(result)
-    except ValueError as exc:
-        return _error(str(exc), status=400)
-    except Exception as exc:
-        return _error(f"Chat failed: {exc}", status=500)
+    payload = request.get_json(silent=True) or {}
+    result = process_chat_payload(payload)
+    return jsonify(result)
 
 
 @app.route("/api/chat/stream", methods=["POST"])
@@ -1363,61 +1381,74 @@ def api_chat_stream():
     @stream_with_context
     def generate():
         try:
-            yield sse_pack("status", {"ok": True, "phase": "start"})
+            yield sse_pack("status", {"phase": "start"})
             result = process_chat_payload(payload)
 
-            assistant_text = safe_str(
-                (result.get("assistant_message") or {}).get("content")
-                or result.get("assistant_text")
-                or result.get("message")
-            )
+            text = safe_str(result.get("assistant_text"))
 
-            if assistant_text:
-                chunk_size = 80
-                for i in range(0, len(assistant_text), chunk_size):
-                    yield sse_pack("delta", {"text": assistant_text[i:i + chunk_size]})
+            for i in range(0, len(text), 80):
+                yield sse_pack("delta", {"text": text[i:i+80]})
 
             yield sse_pack("done", result)
-        except ValueError as exc:
-            yield sse_pack("error", {"error": str(exc)})
-        except Exception as exc:
-            yield sse_pack("error", {"error": f"Chat failed: {exc}"})
 
-    headers = {
-        "Cache-Control": "no-cache",
-        "X-Accel-Buffering": "no",
-        "Connection": "keep-alive",
-    }
-    return Response(generate(), mimetype="text/event-stream", headers=headers)
+        except Exception as e:
+            yield sse_pack("error", {"error": str(e)})
 
+    return Response(generate(), mimetype="text/event-stream")
+
+
+# ------------------ WEB ------------------
 
 @app.route("/api/web/fetch", methods=["POST"])
 def api_web_fetch():
+    payload = request.get_json(silent=True) or {}
+    url = safe_str(payload.get("url"))
+
+    result = fetch_web_result(url)
+
+    create_artifact(
+        session_id=safe_str(payload.get("session_id")),
+        kind="web",
+        title=result.get("title"),
+        content=result.get("body"),
+        summary=result.get("summary"),
+        source_url=result.get("url"),
+        meta=result,
+    )
+
+    return jsonify({"ok": True, "web_result": result})
+
+
+# ------------------ UPLOADS ------------------
+
+@app.route("/api/upload", methods=["POST"])
+def api_upload():
     ensure_storage()
-    try:
-        payload = request.get_json(silent=True) or {}
-        url = safe_str(payload.get("url") or payload.get("content") or payload.get("message") or payload.get("text"))
-        session_id = safe_str(payload.get("session_id") or payload.get("sessionId"))
 
-        if not url:
-            return _error("Missing URL.", status=400)
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "No file"}), 400
 
-        result = fetch_web_result(url)
+    file = request.files["file"]
+    filename = uuid.uuid4().hex + "_" + file.filename
+    path = UPLOADS_DIR / filename
+    file.save(path)
 
-        create_artifact(
-            session_id=session_id,
-            kind="web",
-            title=result.get("title") or "Web Result",
-            content=result.get("body") or "",
-            summary=result.get("summary") or "",
-            source_url=result.get("url") or url,
-            meta=result,
-        )
+    return jsonify({
+        "ok": True,
+        "file": {
+            "name": filename,
+            "url": f"/uploads/{filename}",
+            "path": str(path),
+        }
+    })
 
-        return _ok(web_result=result, session_id=session_id)
-    except Exception as exc:
-        return _error(f"Web fetch failed: {exc}", status=500)
 
+@app.route("/uploads/<path:filename>")
+def serve_upload(filename):
+    return send_from_directory(UPLOADS_DIR, filename)
+
+
+# ------------------ RUN ------------------
 
 if __name__ == "__main__":
     ensure_storage()

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Nova</title>
-  <link rel="stylesheet" href="/static/css/nova-main.css?v=shell-sidepanels-lock-2026-04-04-001">
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=shell-polish-lock-2026-04-05-003">
 </head>
 <body>
   <div class="nova-app-shell" data-app-shell>
@@ -15,90 +15,124 @@
       </div>
 
       <div class="nova-sidebar-brand">
-        <div class="nova-brand-mark">N</div>
-        <div class="nova-brand-copy">
-          <div class="nova-brand-title">Nova</div>
-          <div class="nova-brand-subtitle">Local AI workspace</div>
-        </div>
+        <div class="nova-sidebar-brand-title">Nova</div>
+        <div class="nova-sidebar-brand-subtitle">Fast local AI workspace</div>
       </div>
 
-      <div class="nova-sidebar-section-title">Sessions</div>
-      <div id="sessionsList" class="nova-sessions-list" data-role="sessions-list"></div>
+      <div class="nova-session-list" data-session-list></div>
     </aside>
 
-    <main class="nova-main" data-main-column>
-      <header class="nova-topbar" data-topbar>
+    <main class="nova-main">
+      <header class="nova-topbar">
         <div class="nova-topbar-left">
-          <div class="nova-session-heading">
-            <div id="activeSessionTitle" class="nova-active-session-title" data-role="active-session-title">Nova</div>
-            <div id="activeSessionMeta" class="nova-active-session-meta" data-role="active-session-meta">Fast local AI workspace</div>
+          <div class="nova-topbar-title-wrap">
+            <div class="nova-topbar-title" data-session-title>Nova</div>
+            <div class="nova-status-pill">
+              <span class="nova-status-dot"></span>
+              <span data-state-chip-text>Ready</span>
+            </div>
           </div>
+          <div class="nova-topbar-subtitle" data-session-subtitle>Fast local AI workspace</div>
         </div>
 
         <div class="nova-topbar-right">
-          <button class="nova-chip-btn" type="button" data-action="toggle-right-rail" id="rightRailToggle">Panels</button>
-          <div id="modelChip" class="nova-chip" data-role="model-chip">gpt-5.4</div>
-          <div id="readyStatus" class="nova-status-chip" data-role="ready-status">Ready</div>
+          <div class="nova-chip" data-route-chip>route: idle / ready</div>
+          <div class="nova-chip" data-memory-chip>memory: 0</div>
+          <button class="nova-secondary-btn" type="button" data-action="toggle-debug">Debug</button>
         </div>
       </header>
 
-      <section class="nova-center-stage" data-center-stage>
-        <div id="messages" class="nova-messages" data-role="messages"></div>
-        <div id="routeInspector" class="nova-route-inspector" data-role="route-inspector"></div>
-      </section>
+      <section class="nova-chat" data-chat-thread></section>
 
-      <footer class="nova-composer" data-composer>
-        <div id="pendingUploads" class="nova-pending-uploads" data-role="pending-uploads"></div>
+      <section class="nova-composer-shell">
+        <section class="nova-composer">
+          <div class="nova-upload-strip" data-upload-strip></div>
 
-        <div class="nova-composer-row">
-          <button id="attachBtn" class="nova-icon-btn" type="button" data-action="attach" aria-label="Attach file">＋</button>
           <textarea
-            id="chatInput"
             class="nova-chat-input"
-            name="message"
+            data-chat-input
+            placeholder="Message Nova"
             rows="1"
-            placeholder="Message Nova..."
-            autocomplete="off"
-            spellcheck="true"
           ></textarea>
-          <button id="sendBtn" class="nova-primary-btn" type="button" data-action="send">Send</button>
-        </div>
 
-        <input id="fileInput" data-role="upload" type="file" multiple hidden>
-        <div id="composerStatus" class="nova-composer-status" data-role="composer-status">Ready</div>
-      </footer>
+          <div class="nova-composer-footer">
+            <div class="nova-composer-hint">Enter to send · Shift+Enter for newline</div>
+            <div class="nova-composer-actions">
+              <button class="nova-secondary-btn" type="button" data-action="upload">Attach</button>
+              <button class="nova-primary-btn" type="button" data-action="send">Send</button>
+            </div>
+          </div>
+        </section>
+      </section>
     </main>
 
-    <aside class="nova-right-rail is-open" data-right-rail>
-      <div class="nova-rail-header" data-rail-header>
-        <div class="nova-rail-header-copy">
-          <div id="railTitle" class="nova-rail-title" data-role="rail-title">Artifacts</div>
-          <div id="railSubtitle" class="nova-rail-subtitle" data-role="rail-subtitle">0 items</div>
-        </div>
-        <button class="nova-icon-btn" type="button" data-action="close-right-rail" id="closeRightRail" aria-label="Close panels">×</button>
+    <aside class="nova-right-rail" data-right-rail>
+      <div class="nova-right-rail-header">
+        <div class="nova-right-rail-title">Workspace</div>
+        <div class="nova-right-rail-subtitle">Artifacts, memory, web</div>
       </div>
 
-      <div class="nova-rail-tabs" data-rail-tabs>
-        <button class="nova-tab-btn is-active" type="button" data-panel="artifacts" aria-pressed="true">Artifacts</button>
-        <button class="nova-tab-btn" type="button" data-panel="memory" aria-pressed="false">Memory</button>
-        <button class="nova-tab-btn" type="button" data-panel="web" aria-pressed="false">Web</button>
+      <div class="nova-right-rail-tabs">
+        <button class="nova-rail-tab is-active" type="button" data-panel-tab="artifacts">Artifacts</button>
+        <button class="nova-rail-tab" type="button" data-panel-tab="memory">Memory</button>
+        <button class="nova-rail-tab" type="button" data-panel-tab="web">Web</button>
       </div>
 
-      <div class="nova-rail-body">
-        <div class="nova-memory-toolbar">
-          <input id="memoryInput" class="nova-memory-input" data-role="memory-input" type="text" placeholder="Add memory note...">
-          <button id="memoryAddBtn" class="nova-chip-btn" type="button" data-action="memory-add">Add</button>
-        </div>
+      <div class="nova-right-rail-body">
+        <section class="nova-panel is-active" data-panel="artifacts">
+          <div class="nova-panel-list" data-artifact-list></div>
+        </section>
 
-        <div id="memoryList" class="nova-memory-list" data-role="memory-list"></div>
-        <div id="artifactsList" class="nova-artifacts-list" data-role="artifacts-list"></div>
-        <div id="webList" class="nova-web-list" data-role="web-list"></div>
-        <div id="railContent" class="nova-rail-content" data-role="rail-content"></div>
+        <section class="nova-panel" data-panel="memory">
+          <div class="nova-panel-list" data-memory-list></div>
+        </section>
+
+        <section class="nova-panel" data-panel="web">
+          <div class="nova-panel-list" data-web-list></div>
+        </section>
       </div>
     </aside>
   </div>
 
-  <script src="/static/js/nova-artifacts.js?v=artifact-upgrade-2026-04-03-006"></script>
-  <script src="/static/js/nova-composer-bundle.js?v=shell-sidepanels-lock-2026-04-04-001"></script>
+  <section class="nova-debug-panel" data-debug-panel hidden>
+    <div class="nova-debug-header">
+      <div>
+        <div class="nova-debug-title">Nova Debug</div>
+        <div class="nova-debug-subtitle">Memory + route + state</div>
+      </div>
+      <div class="nova-debug-actions">
+        <button class="nova-secondary-btn" type="button" data-action="debug-refresh">Refresh</button>
+        <button class="nova-secondary-btn" type="button" data-action="debug-copy">Copy</button>
+        <button class="nova-secondary-btn" type="button" data-action="toggle-debug">Close</button>
+      </div>
+    </div>
+
+    <div class="nova-debug-grid">
+      <section class="nova-debug-card">
+        <div class="nova-debug-card-title">Route</div>
+        <pre class="nova-debug-pre" data-debug-route>{}</pre>
+      </section>
+
+      <section class="nova-debug-card">
+        <div class="nova-debug-card-title">Memory</div>
+        <pre class="nova-debug-pre" data-debug-memory>[]</pre>
+      </section>
+
+      <section class="nova-debug-card">
+        <div class="nova-debug-card-title">State</div>
+        <pre class="nova-debug-pre" data-debug-state>{}</pre>
+      </section>
+
+      <section class="nova-debug-card">
+        <div class="nova-debug-card-title">Last response</div>
+        <pre class="nova-debug-pre" data-debug-response>{}</pre>
+      </section>
+    </div>
+  </section>
+
+  <script src="/static/js/nova-composer-core.js?v=final-lock-2026-04-05"></script>
+  <script src="/static/js/nova-composer-sessions.js?v=session-rail-polish-001"></script>
+  <script src="/static/js/nova-composer-artifacts.js?v=artifact-viewer-polish-2026-04-05-001"></script>
+  <script src="/static/js/nova-composer-bundle.js?v=shell-polish-lock-2026-04-05-003"></script>t>
 </body>
 </html>
