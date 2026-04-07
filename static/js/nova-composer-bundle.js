@@ -9,6 +9,49 @@
     } catch (_) {}
   }
 
+  function info() {
+    try {
+      console.info("[NovaComposerBundle]", ...arguments);
+    } catch (_) {}
+  }
+
+  function ensureToastHost() {
+    let host = document.querySelector("[data-toast-host]");
+    if (host) return host;
+
+    host = document.createElement("div");
+    host.className = "nova-toast-host";
+    host.setAttribute("data-toast-host", "true");
+    document.body.appendChild(host);
+    return host;
+  }
+
+  function showToast(message, kind) {
+    const text = String(message || "").trim();
+    if (!text) return;
+
+    const host = ensureToastHost();
+    const toast = document.createElement("div");
+    toast.className = "nova-toast" + (kind ? " is-" + String(kind) : "");
+    toast.textContent = text;
+
+    host.appendChild(toast);
+
+    requestAnimationFrame(function () {
+      toast.classList.add("is-visible");
+    });
+
+    window.setTimeout(function () {
+      toast.classList.remove("is-visible");
+      toast.classList.add("is-leaving");
+      window.setTimeout(function () {
+        try {
+          toast.remove();
+        } catch (_) {}
+      }, 220);
+    }, 2200);
+  }
+
   function warn() {
     try {
       console.warn("[NovaComposerBundle]", ...arguments);
@@ -727,11 +770,20 @@
     renderPendingUploads();
   }
 
-  function removePendingUpload(attachmentId) {
+    function removePendingUpload(attachmentId) {
+    const removed = state.pendingUploads.find(function (item) {
+      return String(item.id) === String(attachmentId);
+    }) || null;
+
     state.pendingUploads = state.pendingUploads.filter(function (item) {
       return String(item.id) !== String(attachmentId);
     });
+
     renderPendingUploads();
+
+    if (removed) {
+      showToast("Removed: " + (removed.filename || removed.name || "attachment"), "info");
+    }
   }
 
   async function uploadOneFile(file) {
@@ -766,18 +818,24 @@
         throw new Error(data.error || "Upload failed.");
       }
 
-      state.pendingUploads = state.pendingUploads.filter(function (item) {
+           state.pendingUploads = state.pendingUploads.filter(function (item) {
         return String(item.id) !== String(tempId);
       });
-      setPendingUploadItem(
-        Object.assign({}, normalizeAttachment(data.attachment || data), {
-          status: "uploaded",
-          upload_error: "",
-        })
-      );
-      return normalizeAttachment(data.attachment || data);
+
+      const uploadedAttachment = Object.assign({}, normalizeAttachment(data.attachment || data), {
+        status: "uploaded",
+        upload_error: "",
+      });
+
+      setPendingUploadItem(uploadedAttachment);
+      showToast("Uploaded: " + (uploadedAttachment.filename || uploadedAttachment.name || "attachment"), "success");
+      return normalizeAttachment(uploadedAttachment); 
+
     } catch (error) {
       warn("upload failed", error);
+
+      const errorText = error && error.message ? error.message : "Upload failed.";
+
       setPendingUploadItem({
         id: tempId,
         name: file && file.name ? file.name : "upload",
@@ -785,9 +843,12 @@
         mime_type: file && file.type ? file.type : "application/octet-stream",
         size: file && typeof file.size === "number" ? file.size : 0,
         status: "error",
-        upload_error: error && error.message ? error.message : "Upload failed.",
+        upload_error: errorText,
       });
-      throw error;
+
+           showToast("Upload failed: " + (file && file.name ? file.name : "attachment"), "error");
+      throw error;   
+
     } finally {
       state.uploadInFlightCount = Math.max(0, state.uploadInFlightCount - 1);
       setBusyUi(state.stream.running);
@@ -1047,18 +1108,21 @@
       return String(item.status || "") === "error";
     });
 
-    if (hasUploading) {
+        if (hasUploading) {
+      showToast("Uploads are still in progress.", "info");
       throw new Error("Please wait for uploads to finish.");
     }
 
     if (hasUploadErrors) {
+      showToast("Remove failed uploads before sending.", "error");
       throw new Error("Remove failed uploads before sending.");
     }
 
-    if (!text.trim() && !attachments.length) {
+        if (!text.trim() && !attachments.length) {
+      showToast("Nothing to send yet.", "info");
       return;
     }
-
+    
     if (!state.activeSessionId) {
       const created = await apiPost("/api/sessions/new", {});
       if (created && created.session && created.session.id) {
@@ -1169,13 +1233,13 @@
     els.attachInput.click();
   }
 
-  function handleComposerSubmit(event) {
+    function handleComposerSubmit(event) {
     if (event) {
       event.preventDefault();
     }
     sendMessage().catch(function (error) {
       warn("send failed", error);
-      window.alert(error && error.message ? error.message : "Send failed.");
+      showToast(error && error.message ? error.message : "Send failed.", "error");
     });
   }
 
@@ -1201,12 +1265,12 @@
       });
     }
 
-    if (els.attachInput) {
+        if (els.attachInput) {
       els.attachInput.addEventListener("change", function (event) {
         const files = event && event.target && event.target.files ? event.target.files : [];
         uploadFiles(files).catch(function (error) {
           warn("upload files failed", error);
-          window.alert(error && error.message ? error.message : "Upload failed.");
+          showToast(error && error.message ? error.message : "Upload failed.", "error");
         });
       });
     }
@@ -1257,9 +1321,8 @@
         if (state.stream.running) return;
         regenerateMessage(regenButton.getAttribute("data-regenerate-message")).catch(function (error) {
           warn("regenerate failed", error);
-          window.alert(error && error.message ? error.message : "Regenerate failed.");
-        });
-      }
+          showToast(error && error.message ? error.message : "Regenerate failed.", "error");
+        });     }
     });
   }
 
