@@ -36,189 +36,153 @@
     return escapeHtml(String(value == null ? "" : value)).replace(/\n/g, "<br>");
   }
 
-  function truncate(value, length) {
-    const text = String(value == null ? "" : value).trim();
-    if (!text) return "";
-    return text.length > length ? text.slice(0, length - 1) + "…" : text;
+  function normalizeText(value) {
+    return String(value == null ? "" : value).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   }
 
-  function coerceArray(value) {
+  function safeArray(value) {
     return Array.isArray(value) ? value : [];
   }
 
-  function formatDateTime(value) {
-    if (!value) return "";
-    try {
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return String(value);
-      return date.toLocaleString();
-    } catch (_) {
-      return String(value);
+  function makeId(prefix) {
+    return (prefix || "id") + "_" + Math.random().toString(16).slice(2) + Date.now().toString(16);
+  }
+
+  function summarizeText(value, limit) {
+    const text = normalizeText(value).trim();
+    const max = Number(limit || 100);
+    if (text.length <= max) return text;
+    return text.slice(0, Math.max(0, max - 1)).trimEnd() + "…";
+  }
+
+  function isImageMime(mime) {
+    return /^image\//i.test(String(mime || ""));
+  }
+
+  function isVideoMime(mime) {
+    return /^video\//i.test(String(mime || ""));
+  }
+
+  function isAudioMime(mime) {
+    return /^audio\//i.test(String(mime || ""));
+  }
+
+  function formatBytes(value) {
+    const num = Number(value || 0);
+    if (!num || num < 1) return "";
+    if (num < 1024) return num + " B";
+    if (num < 1024 * 1024) return (num / 1024).toFixed(1).replace(/\.0$/, "") + " KB";
+    if (num < 1024 * 1024 * 1024) {
+      return (num / (1024 * 1024)).toFixed(1).replace(/\.0$/, "") + " MB";
     }
+    return (num / (1024 * 1024 * 1024)).toFixed(1).replace(/\.0$/, "") + " GB";
   }
 
-  function normalizeId(value, fallback) {
-    const raw = value == null ? "" : String(value).trim();
-    return raw || fallback || "";
+  function normalizeAttachment(item) {
+    const raw = item && typeof item === "object" ? item : {};
+    const name =
+      raw.filename ||
+      raw.name ||
+      raw.title ||
+      raw.label ||
+      "attachment";
+    const mimeType =
+      raw.mime_type ||
+      raw.type ||
+      "application/octet-stream";
+    return {
+      id: String(raw.id || raw.attachment_id || makeId("att")),
+      name: String(name),
+      filename: String(name),
+      stored_name: String(raw.stored_name || raw.stored_filename || name),
+      url: String(raw.url || raw.file_url || raw.source_url || ""),
+      mime_type: String(mimeType),
+      size: Number(raw.size || 0),
+      status: String(raw.status || "uploaded"),
+      upload_error: String(raw.upload_error || ""),
+    };
   }
 
-  function firstNonEmpty() {
-    for (let i = 0; i < arguments.length; i += 1) {
-      const value = arguments[i];
-      if (value != null && String(value).trim() !== "") {
-        return String(value);
-      }
-    }
-    return "";
+  function normalizeMessage(raw) {
+    const item = raw && typeof raw === "object" ? raw : {};
+    return {
+      id: String(item.id || makeId("msg")),
+      role: String(item.role || "assistant"),
+      text: normalizeText(item.text || item.content || item.body || item.message || ""),
+      created_at: String(item.created_at || new Date().toISOString()),
+      pending: Boolean(item.pending),
+      streaming: Boolean(item.streaming),
+      stopped: Boolean(item.stopped),
+      error: Boolean(item.error),
+      source: String(item.source || ""),
+      meta: item.meta && typeof item.meta === "object" ? item.meta : {},
+      attachments: safeArray(item.attachments).map(normalizeAttachment),
+    };
   }
 
-  const RAIL_STORAGE_KEY = "nova.rail.restore.v1";
-
-  const state = {
-    sessions: [],
-    artifacts: [],
-    memory: [],
-    web: [],
-    activeSessionId: null,
-    lastLoadedSessionId: null,
-    sidebarOpen: true,
-    railOpen: true,
-    railTab: "artifacts",
-    viewerOpen: false,
-    viewerKind: null,
-    activeArtifactId: null,
-    activeMemoryId: null,
-    activeWebId: null,
-    selectedItem: null,
-    pendingUploads: [],
-    isSending: false,
-    isOpeningSession: false,
-  };
+  function attachmentSummary(attachment) {
+    const name = attachment.filename || attachment.name || "attachment";
+    const size = formatBytes(attachment.size);
+    return size ? name + " · " + size : name;
+  }
 
   const els = {
     appShell: qs("[data-app-shell]"),
-    sidebar: qs("[data-sidebar]"),
-    rail: qs("[data-rail]"),
-    sidebarReopen: qs("[data-action='reopen-sidebar']"),
-    railReopen: qs("[data-action='reopen-rail']"),
-
+    body: document.body,
+    sidebar: qs("[data-left-sidebar]"),
+    sidebarBackdrop: qs("[data-sidebar-backdrop]"),
+    sidebarToggle: qs("[data-sidebar-toggle]"),
+    sidebarClose: qs("[data-sidebar-close]"),
+    newChatButton: qs("[data-new-chat]"),
     sessionList: qs("[data-session-list]"),
     chatThread: qs("[data-chat-thread]"),
-    emptyState: qs("[data-empty-state]"),
+    chatEmpty: qs("[data-chat-empty]"),
     chatInput: qs("[data-chat-input]"),
-    uploadStrip: qs("[data-upload-strip]"),
-
+    composerForm: qs("[data-chat-form]"),
+    sendButton: qs("[data-send-button]"),
+    stopButton: qs("[data-stop-button]"),
+    attachButton: qs("[data-attach-button]"),
+    attachInput: qs("[data-attach-input]"),
+    uploadStaging: qs("[data-upload-staging]"),
     topbarTitle: qs("[data-topbar-title]"),
     topbarSubtitle: qs("[data-topbar-subtitle]"),
     topbarStatus: qs("[data-topbar-status]"),
-
-    railTitle: qs("[data-rail-title]"),
-    railSubtitle: qs("[data-rail-subtitle]"),
-
-    railTabs: qsa("[data-rail-tab]"),
-    artifactPanel: qs("[data-rail-panel='artifacts']"),
-    memoryPanel: qs("[data-rail-panel='memory']"),
-    webPanel: qs("[data-rail-panel='web']"),
-
     artifactList: qs("[data-artifact-list]"),
     memoryList: qs("[data-memory-list]"),
     webList: qs("[data-web-list]"),
-
-    artifactEmpty: qs("[data-artifact-empty]"),
-    memoryEmpty: qs("[data-memory-empty]"),
-    webEmpty: qs("[data-web-empty]"),
-
-    viewer: qs("[data-viewer]"),
-    viewerShell: qs("[data-viewer-shell]"),
+    rail: qs("[data-right-rail]"),
+    railTitle: qs("[data-rail-title]"),
+    railSubtitle: qs("[data-rail-subtitle]"),
+    railViewer: qs("[data-rail-viewer]"),
+    railTabs: qsa("[data-rail-tab]"),
+    railPanels: qsa("[data-rail-panel]"),
   };
 
-  const TAB_META = {
-    artifacts: {
-      title: "Artifacts",
-      subtitle: "Saved outputs and side panels",
+  const state = {
+    booted: false,
+    activeSessionId: "",
+    sessions: [],
+    messages: [],
+    artifacts: [],
+    memory: [],
+    pendingUploads: [],
+    uploadInFlightCount: 0,
+    stream: {
+      controller: null,
+      running: false,
+      messageId: "",
+      mode: "",
+      placeholderId: "",
+      buffer: "",
     },
-    memory: {
-      title: "Memory",
-      subtitle: "Saved notes and preferences",
-    },
-    web: {
-      title: "Web",
-      subtitle: "Fetched pages and web results",
+    rail: {
+      tab: "artifacts",
+      selectedId: "",
+      selectedKind: "",
     },
   };
 
-  function safeJsonParse(value, fallback) {
-    try {
-      return JSON.parse(value);
-    } catch (_) {
-      return fallback;
-    }
-  }
-
-  function getStoredRailState() {
-    try {
-      const raw = localStorage.getItem(RAIL_STORAGE_KEY);
-      if (!raw) return null;
-      return safeJsonParse(raw, null);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function persistRailState() {
-    try {
-      localStorage.setItem(
-        RAIL_STORAGE_KEY,
-        JSON.stringify({
-          railTab: state.railTab,
-          railOpen: !!state.railOpen,
-          viewerOpen: !!state.viewerOpen,
-          viewerKind: state.viewerKind || null,
-          activeArtifactId: state.activeArtifactId || null,
-          activeMemoryId: state.activeMemoryId || null,
-          activeWebId: state.activeWebId || null,
-          activeSessionId: state.activeSessionId || null,
-        })
-      );
-    } catch (_) {}
-  }
-
-  function clearPersistedSelection(keepTab, keepRailOpen) {
-    state.viewerOpen = false;
-    state.viewerKind = null;
-    state.activeArtifactId = null;
-    state.activeMemoryId = null;
-    state.activeWebId = null;
-    state.selectedItem = null;
-
-    if (typeof keepTab === "string" && keepTab) {
-      state.railTab = keepTab;
-    }
-
-    if (typeof keepRailOpen === "boolean") {
-      state.railOpen = keepRailOpen;
-    }
-
-    persistRailState();
-  }
-
-  function hydrateRailStateFromStorage() {
-    const saved = getStoredRailState();
-    if (!saved || typeof saved !== "object") return;
-
-    if (saved.railTab === "artifacts" || saved.railTab === "memory" || saved.railTab === "web") {
-      state.railTab = saved.railTab;
-    }
-
-    state.railOpen = saved.railOpen !== false;
-    state.viewerOpen = !!saved.viewerOpen;
-    state.viewerKind = saved.viewerKind || null;
-    state.activeArtifactId = saved.activeArtifactId || null;
-    state.activeMemoryId = saved.activeMemoryId || null;
-    state.activeWebId = saved.activeWebId || null;
-  }
-
-  function setTopbar(title, subtitle, status) {
+  function setTopbar(title, subtitle, statusText) {
     if (els.topbarTitle) {
       els.topbarTitle.textContent = title || "Nova";
     }
@@ -226,1562 +190,1111 @@
       els.topbarSubtitle.textContent = subtitle || "Fast local AI workspace";
     }
     if (els.topbarStatus) {
-      els.topbarStatus.textContent = status || "Ready";
+      els.topbarStatus.textContent = statusText || "Ready";
     }
   }
 
-  function setRailHeader(title, subtitle) {
-    if (els.railTitle) {
-      els.railTitle.textContent = title || "";
+  function setBusyUi(isBusy) {
+    if (els.sendButton) {
+      els.sendButton.disabled = Boolean(isBusy);
     }
-    if (els.railSubtitle) {
-      els.railSubtitle.textContent = subtitle || "";
+    if (els.stopButton) {
+      els.stopButton.hidden = !isBusy;
+      els.stopButton.disabled = !isBusy;
     }
-  }
-
-  function getTabMeta(tabName) {
-    return TAB_META[tabName] || TAB_META.artifacts;
-  }
-
-  function getActiveSession() {
-    return state.sessions.find((session) => session.id === state.activeSessionId) || null;
-  }
-
-  function isMobileSidebarOverlayMode() {
-    try {
-      return window.innerWidth <= 820;
-    } catch (_) {
-      return false;
+    if (els.chatInput) {
+      els.chatInput.disabled = false;
+    }
+    if (els.attachButton) {
+      els.attachButton.disabled = Boolean(isBusy && state.uploadInFlightCount > 0);
     }
   }
 
-  function isMobileRailOverlayMode() {
-    try {
-      return window.innerWidth <= 1180;
-    } catch (_) {
-      return false;
+  function autoResizeTextarea() {
+    if (!els.chatInput) return;
+    els.chatInput.style.height = "auto";
+    els.chatInput.style.height = Math.min(els.chatInput.scrollHeight, 280) + "px";
+  }
+
+  function scrollChatToBottom(force) {
+    if (!els.chatThread) return;
+    const nearBottom =
+      els.chatThread.scrollHeight - els.chatThread.scrollTop - els.chatThread.clientHeight < 160;
+    if (force || nearBottom) {
+      els.chatThread.scrollTop = els.chatThread.scrollHeight;
     }
   }
 
-  function isAnyOverlayPanelOpen() {
+  function setChatEmptyVisible(isVisible) {
+    if (!els.chatEmpty) return;
+    els.chatEmpty.hidden = !isVisible;
+  }
+
+  function activeSession() {
+    return state.sessions.find(function (session) {
+      return String(session.id) === String(state.activeSessionId);
+    }) || null;
+  }
+
+  function updateTopbarFromState() {
+    const session = activeSession();
+    const title = session && session.title ? session.title : "Nova";
+    const subtitle =
+      session && Number(session.message_count || safeArray(session.messages).length || 0) > 0
+        ? Number(session.message_count || safeArray(session.messages).length || 0) + " messages"
+        : "Fast local AI workspace";
+    const statusText = state.stream.running ? "Generating" : "Ready";
+    setTopbar(title, subtitle, statusText);
+  }
+
+  function findMessageById(messageId) {
+    return state.messages.find(function (item) {
+      return String(item.id) === String(messageId);
+    }) || null;
+  }
+
+  function upsertMessage(rawMessage) {
+    const message = normalizeMessage(rawMessage);
+    const index = state.messages.findIndex(function (item) {
+      return String(item.id) === String(message.id);
+    });
+    if (index >= 0) {
+      state.messages[index] = Object.assign({}, state.messages[index], message);
+    } else {
+      state.messages.push(message);
+    }
+    renderChat();
+    return message;
+  }
+
+  function removeMessageById(messageId) {
+    const before = state.messages.length;
+    state.messages = state.messages.filter(function (item) {
+      return String(item.id) !== String(messageId);
+    });
+    if (state.messages.length !== before) {
+      renderChat();
+    }
+  }
+
+  function setSessions(list) {
+    state.sessions = safeArray(list).map(function (item) {
+      const session = item && typeof item === "object" ? item : {};
+      return {
+        id: String(session.id || makeId("session")),
+        title: String(session.title || "Untitled chat"),
+        created_at: String(session.created_at || ""),
+        updated_at: String(session.updated_at || ""),
+        pinned: Boolean(session.pinned),
+        last_message_preview: String(session.last_message_preview || ""),
+        message_count: Number(session.message_count || safeArray(session.messages).length || 0),
+        messages: safeArray(session.messages).map(normalizeMessage),
+      };
+    });
+    renderSessionList();
+  }
+
+  function applyStatePayload(payload) {
+    const data = payload && typeof payload === "object" ? payload : {};
+    state.activeSessionId = String(
+      data.active_session_id ||
+        data.session_id ||
+        (data.session && data.session.id) ||
+        state.activeSessionId ||
+        ""
+    );
+
+    if (Array.isArray(data.sessions)) {
+      setSessions(data.sessions);
+    }
+
+    if (Array.isArray(data.messages)) {
+      state.messages = data.messages.map(normalizeMessage);
+    } else if (data.session && Array.isArray(data.session.messages)) {
+      state.messages = data.session.messages.map(normalizeMessage);
+    }
+
+    state.artifacts = safeArray(data.artifacts);
+    state.memory = safeArray(data.memory);
+
+    renderSessionList();
+    renderChat();
+    renderArtifacts();
+    renderMemory();
+    updateTopbarFromState();
+  }
+
+  function currentUserMessageForRegenerate(targetAssistantId) {
+    const targetId = String(targetAssistantId || "");
+    let targetIndex = -1;
+    for (let i = 0; i < state.messages.length; i += 1) {
+      if (String(state.messages[i].id) === targetId) {
+        targetIndex = i;
+        break;
+      }
+    }
+    if (targetIndex <= 0) return null;
+    for (let j = targetIndex - 1; j >= 0; j -= 1) {
+      if (String(state.messages[j].role) === "user") {
+        return state.messages[j];
+      }
+    }
+    return null;
+  }
+
+  function createAssistantPlaceholder(mode, targetAssistantId) {
+    const messageId = String(targetAssistantId || makeId("assistant"));
+    const placeholder = normalizeMessage({
+      id: messageId,
+      role: "assistant",
+      text: "",
+      created_at: new Date().toISOString(),
+      pending: true,
+      streaming: true,
+      source: mode || "send",
+      attachments: [],
+      meta: mode === "regenerate" ? { regenerate_of: messageId } : {},
+    });
+    upsertMessage(placeholder);
+    return placeholder;
+  }
+
+  function attachmentChipHtml(attachment, options) {
+    const item = normalizeAttachment(attachment);
+    const opts = options && typeof options === "object" ? options : {};
+    const removable = Boolean(opts.removable);
+    const status = item.status || "uploaded";
+    const error = item.upload_error || "";
+    const summary = attachmentSummary(item);
+    const removeButton = removable
+      ? '<button type="button" class="nova-upload-chip__remove" data-upload-remove="' +
+        escapeHtml(item.id) +
+        '" aria-label="Remove attachment">×</button>'
+      : "";
+    const statusHtml =
+      status === "uploading"
+        ? '<span class="nova-upload-chip__status">Uploading…</span>'
+        : status === "error"
+        ? '<span class="nova-upload-chip__status nova-upload-chip__status--error">' +
+          escapeHtml(error || "Upload failed") +
+          "</span>"
+        : "";
     return (
-      (isMobileSidebarOverlayMode() && !!state.sidebarOpen) ||
-      (isMobileRailOverlayMode() && !!state.railOpen)
+      '<div class="nova-upload-chip" data-upload-id="' +
+      escapeHtml(item.id) +
+      '">' +
+      '<div class="nova-upload-chip__meta">' +
+      '<div class="nova-upload-chip__name">' +
+      escapeHtml(item.filename || item.name || "attachment") +
+      "</div>" +
+      '<div class="nova-upload-chip__sub">' +
+      escapeHtml(summary) +
+      "</div>" +
+      statusHtml +
+      "</div>" +
+      removeButton +
+      "</div>"
     );
   }
 
-function applyBodyLockState() {
-  const overlayOpen = isAnyOverlayPanelOpen();
-
-  // scroll lock
-  document.body.style.overflow = overlayOpen ? "hidden" : "";
-  document.documentElement.style.overflow = overlayOpen ? "hidden" : "";
-
-  // 🔥 THIS WAS MISSING → THIS FIXES YOUR CSS
-  document.body.classList.toggle("is-sidebar-open", !!state.sidebarOpen);
-  document.body.classList.toggle("is-rail-open", !!state.railOpen);
-  document.body.classList.toggle("is-shell-locked", overlayOpen);
-
-  // existing dataset (keep)
-  document.body.dataset.novaOverlayOpen = overlayOpen ? "true" : "false";
-  document.body.dataset.novaSidebarOpen = state.sidebarOpen ? "true" : "false";
-  document.body.dataset.novaRailOpen = state.railOpen ? "true" : "false";
-
-  if (els.appShell) {
-    els.appShell.dataset.sidebarOpen = state.sidebarOpen ? "true" : "false";
-    els.appShell.dataset.railOpen = state.railOpen ? "true" : "false";
-    els.appShell.dataset.overlayOpen = overlayOpen ? "true" : "false";
-  }
-
-  if (els.chatThread) {
-    els.chatThread.style.overflow = overlayOpen ? "hidden" : "";
-    els.chatThread.style.pointerEvents = overlayOpen ? "none" : "";
-    els.chatThread.style.userSelect = overlayOpen ? "none" : "";
-  }
-
-  if (els.viewer) {
-    els.viewer.style.pointerEvents = "";
-  }
-}
-
-
-  function syncSidebarVisibility() {
-    if (els.sidebar) {
-      els.sidebar.hidden = !state.sidebarOpen;
+  function renderPendingUploads() {
+    if (!els.uploadStaging) return;
+    const items = state.pendingUploads;
+    if (!items.length) {
+      els.uploadStaging.innerHTML = "";
+      els.uploadStaging.hidden = true;
+      return;
     }
-
-    if (els.sidebarReopen) {
-      els.sidebarReopen.hidden = !!state.sidebarOpen;
-    }
-
-    applyBodyLockState();
+    els.uploadStaging.hidden = false;
+    els.uploadStaging.innerHTML = items
+      .map(function (item) {
+        return attachmentChipHtml(item, { removable: item.status !== "uploading" });
+      })
+      .join("");
   }
 
-  function openSidebar() {
-    state.sidebarOpen = true;
-    syncSidebarVisibility();
-  }
+  function renderAttachmentBlock(attachment) {
+    const item = normalizeAttachment(attachment);
+    const name = item.filename || item.name || "attachment";
+    const href = item.url || "#";
+    const mime = item.mime_type || "application/octet-stream";
+    const sub = [];
+    if (mime) sub.push(mime);
+    if (item.size) sub.push(formatBytes(item.size));
+    const subText = sub.join(" · ");
 
-  function closeSidebar() {
-    state.sidebarOpen = false;
-    syncSidebarVisibility();
-  }
-
-  function toggleSidebar() {
-    if (state.sidebarOpen) {
-      closeSidebar();
-    } else {
-      openSidebar();
-    }
-  }
-
-  function openRail() {
-    state.railOpen = true;
-
-    if (els.rail) {
-      els.rail.hidden = false;
-      els.rail.classList.add("is-open");
-    }
-
-    if (els.railReopen) {
-      els.railReopen.hidden = true;
-    }
-
-    applyBodyLockState();
-    persistRailState();
-  }
-
-  function closeRail() {
-    state.railOpen = false;
-
-    if (els.rail) {
-      els.rail.classList.remove("is-open");
-      els.rail.hidden = true;
-    }
-
-    if (els.railReopen) {
-      els.railReopen.hidden = false;
-    }
-
-    applyBodyLockState();
-    persistRailState();
-  }
-
-  function normalizeSession(raw, index) {
-    const messages = coerceArray(raw && raw.messages);
-    const title = firstNonEmpty(
-      raw && raw.title,
-      raw && raw.name,
-      raw && raw.label,
-      messages[0] && (messages[0].content || messages[0].text),
-      "New Chat"
-    );
-
-    return {
-      id: normalizeId(raw && raw.id, "session-" + index),
-      title: truncate(title, 80) || "New Chat",
-      updated_at: firstNonEmpty(raw && raw.updated_at, raw && raw.created_at, ""),
-      message_count:
-        raw && Number.isFinite(raw.message_count) ? raw.message_count : messages.length,
-      last_message_preview: firstNonEmpty(
-        raw && raw.last_message_preview,
-        messages.length ? (messages[messages.length - 1].content || messages[messages.length - 1].text || "") : "",
-        ""
-      ),
-      pinned: !!(raw && (raw.pinned || raw.is_pinned)),
-      messages: messages.map(normalizeMessage),
-    };
-  }
-
-  function normalizeMessage(raw, index) {
-    return {
-      id: normalizeId(raw && raw.id, "message-" + index),
-      role: firstNonEmpty(raw && raw.role, raw && raw.sender, "assistant").toLowerCase(),
-      content: firstNonEmpty(raw && raw.content, raw && raw.text, raw && raw.body, ""),
-      image_url: firstNonEmpty(raw && raw.image_url, raw && raw.imageUrl, ""),
-      attachments: coerceArray(raw && raw.attachments),
-      created_at: firstNonEmpty(raw && raw.created_at, raw && raw.timestamp, ""),
-      is_error: !!(raw && (raw.is_error || raw.error)),
-    };
-  }
-
-  function normalizeArtifact(raw, index) {
-    const id = normalizeId(raw && raw.id, "artifact-" + index);
-    const viewer = raw && raw.viewer ? raw.viewer : {};
-    const kind = firstNonEmpty(
-      viewer && viewer.kind,
-      raw && raw.kind,
-      raw && raw.type,
-      "artifact"
-    );
-    const title = firstNonEmpty(
-      viewer && viewer.title,
-      raw && raw.title,
-      kind,
-      "Artifact"
-    );
-    const body = firstNonEmpty(
-      viewer && viewer.body,
-      raw && raw.body,
-      raw && raw.preview,
-      raw && raw.content,
-      raw && raw.summary,
-      ""
-    );
-    const preview = firstNonEmpty(raw && raw.preview, body, raw && raw.summary, "");
-
-    return {
-      id,
-      session_id: firstNonEmpty(raw && raw.session_id, raw && raw.sessionId, ""),
-      kind,
-      title,
-      preview: truncate(preview, 160),
-      body,
-      created_at: firstNonEmpty(raw && raw.created_at, raw && raw.updated_at, ""),
-      updated_at: firstNonEmpty(raw && raw.updated_at, raw && raw.created_at, ""),
-      image_url: firstNonEmpty(
-        viewer && viewer.image_url,
-        raw && raw.image_url,
-        raw && raw.imageUrl,
-        ""
-      ),
-      video_url: firstNonEmpty(
-        viewer && viewer.video_url,
-        raw && raw.video_url,
-        raw && raw.videoUrl,
-        ""
-      ),
-      audio_url: firstNonEmpty(
-        viewer && viewer.audio_url,
-        raw && raw.audio_url,
-        raw && raw.audioUrl,
-        ""
-      ),
-      source_url: firstNonEmpty(
-        viewer && viewer.source_url,
-        raw && raw.source_url,
-        raw && raw.url,
-        ""
-      ),
-      analysis_text: firstNonEmpty(
-        viewer && viewer.analysis_text,
-        raw && raw.analysis_text,
-        raw && raw.analysis,
-        ""
-      ),
-      bullets: coerceArray((viewer && viewer.bullets) || (raw && raw.bullets) || []).filter(Boolean),
-      meta: raw && raw.meta ? raw.meta : {},
-    };
-  }
-
-  function normalizeMemory(raw, index) {
-    const id = normalizeId(raw && raw.id, "memory-" + index);
-    const text = firstNonEmpty(raw && raw.text, raw && raw.body, raw && raw.content, "");
-    return {
-      id,
-      title: truncate(firstNonEmpty(raw && raw.kind, raw && raw.title, "Memory"), 40),
-      kind: firstNonEmpty(raw && raw.kind, "memory"),
-      text,
-      preview: truncate(text, 140),
-      created_at: firstNonEmpty(raw && raw.created_at, raw && raw.updated_at, ""),
-      updated_at: firstNonEmpty(raw && raw.updated_at, raw && raw.created_at, ""),
-      source: firstNonEmpty(raw && raw.source, ""),
-      session_id: firstNonEmpty(raw && raw.session_id, ""),
-    };
-  }
-
-  function normalizeWeb(raw, index) {
-    const id = normalizeId(raw && raw.id, "web-" + index);
-    return {
-      id,
-      title: firstNonEmpty(raw && raw.title, raw && raw.site_name, raw && raw.url, "Web Result"),
-      subtitle: firstNonEmpty(raw && raw.site_name, raw && raw.domain, ""),
-      preview: truncate(
-        firstNonEmpty(raw && raw.summary, raw && raw.preview, raw && raw.description, ""),
-        160
-      ),
-      body: firstNonEmpty(raw && raw.content, raw && raw.summary, raw && raw.description, ""),
-      url: firstNonEmpty(raw && raw.url, raw && raw.source_url, ""),
-      created_at: firstNonEmpty(raw && raw.fetched_at, raw && raw.created_at, ""),
-      status_code: firstNonEmpty(raw && raw.status_code, ""),
-    };
-  }
-
-  async function api(path, options) {
-    const response = await fetch(path, {
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      ...options,
-    });
-
-    const text = await response.text();
-    let data = null;
-
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch (_) {
-      data = { raw: text };
-    }
-
-    if (!response.ok) {
-      const message = firstNonEmpty(
-        data && data.error,
-        data && data.message,
-        response.statusText,
-        "Request failed"
+    if (item.url && isImageMime(mime)) {
+      return (
+        '<div class="message-attachment message-attachment--image">' +
+        '<a href="' +
+        escapeHtml(href) +
+        '" target="_blank" rel="noopener noreferrer">' +
+        '<img src="' +
+        escapeHtml(href) +
+        '" alt="' +
+        escapeHtml(name) +
+        '" class="message-attachment__image">' +
+        "</a>" +
+        '<div class="message-attachment__footer">' +
+        '<a href="' +
+        escapeHtml(href) +
+        '" target="_blank" rel="noopener noreferrer" class="message-attachment__name">' +
+        escapeHtml(name) +
+        "</a>" +
+        '<div class="message-attachment__sub">' +
+        escapeHtml(subText) +
+        "</div>" +
+        "</div>" +
+        "</div>"
       );
-      throw new Error(message);
     }
 
-    return data || {};
-  }
-
-  async function postJson(path, body) {
-    const data = await api(path, {
-      method: "POST",
-      body: JSON.stringify(body || {}),
-    });
-
-    if (!data || data.ok === false) {
-      throw new Error((data && data.error) || "Request failed");
+    if (item.url && isVideoMime(mime)) {
+      return (
+        '<div class="message-attachment message-attachment--video">' +
+        '<video controls preload="metadata" class="message-attachment__video">' +
+        '<source src="' +
+        escapeHtml(href) +
+        '" type="' +
+        escapeHtml(mime) +
+        '">' +
+        "</video>" +
+        '<div class="message-attachment__footer">' +
+        '<a href="' +
+        escapeHtml(href) +
+        '" target="_blank" rel="noopener noreferrer" class="message-attachment__name">' +
+        escapeHtml(name) +
+        "</a>" +
+        '<div class="message-attachment__sub">' +
+        escapeHtml(subText) +
+        "</div>" +
+        "</div>" +
+        "</div>"
+      );
     }
 
-    return data;
-  }
-
-  function getSelectedItemFromState() {
-    if (state.activeArtifactId) {
-      const artifact = state.artifacts.find((x) => x.id === state.activeArtifactId);
-      if (artifact) return { type: "artifact", item: artifact };
+    if (item.url && isAudioMime(mime)) {
+      return (
+        '<div class="message-attachment message-attachment--audio">' +
+        '<audio controls preload="metadata" class="message-attachment__audio">' +
+        '<source src="' +
+        escapeHtml(href) +
+        '" type="' +
+        escapeHtml(mime) +
+        '">' +
+        "</audio>" +
+        '<div class="message-attachment__footer">' +
+        '<a href="' +
+        escapeHtml(href) +
+        '" target="_blank" rel="noopener noreferrer" class="message-attachment__name">' +
+        escapeHtml(name) +
+        "</a>" +
+        '<div class="message-attachment__sub">' +
+        escapeHtml(subText) +
+        "</div>" +
+        "</div>" +
+        "</div>"
+      );
     }
 
-    if (state.activeMemoryId) {
-      const memory = state.memory.find((x) => x.id === state.activeMemoryId);
-      if (memory) return { type: "memory", item: memory };
-    }
-
-    if (state.activeWebId) {
-      const webItem = state.web.find((x) => x.id === state.activeWebId);
-      if (webItem) return { type: "web", item: webItem };
-    }
-
-    return null;
-  }
-
-  function getSelectedIdForTab(tabName) {
-    if (tabName === "artifacts") return state.activeArtifactId;
-    if (tabName === "memory") return state.activeMemoryId;
-    if (tabName === "web") return state.activeWebId;
-    return null;
-  }
-
-  function getSelectedTypeForTab(tabName) {
-    if (tabName === "artifacts") return "artifact";
-    if (tabName === "memory") return "memory";
-    if (tabName === "web") return "web";
-    return null;
-  }
-
-  function clearActiveIdsExcept(typeToKeep) {
-    if (typeToKeep !== "artifact") state.activeArtifactId = null;
-    if (typeToKeep !== "memory") state.activeMemoryId = null;
-    if (typeToKeep !== "web") state.activeWebId = null;
-  }
-
-  function clearViewerState() {
-    state.viewerOpen = false;
-    state.viewerKind = null;
-    state.activeArtifactId = null;
-    state.activeMemoryId = null;
-    state.activeWebId = null;
-    state.selectedItem = null;
-  }
-
-  function syncSelectedItem() {
-    const selected = getSelectedItemFromState();
-
-    if (!selected) {
-      state.viewerOpen = false;
-      state.viewerKind = null;
-      state.selectedItem = null;
-      return null;
-    }
-
-    state.viewerOpen = true;
-    state.viewerKind = selected.type;
-    state.selectedItem = selected;
-    return selected;
-  }
-
-  function syncRailHeader() {
-    const selectedId = getSelectedIdForTab(state.railTab);
-    const selectedType = getSelectedTypeForTab(state.railTab);
-
-    if (state.viewerOpen && selectedId && selectedType) {
-      const selected = syncSelectedItem();
-      if (selected && selected.type === selectedType && selected.item) {
-        const item = selected.item;
-
-        if (selected.type === "artifact") {
-          setRailHeader(
-            firstNonEmpty(item.title, "Artifact"),
-            firstNonEmpty(item.kind, "artifact")
-          );
-          return;
-        }
-
-        if (selected.type === "memory") {
-          setRailHeader(
-            firstNonEmpty(item.title, "Memory"),
-            firstNonEmpty(item.kind, "memory")
-          );
-          return;
-        }
-
-        if (selected.type === "web") {
-          setRailHeader(
-            firstNonEmpty(item.title, "Web Result"),
-            firstNonEmpty(
-              item.subtitle,
-              item.status_code ? "HTTP " + item.status_code : "",
-              "web"
-            )
-          );
-          return;
-        }
-      }
-    }
-
-    const meta = getTabMeta(state.railTab);
-    setRailHeader(meta.title, meta.subtitle);
-  }
-
-  function validateRailSelectionAgainstCurrentData() {
-    if (state.activeArtifactId && !state.artifacts.some((x) => x.id === state.activeArtifactId)) {
-      state.activeArtifactId = null;
-    }
-
-    if (state.activeMemoryId && !state.memory.some((x) => x.id === state.activeMemoryId)) {
-      state.activeMemoryId = null;
-    }
-
-    if (state.activeWebId && !state.web.some((x) => x.id === state.activeWebId)) {
-      state.activeWebId = null;
-    }
-
-    const selectedId = getSelectedIdForTab(state.railTab);
-
-    if (!selectedId) {
-      state.viewerOpen = false;
-      state.viewerKind = null;
-      state.selectedItem = null;
-      clearActiveIdsExcept(null);
-      return;
-    }
-
-    const selected = getSelectedItemFromState();
-    if (!selected) {
-      clearViewerState();
-      return;
-    }
-
-    clearActiveIdsExcept(selected.type);
-    state.viewerOpen = true;
-    state.viewerKind = selected.type;
-    state.selectedItem = selected;
-  }
-
-  function handleSessionContextShift(previousSessionId, nextSessionId) {
-    const prev = previousSessionId ? String(previousSessionId) : "";
-    const next = nextSessionId ? String(nextSessionId) : "";
-
-    if (!prev) return;
-    if (!next) return;
-    if (prev === next) return;
-
-    clearPersistedSelection(state.railTab, state.railOpen);
-  }
-
-  function applyPersistedRailAfterStateLoad(previousSessionId, nextSessionId) {
-    handleSessionContextShift(previousSessionId, nextSessionId);
-    validateRailSelectionAgainstCurrentData();
-    persistRailState();
-  }
-
-  function setRailTab(tabName, options) {
-    const opts = options || {};
-    const nextTab = ["artifacts", "memory", "web"].includes(tabName) ? tabName : "artifacts";
-
-    state.railTab = nextTab;
-
-    if (!opts.preserveSelection) {
-      clearViewerState();
-    } else {
-      const selectedId = getSelectedIdForTab(nextTab);
-      if (!selectedId) {
-        state.viewerOpen = false;
-        state.viewerKind = null;
-        state.selectedItem = null;
-      } else {
-        syncSelectedItem();
-      }
-    }
-
-    openRail();
-    syncRailHeader();
-    renderRail();
-    persistRailState();
-  }
-
-  function openViewer(type, item) {
-    if (!item) return;
-
-    if (type === "artifact") {
-      state.railTab = "artifacts";
-      state.activeArtifactId = item.id;
-      clearActiveIdsExcept("artifact");
-    } else if (type === "memory") {
-      state.railTab = "memory";
-      state.activeMemoryId = item.id;
-      clearActiveIdsExcept("memory");
-    } else if (type === "web") {
-      state.railTab = "web";
-      state.activeWebId = item.id;
-      clearActiveIdsExcept("web");
-    } else {
-      return;
-    }
-
-    state.viewerOpen = true;
-    state.viewerKind = type;
-    state.selectedItem = { type, item };
-
-    openRail();
-    syncRailHeader();
-    renderRail();
-    persistRailState();
-  }
-
-  // =========================================================
-  // ONE TRUE SESSION OPEN / NEW CONTRACT
-  // =========================================================
-
-  async function openSessionOnBackend(sessionId) {
-    const id = String(sessionId || "").trim();
-    if (!id) {
-      throw new Error("Missing session id");
-    }
-
-    const data = await api("/api/sessions/open", {
-      method: "POST",
-      body: JSON.stringify({ session_id: id }),
-    });
-
-    if (!data || !data.ok) {
-      throw new Error((data && data.error) || "Session open failed");
-    }
-
-    if (!data.session || !data.active_session_id) {
-      throw new Error("Invalid session open payload");
-    }
-
-    return data;
-  }
-
-  async function createNewChatOnBackend() {
-    const data = await api("/api/sessions/new", {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
-
-    if (!data || !data.ok) {
-      throw new Error((data && data.error) || "New chat create failed");
-    }
-
-    const session =
-      data.session ||
-      coerceArray(data.sessions).find((item) => item && item.id === data.active_session_id) ||
-      null;
-
-    const activeSessionId = firstNonEmpty(
-      data.active_session_id,
-      session && session.id,
-      ""
+    return (
+      '<div class="message-attachment message-attachment--file">' +
+      '<a href="' +
+      escapeHtml(href || "#") +
+      '" target="_blank" rel="noopener noreferrer" class="message-attachment__file-link">' +
+      '<div class="message-attachment__icon">📎</div>' +
+      '<div class="message-attachment__footer">' +
+      '<div class="message-attachment__name">' +
+      escapeHtml(name) +
+      "</div>" +
+      '<div class="message-attachment__sub">' +
+      escapeHtml(subText) +
+      "</div>" +
+      "</div>" +
+      "</a>" +
+      "</div>"
     );
-
-    if (!session || !activeSessionId) {
-      throw new Error("Invalid new chat payload");
-    }
-
-    return {
-      ok: true,
-      session,
-      active_session_id: activeSessionId,
-    };
   }
 
-  async function renameSessionOnBackend(sessionId, title) {
-    const id = String(sessionId || "").trim();
-    const nextTitle = String(title || "").trim();
-
-    if (!id) {
-      throw new Error("Missing session id");
-    }
-
-    if (!nextTitle) {
-      throw new Error("Title is required");
-    }
-
-    const data = await postJson("/api/sessions/rename", {
-      session_id: id,
-      title: nextTitle,
-    });
-
-    if (!data.session || !data.active_session_id) {
-      throw new Error("Invalid rename payload");
-    }
-
-    return data;
-  }
-
-  async function deleteSessionOnBackend(sessionId) {
-    const id = String(sessionId || "").trim();
-
-    if (!id) {
-      throw new Error("Missing session id");
-    }
-
-    const data = await postJson("/api/sessions/delete", {
-      session_id: id,
-    });
-
-    if (!data.session || !data.active_session_id) {
-      throw new Error("Invalid delete payload");
-    }
-
-    return data;
-  }
-
-  function upsertSession(normalizedSession) {
-    let found = false;
-
-    state.sessions = state.sessions.map((session) => {
-      if (session.id === normalizedSession.id) {
-        found = true;
-        return normalizedSession;
-      }
-      return session;
-    });
-
-    if (!found) {
-      state.sessions.unshift(normalizedSession);
-    }
-  }
-
-  function removeSessionById(sessionId) {
-    const id = String(sessionId || "").trim();
-    if (!id) return;
-
-    state.sessions = state.sessions.filter((session) => session.id !== id);
-  }
-
-  async function reloadStateFromBackend() {
-    const previousSessionId = state.lastLoadedSessionId || state.activeSessionId || null;
-    const data = await api("/api/state", { method: "GET" });
-
-    state.sessions = coerceArray(data.sessions).map(normalizeSession);
-    state.artifacts = coerceArray(data.artifacts).map(normalizeArtifact);
-    state.memory = coerceArray(data.memory).map(normalizeMemory);
-    state.web = coerceArray(data.web || data.web_results || []).map(normalizeWeb);
-
-    const activeSessionId = firstNonEmpty(
-      data.active_session_id,
-      data.active_session && data.active_session.id,
-      data.session && data.session.id,
-      state.sessions[0] && state.sessions[0].id,
-      ""
+  function renderMessageActions(message) {
+    if (String(message.role) !== "assistant") return "";
+    const disabled = state.stream.running ? ' aria-disabled="true"' : "";
+    return (
+      '<div class="message-actions">' +
+      '<button type="button" class="message-action" data-copy-message="' +
+      escapeHtml(message.id) +
+      '"' +
+      disabled +
+      ">Copy</button>" +
+      '<button type="button" class="message-action" data-regenerate-message="' +
+      escapeHtml(message.id) +
+      '"' +
+      disabled +
+      ">Regenerate</button>" +
+      "</div>"
     );
-
-    state.activeSessionId = activeSessionId || null;
-    state.lastLoadedSessionId = state.activeSessionId || null;
-
-    if (!["artifacts", "memory", "web"].includes(state.railTab)) {
-      state.railTab = "artifacts";
-    }
-
-    applyPersistedRailAfterStateLoad(previousSessionId, state.activeSessionId);
-    renderAll();
-
-    return data;
   }
 
-  async function switchToSession(sessionId) {
-    const nextId = String(sessionId || "").trim();
-    if (!nextId || state.isOpeningSession) return;
-
-    if (String(state.activeSessionId || "") === nextId) {
-      if (isMobileSidebarOverlayMode()) {
-        closeSidebar();
-      }
-      return;
-    }
-
-    const previousSessionId = state.activeSessionId || null;
-
-    state.isOpeningSession = true;
-    state.lastLoadedSessionId = previousSessionId;
-
-    setTopbar(
-      (getActiveSession() && getActiveSession().title) || "Nova",
-      "Restoring session...",
-      "Working"
+  function renderMessageCard(message) {
+    const role = String(message.role || "assistant");
+    const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
+    const attachments = safeArray(message.attachments);
+    const attachmentsHtml = attachments.length
+      ? '<div class="message-attachments">' +
+        attachments.map(renderAttachmentBlock).join("") +
+        "</div>"
+      : "";
+    const bodyHtml = message.text
+      ? '<div class="message-card__body">' + renderSafeText(message.text) + "</div>"
+      : message.pending || message.streaming
+      ? '<div class="message-card__body"><span class="message-card__cursor">▋</span></div>'
+      : "";
+    const metaBits = [];
+    if (message.pending || message.streaming) metaBits.push("Streaming");
+    if (message.error) metaBits.push("Error");
+    if (message.stopped) metaBits.push("Stopped");
+    if (message.source) metaBits.push(message.source);
+    const metaHtml = metaBits.length
+      ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
+      : "";
+    return (
+      '<article class="message-card ' +
+      roleClass +
+      '" data-message-id="' +
+      escapeHtml(message.id) +
+      '">' +
+      '<div class="message-card__header">' +
+      '<div class="message-card__role">' +
+      escapeHtml(role === "user" ? "You" : "Nova") +
+      "</div>" +
+      metaHtml +
+      "</div>" +
+      bodyHtml +
+      attachmentsHtml +
+      renderMessageActions(message) +
+      "</article>"
     );
-
-    clearPersistedSelection(state.railTab, state.railOpen);
-    renderRail();
-    renderSessions();
-
-    try {
-      const payload = await openSessionOnBackend(nextId);
-      const normalized = normalizeSession(payload.session, 0);
-
-      state.activeSessionId = String(payload.active_session_id || normalized.id || nextId);
-      state.lastLoadedSessionId = state.activeSessionId;
-
-      upsertSession(normalized);
-
-      clearViewerState();
-
-      if (isMobileSidebarOverlayMode()) {
-        closeSidebar();
-      }
-
-      renderAll();
-    } catch (error) {
-      state.activeSessionId = previousSessionId;
-      warn("switchToSession failed", error);
-      setTopbar("Nova", "Session restore failed", "Error");
-      alert("Session open failed: " + error.message);
-      renderAll();
-    } finally {
-      state.isOpeningSession = false;
-      renderSessions();
-      renderChat();
-    }
-  }
-
-  async function createNewChat() {
-    if (state.isOpeningSession || state.isSending) return;
-
-    const previousSessionId = state.activeSessionId || null;
-
-    state.isOpeningSession = true;
-    state.lastLoadedSessionId = previousSessionId;
-
-    setTopbar("Nova", "Creating new chat...", "Working");
-
-    clearPersistedSelection(state.railTab, state.railOpen);
-    renderRail();
-    renderSessions();
-
-    try {
-      const payload = await createNewChatOnBackend();
-      const normalized = normalizeSession(payload.session, 0);
-
-      state.activeSessionId = String(payload.active_session_id || normalized.id || "");
-      state.lastLoadedSessionId = state.activeSessionId;
-
-      upsertSession(normalized);
-      clearViewerState();
-
-      if (isMobileSidebarOverlayMode()) {
-        closeSidebar();
-      }
-
-      renderAll();
-
-      if (els.chatInput) {
-        els.chatInput.focus();
-      }
-    } catch (error) {
-      state.activeSessionId = previousSessionId;
-      warn("createNewChat failed", error);
-      setTopbar("Nova", "New chat failed", "Error");
-      alert("New chat failed: " + error.message);
-      renderAll();
-    } finally {
-      state.isOpeningSession = false;
-      renderSessions();
-      renderChat();
-    }
-  }
-
-  async function renameSession(sessionId) {
-    const id = String(sessionId || "").trim();
-    if (!id || state.isOpeningSession || state.isSending) return;
-
-    const target =
-      state.sessions.find((session) => session.id === id) ||
-      (state.activeSessionId === id ? getActiveSession() : null);
-
-    const currentTitle = firstNonEmpty(target && target.title, "Untitled chat");
-    const nextTitleRaw = window.prompt("Rename session", currentTitle);
-
-    if (nextTitleRaw == null) {
-      return;
-    }
-
-    const nextTitle = String(nextTitleRaw || "").trim();
-    if (!nextTitle) {
-      return;
-    }
-
-    state.isOpeningSession = true;
-    setTopbar(currentTitle, "Renaming session...", "Working");
-
-    try {
-      const payload = await renameSessionOnBackend(id, nextTitle);
-      const normalized = normalizeSession(payload.session, 0);
-
-      state.activeSessionId = String(payload.active_session_id || normalized.id || id);
-      state.lastLoadedSessionId = state.activeSessionId;
-
-      upsertSession(normalized);
-
-      if (state.activeSessionId === normalized.id) {
-        clearViewerState();
-      }
-
-      renderAll();
-      await reloadStateFromBackend();
-    } catch (error) {
-      warn("renameSession failed", error);
-      setTopbar("Nova", "Rename failed", "Error");
-      alert("Rename failed: " + error.message);
-      renderAll();
-    } finally {
-      state.isOpeningSession = false;
-      renderSessions();
-      renderChat();
-    }
-  }
-
-  async function deleteSession(sessionId) {
-    const id = String(sessionId || "").trim();
-    if (!id || state.isOpeningSession || state.isSending) return;
-
-    const target =
-      state.sessions.find((session) => session.id === id) ||
-      (state.activeSessionId === id ? getActiveSession() : null);
-
-    const label = firstNonEmpty(target && target.title, "this chat");
-    const confirmed = window.confirm('Delete "' + label + '"?');
-
-    if (!confirmed) {
-      return;
-    }
-
-    state.isOpeningSession = true;
-    setTopbar(label, "Deleting session...", "Working");
-
-    try {
-      const payload = await deleteSessionOnBackend(id);
-      const deletedSessionId = firstNonEmpty(payload.deleted_session_id, id);
-      const normalized = normalizeSession(payload.session, 0);
-
-      removeSessionById(deletedSessionId);
-
-      state.activeSessionId = String(payload.active_session_id || normalized.id || "");
-      state.lastLoadedSessionId = state.activeSessionId;
-
-      upsertSession(normalized);
-      clearViewerState();
-
-      if (isMobileSidebarOverlayMode()) {
-        closeSidebar();
-      }
-
-      renderAll();
-      await reloadStateFromBackend();
-    } catch (error) {
-      warn("deleteSession failed", error);
-      setTopbar("Nova", "Delete failed", "Error");
-      alert("Delete failed: " + error.message);
-      renderAll();
-    } finally {
-      state.isOpeningSession = false;
-      renderSessions();
-      renderChat();
-    }
-  }
-
-  async function loadState() {
-    log("loadState start");
-
-    try {
-      await reloadStateFromBackend();
-      log("loadState complete");
-    } catch (error) {
-      warn("loadState failed", error);
-      setTopbar("Nova", "State load failed", "Error");
-    }
-  }
-
-  function renderSessions() {
-    if (!els.sessionList) return;
-
-    els.sessionList.innerHTML = "";
-
-    state.sessions.forEach((session) => {
-      const card = document.createElement("div");
-      card.className =
-        "nova-session-card" + (session.id === state.activeSessionId ? " is-active" : "");
-      card.dataset.sessionId = session.id;
-
-      const openButton = document.createElement("button");
-      openButton.type = "button";
-      openButton.className = "nova-session-card-main";
-      openButton.dataset.action = "open-session";
-      openButton.dataset.sessionId = session.id;
-
-      if (state.isOpeningSession) {
-        openButton.disabled = true;
-      }
-
-      openButton.innerHTML = [
-        '<div class="nova-session-card-top">',
-        `<div class="nova-session-card-title">${escapeHtml(session.title)}</div>`,
-        session.pinned ? '<div class="nova-session-card-pin">📌</div>' : "",
-        "</div>",
-        session.last_message_preview
-          ? `<div class="nova-session-card-preview">${escapeHtml(truncate(session.last_message_preview, 100))}</div>`
-          : "",
-        `<div class="nova-session-card-meta">${escapeHtml(
-          [session.message_count + " msgs", formatDateTime(session.updated_at)].filter(Boolean).join(" · ")
-        )}</div>`,
-      ].join("");
-
-      const actions = document.createElement("div");
-      actions.className = "nova-session-card-actions";
-      actions.innerHTML = [
-        `<button type="button" class="nova-session-card-action" data-action="rename-session" data-session-id="${escapeHtml(session.id)}" title="Rename">✎</button>`,
-        `<button type="button" class="nova-session-card-action" data-action="delete-session" data-session-id="${escapeHtml(session.id)}" title="Delete">×</button>`,
-      ].join("");
-
-      card.appendChild(openButton);
-      card.appendChild(actions);
-      els.sessionList.appendChild(card);
-    });
   }
 
   function renderChat() {
     if (!els.chatThread) return;
-
-    const activeSession = getActiveSession();
-    const messages = activeSession ? coerceArray(activeSession.messages) : [];
-
-    setTopbar(
-      activeSession ? activeSession.title : "Nova",
-      activeSession
-        ? [messages.length + " messages", formatDateTime(activeSession.updated_at)].filter(Boolean).join(" · ")
-        : "Fast local AI workspace",
-      state.isSending || state.isOpeningSession ? "Working" : "Ready"
-    );
-
-    els.chatThread.innerHTML = "";
-
-    if (!messages.length) {
-      if (els.emptyState) {
-        els.chatThread.appendChild(els.emptyState);
-        els.emptyState.hidden = false;
-      } else {
-        const empty = document.createElement("div");
-        empty.className = "nova-empty-state";
-        empty.innerHTML =
-          '<div class="nova-empty-state-title">Nova is live</div>' +
-          '<div class="nova-empty-state-copy">Chat is working. Uploads stage before send. Artifacts rail stays available.</div>';
-        els.chatThread.appendChild(empty);
-      }
-      return;
-    }
-
-    messages.forEach((message) => {
-      const wrapper = document.createElement("div");
-      wrapper.className =
-        "nova-message " +
-        (message.role === "user" ? "nova-message-user" : "nova-message-assistant");
-
-      const bubble = document.createElement("div");
-      bubble.className = "nova-message-bubble";
-
-      const content = document.createElement("div");
-      content.className = "nova-message-content";
-      content.innerHTML = renderSafeText(message.content || "");
-      bubble.appendChild(content);
-
-      if (message.image_url) {
-        const imageWrap = document.createElement("div");
-        imageWrap.className = "nova-message-image-wrap";
-        imageWrap.innerHTML =
-          '<img class="nova-message-image" alt="Generated image" src="' +
-          escapeHtml(message.image_url) +
-          '">';
-        bubble.appendChild(imageWrap);
-      }
-
-      const attachments = coerceArray(message.attachments);
-      if (attachments.length) {
-        const attachmentWrap = document.createElement("div");
-        attachmentWrap.className = "nova-message-attachments";
-        attachmentWrap.innerHTML = attachments
-          .map((attachment) => {
-            const label = firstNonEmpty(
-              attachment && attachment.filename,
-              attachment && attachment.name,
-              attachment && attachment.url,
-              "Attachment"
-            );
-            return '<div class="nova-message-attachment">' + escapeHtml(label) + "</div>";
-          })
-          .join("");
-        bubble.appendChild(attachmentWrap);
-      }
-
-      wrapper.appendChild(bubble);
-      els.chatThread.appendChild(wrapper);
-    });
-
-    els.chatThread.scrollTop = els.chatThread.scrollHeight;
+    setChatEmptyVisible(state.messages.length === 0);
+    els.chatThread.innerHTML = state.messages.map(renderMessageCard).join("");
+    scrollChatToBottom(true);
   }
 
-  function renderArtifactList() {
+  function renderSessionList() {
+    if (!els.sessionList) return;
+    const sessions = state.sessions.slice().sort(function (a, b) {
+      const ap = a.pinned ? 1 : 0;
+      const bp = b.pinned ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      const at = Date.parse(a.updated_at || a.created_at || 0) || 0;
+      const bt = Date.parse(b.updated_at || b.created_at || 0) || 0;
+      return bt - at;
+    });
+
+    els.sessionList.innerHTML = sessions
+      .map(function (session) {
+        const active = String(session.id) === String(state.activeSessionId);
+        return (
+          '<button type="button" class="session-card' +
+          (active ? " is-active" : "") +
+          '" data-open-session="' +
+          escapeHtml(session.id) +
+          '">' +
+          '<div class="session-card__title-row">' +
+          '<div class="session-card__title">' +
+          escapeHtml(session.title || "Untitled chat") +
+          "</div>" +
+          (session.pinned ? '<div class="session-card__pin">📌</div>' : "") +
+          "</div>" +
+          '<div class="session-card__preview">' +
+          escapeHtml(session.last_message_preview || "No messages yet") +
+          "</div>" +
+          "</button>"
+        );
+      })
+      .join("");
+  }
+
+  function renderArtifacts() {
     if (!els.artifactList) return;
-
-    els.artifactList.innerHTML = "";
-
-    state.artifacts.forEach((artifact) => {
-      const button = document.createElement("button");
-      button.type = "button";
-
-      const isActive = state.railTab === "artifacts" && state.activeArtifactId === artifact.id;
-
-      button.className = "nova-rail-card" + (isActive ? " is-active" : "");
-      button.dataset.artifactItem = "true";
-      button.dataset.artifactId = artifact.id;
-
-      if (isActive) {
-        button.setAttribute("aria-current", "true");
-      } else {
-        button.removeAttribute("aria-current");
-      }
-
-      button.innerHTML = [
-        artifact.kind
-          ? `<div class="nova-rail-card-kicker">${escapeHtml(String(artifact.kind).replace(/_/g, " "))}</div>`
-          : "",
-        `<div class="nova-rail-card-title">${escapeHtml(truncate(artifact.title, 90))}</div>`,
-        artifact.preview
-          ? `<div class="nova-rail-card-preview">${escapeHtml(artifact.preview)}</div>`
-          : "",
-        `<div class="nova-rail-card-meta">${escapeHtml(
-          [formatDateTime(artifact.updated_at || artifact.created_at), artifact.session_id ? "session linked" : ""]
-            .filter(Boolean)
-            .join(" · ")
-        )}</div>`,
-      ].join("");
-
-      button.addEventListener("click", function () {
-        openViewer("artifact", artifact);
-      });
-
-      els.artifactList.appendChild(button);
-    });
-
-    if (els.artifactEmpty) {
-      els.artifactEmpty.hidden = state.artifacts.length > 0;
-    }
+    const items = safeArray(state.artifacts);
+    els.artifactList.innerHTML = items.length
+      ? items
+          .map(function (item) {
+            const id = String(item.id || "");
+            const title = String(item.title || item.name || "Artifact");
+            const preview = String(item.preview || item.body || item.summary || "");
+            return (
+              '<button type="button" class="rail-item" data-artifact-open="' +
+              escapeHtml(id) +
+              '">' +
+              '<div class="rail-item__title">' +
+              escapeHtml(title) +
+              "</div>" +
+              '<div class="rail-item__preview">' +
+              escapeHtml(summarizeText(preview, 90)) +
+              "</div>" +
+              "</button>"
+            );
+          })
+          .join("")
+      : '<div class="rail-empty">No artifacts yet.</div>';
   }
 
-  function renderMemoryList() {
+  function renderMemory() {
     if (!els.memoryList) return;
+    const items = safeArray(state.memory);
+    els.memoryList.innerHTML = items.length
+      ? items
+          .map(function (item) {
+            const text = String(item.text || item.content || item.body || "");
+            const kind = String(item.kind || "note");
+            return (
+              '<div class="rail-item rail-item--static">' +
+              '<div class="rail-item__title">' +
+              escapeHtml(kind) +
+              "</div>" +
+              '<div class="rail-item__preview">' +
+              escapeHtml(summarizeText(text, 120)) +
+              "</div>" +
+              "</div>"
+            );
+          })
+          .join("")
+      : '<div class="rail-empty">No memory yet.</div>';
+  }
 
-    els.memoryList.innerHTML = "";
+  async function apiGet(url) {
+    const response = await fetch(url, {
+      method: "GET",
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+    const data = await response.json().catch(function () {
+      return {};
+    });
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || ("Request failed: " + response.status));
+    }
+    return data;
+  }
 
-    state.memory.forEach((memory) => {
-      const button = document.createElement("button");
-      button.type = "button";
+  async function apiPost(url, body, extra) {
+    const response = await fetch(
+      url,
+      Object.assign(
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(body || {}),
+        },
+        extra || {}
+      )
+    );
+    const data = await response.json().catch(function () {
+      return {};
+    });
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || ("Request failed: " + response.status));
+    }
+    return data;
+  }
 
-      const isActive = state.railTab === "memory" && state.activeMemoryId === memory.id;
+  async function loadState() {
+    const payload = await apiGet("/api/state");
+    applyStatePayload(payload);
+  }
 
-      button.className = "nova-rail-card" + (isActive ? " is-active" : "");
-      button.dataset.memoryId = memory.id;
+  function setPendingUploadItem(nextItem) {
+    const normalized = normalizeAttachment(nextItem);
+    const index = state.pendingUploads.findIndex(function (item) {
+      return String(item.id) === String(normalized.id);
+    });
+    if (index >= 0) {
+      state.pendingUploads[index] = Object.assign({}, state.pendingUploads[index], normalized);
+    } else {
+      state.pendingUploads.push(normalized);
+    }
+    renderPendingUploads();
+  }
 
-      if (isActive) {
-        button.setAttribute("aria-current", "true");
-      } else {
-        button.removeAttribute("aria-current");
-      }
+  function removePendingUpload(attachmentId) {
+    state.pendingUploads = state.pendingUploads.filter(function (item) {
+      return String(item.id) !== String(attachmentId);
+    });
+    renderPendingUploads();
+  }
 
-      button.innerHTML = [
-        `<div class="nova-rail-card-kicker">${escapeHtml(memory.kind || "memory")}</div>`,
-        `<div class="nova-rail-card-title">${escapeHtml(memory.title || "Memory")}</div>`,
-        memory.preview
-          ? `<div class="nova-rail-card-preview">${escapeHtml(memory.preview)}</div>`
-          : "",
-        `<div class="nova-rail-card-meta">${escapeHtml(
-          [memory.source, formatDateTime(memory.updated_at || memory.created_at)].filter(Boolean).join(" · ")
-        )}</div>`,
-      ].join("");
-
-      button.addEventListener("click", function () {
-        openViewer("memory", memory);
-      });
-
-      els.memoryList.appendChild(button);
+  async function uploadOneFile(file) {
+    const tempId = makeId("att_local");
+    setPendingUploadItem({
+      id: tempId,
+      name: file && file.name ? file.name : "upload",
+      filename: file && file.name ? file.name : "upload",
+      mime_type: file && file.type ? file.type : "application/octet-stream",
+      size: file && typeof file.size === "number" ? file.size : 0,
+      status: "uploading",
     });
 
-    if (els.memoryEmpty) {
-      els.memoryEmpty.hidden = state.memory.length > 0;
+    const formData = new FormData();
+    formData.append("file", file);
+
+    state.uploadInFlightCount += 1;
+    setBusyUi(state.stream.running);
+
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        credentials: "same-origin",
+        body: formData,
+      });
+
+      const data = await response.json().catch(function () {
+        return {};
+      });
+
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || "Upload failed.");
+      }
+
+      state.pendingUploads = state.pendingUploads.filter(function (item) {
+        return String(item.id) !== String(tempId);
+      });
+      setPendingUploadItem(
+        Object.assign({}, normalizeAttachment(data.attachment || data), {
+          status: "uploaded",
+          upload_error: "",
+        })
+      );
+      return normalizeAttachment(data.attachment || data);
+    } catch (error) {
+      warn("upload failed", error);
+      setPendingUploadItem({
+        id: tempId,
+        name: file && file.name ? file.name : "upload",
+        filename: file && file.name ? file.name : "upload",
+        mime_type: file && file.type ? file.type : "application/octet-stream",
+        size: file && typeof file.size === "number" ? file.size : 0,
+        status: "error",
+        upload_error: error && error.message ? error.message : "Upload failed.",
+      });
+      throw error;
+    } finally {
+      state.uploadInFlightCount = Math.max(0, state.uploadInFlightCount - 1);
+      setBusyUi(state.stream.running);
+      renderPendingUploads();
     }
   }
 
-  function renderWebList() {
-    if (!els.webList) return;
-
-    els.webList.innerHTML = "";
-
-    state.web.forEach((item) => {
-      const button = document.createElement("button");
-      button.type = "button";
-
-      const isActive = state.railTab === "web" && state.activeWebId === item.id;
-
-      button.className = "nova-rail-card" + (isActive ? " is-active" : "");
-      button.dataset.webId = item.id;
-
-      if (isActive) {
-        button.setAttribute("aria-current", "true");
-      } else {
-        button.removeAttribute("aria-current");
-      }
-
-      button.innerHTML = [
-        item.subtitle ? `<div class="nova-rail-card-kicker">${escapeHtml(item.subtitle)}</div>` : "",
-        `<div class="nova-rail-card-title">${escapeHtml(truncate(item.title, 90))}</div>`,
-        item.preview
-          ? `<div class="nova-rail-card-preview">${escapeHtml(item.preview)}</div>`
-          : "",
-        `<div class="nova-rail-card-meta">${escapeHtml(
-          [item.status_code ? "HTTP " + item.status_code : "", formatDateTime(item.created_at)]
-            .filter(Boolean)
-            .join(" · ")
-        )}</div>`,
-      ].join("");
-
-      button.addEventListener("click", function () {
-        openViewer("web", item);
-      });
-
-      els.webList.appendChild(button);
-    });
-
-    if (els.webEmpty) {
-      els.webEmpty.hidden = state.web.length > 0;
+  async function uploadFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    for (const file of files) {
+      await uploadOneFile(file);
     }
   }
 
-  function renderViewer() {
-    if (!els.viewer || !els.viewerShell) return;
+  function clearPendingUploads() {
+    state.pendingUploads = [];
+    if (els.attachInput) {
+      els.attachInput.value = "";
+    }
+    renderPendingUploads();
+  }
 
-    const selected = state.selectedItem || getSelectedItemFromState();
+  function getSendPayload(base) {
+    const source = base && typeof base === "object" ? base : {};
+    return {
+      session_id: String(state.activeSessionId || ""),
+      user_text: String(source.user_text || ""),
+      stream: true,
+      regenerate_of: source.regenerate_of ? String(source.regenerate_of) : "",
+      attachments: safeArray(source.attachments).map(normalizeAttachment),
+    };
+  }
 
-    if (!state.viewerOpen || !selected || !selected.item) {
-      els.viewer.hidden = true;
-      els.viewerShell.innerHTML =
-        '<div class="nova-viewer-empty" data-viewer-empty>' +
-        '<div class="nova-viewer-empty-title">Nothing selected</div>' +
-        '<div class="nova-viewer-empty-copy">Select an artifact, memory item, or web result to view details.</div>' +
-        "</div>";
+  function appendUserMessageLocal(text, attachments) {
+    const message = normalizeMessage({
+      id: makeId("user"),
+      role: "user",
+      text: text,
+      attachments: safeArray(attachments).map(normalizeAttachment),
+      created_at: new Date().toISOString(),
+    });
+    upsertMessage(message);
+    return message;
+  }
+
+  async function consumeChatStream(payload) {
+    if (state.stream.running) {
+      throw new Error("A generation is already running.");
+    }
+
+    const controller = new AbortController();
+    state.stream.controller = controller;
+    state.stream.running = true;
+    state.stream.messageId = "";
+    state.stream.placeholderId = "";
+    state.stream.mode = payload.regenerate_of ? "regenerate" : "send";
+    state.stream.buffer = "";
+    setBusyUi(true);
+    updateTopbarFromState();
+
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    if (!response.ok || !response.body) {
+      state.stream.running = false;
+      state.stream.controller = null;
+      setBusyUi(false);
+      updateTopbarFromState();
+      let message = "Chat failed.";
+      try {
+        const data = await response.json();
+        if (data && data.error) message = data.error;
+      } catch (_) {}
+      throw new Error(message);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    try {
+      while (true) {
+        const result = await reader.read();
+        if (result.done) break;
+        buffer += decoder.decode(result.value, { stream: true });
+
+        let boundary = buffer.indexOf("\n\n");
+        while (boundary >= 0) {
+          const rawEvent = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          boundary = buffer.indexOf("\n\n");
+
+          const lines = rawEvent.split("\n");
+          const dataLine = lines
+            .filter(function (line) {
+              return line.indexOf("data: ") === 0;
+            })
+            .map(function (line) {
+              return line.slice(6);
+            })
+            .join("");
+
+          if (!dataLine) continue;
+
+          let evt = null;
+          try {
+            evt = JSON.parse(dataLine);
+          } catch (error) {
+            warn("bad sse json", error, dataLine);
+            continue;
+          }
+
+          handleStreamEvent(evt);
+        }
+      }
+    } finally {
+      try {
+        reader.releaseLock();
+      } catch (_) {}
+    }
+  }
+
+  function handleStreamEvent(evt) {
+    const event = evt && typeof evt === "object" ? evt : {};
+    const type = String(event.type || "");
+
+    if (type === "start") {
+      const messageId = String(event.message_id || event.assistant_message_id || makeId("assistant"));
+      state.stream.messageId = messageId;
+
+      const existing = findMessageById(messageId);
+      if (existing) {
+        upsertMessage(
+          Object.assign({}, existing, {
+            pending: true,
+            streaming: true,
+            source: state.stream.mode || "send",
+          })
+        );
+      } else {
+        const placeholder = createAssistantPlaceholder(state.stream.mode || "send", messageId);
+        state.stream.placeholderId = placeholder.id;
+      }
+
+      scrollChatToBottom(true);
       return;
     }
 
-    els.viewer.hidden = false;
+    if (type === "token") {
+      const messageId = String(event.message_id || event.assistant_message_id || state.stream.messageId || "");
+      if (!messageId) return;
 
-    if (selected.type === "artifact") {
-      els.viewerShell.innerHTML = renderArtifactViewer(selected.item);
-    } else if (selected.type === "memory") {
-      els.viewerShell.innerHTML = renderMemoryViewer(selected.item);
-    } else if (selected.type === "web") {
-      els.viewerShell.innerHTML = renderWebViewer(selected.item);
-    } else {
-      els.viewerShell.innerHTML =
-        '<div class="nova-viewer-empty"><div class="nova-viewer-empty-title">Nothing selected</div></div>';
-    }
-  }
-
-  function renderArtifactViewer(item) {
-    const metaChips = [
-      item.kind ? `<span class="nova-viewer-meta-chip">${escapeHtml(item.kind)}</span>` : "",
-      item.created_at
-        ? `<span class="nova-viewer-meta-chip">${escapeHtml(formatDateTime(item.created_at))}</span>`
-        : "",
-      item.session_id
-        ? `<span class="nova-viewer-meta-chip">${escapeHtml("session linked")}</span>`
-        : "",
-    ]
-      .filter(Boolean)
-      .join("");
-
-    const media = item.image_url
-      ? `<div class="nova-viewer-media"><img class="nova-viewer-image" src="${escapeHtml(item.image_url)}" alt="Artifact image"></div>`
-      : item.video_url
-      ? `<div class="nova-viewer-media"><video class="nova-viewer-video" controls src="${escapeHtml(item.video_url)}"></video></div>`
-      : item.audio_url
-      ? `<div class="nova-viewer-media"><audio class="nova-viewer-audio" controls src="${escapeHtml(item.audio_url)}"></audio></div>`
-      : "";
-
-    const actions = item.source_url
-      ? `<div class="nova-viewer-actions"><a class="nova-viewer-link" href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener noreferrer">Open source</a></div>`
-      : "";
-
-    const body = item.body
-      ? `<div class="nova-viewer-body">${renderSafeText(item.body)}</div>`
-      : "";
-
-    const analysis = item.analysis_text
-      ? '<div class="nova-viewer-analysis">' +
-        '<div class="nova-viewer-section-title">Analysis</div>' +
-        `<div class="nova-viewer-analysis-text">${renderSafeText(item.analysis_text)}</div>` +
-        "</div>"
-      : "";
-
-    const bullets = item.bullets && item.bullets.length
-      ? '<div class="nova-viewer-bullets">' +
-        '<div class="nova-viewer-section-title">Highlights</div>' +
-        '<ul class="nova-viewer-bullets-list">' +
-        item.bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join("") +
-        "</ul>" +
-        "</div>"
-      : "";
-
-    return (
-      '<div class="nova-viewer-header">' +
-      '<div class="nova-viewer-kicker">Artifact</div>' +
-      `<div class="nova-viewer-title">${escapeHtml(item.title || "Artifact")}</div>` +
-      `<div class="nova-viewer-meta">${metaChips}</div>` +
-      "</div>" +
-      media +
-      actions +
-      body +
-      analysis +
-      bullets
-    );
-  }
-
-  function renderMemoryViewer(item) {
-    const metaChips = [
-      item.kind ? `<span class="nova-viewer-meta-chip">${escapeHtml(item.kind)}</span>` : "",
-      item.source ? `<span class="nova-viewer-meta-chip">${escapeHtml(item.source)}</span>` : "",
-      item.updated_at
-        ? `<span class="nova-viewer-meta-chip">${escapeHtml(formatDateTime(item.updated_at))}</span>`
-        : "",
-    ]
-      .filter(Boolean)
-      .join("");
-
-    return (
-      '<div class="nova-viewer-header">' +
-      '<div class="nova-viewer-kicker">Memory</div>' +
-      `<div class="nova-viewer-title">${escapeHtml(item.title || "Memory")}</div>` +
-      `<div class="nova-viewer-meta">${metaChips}</div>` +
-      "</div>" +
-      `<div class="nova-viewer-body">${renderSafeText(item.text || "")}</div>`
-    );
-  }
-
-  function renderWebViewer(item) {
-    const metaChips = [
-      item.subtitle ? `<span class="nova-viewer-meta-chip">${escapeHtml(item.subtitle)}</span>` : "",
-      item.status_code ? `<span class="nova-viewer-meta-chip">HTTP ${escapeHtml(item.status_code)}</span>` : "",
-      item.created_at
-        ? `<span class="nova-viewer-meta-chip">${escapeHtml(formatDateTime(item.created_at))}</span>`
-        : "",
-    ]
-      .filter(Boolean)
-      .join("");
-
-    const actions = item.url
-      ? `<div class="nova-viewer-actions"><a class="nova-viewer-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open page</a></div>`
-      : "";
-
-    return (
-      '<div class="nova-viewer-header">' +
-      '<div class="nova-viewer-kicker">Web</div>' +
-      `<div class="nova-viewer-title">${escapeHtml(item.title || "Web Result")}</div>` +
-      `<div class="nova-viewer-meta">${metaChips}</div>` +
-      "</div>" +
-      actions +
-      `<div class="nova-viewer-body">${renderSafeText(item.body || item.preview || "")}</div>`
-    );
-  }
-
-  function renderRail() {
-    if (!els.rail) return;
-
-    if (state.railOpen) {
-      els.rail.hidden = false;
-      els.rail.classList.add("is-open");
-      if (els.railReopen) els.railReopen.hidden = true;
-    } else {
-      els.rail.hidden = true;
-      els.rail.classList.remove("is-open");
-      if (els.railReopen) els.railReopen.hidden = false;
-      applyBodyLockState();
+      const existing = findMessageById(messageId) || createAssistantPlaceholder(state.stream.mode || "send", messageId);
+      upsertMessage(
+        Object.assign({}, existing, {
+          id: messageId,
+          text: String(existing.text || "") + String(event.token || ""),
+          pending: true,
+          streaming: true,
+          source: state.stream.mode || "send",
+        })
+      );
+      scrollChatToBottom(false);
       return;
     }
 
-    syncRailHeader();
+    if (type === "final") {
+      const finalMessage = normalizeMessage(
+        event.message || {
+          id: String(event.message_id || event.assistant_message_id || state.stream.messageId || makeId("assistant")),
+          role: "assistant",
+          text: state.stream.buffer || "",
+        }
+      );
+      upsertMessage(
+        Object.assign({}, finalMessage, {
+          pending: false,
+          streaming: false,
+        })
+      );
 
-    els.railTabs.forEach((tabButton) => {
-      const tabName = tabButton.getAttribute("data-rail-tab");
-      const isActive = tabName === state.railTab;
-      tabButton.classList.toggle("is-active", isActive);
-      tabButton.setAttribute("aria-pressed", isActive ? "true" : "false");
-      tabButton.setAttribute("aria-selected", isActive ? "true" : "false");
-    });
+      if (Array.isArray(event.messages)) {
+        state.messages = event.messages.map(normalizeMessage);
+        renderChat();
+      }
+      if (Array.isArray(event.artifacts)) {
+        state.artifacts = event.artifacts;
+        renderArtifacts();
+      }
+      if (Array.isArray(event.memory)) {
+        state.memory = event.memory;
+        renderMemory();
+      }
 
-    if (els.artifactPanel) {
-      const active = state.railTab === "artifacts";
-      els.artifactPanel.hidden = !active;
-      els.artifactPanel.classList.toggle("is-active", active);
+      state.stream.running = false;
+      state.stream.controller = null;
+      state.stream.messageId = "";
+      state.stream.placeholderId = "";
+      state.stream.buffer = "";
+      setBusyUi(false);
+      updateTopbarFromState();
+      scrollChatToBottom(true);
+      return;
     }
 
-    if (els.memoryPanel) {
-      const active = state.railTab === "memory";
-      els.memoryPanel.hidden = !active;
-      els.memoryPanel.classList.toggle("is-active", active);
+    if (type === "error") {
+      const errorMessage = normalizeMessage(
+        event.message || {
+          id: String(event.message_id || event.assistant_message_id || state.stream.messageId || makeId("assistant")),
+          role: "assistant",
+          text: String(event.error || "Generation failed."),
+          error: true,
+        }
+      );
+
+      upsertMessage(
+        Object.assign({}, errorMessage, {
+          pending: false,
+          streaming: false,
+          error: true,
+        })
+      );
+
+      state.stream.running = false;
+      state.stream.controller = null;
+      state.stream.messageId = "";
+      state.stream.placeholderId = "";
+      state.stream.buffer = "";
+      setBusyUi(false);
+      updateTopbarFromState();
+      return;
     }
-
-    if (els.webPanel) {
-      const active = state.railTab === "web";
-      els.webPanel.hidden = !active;
-      els.webPanel.classList.toggle("is-active", active);
-    }
-
-    renderArtifactList();
-    renderMemoryList();
-    renderWebList();
-    renderViewer();
-    applyBodyLockState();
-  }
-
-  function renderAll() {
-    renderSessions();
-    renderChat();
-    renderRail();
-    syncSidebarVisibility();
   }
 
   async function sendMessage() {
-    if (!els.chatInput || state.isSending || state.isOpeningSession) return;
+    const text = els.chatInput ? normalizeText(els.chatInput.value) : "";
+    const attachments = state.pendingUploads
+      .filter(function (item) {
+        return String(item.status || "") === "uploaded";
+      })
+      .map(normalizeAttachment);
 
-    const text = String(els.chatInput.value || "").trim();
-    if (!text) return;
+    const hasUploading = state.pendingUploads.some(function (item) {
+      return String(item.status || "") === "uploading";
+    });
 
-    state.isSending = true;
+    const hasUploadErrors = state.pendingUploads.some(function (item) {
+      return String(item.status || "") === "error";
+    });
 
-    setTopbar(
-      (getActiveSession() && getActiveSession().title) || "Nova",
-      "Working...",
-      "Working"
-    );
+    if (hasUploading) {
+      throw new Error("Please wait for uploads to finish.");
+    }
 
-    try {
-      await api("/api/chat", {
-        method: "POST",
-        body: JSON.stringify({
-          session_id: state.activeSessionId,
-          user_text: text,
-        }),
-      });
+    if (hasUploadErrors) {
+      throw new Error("Remove failed uploads before sending.");
+    }
 
-      els.chatInput.value = "";
+    if (!text.trim() && !attachments.length) {
+      return;
+    }
+
+    if (!state.activeSessionId) {
+      const created = await apiPost("/api/sessions/new", {});
+      if (created && created.session && created.session.id) {
+        state.activeSessionId = String(created.session.id);
+      } else if (created && created.active_session_id) {
+        state.activeSessionId = String(created.active_session_id);
+      }
       await loadState();
+    }
+
+    appendUserMessageLocal(text, attachments);
+    if (els.chatInput) {
+      els.chatInput.value = "";
+      autoResizeTextarea();
+    }
+
+    clearPendingUploads();
+
+    const payload = getSendPayload({
+      user_text: text,
+      attachments: attachments,
+    });
+
+    await consumeChatStream(payload);
+  }
+
+  async function regenerateMessage(targetAssistantId) {
+    const assistantId = String(targetAssistantId || "");
+    if (!assistantId) return;
+
+    const userMessage = currentUserMessageForRegenerate(assistantId);
+    const attachments = userMessage ? safeArray(userMessage.attachments).map(normalizeAttachment) : [];
+
+    const existing = findMessageById(assistantId);
+    if (existing) {
+      upsertMessage(
+        Object.assign({}, existing, {
+          text: "",
+          pending: true,
+          streaming: true,
+          error: false,
+          stopped: false,
+          source: "regenerate",
+        })
+      );
+    } else {
+      createAssistantPlaceholder("regenerate", assistantId);
+    }
+
+    const payload = getSendPayload({
+      user_text: "",
+      attachments: attachments,
+      regenerate_of: assistantId,
+    });
+
+    await consumeChatStream(payload);
+  }
+
+  function stopGeneration() {
+    if (!state.stream.running || !state.stream.controller) return;
+    try {
+      state.stream.controller.abort();
+    } catch (_) {}
+    state.stream.running = false;
+    state.stream.controller = null;
+    setBusyUi(false);
+    updateTopbarFromState();
+  }
+
+  async function openSession(sessionId) {
+    const id = String(sessionId || "");
+    if (!id) return;
+    if (state.stream.running) {
+      stopGeneration();
+    }
+    const payload = await apiPost("/api/sessions/open", { session_id: id });
+    if (payload && payload.session) {
+      state.activeSessionId = String(payload.session.id || id);
+    }
+    await loadState();
+  }
+
+  async function createNewChat() {
+    if (state.stream.running) {
+      stopGeneration();
+    }
+    await apiPost("/api/sessions/new", {});
+    clearPendingUploads();
+    if (els.chatInput) {
+      els.chatInput.value = "";
+      autoResizeTextarea();
+    }
+    await loadState();
+  }
+
+  async function copyMessage(messageId) {
+    const message = findMessageById(messageId);
+    if (!message) return;
+    try {
+      await navigator.clipboard.writeText(message.text || "");
     } catch (error) {
-      warn("sendMessage failed", error);
-      alert("Send failed: " + error.message);
-    } finally {
-      state.isSending = false;
-      renderChat();
+      warn("copy failed", error);
     }
   }
 
-  function bindActions() {
-    document.addEventListener("click", function (event) {
-      const button = event.target.closest("[data-action]");
-      if (!button) return;
+  function openAttachPicker() {
+    if (!els.attachInput) return;
+    els.attachInput.click();
+  }
 
-      const action = button.getAttribute("data-action");
-      const sessionId =
-        button.getAttribute("data-session-id") ||
-        button.closest("[data-session-id]")?.getAttribute("data-session-id") ||
-        "";
-
-      if (action === "toggle-rail") {
-        if (state.railOpen) {
-          closeRail();
-        } else {
-          openRail();
-          renderRail();
-        }
-        return;
-      }
-
-      if (action === "close-rail") {
-        closeRail();
-        return;
-      }
-
-      if (action === "reopen-rail") {
-        openRail();
-        renderRail();
-        return;
-      }
-
-      if (action === "toggle-sidebar") {
-        toggleSidebar();
-        return;
-      }
-
-      if (action === "reopen-sidebar") {
-        openSidebar();
-        return;
-      }
-
-      if (action === "new-chat") {
-        createNewChat();
-        return;
-      }
-
-      if (action === "open-session") {
-        event.preventDefault();
-        event.stopPropagation();
-        switchToSession(sessionId);
-        return;
-      }
-
-      if (action === "rename-session") {
-        event.preventDefault();
-        event.stopPropagation();
-        renameSession(sessionId);
-        return;
-      }
-
-      if (action === "delete-session") {
-        event.preventDefault();
-        event.stopPropagation();
-        deleteSession(sessionId);
-        return;
-      }
-
-      if (action === "send") {
-        sendMessage();
-        return;
-      }
-
-      if (action === "attach" || action === "voice") {
-        alert(action === "attach" ? "Attach wiring comes next." : "Voice wiring comes next.");
-      }
+  function handleComposerSubmit(event) {
+    if (event) {
+      event.preventDefault();
+    }
+    sendMessage().catch(function (error) {
+      warn("send failed", error);
+      window.alert(error && error.message ? error.message : "Send failed.");
     });
+  }
 
-    els.railTabs.forEach((tabButton) => {
-      tabButton.addEventListener("click", function () {
-        const tabName = tabButton.getAttribute("data-rail-tab");
-        setRailTab(tabName, { preserveSelection: false });
-      });
-    });
+  function bindEvents() {
+    if (els.composerForm) {
+      els.composerForm.addEventListener("submit", handleComposerSubmit);
+    }
 
     if (els.chatInput) {
+      els.chatInput.addEventListener("input", autoResizeTextarea);
       els.chatInput.addEventListener("keydown", function (event) {
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
-          sendMessage();
+          handleComposerSubmit(event);
         }
       });
     }
 
-    window.addEventListener("resize", function () {
-      applyBodyLockState();
-      syncSidebarVisibility();
+    if (els.attachButton) {
+      els.attachButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        openAttachPicker();
+      });
+    }
 
-      if (els.rail) {
-        if (state.railOpen) {
-          els.rail.hidden = false;
-          els.rail.classList.add("is-open");
-        } else {
-          els.rail.hidden = true;
-          els.rail.classList.remove("is-open");
-        }
+    if (els.attachInput) {
+      els.attachInput.addEventListener("change", function (event) {
+        const files = event && event.target && event.target.files ? event.target.files : [];
+        uploadFiles(files).catch(function (error) {
+          warn("upload files failed", error);
+          window.alert(error && error.message ? error.message : "Upload failed.");
+        });
+      });
+    }
+
+    if (els.stopButton) {
+      els.stopButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        stopGeneration();
+      });
+    }
+
+    if (els.newChatButton) {
+      els.newChatButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        createNewChat().catch(function (error) {
+          warn("new chat failed", error);
+        });
+      });
+    }
+
+    document.addEventListener("click", function (event) {
+      const removeChip = event.target.closest("[data-upload-remove]");
+      if (removeChip) {
+        event.preventDefault();
+        removePendingUpload(removeChip.getAttribute("data-upload-remove"));
+        return;
       }
 
-      if (els.railReopen) {
-        els.railReopen.hidden = state.railOpen;
+      const openSessionButton = event.target.closest("[data-open-session]");
+      if (openSessionButton) {
+        event.preventDefault();
+        openSession(openSessionButton.getAttribute("data-open-session")).catch(function (error) {
+          warn("open session failed", error);
+        });
+        return;
+      }
+
+      const copyButton = event.target.closest("[data-copy-message]");
+      if (copyButton) {
+        event.preventDefault();
+        copyMessage(copyButton.getAttribute("data-copy-message"));
+        return;
+      }
+
+      const regenButton = event.target.closest("[data-regenerate-message]");
+      if (regenButton) {
+        event.preventDefault();
+        if (state.stream.running) return;
+        regenerateMessage(regenButton.getAttribute("data-regenerate-message")).catch(function (error) {
+          warn("regenerate failed", error);
+          window.alert(error && error.message ? error.message : "Regenerate failed.");
+        });
       }
     });
   }
 
   async function boot() {
+    if (state.booted) return;
+    state.booted = true;
+
     log("boot start");
+    bindEvents();
+    autoResizeTextarea();
+    renderPendingUploads();
+    setBusyUi(false);
+    setTopbar("Nova", "Fast local AI workspace", "Ready");
 
-    hydrateRailStateFromStorage();
-
-    state.sidebarOpen = !(els.sidebar && els.sidebar.hidden);
-
-    if (els.sidebarReopen) {
-      els.sidebarReopen.hidden = state.sidebarOpen;
+    try {
+      await loadState();
+    } catch (error) {
+      warn("boot state load failed", error);
+      renderChat();
+      renderSessionList();
+      renderArtifacts();
+      renderMemory();
     }
-
-    if (els.railReopen) {
-      els.railReopen.hidden = state.railOpen;
-    }
-
-    if (els.rail) {
-      els.rail.hidden = !state.railOpen;
-      els.rail.classList.toggle("is-open", state.railOpen);
-    }
-
-    syncSidebarVisibility();
-    bindActions();
-    await loadState();
-    applyBodyLockState();
 
     log("boot complete");
   }
 
   window.NovaComposerBundle = {
-    state,
-    loadState,
-    renderAll,
-    setRailTab,
-    openViewer,
-    clearViewerState,
-    switchToSession,
-    openSessionOnBackend,
-    createNewChat,
-    createNewChatOnBackend,
-    renameSession,
-    renameSessionOnBackend,
-    deleteSession,
-    deleteSessionOnBackend,
-    reloadStateFromBackend,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-    openRail,
-    closeRail,
-    applyBodyLockState,
+    state: state,
+    sendMessage: sendMessage,
+    regenerateMessage: regenerateMessage,
+    stopGeneration: stopGeneration,
+    loadState: loadState,
+    uploadFiles: uploadFiles,
+    clearPendingUploads: clearPendingUploads,
   };
 
   boot();
