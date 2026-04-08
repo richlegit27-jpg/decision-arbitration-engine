@@ -847,6 +847,7 @@ def stream_model_text(
         except Exception:
             continue
 
+
 # =========================================================
 # STREAM CONTRACT LOCK
 # =========================================================
@@ -870,6 +871,7 @@ def chat_stream_generator(
     if not session:
         session = ensure_active_session(store)
 
+    locked_session_id = str(session.get("id") or session_id or "")
     attachments = normalize_attachments(attachments)
 
     if not regenerate_of and (normalize_text(user_text).strip() or attachments):
@@ -883,7 +885,12 @@ def chat_stream_generator(
     final_written = False
     started = False
 
-    def persist_final(*, stopped: bool = False, error: bool = False, error_message: str = "") -> dict[str, Any]:
+    def persist_final(
+        *,
+        stopped: bool = False,
+        error: bool = False,
+        error_message: str = "",
+    ) -> dict[str, Any]:
         nonlocal final_written
 
         if final_written:
@@ -906,7 +913,7 @@ def chat_stream_generator(
                 "error": error,
                 "source": "regenerate" if regenerate_of else "send",
                 "meta": {
-                                   "regenerate_of": regenerate_of or "",
+                    "regenerate_of": regenerate_of or "",
                 },
             }
         )
@@ -925,7 +932,7 @@ def chat_stream_generator(
         try:
             save_artifact_from_assistant(
                 assistant_message,
-                session.get("id") or session_id,
+                locked_session_id,
             )
         except Exception:
             pass
@@ -936,7 +943,7 @@ def chat_stream_generator(
     try:
         start_event = {
             "type": "start",
-            "session_id": session.get("id") or session_id,
+            "session_id": locked_session_id,
             "message_id": assistant_message_id,
             "assistant_message_id": assistant_message_id,
             "mode": "regenerate" if regenerate_of else "send",
@@ -954,13 +961,12 @@ def chat_stream_generator(
             yield sse(
                 {
                     "type": "token",
-                    "session_id": session.get("id") or session_id,
+                    "session_id": locked_session_id,
                     "message_id": assistant_message_id,
                     "assistant_message_id": assistant_message_id,
                     "token": token,
                 }
             )
-
 
         final_message = persist_final(stopped=False, error=False)
 
@@ -968,7 +974,7 @@ def chat_stream_generator(
             {
                 "type": "final",
                 "ok": True,
-                "session_id": session.get("id") or session_id,
+                "session_id": locked_session_id,
                 "message_id": assistant_message_id,
                 "assistant_message_id": assistant_message_id,
                 "message": final_message,
@@ -989,12 +995,16 @@ def chat_stream_generator(
 
         if started:
             try:
-                final_message = persist_final(stopped=False, error=True, error_message=error_text)
+                final_message = persist_final(
+                    stopped=False,
+                    error=True,
+                    error_message=error_text,
+                )
                 yield sse(
                     {
                         "type": "error",
                         "ok": False,
-                        "session_id": session.get("id") or session_id,
+                        "session_id": locked_session_id,
                         "message_id": assistant_message_id,
                         "assistant_message_id": assistant_message_id,
                         "message": final_message,
@@ -1006,7 +1016,7 @@ def chat_stream_generator(
                     {
                         "type": "error",
                         "ok": False,
-                        "session_id": session.get("id") or session_id,
+                        "session_id": locked_session_id,
                         "message_id": assistant_message_id,
                         "assistant_message_id": assistant_message_id,
                         "error": error_text,
@@ -1017,7 +1027,7 @@ def chat_stream_generator(
                 {
                     "type": "error",
                     "ok": False,
-                    "session_id": session.get("id") or session_id,
+                    "session_id": locked_session_id,
                     "error": error_text,
                 }
             )
@@ -1035,6 +1045,7 @@ def run_non_stream_chat(
     if not session:
         session = ensure_active_session(store)
 
+    locked_session_id = str(session.get("id") or session_id or "")
     attachments = normalize_attachments(attachments)
 
     if not regenerate_of and (normalize_text(user_text).strip() or attachments):
@@ -1051,6 +1062,7 @@ def run_non_stream_chat(
         regenerate_of=regenerate_of,
     ):
         parts.append(chunk)
+
     final_text = "".join(parts)
 
     assistant_message = normalize_message(
@@ -1075,10 +1087,17 @@ def run_non_stream_chat(
 
     save_sessions_store(store)
 
+    try:
+        save_artifact_from_assistant(
+            assistant_message,
+            locked_session_id,
+        )
+    except Exception:
+        pass
+
     payload = state_payload(session)
     payload["assistant_message"] = assistant_message
     return payload
-
 
 # =========================================================
 # ROUTES

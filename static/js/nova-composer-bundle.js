@@ -821,6 +821,52 @@ async function apiPost(url, body, extra) {
   return data;
 }
 
+async function stopActiveStream(options) {
+  const opts = Object.assign(
+    { silent: false, reason: "Stopped.", statusState: "idle", statusText: "Ready" },
+    options || {}
+  );
+
+  if (!state.stream || !state.stream.running) return;
+
+  const controller = state.stream.controller;
+  if (controller) {
+    try { controller.abort(); } catch (_) {}
+  }
+
+  const id = state.stream.messageId || state.stream.placeholderId;
+  if (id) {
+    const msg = findMessageById(id);
+    if (msg) {
+      upsertMessage({
+        ...msg,
+        pending: false,
+        streaming: false,
+        stopped: true,
+        error: false,
+      });
+    }
+  }
+
+  finishStreamUi({
+    statusState: opts.statusState,
+    statusText: opts.statusText,
+  });
+
+  if (!opts.silent) {
+    showToast(opts.reason, "info");
+  }
+}
+
+async function stopStreamBeforeSessionChange() {
+  if (!state.stream || !state.stream.running) return;
+
+  await stopActiveStream({
+    silent: true,
+    reason: "Stopped before switching sessions.",
+  });
+}
+
 async function consumeChatStream(payload) {
   if (state.stream.running) {
     showToast("A generation is already running.", "info");
@@ -912,50 +958,53 @@ async function consumeChatStream(payload) {
         });
       }
 
-      upsertMessage({
-        ...msg,
-        text: (msg.text || "") + (event.token || ""),
-        pending: true,
-        streaming: true,
-      });
+upsertMessage({
+  ...msg,
+  text: (msg.text || "") + (event.token || ""),
+  pending: true,
+  streaming: true,
+  error:false,
+});
 
       scrollChatToBottom(true);
       return;
     }
 
-    if (type === "final") {
-      const finalMsg = normalizeMessage(event.message || {
-        id: state.stream.messageId || makeId("assistant"),
-        role: "assistant",
-        text: "",
-      });
+if (type === "final") {
+  const finalMsg = normalizeMessage(event.message || {
+    id: state.stream.messageId || makeId("assistant"),
+    role: "assistant",
+    text: "",
+  });
 
-      upsertMessage({
-        ...finalMsg,
-        pending: false,
-        streaming: false,
-        error: false,
-      });
+  upsertMessage({
+    ...finalMsg,
+    pending: false,
+    streaming: false,
+    stopped: false,
+    error: false,
+  });
 
-      if (Array.isArray(event.messages)) {
-        state.messages = event.messages.map(normalizeMessage);
-        renderChat();
-      }
+  if (Array.isArray(event.messages)) {
+    state.messages = event.messages.map(normalizeMessage);
+    renderChat();
+  }
 
-      if (Array.isArray(event.artifacts)) {
-        state.artifacts = event.artifacts;
-        renderArtifacts();
-      }
+  if (Array.isArray(event.artifacts)) {
+    state.artifacts = event.artifacts;
+    renderArtifacts();
+  }
 
-      if (Array.isArray(event.memory)) {
-        state.memory = event.memory;
-        renderMemory();
-      }
+  if (Array.isArray(event.memory)) {
+    state.memory = event.memory;
+    renderMemory();
+  }
 
-      finishStreamUi({ statusState: "idle", statusText: "Ready" });
-      scrollChatToBottom(true);
-      return;
-    }
+  finishStreamUi({ statusState: "idle", statusText: "Ready" });
+  scrollChatToBottom(true);
+  return;
+}
+
 
     if (type === "error") {
       const text = String(event.error || "Generation failed.");
@@ -973,6 +1022,9 @@ async function consumeChatStream(payload) {
       return;
     }
   }
+
+
+
 
   while (true) {
     const { done, value } = await reader.read();
@@ -999,6 +1051,13 @@ async function consumeChatStream(payload) {
   finishStreamUi({ statusState: "idle", statusText: "Ready" });
 }
 
+
+
+
+
+
+
+
   async function loadState() {
     const payload = await apiGet("/api/state");
     applyStatePayload(payload);
@@ -1008,21 +1067,19 @@ async function openSessionFromBackend(sessionId) {
   const id = String(sessionId || "").trim();
   if (!id) return;
 
-  if (state.stream.running) {
-    stopGeneration();
+  await stopStreamBeforeSessionChange();
+
+  const result = await apiPost("/api/sessions/open", {
+    session_id: id,
+  });
+
+  if (result && result.session && result.session.id) {
+    state.activeSessionId = String(result.session.id);
+  } else if (result && result.active_session_id) {
+    state.activeSessionId = String(result.active_session_id);
+  } else {
+    state.activeSessionId = id;
   }
-
-  const session = state.sessions.find(function (item) {
-    return String(item.id || "") === id;
-  }) || null;
-
-  if (!session) {
-    showToast("Session not found.", "error");
-    return;
-  }
-
-  state.activeSessionId = id;
-  state.messages = safeArray(session.messages).map(normalizeMessage);
 
   clearPendingUploads();
 
@@ -1030,6 +1087,8 @@ async function openSessionFromBackend(sessionId) {
     els.chatInput.value = "";
     autoResizeTextarea();
   }
+
+  await loadState();
 
   renderSessionList();
   renderChat();
