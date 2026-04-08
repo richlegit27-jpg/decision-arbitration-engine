@@ -1713,3 +1713,275 @@ body.is-shell-locked .nova-composer {
     padding: 10px;
   }
 }
+
+/* =========================================================
+   TOAST VISUAL LOCK
+   upload-toast-visual-lock-2026-04-07-001
+   append at bottom of C:\Users\Owner\nova\static\css\nova-main.css
+   ========================================================= */
+
+.nova-toast-host {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+  width: min(360px, calc(100vw - 24px));
+  pointer-events: none;
+}
+
+.nova-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background:
+    linear-gradient(180deg, rgba(23, 33, 59, 0.96), rgba(11, 16, 32, 0.96));
+  color: var(--text, #f4f7fb);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow:
+    0 16px 40px rgba(0,0,0,0.34),
+    0 4px 14px rgba(0,0,0,0.18);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.nova-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.nova-toast.is-leaving {
+  opacity: 0;
+  transform: translateY(8px) scale(0.985);
+}
+
+.nova-toast.is-success {
+  border-color: rgba(110, 231, 183, 0.28);
+  background:
+    linear-gradient(180deg, rgba(20, 83, 45, 0.94), rgba(6, 46, 24, 0.96));
+  color: #dcfce7;
+}
+
+.nova-toast.is-error {
+  border-color: rgba(248, 113, 113, 0.30);
+  background:
+    linear-gradient(180deg, rgba(127, 29, 29, 0.94), rgba(69, 10, 10, 0.96));
+  color: #fee2e2;
+}
+
+.nova-toast.is-info {
+  border-color: rgba(96, 165, 250, 0.30);
+  background:
+    linear-gradient(180deg, rgba(30, 58, 138, 0.94), rgba(23, 37, 84, 0.96));
+  color: #dbeafe;
+}
+
+@media (max-width: 640px) {
+  .nova-toast-host {
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+    width: auto;
+  }
+
+  .nova-toast {
+    min-height: 44px;
+    padding: 11px 12px;
+    font-size: 12px;
+    border-radius: 12px;
+  }
+}
+
+/* =========================================================
+   STREAM BUSY + STOP VISUAL POLISH
+   stream-busy-stop-polish-2026-04-07-001
+   append at bottom of C:\Users\Owner\nova\static\css\nova-main.css
+   ========================================================= */
+
+[data-send-button]:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+[data-stop-button] {
+  min-width: 88px;
+  border: 1px solid rgba(255, 120, 120, 0.28) !important;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 120, 120, 0.18),
+    rgba(255, 120, 120, 0.10)
+  ) !important;
+  color: #ffd7d7 !important;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease,
+    opacity 0.16s ease;
+}
+
+[data-stop-button]:hover:not(:disabled) {
+  border-color: rgba(255, 120, 120, 0.42) !important;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 120, 120, 0.26),
+    rgba(255, 120, 120, 0.14)
+  ) !important;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24);
+  transform: translateY(-1px);
+}
+
+[data-stop-button]:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+[data-stop-button]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+[data-stop-button][hidden] {
+  display: none !important;
+}
+
+.message-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-soft, #b7c0d9);
+}
+
+.message-card--assistant .message-card__meta {
+  opacity: 0.95;
+}
+
+.message-card--assistant .message-card__body {
+  position: relative;
+}
+
+.message-card--assistant[data-message-id] .message-card__cursor {
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--text, #f4f7fb);
+  animation: novaStreamCursorPulse 1s steps(1) infinite;
+}
+
+@keyframes novaStreamCursorPulse {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0.22;
+  }
+}
+
+.message-card--assistant .message-actions .message-action[aria-disabled="true"] {
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.message-card--assistant .message-actions .message-action[aria-disabled="true"]:hover {
+  transform: none;
+}
+
+.message-card__meta::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  flex: 0 0 auto;
+}
+
+.message-card__meta:has-text("Streaming") {
+  color: var(--text-soft, #b7c0d9);
+}
+
+.message-card__meta[data-streaming],
+.message-card__meta.is-streaming {
+  color: #dbeafe;
+}
+
+.message-card__meta.is-error {
+  color: #ffd6d6;
+}
+
+.message-card__meta.is-stopped {
+  color: #ffe7b8;
+}
+
+.nova-status-chip {
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.nova-status-chip.is-busy,
+.nova-status-chip[data-state="busy"] {
+  color: #dbeafe;
+  border-color: rgba(96, 165, 250, 0.28);
+  background: linear-gradient(
+    180deg,
+    rgba(37, 99, 235, 0.18),
+    rgba(30, 64, 175, 0.12)
+  );
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.06) inset;
+}
+
+.nova-status-chip.is-error,
+.nova-status-chip[data-state="error"] {
+  color: #fee2e2;
+  border-color: rgba(248, 113, 113, 0.28);
+  background: linear-gradient(
+    180deg,
+    rgba(127, 29, 29, 0.20),
+    rgba(69, 10, 10, 0.12)
+  );
+}
+
+.nova-status-chip.is-idle,
+.nova-status-chip[data-state="idle"] {
+  color: inherit;
+}
+
+.nova-composer:has([data-stop-button]:not([hidden])) [data-send-button] {
+  opacity: 0.5;
+}
+
+.nova-composer:has([data-stop-button]:not([hidden])) .nova-composer-actions-right {
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  [data-stop-button] {
+    min-width: 74px;
+  }
+
+  .message-card__meta {
+    font-size: 10px;
+  }
+}

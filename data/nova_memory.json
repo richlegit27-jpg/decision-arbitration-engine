@@ -1,56 +1,56 @@
-{
-  "items": [
-    {
-      "id": "4811810bc3",
-      "memory_id": "4811810bc3",
-      "title": "note",
-      "content": "i'm going to watch a movie later",
-      "text": "i'm going to watch a movie later",
-      "value": "i'm going to watch a movie later",
-      "kind": "note",
-      "source": "user",
-      "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-      "created_at": "2026-04-05T00:08:35.318792+00:00",
-      "updated_at": "2026-04-05T00:08:35.318792+00:00"
-    },
-    {
-      "id": "6179aaeb-260b-4d18-83d0-bf207b239432",
-      "memory_id": "6179aaeb-260b-4d18-83d0-bf207b239432",
-      "title": "note",
-      "content": "remember i got homework to do",
-      "text": "remember i got homework to do",
-      "value": "remember i got homework to do",
-      "kind": "note",
-      "source": "user",
-      "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-      "created_at": "2026-04-03T02:15:17.216374+00:00",
-      "updated_at": "2026-04-03T02:15:17.216374+00:00"
-    },
-    {
-      "id": "b84c4a36-54f2-4b99-9b96-7ae4fd9535f5",
-      "memory_id": "b84c4a36-54f2-4b99-9b96-7ae4fd9535f5",
-      "title": "note",
-      "content": "remember i am going to the gym later",
-      "text": "remember i am going to the gym later",
-      "value": "remember i am going to the gym later",
-      "kind": "note",
-      "source": "user",
-      "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-      "created_at": "2026-04-03T02:14:16.803013+00:00",
-      "updated_at": "2026-04-03T02:14:16.803013+00:00"
-    },
-    {
-      "id": "25c63082-3c11-46d7-88e3-5133bce1c210",
-      "memory_id": "25c63082-3c11-46d7-88e3-5133bce1c210",
-      "title": "note",
-      "content": "remember my name is richard",
-      "text": "remember my name is richard",
-      "value": "remember my name is richard",
-      "kind": "note",
-      "source": "user",
-      "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-      "created_at": "2026-04-03T02:08:41.113518+00:00",
-      "updated_at": "2026-04-03T02:08:41.113518+00:00"
-    }
-  ]
-}
+[
+  {
+    "id": "mem_a52d8d87edd648a387dc79c8f93569e2",
+    "text": "concise direct replies.",
+    "kind": "preference",
+    "source": "memory",
+    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
+    "created_at": "2026-04-08T05:13:31.073517+00:00",
+    "updated_at": "2026-04-08T05:13:31.073517+00:00"
+  },
+  {
+    "id": "mem_0ff08f9495484ba1a8fb303af536182d",
+    "text": "concise direct replies.",
+    "kind": "preference",
+    "source": "memory",
+    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
+    "created_at": "2026-04-08T05:07:55.625336+00:00",
+    "updated_at": "2026-04-08T05:07:55.625336+00:00"
+  },
+  {
+    "id": "mem_11d776ffcdbd4246a7bbc53bb799ed08",
+    "text": "concise direct replies.",
+    "kind": "preference",
+    "source": "memory",
+    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
+    "created_at": "2026-04-08T05:07:14.080068+00:00",
+    "updated_at": "2026-04-08T05:07:14.080068+00:00"
+  },
+  {
+    "id": "mem_21c2d55169e84d609c00a88d9055e87a",
+    "text": "concise direct replies with no fluff.",
+    "kind": "preference",
+    "source": "memory",
+    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
+    "created_at": "2026-04-08T03:11:04.280184+00:00",
+    "updated_at": "2026-04-08T03:11:04.280184+00:00"
+  },
+  {
+    "id": "mem_724259355ab64abfb1bd1c139d22329f",
+    "text": "Nova memory system",
+    "kind": "project",
+    "source": "memory",
+    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
+    "created_at": "2026-04-08T02:47:10.019749+00:00",
+    "updated_at": "2026-04-08T02:47:10.019749+00:00"
+  },
+  {
+    "id": "mem_b4cc560f632c426791153e44aa1b8d84",
+    "text": "dark UI and I am working on Nova memory system",
+    "kind": "preference",
+    "source": "memory",
+    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
+    "created_at": "2026-04-08T02:47:10.019749+00:00",
+    "updated_at": "2026-04-08T02:47:10.019749+00:00"
+  }
+]
