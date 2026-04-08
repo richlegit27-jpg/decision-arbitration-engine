@@ -381,6 +381,70 @@ def make_assistant_message(
     )
 
 
+def save_artifact_from_assistant(message: dict[str, Any], session_id: str) -> None:
+    if not isinstance(message, dict):
+        return
+
+    text = normalize_text(message.get("text") or "").strip()
+    if not text:
+        return
+
+    message_id = str(message.get("id") or "").strip()
+    if not message_id:
+        return
+
+    session_id = str(session_id or "").strip()
+    if not session_id:
+        return
+
+    artifacts = load_artifacts()
+
+    existing_index = -1
+    existing_artifact: dict[str, Any] | None = None
+
+    for idx, item in enumerate(artifacts):
+        if str(item.get("message_id") or "") == message_id:
+            existing_index = idx
+            existing_artifact = item
+            break
+
+    created_at = str(message.get("created_at") or now_iso())
+    updated_at = now_iso()
+
+    artifact = {
+        "id": (
+            str(existing_artifact.get("id") or "")
+            if existing_artifact
+            else make_id("artifact")
+        ),
+        "session_id": session_id,
+        "message_id": message_id,
+        "kind": "chat_reply",
+        "title": "Assistant Reply",
+        "body": text,
+        "preview": summarize_text(text, 120),
+        "created_at": (
+            str(existing_artifact.get("created_at") or created_at)
+            if existing_artifact
+            else created_at
+        ),
+        "updated_at": updated_at,
+        "meta": {
+            "source": str(message.get("source") or "send"),
+            "source_url": "",
+            "analysis_text": "",
+            "bullets": [],
+        },
+    }
+
+    if existing_index >= 0:
+        artifacts[existing_index] = artifact
+    else:
+        artifacts.insert(0, artifact)
+
+    save_artifacts(artifacts)
+
+
 def session_contract_payload(session: dict[str, Any]) -> dict[str, Any]:
     return {
         "ok": True,
@@ -396,7 +460,6 @@ def session_contract_payload(session: dict[str, Any]) -> dict[str, Any]:
         },
         "active_session_id": session.get("id") or "",
     }
-
 
 def session_delete_contract_payload(
     deleted_session_id: str,
@@ -843,7 +906,7 @@ def chat_stream_generator(
                 "error": error,
                 "source": "regenerate" if regenerate_of else "send",
                 "meta": {
-                    "regenerate_of": regenerate_of or "",
+                                   "regenerate_of": regenerate_of or "",
                 },
             }
         )
@@ -858,6 +921,15 @@ def chat_stream_generator(
                 append_message(session, assistant_message)
 
         save_sessions_store(store)
+
+        try:
+            save_artifact_from_assistant(
+                assistant_message,
+                session.get("id") or session_id,
+            )
+        except Exception:
+            pass
+
         final_written = True
         return assistant_message
 
@@ -888,6 +960,7 @@ def chat_stream_generator(
                     "token": token,
                 }
             )
+
 
         final_message = persist_final(stopped=False, error=False)
 
