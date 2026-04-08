@@ -1,1591 +1,1524 @@
-﻿import base64
+﻿from __future__ import annotations
+
 import json
 import mimetypes
 import os
 import re
+import time
 import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
-from urllib.parse import urlparse
+from typing import Any, Generator
 
-import requests
-from flask import Flask, Response, jsonify, render_template, request, send_from_directory, stream_with_context
-
-try:
-    from bs4 import BeautifulSoup
-except Exception:
-    BeautifulSoup = None
+from flask import Flask, Response, jsonify, request, send_from_directory
+from flask_cors import CORS
 
 try:
     from openai import OpenAI
 except Exception:
     OpenAI = None
 
+def sse(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False, default=str)}\n\n"
+
+# =========================================================
+# PATHS
+# =========================================================
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 UPLOADS_DIR = BASE_DIR / "uploads"
-TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
-
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+TEMPLATES_DIR = BASE_DIR / "templates"
 
 SESSIONS_FILE = DATA_DIR / "nova_sessions.json"
 ARTIFACTS_FILE = DATA_DIR / "nova_artifacts.json"
 MEMORY_FILE = DATA_DIR / "nova_memory.json"
 
-app = Flask(__name__, template_folder=str(TEMPLATES_DIR), static_folder=str(STATIC_DIR))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# =========================================================
+# APP
+# =========================================================
+
+app = Flask(
+    __name__,
+    static_folder=str(STATIC_DIR),
+    template_folder=str(TEMPLATES_DIR),
+)
+CORS(app)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4")
-NOVA_IMAGE_MODEL = os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1")
-NOVA_IMAGE_SIZE = os.getenv("NOVA_IMAGE_SIZE", "1024x1024")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4").strip() or "gpt-5.4"
 
-client = OpenAI(api_key=OPENAI_API_KEY) if OpenAI and OPENAI_API_KEY else None
+OPENAI_CLIENT = None
+if OPENAI_API_KEY and OpenAI is not None:
+    try:
+        OPENAI_CLIENT = OpenAI(api_key=OPENAI_API_KEY)
+    except Exception:
+        OPENAI_CLIENT = None
 
-URL_RE = re.compile(r"(https?://[^\s]+|www\.[^\s]+)", re.IGNORECASE)
 
-
-# ------------------ CORE UTILS ------------------
+# =========================================================
+# HELPERS
+# =========================================================
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def safe_str(x: Any) -> str:
-    return str(x or "").strip()
-
-
-def write_json(path: Path, data: Any) -> None:
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+def make_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex}"
 
 
 def read_json(path: Path, default: Any) -> Any:
+    if not path.exists():
+        write_json(path, default)
+        return deepcopy(default)
     try:
-        if not path.exists():
-            return default
-        raw = path.read_text(encoding="utf-8").strip()
-        if not raw:
-            return default
-        return json.loads(raw)
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
-        return default
+        write_json(path, default)
+        return deepcopy(default)
 
 
-def ensure_storage() -> None:
+def write_json(path: Path, value: Any) -> None:
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def normalize_text(value: Any) -> str:
+    return str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+
+
+def safe_list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
+def summarize_text(value: str, limit: int = 120) -> str:
+    text = normalize_text(value).strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "…"
+
+
+def ensure_store_files() -> None:
     if not SESSIONS_FILE.exists():
-        write_json(SESSIONS_FILE, {"active_session_id": "", "sessions": []})
-    if not ARTIFACTS_FILE.exists():
-        write_json(ARTIFACTS_FILE, {"artifacts": []})
-    if not MEMORY_FILE.exists():
-        write_json(MEMORY_FILE, {"items": []})
-
-
-def _ok(**kwargs):
-    return jsonify({"ok": True, **kwargs})
-
-
-def _error(msg: str, status: int = 400):
-    return jsonify({"ok": False, "error": msg}), status
-
-
-def sse_pack(event: str, payload: dict[str, Any]) -> str:
-    return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
-
-
-def normalize_possible_media_url(x: Any) -> str:
-    raw = safe_str(x)
-    if not raw:
-        return ""
-    if raw.startswith("http://") or raw.startswith("https://") or raw.startswith("/"):
-        return raw
-    raw = raw.replace("\\", "/")
-    raw = re.sub(r"^uploads/", "", raw)
-    return f"/api/uploads/{raw}"
-
-
-def guess_kind_from_mime(mime_type: str) -> str:
-    mt = safe_str(mime_type).lower()
-    if mt.startswith("image/"):
-        return "image"
-    if mt.startswith("video/"):
-        return "video"
-    if mt.startswith("audio/"):
-        return "audio"
-    return "file"
-
-
-def normalize_attachment(x: Any) -> dict[str, Any] | None:
-    if not isinstance(x, dict):
-        return None
-
-    name = safe_str(x.get("name") or x.get("filename") or x.get("stored_name") or "attachment")
-    mime_type = safe_str(x.get("mime_type") or x.get("mime") or x.get("content_type"))
-    url = normalize_possible_media_url(x.get("url") or x.get("path") or x.get("preview_url"))
-    kind = safe_str(x.get("kind")) or guess_kind_from_mime(mime_type)
-
-    return {
-        "id": safe_str(x.get("id") or uuid.uuid4().hex[:8]),
-        "name": name,
-        "filename": name,
-        "stored_name": safe_str(x.get("stored_name")),
-        "url": url,
-        "preview_url": url,
-        "path": url,
-        "mime_type": mime_type,
-        "kind": kind,
-        "size": int(x.get("size") or 0),
-        "uploaded_at": safe_str(x.get("uploaded_at") or now_iso()),
-    }
-
-
-def safe_int(x: Any, default: int = 0) -> int:
-    try:
-        return int(x)
-    except Exception:
-        return default
-
-
-# ------------------ MEMORY ------------------
-
-# ------------------ MEMORY ------------------
-
-MEMORY_PATTERNS = [
-    r"^\s*remember\s+that\s+(.+)$",
-    r"^\s*remember\s+(.+)$",
-    r"^\s*from\s+now\s+on[:,]?\s*(.+)$",
-    r"^\s*i\s+prefer\s+(.+)$",
-    r"^\s*always\s+(.+)$",
-    r"^\s*my\s+project\s+is\s+(.+)$",
-    r"^\s*my\s+ports?\s+(?:are|is)\s+(.+)$",
-    r"^\s*use\s+this\s+path[:,]?\s*(.+)$",
-    r"^\s*keep\s+(.+)$",
-]
-
-MEMORY_BAD_SUBSTRINGS = [
-    "traceback",
-    "error:",
-    "exception",
-    "stack trace",
-    "console.log",
-    "uncaught",
-    "failed to load",
-    "http://127.0.0.1",
-    "https://127.0.0.1",
-]
-
-MEMORY_CONFLICT_RULES = [
-    {
-        "name": "response_style_full_file",
-        "patterns": [
-            r"\bfull file\b",
-            r"\bfull files\b",
-            r"\bsmff\b",
-            r"\bfull file replacements?\b",
-        ],
-        "kind": "preference",
-    },
-    {
-        "name": "response_style_no_partials",
-        "patterns": [
-            r"\bno partials?\b",
-            r"\bdon't give me partials?\b",
-            r"\bnot partials?\b",
-            r"\bonly full\b",
-        ],
-        "kind": "preference",
-    },
-    {
-        "name": "architecture_modular_backend",
-        "patterns": [
-            r"\bmodular\b",
-            r"\bbackend split\b",
-            r"\bstay modular\b",
-            r"\bsplit modular structure\b",
-        ],
-        "kind": "project",
-    },
-    {
-        "name": "ports_config",
-        "patterns": [
-            r"\bports?\b",
-            r"\b8744\b",
-            r"\b8743\b",
-            r"\b5001\b",
-        ],
-        "kind": "project",
-    },
-]
-
-def load_memory_payload() -> dict[str, list[dict[str, Any]]]:
-    raw = read_json(MEMORY_FILE, {"items": []})
-    items = raw.get("items", []) if isinstance(raw, dict) else []
-    if not isinstance(items, list):
-        items = []
-    return {"items": items}
-
-def save_memory_payload(payload: dict[str, list[dict[str, Any]]]) -> None:
-    write_json(MEMORY_FILE, {"items": payload.get("items", [])})
-
-def normalize_memory_text(text: str) -> str:
-    value = safe_str(text)
-    value = re.sub(r"\s+", " ", value).strip(" .,-:\t\r\n")
-    return value
-
-def memory_exists(items: list[dict[str, Any]], text: str) -> bool:
-    target = normalize_memory_text(text).lower()
-    if not target:
-        return True
-
-    for item in items:
-        existing = normalize_memory_text(item.get("text", "")).lower()
-        if existing == target:
-            return True
-
-    return False
-
-def classify_memory_text(text: str) -> str:
-    lowered = normalize_memory_text(text).lower()
-
-    if any(x in lowered for x in ["prefer", "always", "from now on", "use this path", "keep "]):
-        return "preference"
-
-    if any(x in lowered for x in ["project", "ports", "path", "backend", "frontend", "nova"]):
-        return "project"
-
-    return "note"
-
-def extract_memory_candidates(content: str) -> list[str]:
-    text = safe_str(content)
-    if not text:
-        return []
-
-    stripped = text.strip()
-    lowered = stripped.lower()
-
-    if len(stripped) < 8 or len(stripped) > 220:
-        return []
-
-    if "\n" in stripped and len(stripped.splitlines()) > 3:
-        return []
-
-    if any(bad in lowered for bad in MEMORY_BAD_SUBSTRINGS):
-        return []
-
-    candidates: list[str] = []
-
-    for pattern in MEMORY_PATTERNS:
-        match = re.match(pattern, stripped, re.IGNORECASE)
-        if match:
-            captured = normalize_memory_text(match.group(1))
-            if captured:
-                candidates.append(captured)
-
-    if not candidates:
-        direct_prefixes = [
-            "i prefer ",
-            "from now on ",
-            "my project is ",
-            "my ports are ",
-            "my port is ",
-            "use this path ",
-            "always ",
-            "keep ",
-        ]
-        if any(lowered.startswith(prefix) for prefix in direct_prefixes):
-            cleaned = normalize_memory_text(stripped)
-            if cleaned:
-                candidates.append(cleaned)
-
-    deduped: list[str] = []
-    seen: set[str] = set()
-
-    for candidate in candidates:
-        key = candidate.lower()
-        if key not in seen:
-            seen.add(key)
-            deduped.append(candidate)
-
-    return deduped[:3]
-
-def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
-
-def parse_iso_datetime(value: str | None) -> datetime:
-    raw = safe_str(value)
-    if not raw:
-        return utc_now()
-
-    try:
-        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        if parsed.tzinfo is None:
-            return parsed.replace(tzinfo=timezone.utc)
-        return parsed.astimezone(timezone.utc)
-    except Exception:
-        return utc_now()
-
-def memory_conflict_key(text: str, kind: str = "") -> str:
-    clean = normalize_memory_text(text).lower()
-    clean_kind = safe_str(kind).lower()
-
-    for rule in MEMORY_CONFLICT_RULES:
-        rule_kind = safe_str(rule.get("kind"))
-        if rule_kind and rule_kind != clean_kind:
-            continue
-
-        for pattern in rule.get("patterns", []):
-            try:
-                if re.search(pattern, clean, re.IGNORECASE):
-                    return safe_str(rule.get("name"))
-            except re.error:
-                continue
-
-    if clean_kind == "preference":
-        if clean.startswith("i prefer "):
-            return "pref:" + clean.split("i prefer ", 1)[1][:80]
-        if clean.startswith("from now on "):
-            return "pref:" + clean.split("from now on ", 1)[1][:80]
-
-    if clean_kind == "project":
-        if "port" in clean:
-            return "project:ports"
-        if "path" in clean:
-            return "project:path"
-        if "backend" in clean and "split" in clean:
-            return "project:backend-split"
-
-    return ""
-
-def memory_priority_score(item: dict[str, Any]) -> int:
-    text = normalize_memory_text(item.get("text", "")).lower()
-    kind = safe_str(item.get("kind")).lower()
-    source = safe_str(item.get("source")).lower()
-
-    score = 0
-
-    if kind == "preference":
-        score += 100
-    elif kind == "project":
-        score += 80
-    else:
-        score += 50
-
-    if source == "manual":
-        score += 25
-    elif source == "auto":
-        score += 10
-
-    if len(text) <= 120:
-        score += 10
-
-    if any(x in text for x in ["always", "from now on", "prefer", "must", "only"]):
-        score += 20
-
-    if any(x in text for x in ["nova", "backend", "split", "smff", "full file"]):
-        score += 15
-
-    age_seconds = max(0, int((utc_now() - parse_iso_datetime(item.get("updated_at"))).total_seconds()))
-    age_days = age_seconds // 86400
-
-    if age_days <= 1:
-        score += 30
-    elif age_days <= 7:
-        score += 20
-    elif age_days <= 30:
-        score += 10
-
-    return score
-
-def replace_conflicting_memory(items: list[dict[str, Any]], new_item: dict[str, Any]) -> list[dict[str, Any]]:
-    new_key = memory_conflict_key(new_item.get("text", ""), new_item.get("kind", ""))
-    if not new_key:
-        return items
-
-    filtered: list[dict[str, Any]] = []
-    for item in items:
-        old_key = memory_conflict_key(item.get("text", ""), item.get("kind", ""))
-        if old_key and old_key == new_key and safe_str(item.get("id")) != safe_str(new_item.get("id")):
-            continue
-        filtered.append(item)
-
-    return filtered
-
-def save_memory_item_dominant(
-    *,
-    text: str,
-    kind: str = "note",
-    source: str = "auto",
-    session_id: str = "",
-) -> dict[str, Any] | None:
-    clean = normalize_memory_text(text)
-    if not clean:
-        return None
-
-    payload = load_memory_payload()
-    items = payload.get("items", [])
-
-    if memory_exists(items, clean):
-        return None
-
-    item = {
-        "id": uuid.uuid4().hex[:10],
-        "text": clean,
-        "kind": safe_str(kind) or "note",
-        "source": safe_str(source) or "auto",
-        "session_id": safe_str(session_id),
-        "created_at": now_iso(),
-        "updated_at": now_iso(),
-        "preview": clean[:160],
-    }
-
-    items.insert(0, item)
-    items = replace_conflicting_memory(items, item)
-
-    items = sorted(
-        items,
-        key=lambda x: (
-            -memory_priority_score(x),
-            -int(parse_iso_datetime(x.get("updated_at")).timestamp()),
-        ),
-    )[:300]
-
-    payload["items"] = items
-    save_memory_payload(payload)
-    return item
-
-def auto_learn_memory_dominant(content: str, session_id: str = "") -> list[dict[str, Any]]:
-    learned: list[dict[str, Any]] = []
-
-    for candidate in extract_memory_candidates(content):
-        item = save_memory_item_dominant(
-            text=candidate,
-            kind=classify_memory_text(candidate),
-            source="auto",
-            session_id=session_id,
+        write_json(
+            SESSIONS_FILE,
+            {
+                "active_session_id": "",
+                "sessions": [],
+            },
         )
-        if item:
-            learned.append(item)
-
-    return learned
-
-def get_dominant_memories(limit: int = 8) -> list[dict[str, Any]]:
-    payload = load_memory_payload()
-    items = payload.get("items", [])
-
-    ranked = sorted(
-        items,
-        key=lambda x: (
-            -memory_priority_score(x),
-            -int(parse_iso_datetime(x.get("updated_at")).timestamp()),
-        ),
-    )
-
-    return ranked[:max(1, limit)]
-
-def build_memory_system_prompt(limit: int = 8) -> str:
-    top_items = get_dominant_memories(limit=limit)
-    if not top_items:
-        return ""
-
-    lines = ["Persistent user memory (highest priority):"]
-
-    for item in top_items:
-        kind = safe_str(item.get("kind") or "note").strip()
-        text = normalize_memory_text(item.get("text", ""))
-        if not text:
-            continue
-        lines.append(f"- [{kind}] {text}")
-
-    if len(lines) == 1:
-        return ""
-
-    return "\n".join(lines)
+    if not ARTIFACTS_FILE.exists():
+        write_json(ARTIFACTS_FILE, [])
+    if not MEMORY_FILE.exists():
+        write_json(MEMORY_FILE, [])
 
 
-# ------------------ SESSIONS ------------------
-
-def normalize_message(x: Any) -> dict[str, Any] | None:
-    if not isinstance(x, dict):
-        return None
-
-    attachments_raw = x.get("attachments") if isinstance(x.get("attachments"), list) else []
-    attachments = [a for a in (normalize_attachment(v) for v in attachments_raw) if a]
-
-    return {
-        "id": safe_str(x.get("id") or uuid.uuid4().hex[:8]),
-        "role": safe_str(x.get("role") or "assistant").lower() or "assistant",
-        "content": safe_str(x.get("content") or x.get("text") or x.get("message")),
-        "created_at": safe_str(x.get("created_at") or now_iso()),
-        "attachments": attachments,
-        "route_meta": x.get("route_meta") if isinstance(x.get("route_meta"), dict) else {},
-    }
-
-
-def normalize_session(x: Any) -> dict[str, Any] | None:
-    if not isinstance(x, dict):
-        return None
-
-    messages_raw = x.get("messages") if isinstance(x.get("messages"), list) else []
-    messages = [m for m in (normalize_message(v) for v in messages_raw) if m]
-
-    session_id = safe_str(x.get("id") or x.get("session_id") or uuid.uuid4().hex[:8])
-    created_at = safe_str(x.get("created_at") or now_iso())
-    updated_at = safe_str(x.get("updated_at") or created_at)
-    title = safe_str(x.get("title") or x.get("name")) or "New Chat"
-
-    last_preview = safe_str(x.get("last_message_preview"))
-    if not last_preview:
-        for msg in reversed(messages):
-            if safe_str(msg.get("content")):
-                last_preview = safe_str(msg.get("content"))[:160]
-                break
-
-    return {
-        "id": session_id,
-        "session_id": session_id,
-        "title": title,
-        "pinned": bool(x.get("pinned", False)),
-        "active": bool(x.get("active", False)),
-        "created_at": created_at,
-        "updated_at": updated_at,
-        "message_count": len(messages),
-        "last_message_preview": last_preview,
-        "messages": messages,
-    }
-
-
-def _read_sessions_store() -> dict[str, Any]:
-    ensure_storage()
-
-    default_store = {
-        "active_session_id": "",
-        "sessions": []
-    }
-
-    try:
-        if not SESSIONS_FILE.exists():
-            with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
-                json.dump(default_store, f, indent=2, ensure_ascii=False)
-            return deepcopy(default_store)
-
-        with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
-            raw = json.load(f)
-    except Exception:
-        return deepcopy(default_store)
-
-    if isinstance(raw, list):
-        return {
+def load_sessions_store() -> dict[str, Any]:
+    ensure_store_files()
+    store = read_json(
+        SESSIONS_FILE,
+        {
             "active_session_id": "",
-            "sessions": raw
-        }
-
-    if not isinstance(raw, dict):
-        return deepcopy(default_store)
-
-    sessions = raw.get("sessions")
-    if not isinstance(sessions, list):
-        sessions = []
-
-    return {
-        "active_session_id": str(raw.get("active_session_id") or ""),
-        "sessions": sessions
-    }
-
-
-def _write_sessions_store(store: dict[str, Any]) -> None:
-    ensure_storage()
-
-    payload = {
-        "active_session_id": str((store or {}).get("active_session_id") or ""),
-        "sessions": (store or {}).get("sessions") if isinstance((store or {}).get("sessions"), list) else []
-    }
-
-    with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, ensure_ascii=False)
-
-
-def _session_id_of(session: Any) -> str:
-    if not isinstance(session, dict):
-        return ""
-    return str(
-        session.get("id")
-        or session.get("session_id")
-        or session.get("uuid")
-        or ""
+            "sessions": [],
+        },
     )
+    if not isinstance(store, dict):
+        store = {"active_session_id": "", "sessions": []}
+    store["active_session_id"] = str(store.get("active_session_id") or "")
+    store["sessions"] = safe_list(store.get("sessions"))
+    return store
 
 
-def _mark_active_session(store: dict[str, Any], session_id: str) -> dict[str, Any] | None:
-    target_id = str(session_id or "").strip()
-    sessions = (store or {}).get("sessions") if isinstance((store or {}).get("sessions"), list) else []
-
-    found = None
-    for session in sessions:
-        sid = _session_id_of(session)
-        is_active = bool(target_id and sid == target_id)
-        session["active"] = is_active
-        if is_active:
-            found = session
-
-    if found:
-        store["active_session_id"] = target_id
-    elif sessions:
-        fallback_id = _session_id_of(sessions[0])
-        store["active_session_id"] = fallback_id
-        for i, session in enumerate(sessions):
-            session["active"] = i == 0
-        found = sessions[0]
-    else:
-        store["active_session_id"] = ""
-        found = None
-
-    return found
+def save_sessions_store(store: dict[str, Any]) -> None:
+    write_json(SESSIONS_FILE, store)
 
 
-def load_sessions_payload() -> dict[str, Any]:
-    raw_store = _read_sessions_store()
-    items_raw = raw_store.get("sessions", [])
-    sessions = [s for s in (normalize_session(x) for x in items_raw) if s]
-
-    active_session_id = safe_str(raw_store.get("active_session_id"))
-
-    sessions.sort(key=lambda s: safe_str(s.get("updated_at")), reverse=True)
-    sessions.sort(key=lambda s: 1 if s.get("pinned") else 0, reverse=True)
-
-    normalized_store = {
-        "active_session_id": active_session_id,
-        "sessions": sessions
-    }
-    _mark_active_session(normalized_store, active_session_id)
-    return normalized_store
+def load_artifacts() -> list[dict[str, Any]]:
+    ensure_store_files()
+    items = read_json(ARTIFACTS_FILE, [])
+    return items if isinstance(items, list) else []
 
 
-def save_sessions_payload(payload: dict[str, Any]) -> None:
-    store = {
-        "active_session_id": safe_str(payload.get("active_session_id")),
-        "sessions": payload.get("sessions", []) if isinstance(payload.get("sessions"), list) else [],
-    }
-    _mark_active_session(store, store.get("active_session_id", ""))
-    _write_sessions_store(store)
+def save_artifacts(items: list[dict[str, Any]]) -> None:
+    write_json(ARTIFACTS_FILE, items)
 
+def build_artifact_viewer(artifact: dict[str, Any]) -> dict[str, Any]:
+    meta = artifact.get("meta") if isinstance(artifact.get("meta"), dict) else {}
 
-def create_session(title: str = "New Chat") -> dict[str, Any]:
-    ts = now_iso()
-    session_id = uuid.uuid4().hex[:8]
+    kind = str(artifact.get("kind") or "")
+    body = str(artifact.get("body") or artifact.get("content") or "")
+    title = str(artifact.get("title") or "Artifact")
+
+    image_url = meta.get("image_url") or artifact.get("image_url") or ""
+    source_url = meta.get("source_url") or artifact.get("source_url") or ""
+    video_url = meta.get("video_url") or ""
+    audio_url = meta.get("audio_url") or ""
+
+    analysis_text = meta.get("analysis_text") or ""
+    bullets = meta.get("bullets") if isinstance(meta.get("bullets"), list) else []
+
     return {
-        "id": session_id,
-        "session_id": session_id,
+        "kind": kind,
         "title": title,
-        "pinned": False,
-        "active": False,
-        "created_at": ts,
-        "updated_at": ts,
-        "message_count": 0,
-        "last_message_preview": "",
-        "messages": [],
+        "body": body,
+        "image_url": image_url,
+        "video_url": video_url,
+        "audio_url": audio_url,
+        "source_url": source_url,
+        "analysis_text": analysis_text,
+        "bullets": bullets,
     }
 
 
-def get_session(session_id: str) -> dict[str, Any] | None:
-    session_id = safe_str(session_id)
-    if not session_id:
-        return None
-    for session in load_sessions_payload()["sessions"]:
-        if safe_str(session.get("id")) == session_id:
+def load_memory() -> list[dict[str, Any]]:
+    ensure_store_files()
+    items = read_json(MEMORY_FILE, [])
+    return items if isinstance(items, list) else []
+
+
+def find_session(store: dict[str, Any], session_id: str) -> dict[str, Any] | None:
+    for session in safe_list(store.get("sessions")):
+        if str(session.get("id") or "") == str(session_id or ""):
             return session
     return None
 
 
-def upsert_session(session: dict[str, Any], make_active: bool = False) -> dict[str, Any]:
-    payload = load_sessions_payload()
-    sessions = payload["sessions"]
-    sid = safe_str(session.get("id"))
-
-    replaced = False
-    for i, current in enumerate(sessions):
-        if safe_str(current.get("id")) == sid:
-            sessions[i] = session
-            replaced = True
-            break
-
-    if not replaced:
-        sessions.insert(0, session)
-
-    sessions.sort(key=lambda s: safe_str(s.get("updated_at")), reverse=True)
-    sessions.sort(key=lambda s: 1 if s.get("pinned") else 0, reverse=True)
-
-    payload["sessions"] = sessions
-    if make_active:
-        payload["active_session_id"] = sid
-
-    _mark_active_session(payload, payload.get("active_session_id", ""))
-    save_sessions_payload(payload)
-    return payload
-
-
-def get_last_user_message(session: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
-    messages = session.get("messages") if isinstance(session.get("messages"), list) else []
-    for msg in reversed(messages):
-        if safe_str(msg.get("role")).lower() == "user":
-            content = safe_str(msg.get("content"))
-            attachments = msg.get("attachments") if isinstance(msg.get("attachments"), list) else []
-            if content or attachments:
-                return content, attachments
-    return "", []
-
-
-def persist_session(session: dict[str, Any], assistant_text: str = "", fallback_preview: str = "", make_active: bool = True) -> None:
-    session["updated_at"] = now_iso()
-    session["message_count"] = len(session.get("messages", []))
-    preview = safe_str(assistant_text) or safe_str(fallback_preview)
-    session["last_message_preview"] = preview[:160]
-    upsert_session(session, make_active=make_active)
-
-
-# ------------------ ARTIFACT ENGINE ------------------
-
-def normalize_artifact(x: Any) -> dict[str, Any] | None:
-    if not isinstance(x, dict):
-        return None
-
-    image_url = normalize_possible_media_url(x.get("image_url"))
-    source_url = safe_str(x.get("source_url"))
-    kind = safe_str(x.get("kind") or "artifact")
-    title = safe_str(x.get("title") or "Artifact")
-    content = safe_str(x.get("content"))
-    summary = safe_str(x.get("summary"))
-
-    viewer = x.get("viewer") if isinstance(x.get("viewer"), dict) else {}
-    meta = x.get("meta") if isinstance(x.get("meta"), dict) else {}
-
-    merged_viewer = {
-        "kind": safe_str(viewer.get("kind") or kind),
-        "title": safe_str(viewer.get("title") or title),
-        "body": safe_str(viewer.get("body") or content),
-        "image_url": normalize_possible_media_url(viewer.get("image_url") or image_url),
-        "source_url": safe_str(viewer.get("source_url") or source_url),
-    }
-
+def make_session(title: str = "New chat") -> dict[str, Any]:
+    session_id = make_id("session")
+    now = now_iso()
     return {
-        "id": safe_str(x.get("id") or uuid.uuid4().hex[:10]),
-        "artifact_id": safe_str(x.get("artifact_id") or x.get("id") or ""),
-        "session_id": safe_str(x.get("session_id")),
-        "kind": kind,
+        "id": session_id,
         "title": title,
-        "content": content,
-        "summary": summary,
-        "preview": safe_str(x.get("preview") or summary or content)[:220],
-        "image_url": image_url,
-        "source_url": source_url,
-        "created_at": safe_str(x.get("created_at") or now_iso()),
-        "updated_at": safe_str(x.get("updated_at") or x.get("created_at") or now_iso()),
-        "pinned": bool(x.get("pinned", False)),
-        "viewer": merged_viewer,
-        "meta": meta,
-    }
-
-
-def load_artifacts_payload() -> dict[str, list[dict[str, Any]]]:
-    raw = read_json(ARTIFACTS_FILE, {"artifacts": []})
-
-    if isinstance(raw, list):
-        items_raw = raw
-    elif isinstance(raw, dict):
-        items_raw = raw.get("artifacts", [])
-        if not isinstance(items_raw, list):
-            items_raw = []
-    else:
-        items_raw = []
-
-    artifacts = [a for a in (normalize_artifact(x) for x in items_raw) if a]
-    artifacts.sort(key=lambda a: safe_str(a.get("updated_at")), reverse=True)
-    artifacts.sort(key=lambda a: 1 if a.get("pinned") else 0, reverse=True)
-    return {"artifacts": artifacts}
-
-
-def save_artifacts_payload(payload: dict[str, list[dict[str, Any]]]) -> None:
-    write_json(ARTIFACTS_FILE, {"artifacts": payload.get("artifacts", [])})
-
-
-def get_artifact(artifact_id: str) -> dict[str, Any] | None:
-    aid = safe_str(artifact_id)
-    if not aid:
-        return None
-
-    for artifact in load_artifacts_payload()["artifacts"]:
-        if safe_str(artifact.get("id")) == aid or safe_str(artifact.get("artifact_id")) == aid:
-            return artifact
-    return None
-
-
-def create_artifact(
-    *,
-    session_id: str,
-    kind: str,
-    title: str,
-    content: str = "",
-    summary: str = "",
-    image_url: str = "",
-    source_url: str = "",
-    meta: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    payload = load_artifacts_payload()
-    ts = now_iso()
-
-    artifact = {
-        "id": uuid.uuid4().hex[:10],
-        "artifact_id": "",
-        "session_id": safe_str(session_id),
-        "kind": safe_str(kind or "artifact"),
-        "title": safe_str(title or "Artifact"),
-        "content": safe_str(content),
-        "summary": safe_str(summary),
-        "preview": safe_str(summary or content)[:220],
-        "image_url": normalize_possible_media_url(image_url),
-        "source_url": safe_str(source_url),
-        "created_at": ts,
-        "updated_at": ts,
+        "created_at": now,
+        "updated_at": now,
         "pinned": False,
-        "meta": meta or {},
-        "viewer": {
-            "kind": safe_str(kind or "artifact"),
-            "title": safe_str(title or "Artifact"),
-            "body": safe_str(content),
-            "image_url": normalize_possible_media_url(image_url),
-            "source_url": safe_str(source_url),
-        },
+        "last_message_preview": "",
+        "message_count": 0,
+        "messages": [],
     }
 
-    artifact["artifact_id"] = artifact["id"]
-    payload["artifacts"].insert(0, artifact)
-    save_artifacts_payload(payload)
-    return artifact
+
+def ensure_active_session(store: dict[str, Any]) -> dict[str, Any]:
+    active_session_id = str(store.get("active_session_id") or "")
+    session = find_session(store, active_session_id)
+    if session:
+        return session
+
+    sessions = safe_list(store.get("sessions"))
+    if sessions:
+        store["active_session_id"] = sessions[0]["id"]
+        save_sessions_store(store)
+        return sessions[0]
+
+    session = make_session("New chat")
+    store["sessions"].append(session)
+    store["active_session_id"] = session["id"]
+    save_sessions_store(store)
+    return session
 
 
-# ------------------ ROUTING / MODEL ------------------
-
-def route_request(content: str, attachments: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    text = safe_str(content)
-    lowered = text.lower()
-    attachments = attachments or []
-
-    if lowered.startswith("/image"):
-        return {"route": "image", "mode": "writing", "reason": "Explicit /image command.", "matched_keywords": ["/image"]}
-
-    if URL_RE.search(text):
-        return {"route": "web", "mode": "analysis", "reason": "Detected URL in request.", "matched_keywords": ["url"]}
-
-    if attachments:
-        return {"route": "chat", "mode": "analysis", "reason": "Attachments detected.", "matched_keywords": []}
-
-    return {"route": "chat", "mode": "general", "reason": "Default conversational route.", "matched_keywords": []}
+def message_text(message: dict[str, Any]) -> str:
+    return normalize_text(
+        message.get("text")
+        or message.get("content")
+        or message.get("body")
+        or message.get("message")
+        or ""
+    )
 
 
-def build_model_messages(
-    *,
-    session: dict[str, Any],
-    content: str,
-    attachments: list[dict[str, Any]] | None,
-) -> list[dict[str, str]]:
-    messages: list[dict[str, str]] = [
-        {"role": "system", "content": "You are Nova. Be helpful, direct, concise, and practical."}
-    ]
+def normalize_message(message: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(message.get("id") or make_id("msg")),
+        "role": str(message.get("role") or "assistant"),
+        "text": message_text(message),
+        "created_at": str(message.get("created_at") or now_iso()),
+        "pending": bool(message.get("pending", False)),
+        "streaming": bool(message.get("streaming", False)),
+        "stopped": bool(message.get("stopped", False)),
+        "error": bool(message.get("error", False)),
+        "source": str(message.get("source") or ""),
+        "meta": message.get("meta") if isinstance(message.get("meta"), dict) else {},
+        "attachments": safe_list(message.get("attachments")),
+    }
 
-    for msg in session.get("messages", [])[-12:]:
-        text = safe_str(msg.get("content"))
-        role = safe_str(msg.get("role") or "user")
-        if text:
-            messages.append({"role": role, "content": text})
 
-    if attachments:
-        names = []
-        for a in attachments:
-            if isinstance(a, dict):
-                names.append(f"- {safe_str(a.get('name') or a.get('filename') or 'attachment')}")
-        if names:
-            messages.append({"role": "user", "content": "Attached files:\n" + "\n".join(names)})
-
-    messages.append({"role": "user", "content": safe_str(content)})
+def session_messages(session: dict[str, Any]) -> list[dict[str, Any]]:
+    messages = safe_list(session.get("messages"))
+    session["messages"] = messages
     return messages
 
 
-def fallback_assistant_text(content: str, attachments: list[dict[str, Any]] | None = None) -> str:
-    prompt = safe_str(content)
-    if prompt:
-        return f"Nova: {prompt}"
-    if attachments:
-        return f"Nova: received {len(attachments)} attachment(s)."
-    return "Nova: ready."
+def recalc_session(session: dict[str, Any]) -> None:
+    messages = session_messages(session)
+    session["message_count"] = len(messages)
+    session["updated_at"] = now_iso()
+    preview = ""
+    if messages:
+        preview = summarize_text(message_text(messages[-1]), 100)
+    session["last_message_preview"] = preview
 
 
-def call_model(messages: list[dict[str, str]], fallback_text: str = "") -> str:
-    if not client:
-        return safe_str(fallback_text) or "Nova: backend is live."
+def append_message(session: dict[str, Any], message: dict[str, Any]) -> dict[str, Any]:
+    msg = normalize_message(message)
+    session_messages(session).append(msg)
+    recalc_session(session)
+    return msg
 
+
+def replace_message(session: dict[str, Any], message_id: str, new_message: dict[str, Any]) -> dict[str, Any] | None:
+    messages = session_messages(session)
+    for index, item in enumerate(messages):
+        if str(item.get("id") or "") == str(message_id or ""):
+            msg = normalize_message(new_message)
+            messages[index] = msg
+            recalc_session(session)
+            return msg
+    return None
+
+
+def find_message(session: dict[str, Any], message_id: str) -> dict[str, Any] | None:
+    for item in session_messages(session):
+        if str(item.get("id") or "") == str(message_id or ""):
+            return item
+    return None
+
+
+def sanitize_filename(filename: str) -> str:
+    raw = Path(str(filename or "upload.bin")).name
+    raw = re.sub(r"[^A-Za-z0-9._ -]+", "_", raw).strip()
+    return raw or "upload.bin"
+
+
+def file_size(path: Path) -> int:
     try:
-        response = client.responses.create(model=OPENAI_MODEL, input=messages)
-        text = safe_str(getattr(response, "output_text", "") or "")
-        return text or safe_str(fallback_text) or "Nova: model returned an empty response."
+        return int(path.stat().st_size)
     except Exception:
-        return safe_str(fallback_text) or "Nova: model call failed."
+        return 0
 
 
-# ------------------ WEB ------------------
-
-def normalize_url(value: str) -> str:
-    raw = safe_str(value)
-    if not raw:
-        return ""
-    if raw.startswith("www."):
-        return f"https://{raw}"
-    return raw
-
-
-def extract_first_url(text: str) -> str:
-    match = URL_RE.search(text or "")
-    if not match:
-        return ""
-    return normalize_url(match.group(1))
-
-
-def collapse_ws(value: str) -> str:
-    return re.sub(r"\s+", " ", safe_str(value)).strip()
-
-
-def html_to_text(html: str) -> str:
-    if not html:
-        return ""
-
-    if BeautifulSoup:
-        soup = BeautifulSoup(html, "html.parser")
-        for tag in soup(["script", "style", "noscript", "svg", "canvas", "header", "footer", "nav", "form", "aside"]):
-            tag.decompose()
-        text = soup.get_text("\n")
-    else:
-        text = re.sub(r"(?is)<script.*?>.*?</script>", " ", html)
-        text = re.sub(r"(?is)<style.*?>.*?</style>", " ", text)
-        text = re.sub(r"(?s)<[^>]+>", " ", text)
-
-    lines = [collapse_ws(line) for line in text.splitlines()]
-    lines = [line for line in lines if line]
-    return "\n".join(lines)
-
-
-def summarize_text(text: str) -> str:
-    lines = [collapse_ws(x) for x in text.splitlines() if collapse_ws(x)]
-    return "\n\n".join(lines[:8])[:1000]
-
-
-def fetch_web_result(url: str) -> dict[str, Any]:
-    target = normalize_url(url)
-    if not target:
-        raise ValueError("Missing URL.")
-
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    }
-
-    response = requests.get(target, timeout=18, headers=headers, allow_redirects=True)
-    response.raise_for_status()
-
-    final_url = response.url
-    html = response.text or ""
-
-    title = urlparse(final_url).netloc or "Web result"
-    if BeautifulSoup:
-        soup = BeautifulSoup(html, "html.parser")
-        if soup.title and soup.title.string:
-            title = collapse_ws(soup.title.string)
-
-    body = summarize_text(html_to_text(html))
-    summary = body[:220]
-
-    return {
-        "url": final_url,
-        "title": title,
-        "body": body,
-        "summary": summary,
-    }
-
-
-# ------------------ IMAGE ------------------
-
-def decode_base64_image(data: str) -> bytes:
-    raw = safe_str(data)
-    if "," in raw and raw.startswith("data:"):
-        raw = raw.split(",", 1)[1]
-    return base64.b64decode(raw)
-
-
-def save_generated_image_bytes(image_bytes: bytes) -> str:
-    filename = f"generated_{uuid.uuid4().hex}.png"
-    target = UPLOADS_DIR / filename
-    target.write_bytes(image_bytes)
-    return f"/api/uploads/{filename}"
-
-
-def generate_image(prompt: str, size: str = "") -> dict[str, Any]:
-    prompt = safe_str(prompt)
-    image_size = safe_str(size) or NOVA_IMAGE_SIZE
-
-    if not prompt:
-        raise ValueError("Missing image prompt.")
-
-    if not client:
-        placeholder_name = f"generated_{uuid.uuid4().hex}.txt"
-        placeholder_path = UPLOADS_DIR / placeholder_name
-        placeholder_path.write_text(f"Image prompt placeholder:\n\n{prompt}\n", encoding="utf-8")
-        return {
-            "ok": True,
-            "image_url": f"/api/uploads/{placeholder_name}",
-            "prompt": prompt,
-            "model": NOVA_IMAGE_MODEL,
-            "size": image_size,
-            "placeholder": True,
-        }
-
-    try:
-        result = client.images.generate(
-            model=NOVA_IMAGE_MODEL,
-            prompt=prompt,
-            size=image_size,
-        )
-
-        data = getattr(result, "data", None) or []
-        if not data:
-            raise ValueError("No image returned.")
-
-        first = data[0]
-        image_b64 = getattr(first, "b64_json", None)
-        image_url = getattr(first, "url", None)
-
-        if image_b64:
-            image_bytes = decode_base64_image(image_b64)
-            saved_url = save_generated_image_bytes(image_bytes)
-            return {
-                "ok": True,
-                "image_url": saved_url,
-                "prompt": prompt,
-                "model": NOVA_IMAGE_MODEL,
-                "size": image_size,
-                "placeholder": False,
-            }
-
-        if image_url:
-            return {
-                "ok": True,
-                "image_url": image_url,
-                "prompt": prompt,
-                "model": NOVA_IMAGE_MODEL,
-                "size": image_size,
-                "placeholder": False,
-            }
-
-        raise ValueError("Image response missing usable data.")
-    except Exception as exc:
-        raise RuntimeError(f"Image generation failed: {exc}") from exc
-
-
-# ------------------ STATE ------------------
-
-def build_state(session_id: str = "") -> dict[str, Any]:
-    store = load_sessions_payload()
-    sessions = store["sessions"]
-    active_session_id = safe_str(session_id) or safe_str(store.get("active_session_id"))
-
-    active_session = None
-    if active_session_id:
-        active_session = next((s for s in sessions if safe_str(s.get("id")) == active_session_id), None)
-    if active_session is None and sessions:
-        active_session = sessions[0]
-        active_session_id = safe_str(active_session.get("id"))
-
-    for session in sessions:
-        session["active"] = safe_str(session.get("id")) == active_session_id
-
-    artifacts = load_artifacts_payload()["artifacts"]
-    memory_items = load_memory_payload()["items"]
-    session_messages = active_session.get("messages", []) if active_session else []
-    web_items = [a for a in artifacts if safe_str(a.get("kind")) in {"web", "web_result", "web_fetch"}]
-
-    return {
-        "ok": True,
-        "session_id": active_session_id,
-        "active_session_id": active_session_id,
-        "sessions": sessions,
-        "session": {
-            "id": safe_str(active_session.get("id")) if active_session else "",
-            "title": safe_str(active_session.get("title")) if active_session else "",
-            "messages": session_messages,
-        },
-        "messages": session_messages,
-        "memory_items": memory_items,
-        "artifacts": artifacts,
-        "web_items": web_items,
-        "memory": memory_items,
-        "web": web_items,
-        "openai_model": OPENAI_MODEL,
-        "chat_model": OPENAI_MODEL,
-        "model": OPENAI_MODEL,
-         }
-
-                  
-# ------------------ CHAT CORE ------------------
-
-
-def process_chat_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    ensure_storage()
-
-    content = (
-        safe_str(payload.get("content"))
-        or safe_str(payload.get("message"))
-        or safe_str(payload.get("user_text"))
-        or safe_str(payload.get("text"))
+def normalize_attachment(item: dict[str, Any]) -> dict[str, Any]:
+    item = item if isinstance(item, dict) else {}
+    attachment_id = str(item.get("id") or item.get("attachment_id") or make_id("att"))
+    filename = sanitize_filename(
+        str(item.get("filename") or item.get("name") or item.get("title") or "upload.bin")
     )
+    stored_name = sanitize_filename(
+        str(item.get("stored_name") or item.get("stored_filename") or filename)
+    )
+    url = str(item.get("url") or item.get("file_url") or item.get("source_url") or "").strip()
+    mime_type = str(
+        item.get("mime_type")
+        or item.get("type")
+        or mimetypes.guess_type(filename)[0]
+        or "application/octet-stream"
+    ).strip()
+    size = int(item.get("size") or 0) if str(item.get("size") or "").strip() else 0
 
-    session_id = safe_str(payload.get("session_id") or payload.get("sessionId"))
-    attachments_raw = payload.get("attachments") if isinstance(payload.get("attachments"), list) else []
-    attachments = [a for a in (normalize_attachment(x) for x in attachments_raw) if a]
-    regenerate = bool(payload.get("regenerate"))
+    return {
+        "id": attachment_id,
+        "name": filename,
+        "filename": filename,
+        "stored_name": stored_name,
+        "url": url,
+        "mime_type": mime_type or "application/octet-stream",
+        "size": size,
+    }
 
-    session = get_session(session_id)
-    if not session:
-        session = create_session()
-        upsert_session(session, make_active=True)
-        session_id = session["id"]
 
-    if regenerate:
-        content, attachments = get_last_user_message(session)
+def normalize_attachments(items: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for item in safe_list(items):
+        normalized = normalize_attachment(item if isinstance(item, dict) else {})
+        out.append(normalized)
+    return out
 
-    if not content and not attachments:
-        raise ValueError("Missing content.")
 
-    route_meta = route_request(content, attachments)
-
-    learned_memory_items = []
-    if not regenerate and route_meta.get("route") == "chat":
-        learned_memory_items = auto_learn_memory_dominant(content, session_id=session_id)
-
-    if route_meta.get("route") == "image":
-        prompt = safe_str(content)
-        if prompt.lower().startswith("/image"):
-            prompt = prompt[6:].strip()
-
-        image_result = generate_image(prompt, safe_str(payload.get("size")))
-        image_url = safe_str(image_result.get("image_url"))
-
-        if not regenerate:
-            session["messages"].append({
-                "id": uuid.uuid4().hex[:8],
-                "role": "user",
-                "content": content,
-                "created_at": now_iso(),
-                "attachments": attachments,
-                "route_meta": route_meta,
-            })
-
-        assistant_text = f"Generated image for: {prompt}" if prompt else "Generated image."
-
-        assistant_message = {
-            "id": uuid.uuid4().hex[:8],
-            "role": "assistant",
-            "content": assistant_text,
-            "created_at": now_iso(),
-            "attachments": [],
-            "route_meta": route_meta,
-        }
-
-        session["messages"].append(assistant_message)
-
-        persist_session(session, assistant_text=assistant_text, fallback_preview=content, make_active=True)
-
-        return {
-            "ok": True,
-            "assistant_message": assistant_message,
-            "assistant_text": assistant_text,
-            "session_id": session_id,
-            "learned_memory_items": learned_memory_items,
-            "dominant_memory": get_dominant_memories(limit=8),
-        }
-
-    if not regenerate:
-        session["messages"].append({
-            "id": uuid.uuid4().hex[:8],
+def make_user_message(text: str, attachments: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    return normalize_message(
+        {
+            "id": make_id("user"),
             "role": "user",
-            "content": content,
+            "text": normalize_text(text),
             "created_at": now_iso(),
-            "attachments": attachments,
-            "route_meta": route_meta,
-        })
-
-    fallback = fallback_assistant_text(content, attachments)
-
-    model_messages = build_model_messages(
-        session=session,
-        content=content,
-        attachments=attachments,
+            "attachments": normalize_attachments(attachments),
+        }
     )
 
-    memory_prompt = build_memory_system_prompt(limit=8)
-    if memory_prompt:
-        model_messages.insert(0, {
-            "role": "system",
-            "content": memory_prompt
-        })
 
-    assistant_text = call_model(model_messages, fallback_text=fallback)
-
-    assistant_message = {
-        "id": uuid.uuid4().hex[:8],
-        "role": "assistant",
-        "content": assistant_text,
-        "created_at": now_iso(),
-        "attachments": [],
-        "route_meta": route_meta,
-    }
-
-    session["messages"].append(assistant_message)
-
-    create_artifact(
-        session_id=session_id,
-        kind="chat",
-        title="Chat Reply",
-        content=assistant_text,
-        summary=assistant_text[:220],
+def make_assistant_message(
+    text: str,
+    *,
+    message_id: str | None = None,
+    source: str = "",
+    pending: bool = False,
+    streaming: bool = False,
+    stopped: bool = False,
+    error: bool = False,
+    meta: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return normalize_message(
+        {
+            "id": message_id or make_id("assistant"),
+            "role": "assistant",
+            "text": normalize_text(text),
+            "created_at": now_iso(),
+            "pending": pending,
+            "streaming": streaming,
+            "stopped": stopped,
+            "error": error,
+            "source": source,
+            "meta": meta or {},
+        }
     )
 
-    if safe_str(session.get("title")) in {"", "New Chat"}:
-        session["title"] = content[:48].rstrip() or "New Chat"
 
-    persist_session(session, assistant_text=assistant_text, fallback_preview=content, make_active=True)
-
-    state = build_state(session_id=session_id)
-
+def session_contract_payload(session: dict[str, Any]) -> dict[str, Any]:
     return {
         "ok": True,
-        "assistant_message": assistant_message,
-        "assistant_text": assistant_text,
-        "session_id": session_id,
-        "session": state.get("session"),
-        "sessions": state.get("sessions"),
-        "messages": state.get("messages"),
-        "artifacts": state.get("artifacts"),
-        "memory_items": state.get("memory_items"),
-        "web_items": state.get("web_items"),
-        "learned_memory_items": learned_memory_items,
-        "dominant_memory": get_dominant_memories(limit=8),
+        "session": {
+            "id": session.get("id") or "",
+            "title": session.get("title") or "Untitled chat",
+            "created_at": session.get("created_at") or "",
+            "updated_at": session.get("updated_at") or "",
+            "pinned": bool(session.get("pinned", False)),
+            "last_message_preview": session.get("last_message_preview") or "",
+            "message_count": int(session.get("message_count") or 0),
+            "messages": session_messages(session),
+        },
+        "active_session_id": session.get("id") or "",
     }
 
 
-# ------------------ ROUTES ------------------
-
-@app.route("/")
-def index():
-    return render_template("index.html")
-
-
-@app.route("/api/health", methods=["GET"])
-def api_health():
-    return jsonify({
+def session_delete_contract_payload(
+    deleted_session_id: str,
+    active_session: dict[str, Any],
+) -> dict[str, Any]:
+    return {
         "ok": True,
-        "chat_model": OPENAI_MODEL,
-        "model": OPENAI_MODEL,
-    })
+        "deleted_session_id": deleted_session_id,
+        "session": {
+            "id": active_session.get("id") or "",
+            "title": active_session.get("title") or "Untitled chat",
+            "created_at": active_session.get("created_at") or "",
+            "updated_at": active_session.get("updated_at") or "",
+            "pinned": bool(active_session.get("pinned", False)),
+            "last_message_preview": active_session.get("last_message_preview") or "",
+            "message_count": int(active_session.get("message_count") or 0),
+            "messages": session_messages(active_session),
+        },
+        "active_session_id": active_session.get("id") or "",
+    }
 
 
-@app.route("/api/state", methods=["GET"])
-def api_state():
-    ensure_storage()
-    state = build_state()
-    return jsonify({"ok": True, **state})
+def session_error_payload(
+    *,
+    error: str,
+    active_session_id: str = "",
+    deleted_session_id: str | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "ok": False,
+        "error": error,
+        "session": None,
+        "active_session_id": active_session_id or "",
+    }
+    if deleted_session_id is not None:
+        payload["deleted_session_id"] = deleted_session_id
+    return payload
 
 
-# ------------------ SESSION FAMILY ------------------
-
-@app.route("/api/session/new", methods=["POST"])
-def api_session_new():
-    ensure_storage()
-    session = create_session()
-    upsert_session(session, make_active=True)
-    state = build_state(session_id=session["id"])
-    return jsonify({"ok": True, **state})
-
-
-@app.route("/api/session/switch", methods=["POST"])
-def api_session_switch():
-    payload = request.get_json(silent=True) or {}
-    session_id = safe_str(payload.get("session_id"))
-
-    if not session_id:
-        return jsonify({"ok": False, "error": "session_id required"}), 400
-
-    store = load_sessions_payload()
-    _mark_active_session(store, session_id)
-    save_sessions_payload(store)
-
-    state = build_state(session_id=session_id)
-    return jsonify({"ok": True, **state})
-
-
-@app.route("/api/session/rename", methods=["POST"])
-def api_session_rename():
-    payload = request.get_json(silent=True) or {}
-    session_id = safe_str(payload.get("session_id"))
-    title = safe_str(payload.get("title"))
-
-    store = load_sessions_payload()
-
-    for s in store["sessions"]:
-        if safe_str(s["id"]) == session_id:
-            s["title"] = title
-            s["updated_at"] = now_iso()
-
-    save_sessions_payload(store)
-
-    state = build_state(session_id=session_id)
-    return jsonify({"ok": True, **state})
-
-
-@app.route("/api/session/delete", methods=["POST"])
-def api_session_delete():
-    payload = request.get_json(silent=True) or {}
-    session_id = safe_str(payload.get("session_id"))
-
-    store = load_sessions_payload()
-    store["sessions"] = [s for s in store["sessions"] if safe_str(s["id"]) != session_id]
-
-    save_sessions_payload(store)
-
-    state = build_state()
-    return jsonify({"ok": True, **state})
-
-
-# ------------------ CHAT ------------------
-
-@app.route("/api/chat", methods=["POST"])
-def api_chat():
-    payload = request.get_json(silent=True) or {}
-    result = process_chat_payload(payload)
-    return jsonify(result)
-
-
-@app.route("/api/chat/stream", methods=["POST"])
-def api_chat_stream():
-    data = request.get_json(silent=True) or {}
-    user_text = (
-        data.get("message")
-        or data.get("content")
-        or data.get("user_text")
+def resolve_session_id_from_request(data: dict[str, Any]) -> str:
+    return str(
+        data.get("session_id")
+        or data.get("id")
+        or data.get("active_session_id")
         or ""
     ).strip()
-    session_id = str(data.get("session_id") or "").strip()
-    attachments = data.get("attachments") or []
 
-    if not user_text and not attachments:
-        return jsonify({"ok": False, "error": "Message required."}), 400
 
-    def sse(event):
-        return f"data: {json.dumps(event)}\n\n"
+def state_payload(session: dict[str, Any] | None = None) -> dict[str, Any]:
+    store = load_sessions_store()
+    active = session or ensure_active_session(store)
 
-    def generate():
-        assistant_text = ""
-        assistant_message = None
+    raw_artifacts = load_artifacts()
+    artifacts: list[dict[str, Any]] = []
+    for item in raw_artifacts:
+        enriched = dict(item)
+        enriched["viewer"] = build_artifact_viewer(item)
+        artifacts.append(enriched)
 
-        try:
-            route_meta = {}
-            try:
-                if "route_request" in globals():
-                    route_meta = route_request(user_text=user_text, attachments=attachments) or {}
-            except Exception:
-                route_meta = {}
+    memory = load_memory()
 
-            yield sse({
-                "ok": True,
-                "phase": "start",
-                "session_id": session_id,
-                "route_meta": route_meta,
-            })
-
-            current_session = None
-            try:
-                if "chat_service" in globals() and hasattr(chat_service, "ensure_session"):
-                    current_session = chat_service.ensure_session(session_id=session_id)
-                elif "ensure_session" in globals():
-                    current_session = ensure_session(session_id)
-            except Exception:
-                current_session = None
-
-            if isinstance(current_session, dict):
-                session_id_local = str(
-                    current_session.get("id")
-                    or current_session.get("session_id")
-                    or session_id
-                    or ""
-                )
-            else:
-                session_id_local = session_id
-
-            try:
-                if "chat_service" in globals() and hasattr(chat_service, "append_message"):
-                    chat_service.append_message(
-                        session_id=session_id_local,
-                        role="user",
-                        content=user_text,
-                        attachments=attachments,
-                    )
-                elif "append_message" in globals():
-                    append_message(session_id_local, {
-                        "role": "user",
-                        "content": user_text,
-                        "attachments": attachments,
-                    })
-            except Exception:
-                pass
-
-            if OpenAI is None:
-                assistant_text = "Streaming unavailable: OpenAI SDK not loaded."
-                yield sse({"delta": assistant_text})
-            else:
-                client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-                model_name = os.getenv("OPENAI_MODEL", "gpt-5.4")
-
-                messages = [
-                    {"role": "system", "content": "You are Nova. Be helpful, direct, and concise."},
-                    {"role": "user", "content": user_text},
-                ]
-
-                stream = client.chat.completions.create(
-                    model=model_name,
-                    messages=messages,
-                    stream=True,
-                )
-
-                for chunk in stream:
-                    try:
-                        delta = chunk.choices[0].delta.content or ""
-                    except Exception:
-                        delta = ""
-
-                    if not delta:
-                        continue
-
-                    assistant_text += delta
-                    yield sse({"delta": delta})
-
-            try:
-                if "chat_service" in globals() and hasattr(chat_service, "append_message"):
-                    assistant_message = chat_service.append_message(
-                        session_id=session_id_local,
-                        role="assistant",
-                        content=assistant_text,
-                    )
-                elif "append_message" in globals():
-                    assistant_message = append_message(session_id_local, {
-                        "role": "assistant",
-                        "content": assistant_text,
-                    })
-            except Exception:
-                assistant_message = {
-                    "role": "assistant",
-                    "content": assistant_text,
-                }
-
-            payload = {
-                "ok": True,
-                "done": True,
-                "assistant_message": assistant_message or {
-                    "role": "assistant",
-                    "content": assistant_text,
-                },
-                "session_id": session_id_local,
-                "route_meta": route_meta,
+    sessions_summary: list[dict[str, Any]] = []
+    for item in safe_list(store.get("sessions")):
+        sessions_summary.append(
+            {
+                "id": item.get("id"),
+                "title": item.get("title") or "Untitled chat",
+                "created_at": item.get("created_at") or "",
+                "updated_at": item.get("updated_at") or "",
+                "pinned": bool(item.get("pinned", False)),
+                "last_message_preview": item.get("last_message_preview") or "",
+                "message_count": int(item.get("message_count") or 0),
+                "messages": safe_list(item.get("messages")),
             }
+        )
 
-            try:
-                if "build_state_payload" in globals():
-                    state_payload = build_state_payload(session_id_local)
-                    if isinstance(state_payload, dict):
-                        payload.update(state_payload)
-                elif "chat_service" in globals() and hasattr(chat_service, "build_state_payload"):
-                    state_payload = chat_service.build_state_payload(session_id_local)
-                    if isinstance(state_payload, dict):
-                        payload.update(state_payload)
-            except Exception:
-                pass
+    return {
+        "ok": True,
+        "session_id": active.get("id") or "",
+        "active_session_id": active.get("id") or "",
+        "session": {
+            "id": active.get("id") or "",
+            "title": active.get("title") or "Untitled chat",
+            "created_at": active.get("created_at") or "",
+            "updated_at": active.get("updated_at") or "",
+            "pinned": bool(active.get("pinned", False)),
+            "last_message_preview": active.get("last_message_preview") or "",
+            "message_count": int(active.get("message_count") or 0),
+            "messages": session_messages(active),
+        },
+        "messages": session_messages(active),
+        "sessions": sessions_summary,
+        "artifacts": artifacts,
+        "memory": memory,
+        "debug": {
+            "route_build": "attachment-pipeline-polish-2026-04-07-001",
+            "has_openai_api_key": bool(OPENAI_API_KEY),
+            "openai_configured": OPENAI_CLIENT is not None,
+            "chat_model": OPENAI_MODEL,
+            "timestamp": now_iso(),
+        },
+    }
 
-            yield sse(payload)
+# =========================================================
+# MEMORY + ATTACHMENT INJECTION LOCK
+# =========================================================
 
-        except Exception as exc:
-            yield sse({
-                "ok": False,
-                "error": str(exc),
-                "done": True,
-            })
-
-    response = Response(stream_with_context(generate()), mimetype="text/event-stream")
-    response.headers["Cache-Control"] = "no-cache"
-    response.headers["X-Accel-Buffering"] = "no"
-    return response
+MEMORY_MAX_ITEMS = 8
+MEMORY_MAX_CHARS = 2400
+MODEL_HISTORY_LIMIT = 16
+ATTACHMENT_CONTEXT_MAX_ITEMS = 6
 
 
-# ------------------ WEB ------------------
+def _textish(value: Any) -> str:
+    return str(value or "").strip()
 
-@app.route("/api/web/fetch", methods=["POST"])
-def api_web_fetch():
-    payload = request.get_json(silent=True) or {}
-    url = safe_str(payload.get("url"))
 
-    result = fetch_web_result(url)
+def _tokenize(value: str) -> list[str]:
+    raw = _textish(value).lower()
+    parts: list[str] = []
+    current: list[str] = []
+    for ch in raw:
+        if ch.isalnum():
+            current.append(ch)
+        else:
+            if current:
+                parts.append("".join(current))
+                current = []
+    if current:
+        parts.append("".join(current))
+    return parts
 
-    create_artifact(
-        session_id=safe_str(payload.get("session_id")),
-        kind="web",
-        title=result.get("title"),
-        content=result.get("body"),
-        summary=result.get("summary"),
-        source_url=result.get("url"),
-        meta=result,
+
+def _session_keyword_text(session: dict[str, Any]) -> str:
+    bits: list[str] = []
+    bits.append(_textish(session.get("title")))
+    for msg in safe_list(session.get("messages"))[-12:]:
+        role = _textish(msg.get("role")).lower()
+        if role in {"user", "assistant"}:
+            bits.append(_textish(msg.get("content") or msg.get("text")))
+    return " ".join(bit for bit in bits if bit)
+
+
+def _memory_score(item: dict[str, Any], query_terms: set[str]) -> int:
+    text = _textish(item.get("text") or item.get("content") or item.get("body"))
+    if not text:
+        return -1
+
+    kind = _textish(item.get("kind")).lower()
+    source = _textish(item.get("source")).lower()
+    hay_terms = set(_tokenize(text))
+
+    overlap = len(query_terms.intersection(hay_terms))
+    durable_bonus = 0
+
+    if kind in {"preference", "project", "profile", "instruction", "note"}:
+        durable_bonus += 3
+    if source in {"manual", "assistant", "memory"}:
+        durable_bonus += 1
+
+    return overlap * 5 + durable_bonus
+
+
+def build_memory_context_block(
+    *,
+    user_text: str,
+    session: dict[str, Any] | None,
+) -> str:
+    memory_items = safe_list(load_memory())
+    if not memory_items:
+        return ""
+
+    session = session or {}
+    session_text = _session_keyword_text(session)
+    query_terms = set(_tokenize(user_text)) | set(_tokenize(session_text))
+
+    ranked: list[tuple[int, dict[str, Any]]] = []
+    for item in memory_items:
+        score = _memory_score(item, query_terms)
+        if score >= 0:
+            ranked.append((score, item))
+
+    ranked.sort(
+        key=lambda pair: (
+            -pair[0],
+            _textish(pair[1].get("updated_at") or pair[1].get("created_at")),
+        ),
+        reverse=False,
     )
 
-    return jsonify({"ok": True, "web_result": result})
+    selected: list[str] = []
+    total_chars = 0
+
+    for score, item in ranked:
+        text = _textish(item.get("text") or item.get("content") or item.get("body"))
+        if not text:
+            continue
+
+        line = f"- {text}"
+        next_len = total_chars + len(line) + 1
+
+        if selected and next_len > MEMORY_MAX_CHARS:
+            break
+        if len(selected) >= MEMORY_MAX_ITEMS:
+            break
+
+        selected.append(line)
+        total_chars = next_len
+
+    if not selected:
+        return ""
+
+    return "Relevant memory for this request:\n" + "\n".join(selected)
 
 
-# ------------------ UPLOADS ------------------
+def build_attachment_context_block(attachments: list[dict[str, Any]] | None) -> str:
+    normalized = normalize_attachments(attachments)
+    if not normalized:
+        return ""
 
-@app.route("/api/upload", methods=["POST"])
-def api_upload():
-    ensure_storage()
+    selected = normalized[:ATTACHMENT_CONTEXT_MAX_ITEMS]
+    lines: list[str] = []
 
-    if "file" not in request.files:
-        return jsonify({"ok": False, "error": "No file"}), 400
+    for item in selected:
+        label = _textish(item.get("filename") or item.get("name") or "Attachment")
+        mime_type = _textish(item.get("mime_type") or "application/octet-stream")
+        size = int(item.get("size") or 0)
+        size_text = f"{size} bytes" if size > 0 else "size unknown"
+        lines.append(f"- {label} ({mime_type}, {size_text})")
 
-    file = request.files["file"]
-    filename = uuid.uuid4().hex + "_" + file.filename
-    path = UPLOADS_DIR / filename
-    file.save(path)
+    return "Attachments for this request:\n" + "\n".join(lines)
 
-    return jsonify({
-        "ok": True,
-        "file": {
-            "name": filename,
-            "url": f"/uploads/{filename}",
-            "path": str(path),
+
+def build_messages_for_model(
+    session: dict[str, Any],
+    user_text: str,
+    attachments: list[dict[str, Any]] | None = None,
+    regenerate_of: str | None = None,
+) -> list[dict[str, str]]:
+    model_messages: list[dict[str, str]] = []
+
+    memory_block = build_memory_context_block(
+        user_text=user_text,
+        session=session,
+    )
+    if memory_block:
+        model_messages.append(
+            {
+                "role": "system",
+                "content": (
+                    "Use the following durable memory only when it is relevant. "
+                    "Do not mention memory explicitly unless the user asks.\n\n"
+                    f"{memory_block}"
+                ),
+            }
+        )
+
+    attachment_block = build_attachment_context_block(attachments)
+    if attachment_block:
+        model_messages.append(
+            {
+                "role": "system",
+                "content": (
+                    "The user included file attachments. Use this attachment metadata only when relevant. "
+                    "Do not claim to have fully read file contents unless those contents are actually available.\n\n"
+                    f"{attachment_block}"
+                ),
+            }
+        )
+
+    history = session_messages(session)[-MODEL_HISTORY_LIMIT:]
+    for msg in history:
+        role = str(msg.get("role") or "assistant")
+        if role not in {"system", "user", "assistant"}:
+            continue
+        text = message_text(msg).strip()
+        if not text:
+            continue
+        model_messages.append({"role": role, "content": text})
+
+    if regenerate_of:
+        target = find_message(session, regenerate_of)
+        target_text = message_text(target or {})
+        if target_text.strip():
+            model_messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "Please regenerate the assistant answer for the previously generated message below. "
+                        "Return a fresh better version only.\n\n"
+                        f"Target assistant message:\n{target_text}"
+                    ),
+                }
+            )
+    else:
+        clean_user_text = normalize_text(user_text).strip()
+        if clean_user_text:
+            model_messages.append({"role": "user", "content": clean_user_text})
+        elif attachment_block:
+            model_messages.append(
+                {
+                    "role": "user",
+                    "content": "Please respond using the attached files as context.",
+                }
+            )
+
+    return model_messages
+
+
+def local_fallback_response(
+    session: dict[str, Any],
+    user_text: str,
+    attachments: list[dict[str, Any]] | None = None,
+    regenerate_of: str | None = None,
+) -> str:
+    if regenerate_of:
+        target = find_message(session, regenerate_of)
+        target_text = message_text(target or {})
+        return (
+            "Regenerated response.\n\n"
+            f"Target message preview:\n{target_text[:500]}\n\n"
+            "No live model is configured, so this is the local fallback path."
+        )
+
+    attachment_block = build_attachment_context_block(attachments)
+    attachment_suffix = f"\n\n{attachment_block}" if attachment_block else ""
+    previous_user_count = sum(1 for m in session_messages(session) if str(m.get("role")) == "user")
+
+    if normalize_text(user_text).strip():
+        return (
+            f"You said:\n{normalize_text(user_text)}"
+            f"{attachment_suffix}\n\n"
+            f"This is local fallback reply #{previous_user_count} because no live model is configured."
+        )
+
+    return (
+        "You sent attachments without text."
+        f"{attachment_suffix}\n\n"
+        f"This is local fallback reply #{previous_user_count} because no live model is configured."
+    )
+
+def stream_model_text(
+    session: dict[str, Any],
+    user_text: str,
+    attachments: list[dict[str, Any]] | None = None,
+    regenerate_of: str | None = None,
+) -> Generator[str, None, None]:
+    model_messages = build_messages_for_model(
+        session,
+        user_text,
+        attachments=attachments,
+        regenerate_of=regenerate_of,
+    )
+
+    if OPENAI_CLIENT is None:
+        fallback_text = local_fallback_response(
+            session,
+            user_text,
+            attachments=attachments,
+            regenerate_of=regenerate_of,
+        )
+        for ch in fallback_text:
+            yield ch
+        return
+
+    stream = OPENAI_CLIENT.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=model_messages,
+        stream=True,
+    )
+
+    for chunk in stream:
+        try:
+            choices = getattr(chunk, "choices", None) or []
+            if not choices:
+                continue
+
+            delta = getattr(choices[0], "delta", None)
+            if delta is None:
+                continue
+
+            content = getattr(delta, "content", None)
+            if content:
+                yield str(content)
+        except Exception:
+            continue
+
+# =========================================================
+# STREAM CONTRACT LOCK
+# =========================================================
+
+def chat_stream_generator(
+    *,
+    session_id: str,
+    user_text: str,
+    attachments: list[dict[str, Any]] | None,
+    regenerate_of: str | None,
+) -> Generator[str, None, None]:
+    """
+    Backend-true contract:
+    - exactly one start
+    - zero or more token
+    - exactly one final OR one error
+    - on abort/disconnect, do not write a second assistant message
+    """
+    store = load_sessions_store()
+    session = find_session(store, session_id)
+    if not session:
+        session = ensure_active_session(store)
+
+    attachments = normalize_attachments(attachments)
+
+    if not regenerate_of and (normalize_text(user_text).strip() or attachments):
+        append_message(session, make_user_message(user_text, attachments))
+
+    target_message = find_message(session, regenerate_of) if regenerate_of else None
+
+    assistant_message_id = (target_message or {}).get("id") if target_message else make_id("assistant")
+    assistant_created_at = now_iso()
+    final_text = ""
+    final_written = False
+    started = False
+
+    def persist_final(*, stopped: bool = False, error: bool = False, error_message: str = "") -> dict[str, Any]:
+        nonlocal final_written
+
+        if final_written:
+            existing = find_message(session, assistant_message_id)
+            return existing or {}
+
+        text_value = final_text
+        if error and error_message:
+            text_value = (text_value + ("\n\n" if text_value else "") + f"[Error] {error_message}").strip()
+
+        assistant_message = normalize_message(
+            {
+                "id": assistant_message_id,
+                "role": "assistant",
+                "text": text_value,
+                "created_at": assistant_created_at,
+                "pending": False,
+                "streaming": False,
+                "stopped": stopped,
+                "error": error,
+                "source": "regenerate" if regenerate_of else "send",
+                "meta": {
+                    "regenerate_of": regenerate_of or "",
+                },
+            }
+        )
+
+        if regenerate_of and target_message:
+            replace_message(session, assistant_message_id, assistant_message)
+        else:
+            existing = find_message(session, assistant_message_id)
+            if existing:
+                replace_message(session, assistant_message_id, assistant_message)
+            else:
+                append_message(session, assistant_message)
+
+        save_sessions_store(store)
+        final_written = True
+        return assistant_message
+
+    try:
+        start_event = {
+            "type": "start",
+            "session_id": session.get("id") or session_id,
+            "message_id": assistant_message_id,
+            "assistant_message_id": assistant_message_id,
+            "mode": "regenerate" if regenerate_of else "send",
         }
-    })
+        started = True
+        yield sse(start_event)
+
+        for token in stream_model_text(
+            session,
+            user_text,
+            attachments=attachments,
+            regenerate_of=regenerate_of,
+        ):
+            final_text += token
+            yield sse(
+                {
+                    "type": "token",
+                    "session_id": session.get("id") or session_id,
+                    "message_id": assistant_message_id,
+                    "assistant_message_id": assistant_message_id,
+                    "token": token,
+                }
+            )
+
+        final_message = persist_final(stopped=False, error=False)
+
+        yield sse(
+            {
+                "type": "final",
+                "ok": True,
+                "session_id": session.get("id") or session_id,
+                "message_id": assistant_message_id,
+                "assistant_message_id": assistant_message_id,
+                "message": final_message,
+                "messages": session_messages(session),
+                "artifacts": load_artifacts(),
+                "memory": load_memory(),
+            }
+        )
+
+    except GeneratorExit:
+        raise
+
+    except BrokenPipeError:
+        raise
+
+    except Exception as exc:
+        error_text = str(exc) or "Generation failed."
+
+        if started:
+            try:
+                final_message = persist_final(stopped=False, error=True, error_message=error_text)
+                yield sse(
+                    {
+                        "type": "error",
+                        "ok": False,
+                        "session_id": session.get("id") or session_id,
+                        "message_id": assistant_message_id,
+                        "assistant_message_id": assistant_message_id,
+                        "message": final_message,
+                        "error": error_text,
+                    }
+                )
+            except Exception:
+                yield sse(
+                    {
+                        "type": "error",
+                        "ok": False,
+                        "session_id": session.get("id") or session_id,
+                        "message_id": assistant_message_id,
+                        "assistant_message_id": assistant_message_id,
+                        "error": error_text,
+                    }
+                )
+        else:
+            yield sse(
+                {
+                    "type": "error",
+                    "ok": False,
+                    "session_id": session.get("id") or session_id,
+                    "error": error_text,
+                }
+            )
 
 
-@app.route("/uploads/<path:filename>")
-def serve_upload(filename):
-    return send_from_directory(UPLOADS_DIR, filename)
+def run_non_stream_chat(
+    *,
+    session_id: str,
+    user_text: str,
+    attachments: list[dict[str, Any]] | None,
+    regenerate_of: str | None,
+) -> dict[str, Any]:
+    store = load_sessions_store()
+    session = find_session(store, session_id)
+    if not session:
+        session = ensure_active_session(store)
+
+    attachments = normalize_attachments(attachments)
+
+    if not regenerate_of and (normalize_text(user_text).strip() or attachments):
+        append_message(session, make_user_message(user_text, attachments))
+
+    target_message = find_message(session, regenerate_of) if regenerate_of else None
+    assistant_message_id = (target_message or {}).get("id") if target_message else make_id("assistant")
+
+    parts: list[str] = []
+    for chunk in stream_model_text(
+        session,
+        user_text,
+        attachments=attachments,
+        regenerate_of=regenerate_of,
+    ):
+        parts.append(chunk)
+    final_text = "".join(parts)
+
+    assistant_message = normalize_message(
+        {
+            "id": assistant_message_id,
+            "role": "assistant",
+            "text": final_text,
+            "created_at": now_iso(),
+            "pending": False,
+            "streaming": False,
+            "stopped": False,
+            "error": False,
+            "source": "regenerate" if regenerate_of else "send",
+            "meta": {"regenerate_of": regenerate_of or ""},
+        }
+    )
+
+    if regenerate_of and target_message:
+        replace_message(session, assistant_message_id, assistant_message)
+    else:
+        append_message(session, assistant_message)
+
+    save_sessions_store(store)
+
+    payload = state_payload(session)
+    payload["assistant_message"] = assistant_message
+    return payload
 
 
-# ------------------ RUN ------------------
+# =========================================================
+# ROUTES
+# =========================================================
+
+@app.get("/")
+def index() -> Any:
+    index_path = TEMPLATES_DIR / "index.html"
+    if index_path.exists():
+        return index_path.read_text(encoding="utf-8")
+    return "<h1>Nova</h1>", 200
+
+
+@app.get("/api/health")
+def api_health() -> Any:
+    return jsonify(
+        {
+            "ok": True,
+            "route_build": "attachment-pipeline-polish-2026-04-07-001",
+            "has_openai_api_key": bool(OPENAI_API_KEY),
+            "openai_configured": OPENAI_CLIENT is not None,
+            "chat_model": OPENAI_MODEL,
+            "timestamp": now_iso(),
+        }
+    )
+
+
+@app.get("/api/state")
+def api_state() -> Any:
+    return jsonify(state_payload())
+
+
+@app.post("/api/upload")
+def api_upload() -> Any:
+    uploaded = request.files.get("file")
+    if not uploaded:
+        return jsonify({"ok": False, "error": "file is required"}), 400
+
+    original_name = sanitize_filename(uploaded.filename or "upload.bin")
+    attachment_id = make_id("att")
+    stored_name = f"{attachment_id}_{original_name}"
+    target_path = UPLOADS_DIR / stored_name
+
+    try:
+        uploaded.save(target_path)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc) or "upload failed"}), 500
+
+    mime_type = (
+        str(uploaded.mimetype or "").strip()
+        or mimetypes.guess_type(original_name)[0]
+        or "application/octet-stream"
+    )
+
+    attachment = normalize_attachment(
+        {
+            "id": attachment_id,
+            "name": original_name,
+            "filename": original_name,
+            "stored_name": stored_name,
+            "url": f"/api/uploads/{stored_name}",
+            "mime_type": mime_type,
+            "size": file_size(target_path),
+        }
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "attachment": attachment,
+            "id": attachment["id"],
+            "name": attachment["name"],
+            "filename": attachment["filename"],
+            "url": attachment["url"],
+            "mime_type": attachment["mime_type"],
+            "size": attachment["size"],
+        }
+    )
+
+
+@app.post("/api/sessions/new")
+def api_sessions_new() -> Any:
+    store = load_sessions_store()
+    session = make_session("New chat")
+    store["sessions"].insert(0, session)
+    store["active_session_id"] = session["id"]
+    save_sessions_store(store)
+    return jsonify(session_contract_payload(session))
+
+
+@app.post("/api/sessions/open")
+def api_sessions_open() -> Any:
+    data = request.get_json(silent=True) or {}
+    session_id = resolve_session_id_from_request(data)
+
+    store = load_sessions_store()
+    current_active = str(store.get("active_session_id") or "")
+
+    if not session_id:
+        return jsonify(
+            session_error_payload(
+                error="session_id is required.",
+                active_session_id=current_active,
+            )
+        ), 400
+
+    session = find_session(store, session_id)
+    if not session:
+        return jsonify(
+            session_error_payload(
+                error="Session not found.",
+                active_session_id=current_active,
+            )
+        ), 404
+
+    store["active_session_id"] = session["id"]
+    save_sessions_store(store)
+
+    return jsonify(session_contract_payload(session))
+
+
+@app.post("/api/sessions/rename")
+def api_sessions_rename() -> Any:
+    data = request.get_json(silent=True) or {}
+
+    session_id = resolve_session_id_from_request(data)
+    title = str(data.get("title") or "").strip()
+
+    store = load_sessions_store()
+    current_active = str(store.get("active_session_id") or "")
+
+    if not session_id:
+        return jsonify(
+            session_error_payload(
+                error="session_id is required.",
+                active_session_id=current_active,
+            )
+        ), 400
+
+    if not title:
+        return jsonify(
+            session_error_payload(
+                error="title is required.",
+                active_session_id=current_active,
+            )
+        ), 400
+
+    session = find_session(store, session_id)
+    if not session:
+        return jsonify(
+            session_error_payload(
+                error="Session not found.",
+                active_session_id=current_active,
+            )
+        ), 404
+
+    session["title"] = title
+    session["updated_at"] = now_iso()
+    save_sessions_store(store)
+
+    return jsonify(session_contract_payload(session))
+
+
+@app.post("/api/sessions/delete")
+def api_sessions_delete() -> Any:
+    data = request.get_json(silent=True) or {}
+
+    session_id = resolve_session_id_from_request(data)
+
+    store = load_sessions_store()
+    current_active = str(store.get("active_session_id") or "")
+    sessions = safe_list(store.get("sessions"))
+
+    if not session_id:
+        return jsonify(
+            session_error_payload(
+                error="session_id is required.",
+                active_session_id=current_active,
+                deleted_session_id=None,
+            )
+        ), 400
+
+    delete_index = -1
+
+    for index, session in enumerate(sessions):
+        if str(session.get("id") or "") == session_id:
+            delete_index = index
+            break
+
+    if delete_index < 0:
+        return jsonify(
+            session_error_payload(
+                error="Session not found.",
+                active_session_id=current_active,
+                deleted_session_id=None,
+            )
+        ), 404
+
+    deleted_session = sessions.pop(delete_index)
+    store["sessions"] = sessions
+
+    active_session: dict[str, Any] | None = None
+
+    if not sessions:
+        replacement = make_session("New chat")
+        sessions.append(replacement)
+        store["sessions"] = sessions
+        store["active_session_id"] = replacement["id"]
+        active_session = replacement
+    else:
+        if current_active == session_id:
+            store["active_session_id"] = str(sessions[0].get("id") or "")
+
+        active_session = find_session(store, store.get("active_session_id") or "")
+        if not active_session:
+            active_session = sessions[0]
+            store["active_session_id"] = str(active_session.get("id") or "")
+
+    save_sessions_store(store)
+
+    return jsonify(
+        session_delete_contract_payload(
+            deleted_session.get("id") or "",
+            active_session,
+        )
+    )
+
+@app.post("/api/chat")
+def api_chat() -> Any:
+    data = request.get_json(silent=True) or {}
+
+    requested_session_id = str(data.get("session_id") or "").strip()
+    user_text = normalize_text(data.get("user_text") or "")
+    attachments = normalize_attachments(safe_list(data.get("attachments")))
+    regenerate_of = str(data.get("regenerate_of") or "").strip() or None
+
+    wants_stream = bool(data.get("stream", False))
+    if user_text.lower().startswith("/image"):
+        wants_stream = False
+
+    store = load_sessions_store()
+    session = find_session(store, requested_session_id) if requested_session_id else None
+    if not session:
+        session = ensure_active_session(store)
+        requested_session_id = session["id"]
+
+    store["active_session_id"] = session["id"]
+    save_sessions_store(store)
+
+    print(
+        "api_chat debug:",
+        {
+            "requested_session_id": requested_session_id,
+            "raw_user_text": data.get("user_text"),
+            "normalized_user_text": user_text,
+            "attachments_count": len(attachments),
+            "regenerate_of": regenerate_of,
+            "wants_stream": wants_stream,
+        },
+    )
+
+    if not regenerate_of and not user_text.strip() and not attachments:
+        return jsonify({"ok": False, "error": "user_text or attachments required for send."}), 400
+
+    if regenerate_of and not find_message(session, regenerate_of):
+        return jsonify({"ok": False, "error": "regenerate target not found."}), 404
+
+    if wants_stream:
+        return Response(
+            chat_stream_generator(
+                session_id=requested_session_id,
+                user_text=user_text,
+                attachments=attachments,
+                regenerate_of=regenerate_of,
+            ),
+            mimetype="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache, no-transform",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    try:
+
+        # =========================================================
+        # IMAGE GENERATION (HARD LOCK)
+        # =========================================================
+
+        if user_text.lower().startswith("/image") and not regenerate_of:
+            prompt = user_text[len("/image"):].strip()
+
+            if not prompt:
+                return jsonify({
+                    "ok": False,
+                    "error": "Missing prompt after /image"
+                }), 400
+
+            if OPENAI_CLIENT is None:
+                return jsonify({
+                    "ok": False,
+                    "error": "OpenAI not configured"
+                }), 500
+
+            import base64
+
+            result = OPENAI_CLIENT.images.generate(
+                model=os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1.5"),
+                prompt=prompt,
+                size=os.getenv("NOVA_IMAGE_SIZE", "1024x1024"),
+            )
+
+            image_b64 = result.data[0].b64_json
+            image_bytes = base64.b64decode(image_b64)
+
+            filename = f"generated_{uuid.uuid4().hex}.png"
+            filepath = UPLOADS_DIR / filename
+
+            with open(filepath, "wb") as f:
+                f.write(image_bytes)
+
+            image_url = f"/api/uploads/{filename}"
+            created_at = now_iso()
+
+            assistant_message = {
+                "id": make_id("assistant"),
+                "role": "assistant",
+                "text": f"![Generated image]({image_url})",
+                "created_at": created_at,
+                "attachments": [
+                    {
+                        "id": make_id("att"),
+                        "url": image_url,
+                        "mime_type": "image/png",
+                        "filename": filename,
+                        "stored_name": filename,
+                        "size": len(image_bytes),
+                    }
+                ],
+                "error": False,
+                "pending": False,
+                "streaming": False,
+                "stopped": False,
+                "source": "send",
+                "meta": {"regenerate_of": ""},
+            }
+
+            append_message(session, assistant_message)
+            save_sessions_store(store)
+
+            return jsonify({
+                "ok": True,
+                "assistant_message": assistant_message,
+                "session": session,
+                "session_id": session["id"],
+                "active_session_id": session["id"],
+                "artifacts": [],
+                "memory": [],
+            })
+
+        # IMAGE ROUTE
+        if user_text.lower().startswith("/image") and not regenerate_of:
+            prompt = user_text[len("/image"):].strip()
+
+            if not prompt:
+                assistant_message = {
+                    "id": f"assistant_{uuid.uuid4().hex}",
+                    "role": "assistant",
+                    "text": "Give me a prompt after /image",
+                    "created_at": now_iso(),
+                    "attachments": [],
+                    "error": False,
+                    "pending": False,
+                    "streaming": False,
+                    "stopped": False,
+                    "source": "send",
+                    "meta": {"regenerate_of": ""},
+                }
+
+                session.setdefault("messages", []).append(assistant_message)
+                session["updated_at"] = now_iso()
+                session["last_message_preview"] = assistant_message["text"][:140]
+                session["message_count"] = len(session.get("messages") or [])
+
+                store["active_session_id"] = session["id"]
+                save_sessions_store(store)
+
+                return jsonify(
+                    {
+                        "ok": True,
+                        "assistant_message": assistant_message,
+                        "session": session,
+                        "session_id": session["id"],
+                        "active_session_id": session["id"],
+                        "artifacts": [],
+                        "memory": [],
+                    }
+                )
+
+            import base64
+
+            client = OpenAI()
+
+            result = client.images.generate(
+                model=os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1.5"),
+                prompt=prompt,
+                size=os.getenv("NOVA_IMAGE_SIZE", "1024x1024"),
+            )
+
+            image_b64 = result.data[0].b64_json
+            image_bytes = base64.b64decode(image_b64)
+
+            filename = f"generated_{uuid.uuid4().hex}.png"
+            filepath = UPLOADS_DIR / filename
+
+            with open(filepath, "wb") as f:
+                f.write(image_bytes)
+
+            image_url = f"/api/uploads/{filename}"
+            created_at = now_iso()
+
+            assistant_message = {
+                "id": f"assistant_{uuid.uuid4().hex}",
+                "role": "assistant",
+                "text": f"![Generated image]({image_url})",
+                "created_at": created_at,
+                "attachments": [
+                    {
+                        "id": f"att_{uuid.uuid4().hex}",
+                        "url": image_url,
+                        "mime_type": "image/png",
+                        "filename": filename,
+                        "stored_name": filename,
+                        "size": len(image_bytes),
+                        "status": "uploaded",
+                        "upload_error": "",
+                    }
+                ],
+                "error": False,
+                "pending": False,
+                "streaming": False,
+                "stopped": False,
+                "source": "send",
+                "meta": {"regenerate_of": ""},
+            }
+
+            artifact = {
+                "id": make_id("artifact"),
+                "title": f"Image: {prompt[:60]}",
+                "kind": "image_generation",
+                "image_url": image_url,
+                "body": prompt,
+                "preview": prompt[:120],
+                "session_id": session["id"],
+                "created_at": created_at,
+                "updated_at": created_at,
+                "meta": {
+                    "image_url": image_url,
+                    "source_url": "",
+                    "analysis_text": "",
+                    "bullets": [],
+                },
+            }
+
+            artifact["viewer"] = build_artifact_viewer(artifact)
+
+            append_message(session, assistant_message)
+
+            session["updated_at"] = created_at
+            session["last_message_preview"] = f"Generated image: {prompt[:80]}"
+            session["message_count"] = len(session.get("messages") or [])
+
+            store["active_session_id"] = session["id"]
+            save_sessions_store(store)
+
+            artifacts_store = load_artifacts()
+            artifacts_store.insert(0, artifact)
+            save_artifacts(artifacts_store)
+
+            payload = state_payload(session)
+            payload["assistant_message"] = assistant_message
+            return jsonify(payload)
+
+        # NORMAL FLOW
+        payload = run_non_stream_chat(
+            session_id=requested_session_id,
+            user_text=user_text,
+            attachments=attachments,
+            regenerate_of=regenerate_of,
+        )
+
+        return jsonify(payload)
+
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc) or "Chat failed."}), 500
+
+@app.get("/api/uploads/<path:filename>")
+def api_uploads(filename: str) -> Any:
+    safe_name = Path(str(filename or "")).name.strip()
+    if not safe_name:
+        return jsonify({"ok": False, "error": "filename is required"}), 400
+
+    target_path = UPLOADS_DIR / safe_name
+    if not target_path.exists() or not target_path.is_file():
+        return jsonify({"ok": False, "error": "upload not found"}), 404
+
+    return send_from_directory(UPLOADS_DIR, safe_name)
+
+
+# =========================================================
+# MAIN
+# =========================================================
 
 if __name__ == "__main__":
-    ensure_storage()
-    app.run(host="127.0.0.1", port=5001, debug=True, threaded=True)
-
+    ensure_store_files()
+    app.run(host="127.0.0.1", port=5001, debug=True)

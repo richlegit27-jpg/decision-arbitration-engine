@@ -225,17 +225,32 @@
     },
   };
 
-  function setTopbar(title, subtitle, statusText) {
-    if (els.topbarTitle) {
-      els.topbarTitle.textContent = title || "Nova";
-    }
-    if (els.topbarSubtitle) {
-      els.topbarSubtitle.textContent = subtitle || "Fast local AI workspace";
-    }
-    if (els.topbarStatus) {
-      els.topbarStatus.textContent = statusText || "Ready";
+function setTopbar(title, subtitle, statusText, statusState) {
+  if (els.topbarTitle) {
+    els.topbarTitle.textContent = title || "Nova";
+  }
+  if (els.topbarSubtitle) {
+    els.topbarSubtitle.textContent = subtitle || "Fast local AI workspace";
+  }
+  if (els.topbarStatus) {
+    els.topbarStatus.textContent = statusText || "Ready";
+
+    els.topbarStatus.classList.remove("is-busy", "is-error", "is-idle");
+
+    const nextState = String(statusState || "idle");
+
+    if (nextState === "busy") {
+      els.topbarStatus.classList.add("is-busy");
+      els.topbarStatus.setAttribute("data-state", "busy");
+    } else if (nextState === "error") {
+      els.topbarStatus.classList.add("is-error");
+      els.topbarStatus.setAttribute("data-state", "error");
+    } else {
+      els.topbarStatus.classList.add("is-idle");
+      els.topbarStatus.setAttribute("data-state", "idle");
     }
   }
+}  
 
   function setBusyUi(isBusy) {
     if (els.sendButton) {
@@ -279,6 +294,31 @@
     }) || null;
   }
 
+    function finishStreamUi(options) {
+  const opts = options && typeof options === "object" ? options : {};
+
+  const statusState = String(opts.statusState || "idle");
+  const statusText =
+    String(opts.statusText || (statusState === "error" ? "Error" : "Ready"));
+
+  state.stream.running = false;
+  state.stream.controller = null;
+  state.stream.messageId = "";
+  state.stream.placeholderId = "";
+  state.stream.buffer = "";
+
+  setBusyUi(false);
+
+  const session = activeSession();
+  const title = session && session.title ? session.title : "Nova";
+  const subtitle =
+    session && Number(session.message_count || safeArray(session.messages).length || 0) > 0
+      ? Number(session.message_count || safeArray(session.messages).length || 0) + " messages"
+      : "Fast local AI workspace";
+
+  setTopbar(title, subtitle, statusText, statusState);
+}
+
   function updateTopbarFromState() {
     const session = activeSession();
     const title = session && session.title ? session.title : "Nova";
@@ -286,8 +326,30 @@
       session && Number(session.message_count || safeArray(session.messages).length || 0) > 0
         ? Number(session.message_count || safeArray(session.messages).length || 0) + " messages"
         : "Fast local AI workspace";
-    const statusText = state.stream.running ? "Generating" : "Ready";
-    setTopbar(title, subtitle, statusText);
+  let statusText = "Ready";
+let statusState = "idle";
+
+if (state.stream.running) {
+  statusText = "Generating";
+  statusState = "busy";
+} else {
+  const lastAssistant = state.messages
+    .slice()
+    .reverse()
+    .find(function (msg) {
+      return String(msg.role || "") === "assistant";
+    }) || null;
+
+  if (lastAssistant && lastAssistant.error) {
+    statusText = "Error";
+    statusState = "error";
+  } else if (lastAssistant && lastAssistant.stopped) {
+    statusText = "Stopped";
+    statusState = "idle";
+  }
+}
+
+setTopbar(title, subtitle, statusText, statusState);
   }
 
   function findMessageById(messageId) {
@@ -578,46 +640,50 @@
     );
   }
 
-  function renderMessageCard(message) {
-    const role = String(message.role || "assistant");
-    const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
-    const attachments = safeArray(message.attachments);
-    const attachmentsHtml = attachments.length
-      ? '<div class="message-attachments">' +
-        attachments.map(renderAttachmentBlock).join("") +
-        "</div>"
-      : "";
-    const bodyHtml = message.text
-      ? '<div class="message-card__body">' + renderSafeText(message.text) + "</div>"
-      : message.pending || message.streaming
-      ? '<div class="message-card__body"><span class="message-card__cursor">▋</span></div>'
-      : "";
-    const metaBits = [];
-    if (message.pending || message.streaming) metaBits.push("Streaming");
-    if (message.error) metaBits.push("Error");
-    if (message.stopped) metaBits.push("Stopped");
-    if (message.source) metaBits.push(message.source);
-    const metaHtml = metaBits.length
-      ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
-      : "";
-    return (
-      '<article class="message-card ' +
-      roleClass +
-      '" data-message-id="' +
-      escapeHtml(message.id) +
-      '">' +
-      '<div class="message-card__header">' +
-      '<div class="message-card__role">' +
-      escapeHtml(role === "user" ? "You" : "Nova") +
-      "</div>" +
-      metaHtml +
-      "</div>" +
-      bodyHtml +
-      attachmentsHtml +
-      renderMessageActions(message) +
-      "</article>"
-    );
-  }
+function renderMessageCard(message) {
+  const role = String(message.role || "assistant");
+  const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
+  const attachments = safeArray(message.attachments);
+  const attachmentsHtml = attachments.length
+    ? '<div class="message-attachments">' +
+      attachments.map(renderAttachmentBlock).join("") +
+      "</div>"
+    : "";
+
+  const bodyHtml = message.text
+    ? '<div class="message-card__body">' + renderSafeText(message.text) + "</div>"
+    : message.pending || message.streaming
+    ? '<div class="message-card__body"><span class="message-card__cursor">▋</span></div>'
+    : "";
+
+  const metaBits = [];
+  if (message.pending || message.streaming) metaBits.push("Streaming");
+  if (message.error) metaBits.push("Error");
+  if (message.stopped) metaBits.push("Stopped");
+  if (message.source) metaBits.push(message.source);
+
+  const metaHtml = metaBits.length
+    ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
+    : "";
+
+  return (
+    '<article class="message-card ' +
+    roleClass +
+    '" data-message-id="' +
+    escapeHtml(message.id) +
+    '">' +
+    '<div class="message-card__header">' +
+    '<div class="message-card__role">' +
+    escapeHtml(role === "user" ? "You" : "Nova") +
+    "</div>" +
+    metaHtml +
+    "</div>" +
+    bodyHtml +
+    attachmentsHtml +
+    renderMessageActions(message) +
+    "</article>"
+  );
+}
 
   function renderChat() {
     if (!els.chatThread) return;
@@ -727,78 +793,532 @@
     return data;
   }
 
-  async function apiPost(url, body, extra) {
-    const response = await fetch(
-      url,
-      Object.assign(
-        {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify(body || {}),
+async function apiPost(url, body, extra) {
+  const response = await fetch(
+    url,
+    Object.assign(
+      {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
-        extra || {}
-      )
-    );
-    const data = await response.json().catch(function () {
-      return {};
-    });
-    if (!response.ok || data.ok === false) {
-      throw new Error(data.error || ("Request failed: " + response.status));
-    }
-    return data;
+        body: JSON.stringify(body || {}),
+      },
+      extra || {}
+    )
+  );
+
+  const data = await response.json().catch(function () {
+    return {};
+  });
+
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.error || ("Request failed: " + response.status));
   }
+
+  return data;
+}
+
+async function consumeChatStream(payload) {
+  if (state.stream.running) {
+    showToast("A generation is already running.", "info");
+    throw new Error("A generation is already running.");
+  }
+
+  const controller = new AbortController();
+  state.stream.controller = controller;
+  state.stream.running = true;
+  state.stream.messageId = "";
+  state.stream.placeholderId = "";
+  state.stream.buffer = "";
+
+  setBusyUi(true);
+  updateTopbarFromState();
+
+  const response = await fetch("/api/chat", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+    },
+    body: JSON.stringify({
+      ...(payload || {}),
+      stream: true,
+    }),
+    signal: controller.signal,
+  });
+
+  if (!response.ok || !response.body) {
+    finishStreamUi({ statusState: "error", statusText: "Error" });
+    throw new Error("Stream request failed.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+
+  function handleStreamEvent(event) {
+    const type = String(event?.type || "");
+
+    if (type === "start") {
+      const id = String(
+        event.message_id ||
+        event.assistant_message_id ||
+        makeId("assistant")
+      );
+
+      state.stream.messageId = id;
+      state.stream.placeholderId = id;
+
+      upsertMessage({
+        id,
+        role: "assistant",
+        text: "",
+        pending: true,
+        streaming: true,
+        error: false,
+        stopped: false,
+        source: event.mode || "send",
+        attachments: [],
+        meta: {},
+      });
+      return;
+    }
+
+    if (type === "token") {
+      const id = String(
+        event.message_id ||
+        event.assistant_message_id ||
+        state.stream.messageId
+      );
+
+      let msg = findMessageById(id);
+
+      if (!msg) {
+        msg = upsertMessage({
+          id,
+          role: "assistant",
+          text: "",
+          pending: true,
+          streaming: true,
+          error: false,
+          stopped: false,
+          source: "send",
+          attachments: [],
+          meta: {},
+        });
+      }
+
+      upsertMessage({
+        ...msg,
+        text: (msg.text || "") + (event.token || ""),
+        pending: true,
+        streaming: true,
+      });
+
+      scrollChatToBottom(true);
+      return;
+    }
+
+    if (type === "final") {
+      const finalMsg = normalizeMessage(event.message || {
+        id: state.stream.messageId || makeId("assistant"),
+        role: "assistant",
+        text: "",
+      });
+
+      upsertMessage({
+        ...finalMsg,
+        pending: false,
+        streaming: false,
+        error: false,
+      });
+
+      if (Array.isArray(event.messages)) {
+        state.messages = event.messages.map(normalizeMessage);
+        renderChat();
+      }
+
+      if (Array.isArray(event.artifacts)) {
+        state.artifacts = event.artifacts;
+        renderArtifacts();
+      }
+
+      if (Array.isArray(event.memory)) {
+        state.memory = event.memory;
+        renderMemory();
+      }
+
+      finishStreamUi({ statusState: "idle", statusText: "Ready" });
+      scrollChatToBottom(true);
+      return;
+    }
+
+    if (type === "error") {
+      const text = String(event.error || "Generation failed.");
+
+      upsertMessage({
+        id: state.stream.messageId || makeId("assistant"),
+        role: "assistant",
+        text,
+        error: true,
+        pending: false,
+        streaming: false,
+      });
+
+      finishStreamUi({ statusState: "error", statusText: "Error" });
+      return;
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() || "";
+
+    for (let part of parts) {
+      part = part.trim();
+      if (!part.startsWith("data:")) continue;
+
+      const jsonStr = part.replace(/^data:\s*/, "");
+
+      try {
+        const evt = JSON.parse(jsonStr);
+        handleStreamEvent(evt);
+      } catch (_) {}
+    }
+  }
+
+  finishStreamUi({ statusState: "idle", statusText: "Ready" });
+}
 
   async function loadState() {
     const payload = await apiGet("/api/state");
     applyStatePayload(payload);
   }
 
-  function setPendingUploadItem(nextItem) {
-    const normalized = normalizeAttachment(nextItem);
-    const index = state.pendingUploads.findIndex(function (item) {
-      return String(item.id) === String(normalized.id);
-    });
-    if (index >= 0) {
-      state.pendingUploads[index] = Object.assign({}, state.pendingUploads[index], normalized);
-    } else {
-      state.pendingUploads.push(normalized);
-    }
-    renderPendingUploads();
+async function openSessionFromBackend(sessionId) {
+  const id = String(sessionId || "").trim();
+  if (!id) return;
+
+  if (state.stream.running) {
+    stopGeneration();
   }
 
-    function removePendingUpload(attachmentId) {
-    const removed = state.pendingUploads.find(function (item) {
-      return String(item.id) === String(attachmentId);
-    }) || null;
+  const session = state.sessions.find(function (item) {
+    return String(item.id || "") === id;
+  }) || null;
 
-    state.pendingUploads = state.pendingUploads.filter(function (item) {
-      return String(item.id) !== String(attachmentId);
-    });
-
-    renderPendingUploads();
-
-    if (removed) {
-      showToast("Removed: " + (removed.filename || removed.name || "attachment"), "info");
-    }
+  if (!session) {
+    showToast("Session not found.", "error");
+    return;
   }
 
-  async function uploadOneFile(file) {
-    const tempId = makeId("att_local");
-    setPendingUploadItem({
-      id: tempId,
-      name: file && file.name ? file.name : "upload",
-      filename: file && file.name ? file.name : "upload",
-      mime_type: file && file.type ? file.type : "application/octet-stream",
-      size: file && typeof file.size === "number" ? file.size : 0,
-      status: "uploading",
-    });
+  state.activeSessionId = id;
+  state.messages = safeArray(session.messages).map(normalizeMessage);
 
-    const formData = new FormData();
-    formData.append("file", file);
+  clearPendingUploads();
+
+  if (els.chatInput) {
+    els.chatInput.value = "";
+    autoResizeTextarea();
+  }
+
+  renderSessionList();
+  renderChat();
+  renderArtifacts();
+  renderMemory();
+  updateTopbarFromState();
+}
+
+async function openSession(sessionId) {
+  return openSessionFromBackend(sessionId);
+}
+
+function artifactViewerHtml(artifact) {
+  const item = artifact && typeof artifact === "object" ? artifact : {};
+  const viewer = item.viewer && typeof item.viewer === "object" ? item.viewer : {};
+
+  const title = String(
+    viewer.title ||
+      item.title ||
+      item.name ||
+      "Artifact"
+  );
+
+  const kind = String(
+    viewer.kind ||
+      item.kind ||      
+item.viewer_kind ||
+      "artifact"
+  );
+
+  const body = String(
+    viewer.body ||
+      item.body ||
+      item.content ||
+      item.summary ||
+      item.preview ||
+      ""
+  );
+
+  const imageUrl = String(
+    viewer.image_url ||
+      item.image_url ||
+      item.url ||
+      ""
+  );
+
+  const videoUrl = String(
+    viewer.video_url ||
+      item.video_url ||
+      ""
+  );
+
+  const audioUrl = String(
+    viewer.audio_url ||
+      item.audio_url ||
+      ""
+  );
+
+  const sourceUrl = String(
+    viewer.source_url ||
+      item.source_url ||
+      ""
+  );
+
+  const analysisText = String(
+    viewer.analysis_text ||
+      item.analysis_text ||
+      ""
+  );
+
+  const bullets = Array.isArray(viewer.bullets) ? viewer.bullets : [];
+
+  const imageBlock = imageUrl
+    ? '<div class="rail-viewer__media">' +
+      '<img src="' +
+      escapeHtml(imageUrl) +
+      '" alt="' +
+      escapeHtml(title) +
+      '" class="rail-viewer__image">' +
+      "</div>"
+    : "";
+
+  const videoBlock = videoUrl
+    ? '<div class="rail-viewer__media">' +
+      '<video controls preload="metadata" class="rail-viewer__video">' +
+      '<source src="' +
+      escapeHtml(videoUrl) +
+      '">' +
+      "</video>" +
+      "</div>"
+    : "";
+
+  const audioBlock = audioUrl
+    ? '<div class="rail-viewer__media">' +
+      '<audio controls class="rail-viewer__audio">' +
+      '<source src="' +
+      escapeHtml(audioUrl) +
+      '">' +
+      "</audio>" +
+      "</div>"
+    : "";
+
+  const sourceBlock = sourceUrl
+    ? '<div class="rail-viewer__links">' +
+      '<a href="' +
+      escapeHtml(sourceUrl) +
+      '" target="_blank" rel="noopener noreferrer" class="rail-viewer__link">Open source</a>' +
+      "</div>"
+    : "";
+
+  const analysisBlock = analysisText
+    ? '<div class="rail-viewer__section">' +
+      '<div class="rail-viewer__label">Analysis</div>' +
+      '<div class="rail-viewer__body">' +
+      renderSafeText(analysisText) +
+      "</div>" +
+      "</div>"
+    : "";
+
+  const bulletsBlock = bullets.length
+    ? '<div class="rail-viewer__section">' +
+      '<div class="rail-viewer__label">Highlights</div>' +
+      '<ul class="rail-viewer__bullets">' +
+      bullets
+        .map(function (bullet) {
+          return "<li>" + escapeHtml(String(bullet || "")) + "</li>";
+        })
+        .join("") +
+      "</ul>" +
+      "</div>"
+    : "";
+
+  const bodyBlock = body
+    ? '<div class="rail-viewer__section">' +
+      '<div class="rail-viewer__label">Content</div>' +
+      '<div class="rail-viewer__body">' +
+      renderSafeText(body) +
+      "</div>" +
+      "</div>"
+    : "";
+
+  return (
+    '<div class="rail-viewer__card">' +
+    '<div class="rail-viewer__eyebrow">' +
+    escapeHtml(kind) +
+    "</div>" +
+    '<div class="rail-viewer__title">' +
+    escapeHtml(title) +
+    "</div>" +
+    imageBlock +
+    videoBlock +
+    audioBlock +
+    sourceBlock +
+    analysisBlock +
+    bulletsBlock +
+    bodyBlock +
+    "</div>"
+  );
+}
+
+function setRailTab(tabName) {
+  const nextTab = String(tabName || "artifacts");
+  state.rail.tab = nextTab;
+
+  els.railTabs.forEach(function (button) {
+    const isActive = String(button.getAttribute("data-rail-tab") || "") === nextTab;
+    button.classList.toggle("is-active", isActive);
+  });
+
+  els.railPanels.forEach(function (panel) {
+    const isActive = String(panel.getAttribute("data-rail-panel") || "") === nextTab;
+    panel.hidden = !isActive;
+    panel.classList.toggle("is-active", isActive);
+  });
+
+  if (els.railTitle) {
+    els.railTitle.textContent =
+      nextTab === "memory" ? "Memory" :
+      nextTab === "web" ? "Web" :
+      "Artifacts";
+  }
+
+  if (els.railSubtitle) {
+    els.railSubtitle.textContent =
+      nextTab === "memory" ? "Saved context and notes" :
+      nextTab === "web" ? "Fetched pages and results" :
+      "Saved outputs for this workspace";
+  }
+}
+
+function setRailSelectedItem(kind, itemId) {
+  state.rail.selectedKind = String(kind || "");
+  state.rail.selectedId = String(itemId || "");
+
+  qsa(".rail-item", els.rail).forEach(function (node) {
+    const artifactId = String(node.getAttribute("data-artifact-open") || "");
+    const webId = String(node.getAttribute("data-web-open") || "");
+    const memoryId = String(node.getAttribute("data-memory-open") || "");
+    const isActive =
+      (kind === "artifact" && artifactId && artifactId === state.rail.selectedId) ||
+      (kind === "web" && webId && webId === state.rail.selectedId) ||
+      (kind === "memory" && memoryId && memoryId === state.rail.selectedId);
+
+    node.classList.toggle("is-active", isActive);
+  });
+}
+
+function findNewestImageArtifact(items) {
+  return safeArray(items).find(function (item) {
+    const artifact = item && typeof item === "object" ? item : {};
+    const viewer = artifact.viewer && typeof artifact.viewer === "object" ? artifact.viewer : {};
+
+    const kind = String(viewer.kind || artifact.kind || "");
+    const imageUrl = String(viewer.image_url || artifact.image_url || "");
+
+    return kind === "image_generation" || Boolean(imageUrl);
+  }) || null;
+}
+
+async function openArtifactFromStateOrBackend(artifactId) {
+  const id = String(artifactId || "").trim();
+  if (!id) return;
+
+  let artifact = findArtifactById(id);
+
+  if (!artifact) {
+    const payload = await apiGet("/api/state");
+    applyStatePayload(payload);
+    artifact = findArtifactById(id);
+  }
+
+  if (!artifact) {
+    showToast("Artifact not found.", "error");
+    return;
+  }
+
+  if (owningSessionId && owningSessionId !== String(state.activeSessionId || "")) {
+    await openSessionFromBackend(owningSessionId);
+    artifact = findArtifactById(id) || artifact;
+  }
+
+  setRailTab("artifacts");
+  setRailSelectedItem("artifact", id);
+
+  if (els.railViewer) {
+    els.railViewer.innerHTML = artifactViewerHtml(artifact);
+  }
+
+  if (els.railTitle) {
+    els.railTitle.textContent = "Artifacts";
+  }
+
+  if (els.railSubtitle) {
+    const viewer = artifact.viewer && typeof artifact.viewer === "object" ? artifact.viewer : {};
+    els.railSubtitle.textContent = String(
+      viewer.title ||
+        artifact.title ||
+        artifact.name ||
+        "Artifact"
+    );
+  }
+}
+
+function setPendingUploadItem(nextItem) {
+  const normalized = normalizeAttachment(nextItem);
+  const index = state.pendingUploads.findIndex(function (item) {
+    return String(item.id) === String(normalized.id);
+  });
+  if (index >= 0) {
+    state.pendingUploads[index] = Object.assign({}, state.pendingUploads[index], normalized);
+  } else {
+    state.pendingUploads.push(normalized);
+  }
+  renderPendingUploads();
+}
+
+async function uploadOneFile(file) {
+  const tempId = makeId("att_local");
+  setPendingUploadItem({
+    id: tempId,
+    name: file && file.name ? file.name : "upload",
+    filename: file && file.name ? file.name : "upload",
+    mime_type: file && file.type ? file.type : "application/octet-stream",
+    size: file && typeof file.size === "number" ? file.size : 0,
+    status: "uploading",
+  });
+
+  const formData = new FormData();
+  formData.append("file", file);
 
     state.uploadInFlightCount += 1;
     setBusyUi(state.stream.running);
@@ -873,15 +1393,18 @@
   }
 
   function getSendPayload(base) {
-    const source = base && typeof base === "object" ? base : {};
-    return {
-      session_id: String(state.activeSessionId || ""),
-      user_text: String(source.user_text || ""),
-      stream: true,
-      regenerate_of: source.regenerate_of ? String(source.regenerate_of) : "",
-      attachments: safeArray(source.attachments).map(normalizeAttachment),
-    };
-  }
+  const source = base && typeof base === "object" ? base : {};
+  const userText = String(source.user_text || "");
+  const isImageCommand = userText.trim().toLowerCase().startsWith("/image");
+
+  return {
+    session_id: String(state.activeSessionId || ""),
+    user_text: userText,
+    stream: !isImageCommand,
+    regenerate_of: source.regenerate_of ? String(source.regenerate_of) : "",
+    attachments: safeArray(source.attachments).map(normalizeAttachment),
+  };
+}
 
   function appendUserMessageLocal(text, attachments) {
     const message = normalizeMessage({
@@ -895,90 +1418,86 @@
     return message;
   }
 
-  async function consumeChatStream(payload) {
-    if (state.stream.running) {
-      throw new Error("A generation is already running.");
-    }
+async function consumeChatJson(payload) {
+  if (state.stream.running) {
+    showToast("A generation is already running.", "info");
+    throw new Error("A generation is already running.");
+  }
 
-    const controller = new AbortController();
-    state.stream.controller = controller;
-    state.stream.running = true;
-    state.stream.messageId = "";
-    state.stream.placeholderId = "";
-    state.stream.mode = payload.regenerate_of ? "regenerate" : "send";
-    state.stream.buffer = "";
-    setBusyUi(true);
-    updateTopbarFromState();
+  setBusyUi(true);
+  state.stream.running = false;
+  updateTopbarFromState();
 
+  try {
     const response = await fetch("/api/chat", {
       method: "POST",
       credentials: "same-origin",
       headers: {
         "Content-Type": "application/json",
-        Accept: "text/event-stream",
+        Accept: "application/json",
       },
       body: JSON.stringify(payload),
-      signal: controller.signal,
     });
 
-    if (!response.ok || !response.body) {
-      state.stream.running = false;
-      state.stream.controller = null;
-      setBusyUi(false);
-      updateTopbarFromState();
-      let message = "Chat failed.";
-      try {
-        const data = await response.json();
-        if (data && data.error) message = data.error;
-      } catch (_) {}
+    const data = await response.json().catch(function () {
+      return {};
+    });
+
+    if (!response.ok || data.ok === false) {
+      const message = String(data.error || "Chat failed.");
+      showToast(message, "error");
       throw new Error(message);
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-
-    try {
-      while (true) {
-        const result = await reader.read();
-        if (result.done) break;
-        buffer += decoder.decode(result.value, { stream: true });
-
-        let boundary = buffer.indexOf("\n\n");
-        while (boundary >= 0) {
-          const rawEvent = buffer.slice(0, boundary);
-          buffer = buffer.slice(boundary + 2);
-          boundary = buffer.indexOf("\n\n");
-
-          const lines = rawEvent.split("\n");
-          const dataLine = lines
-            .filter(function (line) {
-              return line.indexOf("data: ") === 0;
-            })
-            .map(function (line) {
-              return line.slice(6);
-            })
-            .join("");
-
-          if (!dataLine) continue;
-
-          let evt = null;
-          try {
-            evt = JSON.parse(dataLine);
-          } catch (error) {
-            warn("bad sse json", error, dataLine);
-            continue;
-          }
-
-          handleStreamEvent(evt);
-        }
-      }
-    } finally {
-      try {
-        reader.releaseLock();
-      } catch (_) {}
+    if (data.assistant_message) {
+      upsertMessage(
+        Object.assign({}, normalizeMessage(data.assistant_message), {
+          pending: false,
+          streaming: false,
+          error: false,
+        })
+      );
     }
+
+    if (Array.isArray(data.artifacts)) {
+      state.artifacts = data.artifacts;
+      renderArtifacts();
+    }
+
+    if (Array.isArray(data.memory)) {
+      state.memory = data.memory;
+      renderMemory();
+    }
+
+    if (data.session && Array.isArray(data.session.messages)) {
+      state.messages = data.session.messages.map(normalizeMessage);
+      renderChat();
+    }
+
+finishStreamUi({
+      statusText: "Ready",
+      statusState: "idle",
+    });
+
+scrollChatToBottom(true);
+
+const newestImageArtifact = findNewestImageArtifact(
+  data.artifacts || state.artifacts
+);
+
+if (newestImageArtifact && newestImageArtifact.id) {
+  await openArtifactFromStateOrBackend(newestImageArtifact.id);
+}
+    
+return data;
+  } catch (error) {
+    finishStreamUi({
+      statusText: "Error",
+      statusState: "error",
+    });
+    throw error;
   }
+}
 
   function handleStreamEvent(evt) {
     const event = evt && typeof evt === "object" ? evt : {};
@@ -994,6 +1513,8 @@
           Object.assign({}, existing, {
             pending: true,
             streaming: true,
+            error: false,
+            stopped: false,
             source: state.stream.mode || "send",
           })
         );
@@ -1011,15 +1532,19 @@
       if (!messageId) return;
 
       const existing = findMessageById(messageId) || createAssistantPlaceholder(state.stream.mode || "send", messageId);
+
       upsertMessage(
         Object.assign({}, existing, {
           id: messageId,
           text: String(existing.text || "") + String(event.token || ""),
           pending: true,
           streaming: true,
+          error: false,
+          stopped: false,
           source: state.stream.mode || "send",
         })
       );
+
       scrollChatToBottom(false);
       return;
     }
@@ -1032,10 +1557,12 @@
           text: state.stream.buffer || "",
         }
       );
+
       upsertMessage(
         Object.assign({}, finalMessage, {
           pending: false,
           streaming: false,
+          error: false,
         })
       );
 
@@ -1052,23 +1579,19 @@
         renderMemory();
       }
 
-      state.stream.running = false;
-      state.stream.controller = null;
-      state.stream.messageId = "";
-      state.stream.placeholderId = "";
-      state.stream.buffer = "";
-      setBusyUi(false);
-      updateTopbarFromState();
+      finishStreamUi();
       scrollChatToBottom(true);
       return;
     }
 
     if (type === "error") {
+      const errorText = String(event.error || "Generation failed.");
+
       const errorMessage = normalizeMessage(
         event.message || {
           id: String(event.message_id || event.assistant_message_id || state.stream.messageId || makeId("assistant")),
           role: "assistant",
-          text: String(event.error || "Generation failed."),
+          text: errorText,
           error: true,
         }
       );
@@ -1081,73 +1604,79 @@
         })
       );
 
-      state.stream.running = false;
-      state.stream.controller = null;
-      state.stream.messageId = "";
-      state.stream.placeholderId = "";
-      state.stream.buffer = "";
-      setBusyUi(false);
-      updateTopbarFromState();
+      finishStreamUi();
+      showToast(errorText, "error");
       return;
     }
   }
 
-  async function sendMessage() {
-    const text = els.chatInput ? normalizeText(els.chatInput.value) : "";
-    const attachments = state.pendingUploads
-      .filter(function (item) {
-        return String(item.status || "") === "uploaded";
-      })
-      .map(normalizeAttachment);
+async function sendMessage() {
+  const text = els.chatInput ? normalizeText(els.chatInput.value) : "";
+  const attachments = state.pendingUploads
+    .filter(function (item) {
+      return String(item.status || "") === "uploaded";
+    })
+    .map(normalizeAttachment);
 
-    const hasUploading = state.pendingUploads.some(function (item) {
-      return String(item.status || "") === "uploading";
-    });
+  const hasUploading = state.pendingUploads.some(function (item) {
+    return String(item.status || "") === "uploading";
+  });
 
-    const hasUploadErrors = state.pendingUploads.some(function (item) {
-      return String(item.status || "") === "error";
-    });
+  const hasUploadErrors = state.pendingUploads.some(function (item) {
+    return String(item.status || "") === "error";
+  });
 
-        if (hasUploading) {
-      showToast("Uploads are still in progress.", "info");
-      throw new Error("Please wait for uploads to finish.");
-    }
-
-    if (hasUploadErrors) {
-      showToast("Remove failed uploads before sending.", "error");
-      throw new Error("Remove failed uploads before sending.");
-    }
-
-        if (!text.trim() && !attachments.length) {
-      showToast("Nothing to send yet.", "info");
-      return;
-    }
-    
-    if (!state.activeSessionId) {
-      const created = await apiPost("/api/sessions/new", {});
-      if (created && created.session && created.session.id) {
-        state.activeSessionId = String(created.session.id);
-      } else if (created && created.active_session_id) {
-        state.activeSessionId = String(created.active_session_id);
-      }
-      await loadState();
-    }
-
-    appendUserMessageLocal(text, attachments);
-    if (els.chatInput) {
-      els.chatInput.value = "";
-      autoResizeTextarea();
-    }
-
-    clearPendingUploads();
-
-    const payload = getSendPayload({
-      user_text: text,
-      attachments: attachments,
-    });
-
-    await consumeChatStream(payload);
+  if (hasUploading) {
+    showToast("Uploads are still in progress.", "info");
+    throw new Error("Please wait for uploads to finish.");
   }
+
+  if (hasUploadErrors) {
+    showToast("Remove failed uploads before sending.", "error");
+    throw new Error("Remove failed uploads before sending.");
+  }
+
+  if (!text.trim() && !attachments.length) {
+    showToast("Nothing to send yet.", "info");
+    return;
+  }
+
+  if (!state.activeSessionId) {
+    const created = await apiPost("/api/sessions/new", {});
+    if (created && created.session && created.session.id) {
+      state.activeSessionId = String(created.session.id);
+    } else if (created && created.active_session_id) {
+      state.activeSessionId = String(created.active_session_id);
+    }
+    await loadState();
+  }
+
+  appendUserMessageLocal(text, attachments);
+
+  if (els.chatInput) {
+    els.chatInput.value = "";
+    autoResizeTextarea();
+  }
+
+  clearPendingUploads();
+
+  const payload = getSendPayload({
+    user_text: text,
+    attachments: attachments,
+  });
+
+  const isImageCommand = String(text || "").trim().toLowerCase().startsWith("/image");
+
+  if (isImageCommand) {
+    await consumeChatJson(payload);
+    showToast("Image request sent.", "success");
+    return;
+  }
+
+  await consumeChatStream(payload);
+  showToast("Message sent.", "success");
+}
+
 
   async function regenerateMessage(targetAssistantId) {
     const assistantId = String(targetAssistantId || "");
@@ -1178,18 +1707,17 @@
       regenerate_of: assistantId,
     });
 
-    await consumeChatStream(payload);
+        await consumeChatStream(payload);
+    showToast("Response regenerated.", "success");
   }
 
-  function stopGeneration() {
+    function stopGeneration() {
     if (!state.stream.running || !state.stream.controller) return;
     try {
       state.stream.controller.abort();
+      showToast("Generation stopped.", "info");
     } catch (_) {}
-    state.stream.running = false;
-    state.stream.controller = null;
-    setBusyUi(false);
-    updateTopbarFromState();
+    finishStreamUi();
   }
 
   async function openSession(sessionId) {
@@ -1291,6 +1819,35 @@
       });
     }
 
+async function regenerateMessage(targetAssistantId) {
+  if (state.stream.running) {
+    showToast("A generation is already running.", "info");
+    return;
+  }
+
+  const targetId = String(targetAssistantId || "").trim();
+  if (!targetId) {
+    showToast("Nothing to regenerate.", "error");
+    return;
+  }
+
+  const userMessage = currentUserMessageForRegenerate(targetId);
+  if (!userMessage) {
+    showToast("Could not find the user message for regenerate.", "error");
+    return;
+  }
+
+  removeMessageById(targetId);
+
+  const payload = getSendPayload({
+    user_text: String(userMessage.text || ""),
+    regenerate_of: targetId,
+    attachments: safeArray(userMessage.attachments),
+  });
+
+  await consumeChatStream(payload);
+}
+
     document.addEventListener("click", function (event) {
       const removeChip = event.target.closest("[data-upload-remove]");
       if (removeChip) {
@@ -1335,7 +1892,7 @@
     autoResizeTextarea();
     renderPendingUploads();
     setBusyUi(false);
-    setTopbar("Nova", "Fast local AI workspace", "Ready");
+    setTopbar("Nova", "Fast local AI workspace", "Ready", "idle");
 
     try {
       await loadState();
@@ -1350,6 +1907,92 @@
     log("boot complete");
   }
 
+  function closeSidebar() {
+    if (!els.body) return;
+    els.body.classList.remove("sidebar-open");
+  }
+
+  function openSidebar() {
+    if (!els.body) return;
+    els.body.classList.add("sidebar-open");
+  }
+
+  function setActiveRailTab(tab) {
+    const next = String(tab || "artifacts");
+    state.rail.tab = next;
+
+    els.railTabs.forEach(function (btn) {
+      const isActive = btn.getAttribute("data-rail-tab") === next;
+      btn.classList.toggle("is-active", isActive);
+    });
+
+    els.railPanels.forEach(function (panel) {
+      const isActive = panel.getAttribute("data-rail-panel") === next;
+      panel.hidden = !isActive;
+    });
+
+    if (els.railTitle) {
+      els.railTitle.textContent =
+        next === "memory" ? "Memory" :
+        next === "web" ? "Web" :
+        "Artifacts";
+    }
+
+    if (els.railSubtitle) {
+      if (next === "memory") {
+        els.railSubtitle.textContent = state.memory.length + " items";
+      } else if (next === "web") {
+        els.railSubtitle.textContent = "Fetched pages";
+      } else {
+        els.railSubtitle.textContent = state.artifacts.length + " items";
+      }
+    }
+  }
+
+  function wireRailTabs() {
+    els.railTabs.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const tab = btn.getAttribute("data-rail-tab");
+        setActiveRailTab(tab);
+      });
+    });
+  }
+
+  function wireSidebar() {
+    if (els.sidebarToggle) {
+      els.sidebarToggle.addEventListener("click", openSidebar);
+    }
+
+    if (els.sidebarClose) {
+      els.sidebarClose.addEventListener("click", closeSidebar);
+    }
+
+    if (els.sidebarBackdrop) {
+      els.sidebarBackdrop.addEventListener("click", closeSidebar);
+    }
+  }
+
+  function wireWebLinks() {
+    if (!els.webList) return;
+
+    els.webList.addEventListener("click", function (e) {
+      const btn = e.target.closest("[data-web-open]");
+      if (!btn) return;
+
+      const url = btn.getAttribute("data-web-open");
+      if (!url) return;
+
+      window.open(url, "_blank", "noopener");
+    });
+  }
+
+  function initShellExtensions() {
+    wireRailTabs();
+    wireSidebar();
+    wireWebLinks();
+    setActiveRailTab(state.rail.tab || "artifacts");
+  }
+
   window.NovaComposerBundle = {
     state: state,
     sendMessage: sendMessage,
@@ -1360,5 +2003,115 @@
     clearPendingUploads: clearPendingUploads,
   };
 
-  boot();
+document.addEventListener("click", async function (event) {
+  // REMOVE UPLOAD
+  const removeUploadButton = event.target.closest("[data-upload-remove]");
+  if (removeUploadButton) {
+    event.preventDefault();
+    removePendingUpload(removeUploadButton.getAttribute("data-upload-remove"));
+    return;
+  }
+
+  // SESSION CLICK
+  const sessionButton = event.target.closest("[data-open-session]");
+  if (sessionButton) {
+    event.preventDefault();
+
+    const sessionId = sessionButton.getAttribute("data-open-session");
+
+    try {
+      await openSessionFromBackend(sessionId);
+    } catch (error) {
+      warn("open session failed", error);
+      showToast("Failed to open session.", "error");
+    }
+
+    return;
+  }
+
+  // ARTIFACT CLICK
+  const artifactButton = event.target.closest("[data-artifact-open]");
+  if (artifactButton) {
+    event.preventDefault();
+
+    const artifactId = artifactButton.getAttribute("data-artifact-open");
+
+    try {
+      await openArtifactFromStateOrBackend(artifactId);
+    } catch (error) {
+      warn("open artifact failed", error);
+      showToast("Failed to open artifact.", "error");
+    }
+
+    return;
+  }
+
+  // COPY MESSAGE
+  const copyButton = event.target.closest("[data-copy-message]");
+  if (copyButton) {
+    event.preventDefault();
+
+    const messageId = copyButton.getAttribute("data-copy-message");
+    const message = findMessageById(messageId);
+
+    try {
+      await navigator.clipboard.writeText(String((message && message.text) || ""));
+      showToast("Copied.", "success");
+    } catch (error) {
+      warn("copy failed", error);
+      showToast("Copy failed.", "error");
+    }
+
+    return;
+  }
+
+  // REGENERATE
+  const regenerateButton = event.target.closest("[data-regenerate-message]");
+  if (regenerateButton) {
+    event.preventDefault();
+
+    const messageId = regenerateButton.getAttribute("data-regenerate-message");
+
+    try {
+      await regenerateMessage(messageId);
+    } catch (error) {
+      warn("regenerate failed", error);
+      showToast("Regenerate failed.", "error");
+    }
+
+    return;
+  }
+});
+
+async function regenerateMessage(targetAssistantId) {
+  if (state.stream.running) {
+    showToast("A generation is already running.", "info");
+    return;
+  }
+
+  const targetId = String(targetAssistantId || "").trim();
+  if (!targetId) {
+    showToast("Nothing to regenerate.", "error");
+    return;
+  }
+
+  const userMessage = currentUserMessageForRegenerate(targetId);
+  if (!userMessage) {
+    showToast("Could not find the user message for regenerate.", "error");
+    return;
+  }
+
+  removeMessageById(targetId);
+
+  const payload = getSendPayload({
+    user_text: String(userMessage.text || ""),
+    regenerate_of: targetId,
+    attachments: safeArray(userMessage.attachments),
+  });
+
+  await consumeChatStream(payload);
+}
+
+boot();
+initShellExtensions();
 })();
