@@ -80,7 +80,9 @@
   }
 
   function normalizeText(value) {
-    return String(value == null ? "" : value).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    return String(value == null ? "" : value)
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n");
   }
 
   function safeArray(value) {
@@ -133,6 +135,7 @@
       raw.mime_type ||
       raw.type ||
       "application/octet-stream";
+
     return {
       id: String(raw.id || raw.attachment_id || makeId("att")),
       name: String(name),
@@ -225,32 +228,45 @@
     },
   };
 
-function setTopbar(title, subtitle, statusText, statusState) {
-  if (els.topbarTitle) {
-    els.topbarTitle.textContent = title || "Nova";
+  function openRail() {
+    if (!els.rail) return;
+    els.rail.classList.add("is-open");
+    document.body.classList.add("is-rail-open");
   }
-  if (els.topbarSubtitle) {
-    els.topbarSubtitle.textContent = subtitle || "Fast local AI workspace";
+
+  function closeRail() {
+    if (!els.rail) return;
+    els.rail.classList.remove("is-open");
+    document.body.classList.remove("is-rail-open");
   }
-  if (els.topbarStatus) {
-    els.topbarStatus.textContent = statusText || "Ready";
 
-    els.topbarStatus.classList.remove("is-busy", "is-error", "is-idle");
+  function setTopbar(title, subtitle, statusText, statusState) {
+    if (els.topbarTitle) {
+      els.topbarTitle.textContent = title || "Nova";
+    }
 
-    const nextState = String(statusState || "idle");
+    if (els.topbarSubtitle) {
+      els.topbarSubtitle.textContent = subtitle || "Fast local AI workspace";
+    }
 
-    if (nextState === "busy") {
-      els.topbarStatus.classList.add("is-busy");
-      els.topbarStatus.setAttribute("data-state", "busy");
-    } else if (nextState === "error") {
-      els.topbarStatus.classList.add("is-error");
-      els.topbarStatus.setAttribute("data-state", "error");
-    } else {
-      els.topbarStatus.classList.add("is-idle");
-      els.topbarStatus.setAttribute("data-state", "idle");
+    if (els.topbarStatus) {
+      els.topbarStatus.textContent = statusText || "Ready";
+      els.topbarStatus.classList.remove("is-busy", "is-error", "is-idle");
+
+      const nextState = String(statusState || "idle");
+
+      if (nextState === "busy") {
+        els.topbarStatus.classList.add("is-busy");
+        els.topbarStatus.setAttribute("data-state", "busy");
+      } else if (nextState === "error") {
+        els.topbarStatus.classList.add("is-error");
+        els.topbarStatus.setAttribute("data-state", "error");
+      } else {
+        els.topbarStatus.classList.add("is-idle");
+        els.topbarStatus.setAttribute("data-state", "idle");
+      }
     }
   }
-}  
 
   function setBusyUi(isBusy) {
     if (els.sendButton) {
@@ -276,8 +292,10 @@ function setTopbar(title, subtitle, statusText, statusState) {
 
   function scrollChatToBottom(force) {
     if (!els.chatThread) return;
+
     const nearBottom =
       els.chatThread.scrollHeight - els.chatThread.scrollTop - els.chatThread.clientHeight < 160;
+
     if (force || nearBottom) {
       els.chatThread.scrollTop = els.chatThread.scrollHeight;
     }
@@ -294,30 +312,30 @@ function setTopbar(title, subtitle, statusText, statusState) {
     }) || null;
   }
 
-    function finishStreamUi(options) {
-  const opts = options && typeof options === "object" ? options : {};
+  function finishStreamUi(options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const statusState = String(opts.statusState || "idle");
+    const statusText = String(
+      opts.statusText || (statusState === "error" ? "Error" : "Ready")
+    );
 
-  const statusState = String(opts.statusState || "idle");
-  const statusText =
-    String(opts.statusText || (statusState === "error" ? "Error" : "Ready"));
+    state.stream.running = false;
+    state.stream.controller = null;
+    state.stream.messageId = "";
+    state.stream.placeholderId = "";
+    state.stream.buffer = "";
 
-  state.stream.running = false;
-  state.stream.controller = null;
-  state.stream.messageId = "";
-  state.stream.placeholderId = "";
-  state.stream.buffer = "";
+    setBusyUi(false);
 
-  setBusyUi(false);
+    const session = activeSession();
+    const title = session && session.title ? session.title : "Nova";
+    const subtitle =
+      session && Number(session.message_count || safeArray(session.messages).length || 0) > 0
+        ? Number(session.message_count || safeArray(session.messages).length || 0) + " messages"
+        : "Fast local AI workspace";
 
-  const session = activeSession();
-  const title = session && session.title ? session.title : "Nova";
-  const subtitle =
-    session && Number(session.message_count || safeArray(session.messages).length || 0) > 0
-      ? Number(session.message_count || safeArray(session.messages).length || 0) + " messages"
-      : "Fast local AI workspace";
-
-  setTopbar(title, subtitle, statusText, statusState);
-}
+    setTopbar(title, subtitle, statusText, statusState);
+  }
 
   function updateTopbarFromState() {
     const session = activeSession();
@@ -326,30 +344,31 @@ function setTopbar(title, subtitle, statusText, statusState) {
       session && Number(session.message_count || safeArray(session.messages).length || 0) > 0
         ? Number(session.message_count || safeArray(session.messages).length || 0) + " messages"
         : "Fast local AI workspace";
-  let statusText = "Ready";
-let statusState = "idle";
 
-if (state.stream.running) {
-  statusText = "Generating";
-  statusState = "busy";
-} else {
-  const lastAssistant = state.messages
-    .slice()
-    .reverse()
-    .find(function (msg) {
-      return String(msg.role || "") === "assistant";
-    }) || null;
+    let statusText = "Ready";
+    let statusState = "idle";
 
-  if (lastAssistant && lastAssistant.error) {
-    statusText = "Error";
-    statusState = "error";
-  } else if (lastAssistant && lastAssistant.stopped) {
-    statusText = "Stopped";
-    statusState = "idle";
-  }
-}
+    if (state.stream.running) {
+      statusText = "Generating";
+      statusState = "busy";
+    } else {
+      const lastAssistant = state.messages
+        .slice()
+        .reverse()
+        .find(function (msg) {
+          return String(msg.role || "") === "assistant";
+        }) || null;
 
-setTopbar(title, subtitle, statusText, statusState);
+      if (lastAssistant && lastAssistant.error) {
+        statusText = "Error";
+        statusState = "error";
+      } else if (lastAssistant && lastAssistant.stopped) {
+        statusText = "Stopped";
+        statusState = "idle";
+      }
+    }
+
+    setTopbar(title, subtitle, statusText, statusState);
   }
 
   function findMessageById(messageId) {
@@ -363,11 +382,13 @@ setTopbar(title, subtitle, statusText, statusState);
     const index = state.messages.findIndex(function (item) {
       return String(item.id) === String(message.id);
     });
+
     if (index >= 0) {
       state.messages[index] = Object.assign({}, state.messages[index], message);
     } else {
       state.messages.push(message);
     }
+
     renderChat();
     return message;
   }
@@ -377,6 +398,7 @@ setTopbar(title, subtitle, statusText, statusState);
     state.messages = state.messages.filter(function (item) {
       return String(item.id) !== String(messageId);
     });
+
     if (state.messages.length !== before) {
       renderChat();
     }
@@ -396,11 +418,13 @@ setTopbar(title, subtitle, statusText, statusState);
         messages: safeArray(session.messages).map(normalizeMessage),
       };
     });
+
     renderSessionList();
   }
 
   function applyStatePayload(payload) {
     const data = payload && typeof payload === "object" ? payload : {};
+
     state.activeSessionId = String(
       data.active_session_id ||
         data.session_id ||
@@ -432,18 +456,22 @@ setTopbar(title, subtitle, statusText, statusState);
   function currentUserMessageForRegenerate(targetAssistantId) {
     const targetId = String(targetAssistantId || "");
     let targetIndex = -1;
+
     for (let i = 0; i < state.messages.length; i += 1) {
       if (String(state.messages[i].id) === targetId) {
         targetIndex = i;
         break;
       }
     }
+
     if (targetIndex <= 0) return null;
+
     for (let j = targetIndex - 1; j >= 0; j -= 1) {
       if (String(state.messages[j].role) === "user") {
         return state.messages[j];
       }
     }
+
     return null;
   }
 
@@ -460,6 +488,7 @@ setTopbar(title, subtitle, statusText, statusState);
       attachments: [],
       meta: mode === "regenerate" ? { regenerate_of: messageId } : {},
     });
+
     upsertMessage(placeholder);
     return placeholder;
   }
@@ -471,11 +500,13 @@ setTopbar(title, subtitle, statusText, statusState);
     const status = item.status || "uploaded";
     const error = item.upload_error || "";
     const summary = attachmentSummary(item);
+
     const removeButton = removable
       ? '<button type="button" class="nova-upload-chip__remove" data-upload-remove="' +
         escapeHtml(item.id) +
         '" aria-label="Remove attachment">×</button>'
       : "";
+
     const statusHtml =
       status === "uploading"
         ? '<span class="nova-upload-chip__status">Uploading…</span>'
@@ -484,6 +515,7 @@ setTopbar(title, subtitle, statusText, statusState);
           escapeHtml(error || "Upload failed") +
           "</span>"
         : "";
+
     return (
       '<div class="nova-upload-chip" data-upload-id="' +
       escapeHtml(item.id) +
@@ -504,12 +536,14 @@ setTopbar(title, subtitle, statusText, statusState);
 
   function renderPendingUploads() {
     if (!els.uploadStaging) return;
+
     const items = state.pendingUploads;
     if (!items.length) {
       els.uploadStaging.innerHTML = "";
       els.uploadStaging.hidden = true;
       return;
     }
+
     els.uploadStaging.hidden = false;
     els.uploadStaging.innerHTML = items
       .map(function (item) {
@@ -524,8 +558,10 @@ setTopbar(title, subtitle, statusText, statusState);
     const href = item.url || "#";
     const mime = item.mime_type || "application/octet-stream";
     const sub = [];
+
     if (mime) sub.push(mime);
     if (item.size) sub.push(formatBytes(item.size));
+
     const subText = sub.join(" · ");
 
     if (item.url && isImageMime(mime)) {
@@ -623,7 +659,9 @@ setTopbar(title, subtitle, statusText, statusState);
 
   function renderMessageActions(message) {
     if (String(message.role) !== "assistant") return "";
+
     const disabled = state.stream.running ? ' aria-disabled="true"' : "";
+
     return (
       '<div class="message-actions">' +
       '<button type="button" class="message-action" data-copy-message="' +
@@ -640,50 +678,51 @@ setTopbar(title, subtitle, statusText, statusState);
     );
   }
 
-function renderMessageCard(message) {
-  const role = String(message.role || "assistant");
-  const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
-  const attachments = safeArray(message.attachments);
-  const attachmentsHtml = attachments.length
-    ? '<div class="message-attachments">' +
-      attachments.map(renderAttachmentBlock).join("") +
-      "</div>"
-    : "";
+  function renderMessageCard(message) {
+    const role = String(message.role || "assistant");
+    const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
+    const attachments = safeArray(message.attachments);
 
-  const bodyHtml = message.text
-    ? '<div class="message-card__body">' + renderSafeText(message.text) + "</div>"
-    : message.pending || message.streaming
-    ? '<div class="message-card__body"><span class="message-card__cursor">▋</span></div>'
-    : "";
+    const attachmentsHtml = attachments.length
+      ? '<div class="message-attachments">' +
+        attachments.map(renderAttachmentBlock).join("") +
+        "</div>"
+      : "";
 
-  const metaBits = [];
-  if (message.pending || message.streaming) metaBits.push("Streaming");
-  if (message.error) metaBits.push("Error");
-  if (message.stopped) metaBits.push("Stopped");
-  if (message.source) metaBits.push(message.source);
+    const bodyHtml = message.text
+      ? '<div class="message-card__body">' + renderSafeText(message.text) + "</div>"
+      : message.pending || message.streaming
+      ? '<div class="message-card__body"><span class="message-card__cursor">▋</span></div>'
+      : "";
 
-  const metaHtml = metaBits.length
-    ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
-    : "";
+    const metaBits = [];
+    if (message.pending || message.streaming) metaBits.push("Streaming");
+    if (message.error) metaBits.push("Error");
+    if (message.stopped) metaBits.push("Stopped");
+    if (message.source) metaBits.push(message.source);
 
-  return (
-    '<article class="message-card ' +
-    roleClass +
-    '" data-message-id="' +
-    escapeHtml(message.id) +
-    '">' +
-    '<div class="message-card__header">' +
-    '<div class="message-card__role">' +
-    escapeHtml(role === "user" ? "You" : "Nova") +
-    "</div>" +
-    metaHtml +
-    "</div>" +
-    bodyHtml +
-    attachmentsHtml +
-    renderMessageActions(message) +
-    "</article>"
-  );
-}
+    const metaHtml = metaBits.length
+      ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
+      : "";
+
+    return (
+      '<article class="message-card ' +
+      roleClass +
+      '" data-message-id="' +
+      escapeHtml(message.id) +
+      '">' +
+      '<div class="message-card__header">' +
+      '<div class="message-card__role">' +
+      escapeHtml(role === "user" ? "You" : "Nova") +
+      "</div>" +
+      metaHtml +
+      "</div>" +
+      bodyHtml +
+      attachmentsHtml +
+      renderMessageActions(message) +
+      "</article>"
+    );
+  }
 
   function renderChat() {
     if (!els.chatThread) return;
@@ -694,10 +733,12 @@ function renderMessageCard(message) {
 
   function renderSessionList() {
     if (!els.sessionList) return;
+
     const sessions = state.sessions.slice().sort(function (a, b) {
       const ap = a.pinned ? 1 : 0;
       const bp = b.pinned ? 1 : 0;
       if (ap !== bp) return bp - ap;
+
       const at = Date.parse(a.updated_at || a.created_at || 0) || 0;
       const bt = Date.parse(b.updated_at || b.created_at || 0) || 0;
       return bt - at;
@@ -706,6 +747,7 @@ function renderMessageCard(message) {
     els.sessionList.innerHTML = sessions
       .map(function (session) {
         const active = String(session.id) === String(state.activeSessionId);
+
         return (
           '<button type="button" class="session-card' +
           (active ? " is-active" : "") +
@@ -729,6 +771,7 @@ function renderMessageCard(message) {
 
   function renderArtifacts() {
     if (!els.artifactList) return;
+
     const items = safeArray(state.artifacts);
     els.artifactList.innerHTML = items.length
       ? items
@@ -736,6 +779,7 @@ function renderMessageCard(message) {
             const id = String(item.id || "");
             const title = String(item.title || item.name || "Artifact");
             const preview = String(item.preview || item.body || item.summary || "");
+
             return (
               '<button type="button" class="rail-item" data-artifact-open="' +
               escapeHtml(id) +
@@ -755,12 +799,14 @@ function renderMessageCard(message) {
 
   function renderMemory() {
     if (!els.memoryList) return;
+
     const items = safeArray(state.memory);
     els.memoryList.innerHTML = items.length
       ? items
           .map(function (item) {
             const text = String(item.text || item.content || item.body || "");
             const kind = String(item.kind || "note");
+
             return (
               '<div class="rail-item rail-item--static">' +
               '<div class="rail-item__title">' +
@@ -784,281 +830,377 @@ function renderMessageCard(message) {
         Accept: "application/json",
       },
     });
+
     const data = await response.json().catch(function () {
       return {};
     });
+
     if (!response.ok || data.ok === false) {
       throw new Error(data.error || ("Request failed: " + response.status));
     }
+
     return data;
   }
 
-async function apiPost(url, body, extra) {
-  const response = await fetch(
-    url,
-    Object.assign(
-      {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
+  async function apiPost(url, body, extra) {
+    const response = await fetch(
+      url,
+      Object.assign(
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(body || {}),
         },
-        body: JSON.stringify(body || {}),
+        extra || {}
+      )
+    );
+
+    const data = await response.json().catch(function () {
+      return {};
+    });
+
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || ("Request failed: " + response.status));
+    }
+
+    return data;
+  }
+
+  async function stopActiveStream(options) {
+    const opts = Object.assign(
+      { silent: false, reason: "Stopped.", statusState: "idle", statusText: "Ready" },
+      options || {}
+    );
+
+    if (!state.stream || !state.stream.running) return;
+
+    const controller = state.stream.controller;
+    if (controller) {
+      try {
+        controller.abort();
+      } catch (_) {}
+    }
+
+    const id = state.stream.messageId || state.stream.placeholderId;
+    if (id) {
+      const msg = findMessageById(id);
+      if (msg) {
+        upsertMessage({
+          ...msg,
+          pending: false,
+          streaming: false,
+          stopped: true,
+          error: false,
+        });
+      }
+    }
+
+    finishStreamUi({
+      statusState: opts.statusState,
+      statusText: opts.statusText,
+    });
+
+    if (!opts.silent) {
+      showToast(opts.reason, "info");
+    }
+  }
+
+  async function stopStreamBeforeSessionChange() {
+    if (!state.stream || !state.stream.running) return;
+
+    await stopActiveStream({
+      silent: true,
+      reason: "Stopped before switching sessions.",
+    });
+  }
+
+  async function consumeChatStream(payload) {
+    if (state.stream.running) {
+      showToast("A generation is already running.", "info");
+      throw new Error("A generation is already running.");
+    }
+
+    const controller = new AbortController();
+    state.stream.controller = controller;
+    state.stream.running = true;
+    state.stream.messageId = "";
+    state.stream.placeholderId = "";
+    state.stream.buffer = "";
+
+    setBusyUi(true);
+    updateTopbarFromState();
+
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
       },
-      extra || {}
-    )
-  );
+      body: JSON.stringify({
+        ...(payload || {}),
+        stream: true,
+      }),
+      signal: controller.signal,
+    });
 
-  const data = await response.json().catch(function () {
-    return {};
-  });
-
-  if (!response.ok || data.ok === false) {
-    throw new Error(data.error || ("Request failed: " + response.status));
-  }
-
-  return data;
-}
-
-async function stopActiveStream(options) {
-  const opts = Object.assign(
-    { silent: false, reason: "Stopped.", statusState: "idle", statusText: "Ready" },
-    options || {}
-  );
-
-  if (!state.stream || !state.stream.running) return;
-
-  const controller = state.stream.controller;
-  if (controller) {
-    try { controller.abort(); } catch (_) {}
-  }
-
-  const id = state.stream.messageId || state.stream.placeholderId;
-  if (id) {
-    const msg = findMessageById(id);
-    if (msg) {
-      upsertMessage({
-        ...msg,
-        pending: false,
-        streaming: false,
-        stopped: true,
-        error: false,
-      });
-    }
-  }
-
-  finishStreamUi({
-    statusState: opts.statusState,
-    statusText: opts.statusText,
-  });
-
-  if (!opts.silent) {
-    showToast(opts.reason, "info");
-  }
-}
-
-async function stopStreamBeforeSessionChange() {
-  if (!state.stream || !state.stream.running) return;
-
-  await stopActiveStream({
-    silent: true,
-    reason: "Stopped before switching sessions.",
-  });
-}
-
-async function consumeChatStream(payload) {
-  if (state.stream.running) {
-    showToast("A generation is already running.", "info");
-    throw new Error("A generation is already running.");
-  }
-
-  const controller = new AbortController();
-  state.stream.controller = controller;
-  state.stream.running = true;
-  state.stream.messageId = "";
-  state.stream.placeholderId = "";
-  state.stream.buffer = "";
-
-  setBusyUi(true);
-  updateTopbarFromState();
-
-  const response = await fetch("/api/chat", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "text/event-stream",
-    },
-    body: JSON.stringify({
-      ...(payload || {}),
-      stream: true,
-    }),
-    signal: controller.signal,
-  });
-
-  if (!response.ok || !response.body) {
-    finishStreamUi({ statusState: "error", statusText: "Error" });
-    throw new Error("Stream request failed.");
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let buffer = "";
-
-  function handleStreamEvent(event) {
-    const type = String(event?.type || "");
-
-    if (type === "start") {
-      const id = String(
-        event.message_id ||
-        event.assistant_message_id ||
-        makeId("assistant")
-      );
-
-      state.stream.messageId = id;
-      state.stream.placeholderId = id;
-
-      upsertMessage({
-        id,
-        role: "assistant",
-        text: "",
-        pending: true,
-        streaming: true,
-        error: false,
-        stopped: false,
-        source: event.mode || "send",
-        attachments: [],
-        meta: {},
-      });
-      return;
+    if (!response.ok || !response.body) {
+      finishStreamUi({ statusState: "error", statusText: "Error" });
+      throw new Error("Stream request failed.");
     }
 
-    if (type === "token") {
-      const id = String(
-        event.message_id ||
-        event.assistant_message_id ||
-        state.stream.messageId
-      );
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
 
-      let msg = findMessageById(id);
+    function handleStreamEvent(event) {
+      const type = String((event && event.type) || "");
 
-      if (!msg) {
-        msg = upsertMessage({
-          id,
+      if (type === "start") {
+        const id = String(
+          event.message_id ||
+            event.assistant_message_id ||
+            makeId("assistant")
+        );
+
+        state.stream.messageId = id;
+        state.stream.placeholderId = id;
+
+        upsertMessage({
+          id: id,
           role: "assistant",
           text: "",
           pending: true,
           streaming: true,
           error: false,
           stopped: false,
-          source: "send",
+          source: event.mode || "send",
           attachments: [],
           meta: {},
         });
+        scrollChatToBottom(true);
+        return;
       }
 
-upsertMessage({
-  ...msg,
-  text: (msg.text || "") + (event.token || ""),
-  pending: true,
-  streaming: true,
-  error:false,
-});
+      if (type === "token") {
+        const id = String(
+          event.message_id ||
+            event.assistant_message_id ||
+            state.stream.messageId ||
+            makeId("assistant")
+        );
 
-      scrollChatToBottom(true);
-      return;
+        let msg = findMessageById(id);
+
+        if (!msg) {
+          msg = upsertMessage({
+            id: id,
+            role: "assistant",
+            text: "",
+            pending: true,
+            streaming: true,
+            error: false,
+            stopped: false,
+            source: "send",
+            attachments: [],
+            meta: {},
+          });
+        }
+
+        upsertMessage({
+          ...msg,
+          text: String(msg.text || "") + String(event.token || ""),
+          pending: true,
+          streaming: true,
+          error: false,
+          stopped: false,
+        });
+
+        scrollChatToBottom(true);
+        return;
+      }
+
+      if (type === "final") {
+        const finalMsg = normalizeMessage(
+          event.message || {
+            id: state.stream.messageId || makeId("assistant"),
+            role: "assistant",
+            text: "",
+          }
+        );
+
+        upsertMessage({
+          ...finalMsg,
+          pending: false,
+          streaming: false,
+          stopped: false,
+          error: false,
+        });
+
+        if (Array.isArray(event.messages)) {
+          state.messages = event.messages.map(normalizeMessage);
+          renderChat();
+        }
+
+        if (Array.isArray(event.artifacts)) {
+          state.artifacts = event.artifacts;
+          renderArtifacts();
+        }
+
+        if (Array.isArray(event.memory)) {
+          state.memory = event.memory;
+          renderMemory();
+        }
+
+        if (event.session_id) {
+          state.activeSessionId = String(event.session_id);
+        }
+
+        finishStreamUi({
+          statusText: "Ready",
+          statusState: "idle",
+        });
+
+        updateTopbarFromState();
+        scrollChatToBottom(true);
+        return;
+      }
+      if (type === "error") {
+        const errorId = String(
+          event.message_id ||
+            event.assistant_message_id ||
+            state.stream.messageId ||
+            makeId("assistant")
+        );
+
+        upsertMessage({
+          id: errorId,
+          role: "assistant",
+          text: String(event.error || "Generation failed."),
+          pending: false,
+          streaming: false,
+          stopped: false,
+          error: true,
+          attachments: [],
+          meta: {},
+        });
+
+        if (Array.isArray(event.messages)) {
+          state.messages = event.messages.map(normalizeMessage);
+          renderChat();
+        }
+
+        if (Array.isArray(event.artifacts)) {
+          state.artifacts = event.artifacts;
+          renderArtifacts();
+        }
+
+        if (Array.isArray(event.memory)) {
+          state.memory = event.memory;
+          renderMemory();
+        }
+
+        finishStreamUi({
+          statusText: "Error",
+          statusState: "error",
+        });
+
+        updateTopbarFromState();
+        scrollChatToBottom(true);
+        return;
+      }
+
+      if (type === "stopped") {
+        const stoppedId = String(
+          event.message_id ||
+            event.assistant_message_id ||
+            state.stream.messageId ||
+            makeId("assistant")
+        );
+
+        upsertMessage({
+          id: stoppedId,
+          role: "assistant",
+          text: String(event.text || ""),
+          pending: false,
+          streaming: false,
+          stopped: true,
+          error: false,
+          attachments: [],
+          meta: {},
+        });
+
+        if (Array.isArray(event.messages)) {
+          state.messages = event.messages.map(normalizeMessage);
+          renderChat();
+        }
+
+        if (Array.isArray(event.artifacts)) {
+          state.artifacts = event.artifacts;
+          renderArtifacts();
+        }
+
+        if (Array.isArray(event.memory)) {
+          state.memory = event.memory;
+          renderMemory();
+        }
+
+        finishStreamUi({
+          statusText: "Stopped",
+          statusState: "idle",
+        });
+
+        updateTopbarFromState();
+        scrollChatToBottom(true);
+      }
     }
 
-if (type === "final") {
-  const finalMsg = normalizeMessage(event.message || {
-    id: state.stream.messageId || makeId("assistant"),
-    role: "assistant",
-    text: "",
-  });
+    while (true) {
+      const result = await reader.read();
+      const done = result.done;
+      const value = result.value;
 
-  upsertMessage({
-    ...finalMsg,
-    pending: false,
-    streaming: false,
-    stopped: false,
-    error: false,
-  });
+      if (done) break;
 
-  if (Array.isArray(event.messages)) {
-    state.messages = event.messages.map(normalizeMessage);
-    renderChat();
-  }
+      buffer += decoder.decode(value, { stream: true });
 
-  if (Array.isArray(event.artifacts)) {
-    state.artifacts = event.artifacts;
-    renderArtifacts();
-  }
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() || "";
 
-  if (Array.isArray(event.memory)) {
-    state.memory = event.memory;
-    renderMemory();
-  }
+      for (let part of parts) {
+        part = part.trim();
+        if (!part.startsWith("data:")) continue;
 
-  finishStreamUi({ statusState: "idle", statusText: "Ready" });
-  scrollChatToBottom(true);
-  return;
-}
+        const jsonStr = part.replace(/^data:\s*/, "");
 
-
-    if (type === "error") {
-      const text = String(event.error || "Generation failed.");
-
-      upsertMessage({
-        id: state.stream.messageId || makeId("assistant"),
-        role: "assistant",
-        text,
-        error: true,
-        pending: false,
-        streaming: false,
-      });
-
-      finishStreamUi({ statusState: "error", statusText: "Error" });
-      return;
+        try {
+          const evt = JSON.parse(jsonStr);
+          handleStreamEvent(evt);
+        } catch (error) {
+          warn("stream event parse failed", error);
+        }
+      }
     }
-  }
 
-
-
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-
-    const parts = buffer.split("\n\n");
-    buffer = parts.pop() || "";
-
-    for (let part of parts) {
-      part = part.trim();
-      if (!part.startsWith("data:")) continue;
-
-      const jsonStr = part.replace(/^data:\s*/, "");
-
+    if (buffer.trim().startsWith("data:")) {
       try {
-        const evt = JSON.parse(jsonStr);
-        handleStreamEvent(evt);
-      } catch (_) {}
+        const trailing = JSON.parse(buffer.trim().replace(/^data:\s*/, ""));
+        handleStreamEvent(trailing);
+      } catch (error) {
+        warn("trailing stream event parse failed", error);
+      }
+    }
+
+    if (state.stream.running) {
+      finishStreamUi({ statusState: "idle", statusText: "Ready" });
     }
   }
-
-  finishStreamUi({ statusState: "idle", statusText: "Ready" });
-}
-
-
-
-
-
-
-
-
-  async function loadState() {
+  
+async function loadState() {
     const payload = await apiGet("/api/state");
     applyStatePayload(payload);
   }
@@ -1253,9 +1395,13 @@ function setRailTab(tabName) {
   const nextTab = String(tabName || "artifacts");
   state.rail.tab = nextTab;
 
+  openRail();
+
   els.railTabs.forEach(function (button) {
     const isActive = String(button.getAttribute("data-rail-tab") || "") === nextTab;
     button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
 
   els.railPanels.forEach(function (panel) {
@@ -1263,6 +1409,10 @@ function setRailTab(tabName) {
     panel.hidden = !isActive;
     panel.classList.toggle("is-active", isActive);
   });
+
+  if (els.railViewer) {
+    els.railViewer.hidden = false;
+  }
 
   if (els.railTitle) {
     els.railTitle.textContent =
@@ -1325,15 +1475,23 @@ async function openArtifactFromStateOrBackend(artifactId) {
     return;
   }
 
+  const owningSessionId = String(
+    artifact.session_id ||
+    (artifact.viewer && artifact.viewer.session_id) ||
+    ""
+  ).trim();
+
   if (owningSessionId && owningSessionId !== String(state.activeSessionId || "")) {
     await openSessionFromBackend(owningSessionId);
     artifact = findArtifactById(id) || artifact;
   }
 
+  openRail();
   setRailTab("artifacts");
   setRailSelectedItem("artifact", id);
 
   if (els.railViewer) {
+    els.railViewer.hidden = false;
     els.railViewer.innerHTML = artifactViewerHtml(artifact);
   }
 
@@ -1345,13 +1503,12 @@ async function openArtifactFromStateOrBackend(artifactId) {
     const viewer = artifact.viewer && typeof artifact.viewer === "object" ? artifact.viewer : {};
     els.railSubtitle.textContent = String(
       viewer.title ||
-        artifact.title ||
-        artifact.name ||
-        "Artifact"
+      artifact.title ||
+      artifact.name ||
+      "Artifact"
     );
   }
 }
-
 function setPendingUploadItem(nextItem) {
   const normalized = normalizeAttachment(nextItem);
   const index = state.pendingUploads.findIndex(function (item) {
@@ -1364,6 +1521,77 @@ function setPendingUploadItem(nextItem) {
   }
   renderPendingUploads();
 }
+
+async function uploadOneFile(file) {
+  const tempId = makeId("att_local");
+  setPendingUploadItem({
+    id: tempId,
+    name: file && file.name ? file.name : "upload",
+    filename: file && file.name ? file.name : "upload",
+    mime_type: file && file.type ? file.type : "application/octet-stream",
+    size: file && typeof file.size === "number" ? file.size : 0,
+    status: "uploading",
+  });
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+    state.uploadInFlightCount += 1;
+    setBusyUi(state.stream.running);
+
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        credentials: "same-origin",
+        body: formData,
+      });
+
+      const data = await response.json().catch(function () {
+        return {};
+      });
+
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || "Upload failed.");
+      }
+
+           state.pendingUploads = state.pendingUploads.filter(function (item) {
+        return String(item.id) !== String(tempId);
+      });
+
+      const uploadedAttachment = Object.assign({}, normalizeAttachment(data.attachment || data), {
+        status: "uploaded",
+        upload_error: "",
+      });
+
+      setPendingUploadItem(uploadedAttachment);
+      showToast("Uploaded: " + (uploadedAttachment.filename || uploadedAttachment.name || "attachment"), "success");
+      return normalizeAttachment(uploadedAttachment); 
+
+    } catch (error) {
+      warn("upload failed", error);
+
+      const errorText = error && error.message ? error.message : "Upload failed.";
+
+      setPendingUploadItem({
+        id: tempId,
+        name: file && file.name ? file.name : "upload",
+        filename: file && file.name ? file.name : "upload",
+        mime_type: file && file.type ? file.type : "application/octet-stream",
+        size: file && typeof file.size === "number" ? file.size : 0,
+        status: "error",
+        upload_error: errorText,
+      });
+
+           showToast("Upload failed: " + (file && file.name ? file.name : "attachment"), "error");
+      throw error;   
+
+    } finally {
+      state.uploadInFlightCount = Math.max(0, state.uploadInFlightCount - 1);
+      setBusyUi(state.stream.running);
+      renderPendingUploads();
+    }
+  }
+
 
 async function uploadOneFile(file) {
   const tempId = makeId("att_local");
@@ -1558,117 +1786,6 @@ return data;
   }
 }
 
-  function handleStreamEvent(evt) {
-    const event = evt && typeof evt === "object" ? evt : {};
-    const type = String(event.type || "");
-
-    if (type === "start") {
-      const messageId = String(event.message_id || event.assistant_message_id || makeId("assistant"));
-      state.stream.messageId = messageId;
-
-      const existing = findMessageById(messageId);
-      if (existing) {
-        upsertMessage(
-          Object.assign({}, existing, {
-            pending: true,
-            streaming: true,
-            error: false,
-            stopped: false,
-            source: state.stream.mode || "send",
-          })
-        );
-      } else {
-        const placeholder = createAssistantPlaceholder(state.stream.mode || "send", messageId);
-        state.stream.placeholderId = placeholder.id;
-      }
-
-      scrollChatToBottom(true);
-      return;
-    }
-
-    if (type === "token") {
-      const messageId = String(event.message_id || event.assistant_message_id || state.stream.messageId || "");
-      if (!messageId) return;
-
-      const existing = findMessageById(messageId) || createAssistantPlaceholder(state.stream.mode || "send", messageId);
-
-      upsertMessage(
-        Object.assign({}, existing, {
-          id: messageId,
-          text: String(existing.text || "") + String(event.token || ""),
-          pending: true,
-          streaming: true,
-          error: false,
-          stopped: false,
-          source: state.stream.mode || "send",
-        })
-      );
-
-      scrollChatToBottom(false);
-      return;
-    }
-
-    if (type === "final") {
-      const finalMessage = normalizeMessage(
-        event.message || {
-          id: String(event.message_id || event.assistant_message_id || state.stream.messageId || makeId("assistant")),
-          role: "assistant",
-          text: state.stream.buffer || "",
-        }
-      );
-
-      upsertMessage(
-        Object.assign({}, finalMessage, {
-          pending: false,
-          streaming: false,
-          error: false,
-        })
-      );
-
-      if (Array.isArray(event.messages)) {
-        state.messages = event.messages.map(normalizeMessage);
-        renderChat();
-      }
-      if (Array.isArray(event.artifacts)) {
-        state.artifacts = event.artifacts;
-        renderArtifacts();
-      }
-      if (Array.isArray(event.memory)) {
-        state.memory = event.memory;
-        renderMemory();
-      }
-
-      finishStreamUi();
-      scrollChatToBottom(true);
-      return;
-    }
-
-    if (type === "error") {
-      const errorText = String(event.error || "Generation failed.");
-
-      const errorMessage = normalizeMessage(
-        event.message || {
-          id: String(event.message_id || event.assistant_message_id || state.stream.messageId || makeId("assistant")),
-          role: "assistant",
-          text: errorText,
-          error: true,
-        }
-      );
-
-      upsertMessage(
-        Object.assign({}, errorMessage, {
-          pending: false,
-          streaming: false,
-          error: true,
-        })
-      );
-
-      finishStreamUi();
-      showToast(errorText, "error");
-      return;
-    }
-  }
-
 async function sendMessage() {
   const text = els.chatInput ? normalizeText(els.chatInput.value) : "";
   const attachments = state.pendingUploads
@@ -1835,6 +1952,13 @@ async function sendMessage() {
       els.composerForm.addEventListener("submit", handleComposerSubmit);
     }
 
+    if (els.sendButton) {
+      els.sendButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        handleComposerSubmit(event);
+      });
+    }
+
     if (els.chatInput) {
       els.chatInput.addEventListener("input", autoResizeTextarea);
       els.chatInput.addEventListener("keydown", function (event) {
@@ -1877,69 +2001,6 @@ async function sendMessage() {
         });
       });
     }
-
-async function regenerateMessage(targetAssistantId) {
-  if (state.stream.running) {
-    showToast("A generation is already running.", "info");
-    return;
-  }
-
-  const targetId = String(targetAssistantId || "").trim();
-  if (!targetId) {
-    showToast("Nothing to regenerate.", "error");
-    return;
-  }
-
-  const userMessage = currentUserMessageForRegenerate(targetId);
-  if (!userMessage) {
-    showToast("Could not find the user message for regenerate.", "error");
-    return;
-  }
-
-  removeMessageById(targetId);
-
-  const payload = getSendPayload({
-    user_text: String(userMessage.text || ""),
-    regenerate_of: targetId,
-    attachments: safeArray(userMessage.attachments),
-  });
-
-  await consumeChatStream(payload);
-}
-
-    document.addEventListener("click", function (event) {
-      const removeChip = event.target.closest("[data-upload-remove]");
-      if (removeChip) {
-        event.preventDefault();
-        removePendingUpload(removeChip.getAttribute("data-upload-remove"));
-        return;
-      }
-
-      const openSessionButton = event.target.closest("[data-open-session]");
-      if (openSessionButton) {
-        event.preventDefault();
-        openSession(openSessionButton.getAttribute("data-open-session")).catch(function (error) {
-          warn("open session failed", error);
-        });
-        return;
-      }
-
-      const copyButton = event.target.closest("[data-copy-message]");
-      if (copyButton) {
-        event.preventDefault();
-        copyMessage(copyButton.getAttribute("data-copy-message"));
-        return;
-      }
-
-      const regenButton = event.target.closest("[data-regenerate-message]");
-      if (regenButton) {
-        event.preventDefault();
-        if (state.stream.running) return;
-        regenerateMessage(regenButton.getAttribute("data-regenerate-message")).catch(function (error) {
-          warn("regenerate failed", error);
-          showToast(error && error.message ? error.message : "Regenerate failed.", "error");
-        });     }
-    });
   }
 
   async function boot() {
@@ -1968,67 +2029,105 @@ async function regenerateMessage(targetAssistantId) {
 
   function closeSidebar() {
     if (!els.body) return;
-    els.body.classList.remove("sidebar-open");
+    els.body.classList.remove("is-sidebar-open");
+
+    if (els.sidebarBackdrop) {
+      els.sidebarBackdrop.hidden = true;
+    }
   }
 
   function openSidebar() {
     if (!els.body) return;
-    els.body.classList.add("sidebar-open");
-  }
+    els.body.classList.add("is-sidebar-open");
 
-  function setActiveRailTab(tab) {
-    const next = String(tab || "artifacts");
-    state.rail.tab = next;
-
-    els.railTabs.forEach(function (btn) {
-      const isActive = btn.getAttribute("data-rail-tab") === next;
-      btn.classList.toggle("is-active", isActive);
-    });
-
-    els.railPanels.forEach(function (panel) {
-      const isActive = panel.getAttribute("data-rail-panel") === next;
-      panel.hidden = !isActive;
-    });
-
-    if (els.railTitle) {
-      els.railTitle.textContent =
-        next === "memory" ? "Memory" :
-        next === "web" ? "Web" :
-        "Artifacts";
-    }
-
-    if (els.railSubtitle) {
-      if (next === "memory") {
-        els.railSubtitle.textContent = state.memory.length + " items";
-      } else if (next === "web") {
-        els.railSubtitle.textContent = "Fetched pages";
-      } else {
-        els.railSubtitle.textContent = state.artifacts.length + " items";
-      }
+    if (els.sidebarBackdrop) {
+      els.sidebarBackdrop.hidden = false;
     }
   }
 
   function wireRailTabs() {
+    if (!els.railTabs || !els.railTabs.length) return;
+
     els.railTabs.forEach(function (btn) {
       btn.addEventListener("click", function () {
-        const tab = btn.getAttribute("data-rail-tab");
-        setActiveRailTab(tab);
+        const tab = String(btn.getAttribute("data-rail-tab") || "artifacts");
+        setRailTab(tab);
+
+        if (tab === "artifacts") {
+          setRailSelectedItem("", "");
+          if (els.railViewer) {
+            els.railViewer.hidden = false;
+            els.railViewer.innerHTML =
+              '<div class="nova-viewer-shell">' +
+              '<div class="nova-viewer-empty">' +
+              '<div class="nova-viewer-empty-title">Nothing selected</div>' +
+              '<div class="nova-viewer-empty-copy">Select an artifact to view details.</div>' +
+              '</div>' +
+              '</div>';
+          }
+        } else if (tab === "memory") {
+          setRailSelectedItem("", "");
+          if (els.railViewer) {
+            els.railViewer.hidden = false;
+            els.railViewer.innerHTML =
+              '<div class="nova-viewer-shell">' +
+              '<div class="nova-viewer-empty">' +
+              '<div class="nova-viewer-empty-title">Memory</div>' +
+              '<div class="nova-viewer-empty-copy">Select a memory item to view details.</div>' +
+              '</div>' +
+              '</div>';
+          }
+        } else if (tab === "web") {
+          setRailSelectedItem("", "");
+          if (els.railViewer) {
+            els.railViewer.hidden = false;
+            els.railViewer.innerHTML =
+              '<div class="nova-viewer-shell">' +
+              '<div class="nova-viewer-empty">' +
+              '<div class="nova-viewer-empty-title">Web</div>' +
+              '<div class="nova-viewer-empty-copy">Select a web result to view details.</div>' +
+              '</div>' +
+              '</div>';
+          }
+        }
       });
     });
   }
 
   function wireSidebar() {
-    if (els.sidebarToggle) {
-      els.sidebarToggle.addEventListener("click", openSidebar);
-    }
+    const toggleButtons = document.querySelectorAll("[data-sidebar-toggle]");
+
+    toggleButtons.forEach(function (button) {
+      button.addEventListener("click", function () {
+        if (!els.body) return;
+
+        if (els.body.classList.contains("is-sidebar-open")) {
+          closeSidebar();
+        } else {
+          openSidebar();
+        }
+      });
+    });
 
     if (els.sidebarClose) {
       els.sidebarClose.addEventListener("click", closeSidebar);
     }
 
     if (els.sidebarBackdrop) {
-      els.sidebarBackdrop.addEventListener("click", closeSidebar);
+      els.sidebarBackdrop.addEventListener("click", function () {
+        closeSidebar();
+        closeRail();
+      });
     }
+  }
+
+  function wireRailClose() {
+    const closeBtn = document.querySelector("[data-rail-close]");
+    if (!closeBtn) return;
+
+    closeBtn.addEventListener("click", function () {
+      closeRail();
+    });
   }
 
   function wireWebLinks() {
@@ -2041,15 +2140,75 @@ async function regenerateMessage(targetAssistantId) {
       const url = btn.getAttribute("data-web-open");
       if (!url) return;
 
-      window.open(url, "_blank", "noopener");
+      const item = safeArray(state.artifacts).find(function (entry) {
+        const id = String(entry.id || "");
+        const viewer = entry && typeof entry.viewer === "object" ? entry.viewer : {};
+        const sourceUrl = String(
+          viewer.source_url ||
+          entry.source_url ||
+          (entry.meta && entry.meta.source_url) ||
+          ""
+        );
+        return id === url || sourceUrl === url;
+      });
+
+      openRail();
+      setRailTab("web");
+      setRailSelectedItem("web", String(url));
+
+      if (item && els.railViewer) {
+        els.railViewer.hidden = false;
+        els.railViewer.innerHTML = artifactViewerHtml(item);
+      } else {
+        window.open(url, "_blank", "noopener");
+      }
+    });
+  }
+
+  function wireMemoryClicks() {
+    if (!els.memoryList) return;
+
+    els.memoryList.addEventListener("click", function (e) {
+      const btn = e.target.closest("[data-memory-open]");
+      if (!btn) return;
+
+      const memoryId = String(btn.getAttribute("data-memory-open") || "").trim();
+      if (!memoryId) return;
+
+      const item = safeArray(state.memory).find(function (entry) {
+        return String(entry.id || "") === memoryId;
+      });
+
+      if (!item) return;
+
+      openRail();
+      setRailTab("memory");
+      setRailSelectedItem("memory", memoryId);
+
+      if (els.railViewer) {
+        els.railViewer.hidden = false;
+        els.railViewer.innerHTML =
+          '<div class="nova-viewer-shell">' +
+          '<div class="nova-viewer-card">' +
+          '<div class="nova-viewer-kicker">Memory</div>' +
+          '<div class="nova-viewer-title">' + escapeHtml(String(item.kind || "note")) + '</div>' +
+          '<div class="nova-viewer-body">' + renderSafeText(String(item.text || item.content || item.body || "")) + '</div>' +
+          '</div>' +
+          '</div>';
+      }
+
+      if (els.railTitle) els.railTitle.textContent = "Memory";
+      if (els.railSubtitle) els.railSubtitle.textContent = String(item.kind || "note");
     });
   }
 
   function initShellExtensions() {
     wireRailTabs();
     wireSidebar();
+    wireRailClose();
     wireWebLinks();
-    setActiveRailTab(state.rail.tab || "artifacts");
+    wireMemoryClicks();
+    setRailTab(state.rail.tab || "artifacts");
   }
 
   window.NovaComposerBundle = {
@@ -2062,115 +2221,110 @@ async function regenerateMessage(targetAssistantId) {
     clearPendingUploads: clearPendingUploads,
   };
 
-document.addEventListener("click", async function (event) {
-  // REMOVE UPLOAD
-  const removeUploadButton = event.target.closest("[data-upload-remove]");
-  if (removeUploadButton) {
-    event.preventDefault();
-    removePendingUpload(removeUploadButton.getAttribute("data-upload-remove"));
-    return;
-  }
-
-  // SESSION CLICK
-  const sessionButton = event.target.closest("[data-open-session]");
-  if (sessionButton) {
-    event.preventDefault();
-
-    const sessionId = sessionButton.getAttribute("data-open-session");
-
-    try {
-      await openSessionFromBackend(sessionId);
-    } catch (error) {
-      warn("open session failed", error);
-      showToast("Failed to open session.", "error");
+  document.addEventListener("click", async function (event) {
+    const removeUploadButton = event.target.closest("[data-upload-remove]");
+    if (removeUploadButton) {
+      event.preventDefault();
+      removePendingUpload(removeUploadButton.getAttribute("data-upload-remove"));
+      return;
     }
 
-    return;
-  }
+    const sessionButton = event.target.closest("[data-open-session]");
+    if (sessionButton) {
+      event.preventDefault();
 
-  // ARTIFACT CLICK
-  const artifactButton = event.target.closest("[data-artifact-open]");
-  if (artifactButton) {
-    event.preventDefault();
+      const sessionId = sessionButton.getAttribute("data-open-session");
 
-    const artifactId = artifactButton.getAttribute("data-artifact-open");
+      try {
+        await openSessionFromBackend(sessionId);
+      } catch (error) {
+        warn("open session failed", error);
+        showToast("Failed to open session.", "error");
+      }
 
-    try {
-      await openArtifactFromStateOrBackend(artifactId);
-    } catch (error) {
-      warn("open artifact failed", error);
-      showToast("Failed to open artifact.", "error");
+      return;
     }
 
-    return;
-  }
+    const artifactButton = event.target.closest("[data-artifact-open]");
+    if (artifactButton) {
+      event.preventDefault();
 
-  // COPY MESSAGE
-  const copyButton = event.target.closest("[data-copy-message]");
-  if (copyButton) {
-    event.preventDefault();
+      const artifactId = artifactButton.getAttribute("data-artifact-open");
 
-    const messageId = copyButton.getAttribute("data-copy-message");
-    const message = findMessageById(messageId);
+      try {
+        await openArtifactFromStateOrBackend(artifactId);
+      } catch (error) {
+        warn("open artifact failed", error);
+        showToast("Failed to open artifact.", "error");
+      }
 
-    try {
-      await navigator.clipboard.writeText(String((message && message.text) || ""));
-      showToast("Copied.", "success");
-    } catch (error) {
-      warn("copy failed", error);
-      showToast("Copy failed.", "error");
+      return;
     }
 
-    return;
-  }
+    const copyButton = event.target.closest("[data-copy-message]");
+    if (copyButton) {
+      event.preventDefault();
 
-  // REGENERATE
-  const regenerateButton = event.target.closest("[data-regenerate-message]");
-  if (regenerateButton) {
-    event.preventDefault();
+      const messageId = copyButton.getAttribute("data-copy-message");
+      const message = findMessageById(messageId);
 
-    const messageId = regenerateButton.getAttribute("data-regenerate-message");
+      try {
+        await navigator.clipboard.writeText(String((message && message.text) || ""));
+        showToast("Copied.", "success");
+      } catch (error) {
+        warn("copy failed", error);
+        showToast("Copy failed.", "error");
+      }
 
-    try {
-      await regenerateMessage(messageId);
-    } catch (error) {
-      warn("regenerate failed", error);
-      showToast("Regenerate failed.", "error");
+      return;
     }
 
-    return;
-  }
-});
+    const regenerateButton = event.target.closest("[data-regenerate-message]");
+    if (regenerateButton) {
+      event.preventDefault();
 
-async function regenerateMessage(targetAssistantId) {
-  if (state.stream.running) {
-    showToast("A generation is already running.", "info");
-    return;
-  }
+      const messageId = regenerateButton.getAttribute("data-regenerate-message");
 
-  const targetId = String(targetAssistantId || "").trim();
-  if (!targetId) {
-    showToast("Nothing to regenerate.", "error");
-    return;
-  }
+      try {
+        await regenerateMessage(messageId);
+      } catch (error) {
+        warn("regenerate failed", error);
+        showToast("Regenerate failed.", "error");
+      }
 
-  const userMessage = currentUserMessageForRegenerate(targetId);
-  if (!userMessage) {
-    showToast("Could not find the user message for regenerate.", "error");
-    return;
-  }
-
-  removeMessageById(targetId);
-
-  const payload = getSendPayload({
-    user_text: String(userMessage.text || ""),
-    regenerate_of: targetId,
-    attachments: safeArray(userMessage.attachments),
+      return;
+    }
   });
 
-  await consumeChatStream(payload);
-}
+  async function regenerateMessage(targetAssistantId) {
+    if (state.stream.running) {
+      showToast("A generation is already running.", "info");
+      return;
+    }
 
-boot();
-initShellExtensions();
+    const targetId = String(targetAssistantId || "").trim();
+    if (!targetId) {
+      showToast("Nothing to regenerate.", "error");
+      return;
+    }
+
+    const userMessage = currentUserMessageForRegenerate(targetId);
+    if (!userMessage) {
+      showToast("Could not find the user message for regenerate.", "error");
+      return;
+    }
+
+    removeMessageById(targetId);
+
+    const payload = getSendPayload({
+      user_text: String(userMessage.text || ""),
+      regenerate_of: targetId,
+      attachments: safeArray(userMessage.attachments),
+    });
+
+    await consumeChatStream(payload);
+  }
+
+  boot();
+  initShellExtensions();
 })();

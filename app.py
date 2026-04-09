@@ -6,10 +6,12 @@ import os
 import re
 import time
 import uuid
+import math
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Generator
+from collections import defaultdict
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -304,7 +306,6 @@ def file_size(path: Path) -> int:
     except Exception:
         return 0
 
-
 def normalize_attachment(item: dict[str, Any]) -> dict[str, Any]:
     item = item if isinstance(item, dict) else {}
     attachment_id = str(item.get("id") or item.get("attachment_id") or make_id("att"))
@@ -341,7 +342,6 @@ def normalize_attachments(items: list[dict[str, Any]] | None) -> list[dict[str, 
         out.append(normalized)
     return out
 
-
 def make_user_message(text: str, attachments: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     return normalize_message(
         {
@@ -352,7 +352,6 @@ def make_user_message(text: str, attachments: list[dict[str, Any]] | None = None
             "attachments": normalize_attachments(attachments),
         }
     )
-
 
 def make_assistant_message(
     text: str,
@@ -404,7 +403,6 @@ def _detect_artifact_kind(text: str) -> str:
 
     return "chat_reply"
 
-
 def _build_artifact_title(text: str, kind: str) -> str:
     text = normalize_text(text).strip()
 
@@ -438,12 +436,10 @@ ARTIFACT_BULLET_MAX_ITEMS = 5
 ARTIFACT_BULLET_MAX_LEN = 140
 ARTIFACT_SUMMARY_MAX_LEN = 240
 
-
 def _clean_artifact_line(line: str) -> str:
     line = normalize_text(line).strip()
     line = re.sub(r"\s+", " ", line)
     return line.strip("-*• \t")
-
 
 def _split_artifact_lines(text: str) -> list[str]:
     raw_lines = normalize_text(text).split("\n")
@@ -456,7 +452,6 @@ def _split_artifact_lines(text: str) -> list[str]:
         lines.append(cleaned)
 
     return lines
-
 
 def _summarize_artifact_text(text: str, kind: str) -> str:
     lines = _split_artifact_lines(text)
@@ -481,7 +476,6 @@ def _summarize_artifact_text(text: str, kind: str) -> str:
         return summarize_text(f"Web result: {first}", ARTIFACT_SUMMARY_MAX_LEN)
 
     return summarize_text(first, ARTIFACT_SUMMARY_MAX_LEN)
-
 
 def _extract_artifact_bullets(text: str, kind: str) -> list[str]:
     lines = _split_artifact_lines(text)
@@ -535,7 +529,6 @@ def _extract_artifact_bullets(text: str, kind: str) -> list[str]:
 
     return fallback
 
-
 def _build_artifact_meta(text: str, kind: str, message: dict[str, Any]) -> dict[str, Any]:
     existing_meta = message.get("meta") if isinstance(message.get("meta"), dict) else {}
 
@@ -561,12 +554,10 @@ def _build_artifact_meta(text: str, kind: str, message: dict[str, Any]) -> dict[
 
 ARTIFACT_DUPLICATE_WINDOW = 8
 
-
 def _artifact_text_fingerprint(text: str) -> str:
     cleaned = normalize_text(text).strip().lower()
     cleaned = re.sub(r"\s+", " ", cleaned)
     return cleaned
-
 
 def _artifact_meta_fingerprint(meta: dict[str, Any] | None) -> str:
     meta = meta if isinstance(meta, dict) else {}
@@ -576,7 +567,6 @@ def _artifact_meta_fingerprint(meta: dict[str, Any] | None) -> str:
     bullets = meta.get("bullets") if isinstance(meta.get("bullets"), list) else []
     bullet_text = " | ".join(str(x).strip().lower() for x in bullets if str(x).strip())
     return f"{source}||{source_url}||{analysis_text}||{bullet_text}"
-
 
 def _artifacts_equivalent(a: dict[str, Any], b: dict[str, Any]) -> bool:
     if not isinstance(a, dict) or not isinstance(b, dict):
@@ -603,7 +593,6 @@ def _artifacts_equivalent(a: dict[str, Any], b: dict[str, Any]) -> bool:
     a_meta_fp = _artifact_meta_fingerprint(a.get("meta"))
     b_meta_fp = _artifact_meta_fingerprint(b.get("meta"))
     return a_meta_fp == b_meta_fp
-
 
 def _choose_better_artifact(existing_artifact: dict[str, Any], new_artifact: dict[str, Any]) -> dict[str, Any]:
     existing_meta = existing_artifact.get("meta") if isinstance(existing_artifact.get("meta"), dict) else {}
@@ -672,7 +661,6 @@ def _first_attachment_url(message: dict[str, Any]) -> str:
             return url
     return ""
 
-
 def _first_attachment_mime(message: dict[str, Any]) -> str:
     attachments = safe_list(message.get("attachments"))
     for item in attachments:
@@ -682,7 +670,6 @@ def _first_attachment_mime(message: dict[str, Any]) -> str:
         if mime_type:
             return mime_type
     return ""
-
 
 def _detect_routed_artifact_kind(message: dict[str, Any], text: str) -> str:
     meta = message.get("meta") if isinstance(message.get("meta"), dict) else {}
@@ -710,7 +697,6 @@ def _detect_routed_artifact_kind(message: dict[str, Any], text: str) -> str:
 
     return _detect_artifact_kind(text)
 
-
 def _build_routed_artifact_title(message: dict[str, Any], text: str, kind: str) -> str:
     meta = message.get("meta") if isinstance(message.get("meta"), dict) else {}
     source_url = str(meta.get("source_url") or message.get("source_url") or "").strip()
@@ -729,7 +715,6 @@ def _build_routed_artifact_title(message: dict[str, Any], text: str, kind: str) 
         return f"Web: {summarize_text(text, 70)}"
 
     return _build_artifact_title(text, kind)
-
 
 def _build_routed_artifact_meta(text: str, kind: str, message: dict[str, Any]) -> dict[str, Any]:
     base = _build_artifact_meta(text, kind, message)
@@ -970,6 +955,139 @@ MODEL_HISTORY_LIMIT = 16
 ATTACHMENT_CONTEXT_MAX_ITEMS = 6
 
 # =========================================================
+# PHASE D.3 — MEMORY CONFLICT + PRIORITY WEIGHTING
+# =========================================================
+
+def _memory_bucket_key(item: dict[str, Any]) -> str:
+    text = _textish(item.get("text") or "").lower()
+
+    if any(w in text for w in {"short", "brief", "concise", "tight"}):
+        return "length"
+    if any(w in text for w in {"long", "detailed", "in depth", "deep dive", "verbose"}):
+        return "length"
+
+    if "direct" in text:
+        return "tone"
+    if any(w in text for w in {"gentle", "soft"}):
+        return "tone"
+
+    if "powershell" in text:
+        return "shell"
+
+    if any(w in text for w in {"full file", "full-file", "smff"}):
+        return "format"
+
+    if any(w in text for w in {"steps", "step by step"}):
+        return "workflow"
+
+    return f"raw:{text}"
+
+
+def _memory_route_bonus(item: dict[str, Any], route_result: dict[str, Any] | None) -> int:
+    route = _textish(
+        (route_result or {}).get("primary")
+        or (route_result or {}).get("mode")
+        or ""
+    ).lower()
+
+    kind = _textish(item.get("kind") or "").lower()
+    text = _textish(item.get("text") or "").lower()
+
+    bonus = 0
+
+    if kind == "preference":
+        bonus += 2
+
+    if route in {"coding", "code"} and any(w in text for w in {"powershell", "full file", "smff"}):
+        bonus += 4
+
+    if route in {"planning", "plan"} and any(w in text for w in {"phase", "steps", "next move"}):
+        bonus += 3
+
+    if route in {"debug", "fix", "error"} and any(w in text for w in {"direct", "concise", "root cause"}):
+        bonus += 3
+
+    return bonus
+
+
+def _memory_time_score(item: dict[str, Any]) -> int:
+    stamp = _textish(item.get("updated_at") or item.get("created_at") or "")
+    if not stamp:
+        return 0
+
+    try:
+        dt = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+        age_seconds = max(0.0, (datetime.now(timezone.utc) - dt).total_seconds())
+    except Exception:
+        return 0
+
+    age_days = age_seconds / 86400.0
+
+    if age_days <= 7:
+        return 4
+    if age_days <= 30:
+        return 3
+    if age_days <= 90:
+        return 2
+    if age_days <= 180:
+        return 1
+    return 0
+
+
+def resolve_memory_conflicts(
+    selected: list[dict[str, Any]],
+    route_result: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    if not selected:
+        return []
+
+    ranked: list[dict[str, Any]] = []
+
+    for item in selected:
+        row = dict(item)
+        base_score = int(row.get("score") or 0)
+        route_bonus = _memory_route_bonus(row, route_result)
+        time_score = _memory_time_score(row)
+        final_score = base_score + route_bonus + time_score
+
+        reasons = row.get("reasons") if isinstance(row.get("reasons"), list) else []
+        reasons = list(reasons)
+        if route_bonus:
+            reasons.append(f"route_bonus:{route_bonus}")
+        if time_score:
+            reasons.append(f"time_bonus:{time_score}")
+
+        row["final_score"] = final_score
+        row["reasons"] = reasons
+        row["_bucket"] = _memory_bucket_key(row)
+        ranked.append(row)
+
+    ranked.sort(
+        key=lambda x: (
+            int(x.get("final_score") or 0),
+            _textish(x.get("updated_at") or x.get("created_at") or ""),
+        ),
+        reverse=True,
+    )
+
+    winners: dict[str, dict[str, Any]] = {}
+    for item in ranked:
+        bucket = str(item.get("_bucket") or "")
+        if bucket not in winners:
+            winners[bucket] = item
+
+    final = list(winners.values())
+    final.sort(
+        key=lambda x: (
+            int(x.get("final_score") or 0),
+            _textish(x.get("updated_at") or x.get("created_at") or ""),
+        ),
+        reverse=True,
+    )
+
+    return final[:MEMORY_MAX_ITEMS]
+
+# =========================================================
 # MODE DETECTION + SYSTEM PROMPT LOCK
 # =========================================================
 
@@ -982,22 +1100,66 @@ def detect_request_mode(user_text: str) -> str:
         return "debug"
 
     if any(k in text for k in [
-        "code", "function", "script", "python", "javascript", "api", "app.py"
+        "code", "function", "script", "python", "javascript", "api", "app.py", "route", "endpoint"
     ]):
         return "coding"
 
     if any(k in text for k in [
-        "plan", "roadmap", "steps", "strategy", "next move", "phase"
+        "plan", "roadmap", "steps", "strategy", "next move", "phase", "priority"
     ]):
         return "planning"
 
     if any(k in text for k in [
-        "write", "story", "book", "paragraph", "email"
+        "write", "rewrite", "story", "book", "paragraph", "email", "message"
     ]):
         return "writing"
 
     return "general"
 
+def build_route_debug_payload(
+    *,
+    user_text: str,
+    session: dict[str, Any] | None,
+    attachments: list[dict[str, Any]] | None = None,
+    regenerate_of: str | None = None,
+) -> dict[str, Any]:
+    mode = detect_request_mode(user_text)
+    attachment_items = normalize_attachments(attachments)
+    attachment_names = [str(item.get("name") or item.get("filename") or "") for item in attachment_items]
+
+    session_id = ""
+    session_title = ""
+    if isinstance(session, dict):
+        session_id = str(session.get("id") or "")
+        session_title = str(session.get("title") or "")
+
+    lowered = _textish(user_text).lower()
+
+    signals: list[str] = []
+    if any(k in lowered for k in ["error", "traceback", "bug", "fix", "crash", "exception"]):
+        signals.append("debug_terms")
+    if any(k in lowered for k in ["code", "python", "javascript", "api", "app.py", "route", "endpoint"]):
+        signals.append("coding_terms")
+    if any(k in lowered for k in ["plan", "roadmap", "steps", "phase", "priority"]):
+        signals.append("planning_terms")
+    if any(k in lowered for k in ["write", "rewrite", "story", "book", "email", "message"]):
+        signals.append("writing_terms")
+    if regenerate_of:
+        signals.append("regenerate")
+    if attachment_items:
+        signals.append("attachments_present")
+
+    return {
+        "mode": mode,
+        "signals": signals,
+        "user_text_preview": summarize_text(_textish(user_text), 160),
+        "session_id": session_id,
+        "session_title": session_title,
+        "attachments_count": len(attachment_items),
+        "attachment_names": attachment_names[:6],
+        "regenerate_of": str(regenerate_of or ""),
+        "timestamp": now_iso(),
+    }
 
 def build_mode_system_prompt(mode: str) -> str:
     if mode == "debug":
@@ -1040,12 +1202,51 @@ def build_mode_system_prompt(mode: str) -> str:
     )
 
 # =========================================================
+# PHASE D.2 — RESPONSE DOMINANCE LOCK
+# =========================================================
+
+def enforce_response_dominance(text: str, route: str) -> str:
+    t = normalize_text(text).strip()
+
+    if not t:
+        return t
+
+    # kill fluff phrases
+    fluff = [
+        "here's what you can do",
+        "it seems like",
+        "you might want to",
+        "in conclusion",
+        "overall,",
+    ]
+
+    lowered = t.lower()
+    for f in fluff:
+        if lowered.startswith(f):
+            t = t[len(f):].lstrip(" ,:-")
+
+    # enforce structure for certain routes
+    if route == "planning":
+        if not re.search(r"\d+\.", t):
+            lines = [l.strip() for l in t.split("\n") if l.strip()]
+            if len(lines) > 1:
+                t = "\n".join(f"{i+1}. {line}" for i, line in enumerate(lines))
+
+    if route == "debug":
+        if "fix" not in lowered:
+            t += "\n\nFix:\n- Identify root cause\n- Apply correction\n- Verify outcome"
+
+    # tighten spacing
+    t = re.sub(r"\n{3,}", "\n\n", t)
+
+    return t.strip()
+
+# =========================================================
 # MEMORY EXTRACTION + DURABLE WRITE LOCK
 # =========================================================
 
 MEMORY_WRITE_MAX_ITEMS = 200
 MEMORY_TEXT_MAX = 300
-
 
 def _textish(value: Any) -> str:
     return str(value or "").strip()
@@ -1138,7 +1339,6 @@ def _memory_kind_priority(kind: str) -> int:
         return 2
     return 1
 
-
 def _memory_conflict_key(text: str, kind: str) -> str:
     lowered = _clean_memory_text(text).lower()
     kind = _textish(kind).lower()
@@ -1167,86 +1367,75 @@ def _memory_conflict_key(text: str, kind: str) -> str:
 
     return f"{kind}:{lowered}"
 
-
 def save_memory_items(candidates: list[dict[str, str]], session_id: str) -> None:
     if not candidates:
         return
 
-    memory = load_memory()
+    existing = safe_list(load_memory())
     now = now_iso()
 
-    normalized_memory: list[dict[str, Any]] = []
-    for item in memory:
+    ordered_existing = []
+    for item in existing:
         if isinstance(item, dict):
-            normalized_memory.append(item)
+            ordered_existing.append(item)
 
     existing_texts = {
-        _textish(item.get("text")).lower()
-        for item in normalized_memory
+        _clean_memory_text(item.get("text") or "").lower()
+        for item in ordered_existing
+        if _clean_memory_text(item.get("text") or "")
     }
 
-    conflict_index_by_key: dict[str, int] = {}
-    for index, item in enumerate(normalized_memory):
-        text = _textish(item.get("text"))
+    conflict_index: dict[str, int] = {}
+    for idx, item in enumerate(ordered_existing):
+        text = _textish(item.get("text") or "")
         kind = _textish(item.get("kind") or "note")
         key = _memory_conflict_key(text, kind)
-        conflict_index_by_key[key] = index
+        if key:
+            conflict_index[key] = idx
 
-    for item in candidates:
-        text = _clean_memory_text(item.get("text") or "")
-        kind = _textish(item.get("kind") or "note").lower() or "note"
-        lowered_text = text.lower()
+    for candidate in candidates:
+        text = _clean_memory_text(candidate.get("text") or "")
+        kind = _textish(candidate.get("kind") or "note").lower() or "note"
 
         if not text:
             continue
-        if lowered_text in existing_texts:
+
+        lowered = text.lower()
+        if lowered in existing_texts:
             continue
 
-        new_record = {
-            "id": make_id("mem"),
-            "text": text,
+        key = _memory_conflict_key(text, kind)
+
+        new_item = {
+            "id": make_id("memory"),
             "kind": kind,
-            "source": "memory",
+            "text": text,
+            "source": "assistant",
             "session_id": session_id,
             "created_at": now,
             "updated_at": now,
-            "uses": 1,
         }
 
-        conflict_key = _memory_conflict_key(text, kind)
+        if key in conflict_index:
+            old_idx = conflict_index[key]
+            old_item = ordered_existing[old_idx]
 
-        if conflict_key in conflict_index_by_key:
-            existing_index = conflict_index_by_key[conflict_key]
-            existing_item = normalized_memory[existing_index]
+            new_item["id"] = old_item.get("id") or new_item["id"]
+            new_item["created_at"] = old_item.get("created_at") or now
+            ordered_existing[old_idx] = new_item
+        else:
+            ordered_existing.insert(0, new_item)
+            conflict_index[key] = 0
 
-            existing_kind = _textish(existing_item.get("kind") or "note").lower()
-            existing_priority = _memory_kind_priority(existing_kind)
-            new_priority = _memory_kind_priority(kind)
+        existing_texts.add(lowered)
 
-            if new_priority >= existing_priority:
-                normalized_memory.pop(existing_index)
-                normalized_memory.insert(0, new_record)
+    ordered_existing.sort(
+        key=lambda item: _textish(item.get("updated_at") or item.get("created_at")),
+        reverse=True,
+    )
 
-                conflict_index_by_key = {}
-                for idx, mem_item in enumerate(normalized_memory):
-                    mem_text = _textish(mem_item.get("text"))
-                    mem_kind = _textish(mem_item.get("kind") or "note")
-                    mem_key = _memory_conflict_key(mem_text, mem_kind)
-                    conflict_index_by_key[mem_key] = idx
-
-                existing_texts = {
-                    _textish(mem_item.get("text")).lower()
-                    for mem_item in normalized_memory
-                }
-            continue
-
-        normalized_memory.insert(0, new_record)
-        existing_texts.add(lowered_text)
-        conflict_index_by_key[conflict_key] = 0
-
-    normalized_memory = normalized_memory[:MEMORY_WRITE_MAX_ITEMS]
-    write_json(MEMORY_FILE, normalized_memory)
-
+    ordered_existing = ordered_existing[:MEMORY_WRITE_MAX_ITEMS]
+    write_json(MEMORY_FILE, ordered_existing)
 
 def _session_keyword_text(session: dict[str, Any]) -> str:
     bits: list[str] = []
@@ -1475,20 +1664,27 @@ def _detect_response_format_mode(user_text: str) -> str:
 
     return "general"
 
-
 def build_response_formatting_block(
     *,
     user_text: str,
     session: dict[str, Any] | None,
 ) -> str:
     mode = _detect_response_format_mode(user_text)
+    lowered = _textish(user_text).lower()
+
+    wants_tldr = "tldr" in lowered or "tl;dr" in lowered
+    wants_full_file = "full file" in lowered or "smff" in lowered
+    wants_steps = "steps" in lowered or "step by step" in lowered
+    wants_short = any(term in lowered for term in {"short", "brief", "quick", "concise", "direct"})
+    wants_detail = any(term in lowered for term in {"detailed", "in depth", "deep dive", "full breakdown"})
 
     lines: list[str] = [
         "- Match the user's stored style preferences when relevant.",
         "- Prefer clean formatting over long walls of text.",
-        "- Lead with the answer or action, not setup talk.",
+        "- Lead with the answer, action, or fix first.",
         "- Do not waste space repeating the user's question.",
-        "- Do not sound robotic, corporate, or overly polished.",
+        "- Do not sound robotic, corporate, or over-polished.",
+        "- Use only enough structure to make execution faster and clearer.",
     ]
 
     if mode == "debug":
@@ -1542,21 +1738,164 @@ def build_response_formatting_block(
             ]
         )
 
-    lowered = _textish(user_text).lower()
-    if "tldr" in lowered or "tl;dr" in lowered:
+    if wants_tldr:
         lines.append("- Include a short TLDR at the top.")
-    if "full file" in lowered or "smff" in lowered:
+
+    if wants_full_file:
         lines.append("- The user wants a real full-file style answer, not partial snippets.")
-    if "steps" in lowered:
+
+    if wants_steps:
         lines.append("- Use numbered steps where that makes execution easier.")
 
+    if wants_short and not wants_detail:
+        lines.append("- Keep the answer tight. Trim filler and optional explanation.")
+
+    if wants_detail:
+        lines.append("- The user asked for more depth. Expand, but stay structured and useful.")
+
     return "Response formatting rules for this request:\n" + "\n".join(lines)
+
+# =========================================================
+# RESPONSE QUALITY CONTROL LOCK
+# =========================================================
+
+def _canonical_response_route(route: str) -> str:
+    route = _textish(route).lower()
+
+    if route in {"debug", "fix", "error"}:
+        return "debug"
+
+    if route in {"code", "coding", "implementation", "dev"}:
+        return "code"
+
+    if route in {"plan", "planning", "roadmap", "strategy"}:
+        return "plan"
+
+    if route in {"write", "writing", "rewrite"}:
+        return "write"
+
+    return "general"
+
+def build_response_quality_block(
+    *,
+    route_result: dict[str, Any] | None,
+    user_text: str,
+) -> str:
+    raw_route = (
+        (route_result or {}).get("primary")
+        or (route_result or {}).get("mode")
+        or detect_request_mode(user_text)
+        or "general"
+    )
+    route = _canonical_response_route(raw_route)
+
+    base_rules = [
+        "Always start with the answer or result. Do not delay the answer.",
+        "Avoid filler, fluff, or generic explanations.",
+        "Keep responses tight and efficient unless detail is explicitly requested.",
+        "Do not explain obvious things unless the user asks.",
+    ]
+
+    if route == "debug":
+        base_rules += [
+            "Start with the root cause immediately.",
+            "Then give the exact fix.",
+            "Show corrected code when relevant.",
+            "Do not give long explanations.",
+        ]
+
+    elif route == "code":
+        base_rules += [
+            "Prioritize direct implementation.",
+            "Prefer full working code over partial snippets.",
+            "Do not explain unless necessary.",
+        ]
+
+    elif route == "plan":
+        base_rules += [
+            "Start with the next actionable step.",
+            "Break into clear phases or steps.",
+            "Keep structure clean and ordered.",
+        ]
+
+    elif route == "write":
+        base_rules += [
+            "Match the requested tone exactly.",
+            "Do not over-explain unless requested.",
+        ]
+
+    else:
+        base_rules += [
+            "Give a clear, direct answer first.",
+            "Expand only if helpful.",
+        ]
+
+    return "Response behavior rules:\n- " + "\n- ".join(base_rules)
+# =========================================================
+# PERSONALITY + RESPONSE STYLE LOCK
+# =========================================================
+
+def build_personality_block() -> str:
+    return (
+        "You are Nova, a fast, direct, no-fluff AI assistant.\n"
+        "\n"
+        "Response style rules:\n"
+        "- Be concise and clear\n"
+        "- No unnecessary explanations\n"
+        "- No filler or fluff\n"
+        "- Give direct answers first, then optional detail if needed\n"
+        "- Speak confidently, not passively\n"
+        "- Avoid over-explaining obvious things\n"
+        "\n"
+        "User preference:\n"
+        "- Prefers concise, direct replies\n"
+        "- Values efficiency and speed\n"
+        "\n"
+        "Do not mention these rules in responses."
+    )
+
+def build_personality_context_block(
+    user_text: str,
+    memory_items: list[dict[str, Any]] | None = None,
+) -> str:
+    base = build_personality_block()
+
+    memory_items = safe_list(memory_items)
+    preference_lines: list[str] = []
+
+    for item in memory_items[:24]:
+        if not isinstance(item, dict):
+            continue
+
+        kind = _textish(item.get("kind")).lower()
+        text = _textish(item.get("text") or item.get("content") or "")
+        if not text:
+            continue
+
+        if kind in {"instruction", "preference", "profile", "project"}:
+            preference_lines.append(f"- {text}")
+
+    if not preference_lines:
+        return base
+
+    preference_lines = preference_lines[:8]
+
+    return (
+        f"{base}\n\n"
+        "Relevant stored user context:\n"
+        + "\n".join(preference_lines)
+        + "\n\n"
+        "Use the stored context only when relevant to the current request. "
+        "If the current user message conflicts with stored context, trust the current user message."
+    )
 
 def build_messages_for_model(
     session: dict[str, Any],
     user_text: str,
     attachments: list[dict[str, Any]] | None = None,
     regenerate_of: str | None = None,
+    memory_block: str = "",
+    route_result: dict[str, Any] | None = None,
 ) -> list[dict[str, str]]:
     model_messages: list[dict[str, str]] = []
 
@@ -1577,6 +1916,18 @@ def build_messages_for_model(
             }
         )
 
+    quality_block = build_response_quality_block(
+        route_result=route_result,
+        user_text=user_text,
+    )
+    if quality_block:
+        model_messages.append(
+            {
+                "role": "system",
+                "content": quality_block,
+            }
+        )
+
     formatting_block = build_response_formatting_block(
         user_text=user_text,
         session=session,
@@ -1593,11 +1944,15 @@ def build_messages_for_model(
             }
         )
 
-    memory_block = build_memory_context_block(
-        user_text=user_text,
-        session=session,
-    )
     if memory_block:
+        injected_memory = memory_block
+    else:
+        injected_memory = build_memory_context_block(
+            user_text=user_text,
+            session=session,
+        )
+
+    if injected_memory:
         model_messages.append(
             {
                 "role": "system",
@@ -1606,7 +1961,7 @@ def build_messages_for_model(
                     "Priority order: instructions, preferences, project context, then general notes. "
                     "Follow stored user workflow and style preferences when they apply. "
                     "Do not mention memory explicitly unless the user asks.\n\n"
-                    f"{memory_block}"
+                    f"{injected_memory}"
                 ),
             }
         )
@@ -1624,9 +1979,6 @@ def build_messages_for_model(
             }
         )
 
-    # =========================================================
-    # HISTORY (TRIMMED)
-    # =========================================================
     history = session_messages(session)[-MODEL_HISTORY_LIMIT:]
     for msg in history:
         role = str(msg.get("role") or "assistant")
@@ -1637,151 +1989,112 @@ def build_messages_for_model(
         if not text:
             continue
 
-        model_messages.append({
-            "role": role,
-            "content": text
-        })
+        model_messages.append(
+            {
+                "role": role,
+                "content": text,
+            }
+        )
 
-    # =========================================================
-    # USER INPUT / REGENERATE
-    # =========================================================
     if regenerate_of:
         target = find_message(session, regenerate_of)
         target_text = message_text(target or {})
 
         if target_text.strip():
-            model_messages.append({
-                "role": "user",
-                "content": (
-                    "Please regenerate the assistant answer below.\n\n"
-                    f"{target_text}"
-                )
-            })
+            model_messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "Please regenerate the assistant answer below.\n\n"
+                        f"{target_text}"
+                    ),
+                }
+            )
         else:
             clean_user_text = normalize_text(user_text).strip()
             if clean_user_text:
-                model_messages.append({
-                    "role": "user",
-                    "content": clean_user_text
-                })
+                model_messages.append(
+                    {
+                        "role": "user",
+                        "content": clean_user_text,
+                    }
+                )
     else:
         clean_user_text = normalize_text(user_text).strip()
 
         if clean_user_text:
-            model_messages.append({
-                "role": "user",
-                "content": clean_user_text
-            })
+            model_messages.append(
+                {
+                    "role": "user",
+                    "content": clean_user_text,
+                }
+            )
         elif attachments:
-            model_messages.append({
-                "role": "user",
-                "content": "Use the uploaded files as context."
-            })
+            model_messages.append(
+                {
+                    "role": "user",
+                    "content": "Use the uploaded files as context.",
+                }
+            )
 
     return model_messages
 
-PERSONALITY_DEFAULT = "direct, concise, practical, solution-first"
-STYLE_MAX_ITEMS = 6
-
-
-def _style_conflict_key(text: str) -> str:
-    lowered = _textish(text).lower()
-
-    if any(word in lowered for word in {"concise", "brief", "short"}):
-        return "reply_length"
-    if any(word in lowered for word in {"detailed", "detail", "long", "longer", "verbose"}):
-        return "reply_length"
-
-    if "direct" in lowered:
-        return "tone_directness"
-    if "gentle" in lowered or "soft" in lowered:
-        return "tone_directness"
-
-    if "formal" in lowered:
-        return "formality"
-    if "casual" in lowered:
-        return "formality"
-
-    return lowered
-
-
 def _extract_style_preferences(memory_items: list[dict[str, Any]]) -> list[str]:
-    selected_by_key: dict[str, tuple[str, str]] = {}
+    if not memory_items:
+        return []
 
-    for item in memory_items:
-        if not isinstance(item, dict):
-            continue
+    def _normalize(text: str) -> str:
+        return _textish(text).strip()
 
-        kind = _textish(item.get("kind")).lower()
-        text = _textish(item.get("text") or item.get("content") or item.get("body"))
-        if not text:
-            continue
+    def _key(text: str) -> str:
+        t = _textish(text).lower()
 
-        lowered = text.lower()
+        # 🔥 length conflict
+        if any(w in t for w in {"short", "brief", "concise", "tight"}):
+            return "length"
+        if any(w in t for w in {"long", "detailed", "in depth", "deep dive", "verbose"}):
+            return "length"
 
-        if kind not in {"preference", "instruction", "profile"}:
-            continue
+        # 🔥 tone
+        if "direct" in t:
+            return "tone"
+        if any(w in t for w in {"gentle", "soft"}):
+            return "tone"
 
-        style_hit = any(
-            word in lowered
-            for word in {
-                "concise", "direct", "detailed", "brief", "tone", "style",
-                "solution-first", "no fluff", "endgame", "short", "clear",
-                "formal", "casual", "gentle", "soft", "verbose", "longer",
-            }
-        )
-        if not style_hit:
-            continue
+        # 🔥 format
+        if "powershell" in t:
+            return "shell"
+        if any(w in t for w in {"full file", "full-file", "smff"}):
+            return "format"
+        if any(w in t for w in {"steps", "step by step"}):
+            return "format"
 
-        key = _style_conflict_key(text)
-        updated_at = _textish(item.get("updated_at") or item.get("created_at") or "")
+        # 🔥 fallback
+        return f"raw:{t}"
 
-        existing = selected_by_key.get(key)
-        if existing is None or updated_at >= existing[0]:
-            selected_by_key[key] = (updated_at, text)
-
-    ranked = sorted(
-        selected_by_key.values(),
-        key=lambda pair: pair[0],
+    ordered = sorted(
+        safe_list(memory_items),
+        key=lambda x: _textish(x.get("updated_at") or x.get("created_at")),
         reverse=True,
     )
 
-    return [text for _, text in ranked[:STYLE_MAX_ITEMS]]
+    winners: dict[str, str] = {}
 
+    for item in ordered:
+        if _textish(item.get("kind")).lower() != "preference":
+            continue
 
-def build_personality_context_block(
-    user_text: str,
-    memory_items: list[dict[str, Any]],
-) -> str:
-    style_preferences = _extract_style_preferences(memory_items)
+        text = _normalize(item.get("text") or "")
+        if not text:
+            continue
 
-    lines: list[str] = [
-        f"- Default assistant behavior: {PERSONALITY_DEFAULT}",
-        "- Be useful fast. Prefer direct answers over setup talk.",
-        "- Keep wording clean and natural. Do not sound generic, corporate, or padded.",
-        "- Newer stored style preferences override older conflicting ones.",
-        "- If the user has a concise/direct preference, that should dominate unless they clearly ask for more detail.",
-        "- When coding or debugging, be concrete, operational, and specific.",
-    ]
+        k = _key(text)
 
-    if style_preferences:
-        lines.append("- Active user style preferences (newest conflict winner):")
-        for item in style_preferences:
-            lines.append(f"  - {item}")
+        # newest wins
+        if k not in winners:
+            winners[k] = text
 
-    lowered = _textish(user_text).lower()
-
-    if any(term in lowered for term in {"bug", "error", "fix", "debug", "traceback", "crash"}):
-        lines.append("- Current request is debugging-heavy. Prioritize root cause, exact fix, and what to test next.")
-
-    if any(term in lowered for term in {"code", "file", "app.py", "javascript", "python", "api"}):
-        lines.append("- Current request is implementation-heavy. Prefer exact blocks and concrete guidance over theory.")
-
-    if any(term in lowered for term in {"explain", "teach", "what is", "how does"}):
-        lines.append("- The user is asking for explanation. Stay clear and practical, but keep it tight unless they ask for more depth.")
-
-    return "Personality and response style:\n" + "\n".join(lines)
-
+    return list(winners.values())
 
 def local_fallback_response(
     session: dict[str, Any],
@@ -1816,52 +2129,6 @@ def local_fallback_response(
     )
 
 
-def stream_model_text(
-    session: dict[str, Any],
-    user_text: str,
-    attachments: list[dict[str, Any]] | None = None,
-    regenerate_of: str | None = None,
-) -> Generator[str, None, None]:
-    model_messages = build_messages_for_model(
-        session,
-        user_text,
-        attachments=attachments,
-        regenerate_of=regenerate_of,
-    )
-
-    if OPENAI_CLIENT is None:
-        fallback_text = local_fallback_response(
-            session,
-            user_text,
-            attachments=attachments,
-            regenerate_of=regenerate_of,
-        )
-        for ch in fallback_text:
-            yield ch
-        return
-
-    stream = OPENAI_CLIENT.chat.completions.create(
-        model=OPENAI_MODEL,
-        messages=model_messages,
-        stream=True,
-    )
-
-    for chunk in stream:
-        try:
-            choices = getattr(chunk, "choices", None) or []
-            if not choices:
-                continue
-
-            delta = getattr(choices[0], "delta", None)
-            if delta is None:
-                continue
-
-            content = getattr(delta, "content", None)
-            if content:
-                yield str(content)
-        except Exception:
-            continue
-
 def build_personality_context_block(user_text: str, memory_items: list[dict[str, Any]]) -> str:
     lines = [
         "- Be concise and direct",
@@ -1877,10 +2144,63 @@ def build_personality_context_block(user_text: str, memory_items: list[dict[str,
 
     return "Assistant behavior:\n" + "\n".join(lines)
 
+def stream_model_text(
+    session: dict[str, Any],
+    user_text: str,
+    attachments: list[dict[str, Any]] | None = None,
+    regenerate_of: str | None = None,
+    memory_block: str = "",
+    route_result: dict[str, Any] | None = None,
+) -> Generator[str, None, None]:
+
+    # =========================================================
+    # 🔥 D5 — ONE SOURCE OF TRUTH
+    # =========================================================
+
+    payload = build_model_payload(
+        session=session,
+        user_text=user_text,
+        attachments=attachments,
+        regenerate_of=regenerate_of,
+    )
+
+    route_result = payload["route_result"]
+    route = payload["route"]
+    memory_selection = payload["memory_selection"]
+    memory_block = payload["memory_block"]
+    execution = payload["execution"]
+    execution_context = payload["execution_context"]
+    model_messages = payload["model_messages"]
+
+    if OPENAI_CLIENT is None:
+        fallback_text = local_fallback_response(
+            user_text=user_text,
+            attachments=attachments,
+        )
+        yield fallback_text
+        return
+
+    stream = OPENAI_CLIENT.chat.completions.create(
+        model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
+        messages=model_messages,
+        stream=True,
+    )
+
+    for chunk in stream:
+        try:
+            delta = chunk.choices[0].delta
+            token = getattr(delta, "content", None)
+        except Exception:
+            token = None
+
+        if not token:
+            continue
+
+        yield token
+
 # =========================================================
 # STREAM CONTRACT LOCK
 # =========================================================
-
 
 def chat_stream_generator(
     *,
@@ -1889,13 +2209,7 @@ def chat_stream_generator(
     attachments: list[dict[str, Any]] | None,
     regenerate_of: str | None,
 ) -> Generator[str, None, None]:
-    """
-    Backend-true contract:
-    - exactly one start
-    - zero or more token
-    - exactly one final OR one error
-    - on abort/disconnect, do not write a second assistant message
-    """
+
     store = load_sessions_store()
     session = find_session(store, session_id)
     if not session:
@@ -1913,90 +2227,68 @@ def chat_stream_generator(
     except Exception:
         pass
 
-    target_message = find_message(session, regenerate_of) if regenerate_of else None
-
-    assistant_message_id = (target_message or {}).get("id") if target_message else make_id("assistant")
+    assistant_message_id = make_id("assistant")
     assistant_created_at = now_iso()
-    final_text = ""
-    final_written = False
+
     started = False
-
-    def persist_final(
-        *,
-        stopped: bool = False,
-        error: bool = False,
-        error_message: str = "",
-    ) -> dict[str, Any]:
-        nonlocal final_written
-
-        if final_written:
-            existing = find_message(session, assistant_message_id)
-            return existing or {}
-
-        text_value = final_text
-        if error and error_message:
-            text_value = (text_value + ("\n\n" if text_value else "") + f"[Error] {error_message}").strip()
-
-        assistant_message = normalize_message(
-            {
-                "id": assistant_message_id,
-                "role": "assistant",
-                "text": text_value,
-                "created_at": assistant_created_at,
-                "pending": False,
-                "streaming": False,
-                "stopped": stopped,
-                "error": error,
-                "source": "regenerate" if regenerate_of else "send",
-                "meta": {
-                    "regenerate_of": regenerate_of or "",
-                },
-            }
-        )
-
-        if regenerate_of and target_message:
-            replace_message(session, assistant_message_id, assistant_message)
-        else:
-            existing = find_message(session, assistant_message_id)
-            if existing:
-                replace_message(session, assistant_message_id, assistant_message)
-            else:
-                append_message(session, assistant_message)
-
-        save_sessions_store(store)
-
-        try:
-            save_artifact_from_assistant(
-                assistant_message,
-                locked_session_id,
-            )
-        except Exception:
-            pass
-
-        final_written = True
-        return assistant_message
+    refined_text = ""
 
     try:
-        start_event = {
-            "type": "start",
-            "session_id": locked_session_id,
-            "message_id": assistant_message_id,
-            "assistant_message_id": assistant_message_id,
-            "mode": "regenerate" if regenerate_of else "send",
-        }
-        started = True
-        yield sse(start_event)
-
-        for token in stream_model_text(
-            session,
-            user_text,
+        # =========================================================
+        # 🔥 D5 — ONE SOURCE OF TRUTH
+        # =========================================================
+        payload = build_model_payload(
+            session=session,
+            user_text=user_text,
             attachments=attachments,
             regenerate_of=regenerate_of,
+        )
+
+        route_result = payload["route_result"]
+        route = payload["route"]
+        memory_selection = payload["memory_selection"]
+        memory_block = payload["memory_block"]
+        execution_context = payload["execution_context"]
+        model_messages = payload["model_messages"]
+
+        # =========================================================
+        # STREAM LOOP
+        # =========================================================
+        for token in stream_model_text(
+            session=session,
+            user_text=user_text,
+            attachments=attachments,
+            regenerate_of=regenerate_of,
+            memory_block=memory_block,
+            route_result=route_result,
         ):
-            final_text += token
+            if not started:
+                started = True
+                yield sse(
+                    {
+                        "type": "start",
+                        "ok": True,
+                        "session_id": locked_session_id,
+                        "message_id": assistant_message_id,
+                        "assistant_message_id": assistant_message_id,
+                        "debug": {
+                            "route_build": "phase-d5-one-source-of-truth-prompt-builder-2026-04-08-001",
+                            "route_result": route_result,
+                            "route": route,
+                        },
+                    }
+                )
+
+            token = str(token or "")
+            if not token:
+                continue
+
+            refined_text += token
+
             yield sse(
                 {
                     "type": "token",
+                    "ok": True,
                     "session_id": locked_session_id,
                     "message_id": assistant_message_id,
                     "assistant_message_id": assistant_message_id,
@@ -2004,7 +2296,17 @@ def chat_stream_generator(
                 }
             )
 
-        final_message = persist_final(stopped=False, error=False)
+        # =========================================================
+        # FINAL WRITE
+        # =========================================================
+        final_message = {
+            "id": assistant_message_id,
+            "role": "assistant",
+            "text": refined_text,
+            "created_at": assistant_created_at,
+        }
+
+        append_message(session, final_message)
 
         yield sse(
             {
@@ -2017,128 +2319,96 @@ def chat_stream_generator(
                 "messages": session_messages(session),
                 "artifacts": load_artifacts(),
                 "memory": load_memory(),
+                "debug": {
+                    "route_build": "phase-d5-one-source-of-truth-prompt-builder-2026-04-08-001",
+                    "route_result": route_result,
+                    "route": route,
+                    "memory_selected_count": len(memory_selection.get("items", [])) if isinstance(memory_selection, dict) else 0,
+                    "has_memory_block": bool(memory_block),
+                    "has_execution_context": bool(execution_context),
+                    "model_messages_count": len(model_messages),
+                },
             }
         )
 
-    except GeneratorExit:
-        raise
-
-    except BrokenPipeError:
-        raise
-
     except Exception as exc:
-        error_text = str(exc) or "Generation failed."
-
-        if started:
-            try:
-                final_message = persist_final(
-                    stopped=False,
-                    error=True,
-                    error_message=error_text,
-                )
-                yield sse(
-                    {
-                        "type": "error",
-                        "ok": False,
-                        "session_id": locked_session_id,
-                        "message_id": assistant_message_id,
-                        "assistant_message_id": assistant_message_id,
-                        "message": final_message,
-                        "error": error_text,
-                    }
-                )
-            except Exception:
-                yield sse(
-                    {
-                        "type": "error",
-                        "ok": False,
-                        "session_id": locked_session_id,
-                        "message_id": assistant_message_id,
-                        "assistant_message_id": assistant_message_id,
-                        "error": error_text,
-                    }
-                )
-        else:
-            yield sse(
-                {
-                    "type": "error",
-                    "ok": False,
-                    "session_id": locked_session_id,
-                    "error": error_text,
-                }
-            )
+        yield sse(
+            {
+                "type": "error",
+                "ok": False,
+                "error": str(exc) or "Stream failed",
+            }
+        )
 
 def run_non_stream_chat(
-    *,
     session_id: str,
     user_text: str,
-    attachments: list[dict[str, Any]] | None,
-    regenerate_of: str | None,
+    attachments: list[dict[str, Any]] | None = None,
+    regenerate_of: str | None = None,
+    route_result: dict[str, Any] | None = None,
+    memory_selection: dict[str, Any] | None = None,
+    memory_block: str = "",
 ) -> dict[str, Any]:
     store = load_sessions_store()
-    session = find_session(store, session_id)
-    if not session:
-        session = ensure_active_session(store)
+    session = find_session(store, session_id) or ensure_active_session(store)
 
-    locked_session_id = str(session.get("id") or session_id or "")
     attachments = normalize_attachments(attachments)
-
-    if not regenerate_of and (normalize_text(user_text).strip() or attachments):
-        append_message(session, make_user_message(user_text, attachments))
-
-    try:
-        candidates = extract_memory_candidates(user_text)
-        save_memory_items(candidates, locked_session_id)
-    except Exception:
-        pass
+    route_result = route_result if isinstance(route_result, dict) else {}
+    memory_selection = memory_selection if isinstance(memory_selection, dict) else {}
 
     target_message = find_message(session, regenerate_of) if regenerate_of else None
     assistant_message_id = (target_message or {}).get("id") if target_message else make_id("assistant")
 
     parts: list[str] = []
-    for chunk in stream_model_text(
+    for token in stream_model_text(
         session,
         user_text,
         attachments=attachments,
         regenerate_of=regenerate_of,
     ):
-        parts.append(chunk)
+        parts.append(str(token or ""))
 
-    final_text = "".join(parts)
+    final_text = "".join(parts).strip()
+    if not final_text:
+        final_text = "No response generated."
 
-    assistant_message = normalize_message(
-        {
-            "id": assistant_message_id,
-            "role": "assistant",
-            "text": final_text,
-            "created_at": now_iso(),
-            "pending": False,
-            "streaming": False,
-            "stopped": False,
-            "error": False,
-            "source": "regenerate" if regenerate_of else "send",
-            "meta": {"regenerate_of": regenerate_of or ""},
-        }
+    assistant_message = make_assistant_message(
+        final_text,
+        message_id=assistant_message_id,
+        source="send",
+        pending=False,
+        streaming=False,
+        stopped=False,
+        error=False,
+        meta={
+            "regenerate_of": regenerate_of or "",
+        },
     )
 
-    if regenerate_of and target_message:
+    if target_message:
         replace_message(session, assistant_message_id, assistant_message)
     else:
         append_message(session, assistant_message)
 
+    recalc_session(session)
     save_sessions_store(store)
 
     try:
-        save_artifact_from_assistant(
-            assistant_message,
-            locked_session_id,
-        )
+        save_artifact_from_assistant(assistant_message, session["id"])
     except Exception:
         pass
 
-    payload = state_payload(session)
-    payload["assistant_message"] = assistant_message
-    return payload
+    return {
+        "ok": True,
+        "assistant_message": assistant_message,
+        "session": session_contract_payload(session)["session"],
+        "session_id": session["id"],
+        "active_session_id": session["id"],
+        "debug": {
+            "route_result": route_result,
+            "memory_selected_count": len(memory_selection.get("selected") or []),
+        },
+    }
 
 # =========================================================
 # ROUTES
@@ -2366,6 +2636,1242 @@ def api_sessions_delete() -> Any:
         )
     )
 
+# =========================================================
+# MEMORY RELEVANCE SELECTION LOCK
+# =========================================================
+
+MEMORY_RELEVANCE_BUILD = "memory-relevance-lock-2026-04-08-001"
+MEMORY_MAX_INJECT = 6
+MEMORY_TEXT_SOFT_MAX = 220
+
+MEMORY_KIND_BASE_WEIGHTS = {
+    "preference": 4.0,
+    "personality": 3.5,
+    "project": 3.0,
+    "identity": 2.0,
+    "workflow": 3.5,
+    "goal": 2.5,
+    "summary": 1.8,
+    "note": 1.2,
+    "temporary": 0.6,
+}
+
+ROUTE_MEMORY_KIND_BONUS = {
+    "code": {"workflow": 2.0, "project": 1.5, "preference": 1.2},
+    "debug": {"workflow": 1.8, "project": 1.4, "summary": 0.8},
+    "plan": {"goal": 1.8, "project": 1.6, "workflow": 1.0},
+    "write": {"preference": 1.6, "personality": 1.8, "summary": 1.0},
+    "analysis": {"summary": 1.4, "project": 1.2, "goal": 1.0},
+    "general": {"preference": 1.0, "project": 0.8},
+    "attachment_analysis": {"project": 1.0, "workflow": 0.8},
+    "web": {"project": 0.8, "goal": 0.6},
+    "image": {"preference": 0.8, "project": 0.6},
+}
+
+TEMPORARY_MEMORY_HINTS = [
+    "today",
+    "tonight",
+    "this week",
+    "this month",
+    "for now",
+    "currently",
+    "temporary",
+    "tmp",
+    "draft",
+    "test",
+    "trying",
+]
+
+DURABLE_MEMORY_HINTS = [
+    "prefer",
+    "always",
+    "never",
+    "from now on",
+    "going forward",
+    "i want",
+    "my project",
+    "my app",
+    "my workflow",
+]
+
+CONFLICT_HINT_GROUPS = [
+    ["prefer concise", "prefer detailed"],
+    ["always send full file", "partial edits are fine"],
+    ["powershell", "bash"],
+]
+
+
+def _memory_textish(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _memory_normalize_text(value: Any) -> str:
+    text = _memory_textish(value).lower().strip()
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
+def _memory_tokenize(value: Any) -> list[str]:
+    text = _memory_normalize_text(value)
+    return re.findall(r"[a-z0-9_./:\\-]+", text)
+
+
+def _memory_overlap_score(a: Any, b: Any) -> float:
+    ta = set(_memory_tokenize(a))
+    tb = set(_memory_tokenize(b))
+    if not ta or not tb:
+        return 0.0
+    overlap = ta & tb
+    if not overlap:
+        return 0.0
+    return min(4.0, float(len(overlap)) * 0.7)
+
+
+def _memory_kind_of(item: dict[str, Any]) -> str:
+    kind = _memory_normalize_text(item.get("kind") or "")
+    if kind:
+        return kind
+    text = _memory_normalize_text(item.get("text") or "")
+    if any(h in text for h in DURABLE_MEMORY_HINTS):
+        return "preference"
+    if any(h in text for h in TEMPORARY_MEMORY_HINTS):
+        return "temporary"
+    return "note"
+
+
+def _memory_age_days(item: dict[str, Any]) -> float:
+    raw = (
+        item.get("updated_at")
+        or item.get("created_at")
+        or item.get("timestamp")
+        or ""
+    )
+    raw = _memory_textish(raw)
+    if not raw:
+        return 9999.0
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return max(0.0, (now - dt.astimezone(timezone.utc)).total_seconds() / 86400.0)
+    except Exception:
+        return 9999.0
+
+
+def _memory_recency_score(kind: str, age_days: float) -> float:
+    if age_days >= 9999:
+        return 0.0
+
+    if kind in {"preference", "workflow", "project", "personality"}:
+        if age_days <= 365:
+            return 1.6
+        if age_days <= 730:
+            return 1.0
+        return 0.2
+
+    if kind in {"temporary", "note"}:
+        if age_days <= 3:
+            return 1.6
+        if age_days <= 14:
+            return 0.8
+        if age_days <= 45:
+            return 0.2
+        return -1.2
+
+    if age_days <= 30:
+        return 1.0
+    if age_days <= 120:
+        return 0.4
+    return 0.0
+
+
+def _memory_is_temporary(item: dict[str, Any]) -> bool:
+    text = _memory_normalize_text(item.get("text") or "")
+    kind = _memory_kind_of(item)
+    return kind == "temporary" or any(h in text for h in TEMPORARY_MEMORY_HINTS)
+
+
+def _memory_is_durable(item: dict[str, Any]) -> bool:
+    text = _memory_normalize_text(item.get("text") or "")
+    kind = _memory_kind_of(item)
+    return kind in {"preference", "workflow", "project", "personality"} or any(
+        h in text for h in DURABLE_MEMORY_HINTS
+    )
+
+
+def _memory_trim_text(text: Any, limit: int = MEMORY_TEXT_SOFT_MAX) -> str:
+    value = _memory_textish(text)
+    if len(value) <= limit:
+        return value
+    return value[: limit - 3].rstrip() + "..."
+
+
+def _memory_route_bonus(route_name: str, kind: str) -> float:
+    route_map = ROUTE_MEMORY_KIND_BONUS.get(route_name or "", {})
+    return float(route_map.get(kind, 0.0))
+
+
+def _memory_conflict_key(text: str, kind: str = "") -> str:
+    normalized = _memory_normalize_text(text)
+    normalized_kind = _textish(kind).strip().lower()
+
+    for group in CONFLICT_HINT_GROUPS:
+        for hint in group:
+            if hint in normalized:
+                base = "group:" + "|".join(group)
+                return f"{normalized_kind}::{base}" if normalized_kind else base
+
+    return f"{normalized_kind}::{normalized}" if normalized_kind else normalized
+
+def _score_memory_item(
+    item: dict[str, Any],
+    user_text: str,
+    route_result: dict[str, Any] | None = None,
+    session_id: str | None = None,
+) -> dict[str, Any]:
+    text = _memory_textish(item.get("text") or "")
+    if not text:
+        return {
+            "id": item.get("id") or "",
+            "score": -999.0,
+            "reasons": ["empty-text"],
+            "kind": _memory_kind_of(item),
+            "text": "",
+            "age_days": 9999.0,
+        }
+
+    route_result = route_result or {}
+    primary = route_result.get("primary") or "general"
+    secondary = route_result.get("secondary") or ""
+    kind = _memory_kind_of(item)
+    age_days = _memory_age_days(item)
+
+    score = 0.0
+    reasons: list[str] = []
+
+    base = float(MEMORY_KIND_BASE_WEIGHTS.get(kind, 1.0))
+    score += base
+    reasons.append(f"kind:{kind}+{base}")
+
+    overlap = _memory_overlap_score(text, user_text)
+    if overlap:
+        score += overlap
+        reasons.append(f"overlap+{round(overlap, 2)}")
+
+    primary_bonus = _memory_route_bonus(primary, kind)
+    if primary_bonus:
+        score += primary_bonus
+        reasons.append(f"route:{primary}+{primary_bonus}")
+
+    if secondary:
+        secondary_bonus = _memory_route_bonus(secondary, kind) * 0.45
+        if secondary_bonus:
+            score += secondary_bonus
+            reasons.append(f"secondary:{secondary}+{round(secondary_bonus, 2)}")
+
+    recency = _memory_recency_score(kind, age_days)
+    if recency:
+        score += recency
+        reasons.append(f"recency+{round(recency, 2)}")
+
+    item_session_id = _memory_textish(item.get("session_id") or "")
+    if session_id and item_session_id and item_session_id == session_id:
+        score += 0.9
+        reasons.append("same-session+0.9")
+
+    if _memory_is_durable(item):
+        score += 0.8
+        reasons.append("durable+0.8")
+
+    if _memory_is_temporary(item):
+        score -= 0.8
+        reasons.append("temporary-0.8")
+
+    normalized = _memory_normalize_text(text)
+    if "prefer concise" in normalized and primary in {"code", "debug", "plan"}:
+        score += 0.8
+        reasons.append("concise-fit+0.8")
+
+    return {
+        "id": item.get("id") or "",
+        "score": round(score, 3),
+        "reasons": reasons[:12],
+        "kind": kind,
+        "text": _memory_trim_text(text),
+        "age_days": round(age_days, 2) if age_days < 9999 else 9999.0,
+        "session_id": item_session_id,
+        "source": item.get("source") or "",
+        "updated_at": item.get("updated_at") or item.get("created_at") or "",
+        "item": item,
+    }
+
+
+def select_relevant_memories(
+    memories: list[dict[str, Any]],
+    user_text: str,
+    route_result: dict[str, Any] | None = None,
+    session_id: str | None = None,
+    limit: int = MEMORY_MAX_INJECT,
+) -> dict[str, Any]:
+    scored: list[dict[str, Any]] = []
+    for item in memories or []:
+        scored.append(
+            _score_memory_item(
+                item=item,
+                user_text=user_text,
+                route_result=route_result,
+                session_id=session_id,
+            )
+        )
+
+    scored.sort(key=lambda x: x["score"], reverse=True)
+
+    selected: list[dict[str, Any]] = []
+    seen_conflicts: set[str] = set()
+
+    for entry in scored:
+        if len(selected) >= limit:
+            break
+        if entry["score"] <= 0:
+            continue
+
+        conflict_key = _memory_conflict_key(entry["text"])
+        if conflict_key in seen_conflicts:
+            continue
+
+        seen_conflicts.add(conflict_key)
+        selected.append(entry)
+
+    return {
+        "build": MEMORY_RELEVANCE_BUILD,
+        "selected": selected,
+        "top_candidates": scored[:10],
+    }
+
+def render_memory_injection_block(selected_entries: list[dict[str, Any]]) -> str:
+    lines: list[str] = []
+    for entry in selected_entries or []:
+        kind = _memory_textish(entry.get("kind") or "note")
+        text = _memory_textish(entry.get("text") or "")
+        if not text:
+            continue
+        lines.append(f"- [{kind}] {text}")
+    return "\n".join(lines).strip()
+
+# =========================================================
+# ROUTE SCORING + CONFIDENCE LOCK
+# =========================================================
+
+ROUTE_BUILD = "route-scoring-confidence-lock-2026-04-08-001"
+
+ROUTE_FAMILIES = [
+    "debug",
+    "code",
+    "plan",
+    "write",
+    "analysis",
+    "general",
+    "web",
+    "image",
+    "attachment_analysis",
+]
+
+ROUTE_HIGH_CONFIDENCE = 0.80
+ROUTE_MEDIUM_CONFIDENCE = 0.55
+
+ROUTE_SCORE_PATTERNS: dict[str, list[dict[str, Any]]] = {
+    "debug": [
+        {"pattern": r"\btraceback\b", "weight": 6.0, "reason": "traceback"},
+        {"pattern": r"\bsyntaxerror\b", "weight": 6.0, "reason": "syntaxerror"},
+        {"pattern": r"\bindentationerror\b", "weight": 6.0, "reason": "indentationerror"},
+        {"pattern": r"\bnameerror\b", "weight": 5.0, "reason": "nameerror"},
+        {"pattern": r"\btypeerror\b", "weight": 5.0, "reason": "typeerror"},
+        {"pattern": r"\bvalueerror\b", "weight": 5.0, "reason": "valueerror"},
+        {"pattern": r"\bexception\b", "weight": 4.0, "reason": "exception"},
+        {"pattern": r"\berror\b", "weight": 3.5, "reason": "error"},
+        {"pattern": r"\bcrash(?:ed|ing)?\b", "weight": 4.0, "reason": "crash"},
+        {"pattern": r"\bfailing\b", "weight": 3.0, "reason": "failing"},
+        {"pattern": r"\bline\s+\d+\b", "weight": 3.5, "reason": "line-number"},
+        {"pattern": r"\blogs?\b", "weight": 2.5, "reason": "logs"},
+        {"pattern": r"\bdebug\b", "weight": 4.0, "reason": "debug"},
+        {"pattern": r"\bwhy is this breaking\b", "weight": 5.0, "reason": "breaking"},
+        {"pattern": r"\bunexpected end of input\b", "weight": 6.0, "reason": "unexpected-end-of-input"},
+    ],
+    "code": [
+        {"pattern": r"\bsmff\b", "weight": 8.0, "reason": "smff"},
+        {"pattern": r"\bfull file\b", "weight": 6.0, "reason": "full-file"},
+        {"pattern": r"[A-Za-z]:\\[^ \n\r\t]+", "weight": 5.5, "reason": "windows-file-path"},
+        {"pattern": r"\bapp\.py\b", "weight": 4.5, "reason": "app-py"},
+        {"pattern": r"\bindex\.html\b", "weight": 4.5, "reason": "index-html"},
+        {"pattern": r"\bnova-main\.css\b", "weight": 4.5, "reason": "css-file"},
+        {"pattern": r"\bnova-composer-bundle\.js\b", "weight": 4.5, "reason": "js-file"},
+        {"pattern": r"```", "weight": 3.0, "reason": "code-fence"},
+        {"pattern": r"\bdef\b", "weight": 2.5, "reason": "def-keyword"},
+        {"pattern": r"\bclass\b", "weight": 2.5, "reason": "class-keyword"},
+        {"pattern": r"\breturn\b", "weight": 1.5, "reason": "return-keyword"},
+        {"pattern": r"\bimport\b", "weight": 1.5, "reason": "import-keyword"},
+        {"pattern": r"\bfix\b", "weight": 2.5, "reason": "fix"},
+        {"pattern": r"\breplace\b", "weight": 2.0, "reason": "replace"},
+        {"pattern": r"\bedit\b", "weight": 2.0, "reason": "edit"},
+        {"pattern": r"\bfunction\b", "weight": 2.0, "reason": "function"},
+        {"pattern": r"\broute\b", "weight": 2.0, "reason": "route"},
+    ],
+    "plan": [
+        {"pattern": r"\bnext\b", "weight": 2.5, "reason": "next"},
+        {"pattern": r"\bnext move\b", "weight": 5.0, "reason": "next-move"},
+        {"pattern": r"\bplan\b", "weight": 4.0, "reason": "plan"},
+        {"pattern": r"\broadmap\b", "weight": 5.0, "reason": "roadmap"},
+        {"pattern": r"\bphase\b", "weight": 4.0, "reason": "phase"},
+        {"pattern": r"\bsequence\b", "weight": 3.0, "reason": "sequence"},
+        {"pattern": r"\bpriority\b", "weight": 3.0, "reason": "priority"},
+        {"pattern": r"\barchitecture\b", "weight": 3.5, "reason": "architecture"},
+        {"pattern": r"\bwhat should we do next\b", "weight": 6.0, "reason": "what-next"},
+        {"pattern": r"\bbest next\b", "weight": 5.0, "reason": "best-next"},
+    ],
+    "write": [
+        {"pattern": r"\brewrite\b", "weight": 5.0, "reason": "rewrite"},
+        {"pattern": r"\bpolish\b", "weight": 3.5, "reason": "polish"},
+        {"pattern": r"\bmake this sound better\b", "weight": 6.0, "reason": "sound-better"},
+        {"pattern": r"\bemail\b", "weight": 4.0, "reason": "email"},
+        {"pattern": r"\bpost\b", "weight": 2.5, "reason": "post"},
+        {"pattern": r"\bsummary\b", "weight": 2.5, "reason": "summary"},
+        {"pattern": r"\btone\b", "weight": 2.5, "reason": "tone"},
+    ],
+    "analysis": [
+        {"pattern": r"\banaly[sz]e\b", "weight": 5.0, "reason": "analyze"},
+        {"pattern": r"\bcompare\b", "weight": 4.0, "reason": "compare"},
+        {"pattern": r"\btrade[\-\s]?off\b", "weight": 4.0, "reason": "tradeoff"},
+        {"pattern": r"\bpros?\b", "weight": 2.0, "reason": "pros"},
+        {"pattern": r"\bcons?\b", "weight": 2.0, "reason": "cons"},
+        {"pattern": r"\bwhy\b", "weight": 1.5, "reason": "why"},
+        {"pattern": r"\broot cause\b", "weight": 5.0, "reason": "root-cause"},
+        {"pattern": r"\bevaluate\b", "weight": 4.0, "reason": "evaluate"},
+        {"pattern": r"\binspect\b", "weight": 3.0, "reason": "inspect"},
+    ],
+    "web": [
+        {"pattern": r"(?i)\b/web\b", "weight": 9.0, "reason": "slash-web"},
+        {"pattern": r"https?://", "weight": 8.0, "reason": "http-url"},
+        {"pattern": r"\bwww\.[^\s]+\b", "weight": 7.0, "reason": "www-url"},
+        {"pattern": r"\bfetch\b", "weight": 2.0, "reason": "fetch"},
+        {"pattern": r"\bwebsite\b", "weight": 2.5, "reason": "website"},
+        {"pattern": r"\burl\b", "weight": 2.5, "reason": "url"},
+    ],
+    "image": [
+        {"pattern": r"(?i)\b/image\b", "weight": 9.0, "reason": "slash-image"},
+        {"pattern": r"\bgenerate image\b", "weight": 6.0, "reason": "generate-image"},
+        {"pattern": r"\bmake an image\b", "weight": 6.0, "reason": "make-image"},
+        {"pattern": r"\bcreate an image\b", "weight": 6.0, "reason": "create-image"},
+        {"pattern": r"\bimage prompt\b", "weight": 5.0, "reason": "image-prompt"},
+    ],
+    "general": [
+        {"pattern": r".+", "weight": 1.0, "reason": "general-fallback"},
+    ],
+}
+
+ATTACHMENT_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
+ATTACHMENT_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
+ATTACHMENT_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".ogg"}
+ATTACHMENT_DOC_EXTENSIONS = {
+    ".pdf", ".txt", ".md", ".doc", ".docx", ".csv", ".json", ".log", ".py", ".js", ".html", ".css"
+}
+
+
+def _router_textish(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _normalize_router_text(value: Any) -> str:
+    text = _router_textish(value)
+    text = text.replace("\r", "\n")
+    text = re.sub(r"[ \t]+", " ", text)
+    return text.strip().lower()
+
+def _route_text(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def _route_primary(route_result: dict[str, Any] | None) -> str:
+    if not isinstance(route_result, dict):
+        return "general"
+
+    primary = (
+        route_result.get("primary")
+        or route_result.get("route")
+        or route_result.get("mode")
+        or "general"
+    )
+    primary = _route_text(primary)
+
+    alias_map = {
+        "coding": "code",
+        "planning": "plan",
+        "writing": "write",
+        "image_analysis": "attachment_analysis",
+    }
+    return alias_map.get(primary, primary or "general")
+
+
+def _route_confidence(route_result: dict[str, Any] | None) -> float:
+    if not isinstance(route_result, dict):
+        return 0.0
+
+    raw = route_result.get("confidence", 0.0)
+    try:
+        return max(0.0, min(float(raw), 1.0))
+    except Exception:
+        return 0.0
+
+
+def _route_signals(route_result: dict[str, Any] | None) -> list[str]:
+    if not isinstance(route_result, dict):
+        return []
+
+    signals = route_result.get("signals")
+    if not isinstance(signals, list):
+        return []
+
+    out: list[str] = []
+    for item in signals:
+        text = str(item or "").strip()
+        if text:
+            out.append(text)
+    return out[:24]
+
+
+def build_tool_use_brain(
+    *,
+    user_text: str,
+    attachments: list[dict[str, Any]] | None = None,
+    route_result: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    attachments = normalize_attachments(attachments)
+    primary = _route_primary(route_result)
+    confidence = _route_confidence(route_result)
+    signals = _route_signals(route_result)
+
+    lowered = normalize_text(user_text).strip().lower()
+
+    has_url = (
+        "http://" in lowered
+        or "https://" in lowered
+        or "www." in lowered
+        or lowered.startswith("/web ")
+    )
+
+    has_image_attachment = any(
+        str(item.get("mime_type") or "").lower().startswith("image/")
+        for item in attachments
+    )
+
+    has_any_attachment = bool(attachments)
+
+    should_use_web = primary == "web" or has_url
+    should_use_attachments = has_any_attachment
+    should_use_attachment_analysis = primary == "attachment_analysis" or has_image_attachment
+    should_use_memory = primary in {"debug", "code", "plan", "write", "analysis", "general"}
+
+    response_mode_map = {
+        "debug": "root-cause-first",
+        "code": "implementation-first",
+        "plan": "next-step-first",
+        "write": "tone-match",
+        "analysis": "reasoned-summary",
+        "web": "source-aware-summary",
+        "image": "generation-directive",
+        "attachment_analysis": "attachment-aware-analysis",
+        "general": "direct-answer",
+    }
+
+    return {
+        "build": "phase-c-tool-brain-lock-2026-04-08-001",
+        "primary": primary,
+        "confidence": confidence,
+        "signals": signals,
+        "should_use_memory": should_use_memory,
+        "should_use_web": should_use_web,
+        "should_use_attachments": should_use_attachments,
+        "should_use_attachment_analysis": should_use_attachment_analysis,
+        "response_mode": response_mode_map.get(primary, "direct-answer"),
+    }
+
+
+def build_tool_use_block(tool_brain: dict[str, Any] | None) -> str:
+    if not isinstance(tool_brain, dict):
+        return ""
+
+    primary = _route_text(tool_brain.get("primary") or "general")
+    confidence = tool_brain.get("confidence", 0.0)
+    response_mode = str(tool_brain.get("response_mode") or "direct-answer")
+    signals = tool_brain.get("signals") if isinstance(tool_brain.get("signals"), list) else []
+
+    rules: list[str] = [
+        f"Primary operating route: {primary}",
+        f"Confidence: {confidence}",
+        f"Response mode: {response_mode}",
+    ]
+
+    if tool_brain.get("should_use_memory"):
+        rules.append("Use relevant memory when it helps answer correctly.")
+    else:
+        rules.append("Do not force memory if it is not useful.")
+
+    if tool_brain.get("should_use_web"):
+        rules.append("A web-oriented request is likely. Prefer web-aware behavior when available.")
+
+    if tool_brain.get("should_use_attachments"):
+        rules.append("The user included attachments. Use attachment metadata when relevant.")
+
+    if tool_brain.get("should_use_attachment_analysis"):
+        rules.append("Attachment/image analysis is likely relevant.")
+
+    if primary == "debug":
+        rules += [
+            "Start with the root cause.",
+            "Then give the exact fix.",
+            "Prefer concrete corrections over theory.",
+        ]
+    elif primary == "code":
+        rules += [
+            "Prioritize implementation.",
+            "Prefer full working code when the user wants file work.",
+        ]
+    elif primary == "plan":
+        rules += [
+            "Start with the next move.",
+            "Keep steps ordered and actionable.",
+        ]
+    elif primary == "write":
+        rules += [
+            "Match requested tone and voice.",
+            "Optimize wording, not explanation.",
+        ]
+    elif primary == "web":
+        rules += [
+            "Summarize source-backed content cleanly.",
+            "Do not pretend to have fetched anything that has not been fetched.",
+        ]
+    elif primary == "attachment_analysis":
+        rules += [
+            "Ground the answer in available attachment context.",
+            "Do not claim full file understanding unless content is actually available.",
+        ]
+    else:
+        rules += [
+            "Answer directly first.",
+            "Expand only when useful.",
+        ]
+
+    if signals:
+        rules.append("Signals: " + ", ".join(str(x) for x in signals[:10]))
+
+    return "Tool-use and routing rules:\n- " + "\n- ".join(rules)
+
+def _attachment_name(att: dict[str, Any]) -> str:
+    return str(
+        att.get("filename")
+        or att.get("name")
+        or att.get("path")
+        or att.get("url")
+        or ""
+    ).strip()
+
+
+def _attachment_ext(name: str) -> str:
+    try:
+        return Path(name).suffix.lower()
+    except Exception:
+        return ""
+
+
+def _classify_attachment_kind(att: dict[str, Any]) -> str:
+    mime = str(att.get("mime_type") or att.get("content_type") or "").lower()
+    name = _attachment_name(att)
+    ext = _attachment_ext(name)
+
+    if mime.startswith("image/") or ext in ATTACHMENT_IMAGE_EXTENSIONS:
+        return "image"
+    if mime.startswith("video/") or ext in ATTACHMENT_VIDEO_EXTENSIONS:
+        return "video"
+    if mime.startswith("audio/") or ext in ATTACHMENT_AUDIO_EXTENSIONS:
+        return "audio"
+    if (
+        mime.startswith("text/")
+        or "json" in mime
+        or "pdf" in mime
+        or ext in ATTACHMENT_DOC_EXTENSIONS
+    ):
+        return "document"
+    return "unknown"
+
+
+def _summarize_attachment_signals(attachments: list[dict[str, Any]]) -> dict[str, Any]:
+    counts = {
+        "total": 0,
+        "image": 0,
+        "video": 0,
+        "audio": 0,
+        "document": 0,
+        "unknown": 0,
+    }
+    names: list[str] = []
+
+    for att in attachments or []:
+        kind = _classify_attachment_kind(att)
+        counts["total"] += 1
+        counts[kind] = counts.get(kind, 0) + 1
+        name = _attachment_name(att)
+        if name:
+            names.append(name)
+
+    return {
+        "counts": counts,
+        "names": names[:8],
+    }
+
+
+def _score_patterns(route_name: str, normalized_text: str) -> tuple[float, list[str]]:
+    total = 0.0
+    reasons: list[str] = []
+
+    for spec in ROUTE_SCORE_PATTERNS.get(route_name, []):
+        pattern = str(spec.get("pattern") or "")
+        weight = float(spec.get("weight") or 0.0)
+        reason = str(spec.get("reason") or pattern)
+
+        try:
+            if re.search(pattern, normalized_text, flags=re.IGNORECASE):
+                total += weight
+                reasons.append(reason)
+        except Exception:
+            continue
+
+    return total, reasons
+
+
+def _apply_attachment_route_bias(
+    scores: dict[str, float],
+    reasons: dict[str, list[str]],
+    attachments: list[dict[str, Any]],
+) -> dict[str, Any]:
+    info = _summarize_attachment_signals(attachments)
+    counts = info["counts"]
+
+    if counts["total"] <= 0:
+        return info
+
+    scores["attachment_analysis"] += 5.0
+    reasons["attachment_analysis"].append("has-attachments")
+
+    if counts["image"] > 0:
+        scores["attachment_analysis"] += 2.5
+        reasons["attachment_analysis"].append("image-attachment")
+        scores["image"] += 1.0
+        reasons["image"].append("image-attachment-present")
+
+    if counts["document"] > 0:
+        scores["analysis"] += 1.5
+        reasons["analysis"].append("document-attachment")
+        scores["code"] += 1.0
+        reasons["code"].append("document-attachment-present")
+
+    if counts["video"] > 0 or counts["audio"] > 0:
+        scores["attachment_analysis"] += 1.5
+        reasons["attachment_analysis"].append("media-attachment")
+
+    return info
+
+
+def _route_softmax_confidence(scores: dict[str, float]) -> float:
+    if not scores:
+        return 0.0
+
+    ordered = sorted(scores.values(), reverse=True)
+    if not ordered:
+        return 0.0
+
+    top = ordered[0]
+    shifted = [math.exp(v - top) for v in ordered]
+    denom = sum(shifted) or 1.0
+    probs = [v / denom for v in shifted]
+    return float(max(probs) if probs else 0.0)
+
+
+def _route_confidence_band(confidence: float) -> str:
+    if confidence >= ROUTE_HIGH_CONFIDENCE:
+        return "high"
+    if confidence >= ROUTE_MEDIUM_CONFIDENCE:
+        return "medium"
+    return "low"
+
+
+def _choose_primary_secondary(scores: dict[str, float]) -> tuple[str, str | None, float, float]:
+    ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+    if not ranked:
+        return "general", None, 0.0, 0.0
+
+    primary, primary_score = ranked[0]
+    secondary = ranked[1][0] if len(ranked) > 1 else None
+    secondary_score = ranked[1][1] if len(ranked) > 1 else 0.0
+    return primary, secondary, float(primary_score), float(secondary_score)
+
+
+def _route_mixed_intent(primary_score: float, secondary_score: float) -> bool:
+    if primary_score <= 0:
+        return False
+    gap = primary_score - secondary_score
+    ratio = (secondary_score / primary_score) if primary_score else 0.0
+    return ratio >= 0.68 or gap <= 2.5
+
+
+def choose_route(
+    user_text: Any,
+    attachments: list[dict[str, Any]] | None = None,
+    regenerate_of: Any = None,
+) -> dict[str, Any]:
+    attachments = list(attachments or [])
+    raw_text = _router_textish(user_text)
+    normalized_text = _normalize_router_text(raw_text)
+
+    scores: dict[str, float] = {name: 0.0 for name in ROUTE_FAMILIES}
+    reasons: dict[str, list[str]] = defaultdict(list)
+
+    for route_name in ROUTE_FAMILIES:
+        route_score, route_reasons = _score_patterns(route_name, normalized_text)
+        scores[route_name] += route_score
+        reasons[route_name].extend(route_reasons)
+
+    attachment_info = _apply_attachment_route_bias(scores, reasons, attachments)
+
+    if regenerate_of:
+        scores["debug"] += 0.5
+        reasons["debug"].append("regenerate-context")
+        scores["code"] += 0.5
+        reasons["code"].append("regenerate-context")
+
+    primary, secondary, primary_score, secondary_score = _choose_primary_secondary(scores)
+    mixed_intent = _route_mixed_intent(primary_score, secondary_score)
+    confidence = _route_softmax_confidence(scores)
+    confidence_band = _route_confidence_band(confidence)
+
+    fallback_used = False
+    effective_primary = primary
+    effective_secondary = secondary
+
+    if confidence_band == "low":
+        fallback_used = True
+        effective_secondary = primary
+        effective_primary = "general"
+
+    return {
+        "primary": effective_primary,
+        "secondary": effective_secondary,
+        "raw_primary": primary,
+        "confidence": round(confidence, 4),
+        "confidence_band": confidence_band,
+        "mixed_intent": mixed_intent,
+        "fallback_used": fallback_used,
+        "scores": {k: round(v, 3) for k, v in sorted(scores.items(), key=lambda kv: kv[1], reverse=True)},
+        "reasons": {k: list(dict.fromkeys(v))[:10] for k, v in reasons.items() if v},
+        "attachments": attachment_info,
+        "raw_user_text": raw_text,
+        "normalized_user_text": normalized_text,
+        "regenerate_of": regenerate_of,
+        "route_build": ROUTE_BUILD,
+    }
+
+
+# =========================================================
+# PHASE D.5 — ONE-SOURCE-OF-TRUTH PROMPT BUILDER LOCK
+# =========================================================
+
+from copy import deepcopy
+
+
+def _safe_str(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _safe_list(value: Any) -> list:
+    return value if isinstance(value, list) else []
+
+
+def _clip_text(value: Any, limit: int = 4000) -> str:
+    text = _safe_str(value)
+    if len(text) <= limit:
+        return text
+    return text[:limit].rstrip() + " ...[truncated]"
+
+
+def _normalize_attachment_prompt_block(attachments: list[dict]) -> str:
+    if not attachments:
+        return ""
+
+    lines: list[str] = []
+    for idx, att in enumerate(attachments, start=1):
+        if not isinstance(att, dict):
+            continue
+
+        name = _safe_str(att.get("name") or att.get("filename") or f"attachment_{idx}")
+        kind = _safe_str(att.get("kind") or att.get("type") or "file")
+        mime = _safe_str(att.get("mime_type") or att.get("mime") or "")
+        notes = _safe_str(att.get("analysis_text") or att.get("summary") or att.get("notes") or "")
+        url = _safe_str(att.get("url") or att.get("path") or att.get("src") or "")
+
+        chunk = [f"{idx}. {name} [{kind}]"]
+        if mime:
+            chunk.append(f"mime={mime}")
+        if url:
+            chunk.append(f"source={url}")
+        if notes:
+            chunk.append(f"notes={_clip_text(notes, 500)}")
+
+        lines.append(" | ".join(chunk))
+
+    if not lines:
+        return ""
+
+    return "ATTACHMENT CONTEXT:\n" + "\n".join(lines)
+
+
+def _normalize_execution_context_block(execution: dict | None) -> str:
+    execution = execution or {}
+    if not isinstance(execution, dict):
+        return ""
+
+    summary = _safe_str(execution.get("summary"))
+    instructions = _safe_str(execution.get("instructions"))
+    constraints = _safe_list(execution.get("constraints"))
+    steps = _safe_list(execution.get("steps"))
+    tools = _safe_list(execution.get("tools"))
+    warnings = _safe_list(execution.get("warnings"))
+
+    lines: list[str] = []
+
+    if summary:
+        lines.append(f"EXECUTION SUMMARY:\n{_clip_text(summary, 1200)}")
+
+    if instructions:
+        lines.append(f"EXECUTION INSTRUCTIONS:\n{_clip_text(instructions, 1200)}")
+
+    if constraints:
+        lines.append(
+            "EXECUTION CONSTRAINTS:\n" +
+            "\n".join(f"- {_clip_text(item, 240)}" for item in constraints if _safe_str(item))
+        )
+
+    if steps:
+        lines.append(
+            "EXECUTION STEPS:\n" +
+            "\n".join(f"- {_clip_text(item, 240)}" for item in steps if _safe_str(item))
+        )
+
+    if tools:
+        lines.append(
+            "SUGGESTED TOOLS:\n" +
+            "\n".join(f"- {_clip_text(item, 120)}" for item in tools if _safe_str(item))
+        )
+
+    if warnings:
+        lines.append(
+            "WARNINGS:\n" +
+            "\n".join(f"- {_clip_text(item, 240)}" for item in warnings if _safe_str(item))
+        )
+
+    return "\n\n".join(part for part in lines if part).strip()
+
+
+def _build_route_context_block(route_result: dict | None) -> str:
+    route_result = route_result or {}
+    if not isinstance(route_result, dict):
+        return ""
+
+    route = _safe_str(route_result.get("route") or route_result.get("mode") or "general")
+    intent = _safe_str(route_result.get("intent"))
+    reason = _safe_str(route_result.get("reason"))
+    goals = _safe_list(route_result.get("goals"))
+    constraints = _safe_list(route_result.get("constraints"))
+
+    lines = [f"ROUTE MODE: {route}"]
+    if intent:
+        lines.append(f"ROUTE INTENT: {intent}")
+    if reason:
+        lines.append(f"ROUTE REASON: {_clip_text(reason, 500)}")
+    if goals:
+        lines.append("ROUTE GOALS:\n" + "\n".join(f"- {_clip_text(x, 160)}" for x in goals if _safe_str(x)))
+    if constraints:
+        lines.append("ROUTE CONSTRAINTS:\n" + "\n".join(f"- {_clip_text(x, 160)}" for x in constraints if _safe_str(x)))
+
+    return "\n".join(lines).strip()
+
+
+def _build_memory_block(memory_selection: dict | None) -> str:
+    memory_selection = memory_selection or {}
+    if not isinstance(memory_selection, dict):
+        return ""
+
+    items = _safe_list(memory_selection.get("items"))
+    if not items:
+        return ""
+
+    lines: list[str] = []
+    for idx, item in enumerate(items, start=1):
+        if not isinstance(item, dict):
+            continue
+
+        kind = _safe_str(item.get("kind") or "memory")
+        text = _safe_str(item.get("text"))
+        source = _safe_str(item.get("source"))
+        if not text:
+            continue
+
+        line = f"{idx}. ({kind}) {_clip_text(text, 240)}"
+        if source:
+            line += f" [source={source}]"
+        lines.append(line)
+
+    if not lines:
+        return ""
+
+    return "MEMORY CONTEXT:\n" + "\n".join(lines)
+
+
+def _build_system_prompt_unified(
+    *,
+    user_text: str,
+    route_result: dict | None,
+    memory_block: str,
+    attachment_block: str,
+    execution_context: str,
+) -> str:
+    base_sections: list[str] = []
+
+    # Use your existing system/personality builder if present.
+    base_builder = globals().get("build_dynamic_system_prompt") or globals().get("build_system_prompt")
+    if callable(base_builder):
+        try:
+            base_text = base_builder(user_text=user_text, route_result=route_result)
+        except TypeError:
+            base_text = base_builder(user_text)
+        except Exception:
+            base_text = ""
+        if _safe_str(base_text):
+            base_sections.append(_safe_str(base_text))
+
+    if not base_sections:
+        base_sections.append(
+            "\n".join(
+                [
+                    "You are Nova.",
+                    "Be accurate, direct, useful, and consistent.",
+                    "Follow the user's intent tightly.",
+                    "Prefer action over filler.",
+                    "Do not contradict remembered user preferences unless the current request overrides them.",
+                ]
+            )
+        )
+
+    route_block = _build_route_context_block(route_result)
+    if route_block:
+        base_sections.append(route_block)
+
+    if memory_block:
+        base_sections.append(memory_block)
+
+    if attachment_block:
+        base_sections.append(attachment_block)
+
+    if execution_context:
+        base_sections.append(execution_context)
+
+    return "\n\n".join(section.strip() for section in base_sections if _safe_str(section)).strip()
+
+
+def build_prompt_context(
+    *,
+    user_text: str,
+    session: dict,
+    attachments: list[dict] | None = None,
+    regenerate_of: str | None = None,
+) -> dict:
+    attachments = _safe_list(attachments)
+
+    # ROUTE
+    route_result: dict = {}
+    route = "general"
+    router_fn = globals().get("route_user_input") or globals().get("route_message") or globals().get("detect_route")
+    if callable(router_fn):
+        try:
+            route_result = router_fn(
+                user_text=user_text,
+                session=session,
+                attachments=attachments,
+                regenerate_of=regenerate_of,
+            )
+        except TypeError:
+            try:
+                route_result = router_fn(user_text, session)
+            except Exception:
+                route_result = {}
+        except Exception:
+            route_result = {}
+
+    if not isinstance(route_result, dict):
+        route_result = {}
+
+    route = _safe_str(route_result.get("route") or route_result.get("mode") or "general") or "general"
+
+    # MEMORY
+    memory_selection: dict = {}
+    memory_fn = globals().get("select_relevant_memory") or globals().get("build_memory_selection")
+    if callable(memory_fn):
+        try:
+            memory_selection = memory_fn(
+                user_text=user_text,
+                session=session,
+                route_result=route_result,
+            )
+        except TypeError:
+            try:
+                memory_selection = memory_fn(user_text, session)
+            except Exception:
+                memory_selection = {}
+        except Exception:
+            memory_selection = {}
+
+    if not isinstance(memory_selection, dict):
+        memory_selection = {}
+
+    memory_block = _build_memory_block(memory_selection)
+
+    # EXECUTION
+    execution: dict = {}
+    execution_fn = globals().get("build_execution_plan") or globals().get("prepare_execution_context")
+    if callable(execution_fn):
+        try:
+            execution = execution_fn(
+                user_text=user_text,
+                session=session,
+                route_result=route_result,
+                attachments=attachments,
+            )
+        except TypeError:
+            try:
+                execution = execution_fn(user_text, route_result)
+            except Exception:
+                execution = {}
+        except Exception:
+            execution = {}
+
+    if not isinstance(execution, dict):
+        execution = {}
+
+    execution_context = _normalize_execution_context_block(execution)
+    attachment_block = _normalize_attachment_prompt_block(attachments)
+
+    system_prompt = _build_system_prompt_unified(
+        user_text=user_text,
+        route_result=route_result,
+        memory_block=memory_block,
+        attachment_block=attachment_block,
+        execution_context=execution_context,
+    )
+
+    return {
+        "route_result": route_result,
+        "route": route,
+        "memory_selection": memory_selection,
+        "memory_block": memory_block,
+        "execution": execution,
+        "execution_context": execution_context,
+        "attachment_block": attachment_block,
+        "system_prompt": system_prompt,
+    }
+
+
+def build_model_messages_from_context(
+    *,
+    session: dict,
+    user_text: str,
+    prompt_context: dict,
+    attachments: list[dict] | None = None,
+) -> list[dict]:
+    attachments = _safe_list(attachments)
+    prompt_context = prompt_context or {}
+
+    # Use your existing message builder if present.
+    existing_builder = globals().get("build_messages_for_model")
+    if callable(existing_builder):
+        try:
+            messages = existing_builder(
+                session=session,
+                user_text=user_text,
+                system_prompt=prompt_context.get("system_prompt", ""),
+                attachments=attachments,
+            )
+            if isinstance(messages, list) and messages:
+                return messages
+        except TypeError:
+            pass
+        except Exception:
+            pass
+
+    messages: list[dict] = []
+
+    system_prompt = _safe_str(prompt_context.get("system_prompt"))
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+
+    history = _safe_list(session.get("messages"))
+    for msg in history[-20:]:
+        if not isinstance(msg, dict):
+            continue
+        role = _safe_str(msg.get("role") or "user")
+        text = _safe_str(msg.get("text") or msg.get("content"))
+        if not text:
+            continue
+        if role not in {"system", "user", "assistant", "tool"}:
+            role = "user"
+        messages.append({"role": role, "content": text})
+
+    user_payload = user_text.strip()
+    attachment_block = _safe_str(prompt_context.get("attachment_block"))
+    if attachment_block:
+        user_payload = f"{user_payload}\n\n{attachment_block}".strip()
+
+    messages.append({"role": "user", "content": user_payload})
+    return messages
+
+
+def build_model_payload(
+    *,
+    session: dict,
+    user_text: str,
+    attachments: list[dict] | None = None,
+    regenerate_of: str | None = None,
+) -> dict:
+    prompt_context = build_prompt_context(
+        user_text=user_text,
+        session=session,
+        attachments=attachments,
+        regenerate_of=regenerate_of,
+    )
+
+    model_messages = build_model_messages_from_context(
+        session=session,
+        user_text=user_text,
+        prompt_context=prompt_context,
+        attachments=attachments,
+    )
+
+    payload = deepcopy(prompt_context)
+    payload["model_messages"] = model_messages
+    return payload
+
+# =========================================================
+# API ROUTES
+# =========================================================
+
 @app.post("/api/chat")
 def api_chat() -> Any:
     data = request.get_json(silent=True) or {}
@@ -2374,6 +3880,34 @@ def api_chat() -> Any:
     user_text = normalize_text(data.get("user_text") or "")
     attachments = normalize_attachments(safe_list(data.get("attachments")))
     regenerate_of = str(data.get("regenerate_of") or "").strip() or None
+
+    # =========================================================
+    # ROUTE SCORING (SUPER BRAIN ENTRY)
+    # =========================================================
+    route_result = choose_route(
+        user_text=user_text,
+        attachments=attachments,
+        regenerate_of=regenerate_of,
+    )
+
+    route_debug = {
+        "route_build": route_result["route_build"],
+        "requested_session_id": requested_session_id,
+        "raw_user_text": route_result["raw_user_text"],
+        "normalized_user_text": route_result["normalized_user_text"],
+        "attachments_count": len(attachments),
+        "regenerate_of": regenerate_of,
+        "primary_route": route_result["primary"],
+        "secondary_route": route_result["secondary"],
+        "raw_primary_route": route_result["raw_primary"],
+        "confidence": route_result["confidence"],
+        "confidence_band": route_result["confidence_band"],
+        "mixed_intent": route_result["mixed_intent"],
+        "fallback_used": route_result["fallback_used"],
+        "scores": route_result["scores"],
+        "reasons": route_result["reasons"],
+        "attachment_signals": route_result["attachments"],
+    }
 
     wants_stream = bool(data.get("stream", False))
     if user_text.lower().startswith("/image"):
@@ -2423,188 +3957,61 @@ def api_chat() -> Any:
         )
 
     try:
-
-# =========================================================
-# IMAGE GENERATION (HARD LOCK)
-# =========================================================
-
+        # =========================================================
+        # IMAGE GENERATION (HARD LOCK)
+        # =========================================================
         if user_text.lower().startswith("/image") and not regenerate_of:
-            prompt = user_text[len("/image"):].strip()
-
-            if not prompt:
-                return jsonify({
-                    "ok": False,
-                    "error": "Missing prompt after /image"
-                }), 400
-
-            if OPENAI_CLIENT is None:
-                return jsonify({
-                    "ok": False,
-                    "error": "OpenAI not configured"
-                }), 500
-
-            import base64
-
-            result = OPENAI_CLIENT.images.generate(
-                model=os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1.5"),
-                prompt=prompt,
-                size=os.getenv("NOVA_IMAGE_SIZE", "1024x1024"),
-            )
-
-            image_b64 = result.data[0].b64_json
-            image_bytes = base64.b64decode(image_b64)
-
-            filename = f"generated_{uuid.uuid4().hex}.png"
-            filepath = UPLOADS_DIR / filename
-
-            with open(filepath, "wb") as f:
-                f.write(image_bytes)
-
-            image_url = f"/api/uploads/{filename}"
-            created_at = now_iso()
-
-            assistant_message = {
-                "id": make_id("assistant"),
-                "role": "assistant",
-                "text": f"![Generated image]({image_url})",
-                "created_at": created_at,
-                "attachments": [
-                    {
-                        "id": make_id("att"),
-                        "url": image_url,
-                        "mime_type": "image/png",
-                        "filename": filename,
-                        "stored_name": filename,
-                        "size": len(image_bytes),
-                    }
-                ],
-                "error": False,
-                "pending": False,
-                "streaming": False,
-                "stopped": False,
-                "source": "send",
-                "meta": {
-                    "regenerate_of": "",
-                    "image_url": image_url,
-                },
-            }
-
-            assistant_message = normalize_message(assistant_message)
-            append_message(session, assistant_message)
-            recalc_session(session)
-            save_sessions_store(store)
-
-            try:
-                save_artifact_from_assistant(assistant_message, session["id"])
-            except Exception:
-                pass
-
             return jsonify({
-                "ok": True,
-                "assistant_message": assistant_message,
-                "session": session_contract_payload(session)["session"],
-                "session_id": session["id"],
-                "active_session_id": session["id"],
-                "image_url": image_url,
+                "ok": False,
+                "error": "Image temporarily disabled for debug",
             })
 
-            import base64
-
-            client = OpenAI()
-
-            result = client.images.generate(
-                model=os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1.5"),
-                prompt=prompt,
-                size=os.getenv("NOVA_IMAGE_SIZE", "1024x1024"),
-            )
-
-            image_b64 = result.data[0].b64_json
-            image_bytes = base64.b64decode(image_b64)
-
-            filename = f"generated_{uuid.uuid4().hex}.png"
-            filepath = UPLOADS_DIR / filename
-
-            with open(filepath, "wb") as f:
-                f.write(image_bytes)
-
-            image_url = f"/api/uploads/{filename}"
-            created_at = now_iso()
-
-            assistant_message = {
-                "id": f"assistant_{uuid.uuid4().hex}",
-                "role": "assistant",
-                "text": f"![Generated image]({image_url})",
-                "created_at": created_at,
-                "attachments": [
-                    {
-                        "id": f"att_{uuid.uuid4().hex}",
-                        "url": image_url,
-                        "mime_type": "image/png",
-                        "filename": filename,
-                        "stored_name": filename,
-                        "size": len(image_bytes),
-                        "status": "uploaded",
-                        "upload_error": "",
-                    }
-                ],
-                "error": False,
-                "pending": False,
-                "streaming": False,
-                "stopped": False,
-                "source": "send",
-                "meta": {"regenerate_of": ""},
-            }
-
-            artifact = {
-                "id": make_id("artifact"),
-                "title": f"Image: {prompt[:60]}",
-                "kind": "image_generation",
-                "image_url": image_url,
-                "body": prompt,
-                "preview": prompt[:120],
-                "session_id": session["id"],
-                "created_at": created_at,
-                "updated_at": created_at,
-                "meta": {
-                    "image_url": image_url,
-                    "source_url": "",
-                    "analysis_text": "",
-                    "bullets": [],
-                },
-            }
-
-            artifact["viewer"] = build_artifact_viewer(artifact)
-
-            append_message(session, assistant_message)
-
-            session["updated_at"] = created_at
-            session["last_message_preview"] = f"Generated image: {prompt[:80]}"
-            session["message_count"] = len(session.get("messages") or [])
-
-            store["active_session_id"] = session["id"]
-            save_sessions_store(store)
-
-            try:
-                save_artifact_from_assistant(assistant_message, session["id"])
-            except Exception:
-                pass
-
-            payload = state_payload(session)
-            payload["assistant_message"] = assistant_message
-            return jsonify(payload)
-
-        # NORMAL FLOW
-        payload = run_non_stream_chat(
-            session_id=requested_session_id,
+        # =========================================================
+        # NORMAL CHAT FLOW (D5 CLEAN)
+        # =========================================================
+        payload = build_model_payload(
+            session=session,
             user_text=user_text,
             attachments=attachments,
             regenerate_of=regenerate_of,
         )
 
-        return jsonify(payload)
+        route_result = payload["route_result"]
+        route = payload["route"]
+        memory_selection = payload["memory_selection"]
+        memory_block = payload["memory_block"]
+        execution = payload["execution"]
+        execution_context = payload["execution_context"]
+        model_messages = payload["model_messages"]
+
+        result = run_non_stream_chat(
+            session_id=requested_session_id,
+            user_text=user_text,
+            attachments=attachments,
+            regenerate_of=regenerate_of,
+            route_result=route_result,
+            memory_selection=memory_selection,
+            memory_block=memory_block,
+        )
+
+        if isinstance(result, dict):
+            debug_obj = result.get("debug") or {}
+            debug_obj["route_debug"] = route_debug
+            debug_obj["route_build"] = "phase-d5-one-source-of-truth-prompt-builder-2026-04-08-001"
+            debug_obj["model_messages_count"] = len(model_messages)
+            debug_obj["memory_selected_count"] = len(memory_selection.get("items", [])) if isinstance(memory_selection, dict) else 0
+            debug_obj["has_memory_block"] = bool(memory_block)
+            debug_obj["has_execution_context"] = bool(execution_context)
+            result["debug"] = debug_obj
+
+        return jsonify(result)
 
     except Exception as exc:
-        return jsonify({"ok": False, "error": str(exc) or "Chat failed."}), 500
+        return jsonify({
+            "ok": False,
+            "error": str(exc) or "Chat failed.",
+        }), 500
+
 
 @app.get("/api/uploads/<path:filename>")
 def api_uploads(filename: str) -> Any:

@@ -1,5 +1,89 @@
 [
   {
+    "id": "artifact_b291177624c348e58b0795117d9c3957",
+    "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
+    "message_id": "assistant_7ad16f685719412f973df7453f32393f",
+    "kind": "chat_reply",
+    "title": "Response: Hello.",
+    "body": "Hello.",
+    "preview": "Hello.",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-08T15:51:58.686724+00:00",
+    "updated_at": "2026-04-08T15:51:58.693376+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hello.",
+      "bullets": [
+        "Hello."
+      ]
+    }
+  },
+  {
+    "id": "artifact_280ef6110ec54b1fac4f3b09a4e48ad7",
+    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
+    "message_id": "assistant_7a4ad5c65f3440e2aeed969aad7d4255",
+    "kind": "chat_reply",
+    "title": "Response: Understood.",
+    "body": "Understood.",
+    "preview": "Understood.",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-08T07:57:56.921724+00:00",
+    "updated_at": "2026-04-08T07:57:58.395401+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Understood.",
+      "bullets": [
+        "Understood."
+      ]
+    }
+  },
+  {
+    "id": "artifact_7f0b21bdeca64824b6f9818aa1c44dd5",
+    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
+    "message_id": "assistant_0ef8763f25d24fd2bca507067a893c5b",
+    "kind": "chat_reply",
+    "title": "Response: Hi.",
+    "body": "Hi.",
+    "preview": "Hi.",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-08T07:57:41.911452+00:00",
+    "updated_at": "2026-04-08T07:57:43.751689+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi.",
+      "bullets": [
+        "Hi."
+      ]
+    }
+  },
+  {
+    "id": "artifact_279fe032376144bb86fa5cad4c2dd11f",
+    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
+    "message_id": "assistant_7c34110508f441e2b3eeec123e72deba",
+    "kind": "chat_reply",
+    "title": "Response: Got it. Short, direct answers.",
+    "body": "Got it. Short, direct answers.",
+    "preview": "Got it. Short, direct answers.",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-08T07:35:41.421216+00:00",
+    "updated_at": "2026-04-08T07:35:43.414590+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Got it. Short, direct answers.",
+      "bullets": [
+        "Got it. Short, direct answers."
+      ]
+    }
+  },
+  {
     "id": "artifact_edc41edf7201468389062465a682337b",
     "session_id": "session_73abe796d86b4100b9478e15000de9bc",
     "message_id": "assistant_6cacebb6ece0453d9de160e11d681a6e",
