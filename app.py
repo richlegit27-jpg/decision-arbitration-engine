@@ -7,12 +7,14 @@ import re
 import time
 import uuid
 import math
+
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Generator
 from collections import defaultdict
-
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse, parse_qs, unquote
 from flask import Flask, Response, jsonify, request, send_from_directory
 from flask_cors import CORS
 from helpers.web_utils import (
@@ -21,6 +23,342 @@ from helpers.web_utils import (
 )
 
 from helpers.video_utils import build_video_analysis_result
+
+
+WEB_FETCH_TIMEOUT = 12
+WEB_FETCH_TEXT_LIMIT = 6000
+WEB_SEARCH_TIMEOUT = 12
+WEB_SEARCH_MAX_RESULTS = 5
+CURRENT_INFO_FETCH_LIMIT = 3
+
+CURRENT_INFO_HINTS = {
+    "latest", "today", "current", "recent", "recently", "updated", "update",
+    "news", "headlines", "record", "score", "scores", "standing", "standings",
+    "schedule", "weather", "forecast", "temperature", "stock", "stocks",
+    "price", "prices", "market", "rankings", "ranking", "who won", "who is winning",
+    "what happened", "breaking", "live",
+}
+
+def clean_web_input(value: Any) -> str:
+    value = normalize_text(value).strip()
+
+    if value.startswith("'") and value.endswith("'") and len(value) >= 2:
+        value = value[1:-1].strip()
+
+    if value.lower().startswith("/web "):
+        value = value[5:].strip()
+
+    return value
+
+def _looks_like_current_info_query(text: str) -> bool:
+    text = normalize_text(text).strip().lower()
+    if not text:
+        return False
+
+    if text.startswith("/web ") or text.startswith("/image "):
+        return False
+
+    if extract_url(text):
+        return False
+
+    for hint in CURRENT_INFO_HINTS:
+        if hint in text:
+            return True
+
+    sports_patterns = [
+        r"\b(record|score|standing|standings|schedule)\b",
+        r"\b(latest|current|today|recent)\b",
+        r"\b(news|headline|headlines|breaking)\b",
+        r"\b(weather|forecast|temperature)\b",
+        r"\b(stock|stocks|market|price|prices)\b",
+    ]
+
+    return any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in sports_patterns)
+
+def detect_tool_intent(text: str) -> str:
+    text = normalize_text(text).strip()
+    lowered = text.lower()
+
+    if lowered.startswith("/web "):
+        return "web"
+
+    if extract_url(text):
+        return "web"
+
+    if _looks_like_current_info_query(text):
+        return "current_info"
+
+    if lowered.startswith("/image "):
+        return "image"
+
+    return "none"
+
+def _clean_search_result_url(url: str) -> str:
+    url = normalize_text(url).strip()
+    if not url:
+        return ""
+
+    try:
+        parsed = urlparse(url)
+        query = parse_qs(parsed.query)
+        uddg = query.get("uddg")
+        if uddg and uddg[0]:
+            return unquote(uddg[0]).strip()
+    except Exception:
+        pass
+
+    return url
+
+def search_web(query: str, max_results: int = WEB_SEARCH_MAX_RESULTS) -> dict[str, Any]:
+    query = normalize_text(query).strip()
+    if not query:
+        return {
+            "ok": False,
+            "error": "Empty search query.",
+            "query": "",
+            "results": [],
+        }
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Nova/2026",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+
+    try:
+        response = requests.get(
+            "https://html.duckduckgo.com/html/",
+            params={"q": query},
+            timeout=WEB_SEARCH_TIMEOUT,
+            headers=headers,
+            allow_redirects=True,
+        )
+        response.raise_for_status()
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": str(exc) or "Search request failed.",
+            "query": query,
+            "results": [],
+        }
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    results: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    for node in soup.select(".result"):
+        link = node.select_one(".result__title a") or node.select_one("a.result__a")
+        snippet_node = node.select_one(".result__snippet")
+        if not link:
+            continue
+
+        title = normalize_text(link.get_text(" ", strip=True)).strip()
+        href = _clean_search_result_url(link.get("href") or "")
+        snippet = normalize_text(snippet_node.get_text(" ", strip=True) if snippet_node else "").strip()
+
+        if not href or not title:
+            continue
+
+        key = href.lower().strip()
+        if key in seen:
+            continue
+        seen.add(key)
+
+        results.append(
+            {
+                "title": title,
+                "url": href,
+                "snippet": snippet,
+                "domain": _domain_from_url(href),
+            }
+        )
+
+        if len(results) >= max_results:
+            break
+
+    return {
+        "ok": True,
+        "query": query,
+        "results": results,
+    }
+
+def build_current_info_context(query: str) -> dict[str, Any]:
+    search_result = search_web(query, max_results=WEB_SEARCH_MAX_RESULTS)
+    if not search_result.get("ok"):
+        return {
+            "ok": False,
+            "error": search_result.get("error") or "Search failed.",
+            "query": query,
+            "results": [],
+            "sources": [],
+            "source_text": "",
+        }
+
+    results = safe_list(search_result.get("results"))
+    sources: list[dict[str, Any]] = []
+    blocks: list[str] = []
+
+    for item in results[:CURRENT_INFO_FETCH_LIMIT]:
+        if not isinstance(item, dict):
+            continue
+
+        url = normalize_text(item.get("url") or "").strip()
+        if not url:
+            continue
+
+        fetched = fetch_web(url)
+        if not fetched.get("ok"):
+            continue
+
+        title = normalize_text(fetched.get("title") or item.get("title") or "").strip()
+        description = normalize_text(fetched.get("description") or item.get("snippet") or "").strip()
+        content = normalize_text(fetched.get("content") or "").strip()
+        domain = normalize_text(fetched.get("domain") or item.get("domain") or "").strip()
+
+        sources.append(
+            {
+                "title": title,
+                "url": url,
+                "domain": domain,
+                "description": description,
+                "content": content[:1800],
+                "status_code": int(fetched.get("status_code") or 0),
+            }
+        )
+
+        block_parts = [
+            f"TITLE: {title}" if title else "",
+            f"URL: {url}" if url else "",
+            f"DOMAIN: {domain}" if domain else "",
+            f"DESCRIPTION: {description}" if description else "",
+            f"CONTENT: {content[:1800]}" if content else "",
+        ]
+        block = "\n".join(part for part in block_parts if part)
+        if block:
+            blocks.append(block)
+
+    return {
+        "ok": True,
+        "query": query,
+        "results": results,
+        "sources": sources,
+        "source_text": "\n\n---\n\n".join(blocks).strip(),
+    }
+
+def answer_current_info_query(query: str) -> dict[str, Any]:
+    context = build_current_info_context(query)
+    if not context.get("ok"):
+        return {
+            "ok": False,
+            "error": context.get("error") or "Current-info search failed.",
+            "query": query,
+            "results": [],
+            "sources": [],
+            "text": "",
+        }
+
+    sources = safe_list(context.get("sources"))
+    if not sources:
+        return {
+            "ok": False,
+            "error": "No useful search sources found.",
+            "query": query,
+            "results": safe_list(context.get("results")),
+            "sources": [],
+            "text": "",
+        }
+
+    if OPENAI_CLIENT is None:
+        lines = [f"Search results for: {query}", ""]
+        for source in sources[:3]:
+            title = normalize_text(source.get("title") or "").strip()
+            url = normalize_text(source.get("url") or "").strip()
+            description = normalize_text(source.get("description") or "").strip()
+
+            if title:
+                lines.append(f"- {title}")
+            if description:
+                lines.append(f"  {description}")
+            if url:
+                lines.append(f"  {url}")
+
+        return {
+            "ok": True,
+            "query": query,
+            "results": safe_list(context.get("results")),
+            "sources": sources,
+            "text": "\n".join(lines).strip(),
+        }
+
+    source_text = normalize_text(context.get("source_text") or "").strip()
+    system_prompt = (
+        "You are Nova, a sharp current-info web assistant.\n"
+        "Answer only from the provided search/fetch evidence.\n"
+        "Be concise, direct, and useful.\n"
+        "If the evidence is weak or conflicting, say that clearly.\n"
+        "Prefer the freshest and most clearly relevant evidence.\n"
+        "Do not claim certainty beyond the provided sources.\n"
+    )
+
+    user_prompt = (
+        f"User query: {query}\n\n"
+        f"Current UTC time: {now_iso()}\n\n"
+        "Evidence from live web search and fetched pages:\n\n"
+        f"{source_text}\n\n"
+        "Write a direct answer first, then a short Sources section with title + domain only."
+    )
+
+    try:
+        response = OPENAI_CLIENT.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            stream=False,
+        )
+        text = normalize_text(response.choices[0].message.content or "").strip()
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": str(exc) or "Model synthesis failed.",
+            "query": query,
+            "results": safe_list(context.get("results")),
+            "sources": sources,
+            "text": "",
+        }
+
+    return {
+        "ok": True,
+        "query": query,
+        "results": safe_list(context.get("results")),
+        "sources": sources,
+        "text": text,
+    }
+
+def build_current_info_meta(result: dict[str, Any]) -> dict[str, Any]:
+    sources = safe_list(result.get("sources"))
+    first_url = ""
+    if sources and isinstance(sources[0], dict):
+        first_url = normalize_text(sources[0].get("url") or "").strip()
+
+    bullets: list[str] = []
+    for item in sources[:3]:
+        if not isinstance(item, dict):
+            continue
+        title = summarize_text(normalize_text(item.get("title") or "").strip(), 100)
+        domain = normalize_text(item.get("domain") or "").strip()
+        if title and domain:
+            bullets.append(f"{title} ({domain})")
+        elif title:
+            bullets.append(title)
+
+    return {
+        "source_url": first_url,
+        "search_query": normalize_text(result.get("query") or "").strip(),
+        "analysis_text": summarize_text(normalize_text(result.get("text") or "").strip(), 240),
+        "bullets": bullets[:5],
+        "sources": sources[:5],
+    }
 
 try:
     from openai import OpenAI
@@ -2783,6 +3121,75 @@ def chat_stream_generator(
         save_memory_items(candidates, locked_session_id)
     except Exception:
         pass
+
+    # =========================================================
+    # 🌍 CURRENT INFO AUTO ROUTE
+    # =========================================================
+    if detect_tool_intent(user_text) == "current_info":
+        try:
+            current_info = answer_current_info_query(user_text)
+
+            if not current_info.get("ok"):
+                yield sse({
+                    "type": "error",
+                    "ok": False,
+                    "session_id": locked_session_id,
+                    "message_id": assistant_message_id,
+                    "assistant_message_id": assistant_message_id,
+                    "error": current_info.get("error") or "Current-info lookup failed.",
+                    "debug": {
+                        "tool": "current_info",
+                        "query": user_text,
+                    },
+                })
+                return
+
+            msg = make_assistant_message(
+                normalize_text(current_info.get("text") or "").strip() or "No live answer generated.",
+                message_id=assistant_message_id,
+                source="web_fetch",
+                meta=build_current_info_meta(current_info),
+            )
+
+            append_message(session, msg)
+
+            try:
+                save_artifact_from_assistant(msg, session["id"])
+            except Exception:
+                pass
+
+            yield sse({
+                "type": "final",
+                "ok": True,
+                "session_id": locked_session_id,
+                "message_id": assistant_message_id,
+                "assistant_message_id": assistant_message_id,
+                "message": msg,
+                "messages": session_messages(session),
+                "artifacts": load_artifacts(),
+                "memory": load_memory(),
+                "debug": {
+                    "tool": "current_info",
+                    "query": current_info.get("query") or user_text,
+                    "source_count": len(safe_list(current_info.get("sources"))),
+                },
+            })
+            return
+
+        except Exception as exc:
+            yield sse({
+                "type": "error",
+                "ok": False,
+                "session_id": locked_session_id,
+                "message_id": assistant_message_id,
+                "assistant_message_id": assistant_message_id,
+                "error": str(exc) or "Current-info route failed.",
+                "debug": {
+                    "tool": "current_info",
+                    "query": user_text,
+                },
+            })
+            return
 
     # =========================================================
     # 🌐 WEB AUTO ROUTE (PASS LOCK)
@@ -6892,10 +7299,14 @@ def detect_tool_intent(text: str) -> str:
     if extract_url(text):
         return "web"
 
+    if _looks_like_current_info_query(text):
+        return "current_info"
+
     if lowered.startswith("/image "):
         return "image"
 
     return "none"
+
 
 def _domain_from_url(url: str) -> str:
     try:
@@ -7310,6 +7721,63 @@ def chat_single_response(
         save_memory_items(candidates, locked_session_id)
     except Exception:
         pass
+
+    # -------------------------
+    # CURRENT INFO AUTO ROUTE
+    # -------------------------
+    if detect_tool_intent(user_text) == "current_info":
+        current_info = answer_current_info_query(user_text)
+
+        if not current_info.get("ok"):
+            return {
+                "ok": False,
+                "error": current_info.get("error") or "Current-info lookup failed.",
+                "session_id": locked_session_id,
+                "active_session_id": locked_session_id,
+                "debug": {
+                    "tool": "current_info",
+                    "query": user_text,
+                },
+            }
+
+        assistant_message = make_assistant_message(
+            normalize_text(current_info.get("text") or "").strip() or "No live answer generated.",
+            message_id=assistant_message_id,
+            source="web_fetch",
+            pending=False,
+            streaming=False,
+            stopped=False,
+            error=False,
+            meta=build_current_info_meta(current_info),
+        )
+
+        if target_message:
+            replace_message(session, assistant_message_id, assistant_message)
+        else:
+            append_message(session, assistant_message)
+
+        recalc_session(session)
+        save_sessions_store(store)
+
+        try:
+            save_artifact_from_assistant(assistant_message, session["id"])
+        except Exception:
+            pass
+
+        return {
+            "ok": True,
+            "assistant_message": assistant_message,
+            "session": session_contract_payload(session)["session"],
+            "session_id": session["id"],
+            "active_session_id": session["id"],
+            "artifacts": load_artifacts(),
+            "memory": load_memory(),
+            "debug": {
+                "tool": "current_info",
+                "query": current_info.get("query") or user_text,
+                "source_count": len(safe_list(current_info.get("sources"))),
+            },
+        }
 
     # -------------------------
     # WEB AUTO ROUTE
