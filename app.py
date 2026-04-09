@@ -15,6 +15,13 @@ from collections import defaultdict
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 from flask_cors import CORS
+from helpers.web_utils import (
+    looks_like_url,
+    normalize_url_input,
+    should_route_to_web,
+)
+
+from helpers.video_utils import build_video_analysis_result
 
 try:
     from openai import OpenAI
@@ -6364,98 +6371,6 @@ def detect_video_attachments(
 # =========================================================
 # WEB FETCH NORMALIZATION + AUTO ROUTE (LOCK)
 # =========================================================
-
-def _looks_like_url(text: str) -> bool:
-    t = str(text or "").lower().strip()
-    return ("http://" in t) or ("https://" in t) or ("www." in t)
-
-
-def _normalize_url_input(text: str) -> str:
-    t = normalize_text(text).strip()
-
-    if not t:
-        return ""
-
-    # extract first url-like token
-    parts = t.split()
-    candidate = parts[0]
-
-    if candidate.startswith("www."):
-        return "https://" + candidate
-
-    if not candidate.startswith("http://") and not candidate.startswith("https://"):
-        if "." in candidate:
-            return "https://" + candidate
-
-    return candidate
-
-
-def _should_route_to_web(user_text: str) -> bool:
-    t = normalize_text(user_text).strip().lower()
-
-    if not t:
-        return False
-
-    if t.startswith("/web"):
-        return True
-
-    if _looks_like_url(t):
-        return True
-
-    return False
-
-def build_video_analysis_result(
-    *,
-    attachments: list[dict[str, Any]] | None = None,
-    user_text: str,
-) -> dict[str, Any]:
-    videos = detect_video_attachments(attachments)
-    if not videos:
-        return {
-            "ok": False,
-            "kind": "video_analysis",
-            "summary": "",
-            "videos": [],
-            "error": "No video attachment found.",
-        }
-
-    first_video = videos[0]
-    filename = normalize_text(
-        first_video.get("filename")
-        or first_video.get("name")
-        or "video"
-    ).strip()
-
-    url = normalize_text(
-        first_video.get("url")
-        or first_video.get("file_url")
-        or first_video.get("source_url")
-        or ""
-    ).strip()
-
-    prompt_hint = normalize_text(user_text or "").strip()
-
-    summary = (
-        f"Video received: {filename}.\n"
-        f"Route locked for video analysis."
-    )
-
-    if prompt_hint:
-        summary += f"\nUser request: {prompt_hint}"
-
-    return {
-        "ok": True,
-        "kind": "video_analysis",
-        "summary": summary.strip(),
-        "videos": [
-            {
-                "filename": filename,
-                "url": url,
-                "mime_type": normalize_text(first_video.get('mime_type') or first_video.get('content_type') or '').strip(),
-            }
-        ],
-        "error": "",
-    }
 
 
 def build_video_artifact_from_result(
