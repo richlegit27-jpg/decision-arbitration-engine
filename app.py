@@ -2203,6 +2203,98 @@ def stream_model_text(
 # STREAM CONTRACT LOCK
 # =========================================================
 
+def build_video_analysis_result(
+    *,
+    attachments: list[dict[str, Any]] | None,
+    user_text: str,
+) -> dict[str, Any]:
+    videos = []
+
+    for item in safe_list(attachments):
+        if not isinstance(item, dict):
+            continue
+
+        mime_type = str(item.get("mime_type") or item.get("mime") or "").strip()
+        name = str(item.get("name") or item.get("filename") or "").strip()
+        url = str(item.get("url") or item.get("path") or "").strip()
+        kind = str(item.get("kind") or item.get("type") or "").lower().strip()
+
+        is_video = False
+        if "video" in kind:
+            is_video = True
+        elif mime_type.startswith("video/"):
+            is_video = True
+        elif name.lower().endswith((".mp4", ".webm", ".mov", ".m4v", ".avi")):
+            is_video = True
+        elif url.lower().endswith((".mp4", ".webm", ".mov", ".m4v", ".avi")):
+            is_video = True
+
+        if not is_video:
+            continue
+
+        if url and not url.startswith("/api/uploads/"):
+            safe_name = Path(url).name.strip()
+            if safe_name:
+                url = f"/api/uploads/{safe_name}"
+
+        try:
+            size_int = int(item.get("size") or 0)
+        except Exception:
+            size_int = 0
+
+        videos.append(
+            {
+                "url": url,
+                "name": name or Path(url).name.strip() or "video",
+                "mime_type": mime_type or "video/mp4",
+                "size": size_int,
+            }
+        )
+
+    if not videos:
+        return {
+            "ok": False,
+            "error": "No video attachment found.",
+            "summary": "",
+            "analysis_text": "",
+            "videos": [],
+            "bullets": [],
+        }
+
+    prompt = normalize_text(user_text).strip()
+    first_video = videos[0]
+    video_name = str(first_video.get("name") or "video").strip()
+
+    bullets = [
+        f"Video file received: {video_name}",
+        f"Detected {len(videos)} video attachment(s)",
+    ]
+
+    if prompt:
+        analysis_text = (
+            f"Video received for analysis.\n\n"
+            f"User request: {prompt}\n\n"
+            f"I can confirm the upload and preserve the video in chat and artifacts. "
+            f"Deeper frame-level understanding can be layered in later without breaking this pipeline."
+        )
+    else:
+        analysis_text = (
+            "Video received for analysis.\n\n"
+            "The upload has been preserved and attached to this session."
+        )
+
+    summary = normalize_text(analysis_text).strip()
+    if not summary:
+        summary = "Video received and analyzed."
+
+    return {
+        "ok": True,
+        "summary": summary,
+        "analysis_text": analysis_text,
+        "videos": videos,
+        "bullets": bullets,
+    }
+
 def chat_stream_generator(
     *,
     session_id: str,
@@ -2234,7 +2326,7 @@ def chat_stream_generator(
     started = False
     refined_text = ""
 
-    # 🎥 VIDEO ROUTE
+    # 🎥 VIDEO ROUTE — PASS 2 LOCK
     if has_video(attachments):
         try:
             video_result = build_video_analysis_result(
@@ -2251,19 +2343,41 @@ def chat_stream_generator(
                         "message_id": assistant_message_id,
                         "assistant_message_id": assistant_message_id,
                         "error": video_result.get("error") or "Video analysis failed.",
+                        "debug": {
+                            "tool": "video",
+                        },
                     }
                 )
                 return
 
-            assistant_text = normalize_text(
-                video_result.get("summary") or "Video analysis ready."
+            videos = safe_list(video_result.get("videos"))
+            first_video = videos[0] if videos else {}
+            first_video_url = str(first_video.get("url") or "").strip()
+
+            summary = normalize_text(
+                video_result.get("summary")
+                or video_result.get("analysis_text")
+                or ""
+            ).strip()
+            if not summary:
+                summary = "Video received and analyzed."
+
+            analysis_text = normalize_text(
+                video_result.get("analysis_text")
+                or summary
+                or ""
             ).strip()
 
             msg = make_assistant_message(
-                assistant_text,
+                summary,
                 message_id=assistant_message_id,
                 source="video_analysis",
-                meta=build_video_message_meta(video_result),
+                meta={
+                    "video_url": first_video_url,
+                    "videos": videos,
+                    "analysis_text": analysis_text,
+                    "bullets": safe_list(video_result.get("bullets")),
+                },
             )
 
             append_message(session, msg)
@@ -2286,12 +2400,8 @@ def chat_stream_generator(
                     "memory": load_memory(),
                     "debug": {
                         "tool": "video",
-                        "video_count": len(safe_list(video_result.get("videos"))),
-                        "video_url": (
-                            safe_list(video_result.get("videos"))[:1][0].get("url")
-                            if safe_list(video_result.get("videos"))
-                            else ""
-                        ),
+                        "video_count": len(videos),
+                        "video_url": first_video_url,
                     },
                 }
             )
@@ -2305,14 +2415,16 @@ def chat_stream_generator(
                     "session_id": locked_session_id,
                     "message_id": assistant_message_id,
                     "assistant_message_id": assistant_message_id,
-                    "error": str(exc) or "Video route failed.",
+                    "error": str(exc),
                     "debug": {
                         "tool": "video",
                     },
                 }
             )
             return
-
+ 
+        
+              
     # NORMAL CHAT CONTINUES BELOW HERE
 
     try:

@@ -1,5 +1,26 @@
 [
   {
+    "id": "artifact_2720ef06d56d4a55aa65f7de65e89a5d",
+    "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
+    "message_id": "assistant_80a7b02a11374d61b92c715f7b161aa7",
+    "kind": "chat_reply",
+    "title": "Response: Hi! How can I help?",
+    "body": "Hi! How can I help?",
+    "preview": "Hi! How can I help?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-09T08:20:42.851417+00:00",
+    "updated_at": "2026-04-09T08:20:42.852373+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! How can I help?",
+      "bullets": [
+        "Hi! How can I help?"
+      ]
+    }
+  },
+  {
     "id": "artifact_4eaf7201144b4882a1868a0bafea0b34",
     "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
     "message_id": "assistant_e60ea629277c4ba9973b75792f4e563b",
