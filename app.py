@@ -2198,6 +2198,7 @@ def stream_model_text(
 
         yield token
 
+
 # =========================================================
 # STREAM CONTRACT LOCK
 # =========================================================
@@ -2233,6 +2234,87 @@ def chat_stream_generator(
     started = False
     refined_text = ""
 
+    # 🎥 VIDEO ROUTE
+    if has_video(attachments):
+        try:
+            video_result = build_video_analysis_result(
+                attachments=attachments,
+                user_text=user_text,
+            )
+
+            if not video_result.get("ok"):
+                yield sse(
+                    {
+                        "type": "error",
+                        "ok": False,
+                        "session_id": locked_session_id,
+                        "message_id": assistant_message_id,
+                        "assistant_message_id": assistant_message_id,
+                        "error": video_result.get("error") or "Video analysis failed.",
+                    }
+                )
+                return
+
+            assistant_text = normalize_text(
+                video_result.get("summary") or "Video analysis ready."
+            ).strip()
+
+            msg = make_assistant_message(
+                assistant_text,
+                message_id=assistant_message_id,
+                source="video_analysis",
+                meta=build_video_message_meta(video_result),
+            )
+
+            append_message(session, msg)
+
+            try:
+                save_artifact_from_assistant(msg, session["id"])
+            except Exception:
+                pass
+
+            yield sse(
+                {
+                    "type": "final",
+                    "ok": True,
+                    "session_id": locked_session_id,
+                    "message_id": assistant_message_id,
+                    "assistant_message_id": assistant_message_id,
+                    "message": msg,
+                    "messages": session_messages(session),
+                    "artifacts": load_artifacts(),
+                    "memory": load_memory(),
+                    "debug": {
+                        "tool": "video",
+                        "video_count": len(safe_list(video_result.get("videos"))),
+                        "video_url": (
+                            safe_list(video_result.get("videos"))[:1][0].get("url")
+                            if safe_list(video_result.get("videos"))
+                            else ""
+                        ),
+                    },
+                }
+            )
+            return
+
+        except Exception as exc:
+            yield sse(
+                {
+                    "type": "error",
+                    "ok": False,
+                    "session_id": locked_session_id,
+                    "message_id": assistant_message_id,
+                    "assistant_message_id": assistant_message_id,
+                    "error": str(exc) or "Video route failed.",
+                    "debug": {
+                        "tool": "video",
+                    },
+                }
+            )
+            return
+
+    # NORMAL CHAT CONTINUES BELOW HERE
+
     try:
         # =========================================================
         # 🔥 D5 — ONE SOURCE OF TRUTH
@@ -2248,12 +2330,7 @@ def chat_stream_generator(
         route = payload["route"]
         memory_selection = payload["memory_selection"]
         memory_block = payload["memory_block"]
-        execution_context = payload["execution_context"]
-        model_messages = payload["model_messages"]
 
-        # =========================================================
-        # STREAM LOOP
-        # =========================================================
         for token in stream_model_text(
             session=session,
             user_text=user_text,
@@ -2272,17 +2349,10 @@ def chat_stream_generator(
                         "message_id": assistant_message_id,
                         "assistant_message_id": assistant_message_id,
                         "debug": {
-                    "agent_instruction_hierarchy": build_agent_instruction_hierarchy(
-                        user_text=user_text,
-                        session=session,
-                    ),
-                    "agent_brain": build_agent_brain_bundle(
-                        user_text=user_text,
-                        session=session,
-                    ),                          
                             "route_build": "phase-d5-one-source-of-truth-prompt-builder-2026-04-08-001",
                             "route_result": route_result,
                             "route": route,
+                            "memory_selected_count": len(memory_selection.get("selected") or []),
                         },
                     }
                 )
@@ -2304,17 +2374,22 @@ def chat_stream_generator(
                 }
             )
 
-        # =========================================================
-        # FINAL WRITE
-        # =========================================================
-        final_message = {
-            "id": assistant_message_id,
-            "role": "assistant",
-            "text": refined_text,
-            "created_at": assistant_created_at,
-        }
+        final_message = make_assistant_message(
+            refined_text.strip(),
+            message_id=assistant_message_id,
+            source="send",
+            pending=False,
+            streaming=False,
+            stopped=False,
+            error=False,
+        )
 
         append_message(session, final_message)
+
+        try:
+            save_artifact_from_assistant(final_message, session["id"])
+        except Exception:
+            pass
 
         yield sse(
             {
@@ -2328,25 +2403,25 @@ def chat_stream_generator(
                 "artifacts": load_artifacts(),
                 "memory": load_memory(),
                 "debug": {
-                    "route_build": "phase-d5-one-source-of-truth-prompt-builder-2026-04-08-001",
                     "route_result": route_result,
-                    "route": route,
-                    "memory_selected_count": len(memory_selection.get("items", [])) if isinstance(memory_selection, dict) else 0,
-                    "has_memory_block": bool(memory_block),
-                    "has_execution_context": bool(execution_context),
-                    "model_messages_count": len(model_messages),
+                    "memory_selected_count": len(memory_selection.get("selected") or []),
                 },
             }
         )
+        return
 
     except Exception as exc:
         yield sse(
             {
                 "type": "error",
                 "ok": False,
+                "session_id": locked_session_id,
+                "message_id": assistant_message_id,
+                "assistant_message_id": assistant_message_id,
                 "error": str(exc) or "Stream failed",
             }
         )
+        return
 
 def run_non_stream_chat(
     session_id: str,
@@ -3876,7 +3951,7 @@ def build_model_payload(
     payload["model_messages"] = model_messages
     return payload
 
-def _detect_tool_intent(text: str) -> str:
+def detect_tool_intent(text: str) -> str:
     t = (text or "").lower()
 
     if re.search(r"https?://|www\.", t):
@@ -5757,175 +5832,1166 @@ def finalize_tool_route_output(
     return "Done."
 
 # =========================================================
-# API ROUTES
+# PHASE UI POLISH — RESPONSE SHAPE + DISPLAY CONTRACT LOCK
+# =========================================================
+
+def build_ui_message_payload(
+    *,
+    text: str,
+    route_data: dict[str, Any],
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    clean_text = normalize_text(text or "").strip()
+    route = normalize_text(route_data.get("route") or "chat").lower()
+
+    payload: dict[str, Any] = {
+        "text": clean_text,
+        "kind": "chat",
+        "badges": [],
+        "meta": {},
+    }
+
+    if route == "web":
+        payload["kind"] = "web"
+        payload["badges"].append("web")
+        payload["meta"]["source"] = "web_fetch"
+
+    elif route == "image":
+        payload["kind"] = "image_generation"
+        payload["badges"].append("image")
+
+    elif route == "vision":
+        payload["kind"] = "image_analysis"
+        payload["badges"].append("vision")
+
+    elif route == "video":
+        payload["kind"] = "video_analysis"
+        payload["badges"].append("video")
+
+    elif route == "attachment":
+        payload["kind"] = "attachment_analysis"
+        payload["badges"].append("attachment")
+
+    # tighten preview
+    preview = clean_text[:180].strip()
+    payload["preview"] = preview
+
+    # add lightweight formatting hints
+    if len(clean_text) > 1200:
+        payload["meta"]["long"] = True
+
+    if "\n" in clean_text:
+        payload["meta"]["multiline"] = True
+
+    return payload
+
+
+def build_ui_status_meta(
+    *,
+    route_data: dict[str, Any],
+) -> dict[str, Any]:
+    route = normalize_text(route_data.get("route") or "chat").lower()
+
+    status = "ready"
+    label = "Ready"
+
+    if route == "web":
+        label = "Web"
+    elif route == "image":
+        label = "Image"
+    elif route == "vision":
+        label = "Vision"
+    elif route == "video":
+        label = "Video"
+    elif route == "attachment":
+        label = "Attachment"
+
+    return {
+        "status": status,
+        "label": label,
+    }
+
+def attach_ui_envelope(
+    *,
+    final_message: dict[str, Any],
+    refined_text: str,
+    route_data: dict[str, Any],
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(final_message, dict):
+        return final_message
+
+    ui_payload = build_ui_message_payload(
+        text=refined_text,
+        route_data=route_data,
+        session=session,
+    )
+
+    ui_meta = build_ui_status_meta(
+        route_data=route_data,
+    )
+
+    enriched = dict(final_message)
+    enriched["ui"] = {
+        "message": ui_payload,
+        "status": ui_meta,
+    }
+
+    return enriched
+
+
+
+
+
+
+
+
+# =========================================================
+# FETCH WEB HARDENING + VIDEO PIPELINE LOCK
+# =========================================================
+
+WEB_FETCH_TIMEOUT = 20
+
+
+def normalize_web_url(value: Any) -> str:
+    url = normalize_text(value or "").strip()
+    if not url:
+        return ""
+
+    if url.startswith("www."):
+        url = "https://" + url
+
+    if not re.match(r"^https?://", url, flags=re.IGNORECASE):
+        url = "https://" + url
+
+    return url.strip()
+
+def extract_first_url_from_text(value: Any) -> str:
+    text = normalize_text(value or "")
+    match = re.search(r"(https?://[^\s]+|www\.[^\s]+)", text, flags=re.IGNORECASE)
+    if not match:
+        return ""
+    return normalize_web_url(match.group(1))
+
+
+def build_web_fetch_result(
+    *,
+    url: str,
+    ok: bool,
+    status_code: int | None = None,
+    title: str = "",
+    description: str = "",
+    content: str = "",
+    error: str = "",
+    ssl_verified: bool = True,
+    final_url: str = "",
+) -> dict[str, Any]:
+    clean_url = normalize_web_url(final_url or url)
+
+    preview = normalize_text(description or content or "").strip()
+    if len(preview) > 240:
+        preview = preview[:240].rstrip() + "..."
+
+    return {
+        "ok": bool(ok),
+        "url": clean_url,
+        "final_url": clean_url,
+        "status_code": status_code,
+        "title": normalize_text(title or "").strip(),
+        "description": normalize_text(description or "").strip(),
+        "content": normalize_text(content or "").strip(),
+        "preview": preview,
+        "error": normalize_text(error or "").strip(),
+        "ssl_verified": bool(ssl_verified),
+        "fetched_at": now_iso(),
+    }
+
+
+def fetch_web_page_hardened(url: str) -> dict[str, Any]:
+    clean_url = normalize_web_url(url)
+    if not clean_url:
+        return build_web_fetch_result(
+            url=url,
+            ok=False,
+            error="No valid URL found.",
+            ssl_verified=True,
+        )
+
+    try:
+        response = requests.get(
+            clean_url,
+            timeout=WEB_FETCH_TIMEOUT,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Nova Local Fetch)",
+            },
+            allow_redirects=True,
+            verify=True,
+        )
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        title = ""
+        if soup.title and soup.title.string:
+            title = normalize_text(soup.title.string).strip()
+
+        description = ""
+        desc_meta = soup.find("meta", attrs={"name": "description"})
+        if desc_meta and desc_meta.get("content"):
+            description = normalize_text(desc_meta.get("content")).strip()
+
+        body_text = soup.get_text("\n", strip=True)
+        if len(body_text) > 8000:
+            body_text = body_text[:8000].rstrip()
+
+        return build_web_fetch_result(
+            url=clean_url,
+            ok=True,
+            status_code=int(response.status_code),
+            title=title,
+            description=description,
+            content=body_text,
+            ssl_verified=True,
+            final_url=str(response.url or clean_url),
+        )
+
+    except requests.exceptions.SSLError:
+        try:
+            response = requests.get(
+                clean_url,
+                timeout=WEB_FETCH_TIMEOUT,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Nova Local Fetch)",
+                },
+                allow_redirects=True,
+                verify=False,
+            )
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            title = ""
+            if soup.title and soup.title.string:
+                title = normalize_text(soup.title.string).strip()
+
+            description = ""
+            desc_meta = soup.find("meta", attrs={"name": "description"})
+            if desc_meta and desc_meta.get("content"):
+                description = normalize_text(desc_meta.get("content")).strip()
+
+            body_text = soup.get_text("\n", strip=True)
+            if len(body_text) > 8000:
+                body_text = body_text[:8000].rstrip()
+
+            return build_web_fetch_result(
+                url=clean_url,
+                ok=True,
+                status_code=int(response.status_code),
+                title=title,
+                description=description,
+                content=body_text,
+                ssl_verified=False,
+                final_url=str(response.url or clean_url),
+            )
+        except Exception as exc:
+            return build_web_fetch_result(
+                url=clean_url,
+                ok=False,
+                error=str(exc) or "Web fetch failed after SSL retry.",
+                ssl_verified=False,
+            )
+    except Exception as exc:
+        return build_web_fetch_result(
+            url=clean_url,
+            ok=False,
+            error=str(exc) or "Web fetch failed.",
+            ssl_verified=True,
+        )
+
+
+def build_web_artifact_from_fetch_result(
+    fetch_result: dict[str, Any],
+    session_id: str,
+) -> dict[str, Any]:
+    title = normalize_text(fetch_result.get("title") or "").strip() or "Web Result"
+    description = normalize_text(fetch_result.get("description") or "").strip()
+    content = normalize_text(fetch_result.get("content") or "").strip()
+    preview = normalize_text(fetch_result.get("preview") or "").strip()
+
+    body_parts = []
+    if description:
+        body_parts.append(description)
+    if content:
+        body_parts.append(content[:3000].rstrip())
+
+    return {
+        "title": title,
+        "kind": "web_result",
+        "body": "\n\n".join(body_parts).strip() or preview or "Fetched web content.",
+        "session_id": session_id,
+        "meta": {
+            "source_url": normalize_text(fetch_result.get("final_url") or fetch_result.get("url") or "").strip(),
+            "status_code": fetch_result.get("status_code"),
+            "ssl_verified": bool(fetch_result.get("ssl_verified")),
+            "fetched_at": normalize_text(fetch_result.get("fetched_at") or "").strip(),
+            "preview": preview,
+        },
+    }
+
+
+def detect_video_attachments(
+    attachments: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+
+    for item in safe_list(attachments):
+        if not isinstance(item, dict):
+            continue
+
+        mime = normalize_text(
+            item.get("mime_type")
+            or item.get("content_type")
+            or item.get("type")
+            or ""
+        ).lower()
+
+        name = normalize_text(item.get("name") or item.get("filename") or "").lower()
+
+        is_video = (
+            mime.startswith("video/")
+            or name.endswith(".mp4")
+            or name.endswith(".mov")
+            or name.endswith(".avi")
+            or name.endswith(".mkv")
+            or name.endswith(".webm")
+        )
+
+        if is_video:
+            results.append(item)
+
+    return results
+
+
+def build_video_analysis_result(
+    *,
+    attachments: list[dict[str, Any]] | None = None,
+    user_text: str,
+) -> dict[str, Any]:
+    videos = detect_video_attachments(attachments)
+    if not videos:
+        return {
+            "ok": False,
+            "kind": "video_analysis",
+            "summary": "",
+            "videos": [],
+            "error": "No video attachment found.",
+        }
+
+    first_video = videos[0]
+    filename = normalize_text(
+        first_video.get("filename")
+        or first_video.get("name")
+        or "video"
+    ).strip()
+
+    url = normalize_text(
+        first_video.get("url")
+        or first_video.get("file_url")
+        or first_video.get("source_url")
+        or ""
+    ).strip()
+
+    prompt_hint = normalize_text(user_text or "").strip()
+
+    summary = (
+        f"Video received: {filename}.\n"
+        f"Route locked for video analysis."
+    )
+
+    if prompt_hint:
+        summary += f"\nUser request: {prompt_hint}"
+
+    return {
+        "ok": True,
+        "kind": "video_analysis",
+        "summary": summary.strip(),
+        "videos": [
+            {
+                "filename": filename,
+                "url": url,
+                "mime_type": normalize_text(first_video.get('mime_type') or first_video.get('content_type') or '').strip(),
+            }
+        ],
+        "error": "",
+    }
+
+
+def build_video_artifact_from_result(
+    video_result: dict[str, Any],
+    session_id: str,
+) -> dict[str, Any]:
+    first_video = safe_list(video_result.get("videos"))[:1]
+    first_video = first_video[0] if first_video else {}
+
+    return {
+        "title": normalize_text((first_video or {}).get("filename") or "Video Analysis").strip(),
+        "kind": "video_analysis",
+        "body": normalize_text(video_result.get("summary") or "").strip() or "Video analysis ready.",
+        "session_id": session_id,
+        "meta": {
+            "video_url": normalize_text((first_video or {}).get("url") or "").strip(),
+            "mime_type": normalize_text((first_video or {}).get("mime_type") or "").strip(),
+        },
+    }
+
+
+# =========================================================
+# WEB FETCH HARDEN + VIDEO PIPELINE LOCK
+# =========================================================
+
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse
+
+WEB_FETCH_TIMEOUT = 20
+WEB_FETCH_TEXT_LIMIT = 4000
+
+
+def normalize_url(url: str) -> str:
+    value = normalize_text(url).strip()
+    if not value:
+        return ""
+
+    if value.startswith("www."):
+        value = "https://" + value
+
+    if not re.match(r"^https?://", value, re.IGNORECASE):
+        value = "https://" + value
+
+    return value.rstrip("/")
+
+
+def extract_url(text: str) -> str:
+    match = re.search(r"(https?://[^\s]+|www\.[^\s]+)", text or "", re.IGNORECASE)
+    if not match:
+        return ""
+
+    raw = match.group(1).strip().rstrip(").,!?]}>\"'")
+    if raw.startswith("www."):
+        raw = "https://" + raw
+    if not re.match(r"^https?://", raw, re.IGNORECASE):
+        raw = "https://" + raw
+
+    return raw
+
+
+def detect_tool_intent(text: str) -> str:
+    lower = normalize_text(text).lower()
+
+    if re.search(r"https?://|www\.", lower):
+        return "web"
+
+    if lower.startswith("/image") or any(x in lower for x in [
+        "generate image",
+        "create image",
+        "make image",
+        "draw",
+        "image of",
+        "picture of",
+    ]):
+        return "image"
+
+    return "none"
+
+
+def _domain_from_url(url: str) -> str:
+    try:
+        return urlparse(url).netloc or ""
+    except Exception:
+        return ""
+
+
+def fetch_web(url: str) -> dict[str, Any]:
+    normalized = normalize_url(url)
+    if not normalized:
+        return {
+            "ok": False,
+            "error": "No valid URL found.",
+            "url": "",
+            "normalized_url": "",
+            "ssl_verified": True,
+        }
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Nova/2026",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+
+    ssl_verified = True
+
+    try:
+        response = requests.get(
+            normalized,
+            timeout=WEB_FETCH_TIMEOUT,
+            headers=headers,
+            allow_redirects=True,
+        )
+        response.raise_for_status()
+    except requests.exceptions.SSLError:
+        ssl_verified = False
+        response = requests.get(
+            normalized,
+            timeout=WEB_FETCH_TIMEOUT,
+            headers=headers,
+            allow_redirects=True,
+            verify=False,
+        )
+        response.raise_for_status()
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": str(exc),
+            "url": normalized,
+            "normalized_url": normalized,
+            "ssl_verified": ssl_verified,
+        }
+
+    final_url = str(response.url or normalized).strip()
+    content_type = str(response.headers.get("Content-Type") or "").strip()
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    title = ""
+    if soup.title and soup.title.string:
+        title = normalize_text(soup.title.string).strip()
+
+    description = ""
+    desc_tag = soup.find("meta", attrs={"name": re.compile("^description$", re.I)})
+    if desc_tag and desc_tag.get("content"):
+        description = normalize_text(desc_tag.get("content")).strip()
+
+    site_name = ""
+    site_tag = soup.find("meta", attrs={"property": re.compile("^og:site_name$", re.I)})
+    if site_tag and site_tag.get("content"):
+        site_name = normalize_text(site_tag.get("content")).strip()
+
+    body_text = normalize_text(soup.get_text("\n", strip=True)).strip()
+    body_text = re.sub(r"\n{3,}", "\n\n", body_text)
+    content = body_text[:WEB_FETCH_TEXT_LIMIT]
+    preview = summarize_text(description or content or title or final_url, 240)
+
+    return {
+        "ok": True,
+        "url": final_url,
+        "normalized_url": final_url,
+        "domain": _domain_from_url(final_url),
+        "title": title,
+        "description": description,
+        "site_name": site_name,
+        "content": content,
+        "preview": preview,
+        "status_code": int(response.status_code),
+        "content_type": content_type,
+        "ssl_verified": ssl_verified,
+        "fetched_at": now_iso(),
+    }
+
+
+def build_web_result_text(result: dict[str, Any]) -> str:
+    lines: list[str] = []
+
+    title = normalize_text(result.get("title") or "").strip()
+    description = normalize_text(result.get("description") or "").strip()
+    site_name = normalize_text(result.get("site_name") or "").strip()
+    domain = normalize_text(result.get("domain") or "").strip()
+    url = normalize_text(result.get("url") or "").strip()
+    content = normalize_text(result.get("content") or "").strip()
+
+    if title:
+        lines.append(title)
+    if description:
+        lines.append(description)
+    if site_name or domain:
+        lines.append("Source: " + " · ".join([x for x in [site_name, domain] if x]))
+    if url:
+        lines.append("URL: " + url)
+    if content:
+        lines.append(content)
+
+    text = "\n\n".join([x for x in lines if x]).strip()
+    return text or "Web result"
+
+
+def build_web_result_meta(result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "source": "web_fetch",
+        "source_url": normalize_text(result.get("url") or "").strip(),
+        "site_name": normalize_text(result.get("site_name") or "").strip(),
+        "domain": normalize_text(result.get("domain") or "").strip(),
+        "description": normalize_text(result.get("description") or "").strip(),
+        "preview": normalize_text(result.get("preview") or "").strip(),
+        "ssl_verified": bool(result.get("ssl_verified")),
+        "status_code": int(result.get("status_code") or 0),
+        "content_type": normalize_text(result.get("content_type") or "").strip(),
+        "fetched_at": normalize_text(result.get("fetched_at") or now_iso()).strip(),
+    }
+
+
+def detect_video_attachments(
+    attachments: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+
+    for item in safe_list(attachments):
+        if not isinstance(item, dict):
+            continue
+
+        mime = normalize_text(
+            item.get("mime_type")
+            or item.get("content_type")
+            or item.get("type")
+            or ""
+        ).lower()
+
+        name = normalize_text(
+            item.get("name")
+            or item.get("filename")
+            or ""
+        ).lower()
+
+        is_video = (
+            mime.startswith("video/")
+            or name.endswith(".mp4")
+            or name.endswith(".mov")
+            or name.endswith(".avi")
+            or name.endswith(".mkv")
+            or name.endswith(".webm")
+        )
+
+        if is_video:
+            results.append(item)
+
+    return results
+
+
+def has_video(attachments: list[dict[str, Any]] | None = None) -> bool:
+    return len(detect_video_attachments(attachments)) > 0
+
+
+def build_video_analysis_result(
+    *,
+    attachments: list[dict[str, Any]] | None = None,
+    user_text: str,
+) -> dict[str, Any]:
+    videos = detect_video_attachments(attachments)
+    if not videos:
+        return {
+            "ok": False,
+            "kind": "video_analysis",
+            "summary": "",
+            "videos": [],
+            "error": "No video attachment found.",
+        }
+
+    first_video = videos[0]
+    filename = normalize_text(
+        first_video.get("filename")
+        or first_video.get("name")
+        or "video"
+    ).strip()
+
+    url = normalize_text(
+        first_video.get("url")
+        or first_video.get("file_url")
+        or first_video.get("source_url")
+        or ""
+    ).strip()
+
+    prompt_hint = normalize_text(user_text or "").strip()
+
+    summary = (
+        f"Video received: {filename}.\n"
+        f"Route locked for video analysis."
+    )
+
+    if prompt_hint:
+        summary += f"\nUser request: {prompt_hint}"
+
+    return {
+        "ok": True,
+        "kind": "video_analysis",
+        "summary": summary.strip(),
+        "videos": [
+            {
+                "filename": filename,
+                "url": url,
+                "mime_type": normalize_text(
+                    first_video.get("mime_type")
+                    or first_video.get("content_type")
+                    or ""
+                ).strip(),
+            }
+        ],
+        "error": "",
+    }
+
+# =========================================================
+# VIDEO PIPELINE REAL ARTIFACT + VIEWER LOCK
+# =========================================================
+
+def detect_video_attachments(
+    attachments: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+
+    for item in safe_list(attachments):
+        if not isinstance(item, dict):
+            continue
+
+        mime = normalize_text(
+            item.get("mime_type")
+            or item.get("content_type")
+            or item.get("type")
+            or ""
+        ).lower()
+
+        name = normalize_text(
+            item.get("name")
+            or item.get("filename")
+            or ""
+        ).lower()
+
+        is_video = (
+            mime.startswith("video/")
+            or name.endswith(".mp4")
+            or name.endswith(".mov")
+            or name.endswith(".avi")
+            or name.endswith(".mkv")
+            or name.endswith(".webm")
+        )
+
+        if is_video:
+            results.append(normalize_attachment(item))
+
+    return results
+
+
+def has_video(attachments: list[dict[str, Any]] | None = None) -> bool:
+    return len(detect_video_attachments(attachments)) > 0
+
+
+def build_video_analysis_result(
+    *,
+    attachments: list[dict[str, Any]] | None = None,
+    user_text: str,
+) -> dict[str, Any]:
+    videos = detect_video_attachments(attachments)
+    if not videos:
+        return {
+            "ok": False,
+            "kind": "video_analysis",
+            "summary": "",
+            "videos": [],
+            "error": "No video attachment found.",
+        }
+
+    first_video = videos[0]
+
+    filename = normalize_text(
+        first_video.get("filename")
+        or first_video.get("name")
+        or "video"
+    ).strip()
+
+    video_url = normalize_text(
+        first_video.get("url")
+        or first_video.get("file_url")
+        or first_video.get("source_url")
+        or ""
+    ).strip()
+
+    mime_type = normalize_text(
+        first_video.get("mime_type")
+        or first_video.get("content_type")
+        or ""
+    ).strip()
+
+    prompt_hint = normalize_text(user_text or "").strip()
+
+    summary_lines = [
+        f"Video received: {filename}.",
+        "Video artifact saved and ready in the viewer.",
+    ]
+
+    if prompt_hint:
+        summary_lines.append(f"User request: {prompt_hint}")
+
+    return {
+        "ok": True,
+        "kind": "video_analysis",
+        "summary": "\n".join(summary_lines).strip(),
+        "videos": [
+            {
+                "filename": filename,
+                "url": video_url,
+                "mime_type": mime_type,
+            }
+        ],
+        "error": "",
+    }
+
+
+def build_video_message_meta(video_result: dict[str, Any]) -> dict[str, Any]:
+    videos = safe_list(video_result.get("videos"))
+    first_video = videos[0] if videos else {}
+
+    filename = normalize_text(
+        first_video.get("filename")
+        or "video"
+    ).strip()
+
+    video_url = normalize_text(
+        first_video.get("url")
+        or ""
+    ).strip()
+
+    mime_type = normalize_text(
+        first_video.get("mime_type")
+        or ""
+    ).strip()
+
+    summary = normalize_text(video_result.get("summary") or "").strip()
+
+    return {
+        "video_url": video_url,
+        "mime_type": mime_type,
+        "analysis_text": summary,
+        "bullets": [
+            f"Video: {filename}",
+            "Saved as video artifact.",
+        ],
+    }
+
+# =========================================================
+# API CHAT — THIN WRAPPER LOCK (FINAL)
 # =========================================================
 
 @app.post("/api/chat")
 def api_chat() -> Any:
-    data = request.get_json(silent=True) or {}
+    try:
+        data = request.get_json(silent=True) or {}
 
-    requested_session_id = str(data.get("session_id") or "").strip()
-    user_text = normalize_text(data.get("user_text") or "")
-    attachments = normalize_attachments(safe_list(data.get("attachments")))
-    regenerate_of = str(data.get("regenerate_of") or "").strip() or None
-
-    route_result = choose_route(
-        user_text=user_text,
-        attachments=attachments,
-        regenerate_of=regenerate_of,
-    )
-
-    wants_stream = bool(data.get("stream", True))
-
-    store = load_sessions_store()
-    session = find_session(store, requested_session_id) if requested_session_id else None
-    if not session:
-        session = ensure_active_session(store)
-        requested_session_id = session["id"]
-
-    store["active_session_id"] = session["id"]
-    save_sessions_store(store)
-
-    if not regenerate_of and not user_text.strip() and not attachments:
-        return jsonify({"ok": False, "error": "user_text or attachments required"}), 400
-
-    # =========================================================
-    # STREAM UNIFIED FLOW (CHAT + TOOLS)
-    # =========================================================
-
-    def stream() -> Generator[str, None, None]:
-        assistant_id = make_id("assistant")
-        assistant_created_at = now_iso()
-
-        append_message(session, make_user_message(user_text, attachments))
-
-        yield sse({
-            "type": "start",
-            "message_id": assistant_id,
-            "session_id": session["id"],
-        })
-
-        def detect_tool(text: str) -> str:
-            t = (text or "").lower()
-            if re.search(r"https?://|www\.", t):
-                return "web"
-            if any(x in t for x in ["generate image", "create image", "draw", "image of"]):
-                return "image"
-            return "none"
-
-        tool = detect_tool(user_text)
-        agent_mode = detect_agent_mode(user_text)
-
-        full_text = ""
-
-        if agent_mode:
-            for event in stream_agent_plan(
-                assistant_id=assistant_id,
-                session=session,
-                user_text=user_text,
-            ):
-                yield event
+        requested_session_id = str(data.get("session_id") or "").strip()
+        user_text = normalize_text(data.get("user_text") or "")
+        attachments = normalize_attachments(safe_list(data.get("attachments")))
+        regenerate_of = str(data.get("regenerate_of") or "").strip() or None
+        wants_stream = bool(data.get("stream", True))
 
         # -------------------------
-        # WEB TOOL (STREAM)
+        # SESSION RESOLVE (KEEP THIS)
         # -------------------------
-        if tool == "web":
-            try:
-                url_match = re.search(r"(https?://\S+|www\.\S+)", user_text)
-                url = url_match.group(0) if url_match else user_text.strip()
-                if url.startswith("www."):
-                    url = "https://" + url
+        store = load_sessions_store()
+        session = find_session(store, requested_session_id) if requested_session_id else None
+        if not session:
+            session = ensure_active_session(store)
 
-                web_data = fetch_web(url)
-                text = web_data.get("summary") or web_data.get("title") or "Web result"
+        store["active_session_id"] = session["id"]
+        save_sessions_store(store)
 
-                for token in text.split(" "):
-                    full_text += token + " "
-                    yield sse({
-                        "type": "token",
-                        "message_id": assistant_id,
-                        "token": token + " ",
-                    })
-
-                msg = make_assistant_message(full_text.strip(), message_id=assistant_id)
-
-                append_message(session, msg)
-                save_artifact_from_assistant(msg, session["id"])
-
-                yield sse({
-                    "type": "final",
-                    "message": msg,
-                    "session_id": session["id"],
-                    "messages": session_messages(session),
-                    "artifacts": load_artifacts(),
-                    "memory": load_memory(),
-                })
-                return
-
-            except Exception as e:
-                yield sse({"type": "error", "error": str(e)})
-                return
+        if not regenerate_of and not user_text.strip() and not attachments:
+            return jsonify({"ok": False, "error": "user_text or attachments required"}), 400
 
         # -------------------------
-        # IMAGE TOOL (STREAM)
+        # STREAM PATH (ONLY DELEGATION)
         # -------------------------
-        if tool == "image":
-            try:
-                yield sse({
-                    "type": "token",
-                    "message_id": assistant_id,
-                    "token": "Generating image...",
-                })
-
-                image_url = generate_image(user_text)
-
-                final_text = f"![Generated image]({image_url})"
-
-                msg = make_assistant_message(final_text, message_id=assistant_id)
-
-                append_message(session, msg)
-                save_artifact_from_assistant(msg, session["id"])
-
-                yield sse({
-                    "type": "final",
-                    "message": msg,
-                    "session_id": session["id"],
-                    "messages": session_messages(session),
-                    "artifacts": load_artifacts(),
-                    "memory": load_memory(),
-                })
-                return
-
-            except Exception as e:
-                yield sse({"type": "error", "error": str(e)})
-                return
+        if wants_stream:
+            return Response(
+                chat_stream_generator(
+                    session_id=session["id"],
+                    user_text=user_text,
+                    attachments=attachments,
+                    regenerate_of=regenerate_of,
+                ),
+                mimetype="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                },
+            )
 
         # -------------------------
-        # NORMAL CHAT (STREAM)
+        # NON-STREAM PATH (DELEGATE)
         # -------------------------
-        payload = build_model_payload(
-            session=session,
+        result = chat_single_response(
+            session_id=session["id"],
             user_text=user_text,
             attachments=attachments,
             regenerate_of=regenerate_of,
         )
 
-        model_messages = payload["model_messages"]
+        return jsonify(result)
 
-        agent_system_prompt = build_agent_system_prompt(
-            user_text=user_text,
-            session=session,
-        )
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": str(exc) or "api_chat failed",
+        }), 500
 
-        if model_messages and isinstance(model_messages, list):
-            if model_messages[0].get("role") == "system":
-                model_messages[0]["content"] = agent_system_prompt + "\n\n" + str(model_messages[0].get("content") or "")
-            else:
-                model_messages.insert(0, {
-                    "role": "system",
-                    "content": agent_system_prompt,
+@app.post("/api/web/fetch")
+def api_web_fetch() -> Any:
+    data = request.get_json(silent=True) or {}
+
+    requested_session_id = str(data.get("session_id") or "").strip()
+    raw_url = normalize_text(data.get("url") or data.get("user_text") or "").strip()
+
+    url = extract_url(raw_url) or normalize_url(raw_url)
+    if not url:
+        return jsonify({
+            "ok": False,
+            "error": "A valid URL is required.",
+        }), 400
+
+    store = load_sessions_store()
+    session = find_session(store, requested_session_id) if requested_session_id else None
+    if not session:
+        session = ensure_active_session(store)
+
+    store["active_session_id"] = session["id"]
+    save_sessions_store(store)
+
+    result = fetch_web(url)
+    if not result.get("ok"):
+        return jsonify({
+            "ok": False,
+            "error": result.get("error") or "Web fetch failed.",
+            "debug": {
+                "tool": "web",
+                "url": result.get("url") or url,
+            },
+        }), 500
+
+    text = build_web_result_text(result)
+    meta = build_web_result_meta(result)
+
+    user_msg = make_user_message(url, [])
+    assistant_msg = make_assistant_message(
+        text,
+        source="web_fetch",
+        meta=meta,
+    )
+
+    append_message(session, user_msg)
+    append_message(session, assistant_msg)
+
+    try:
+        save_artifact_from_assistant(assistant_msg, session["id"])
+    except Exception:
+        pass
+
+    return jsonify({
+        "ok": True,
+        "session_id": session["id"],
+        "message": assistant_msg,
+        "messages": session_messages(session),
+        "artifacts": load_artifacts(),
+        "memory": load_memory(),
+        "debug": {
+            "tool": "web",
+            "url": result.get("url") or "",
+            "ssl_verified": bool(result.get("ssl_verified")),
+            "status_code": int(result.get("status_code") or 0),
+        },
+    })
+
+    def stream() -> Generator[str, None, None]:
+        assistant_id = make_id("assistant")
+        full_text = ""
+
+        append_message(session, make_user_message(user_text, attachments))
+
+        # -------------------------
+        # WEB TOOL (STREAM)
+        # -------------------------
+        tool = detect_tool_intent(user_text)
+
+        if tool == "web":
+            try:
+                url = extract_url(user_text)
+                result = fetch_web(url)
+
+                if not result.get("ok"):
+                    yield sse({
+                        "type": "error",
+                        "ok": False,
+                        "error": result.get("error") or "Web fetch failed.",
+                        "debug": {
+                            "tool": "web",
+                            "url": result.get("url") or url,
+                        },
+                    })
+                    return
+
+                text = build_web_result_text(result)
+                meta = build_web_result_meta(result)
+
+                msg = make_assistant_message(
+                    text,
+                    message_id=assistant_id,
+                    source="web_fetch",
+                    meta=meta,
+                )
+                append_message(session, msg)
+
+                try:
+                    save_artifact_from_assistant(msg, session["id"])
+                except Exception:
+                    pass
+
+                yield sse({
+                    "type": "final",
+                    "ok": True,
+                    "message": msg,
+                    "session_id": session["id"],
+                    "messages": session_messages(session),
+                    "artifacts": load_artifacts(),
+                    "memory": load_memory(),
+                    "debug": {
+                        "tool": "web",
+                        "url": result.get("url") or "",
+                        "ssl_verified": bool(result.get("ssl_verified")),
+                        "status_code": int(result.get("status_code") or 0),
+                    },
                 })
+                return
+
+            except Exception as exc:
+                yield sse({
+                    "type": "error",
+                    "ok": False,
+                    "error": str(exc),
+                    "debug": {
+                        "tool": "web",
+                        "url": extract_url(user_text),
+                    },
+                })
+                return
+
+        # -------------------------
+        # VIDEO TOOL (STREAM)
+        # -------------------------
+        if has_video(attachments):
+            try:
+                video_result = build_video_analysis_result(
+                    attachments=attachments,
+                    user_text=user_text,
+                )
+
+                if not video_result.get("ok"):
+                    yield sse({
+                        "type": "error",
+                        "ok": False,
+                        "error": video_result.get("error") or "Video analysis failed.",
+                    })
+                    return
+
+                msg = make_assistant_message(
+                    normalize_text(video_result.get("summary") or "").strip(),
+                    message_id=assistant_id,
+                    source="video_analysis",
+                    meta={
+                        "video_url": (
+                            safe_list(video_result.get("videos"))[:1][0].get("url")
+                            if safe_list(video_result.get("videos"))
+                            else ""
+                        ),
+                        "videos": safe_list(video_result.get("videos")),
+                    },
+                )
+                append_message(session, msg)
+
+                try:
+                    save_artifact_from_assistant(msg, session["id"])
+                except Exception:
+                    pass
+
+                yield sse({
+                    "type": "final",
+                    "ok": True,
+                    "message": msg,
+                    "session_id": session["id"],
+                    "messages": session_messages(session),
+                    "artifacts": load_artifacts(),
+                    "memory": load_memory(),
+                    "debug": {
+                        "tool": "video",
+                        "video_count": len(safe_list(video_result.get("videos"))),
+                    },
+                })
+                return
+
+            except Exception as exc:
+                yield sse({
+                    "type": "error",
+                    "ok": False,
+                    "error": str(exc),
+                    "debug": {
+                        "tool": "video",
+                    },
+                })
+                return
+
+        # -------------------------
+        # NORMAL CHAT (STREAM)
+        # -------------------------
         try:
+            payload = build_model_payload(
+                session=session,
+                user_text=user_text,
+                attachments=attachments,
+                regenerate_of=regenerate_of,
+            )
+
+            model_messages = payload["model_messages"]
+
+            agent_system_prompt = build_agent_system_prompt(
+                user_text=user_text,
+                session=session,
+            )
+
+            agent_tool_follow_through_header = build_agent_tool_follow_through_header(
+                user_text=user_text,
+                session=session,
+                attachments=attachments,
+            )
+
+            agent_system_prompt = (
+                agent_system_prompt
+                + "\n\n"
+                + agent_tool_follow_through_header
+            )
+
+            if model_messages and isinstance(model_messages, list):
+                if model_messages[0].get("role") == "system":
+                    model_messages[0]["content"] = (
+                        agent_system_prompt
+                        + "\n\n"
+                        + str(model_messages[0].get("content") or "")
+                    )
+                else:
+                    model_messages.insert(0, {
+                        "role": "system",
+                        "content": agent_system_prompt,
+                    })
+
+            if OPENAI_CLIENT is None:
+                yield sse({
+                    "type": "error",
+                    "ok": False,
+                    "error": "OPENAI_CLIENT is not configured.",
+                })
+                return
+
             stream_resp = OPENAI_CLIENT.chat.completions.create(
                 model=OPENAI_MODEL,
                 messages=model_messages,
@@ -5934,21 +7000,27 @@ def api_chat() -> Any:
 
             for chunk in stream_resp:
                 token = chunk.choices[0].delta.content or ""
-                if token:
-                    full_text += token
-                    yield sse({
-                        "type": "token",
-                        "message_id": assistant_id,
-                        "token": token,
-                    })
+                if not token:
+                    continue
+
+                full_text += token
+                yield sse({
+                    "type": "token",
+                    "message_id": assistant_id,
+                    "token": token,
+                })
 
             msg = make_assistant_message(full_text.strip(), message_id=assistant_id)
-
             append_message(session, msg)
-            save_artifact_from_assistant(msg, session["id"])
+
+            try:
+                save_artifact_from_assistant(msg, session["id"])
+            except Exception:
+                pass
 
             yield sse({
                 "type": "final",
+                "ok": True,
                 "message": msg,
                 "session_id": session["id"],
                 "messages": session_messages(session),
@@ -5956,8 +7028,18 @@ def api_chat() -> Any:
                 "memory": load_memory(),
             })
 
-        except Exception as e:
-            yield sse({"type": "error", "error": str(e)})
+        except Exception as exc:
+            yield sse({
+                "type": "error",
+                "ok": False,
+                "error": str(exc),
+            })
+
+    if not wants_stream:
+        return jsonify({
+            "ok": False,
+            "error": "Non-stream mode is not wired in this lock yet.",
+        }), 400
 
     return Response(
         stream(),
@@ -5967,6 +7049,7 @@ def api_chat() -> Any:
             "Connection": "keep-alive",
         },
     )
+
 
 @app.get("/api/uploads/<path:filename>")
 def api_uploads(filename: str) -> Any:
@@ -5980,6 +7063,46 @@ def api_uploads(filename: str) -> Any:
 
     return send_from_directory(UPLOADS_DIR, safe_name)
 
+def chat_single_response(
+    *,
+    session_id: str,
+    user_text: str,
+    attachments: list,
+    regenerate_of: str | None,
+) -> dict:
+
+    final_payload = None
+
+    for event in chat_stream_generator(
+        session_id=session_id,
+        user_text=user_text,
+        attachments=attachments,
+        regenerate_of=regenerate_of,
+    ):
+        try:
+            if event.startswith("data:"):
+                parsed = json.loads(event.replace("data:", "").strip())
+
+                if parsed.get("type") == "final":
+                    final_payload = parsed
+                    break
+        except Exception:
+            continue
+
+    if not final_payload:
+        return {
+            "ok": False,
+            "error": "No final response produced",
+        }
+
+    return {
+        "ok": True,
+        "assistant_message": final_payload.get("message"),
+        "messages": final_payload.get("messages"),
+        "artifacts": final_payload.get("artifacts"),
+        "memory": final_payload.get("memory"),
+        "session_id": final_payload.get("session_id"),
+    }
 
 # =========================================================
 # MAIN

@@ -149,24 +149,39 @@
     };
   }
 
-  function normalizeMessage(raw) {
-    const item = raw && typeof raw === "object" ? raw : {};
-    return {
-      id: String(item.id || makeId("msg")),
-      role: String(item.role || "assistant"),
-      text: normalizeText(item.text || item.content || item.body || item.message || ""),
-      created_at: String(item.created_at || new Date().toISOString()),
-      pending: Boolean(item.pending),
-      streaming: Boolean(item.streaming),
-      stopped: Boolean(item.stopped),
-      error: Boolean(item.error),
-      source: String(item.source || ""),
-      meta: item.meta && typeof item.meta === "object" ? item.meta : {},
-      attachments: safeArray(item.attachments).map(normalizeAttachment),
-    };
-  }
+function normalizeMessage(raw) {
+  const item = raw && typeof raw === "object" ? raw : {};
 
-  function attachmentSummary(attachment) {
+  return {
+    id: String(item.id || makeId("msg")),
+    role: String(item.role || "assistant"),
+
+    text: normalizeText(
+      (item.ui && item.ui.message && item.ui.message.text) ||
+      item.text ||
+      item.content ||
+      item.body ||
+      item.message ||
+      ""
+    ),
+
+    created_at: String(item.created_at || new Date().toISOString()),
+
+    pending: Boolean(item.pending),
+    streaming: Boolean(item.streaming),
+    stopped: Boolean(item.stopped),
+    error: Boolean(item.error),
+
+    source: String(item.source || ""),
+
+    ui: item.ui && typeof item.ui === "object" ? item.ui : {},
+    meta: item.meta && typeof item.meta === "object" ? item.meta : {},
+
+    attachments: safeArray(item.attachments).map(normalizeAttachment),
+  };
+}
+
+function attachmentSummary(attachment) {
     const name = attachment.filename || attachment.name || "attachment";
     const size = formatBytes(attachment.size);
     return size ? name + " · " + size : name;
@@ -959,310 +974,263 @@
     });
   }
 
-  async function consumeChatStream(payload) {
-    if (state.stream.running) {
-      showToast("A generation is already running.", "info");
-      return;
+async function consumeChatStream(payload) {
+  if (state.stream.running) {
+    showToast("A generation is already running.", "info");
+    throw new Error("A generation is already running.");
+  }
+
+  const controller = new AbortController();
+  state.stream.controller = controller;
+  state.stream.running = true;
+  state.stream.messageId = "";
+  state.stream.placeholderId = "";
+  state.stream.buffer = "";
+
+  setBusyUi(true);
+  updateTopbarFromState();
+
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      },
+      body: JSON.stringify({
+        ...(payload || {}),
+        stream: true,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok || !response.body) {
+      finishStreamUi({ statusState: "error", statusText: "Error" });
+      throw new Error("Stream request failed.");
     }
 
-    const controller = new AbortController();
-    state.stream.controller = controller;
-    state.stream.running = true;
-    state.stream.messageId = "";
-    state.stream.placeholderId = "";
-    state.stream.buffer = "";
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
 
-    setBusyUi(true);
-    updateTopbarFromState();
+    function handleStreamEvent(event) {
+      const type = String((event && event.type) || "");
 
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "text/event-stream",
-        },
-        body: JSON.stringify({
-          ...(payload || {}),
-          stream: true,
-        }),
-        signal: controller.signal,
-      });
+      if (type === "start") {
+        const id = String(
+          event.message_id ||
+          event.assistant_message_id ||
+          makeId("assistant")
+        );
 
-      if (!response.ok || !response.body) {
-        throw new Error("Stream request failed.");
+        state.stream.messageId = id;
+        state.stream.placeholderId = id;
+
+        upsertMessage({
+          id,
+          role: "assistant",
+          text: "",
+          pending: true,
+          streaming: true,
+          error: false,
+          stopped: false,
+          source: event.mode || "send",
+          attachments: [],
+          meta: {},
+        });
+        return;
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder("utf-8");
-      let buffer = "";
+      if (type === "token") {
+        const id = String(
+          event.message_id ||
+          event.assistant_message_id ||
+          state.stream.messageId ||
+          makeId("assistant")
+        );
 
-      function handleStreamEvent(event) {
-        const type = String((event && event.type) || "");
+        let msg = findMessageById(id);
 
-        if (type === "start") {
-          const id = String(
-            event.message_id ||
-              event.assistant_message_id ||
-              makeId("assistant")
-          );
-
-          state.stream.messageId = id;
-          state.stream.placeholderId = id;
-
-          upsertMessage({
-            id: id,
+        if (!msg) {
+          msg = upsertMessage({
+            id,
             role: "assistant",
             text: "",
             pending: true,
             streaming: true,
             error: false,
             stopped: false,
-            source: event.mode || "send",
+            source: "send",
             attachments: [],
             meta: {},
           });
-          scrollChatToBottom(true);
-          return;
         }
 
-        if (type === "token") {
-          const id = String(
-            event.message_id ||
-              event.assistant_message_id ||
-              state.stream.messageId ||
-              makeId("assistant")
-          );
+        upsertMessage({
+          ...msg,
+          text: String(msg.text || "") + String(event.token || ""),
+          pending: true,
+          streaming: true,
+          error: false,
+          stopped: false,
+        });
 
-          let msg = findMessageById(id);
+        scrollChatToBottom(true);
+        return;
+      }
 
-          if (!msg) {
-            msg = upsertMessage({
-              id: id,
-              role: "assistant",
-              text: "",
-              pending: true,
-              streaming: true,
-              error: false,
-              stopped: false,
-              source: "send",
-              attachments: [],
-              meta: {},
-            });
-          }
-
-          upsertMessage({
-            ...msg,
-            text: String(msg.text || "") + String(event.token || ""),
-            pending: true,
-            streaming: true,
-            error: false,
-            stopped: false,
-          });
-
-          scrollChatToBottom(true);
-          return;
-        }
-
-        if (type === "final") {
-          const finalMsg = normalizeMessage(
-            event.message || {
-              id: state.stream.messageId || makeId("assistant"),
-              role: "assistant",
-              text: "",
-            }
-          );
-
-          upsertMessage({
-            ...finalMsg,
-            pending: false,
-            streaming: false,
-            stopped: false,
-            error: false,
-          });
-
-          if (Array.isArray(event.messages)) {
-            state.messages = event.messages.map(normalizeMessage);
-            renderChat();
-          }
-
-          if (Array.isArray(event.artifacts)) {
-            state.artifacts = event.artifacts;
-            renderArtifacts();
-          }
-
-          if (Array.isArray(event.memory)) {
-            state.memory = event.memory;
-            renderMemory();
-          }
-
-          if (event.session_id) {
-            state.activeSessionId = String(event.session_id);
-          }
-
-          finishStreamUi({
-            statusText: "Ready",
-            statusState: "idle",
-          });
-
-          updateTopbarFromState();
-          scrollChatToBottom(true);
-          return;
-        }
-
-        if (type === "error") {
-          const errorId = String(
-            event.message_id ||
-              event.assistant_message_id ||
-              state.stream.messageId ||
-              makeId("assistant")
-          );
-
-          upsertMessage({
-            id: errorId,
+      if (type === "final") {
+        const finalMsg = normalizeMessage(
+          event.message || {
+            id: state.stream.messageId || makeId("assistant"),
             role: "assistant",
-            text: String(event.error || "Generation failed."),
-            pending: false,
-            streaming: false,
-            stopped: false,
-            error: true,
-            attachments: [],
-            meta: {},
-          });
-
-          if (Array.isArray(event.messages)) {
-            state.messages = event.messages.map(normalizeMessage);
-            renderChat();
+            text: "",
           }
+        );
 
-          if (Array.isArray(event.artifacts)) {
-            state.artifacts = event.artifacts;
-            renderArtifacts();
-          }
+        upsertMessage({
+          ...finalMsg,
+          pending: false,
+          streaming: false,
+          stopped: false,
+          error: false,
+        });
 
-          if (Array.isArray(event.memory)) {
-            state.memory = event.memory;
-            renderMemory();
-          }
-
-          finishStreamUi({
-            statusText: "Error",
-            statusState: "error",
-          });
-
-          updateTopbarFromState();
-          scrollChatToBottom(true);
-          return;
+        if (Array.isArray(event.messages)) {
+          state.messages = event.messages.map(normalizeMessage);
+          renderChat();
         }
 
-        if (type === "stopped") {
-          const stoppedId = String(
-            event.message_id ||
-              event.assistant_message_id ||
-              state.stream.messageId ||
-              makeId("assistant")
-          );
-
-          upsertMessage({
-            id: stoppedId,
-            role: "assistant",
-            text: String(event.text || ""),
-            pending: false,
-            streaming: false,
-            stopped: true,
-            error: false,
-            attachments: [],
-            meta: {},
-          });
-
-          if (Array.isArray(event.messages)) {
-            state.messages = event.messages.map(normalizeMessage);
-            renderChat();
-          }
-
-          if (Array.isArray(event.artifacts)) {
-            state.artifacts = event.artifacts;
-            renderArtifacts();
-          }
-
-          if (Array.isArray(event.memory)) {
-            state.memory = event.memory;
-            renderMemory();
-          }
-
-          finishStreamUi({
-            statusText: "Stopped",
-            statusState: "idle",
-          });
-
-          updateTopbarFromState();
-          scrollChatToBottom(true);
-          return;
+        if (Array.isArray(event.artifacts)) {
+          state.artifacts = event.artifacts;
+          renderArtifacts();
         }
-      }
 
-      while (true) {
-        const result = await reader.read();
-        const done = result.done;
-        const value = result.value;
-
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() || "";
-
-        for (let part of parts) {
-          part = part.trim();
-          if (!part.startsWith("data:")) continue;
-
-          const jsonStr = part.replace(/^data:\s*/, "");
-
-          try {
-            const evt = JSON.parse(jsonStr);
-            handleStreamEvent(evt);
-          } catch (error) {
-            warn("stream event parse failed", error);
-          }
+        if (Array.isArray(event.memory)) {
+          state.memory = event.memory;
+          renderMemory();
         }
-      }
 
-      if (buffer.trim().startsWith("data:")) {
-        try {
-          const trailing = JSON.parse(buffer.trim().replace(/^data:\s*/, ""));
-          handleStreamEvent(trailing);
-        } catch (error) {
-          warn("trailing stream event parse failed", error);
+        if (event.session_id) {
+          state.activeSessionId = String(event.session_id);
         }
-      }
 
-      if (state.stream.running) {
-        finishStreamUi({ statusState: "idle", statusText: "Ready" });
-      }
-    } catch (error) {
-      state.stream.running = false;
-      state.stream.controller = null;
-      state.stream.messageId = "";
-      state.stream.placeholderId = "";
-      state.stream.buffer = "";
-
-      setBusyUi(false);
-      updateTopbarFromState();
-
-      warn("send failed", error);
-      showToast("Send failed.", "error");
-      throw error;
-    } finally {
-      state.stream.controller = null;
-      if (!state.stream.running) {
-        setBusyUi(false);
+        finishStreamUi({
+          statusText: "Ready",
+          statusState: "idle",
+        });
         updateTopbarFromState();
+        scrollChatToBottom(true);
+        return;
+      }
+
+      if (type === "error") {
+        const id = String(
+          event.message_id ||
+          event.assistant_message_id ||
+          state.stream.messageId ||
+          makeId("assistant")
+        );
+
+        const existing = findMessageById(id);
+
+        upsertMessage({
+          ...(existing || {
+            id,
+            role: "assistant",
+            text: "",
+            attachments: [],
+            meta: {},
+          }),
+          text: String(event.error || "Generation failed."),
+          pending: false,
+          streaming: false,
+          stopped: false,
+          error: true,
+        });
+
+        finishStreamUi({
+          statusText: "Error",
+          statusState: "error",
+        });
+        updateTopbarFromState();
+        scrollChatToBottom(true);
       }
     }
+
+    while (true) {
+      const result = await reader.read();
+      const done = result.done;
+      const value = result.value;
+
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() || "";
+
+      for (let part of parts) {
+        part = part.trim();
+        if (!part.startsWith("data:")) continue;
+
+        const jsonStr = part.replace(/^data:\s*/, "");
+
+        try {
+          const evt = JSON.parse(jsonStr);
+          handleStreamEvent(evt);
+        } catch (error) {
+          warn("stream event parse failed", error);
+        }
+      }
+    }
+
+    if (buffer.trim().startsWith("data:")) {
+      try {
+        const trailing = JSON.parse(buffer.trim().replace(/^data:\s*/, ""));
+        handleStreamEvent(trailing);
+      } catch (error) {
+        warn("trailing stream event parse failed", error);
+      }
+    }
+
+    if (state.stream.running) {
+      finishStreamUi({ statusState: "idle", statusText: "Ready" });
+      updateTopbarFromState();
+    }
+  } catch (error) {
+    if (error && error.name === "AbortError") {
+      const id = String(state.stream.messageId || state.stream.placeholderId || "");
+      const msg = id ? findMessageById(id) : null;
+
+      if (msg) {
+        upsertMessage({
+          ...msg,
+          pending: false,
+          streaming: false,
+          stopped: true,
+          error: false,
+        });
+      }
+
+      finishStreamUi({ statusState: "idle", statusText: "Stopped" });
+      updateTopbarFromState();
+      scrollChatToBottom(true);
+      return;
+    }
+
+    finishStreamUi({ statusState: "error", statusText: "Error" });
+    updateTopbarFromState();
+    throw error;
+  } finally {
+    state.stream.running = false;
+    state.stream.controller = null;
+    state.stream.buffer = "";
+    state.stream.placeholderId = "";
   }
-  
+}
+
 async function loadState() {
     const payload = await apiGet("/api/state");
     applyStatePayload(payload);
@@ -2111,110 +2079,46 @@ async function sendMessage() {
 function renderWeb() {
   if (!els.webList) return;
 
-  const items = safeArray(state.artifacts);
-
-  els.webList.innerHTML = items.map(function (item) {
-    const id = String(item.id || "");
-    const title = String(item.title || "Web result");
-
-    return (
-      '<button type="button" class="rail-item" data-web-open="' + id + '">' +
-      '<div class="rail-item__title">' + escapeHtml(title) + '</div>' +
-      "</button>"
-    );
-  }).join("");
-}
-
-function wireRailTabs() {
-  if (!els.railTabs || !els.railTabs.length) return;
-
-  els.railTabs.forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      const tab = String(btn.getAttribute("data-rail-tab") || "artifacts");
-      setRailTab(tab);
-      setRailSelectedItem("", "");
-      openRail();
-
-      if (els.railViewer) {
-        els.railViewer.hidden = false;
-        els.railViewer.innerHTML =
-          '<div class="nova-viewer-shell">' +
-          '<div class="nova-viewer-empty">' +
-          '<div class="nova-viewer-empty-title">' +
-          (tab === "memory" ? "Memory" : tab === "web" ? "Web" : "Artifacts") +
-          '</div>' +
-          '<div class="nova-viewer-empty-copy">Select an item to view details.</div>' +
-          '</div>' +
-          '</div>';
-      }
-
-      if (tab === "web" && typeof renderWeb === "function") {
-        renderWeb();
-      }
-      if (tab === "memory" && typeof renderMemory === "function") {
-        renderMemory();
-      }
-      if (tab === "artifacts" && typeof renderArtifacts === "function") {
-        renderArtifacts();
-      }
-    });
-  });
-}
-
-function renderWeb() {
-  if (!els.webList) return;
-
-  const items = safeArray(state.artifacts).filter(function (item) {
-    const viewer = item && typeof item.viewer === "object" ? item.viewer : {};
-    const kind = String(viewer.kind || item.kind || "");
-    const sourceUrl = String(
-      viewer.source_url ||
-      item.source_url ||
-      (item.meta && item.meta.source_url) ||
-      ""
-    );
-    return kind === "web_result" || kind === "web" || Boolean(sourceUrl);
-  });
+  const items = safeArray(state.webResults);
 
   if (els.webEmpty) {
     els.webEmpty.hidden = items.length > 0;
   }
 
   els.webList.innerHTML = items.length
-    ? items.map(function (item) {
-        const viewer = item && typeof item.viewer === "object" ? item.viewer : {};
-        const openId = String(
-          item.id ||
-          viewer.source_url ||
-          item.source_url ||
-          ""
-        );
-        const title = String(viewer.title || item.title || "Web result");
-        const preview = String(viewer.body || item.preview || item.body || "");
-        const active =
-          state.rail.tab === "web" &&
-          state.rail.selectedKind === "web" &&
-          String(state.rail.selectedId || "") === openId;
+    ? items
+        .map(function (item) {
+          const id = escapeHtml(String(item.id || ""));
+          const title = escapeHtml(String(item.title || "Web result"));
+          const subtitle = escapeHtml(
+            String(item.domain || item.url || item.source_url || "")
+          );
+          const preview = renderSafeText(
+            summarizeText(
+              item.preview ||
+                item.summary ||
+                item.description ||
+                item.body ||
+                item.content ||
+                "",
+              180
+            )
+          );
 
-        return (
-          '<button type="button" class="rail-item' +
-          (active ? " is-active" : "") +
-          '" data-web-open="' +
-          escapeHtml(openId) +
-          '">' +
-          '<div class="rail-item__title">' +
-          escapeHtml(title) +
-          "</div>" +
-          '<div class="rail-item__preview">' +
-          escapeHtml(summarizeText(preview, 100)) +
-          "</div>" +
-          "</button>"
-        );
-      }).join("")
+          return [
+            '<button class="nova-rail-item" type="button" data-web-open="' + id + '">',
+            '<div class="nova-rail-item-kicker">Web</div>',
+            '<div class="nova-rail-item-title">' + title + '</div>',
+            '<div class="nova-rail-item-meta">' + subtitle + '</div>',
+            '<div class="nova-rail-item-preview">' + preview + '</div>',
+            '</button>'
+          ].join("");
+        })
+        .join("")
     : "";
 }
 
-  function wireSidebar() {
+function wireSidebar() {
     const toggleButtons = document.querySelectorAll("[data-sidebar-toggle]");
 
     toggleButtons.forEach(function (button) {
@@ -2320,62 +2224,9 @@ function wireRailTabs() {
         renderArtifacts();
       }
     });
-  });
+  })
 }
 
-function renderWeb() {
-  if (!els.webList) return;
-
-  const items = safeArray(state.artifacts).filter(function (item) {
-    const viewer = item && typeof item.viewer === "object" ? item.viewer : {};
-    const kind = String(viewer.kind || item.kind || "");
-    const sourceUrl = String(
-      viewer.source_url ||
-      item.source_url ||
-      (item.meta && item.meta.source_url) ||
-      ""
-    );
-    return kind === "web_result" || kind === "web" || Boolean(sourceUrl);
-  });
-
-  if (els.webEmpty) {
-    els.webEmpty.hidden = items.length > 0;
-  }
-
-  els.webList.innerHTML = items.length
-    ? items.map(function (item) {
-        const viewer = item && typeof item.viewer === "object" ? item.viewer : {};
-        const openId = String(
-          item.id ||
-          viewer.source_url ||
-          item.source_url ||
-          ""
-        );
-        const title = String(viewer.title || item.title || "Web result");
-        const preview = String(viewer.body || item.preview || item.body || "");
-        const active =
-          state.rail.tab === "web" &&
-          state.rail.selectedKind === "web" &&
-          String(state.rail.selectedId || "") === openId;
-
-        return (
-          '<button type="button" class="rail-item' +
-          (active ? " is-active" : "") +
-          '" data-web-open="' +
-          escapeHtml(openId) +
-          '">' +
-          '<div class="rail-item__title">' +
-          escapeHtml(title) +
-          "</div>" +
-          '<div class="rail-item__preview">' +
-          escapeHtml(summarizeText(preview, 100)) +
-          "</div>" +
-          "</button>"
-        );
-      }).join("")
-    : "";
-}
-     
   function wireMemoryClicks() {
     if (!els.memoryList) return;
 

@@ -1,5 +1,97 @@
 [
   {
+    "id": "artifact_4eaf7201144b4882a1868a0bafea0b34",
+    "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
+    "message_id": "assistant_e60ea629277c4ba9973b75792f4e563b",
+    "kind": "chat_reply",
+    "title": "Response: Hi!",
+    "body": "Hi!",
+    "preview": "Hi!",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-09T07:56:53.660419+00:00",
+    "updated_at": "2026-04-09T07:56:53.661316+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi!",
+      "bullets": [
+        "Hi!"
+      ]
+    }
+  },
+  {
+    "id": "artifact_2c8f4c2c1e3f49d4a948ecf7920d2a2e",
+    "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
+    "message_id": "assistant_27df3c9631ea4415a17b5c5796f6d4e0",
+    "kind": "web_result",
+    "title": "Web: https://www.google.com/",
+    "body": "Google\n\nSource: www.google.com\n\nURL: https://www.google.com/\n\nGoogle\nGmail\nImages\nSign in\nAdvanced search\nGoogle offered in:\nFrançais\nAdvertising\nBusiness Solutions\nAbout Google\nGoogle.ca\n© 2026 -\nPrivacy\n-\nTerms\nGoogle apps",
+    "preview": "Google\n\nSource: www.google.com\n\nURL: https://www.google.com/\n\nGoogle\nGmail\nImages\nSign in\nAdvanced search\nGoogle offere…",
+    "image_url": "",
+    "source_url": "https://www.google.com/",
+    "created_at": "2026-04-09T07:19:14.262278+00:00",
+    "updated_at": "2026-04-09T07:19:14.262902+00:00",
+    "meta": {
+      "source": "web_fetch",
+      "source_url": "https://www.google.com/",
+      "analysis_text": "Web result captured from https://www.google.com/",
+      "bullets": [
+        "Google",
+        "Source: www.google.com",
+        "URL: https://www.google.com/",
+        "Gmail",
+        "Images"
+      ]
+    }
+  },
+  {
+    "id": "artifact_b29b4cc57d8e460a960df2e30bc772ed",
+    "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
+    "message_id": "assistant_bf45936b7a7d4130933c77e7fcbe44fb",
+    "kind": "chat_reply",
+    "title": "Response: Networking is how computers and devices communicate and share data.",
+    "body": "Networking is how computers and devices communicate and share data.\n\n### Core idea\nA network connects devices so they can:\n- send and receive information\n- access the internet\n- share files, printers, and services\n- communicate with other systems\n\n### Basic parts\n- **Device/Host**: computer, phone, server, router\n- **IP address**: unique address for a device on a network\n- **Router**: directs traffic between networks\n- **Switch**: connects devices within the same local network\n- **Modem**: connects your network to your ISP\n- **Protocol**: rules for communication, like TCP/IP\n\n### Common network types\n- **LAN**: Local Area Network, like home or office Wi‑Fi\n- **WAN**: Wide Area Network, covers large distances, like the internet\n- **WLAN**: wireless LAN\n- **VPN**: secure private connection over the internet\n\n### How data moves\nData is broken into small units called **packets**.\nTypical flow:\n1. Your device creates data\n2. Data is split into packets\n3. Packets are sent through routers/switches\n4. Destination receives and reassembles them\n\n### Important protocols\n- **IP**: addressing and routing\n- **TCP**: reliable delivery\n- **UDP**: faster, less reliable delivery\n- **HTTP/HTTPS**: web traffic\n- **DNS**: converts names like `google.com` into IP addresses\n- **DHCP**: gives devices IP addresses automatically\n\n### Example\nWhen you open a website:\n1. DNS finds the website’s IP\n2. Your device sends a request\n3. Routers move that request across networks\n4. The server responds\n5. Your browser shows the page\n\n### Why networking matters\nIt enables:\n- internet access\n- cloud apps\n- online gaming\n- video calls\n- business systems\n- cybersecurity controls\n\nIf you want, I can also explain:\n- networking for beginners\n- OSI model\n- TCP/IP model\n- routers vs switches\n- subnetting",
+    "preview": "Networking is how computers and devices communicate and share data.\n\n### Core idea\nA network connects devices so they c…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-09T06:43:58.563966+00:00",
+    "updated_at": "2026-04-09T06:43:58.564847+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Networking is how computers and devices communicate and share data.",
+      "bullets": [
+        "Networking is how computers and devices communicate and share data.",
+        "### Core idea",
+        "A network connects devices so they can:",
+        "send and receive information",
+        "access the internet"
+      ]
+    }
+  },
+  {
+    "id": "artifact_43be2955c3bd420781616256287cfa0b",
+    "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
+    "message_id": "assistant_5579590e71684c9c912b5b9c360d4ee5",
+    "kind": "chat_reply",
+    "title": "Response: Got it.",
+    "body": "Got it.",
+    "preview": "Got it.",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-09T06:43:44.405442+00:00",
+    "updated_at": "2026-04-09T06:43:44.406246+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Got it.",
+      "bullets": [
+        "Got it."
+      ]
+    }
+  },
+  {
     "id": "artifact_df33dd2528a84497a64b4b82d580fc53",
     "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
     "message_id": "assistant_6ee0c476494a45a584f253182d4410af",
@@ -58,7 +150,7 @@
     "image_url": "",
     "source_url": "",
     "created_at": "2026-04-09T03:40:18.152924+00:00",
-    "updated_at": "2026-04-09T03:49:07.778687+00:00",
+    "updated_at": "2026-04-09T06:43:39.449406+00:00",
     "meta": {
       "source": "send",
       "source_url": "",
