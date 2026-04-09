@@ -2320,6 +2320,86 @@ def chat_stream_generator(
     except Exception:
         pass
 
+    # =========================================================
+    # 🌐 WEB AUTO ROUTE (PASS LOCK)
+    # =========================================================
+
+    if _should_route_to_web(user_text):
+        try:
+            url = _normalize_url_input(user_text)
+
+            if not url:
+                yield sse({
+                    "type": "error",
+                    "ok": False,
+                    "session_id": locked_session_id,
+                    "error": "Invalid URL",
+                })
+                return
+
+            result = fetch_web(url)
+
+            if not result.get("ok"):
+                yield sse({
+                    "type": "error",
+                    "ok": False,
+                    "session_id": locked_session_id,
+                    "error": result.get("error") or "Web fetch failed.",
+                    "debug": {
+                        "tool": "web",
+                        "url": result.get("url") or url,
+                    },
+                })
+                return
+
+            text = build_web_result_text(result)
+            meta = build_web_result_meta(result)
+
+            msg = make_assistant_message(
+                text,
+                message_id=assistant_message_id,
+                source="web_fetch",
+                meta=meta,
+            )
+
+            append_message(session, msg)
+
+            try:
+                save_artifact_from_assistant(msg, session["id"])
+            except Exception:
+                pass
+
+            yield sse({
+                "type": "final",
+                "ok": True,
+                "session_id": locked_session_id,
+                "message_id": assistant_message_id,
+                "assistant_message_id": assistant_message_id,
+                "message": msg,
+                "messages": session_messages(session),
+                "artifacts": load_artifacts(),
+                "memory": load_memory(),
+                "debug": {
+                    "tool": "web",
+                    "url": result.get("url") or url,
+                    "status_code": int(result.get("status_code") or 0),
+                    "ssl_verified": bool(result.get("ssl_verified")),
+                },
+            })
+            return
+
+        except Exception as exc:
+            yield sse({
+                "type": "error",
+                "ok": False,
+                "session_id": locked_session_id,
+                "error": str(exc),
+                "debug": {
+                    "tool": "web",
+                },
+            })
+            return
+
     assistant_message_id = make_id("assistant")
     assistant_created_at = now_iso()
 
@@ -2421,9 +2501,7 @@ def chat_stream_generator(
                     },
                 }
             )
-            return
- 
-        
+            return       
               
     # NORMAL CHAT CONTINUES BELOW HERE
 
@@ -6283,6 +6361,48 @@ def detect_video_attachments(
 
     return results
 
+# =========================================================
+# WEB FETCH NORMALIZATION + AUTO ROUTE (LOCK)
+# =========================================================
+
+def _looks_like_url(text: str) -> bool:
+    t = str(text or "").lower().strip()
+    return ("http://" in t) or ("https://" in t) or ("www." in t)
+
+
+def _normalize_url_input(text: str) -> str:
+    t = normalize_text(text).strip()
+
+    if not t:
+        return ""
+
+    # extract first url-like token
+    parts = t.split()
+    candidate = parts[0]
+
+    if candidate.startswith("www."):
+        return "https://" + candidate
+
+    if not candidate.startswith("http://") and not candidate.startswith("https://"):
+        if "." in candidate:
+            return "https://" + candidate
+
+    return candidate
+
+
+def _should_route_to_web(user_text: str) -> bool:
+    t = normalize_text(user_text).strip().lower()
+
+    if not t:
+        return False
+
+    if t.startswith("/web"):
+        return True
+
+    if _looks_like_url(t):
+        return True
+
+    return False
 
 def build_video_analysis_result(
     *,
