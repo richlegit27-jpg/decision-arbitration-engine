@@ -2956,3 +2956,59 @@ body.is-sidebar-open .nova-sidebar {
   line-height: 1.6;
   color: var(--text-soft);
 }
+
+/* =========================================================
+   🎥 VIDEO UI POLISH LOCK
+   ========================================================= */
+
+.nova-message-video {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nova-video-block {
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0f1115;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.nova-video-player {
+  width: 100%;
+  max-height: 320px;
+  display: block;
+  background: #000;
+}
+
+.nova-video-block a {
+  display: block;
+  padding: 8px 12px;
+  font-size: 12px;
+  text-decoration: none;
+  color: #9aa4b2;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  transition: color 0.15s ease;
+}
+
+.nova-video-block a:hover {
+  color: #ffffff;
+}
+
+/* viewer panel (right side) */
+
+.nova-viewer video {
+  width: 100%;
+  border-radius: 10px;
+  background: #000;
+  margin-bottom: 10px;
+}
+
+/* subtle polish */
+
+.nova-message-video div {
+  font-size: 14px;
+  line-height: 1.4;
+  color: #e6eaf0;
+}
