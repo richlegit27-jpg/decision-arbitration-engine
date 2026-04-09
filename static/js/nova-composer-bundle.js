@@ -786,43 +786,68 @@
     if (!els.artifactList) return;
 
     const items = safeArray(state.artifacts);
+    if (els.artifactEmpty) {
+      els.artifactEmpty.hidden = items.length > 0;
+    }
+
     els.artifactList.innerHTML = items.length
       ? items
           .map(function (item) {
             const id = String(item.id || "");
-            const title = String(item.title || item.name || "Artifact");
-            const preview = String(item.preview || item.body || item.summary || "");
+            const viewer = item && typeof item.viewer === "object" ? item.viewer : {};
+            const title = String(viewer.title || item.title || "Artifact");
+            const preview = String(viewer.body || item.preview || item.body || "");
+            const kind = String(viewer.kind || item.kind || "artifact");
+            const active =
+              state.rail.tab === "artifacts" &&
+              state.rail.selectedKind === "artifacts" &&
+              String(state.rail.selectedId || "") === id;
 
             return (
-              '<button type="button" class="rail-item" data-artifact-open="' +
+              '<button type="button" class="rail-item' +
+              (active ? " is-active" : "") +
+              '" data-artifact-open="' +
               escapeHtml(id) +
               '">' +
               '<div class="rail-item__title">' +
               escapeHtml(title) +
               "</div>" +
               '<div class="rail-item__preview">' +
-              escapeHtml(summarizeText(preview, 90)) +
+              escapeHtml(summarizeText(preview, 100)) +
+              "</div>" +
+              '<div class="rail-item__meta">' +
+              escapeHtml(kind) +
               "</div>" +
               "</button>"
             );
           })
           .join("")
-      : '<div class="rail-empty">No artifacts yet.</div>';
+      : "";
   }
 
   function renderMemory() {
     if (!els.memoryList) return;
 
     const items = safeArray(state.memory);
+    if (els.memoryEmpty) {
+      els.memoryEmpty.hidden = items.length > 0;
+    }
+
     els.memoryList.innerHTML = items.length
       ? items
           .map(function (item) {
             const id = String(item.id || "");
             const text = String(item.text || item.content || item.body || "");
             const kind = String(item.kind || "note");
+            const active =
+              state.rail.tab === "memory" &&
+              state.rail.selectedKind === "memory" &&
+              String(state.rail.selectedId || "") === id;
 
             return (
-              '<button type="button" class="rail-item" data-memory-open="' +
+              '<button type="button" class="rail-item' +
+              (active ? " is-active" : "") +
+              '" data-memory-open="' +
               escapeHtml(id) +
               '">' +
               '<div class="rail-item__title">' +
@@ -835,7 +860,7 @@
             );
           })
           .join("")
-      : '<div class="rail-empty">No memory yet.</div>';
+      : "";
   }
 
   async function apiGet(url) {
@@ -2083,54 +2108,111 @@ async function sendMessage() {
     }
   }
 
-  function wireRailTabs() {
-    if (!els.railTabs || !els.railTabs.length) return;
+function renderWeb() {
+  if (!els.webList) return;
 
-    els.railTabs.forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        const tab = String(btn.getAttribute("data-rail-tab") || "artifacts");
-        setRailTab(tab);
-        openRail();
-      });
-    });
-  }
+  const items = safeArray(state.artifacts);
 
-  function wireMemoryClicks() {
-    if (!els.memoryList) return;
+  els.webList.innerHTML = items.map(function (item) {
+    const id = String(item.id || "");
+    const title = String(item.title || "Web result");
 
-    els.memoryList.addEventListener("click", function (e) {
-      const btn = e.target.closest("[data-memory-open]");
-      if (!btn) return;
+    return (
+      '<button type="button" class="rail-item" data-web-open="' + id + '">' +
+      '<div class="rail-item__title">' + escapeHtml(title) + '</div>' +
+      "</button>"
+    );
+  }).join("");
+}
 
-      const memoryId = String(btn.getAttribute("data-memory-open") || "").trim();
-      if (!memoryId) return;
+function wireRailTabs() {
+  if (!els.railTabs || !els.railTabs.length) return;
 
-      const item = safeArray(state.memory).find(function (entry) {
-        return String(entry.id || "") === memoryId;
-      });
-
-      if (!item) return;
-
+  els.railTabs.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      const tab = String(btn.getAttribute("data-rail-tab") || "artifacts");
+      setRailTab(tab);
+      setRailSelectedItem("", "");
       openRail();
-      setRailTab("memory");
-      setRailSelectedItem("memory", memoryId);
 
       if (els.railViewer) {
         els.railViewer.hidden = false;
         els.railViewer.innerHTML =
           '<div class="nova-viewer-shell">' +
-          '<div class="nova-viewer-card">' +
-          '<div class="nova-viewer-kicker">Memory</div>' +
-          '<div class="nova-viewer-title">' + escapeHtml(String(item.kind || "note")) + '</div>' +
-          '<div class="nova-viewer-body">' + renderSafeText(String(item.text || item.content || item.body || "")) + '</div>' +
+          '<div class="nova-viewer-empty">' +
+          '<div class="nova-viewer-empty-title">' +
+          (tab === "memory" ? "Memory" : tab === "web" ? "Web" : "Artifacts") +
+          '</div>' +
+          '<div class="nova-viewer-empty-copy">Select an item to view details.</div>' +
           '</div>' +
           '</div>';
       }
 
-      if (els.railTitle) els.railTitle.textContent = "Memory";
-      if (els.railSubtitle) els.railSubtitle.textContent = String(item.kind || "note");
+      if (tab === "web" && typeof renderWeb === "function") {
+        renderWeb();
+      }
+      if (tab === "memory" && typeof renderMemory === "function") {
+        renderMemory();
+      }
+      if (tab === "artifacts" && typeof renderArtifacts === "function") {
+        renderArtifacts();
+      }
     });
+  });
+}
+
+function renderWeb() {
+  if (!els.webList) return;
+
+  const items = safeArray(state.artifacts).filter(function (item) {
+    const viewer = item && typeof item.viewer === "object" ? item.viewer : {};
+    const kind = String(viewer.kind || item.kind || "");
+    const sourceUrl = String(
+      viewer.source_url ||
+      item.source_url ||
+      (item.meta && item.meta.source_url) ||
+      ""
+    );
+    return kind === "web_result" || kind === "web" || Boolean(sourceUrl);
+  });
+
+  if (els.webEmpty) {
+    els.webEmpty.hidden = items.length > 0;
   }
+
+  els.webList.innerHTML = items.length
+    ? items.map(function (item) {
+        const viewer = item && typeof item.viewer === "object" ? item.viewer : {};
+        const openId = String(
+          item.id ||
+          viewer.source_url ||
+          item.source_url ||
+          ""
+        );
+        const title = String(viewer.title || item.title || "Web result");
+        const preview = String(viewer.body || item.preview || item.body || "");
+        const active =
+          state.rail.tab === "web" &&
+          state.rail.selectedKind === "web" &&
+          String(state.rail.selectedId || "") === openId;
+
+        return (
+          '<button type="button" class="rail-item' +
+          (active ? " is-active" : "") +
+          '" data-web-open="' +
+          escapeHtml(openId) +
+          '">' +
+          '<div class="rail-item__title">' +
+          escapeHtml(title) +
+          "</div>" +
+          '<div class="rail-item__preview">' +
+          escapeHtml(summarizeText(preview, 100)) +
+          "</div>" +
+          "</button>"
+        );
+      }).join("")
+    : "";
+}
 
   function wireSidebar() {
     const toggleButtons = document.querySelectorAll("[data-sidebar-toggle]");
@@ -2168,41 +2250,132 @@ async function sendMessage() {
     });
   }
 
-  function wireWebLinks() {
-    if (!els.webList) return;
+ function wireWebLinks() {
+  if (!els.webList) return;
 
-    els.webList.addEventListener("click", function (e) {
-      const btn = e.target.closest("[data-web-open]");
-      if (!btn) return;
+  els.webList.addEventListener("click", function (e) {
+    const btn = e.target.closest("[data-web-open]");
+    if (!btn) return;
 
-      const url = btn.getAttribute("data-web-open");
-      if (!url) return;
+    const openId = String(btn.getAttribute("data-web-open") || "").trim();
+    if (!openId) return;
 
-      const item = safeArray(state.artifacts).find(function (entry) {
-        const id = String(entry.id || "");
-        const viewer = entry && typeof entry.viewer === "object" ? entry.viewer : {};
-        const sourceUrl = String(
-          viewer.source_url ||
-          entry.source_url ||
-          (entry.meta && entry.meta.source_url) ||
-          ""
-        );
-        return id === url || sourceUrl === url;
-      });
+    const item = safeArray(state.artifacts).find(function (entry) {
+      const viewer = entry && typeof entry.viewer === "object" ? entry.viewer : {};
+      const id = String(entry.id || "");
+      const sourceUrl = String(
+        viewer.source_url ||
+        entry.source_url ||
+        (entry.meta && entry.meta.source_url) ||
+        ""
+      );
+      return id === openId || sourceUrl === openId;
+    });
 
+    openRail();
+    setRailTab("web");
+    setRailSelectedItem("web", openId);
+
+    if (typeof renderWeb === "function") {
+      renderWeb();
+    }
+
+    if (item && els.railViewer) {
+      els.railViewer.hidden = false;
+      els.railViewer.innerHTML = artifactViewerHtml(item);
+    }
+  });
+} 
+
+function wireRailTabs() {
+  if (!els.railTabs || !els.railTabs.length) return;
+
+  els.railTabs.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      const tab = String(btn.getAttribute("data-rail-tab") || "artifacts");
+      setRailTab(tab);
+      setRailSelectedItem("", "");
       openRail();
-      setRailTab("web");
-      setRailSelectedItem("web", String(url));
 
-      if (item && els.railViewer) {
+      if (els.railViewer) {
         els.railViewer.hidden = false;
-        els.railViewer.innerHTML = artifactViewerHtml(item);
-      } else {
-        window.open(url, "_blank", "noopener");
+        els.railViewer.innerHTML =
+          '<div class="nova-viewer-shell">' +
+          '<div class="nova-viewer-empty">' +
+          '<div class="nova-viewer-empty-title">' +
+          (tab === "memory" ? "Memory" : tab === "web" ? "Web" : "Artifacts") +
+          '</div>' +
+          '<div class="nova-viewer-empty-copy">Select an item to view details.</div>' +
+          '</div>' +
+          '</div>';
+      }
+
+      if (tab === "web" && typeof renderWeb === "function") {
+        renderWeb();
+      }
+      if (tab === "memory" && typeof renderMemory === "function") {
+        renderMemory();
+      }
+      if (tab === "artifacts" && typeof renderArtifacts === "function") {
+        renderArtifacts();
       }
     });
+  });
+}
+
+function renderWeb() {
+  if (!els.webList) return;
+
+  const items = safeArray(state.artifacts).filter(function (item) {
+    const viewer = item && typeof item.viewer === "object" ? item.viewer : {};
+    const kind = String(viewer.kind || item.kind || "");
+    const sourceUrl = String(
+      viewer.source_url ||
+      item.source_url ||
+      (item.meta && item.meta.source_url) ||
+      ""
+    );
+    return kind === "web_result" || kind === "web" || Boolean(sourceUrl);
+  });
+
+  if (els.webEmpty) {
+    els.webEmpty.hidden = items.length > 0;
   }
 
+  els.webList.innerHTML = items.length
+    ? items.map(function (item) {
+        const viewer = item && typeof item.viewer === "object" ? item.viewer : {};
+        const openId = String(
+          item.id ||
+          viewer.source_url ||
+          item.source_url ||
+          ""
+        );
+        const title = String(viewer.title || item.title || "Web result");
+        const preview = String(viewer.body || item.preview || item.body || "");
+        const active =
+          state.rail.tab === "web" &&
+          state.rail.selectedKind === "web" &&
+          String(state.rail.selectedId || "") === openId;
+
+        return (
+          '<button type="button" class="rail-item' +
+          (active ? " is-active" : "") +
+          '" data-web-open="' +
+          escapeHtml(openId) +
+          '">' +
+          '<div class="rail-item__title">' +
+          escapeHtml(title) +
+          "</div>" +
+          '<div class="rail-item__preview">' +
+          escapeHtml(summarizeText(preview, 100)) +
+          "</div>" +
+          "</button>"
+        );
+      }).join("")
+    : "";
+}
+     
   function wireMemoryClicks() {
     if (!els.memoryList) return;
 
@@ -2240,20 +2413,43 @@ async function sendMessage() {
     });
   }
 
-  function initShellExtensions() {
-    if (typeof wireRailTabs === "function") {
-      wireRailTabs();
-    }
-
-    wireSidebar();
-    wireRailClose();
-    wireWebLinks();
-    wireMemoryClicks();
-
-    if (typeof setRailTab === "function") {
-      setRailTab(state.rail.tab || "artifacts");
-    }
+function initShellExtensions() {
+  if (typeof wireRailTabs === "function") {
+    wireRailTabs();
   }
+
+  if (typeof wireSidebar === "function") {
+    wireSidebar();
+  }
+
+  if (typeof wireRailClose === "function") {
+    wireRailClose();
+  }
+
+  if (typeof wireWebLinks === "function") {
+    wireWebLinks();
+  }
+
+  if (typeof wireMemoryClicks === "function") {
+    wireMemoryClicks();
+  }
+
+  if (typeof setRailTab === "function") {
+    setRailTab(state.rail.tab || "artifacts");
+  }
+
+  if (typeof renderArtifacts === "function") {
+    renderArtifacts();
+  }
+
+  if (typeof renderMemory === "function") {
+    renderMemory();
+  }
+
+  if (typeof renderWeb === "function") {
+    renderWeb();
+  }
+}
 
   window.NovaComposerBundle = {
     state: state,

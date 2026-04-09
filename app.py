@@ -2272,6 +2272,14 @@ def chat_stream_generator(
                         "message_id": assistant_message_id,
                         "assistant_message_id": assistant_message_id,
                         "debug": {
+                    "agent_instruction_hierarchy": build_agent_instruction_hierarchy(
+                        user_text=user_text,
+                        session=session,
+                    ),
+                    "agent_brain": build_agent_brain_bundle(
+                        user_text=user_text,
+                        session=session,
+                    ),                          
                             "route_build": "phase-d5-one-source-of-truth-prompt-builder-2026-04-08-001",
                             "route_result": route_result,
                             "route": route,
@@ -3868,6 +3876,1886 @@ def build_model_payload(
     payload["model_messages"] = model_messages
     return payload
 
+def _detect_tool_intent(text: str) -> str:
+    t = (text or "").lower()
+
+    if re.search(r"https?://|www\.", t):
+        return "web"
+
+    if any(x in t for x in [
+        "generate image", "create image", "make image",
+        "draw", "image of", "picture of"
+    ]):
+        return "image"
+
+    return "none"
+
+# =========================================================
+# PHASE G — AGENT PLAN + ACT LOOP
+# =========================================================
+
+def detect_agent_mode(user_text: str) -> bool:
+    t = (user_text or "").lower()
+    return any(x in t for x in [
+        "analyze and fix",
+        "go through",
+        "step by step",
+        "check and repair",
+        "inspect and solve",
+        "debug this fully",
+        "handle this for me",
+        "find the problem and fix it",
+    ])
+
+
+def build_agent_steps(user_text: str) -> list[str]:
+    t = (user_text or "").strip()
+    steps: list[str] = []
+
+    if re.search(r"https?://|www\.", t.lower()):
+        steps.append("Extract the URL from the request")
+        steps.append("Fetch the web content")
+        steps.append("Summarize the important result")
+        return steps
+
+    if any(x in t.lower() for x in ["generate image", "create image", "draw", "image of"]):
+        steps.append("Extract the image prompt")
+        steps.append("Generate the image")
+        steps.append("Return the generated result")
+        return steps
+
+    steps.append("Inspect the request carefully")
+    steps.append("Choose the best route")
+    steps.append("Produce the final result")
+    return steps
+
+
+def stream_agent_plan(
+    *,
+    assistant_id: str,
+    session: dict[str, Any],
+    user_text: str,
+) -> Generator[str, None, str]:
+    steps = build_agent_steps(user_text)
+    built = ""
+
+    for idx, step in enumerate(steps, start=1):
+        token = f"[step {idx}/{len(steps)}] {step}\n"
+        built += token
+        yield sse({
+            "type": "token",
+            "message_id": assistant_id,
+            "token": token,
+        })
+
+    return built
+
+# =========================================================
+# PHASE H — AGENT MEMORY + EXECUTION UPGRADE
+# =========================================================
+
+def build_agent_context(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    text = (user_text or "").lower()
+
+    recent_messages = safe_list(session.get("messages"))[-8:]
+    recent_text = "\n".join(
+        normalize_text(m.get("text") or "")
+        for m in recent_messages
+        if isinstance(m, dict)
+    ).strip()
+
+    matched_memory = select_agent_memory(
+        user_text=user_text,
+        limit=5,
+    )
+
+    return {
+        "recent_text": recent_text,
+        "matched_memory": matched_memory,
+    }
+
+def build_agent_system_prompt(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> str:
+    ctx = build_agent_context(user_text=user_text, session=session)
+
+    mem_lines = []
+    for item in ctx["matched_memory"]:
+        txt = normalize_text(item.get("text") or "").strip()
+        if txt:
+            mem_lines.append(f"- {txt}")
+
+    memory_block = "\n".join(mem_lines).strip()
+    recent_block = (ctx["recent_text"] or "").strip()
+
+    parts = [
+        "You are Nova.",
+        "Follow the user's style hard.",
+        "Be direct.",
+        "Be solution-first.",
+        "Prefer full working output over explanation.",
+        "Do not waste motion.",
+    ]
+
+    if memory_block:
+        parts.append("\nRelevant user memory:\n" + memory_block)
+
+    if recent_block:
+        parts.append("\nRecent conversation context:\n" + recent_block)
+
+    return "\n".join(parts).strip()
+
+# =========================================================
+# PHASE I — AGENT PLAN + ACTION MODE LOCK
+# =========================================================
+
+def build_agent_plan(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    text = normalize_text(user_text or "")
+    lower = text.lower()
+
+    action_mode = "respond"
+    plan_steps: list[str] = []
+    intent = "general"
+
+    if re.search(r"https?://|www\.", lower):
+        action_mode = "tool"
+        intent = "web"
+        plan_steps = [
+            "Detected URL in user input.",
+            "Route to web handling.",
+            "Return result with minimal extra explanation.",
+        ]
+    elif lower.startswith("/image") or any(x in lower for x in [
+        "generate image",
+        "create image",
+        "make image",
+        "draw",
+        "image of",
+        "picture of",
+    ]):
+        action_mode = "tool"
+        intent = "image"
+        plan_steps = [
+            "Detected image-generation intent.",
+            "Route to image handling.",
+            "Return generated result cleanly.",
+        ]
+    elif any(x in lower for x in [
+        "fix",
+        "patch",
+        "replace",
+        "rewrite",
+        "refactor",
+        "smff",
+        "full file",
+    ]):
+        action_mode = "execute"
+        intent = "code"
+        plan_steps = [
+            "User wants direct execution-style help.",
+            "Prefer full working code over discussion.",
+            "Return concrete implementation.",
+        ]
+    elif any(x in lower for x in [
+        "plan",
+        "phase",
+        "next",
+        "roadmap",
+        "what now",
+    ]):
+        action_mode = "plan"
+        intent = "planning"
+        plan_steps = [
+            "User wants next-step guidance.",
+            "Keep sequence tight and actionable.",
+            "Return the next exact move.",
+        ]
+    else:
+        plan_steps = [
+            "Answer directly.",
+            "Keep response concise and useful.",
+            "Avoid wasted motion.",
+        ]
+
+    recent_messages = safe_list(session.get("messages"))[-6:]
+    recent_user_texts: list[str] = []
+
+    for msg in recent_messages:
+        if not isinstance(msg, dict):
+            continue
+        if str(msg.get("role") or "") != "user":
+            continue
+        txt = normalize_text(msg.get("text") or "").strip()
+        if txt:
+            recent_user_texts.append(txt)
+
+    return {
+        "action_mode": action_mode,
+        "intent": intent,
+        "plan_steps": plan_steps[:4],
+        "recent_user_texts": recent_user_texts[-3:],
+    }
+
+
+def build_agent_execution_header(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> str:
+    plan = build_agent_plan(user_text=user_text, session=session)
+
+    lines = [
+        "Execution mode rules:",
+        f"- action_mode: {plan['action_mode']}",
+        f"- intent: {plan['intent']}",
+        "- prioritize direct completion",
+        "- prefer concrete output over explanation",
+        "- keep wording tight",
+        "- do not drift away from user style",
+    ]
+
+    for step in safe_list(plan.get("plan_steps")):
+        step_text = normalize_text(step).strip()
+        if step_text:
+            lines.append(f"- plan: {step_text}")
+
+    for item in safe_list(plan.get("recent_user_texts")):
+        item_text = normalize_text(item).strip()
+        if item_text:
+            lines.append(f"- recent_user: {item_text}")
+
+    return "\n".join(lines).strip()
+
+# =========================================================
+# PHASE J — AGENT TOOL DECISION + RESPONSE SHAPE LOCK
+# =========================================================
+
+def decide_agent_response_shape(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    text = normalize_text(user_text or "")
+    lower = text.lower()
+
+    shape = "default"
+    tone = "direct"
+    requires_full_output = False
+    should_minimize_explanation = True
+    preferred_format = "plain"
+
+    if any(x in lower for x in [
+        "smff",
+        "full file",
+        "whole file",
+        "entire file",
+        "send the file",
+    ]):
+        shape = "full_file"
+        requires_full_output = True
+        preferred_format = "code"
+    elif any(x in lower for x in [
+        "step by step",
+        "walk me through",
+        "teach me",
+        "explain",
+        "why",
+    ]):
+        shape = "guided"
+        tone = "clear"
+        should_minimize_explanation = False
+        preferred_format = "structured"
+    elif any(x in lower for x in [
+        "phase",
+        "next",
+        "what now",
+        "roadmap",
+        "plan",
+    ]):
+        shape = "next_move"
+        preferred_format = "tight"
+    elif any(x in lower for x in [
+        "fix",
+        "patch",
+        "replace",
+        "rewrite",
+        "refactor",
+    ]):
+        shape = "implementation"
+        requires_full_output = True
+        preferred_format = "code"
+
+    recent_messages = safe_list(session.get("messages"))[-8:]
+    recent_assistant_texts: list[str] = []
+
+    for msg in recent_messages:
+        if not isinstance(msg, dict):
+            continue
+        if str(msg.get("role") or "") != "assistant":
+            continue
+        txt = normalize_text(msg.get("text") or "").strip()
+        if txt:
+            recent_assistant_texts.append(txt[:240])
+
+    return {
+        "shape": shape,
+        "tone": tone,
+        "requires_full_output": requires_full_output,
+        "should_minimize_explanation": should_minimize_explanation,
+        "preferred_format": preferred_format,
+        "recent_assistant_texts": recent_assistant_texts[-2:],
+    }
+
+
+def decide_agent_tool_choice(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    text = normalize_text(user_text or "")
+    lower = text.lower()
+
+    suggested_tool = "none"
+    reason = "direct_response"
+
+    if re.search(r"https?://|www\.", lower):
+        suggested_tool = "web"
+        reason = "url_detected"
+    elif lower.startswith("/image") or any(x in lower for x in [
+        "generate image",
+        "create image",
+        "make image",
+        "draw",
+        "image of",
+        "picture of",
+    ]):
+        suggested_tool = "image"
+        reason = "image_intent_detected"
+    elif any(x in lower for x in [
+        "analyze attachment",
+        "look at this image",
+        "what is in this image",
+        "read this screenshot",
+    ]):
+        suggested_tool = "vision"
+        reason = "vision_intent_detected"
+
+    shape_data = decide_agent_response_shape(
+        user_text=user_text,
+        session=session,
+    )
+
+    return {
+        "suggested_tool": suggested_tool,
+        "reason": reason,
+        "response_shape": shape_data,
+    }
+
+
+def build_agent_decision_header(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> str:
+    tool_choice = decide_agent_tool_choice(
+        user_text=user_text,
+        session=session,
+    )
+    response_shape = tool_choice.get("response_shape") or {}
+
+    lines = [
+        "Decision rules:",
+        f"- suggested_tool: {tool_choice.get('suggested_tool') or 'none'}",
+        f"- tool_reason: {tool_choice.get('reason') or 'direct_response'}",
+        f"- response_shape: {response_shape.get('shape') or 'default'}",
+        f"- tone: {response_shape.get('tone') or 'direct'}",
+        f"- preferred_format: {response_shape.get('preferred_format') or 'plain'}",
+    ]
+
+    if bool(response_shape.get("requires_full_output")):
+        lines.append("- full_output_required: yes")
+
+    if bool(response_shape.get("should_minimize_explanation")):
+        lines.append("- minimize_explanation: yes")
+    else:
+        lines.append("- minimize_explanation: no")
+
+    for item in safe_list(response_shape.get("recent_assistant_texts")):
+        item_text = normalize_text(item).strip()
+        if item_text:
+            lines.append(f"- recent_assistant: {item_text}")
+
+    return "\n".join(lines).strip()
+
+# =========================================================
+# PHASE K — AGENT AUTONOMY + TASK LOOP LOCK
+# =========================================================
+
+def build_agent_task_loop(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    text = normalize_text(user_text or "")
+    lower = text.lower()
+
+    mode = "single_pass"
+    max_steps = 1
+    allow_recheck = False
+    completion_style = "direct"
+
+    if any(x in lower for x in [
+        "phase",
+        "plan",
+        "roadmap",
+        "what now",
+        "next",
+    ]):
+        mode = "planner"
+        max_steps = 3
+        allow_recheck = True
+        completion_style = "tight_plan"
+    elif any(x in lower for x in [
+        "fix",
+        "patch",
+        "replace",
+        "rewrite",
+        "refactor",
+        "smff",
+        "full file",
+    ]):
+        mode = "executor"
+        max_steps = 3
+        allow_recheck = True
+        completion_style = "deliver_work"
+    elif re.search(r"https?://|www\.", lower):
+        mode = "tool_route"
+        max_steps = 2
+        allow_recheck = False
+        completion_style = "route_clean"
+    elif any(x in lower for x in [
+        "compare",
+        "analyze",
+        "review",
+        "check",
+        "audit",
+    ]):
+        mode = "analysis"
+        max_steps = 2
+        allow_recheck = True
+        completion_style = "concise_analysis"
+
+    tasks: list[str] = []
+
+    if mode == "planner":
+        tasks = [
+            "Infer the exact next move.",
+            "Keep sequence tight.",
+            "Return only the move that matters now.",
+        ]
+    elif mode == "executor":
+        tasks = [
+            "Identify the concrete deliverable.",
+            "Prefer working implementation.",
+            "Minimize discussion and ship the result.",
+        ]
+    elif mode == "tool_route":
+        tasks = [
+            "Detect the correct route.",
+            "Do not over-explain.",
+            "Return the routed result cleanly.",
+        ]
+    elif mode == "analysis":
+        tasks = [
+            "Inspect the request.",
+            "Summarize only the important outcome.",
+            "Keep wording tight.",
+        ]
+    else:
+        tasks = [
+            "Answer directly.",
+            "Do not waste motion.",
+            "Finish in one pass.",
+        ]
+
+    return {
+        "mode": mode,
+        "max_steps": max_steps,
+        "allow_recheck": allow_recheck,
+        "completion_style": completion_style,
+        "tasks": tasks[:4],
+    }
+
+
+def build_agent_autonomy_header(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> str:
+    loop_data = build_agent_task_loop(
+        user_text=user_text,
+        session=session,
+    )
+
+    lines = [
+        "Autonomy rules:",
+        f"- mode: {loop_data.get('mode') or 'single_pass'}",
+        f"- max_steps: {int(loop_data.get('max_steps') or 1)}",
+        f"- allow_recheck: {'yes' if bool(loop_data.get('allow_recheck')) else 'no'}",
+        f"- completion_style: {loop_data.get('completion_style') or 'direct'}",
+        "- complete the task with minimum wasted motion",
+        "- do not stall",
+        "- do not drift",
+    ]
+
+    for task in safe_list(loop_data.get("tasks")):
+        task_text = normalize_text(task).strip()
+        if task_text:
+            lines.append(f"- task: {task_text}")
+
+    return "\n".join(lines).strip()
+
+# =========================================================
+# PHASE L — AGENT SELF-CHECK + FINAL ANSWER CONTRACT LOCK
+# =========================================================
+
+def build_agent_self_check(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    text = normalize_text(user_text or "")
+    lower = text.lower()
+
+    must_return_code = False
+    must_return_next_move = False
+    must_be_concise = True
+    should_verify_fit = True
+    contract = "direct_answer"
+
+    if any(x in lower for x in [
+        "smff",
+        "full file",
+        "whole file",
+        "entire file",
+        "send the file",
+        "replace this",
+    ]):
+        must_return_code = True
+        contract = "full_file_delivery"
+    elif any(x in lower for x in [
+        "phase",
+        "next",
+        "what now",
+        "roadmap",
+        "plan",
+    ]):
+        must_return_next_move = True
+        contract = "next_move_only"
+    elif any(x in lower for x in [
+        "explain",
+        "why",
+        "teach me",
+        "walk me through",
+        "step by step",
+    ]):
+        must_be_concise = False
+        contract = "guided_answer"
+
+    checks: list[str] = [
+        "Match the user's style.",
+        "Do the answer shape that fits the request.",
+        "Avoid wasting motion.",
+    ]
+
+    if must_return_code:
+        checks.extend([
+            "Return working code, not partial theory.",
+            "Prefer full output when requested.",
+        ])
+
+    if must_return_next_move:
+        checks.extend([
+            "Return the exact next move.",
+            "Do not branch into side quests.",
+        ])
+
+    if must_be_concise:
+        checks.extend([
+            "Keep it tight.",
+            "Cut filler.",
+        ])
+
+    return {
+        "must_return_code": must_return_code,
+        "must_return_next_move": must_return_next_move,
+        "must_be_concise": must_be_concise,
+        "should_verify_fit": should_verify_fit,
+        "contract": contract,
+        "checks": checks[:6],
+    }
+
+
+def build_agent_final_answer_header(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> str:
+    self_check = build_agent_self_check(
+        user_text=user_text,
+        session=session,
+    )
+
+    lines = [
+        "Final answer contract:",
+        f"- contract: {self_check.get('contract') or 'direct_answer'}",
+        f"- must_return_code: {'yes' if bool(self_check.get('must_return_code')) else 'no'}",
+        f"- must_return_next_move: {'yes' if bool(self_check.get('must_return_next_move')) else 'no'}",
+        f"- must_be_concise: {'yes' if bool(self_check.get('must_be_concise')) else 'no'}",
+        f"- should_verify_fit: {'yes' if bool(self_check.get('should_verify_fit')) else 'no'}",
+        "- before answering, self-check output against the request",
+        "- if the answer drifts, tighten it",
+    ]
+
+    for item in safe_list(self_check.get("checks")):
+        item_text = normalize_text(item).strip()
+        if item_text:
+            lines.append(f"- check: {item_text}")
+
+    return "\n".join(lines).strip()
+
+# =========================================================
+# PHASE M — AGENT MEMORY WEIGHTING + PRIORITY SELECTION LOCK
+# =========================================================
+
+def score_agent_memory_item(
+    *,
+    item: dict[str, Any],
+    user_text: str,
+) -> int:
+    if not isinstance(item, dict):
+        return 0
+
+    text = normalize_text(user_text or "").lower()
+    mem_text = normalize_text(item.get("text") or "").lower()
+
+    if not mem_text:
+        return 0
+
+    score = 0
+
+    user_tokens = set(re.findall(r"[a-zA-Z0-9_]+", text))
+    mem_tokens = set(re.findall(r"[a-zA-Z0-9_]+", mem_text))
+    overlap = len(user_tokens & mem_tokens)
+    score += overlap * 5
+
+    priority_terms = [
+        "smff",
+        "full file",
+        "direct",
+        "solution-first",
+        "powershell",
+        "no explanations",
+        "endgame",
+        "full code",
+        "file path",
+    ]
+
+    for term in priority_terms:
+        if term in mem_text:
+            score += 8
+        if term in text and term in mem_text:
+            score += 12
+
+    kind = str(item.get("kind") or "").strip().lower()
+    source = str(item.get("source") or "").strip().lower()
+
+    if kind in {"preference", "rule", "workflow"}:
+        score += 10
+
+    if source in {"assistant", "manual", "system"}:
+        score += 4
+
+    created_at = normalize_text(item.get("created_at") or "")
+    updated_at = normalize_text(item.get("updated_at") or "")
+
+    if updated_at:
+        score += 3
+    elif created_at:
+        score += 1
+
+    return score
+
+
+def select_agent_memory(
+    *,
+    user_text: str,
+    limit: int = 6,
+) -> list[dict[str, Any]]:
+    memory_items = safe_list(load_memory())
+    scored: list[dict[str, Any]] = []
+
+    for item in memory_items:
+        if not isinstance(item, dict):
+            continue
+
+        item_score = score_agent_memory_item(
+            item=item,
+            user_text=user_text,
+        )
+
+        if item_score <= 0:
+            continue
+
+        enriched = dict(item)
+        enriched["_agent_score"] = item_score
+        scored.append(enriched)
+
+    scored.sort(
+        key=lambda x: (
+            int(x.get("_agent_score") or 0),
+            normalize_text(x.get("updated_at") or x.get("created_at") or ""),
+        ),
+        reverse=True,
+    )
+
+    return scored[: max(1, int(limit or 6))]
+
+
+def build_agent_memory_priority_header(
+    *,
+    user_text: str,
+) -> str:
+    selected = select_agent_memory(user_text=user_text, limit=6)
+
+    lines = [
+        "Memory priority rules:",
+        "- favor the user's stable preferences",
+        "- favor recent useful memory when relevance is close",
+        "- prioritize execution preferences over general style notes",
+        "- do not overload the answer with too much memory",
+    ]
+
+    for item in selected:
+        txt = normalize_text(item.get("text") or "").strip()
+        score = int(item.get("_agent_score") or 0)
+        if txt:
+            lines.append(f"- memory[{score}]: {txt}")
+
+    return "\n".join(lines).strip()
+
+# =========================================================
+# PHASE N — AGENT CONFLICT RESOLUTION + INSTRUCTION HIERARCHY LOCK
+# =========================================================
+
+def build_agent_instruction_hierarchy(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    text = normalize_text(user_text or "")
+    lower = text.lower()
+
+    live_user_priority = 100
+    recent_context_priority = 80
+    stable_memory_priority = 60
+    default_behavior_priority = 20
+
+    live_rules: list[str] = []
+    memory_rules: list[str] = []
+    override_reason = "default"
+
+    if any(x in lower for x in [
+        "smff",
+        "full file",
+        "whole file",
+        "entire file",
+        "send the file",
+    ]):
+        live_rules.append("Return full working file output.")
+        override_reason = "full_file_requested"
+
+    if any(x in lower for x in [
+        "no explanations",
+        "no explanation",
+        "just do it",
+        "go now",
+        "endgame",
+    ]):
+        live_rules.append("Minimize explanation hard.")
+        override_reason = "user_requested_minimal_explanation"
+
+    if any(x in lower for x in [
+        "phase",
+        "what now",
+        "next",
+        "roadmap",
+        "plan",
+    ]):
+        live_rules.append("Return the next move only.")
+        override_reason = "next_move_requested"
+
+    selected_memory = select_agent_memory(
+        user_text=user_text,
+        limit=5,
+    )
+
+    for item in selected_memory:
+        mem_text = normalize_text(item.get("text") or "").strip()
+        if mem_text:
+            memory_rules.append(mem_text)
+
+    recent_messages = safe_list(session.get("messages"))[-6:]
+    recent_rules: list[str] = []
+
+    for msg in recent_messages:
+        if not isinstance(msg, dict):
+            continue
+        if str(msg.get("role") or "") != "user":
+            continue
+        msg_text = normalize_text(msg.get("text") or "").strip()
+        if not msg_text:
+            continue
+        recent_rules.append(msg_text[:220])
+
+    return {
+        "live_user_priority": live_user_priority,
+        "recent_context_priority": recent_context_priority,
+        "stable_memory_priority": stable_memory_priority,
+        "default_behavior_priority": default_behavior_priority,
+        "live_rules": live_rules[:4],
+        "memory_rules": memory_rules[:5],
+        "recent_rules": recent_rules[-3:],
+        "override_reason": override_reason,
+    }
+
+
+def build_agent_conflict_resolution(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    hierarchy = build_agent_instruction_hierarchy(
+        user_text=user_text,
+        session=session,
+    )
+
+    live_rules = safe_list(hierarchy.get("live_rules"))
+    memory_rules = safe_list(hierarchy.get("memory_rules"))
+
+    final_rules: list[str] = []
+    conflict_notes: list[str] = []
+
+    for rule in live_rules:
+        rule_text = normalize_text(rule).strip()
+        if rule_text and rule_text not in final_rules:
+            final_rules.append(rule_text)
+
+    for rule in memory_rules:
+        rule_text = normalize_text(rule).strip()
+        if not rule_text:
+            continue
+        if rule_text in final_rules:
+            continue
+        final_rules.append(rule_text)
+
+    if live_rules and memory_rules:
+        conflict_notes.append("Live user request overrides stored memory when they conflict.")
+
+    if not live_rules:
+        conflict_notes.append("No strong live override detected. Use best-fit memory and defaults.")
+
+    if any("full working file" in normalize_text(x).lower() for x in final_rules):
+        conflict_notes.append("Prefer complete implementation over partial snippets.")
+
+    if any("minimize explanation" in normalize_text(x).lower() for x in final_rules):
+        conflict_notes.append("Keep wording tight unless the user explicitly asks for teaching.")
+
+    return {
+        "final_rules": final_rules[:8],
+        "conflict_notes": conflict_notes[:4],
+        "override_reason": hierarchy.get("override_reason") or "default",
+    }
+
+
+def build_agent_conflict_header(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> str:
+    hierarchy = build_agent_instruction_hierarchy(
+        user_text=user_text,
+        session=session,
+    )
+    resolution = build_agent_conflict_resolution(
+        user_text=user_text,
+        session=session,
+    )
+
+    lines = [
+        "Conflict resolution rules:",
+        f"- live_user_priority: {int(hierarchy.get('live_user_priority') or 100)}",
+        f"- recent_context_priority: {int(hierarchy.get('recent_context_priority') or 80)}",
+        f"- stable_memory_priority: {int(hierarchy.get('stable_memory_priority') or 60)}",
+        f"- default_behavior_priority: {int(hierarchy.get('default_behavior_priority') or 20)}",
+        f"- override_reason: {resolution.get('override_reason') or 'default'}",
+        "- when conflict exists, obey the current user request first",
+        "- use memory to reinforce style, not to fight the current request",
+    ]
+
+    for item in safe_list(resolution.get("final_rules")):
+        item_text = normalize_text(item).strip()
+        if item_text:
+            lines.append(f"- final_rule: {item_text}")
+
+    for item in safe_list(resolution.get("conflict_notes")):
+        item_text = normalize_text(item).strip()
+        if item_text:
+            lines.append(f"- note: {item_text}")
+
+    return "\n".join(lines).strip()
+
+# =========================================================
+# ULTIMATE ENDGAME MOVE — AGENT BRAIN CONSOLIDATION LOCK
+# =========================================================
+
+AGENT_PRIORITY_TERMS = [
+    "smff",
+    "full file",
+    "whole file",
+    "entire file",
+    "send the file",
+    "full code",
+    "file path",
+    "powershell",
+    "direct",
+    "solution-first",
+    "endgame",
+    "no explanations",
+]
+
+def agent_tokens(value: Any) -> set[str]:
+    return set(re.findall(r"[a-zA-Z0-9_]+", normalize_text(value or "").lower()))
+
+
+def score_agent_memory_item(
+    *,
+    item: dict[str, Any],
+    user_text: str,
+) -> int:
+    if not isinstance(item, dict):
+        return 0
+
+    text = normalize_text(user_text or "").lower()
+    mem_text = normalize_text(item.get("text") or "").lower()
+    if not mem_text:
+        return 0
+
+    score = 0
+
+    user_tok = agent_tokens(text)
+    mem_tok = agent_tokens(mem_text)
+    overlap = len(user_tok & mem_tok)
+    score += overlap * 5
+
+    for term in AGENT_PRIORITY_TERMS:
+        if term in mem_text:
+            score += 8
+        if term in text and term in mem_text:
+            score += 12
+
+    kind = normalize_text(item.get("kind") or "").lower()
+    source = normalize_text(item.get("source") or "").lower()
+
+    if kind in {"preference", "rule", "workflow"}:
+        score += 10
+    if source in {"assistant", "manual", "system"}:
+        score += 4
+
+    if normalize_text(item.get("updated_at") or ""):
+        score += 3
+    elif normalize_text(item.get("created_at") or ""):
+        score += 1
+
+    return score
+
+
+def select_agent_memory(
+    *,
+    user_text: str,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    memory_items = safe_list(load_memory())
+    scored: list[dict[str, Any]] = []
+
+    for item in memory_items:
+        if not isinstance(item, dict):
+            continue
+
+        item_score = score_agent_memory_item(
+            item=item,
+            user_text=user_text,
+        )
+        if item_score <= 0:
+            continue
+
+        enriched = dict(item)
+        enriched["_agent_score"] = item_score
+        scored.append(enriched)
+
+    scored.sort(
+        key=lambda x: (
+            int(x.get("_agent_score") or 0),
+            normalize_text(x.get("updated_at") or x.get("created_at") or ""),
+        ),
+        reverse=True,
+    )
+
+    return scored[: max(1, int(limit or 5))]
+
+
+def build_agent_context(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    recent_messages = safe_list(session.get("messages"))[-8:]
+    recent_text = "\n".join(
+        normalize_text(m.get("text") or "")
+        for m in recent_messages
+        if isinstance(m, dict)
+    ).strip()
+
+    matched_memory = select_agent_memory(
+        user_text=user_text,
+        limit=5,
+    )
+
+    return {
+        "recent_text": recent_text,
+        "matched_memory": matched_memory,
+    }
+
+
+def build_agent_plan(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    text = normalize_text(user_text or "")
+    lower = text.lower()
+
+    action_mode = "respond"
+    intent = "general"
+    plan_steps: list[str] = []
+
+    if re.search(r"https?://|www\.", lower):
+        action_mode = "tool"
+        intent = "web"
+        plan_steps = [
+            "Detected URL in user input.",
+            "Route to web handling.",
+            "Return result with minimal extra explanation.",
+        ]
+    elif lower.startswith("/image") or any(x in lower for x in [
+        "generate image", "create image", "make image", "draw", "image of", "picture of",
+    ]):
+        action_mode = "tool"
+        intent = "image"
+        plan_steps = [
+            "Detected image-generation intent.",
+            "Route to image handling.",
+            "Return generated result cleanly.",
+        ]
+    elif any(x in lower for x in [
+        "fix", "patch", "replace", "rewrite", "refactor", "smff", "full file",
+    ]):
+        action_mode = "execute"
+        intent = "code"
+        plan_steps = [
+            "User wants direct execution-style help.",
+            "Prefer full working code over discussion.",
+            "Return concrete implementation.",
+        ]
+    elif any(x in lower for x in [
+        "plan", "phase", "next", "roadmap", "what now",
+    ]):
+        action_mode = "plan"
+        intent = "planning"
+        plan_steps = [
+            "User wants next-step guidance.",
+            "Keep sequence tight and actionable.",
+            "Return the next exact move.",
+        ]
+    else:
+        plan_steps = [
+            "Answer directly.",
+            "Keep response concise and useful.",
+            "Avoid wasted motion.",
+        ]
+
+    recent_messages = safe_list(session.get("messages"))[-6:]
+    recent_user_texts: list[str] = []
+
+    for msg in recent_messages:
+        if not isinstance(msg, dict):
+            continue
+        if str(msg.get("role") or "") != "user":
+            continue
+        txt = normalize_text(msg.get("text") or "").strip()
+        if txt:
+            recent_user_texts.append(txt)
+
+    return {
+        "action_mode": action_mode,
+        "intent": intent,
+        "plan_steps": plan_steps[:4],
+        "recent_user_texts": recent_user_texts[-3:],
+    }
+
+
+def decide_agent_response_shape(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    lower = normalize_text(user_text or "").lower()
+
+    shape = "default"
+    tone = "direct"
+    requires_full_output = False
+    should_minimize_explanation = True
+    preferred_format = "plain"
+
+    if any(x in lower for x in [
+        "smff", "full file", "whole file", "entire file", "send the file",
+    ]):
+        shape = "full_file"
+        requires_full_output = True
+        preferred_format = "code"
+    elif any(x in lower for x in [
+        "step by step", "walk me through", "teach me", "explain", "why",
+    ]):
+        shape = "guided"
+        tone = "clear"
+        should_minimize_explanation = False
+        preferred_format = "structured"
+    elif any(x in lower for x in [
+        "phase", "next", "what now", "roadmap", "plan",
+    ]):
+        shape = "next_move"
+        preferred_format = "tight"
+    elif any(x in lower for x in [
+        "fix", "patch", "replace", "rewrite", "refactor",
+    ]):
+        shape = "implementation"
+        requires_full_output = True
+        preferred_format = "code"
+
+    return {
+        "shape": shape,
+        "tone": tone,
+        "requires_full_output": requires_full_output,
+        "should_minimize_explanation": should_minimize_explanation,
+        "preferred_format": preferred_format,
+    }
+
+
+def decide_agent_tool_choice(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    lower = normalize_text(user_text or "").lower()
+
+    suggested_tool = "none"
+    reason = "direct_response"
+
+    if re.search(r"https?://|www\.", lower):
+        suggested_tool = "web"
+        reason = "url_detected"
+    elif lower.startswith("/image") or any(x in lower for x in [
+        "generate image", "create image", "make image", "draw", "image of", "picture of",
+    ]):
+        suggested_tool = "image"
+        reason = "image_intent_detected"
+    elif any(x in lower for x in [
+        "analyze attachment", "look at this image", "what is in this image", "read this screenshot",
+    ]):
+        suggested_tool = "vision"
+        reason = "vision_intent_detected"
+
+    return {
+        "suggested_tool": suggested_tool,
+        "reason": reason,
+        "response_shape": decide_agent_response_shape(
+            user_text=user_text,
+            session=session,
+        ),
+    }
+
+
+def build_agent_task_loop(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    lower = normalize_text(user_text or "").lower()
+
+    mode = "single_pass"
+    max_steps = 1
+    allow_recheck = False
+    completion_style = "direct"
+
+    if any(x in lower for x in ["phase", "plan", "roadmap", "what now", "next"]):
+        mode = "planner"
+        max_steps = 3
+        allow_recheck = True
+        completion_style = "tight_plan"
+    elif any(x in lower for x in [
+        "fix", "patch", "replace", "rewrite", "refactor", "smff", "full file",
+    ]):
+        mode = "executor"
+        max_steps = 3
+        allow_recheck = True
+        completion_style = "deliver_work"
+    elif re.search(r"https?://|www\.", lower):
+        mode = "tool_route"
+        max_steps = 2
+        allow_recheck = False
+        completion_style = "route_clean"
+    elif any(x in lower for x in ["compare", "analyze", "review", "check", "audit"]):
+        mode = "analysis"
+        max_steps = 2
+        allow_recheck = True
+        completion_style = "concise_analysis"
+
+    tasks: list[str] = []
+
+    if mode == "planner":
+        tasks = [
+            "Infer the exact next move.",
+            "Keep sequence tight.",
+            "Return only the move that matters now.",
+        ]
+    elif mode == "executor":
+        tasks = [
+            "Identify the concrete deliverable.",
+            "Prefer working implementation.",
+            "Minimize discussion and ship the result.",
+        ]
+    elif mode == "tool_route":
+        tasks = [
+            "Detect the correct route.",
+            "Do not over-explain.",
+            "Return the routed result cleanly.",
+        ]
+    elif mode == "analysis":
+        tasks = [
+            "Inspect the request.",
+            "Summarize only the important outcome.",
+            "Keep wording tight.",
+        ]
+    else:
+        tasks = [
+            "Answer directly.",
+            "Do not waste motion.",
+            "Finish in one pass.",
+        ]
+
+    return {
+        "mode": mode,
+        "max_steps": max_steps,
+        "allow_recheck": allow_recheck,
+        "completion_style": completion_style,
+        "tasks": tasks[:4],
+    }
+
+
+def build_agent_self_check(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    lower = normalize_text(user_text or "").lower()
+
+    must_return_code = False
+    must_return_next_move = False
+    must_be_concise = True
+    should_verify_fit = True
+    contract = "direct_answer"
+
+    if any(x in lower for x in [
+        "smff", "full file", "whole file", "entire file", "send the file", "replace this",
+    ]):
+        must_return_code = True
+        contract = "full_file_delivery"
+    elif any(x in lower for x in [
+        "phase", "next", "what now", "roadmap", "plan",
+    ]):
+        must_return_next_move = True
+        contract = "next_move_only"
+    elif any(x in lower for x in [
+        "explain", "why", "teach me", "walk me through", "step by step",
+    ]):
+        must_be_concise = False
+        contract = "guided_answer"
+
+    checks: list[str] = [
+        "Match the user's style.",
+        "Do the answer shape that fits the request.",
+        "Avoid wasting motion.",
+    ]
+
+    if must_return_code:
+        checks.extend([
+            "Return working code, not partial theory.",
+            "Prefer full output when requested.",
+        ])
+
+    if must_return_next_move:
+        checks.extend([
+            "Return the exact next move.",
+            "Do not branch into side quests.",
+        ])
+
+    if must_be_concise:
+        checks.extend([
+            "Keep it tight.",
+            "Cut filler.",
+        ])
+
+    return {
+        "must_return_code": must_return_code,
+        "must_return_next_move": must_return_next_move,
+        "must_be_concise": must_be_concise,
+        "should_verify_fit": should_verify_fit,
+        "contract": contract,
+        "checks": checks[:6],
+    }
+
+
+def build_agent_instruction_hierarchy(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    lower = normalize_text(user_text or "").lower()
+
+    live_user_priority = 100
+    recent_context_priority = 80
+    stable_memory_priority = 60
+    default_behavior_priority = 20
+
+    live_rules: list[str] = []
+    override_reason = "default"
+
+    if any(x in lower for x in [
+        "smff", "full file", "whole file", "entire file", "send the file",
+    ]):
+        live_rules.append("Return full working file output.")
+        override_reason = "full_file_requested"
+
+    if any(x in lower for x in [
+        "no explanations", "no explanation", "just do it", "go now", "endgame",
+    ]):
+        live_rules.append("Minimize explanation hard.")
+        override_reason = "user_requested_minimal_explanation"
+
+    if any(x in lower for x in [
+        "phase", "what now", "next", "roadmap", "plan",
+    ]):
+        live_rules.append("Return the next move only.")
+        override_reason = "next_move_requested"
+
+    memory_rules: list[str] = []
+    for item in select_agent_memory(user_text=user_text, limit=5):
+        mem_text = normalize_text(item.get("text") or "").strip()
+        if mem_text:
+            memory_rules.append(mem_text)
+
+    recent_rules: list[str] = []
+    for msg in safe_list(session.get("messages"))[-6:]:
+        if not isinstance(msg, dict):
+            continue
+        if str(msg.get("role") or "") != "user":
+            continue
+        msg_text = normalize_text(msg.get("text") or "").strip()
+        if msg_text:
+            recent_rules.append(msg_text[:220])
+
+    return {
+        "live_user_priority": live_user_priority,
+        "recent_context_priority": recent_context_priority,
+        "stable_memory_priority": stable_memory_priority,
+        "default_behavior_priority": default_behavior_priority,
+        "live_rules": live_rules[:4],
+        "memory_rules": memory_rules[:5],
+        "recent_rules": recent_rules[-3:],
+        "override_reason": override_reason,
+    }
+
+
+def build_agent_conflict_resolution(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    hierarchy = build_agent_instruction_hierarchy(
+        user_text=user_text,
+        session=session,
+    )
+
+    final_rules: list[str] = []
+    conflict_notes: list[str] = []
+
+    for rule in safe_list(hierarchy.get("live_rules")):
+        rule_text = normalize_text(rule).strip()
+        if rule_text and rule_text not in final_rules:
+            final_rules.append(rule_text)
+
+    for rule in safe_list(hierarchy.get("memory_rules")):
+        rule_text = normalize_text(rule).strip()
+        if rule_text and rule_text not in final_rules:
+            final_rules.append(rule_text)
+
+    if hierarchy.get("live_rules") and hierarchy.get("memory_rules"):
+        conflict_notes.append("Live user request overrides stored memory when they conflict.")
+    if not hierarchy.get("live_rules"):
+        conflict_notes.append("No strong live override detected. Use best-fit memory and defaults.")
+    if any("full working file" in normalize_text(x).lower() for x in final_rules):
+        conflict_notes.append("Prefer complete implementation over partial snippets.")
+    if any("minimize explanation" in normalize_text(x).lower() for x in final_rules):
+        conflict_notes.append("Keep wording tight unless the user explicitly asks for teaching.")
+
+    return {
+        "final_rules": final_rules[:8],
+        "conflict_notes": conflict_notes[:4],
+        "override_reason": hierarchy.get("override_reason") or "default",
+    }
+
+
+def build_agent_brain_bundle(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    ctx = build_agent_context(user_text=user_text, session=session)
+    plan = build_agent_plan(user_text=user_text, session=session)
+    tool_choice = decide_agent_tool_choice(user_text=user_text, session=session)
+    task_loop = build_agent_task_loop(user_text=user_text, session=session)
+    self_check = build_agent_self_check(user_text=user_text, session=session)
+    hierarchy = build_agent_instruction_hierarchy(user_text=user_text, session=session)
+    conflict = build_agent_conflict_resolution(user_text=user_text, session=session)
+
+    return {
+        "context": ctx,
+        "plan": plan,
+        "tool_choice": tool_choice,
+        "task_loop": task_loop,
+        "self_check": self_check,
+        "hierarchy": hierarchy,
+        "conflict": conflict,
+        "selected_memory": select_agent_memory(user_text=user_text, limit=5),
+    }
+
+
+def build_agent_system_prompt(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+) -> str:
+    bundle = build_agent_brain_bundle(
+        user_text=user_text,
+        session=session,
+    )
+
+    ctx = bundle["context"]
+    plan = bundle["plan"]
+    tool_choice = bundle["tool_choice"]
+    response_shape = tool_choice.get("response_shape") or {}
+    task_loop = bundle["task_loop"]
+    self_check = bundle["self_check"]
+    conflict = bundle["conflict"]
+
+    mem_lines: list[str] = []
+    for item in safe_list(ctx.get("matched_memory")):
+        txt = normalize_text(item.get("text") or "").strip()
+        score = int(item.get("_agent_score") or 0)
+        if txt:
+            mem_lines.append(f"- [{score}] {txt}")
+
+    recent_block = normalize_text(ctx.get("recent_text") or "").strip()
+
+    parts = [
+        "You are Nova.",
+        "Follow the user's style hard.",
+        "Be direct.",
+        "Be solution-first.",
+        "Prefer full working output over explanation.",
+        "Do not waste motion.",
+        "",
+        "Execution:",
+        f"- action_mode: {plan.get('action_mode') or 'respond'}",
+        f"- intent: {plan.get('intent') or 'general'}",
+        f"- suggested_tool: {tool_choice.get('suggested_tool') or 'none'}",
+        f"- tool_reason: {tool_choice.get('reason') or 'direct_response'}",
+        f"- response_shape: {response_shape.get('shape') or 'default'}",
+        f"- tone: {response_shape.get('tone') or 'direct'}",
+        f"- preferred_format: {response_shape.get('preferred_format') or 'plain'}",
+        f"- completion_style: {task_loop.get('completion_style') or 'direct'}",
+        f"- max_steps: {int(task_loop.get('max_steps') or 1)}",
+        f"- allow_recheck: {'yes' if bool(task_loop.get('allow_recheck')) else 'no'}",
+        "",
+        "Final answer contract:",
+        f"- contract: {self_check.get('contract') or 'direct_answer'}",
+        f"- must_return_code: {'yes' if bool(self_check.get('must_return_code')) else 'no'}",
+        f"- must_return_next_move: {'yes' if bool(self_check.get('must_return_next_move')) else 'no'}",
+        f"- must_be_concise: {'yes' if bool(self_check.get('must_be_concise')) else 'no'}",
+        "- self-check answer against request before finishing",
+        "- if drifting, tighten and finish",
+        "",
+        "Conflict rules:",
+        f"- override_reason: {conflict.get('override_reason') or 'default'}",
+        "- current user request overrides stored memory when they conflict",
+        "- use memory to reinforce style, not fight live instructions",
+    ]
+
+    for item in safe_list(plan.get("plan_steps")):
+        item_text = normalize_text(item).strip()
+        if item_text:
+            parts.append(f"- plan: {item_text}")
+
+    for item in safe_list(task_loop.get("tasks")):
+        item_text = normalize_text(item).strip()
+        if item_text:
+            parts.append(f"- task: {item_text}")
+
+    for item in safe_list(self_check.get("checks")):
+        item_text = normalize_text(item).strip()
+        if item_text:
+            parts.append(f"- check: {item_text}")
+
+    for item in safe_list(conflict.get("final_rules")):
+        item_text = normalize_text(item).strip()
+        if item_text:
+            parts.append(f"- final_rule: {item_text}")
+
+    if mem_lines:
+        parts.append("")
+        parts.append("Relevant user memory:")
+        parts.extend(mem_lines)
+
+    if recent_block:
+        parts.append("")
+        parts.append("Recent conversation context:")
+        parts.append(recent_block)
+
+    return "\n".join(parts).strip()
+
+# =========================================================
+# POST-RESPONSE CLEANUP + ANTI-WAFFLE LOCK
+# =========================================================
+
+ANTI_WAFFLE_OPENERS = [
+    "sure,",
+    "absolutely,",
+    "of course,",
+    "certainly,",
+    "here's",
+    "here is",
+    "no problem,",
+    "got it,",
+]
+
+ANTI_WAFFLE_FILLER_LINES = {
+    "let me know if you want me to keep going.",
+    "let me know if you'd like me to continue.",
+    "if you want, i can keep going.",
+    "if you'd like, i can continue.",
+    "i can help with that.",
+    "hope that helps.",
+}
+
+def cleanup_agent_response(text: Any) -> str:
+    value = str(text or "")
+    if not value.strip():
+        return ""
+
+    lines = value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    cleaned_lines: list[str] = []
+
+    blank_run = 0
+    for raw_line in lines:
+        line = raw_line.rstrip()
+
+        if not line.strip():
+            blank_run += 1
+            if blank_run > 1:
+                continue
+            cleaned_lines.append("")
+            continue
+
+        blank_run = 0
+        low = line.strip().lower()
+
+        if low in ANTI_WAFFLE_FILLER_LINES:
+            continue
+
+        cleaned_lines.append(line)
+
+    cleaned = "\n".join(cleaned_lines).strip()
+
+    lower = cleaned.lower()
+    for opener in ANTI_WAFFLE_OPENERS:
+        if lower.startswith(opener):
+            cleaned = cleaned[len(opener):].lstrip(" \t\n-:,.")
+            lower = cleaned.lower()
+            break
+
+    cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    cleaned = cleaned.strip()
+
+    return cleaned
+
+
+def enforce_agent_response_contract(
+    *,
+    text: Any,
+    user_text: str,
+    session: dict[str, Any],
+) -> str:
+    cleaned = cleanup_agent_response(text)
+
+    self_check = build_agent_self_check(
+        user_text=user_text,
+        session=session,
+    )
+    response_shape = decide_agent_response_shape(
+        user_text=user_text,
+        session=session,
+    )
+    conflict = build_agent_conflict_resolution(
+        user_text=user_text,
+        session=session,
+    )
+
+    must_be_concise = bool(self_check.get("must_be_concise"))
+    requires_full_output = bool(response_shape.get("requires_full_output"))
+    should_minimize_explanation = bool(response_shape.get("should_minimize_explanation"))
+
+    if must_be_concise or should_minimize_explanation:
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+
+    final_rules = [
+        normalize_text(x).strip().lower()
+        for x in safe_list(conflict.get("final_rules"))
+        if normalize_text(x).strip()
+    ]
+
+    if any("minimize explanation" in rule for rule in final_rules):
+        paragraphs = [p.strip() for p in cleaned.split("\n\n") if p.strip()]
+        if len(paragraphs) > 5:
+            cleaned = "\n\n".join(paragraphs[:5]).strip()
+
+    if not requires_full_output and len(cleaned) > 4000:
+        cleaned = cleaned[:4000].rstrip() + "\n\n[trimmed for brevity]"
+
+    return cleaned.strip()
+
+
+def finalize_agent_response(
+    *,
+    text: Any,
+    user_text: str,
+    session: dict[str, Any],
+) -> str:
+    cleaned = enforce_agent_response_contract(
+        text=text,
+        user_text=user_text,
+        session=session,
+    )
+
+    if not cleaned:
+        fallback = "Done."
+        self_check = build_agent_self_check(
+            user_text=user_text,
+            session=session,
+        )
+        if bool(self_check.get("must_return_next_move")):
+            fallback = "Next move ready."
+        elif bool(self_check.get("must_return_code")):
+            fallback = "# No output generated."
+        return fallback
+
+    return cleaned
+
+# =========================================================
+# PHASE TOOL FOLLOW-THROUGH LOCK
+# =========================================================
+
+def detect_agent_tool_route(
+    *,
+    user_text: str,
+    attachments: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    text = normalize_text(user_text or "")
+    lower = text.lower()
+    items = safe_list(attachments)
+
+    has_url = bool(re.search(r"https?://|www\.", lower))
+    has_image_attachment = False
+    has_video_attachment = False
+    has_other_attachment = False
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        mime = normalize_text(
+            item.get("mime_type")
+            or item.get("content_type")
+            or item.get("type")
+            or ""
+        ).lower()
+        name = normalize_text(item.get("name") or item.get("filename") or "").lower()
+
+        probe = f"{mime} {name}".strip()
+
+        if "image/" in mime or any(name.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"]):
+            has_image_attachment = True
+        elif "video/" in mime or any(name.endswith(ext) for ext in [".mp4", ".mov", ".avi", ".mkv", ".webm"]):
+            has_video_attachment = True
+        elif probe:
+            has_other_attachment = True
+
+    route = "chat"
+    reason = "default_chat"
+    should_force_tool = False
+
+    image_terms = [
+        "generate image",
+        "create image",
+        "make image",
+        "draw",
+        "image of",
+        "picture of",
+        "/image",
+    ]
+
+    vision_terms = [
+        "look at this image",
+        "what is in this image",
+        "analyze this image",
+        "read this screenshot",
+        "describe this image",
+        "what do you see",
+        "analyze attachment",
+    ]
+
+    web_terms = [
+        "/web",
+        "open this link",
+        "check this site",
+        "summarize this page",
+        "read this url",
+        "visit this link",
+    ]
+
+    if has_url or any(term in lower for term in web_terms):
+        route = "web"
+        reason = "url_or_web_intent"
+        should_force_tool = True
+    elif lower.startswith("/image") or any(term in lower for term in image_terms):
+        route = "image"
+        reason = "image_generation_intent"
+        should_force_tool = True
+    elif has_image_attachment and any(term in lower for term in vision_terms):
+        route = "vision"
+        reason = "image_attachment_analysis_intent"
+        should_force_tool = True
+    elif has_image_attachment and not text.strip():
+        route = "vision"
+        reason = "image_attachment_present"
+        should_force_tool = True
+    elif has_video_attachment:
+        route = "video"
+        reason = "video_attachment_present"
+        should_force_tool = True
+    elif has_other_attachment and "analyze" in lower:
+        route = "attachment"
+        reason = "generic_attachment_analysis_intent"
+        should_force_tool = True
+
+    return {
+        "route": route,
+        "reason": reason,
+        "has_url": has_url,
+        "has_image_attachment": has_image_attachment,
+        "has_video_attachment": has_video_attachment,
+        "has_other_attachment": has_other_attachment,
+        "should_force_tool": should_force_tool,
+    }
+
+
+def build_agent_tool_follow_through_header(
+    *,
+    user_text: str,
+    session: dict[str, Any],
+    attachments: list[dict[str, Any]] | None = None,
+) -> str:
+    route_data = detect_agent_tool_route(
+        user_text=user_text,
+        attachments=attachments,
+    )
+
+    lines = [
+        "Tool follow-through rules:",
+        f"- forced_route: {route_data.get('route') or 'chat'}",
+        f"- route_reason: {route_data.get('reason') or 'default_chat'}",
+        f"- should_force_tool: {'yes' if bool(route_data.get('should_force_tool')) else 'no'}",
+        "- if a tool route is clearly detected, do not drift into generic chat",
+        "- complete the detected route cleanly",
+        "- when tool route is not applicable, fall back to direct chat cleanly",
+        "- keep final output aligned with the selected route",
+    ]
+
+    return "\n".join(lines).strip()
+
+
+def finalize_tool_route_output(
+    *,
+    route_data: dict[str, Any],
+    text: Any,
+) -> str:
+    value = normalize_text(text or "").strip()
+    route = normalize_text(route_data.get("route") or "chat").lower()
+
+    if value:
+        return value
+
+    if route == "web":
+        return "Web route selected."
+    if route == "image":
+        return "Image route selected."
+    if route == "vision":
+        return "Image analysis route selected."
+    if route == "video":
+        return "Video analysis route selected."
+    if route == "attachment":
+        return "Attachment analysis route selected."
+    return "Done."
+
 # =========================================================
 # API ROUTES
 # =========================================================
@@ -3881,37 +5769,13 @@ def api_chat() -> Any:
     attachments = normalize_attachments(safe_list(data.get("attachments")))
     regenerate_of = str(data.get("regenerate_of") or "").strip() or None
 
-    # =========================================================
-    # ROUTE SCORING (SUPER BRAIN ENTRY)
-    # =========================================================
     route_result = choose_route(
         user_text=user_text,
         attachments=attachments,
         regenerate_of=regenerate_of,
     )
 
-    route_debug = {
-        "route_build": route_result["route_build"],
-        "requested_session_id": requested_session_id,
-        "raw_user_text": route_result["raw_user_text"],
-        "normalized_user_text": route_result["normalized_user_text"],
-        "attachments_count": len(attachments),
-        "regenerate_of": regenerate_of,
-        "primary_route": route_result["primary"],
-        "secondary_route": route_result["secondary"],
-        "raw_primary_route": route_result["raw_primary"],
-        "confidence": route_result["confidence"],
-        "confidence_band": route_result["confidence_band"],
-        "mixed_intent": route_result["mixed_intent"],
-        "fallback_used": route_result["fallback_used"],
-        "scores": route_result["scores"],
-        "reasons": route_result["reasons"],
-        "attachment_signals": route_result["attachments"],
-    }
-
-    wants_stream = bool(data.get("stream", False))
-    if user_text.lower().startswith("/image"):
-        wants_stream = False
+    wants_stream = bool(data.get("stream", True))
 
     store = load_sessions_store()
     session = find_session(store, requested_session_id) if requested_session_id else None
@@ -3922,53 +5786,123 @@ def api_chat() -> Any:
     store["active_session_id"] = session["id"]
     save_sessions_store(store)
 
-    print(
-        "api_chat debug:",
-        {
-            "requested_session_id": requested_session_id,
-            "raw_user_text": data.get("user_text"),
-            "normalized_user_text": user_text,
-            "attachments_count": len(attachments),
-            "regenerate_of": regenerate_of,
-            "wants_stream": wants_stream,
-        },
-    )
-
     if not regenerate_of and not user_text.strip() and not attachments:
-        return jsonify({"ok": False, "error": "user_text or attachments required for send."}), 400
+        return jsonify({"ok": False, "error": "user_text or attachments required"}), 400
 
-    if regenerate_of and not find_message(session, regenerate_of):
-        return jsonify({"ok": False, "error": "regenerate target not found."}), 404
+    # =========================================================
+    # STREAM UNIFIED FLOW (CHAT + TOOLS)
+    # =========================================================
 
-    if wants_stream:
-        return Response(
-            chat_stream_generator(
-                session_id=requested_session_id,
+    def stream() -> Generator[str, None, None]:
+        assistant_id = make_id("assistant")
+        assistant_created_at = now_iso()
+
+        append_message(session, make_user_message(user_text, attachments))
+
+        yield sse({
+            "type": "start",
+            "message_id": assistant_id,
+            "session_id": session["id"],
+        })
+
+        def detect_tool(text: str) -> str:
+            t = (text or "").lower()
+            if re.search(r"https?://|www\.", t):
+                return "web"
+            if any(x in t for x in ["generate image", "create image", "draw", "image of"]):
+                return "image"
+            return "none"
+
+        tool = detect_tool(user_text)
+        agent_mode = detect_agent_mode(user_text)
+
+        full_text = ""
+
+        if agent_mode:
+            for event in stream_agent_plan(
+                assistant_id=assistant_id,
+                session=session,
                 user_text=user_text,
-                attachments=attachments,
-                regenerate_of=regenerate_of,
-            ),
-            mimetype="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache, no-transform",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-            },
-        )
+            ):
+                yield event
 
-    try:
-        # =========================================================
-        # IMAGE GENERATION (HARD LOCK)
-        # =========================================================
-        if user_text.lower().startswith("/image") and not regenerate_of:
-            return jsonify({
-                "ok": False,
-                "error": "Image temporarily disabled for debug",
-            })
+        # -------------------------
+        # WEB TOOL (STREAM)
+        # -------------------------
+        if tool == "web":
+            try:
+                url_match = re.search(r"(https?://\S+|www\.\S+)", user_text)
+                url = url_match.group(0) if url_match else user_text.strip()
+                if url.startswith("www."):
+                    url = "https://" + url
 
-        # =========================================================
-        # NORMAL CHAT FLOW (D5 CLEAN)
-        # =========================================================
+                web_data = fetch_web(url)
+                text = web_data.get("summary") or web_data.get("title") or "Web result"
+
+                for token in text.split(" "):
+                    full_text += token + " "
+                    yield sse({
+                        "type": "token",
+                        "message_id": assistant_id,
+                        "token": token + " ",
+                    })
+
+                msg = make_assistant_message(full_text.strip(), message_id=assistant_id)
+
+                append_message(session, msg)
+                save_artifact_from_assistant(msg, session["id"])
+
+                yield sse({
+                    "type": "final",
+                    "message": msg,
+                    "session_id": session["id"],
+                    "messages": session_messages(session),
+                    "artifacts": load_artifacts(),
+                    "memory": load_memory(),
+                })
+                return
+
+            except Exception as e:
+                yield sse({"type": "error", "error": str(e)})
+                return
+
+        # -------------------------
+        # IMAGE TOOL (STREAM)
+        # -------------------------
+        if tool == "image":
+            try:
+                yield sse({
+                    "type": "token",
+                    "message_id": assistant_id,
+                    "token": "Generating image...",
+                })
+
+                image_url = generate_image(user_text)
+
+                final_text = f"![Generated image]({image_url})"
+
+                msg = make_assistant_message(final_text, message_id=assistant_id)
+
+                append_message(session, msg)
+                save_artifact_from_assistant(msg, session["id"])
+
+                yield sse({
+                    "type": "final",
+                    "message": msg,
+                    "session_id": session["id"],
+                    "messages": session_messages(session),
+                    "artifacts": load_artifacts(),
+                    "memory": load_memory(),
+                })
+                return
+
+            except Exception as e:
+                yield sse({"type": "error", "error": str(e)})
+                return
+
+        # -------------------------
+        # NORMAL CHAT (STREAM)
+        # -------------------------
         payload = build_model_payload(
             session=session,
             user_text=user_text,
@@ -3976,42 +5910,63 @@ def api_chat() -> Any:
             regenerate_of=regenerate_of,
         )
 
-        route_result = payload["route_result"]
-        route = payload["route"]
-        memory_selection = payload["memory_selection"]
-        memory_block = payload["memory_block"]
-        execution = payload["execution"]
-        execution_context = payload["execution_context"]
         model_messages = payload["model_messages"]
 
-        result = run_non_stream_chat(
-            session_id=requested_session_id,
+        agent_system_prompt = build_agent_system_prompt(
             user_text=user_text,
-            attachments=attachments,
-            regenerate_of=regenerate_of,
-            route_result=route_result,
-            memory_selection=memory_selection,
-            memory_block=memory_block,
+            session=session,
         )
 
-        if isinstance(result, dict):
-            debug_obj = result.get("debug") or {}
-            debug_obj["route_debug"] = route_debug
-            debug_obj["route_build"] = "phase-d5-one-source-of-truth-prompt-builder-2026-04-08-001"
-            debug_obj["model_messages_count"] = len(model_messages)
-            debug_obj["memory_selected_count"] = len(memory_selection.get("items", [])) if isinstance(memory_selection, dict) else 0
-            debug_obj["has_memory_block"] = bool(memory_block)
-            debug_obj["has_execution_context"] = bool(execution_context)
-            result["debug"] = debug_obj
+        if model_messages and isinstance(model_messages, list):
+            if model_messages[0].get("role") == "system":
+                model_messages[0]["content"] = agent_system_prompt + "\n\n" + str(model_messages[0].get("content") or "")
+            else:
+                model_messages.insert(0, {
+                    "role": "system",
+                    "content": agent_system_prompt,
+                })
+        try:
+            stream_resp = OPENAI_CLIENT.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=model_messages,
+                stream=True,
+            )
 
-        return jsonify(result)
+            for chunk in stream_resp:
+                token = chunk.choices[0].delta.content or ""
+                if token:
+                    full_text += token
+                    yield sse({
+                        "type": "token",
+                        "message_id": assistant_id,
+                        "token": token,
+                    })
 
-    except Exception as exc:
-        return jsonify({
-            "ok": False,
-            "error": str(exc) or "Chat failed.",
-        }), 500
+            msg = make_assistant_message(full_text.strip(), message_id=assistant_id)
 
+            append_message(session, msg)
+            save_artifact_from_assistant(msg, session["id"])
+
+            yield sse({
+                "type": "final",
+                "message": msg,
+                "session_id": session["id"],
+                "messages": session_messages(session),
+                "artifacts": load_artifacts(),
+                "memory": load_memory(),
+            })
+
+        except Exception as e:
+            yield sse({"type": "error", "error": str(e)})
+
+    return Response(
+        stream(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
 
 @app.get("/api/uploads/<path:filename>")
 def api_uploads(filename: str) -> Any:

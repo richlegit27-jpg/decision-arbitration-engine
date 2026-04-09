@@ -1,5 +1,146 @@
 [
   {
+    "id": "artifact_df33dd2528a84497a64b4b82d580fc53",
+    "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
+    "message_id": "assistant_6ee0c476494a45a584f253182d4410af",
+    "kind": "chat_reply",
+    "title": "Response: Donald Trump is a U.S. politician and businessman.",
+    "body": "Donald Trump is a U.S. politician and businessman.\n\n“Tacos” are a Mexican dish made with a folded or rolled tortilla filled with things like meat, beans, cheese, and vegetables.\n\nIf you mean the phrase connecting Trump and tacos, give me the exact quote and I’ll explain it.",
+    "preview": "Donald Trump is a U.S. politician and businessman.\n\n“Tacos” are a Mexican dish made with a folded or rolled tortilla fi…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-09T04:13:01.109740+00:00",
+    "updated_at": "2026-04-09T04:13:01.110878+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Donald Trump is a U.S. politician and businessman.",
+      "bullets": [
+        "Donald Trump is a U.S. politician and businessman.",
+        "“Tacos” are a Mexican dish made with a folded or rolled tortilla filled with things like meat, beans, cheese, and vegetables.",
+        "If you mean the phrase connecting Trump and tacos, give me the exact quote and I’ll explain it."
+      ]
+    }
+  },
+  {
+    "id": "artifact_3fe67f95eb0e4a40969d81d3307355c8",
+    "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
+    "message_id": "assistant_e4e2e9f148e64392bb94fa654445cfe2",
+    "kind": "writing",
+    "title": "Writing: I don’t have live news access here.",
+    "body": "I don’t have live news access here.\n\nIf you want, I can give you:\n- a quick news summary template\n- likely major story categories today\n- help finding the latest from reliable sources\n\nFastest reliable sources:\n- Reuters\n- AP News\n- BBC\n- Financial Times\n- local major paper in your country\n\nIf you want, I can also summarize news if you paste headlines or links.",
+    "preview": "I don’t have live news access here.\n\nIf you want, I can give you:\n- a quick news summary template\n- likely major story…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-09T04:12:46.741032+00:00",
+    "updated_at": "2026-04-09T04:12:46.742018+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Writing summary: I don’t have live news access here.",
+      "bullets": [
+        "I don’t have live news access here.",
+        "If you want, I can give you:",
+        "a quick news summary template",
+        "likely major story categories today",
+        "help finding the latest from reliable sources"
+      ]
+    }
+  },
+  {
+    "id": "artifact_109fe99a5a9b4753997836a6b7e319bd",
+    "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
+    "message_id": "assistant_ac7e00e0604b4ffabc5edab4811b43cc",
+    "kind": "chat_reply",
+    "title": "Response: Hi.",
+    "body": "Hi.",
+    "preview": "Hi.",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-09T03:40:18.152924+00:00",
+    "updated_at": "2026-04-09T03:49:07.778687+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi.",
+      "bullets": [
+        "Hi."
+      ]
+    }
+  },
+  {
+    "id": "artifact_eddbdb2804af49b5a13b55c3192bcd54",
+    "session_id": "session_b429cad26e134d57bb4e5a0354b146f8",
+    "message_id": "assistant_17708b0a0f564c9f8804035a84360242",
+    "kind": "debug",
+    "title": "Debug Fix: I can help, but I need the actual thing to inspect.",
+    "body": "I can help, but I need the actual thing to inspect.\n\nPlease paste one of these:\n- the code\n- the error message\n- the file/content\n- a screenshot/log\n- or describe what’s going wrong vs. what you expected\n\nIf you want, use this format:\n\n```txt\nProblem:\nWhat I expected:\nWhat happened instead:\nCode/log:\n```\n\nThen I’ll find the issue and suggest the fix.",
+    "preview": "I can help, but I need the actual thing to inspect.\n\nPlease paste one of these:\n- the code\n- the error message\n- the fi…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-09T03:32:46.271072+00:00",
+    "updated_at": "2026-04-09T03:32:46.271910+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Debug outcome: I can help, but I need the actual thing to inspect.",
+      "bullets": [
+        "I can help, but I need the actual thing to inspect.",
+        "the error message",
+        "Then I’ll find the issue and suggest the fix."
+      ]
+    }
+  },
+  {
+    "id": "artifact_9d1b9a6bfc014c0580e5475b6e1fd56a",
+    "session_id": "session_b429cad26e134d57bb4e5a0354b146f8",
+    "message_id": "assistant_f25ef82815c84bb183cb2b52e0303570",
+    "kind": "chat_reply",
+    "title": "Response: Sure — send me the URL you want summarized.",
+    "body": "Sure — send me the URL you want summarized.\n\nIf you want, I can also tailor the summary style:\n- brief TL;DR\n- key takeaways\n- detailed section-by-section\n- executive summary\n- bullet points only\n\nIf the page is behind a login/paywall, paste the text or screenshots and I’ll summarize that instead.",
+    "preview": "Sure — send me the URL you want summarized.\n\nIf you want, I can also tailor the summary style:\n- brief TL;DR\n- key take…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-09T03:32:36.088736+00:00",
+    "updated_at": "2026-04-09T03:32:36.089548+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Sure — send me the URL you want summarized.",
+      "bullets": [
+        "Sure — send me the URL you want summarized.",
+        "If you want, I can also tailor the summary style:",
+        "brief TL;DR",
+        "key takeaways",
+        "detailed section-by-section"
+      ]
+    }
+  },
+  {
+    "id": "artifact_d459aca91336435da6d0c8ca1cca2426",
+    "session_id": "session_b429cad26e134d57bb4e5a0354b146f8",
+    "message_id": "assistant_f890fd0a8a4b489b9bbd867f7d8e21ca",
+    "kind": "debug",
+    "title": "Debug Fix: Sure — please paste the code you want analyzed and fixed.",
+    "body": "Sure — please paste the code you want analyzed and fixed.\n\nIf possible, also include:\n- the error message or wrong behavior\n- what language/framework it is\n- what you expect it to do\n\nThen I’ll go through it step by step:\n1. explain what the code does\n2. identify the problem\n3. show the fix\n4. provide the corrected version\n5. explain why the fix works",
+    "preview": "Sure — please paste the code you want analyzed and fixed.\n\nIf possible, also include:\n- the error message or wrong beha…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-09T03:32:21.560746+00:00",
+    "updated_at": "2026-04-09T03:32:21.561640+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Debug outcome: Sure — please paste the code you want analyzed and fixed.",
+      "bullets": [
+        "Sure — please paste the code you want analyzed and fixed.",
+        "the error message or wrong behavior",
+        "3. show the fix",
+        "5. explain why the fix works"
+      ]
+    }
+  },
+  {
     "id": "artifact_b291177624c348e58b0795117d9c3957",
     "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
     "message_id": "assistant_7ad16f685719412f973df7453f32393f",
