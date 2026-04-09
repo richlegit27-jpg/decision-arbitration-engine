@@ -657,22 +657,25 @@
     );
   }
 
-  function renderMessageActions(message) {
+   function renderMessageActions(message) {
     if (String(message.role) !== "assistant") return "";
 
     const disabled = state.stream.running ? ' aria-disabled="true"' : "";
+    const disabledAttr = state.stream.running ? " disabled" : "";
 
     return (
-      '<div class="message-actions">' +
-      '<button type="button" class="message-action" data-copy-message="' +
+      '<div class="nova-message-actions">' +
+      '<button type="button" class="nova-message-action" data-copy-message="' +
       escapeHtml(message.id) +
       '"' +
       disabled +
+      disabledAttr +
       ">Copy</button>" +
-      '<button type="button" class="message-action" data-regenerate-message="' +
+      '<button type="button" class="nova-message-action" data-regenerate-message="' +
       escapeHtml(message.id) +
       '"' +
       disabled +
+      disabledAttr +
       ">Regenerate</button>" +
       "</div>"
     );
@@ -2043,55 +2046,6 @@ async function sendMessage() {
     if (els.sidebarBackdrop) {
       els.sidebarBackdrop.hidden = false;
     }
-  }
-
-  function wireRailTabs() {
-    if (!els.railTabs || !els.railTabs.length) return;
-
-    els.railTabs.forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        const tab = String(btn.getAttribute("data-rail-tab") || "artifacts");
-        setRailTab(tab);
-
-        if (tab === "artifacts") {
-          setRailSelectedItem("", "");
-          if (els.railViewer) {
-            els.railViewer.hidden = false;
-            els.railViewer.innerHTML =
-              '<div class="nova-viewer-shell">' +
-              '<div class="nova-viewer-empty">' +
-              '<div class="nova-viewer-empty-title">Nothing selected</div>' +
-              '<div class="nova-viewer-empty-copy">Select an artifact to view details.</div>' +
-              '</div>' +
-              '</div>';
-          }
-        } else if (tab === "memory") {
-          setRailSelectedItem("", "");
-          if (els.railViewer) {
-            els.railViewer.hidden = false;
-            els.railViewer.innerHTML =
-              '<div class="nova-viewer-shell">' +
-              '<div class="nova-viewer-empty">' +
-              '<div class="nova-viewer-empty-title">Memory</div>' +
-              '<div class="nova-viewer-empty-copy">Select a memory item to view details.</div>' +
-              '</div>' +
-              '</div>';
-          }
-        } else if (tab === "web") {
-          setRailSelectedItem("", "");
-          if (els.railViewer) {
-            els.railViewer.hidden = false;
-            els.railViewer.innerHTML =
-              '<div class="nova-viewer-shell">' +
-              '<div class="nova-viewer-empty">' +
-              '<div class="nova-viewer-empty-title">Web</div>' +
-              '<div class="nova-viewer-empty-copy">Select a web result to view details.</div>' +
-              '</div>' +
-              '</div>';
-          }
-        }
-      });
-    });
   }
 
   function wireSidebar() {
