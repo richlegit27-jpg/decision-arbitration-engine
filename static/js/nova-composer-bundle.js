@@ -657,7 +657,7 @@
     );
   }
 
-   function renderMessageActions(message) {
+  function renderMessageActions(message) {
     if (String(message.role) !== "assistant") return "";
 
     const disabled = state.stream.running ? ' aria-disabled="true"' : "";
@@ -731,10 +731,11 @@
     if (!els.chatThread) return;
     setChatEmptyVisible(state.messages.length === 0);
     els.chatThread.innerHTML = state.messages.map(renderMessageCard).join("");
+    updateTopbarFromState();
     scrollChatToBottom(true);
   }
 
-  function renderSessionList() {
+   function renderSessionList() {
     if (!els.sessionList) return;
 
     const sessions = state.sessions.slice().sort(function (a, b) {
@@ -752,26 +753,35 @@
         const active = String(session.id) === String(state.activeSessionId);
 
         return (
-          '<button type="button" class="session-card' +
+          '<div class="nova-session-card' +
           (active ? " is-active" : "") +
-          '" data-open-session="' +
+          '">' +
+          '<button type="button" class="nova-session-card-main" data-open-session="' +
           escapeHtml(session.id) +
           '">' +
-          '<div class="session-card__title-row">' +
-          '<div class="session-card__title">' +
+          '<div class="nova-session-card-top">' +
+          '<div class="nova-session-card-title">' +
           escapeHtml(session.title || "Untitled chat") +
           "</div>" +
-          (session.pinned ? '<div class="session-card__pin">📌</div>' : "") +
+          (session.pinned ? '<div class="nova-session-card-pin">📌</div>' : "") +
           "</div>" +
-          '<div class="session-card__preview">' +
+          '<div class="nova-session-card-preview">' +
           escapeHtml(session.last_message_preview || "No messages yet") +
           "</div>" +
-          "</button>"
+          '<div class="nova-session-card-meta">' +
+          escapeHtml(
+            String(
+              Number(session.message_count || safeArray(session.messages).length || 0)
+            ) + " messages"
+          ) +
+          "</div>" +
+          "</button>" +
+          "</div>"
         );
       })
       .join("");
   }
-
+   
   function renderArtifacts() {
     if (!els.artifactList) return;
 
@@ -807,18 +817,21 @@
     els.memoryList.innerHTML = items.length
       ? items
           .map(function (item) {
+            const id = String(item.id || "");
             const text = String(item.text || item.content || item.body || "");
             const kind = String(item.kind || "note");
 
             return (
-              '<div class="rail-item rail-item--static">' +
+              '<button type="button" class="rail-item" data-memory-open="' +
+              escapeHtml(id) +
+              '">' +
               '<div class="rail-item__title">' +
               escapeHtml(kind) +
               "</div>" +
               '<div class="rail-item__preview">' +
               escapeHtml(summarizeText(text, 120)) +
               "</div>" +
-              "</div>"
+              "</button>"
             );
           })
           .join("")
@@ -924,7 +937,7 @@
   async function consumeChatStream(payload) {
     if (state.stream.running) {
       showToast("A generation is already running.", "info");
-      throw new Error("A generation is already running.");
+      return;
     }
 
     const controller = new AbortController();
@@ -937,70 +950,43 @@
     setBusyUi(true);
     updateTopbarFromState();
 
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
-      },
-      body: JSON.stringify({
-        ...(payload || {}),
-        stream: true,
-      }),
-      signal: controller.signal,
-    });
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+        },
+        body: JSON.stringify({
+          ...(payload || {}),
+          stream: true,
+        }),
+        signal: controller.signal,
+      });
 
-    if (!response.ok || !response.body) {
-      finishStreamUi({ statusState: "error", statusText: "Error" });
-      throw new Error("Stream request failed.");
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-
-    function handleStreamEvent(event) {
-      const type = String((event && event.type) || "");
-
-      if (type === "start") {
-        const id = String(
-          event.message_id ||
-            event.assistant_message_id ||
-            makeId("assistant")
-        );
-
-        state.stream.messageId = id;
-        state.stream.placeholderId = id;
-
-        upsertMessage({
-          id: id,
-          role: "assistant",
-          text: "",
-          pending: true,
-          streaming: true,
-          error: false,
-          stopped: false,
-          source: event.mode || "send",
-          attachments: [],
-          meta: {},
-        });
-        scrollChatToBottom(true);
-        return;
+      if (!response.ok || !response.body) {
+        throw new Error("Stream request failed.");
       }
 
-      if (type === "token") {
-        const id = String(
-          event.message_id ||
-            event.assistant_message_id ||
-            state.stream.messageId ||
-            makeId("assistant")
-        );
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
 
-        let msg = findMessageById(id);
+      function handleStreamEvent(event) {
+        const type = String((event && event.type) || "");
 
-        if (!msg) {
-          msg = upsertMessage({
+        if (type === "start") {
+          const id = String(
+            event.message_id ||
+              event.assistant_message_id ||
+              makeId("assistant")
+          );
+
+          state.stream.messageId = id;
+          state.stream.placeholderId = id;
+
+          upsertMessage({
             id: id,
             role: "assistant",
             text: "",
@@ -1008,198 +994,247 @@
             streaming: true,
             error: false,
             stopped: false,
-            source: "send",
+            source: event.mode || "send",
             attachments: [],
             meta: {},
           });
+          scrollChatToBottom(true);
+          return;
         }
 
-        upsertMessage({
-          ...msg,
-          text: String(msg.text || "") + String(event.token || ""),
-          pending: true,
-          streaming: true,
-          error: false,
-          stopped: false,
-        });
+        if (type === "token") {
+          const id = String(
+            event.message_id ||
+              event.assistant_message_id ||
+              state.stream.messageId ||
+              makeId("assistant")
+          );
 
-        scrollChatToBottom(true);
-        return;
-      }
+          let msg = findMessageById(id);
 
-      if (type === "final") {
-        const finalMsg = normalizeMessage(
-          event.message || {
-            id: state.stream.messageId || makeId("assistant"),
-            role: "assistant",
-            text: "",
+          if (!msg) {
+            msg = upsertMessage({
+              id: id,
+              role: "assistant",
+              text: "",
+              pending: true,
+              streaming: true,
+              error: false,
+              stopped: false,
+              source: "send",
+              attachments: [],
+              meta: {},
+            });
           }
-        );
 
-        upsertMessage({
-          ...finalMsg,
-          pending: false,
-          streaming: false,
-          stopped: false,
-          error: false,
-        });
+          upsertMessage({
+            ...msg,
+            text: String(msg.text || "") + String(event.token || ""),
+            pending: true,
+            streaming: true,
+            error: false,
+            stopped: false,
+          });
 
-        if (Array.isArray(event.messages)) {
-          state.messages = event.messages.map(normalizeMessage);
-          renderChat();
+          scrollChatToBottom(true);
+          return;
         }
 
-        if (Array.isArray(event.artifacts)) {
-          state.artifacts = event.artifacts;
-          renderArtifacts();
+        if (type === "final") {
+          const finalMsg = normalizeMessage(
+            event.message || {
+              id: state.stream.messageId || makeId("assistant"),
+              role: "assistant",
+              text: "",
+            }
+          );
+
+          upsertMessage({
+            ...finalMsg,
+            pending: false,
+            streaming: false,
+            stopped: false,
+            error: false,
+          });
+
+          if (Array.isArray(event.messages)) {
+            state.messages = event.messages.map(normalizeMessage);
+            renderChat();
+          }
+
+          if (Array.isArray(event.artifacts)) {
+            state.artifacts = event.artifacts;
+            renderArtifacts();
+          }
+
+          if (Array.isArray(event.memory)) {
+            state.memory = event.memory;
+            renderMemory();
+          }
+
+          if (event.session_id) {
+            state.activeSessionId = String(event.session_id);
+          }
+
+          finishStreamUi({
+            statusText: "Ready",
+            statusState: "idle",
+          });
+
+          updateTopbarFromState();
+          scrollChatToBottom(true);
+          return;
         }
 
-        if (Array.isArray(event.memory)) {
-          state.memory = event.memory;
-          renderMemory();
+        if (type === "error") {
+          const errorId = String(
+            event.message_id ||
+              event.assistant_message_id ||
+              state.stream.messageId ||
+              makeId("assistant")
+          );
+
+          upsertMessage({
+            id: errorId,
+            role: "assistant",
+            text: String(event.error || "Generation failed."),
+            pending: false,
+            streaming: false,
+            stopped: false,
+            error: true,
+            attachments: [],
+            meta: {},
+          });
+
+          if (Array.isArray(event.messages)) {
+            state.messages = event.messages.map(normalizeMessage);
+            renderChat();
+          }
+
+          if (Array.isArray(event.artifacts)) {
+            state.artifacts = event.artifacts;
+            renderArtifacts();
+          }
+
+          if (Array.isArray(event.memory)) {
+            state.memory = event.memory;
+            renderMemory();
+          }
+
+          finishStreamUi({
+            statusText: "Error",
+            statusState: "error",
+          });
+
+          updateTopbarFromState();
+          scrollChatToBottom(true);
+          return;
         }
 
-        if (event.session_id) {
-          state.activeSessionId = String(event.session_id);
+        if (type === "stopped") {
+          const stoppedId = String(
+            event.message_id ||
+              event.assistant_message_id ||
+              state.stream.messageId ||
+              makeId("assistant")
+          );
+
+          upsertMessage({
+            id: stoppedId,
+            role: "assistant",
+            text: String(event.text || ""),
+            pending: false,
+            streaming: false,
+            stopped: true,
+            error: false,
+            attachments: [],
+            meta: {},
+          });
+
+          if (Array.isArray(event.messages)) {
+            state.messages = event.messages.map(normalizeMessage);
+            renderChat();
+          }
+
+          if (Array.isArray(event.artifacts)) {
+            state.artifacts = event.artifacts;
+            renderArtifacts();
+          }
+
+          if (Array.isArray(event.memory)) {
+            state.memory = event.memory;
+            renderMemory();
+          }
+
+          finishStreamUi({
+            statusText: "Stopped",
+            statusState: "idle",
+          });
+
+          updateTopbarFromState();
+          scrollChatToBottom(true);
+          return;
         }
-
-        finishStreamUi({
-          statusText: "Ready",
-          statusState: "idle",
-        });
-
-        updateTopbarFromState();
-        scrollChatToBottom(true);
-        return;
       }
-      if (type === "error") {
-        const errorId = String(
-          event.message_id ||
-            event.assistant_message_id ||
-            state.stream.messageId ||
-            makeId("assistant")
-        );
 
-        upsertMessage({
-          id: errorId,
-          role: "assistant",
-          text: String(event.error || "Generation failed."),
-          pending: false,
-          streaming: false,
-          stopped: false,
-          error: true,
-          attachments: [],
-          meta: {},
-        });
+      while (true) {
+        const result = await reader.read();
+        const done = result.done;
+        const value = result.value;
 
-        if (Array.isArray(event.messages)) {
-          state.messages = event.messages.map(normalizeMessage);
-          renderChat();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+
+        for (let part of parts) {
+          part = part.trim();
+          if (!part.startsWith("data:")) continue;
+
+          const jsonStr = part.replace(/^data:\s*/, "");
+
+          try {
+            const evt = JSON.parse(jsonStr);
+            handleStreamEvent(evt);
+          } catch (error) {
+            warn("stream event parse failed", error);
+          }
         }
-
-        if (Array.isArray(event.artifacts)) {
-          state.artifacts = event.artifacts;
-          renderArtifacts();
-        }
-
-        if (Array.isArray(event.memory)) {
-          state.memory = event.memory;
-          renderMemory();
-        }
-
-        finishStreamUi({
-          statusText: "Error",
-          statusState: "error",
-        });
-
-        updateTopbarFromState();
-        scrollChatToBottom(true);
-        return;
       }
 
-      if (type === "stopped") {
-        const stoppedId = String(
-          event.message_id ||
-            event.assistant_message_id ||
-            state.stream.messageId ||
-            makeId("assistant")
-        );
-
-        upsertMessage({
-          id: stoppedId,
-          role: "assistant",
-          text: String(event.text || ""),
-          pending: false,
-          streaming: false,
-          stopped: true,
-          error: false,
-          attachments: [],
-          meta: {},
-        });
-
-        if (Array.isArray(event.messages)) {
-          state.messages = event.messages.map(normalizeMessage);
-          renderChat();
-        }
-
-        if (Array.isArray(event.artifacts)) {
-          state.artifacts = event.artifacts;
-          renderArtifacts();
-        }
-
-        if (Array.isArray(event.memory)) {
-          state.memory = event.memory;
-          renderMemory();
-        }
-
-        finishStreamUi({
-          statusText: "Stopped",
-          statusState: "idle",
-        });
-
-        updateTopbarFromState();
-        scrollChatToBottom(true);
-      }
-    }
-
-    while (true) {
-      const result = await reader.read();
-      const done = result.done;
-      const value = result.value;
-
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      const parts = buffer.split("\n\n");
-      buffer = parts.pop() || "";
-
-      for (let part of parts) {
-        part = part.trim();
-        if (!part.startsWith("data:")) continue;
-
-        const jsonStr = part.replace(/^data:\s*/, "");
-
+      if (buffer.trim().startsWith("data:")) {
         try {
-          const evt = JSON.parse(jsonStr);
-          handleStreamEvent(evt);
+          const trailing = JSON.parse(buffer.trim().replace(/^data:\s*/, ""));
+          handleStreamEvent(trailing);
         } catch (error) {
-          warn("stream event parse failed", error);
+          warn("trailing stream event parse failed", error);
         }
       }
-    }
 
-    if (buffer.trim().startsWith("data:")) {
-      try {
-        const trailing = JSON.parse(buffer.trim().replace(/^data:\s*/, ""));
-        handleStreamEvent(trailing);
-      } catch (error) {
-        warn("trailing stream event parse failed", error);
+      if (state.stream.running) {
+        finishStreamUi({ statusState: "idle", statusText: "Ready" });
       }
-    }
+    } catch (error) {
+      state.stream.running = false;
+      state.stream.controller = null;
+      state.stream.messageId = "";
+      state.stream.placeholderId = "";
+      state.stream.buffer = "";
 
-    if (state.stream.running) {
-      finishStreamUi({ statusState: "idle", statusText: "Ready" });
+      setBusyUi(false);
+      updateTopbarFromState();
+
+      warn("send failed", error);
+      showToast("Send failed.", "error");
+      throw error;
+    } finally {
+      state.stream.controller = null;
+      if (!state.stream.running) {
+        setBusyUi(false);
+        updateTopbarFromState();
+      }
     }
   }
   
@@ -2048,6 +2083,55 @@ async function sendMessage() {
     }
   }
 
+  function wireRailTabs() {
+    if (!els.railTabs || !els.railTabs.length) return;
+
+    els.railTabs.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const tab = String(btn.getAttribute("data-rail-tab") || "artifacts");
+        setRailTab(tab);
+        openRail();
+      });
+    });
+  }
+
+  function wireMemoryClicks() {
+    if (!els.memoryList) return;
+
+    els.memoryList.addEventListener("click", function (e) {
+      const btn = e.target.closest("[data-memory-open]");
+      if (!btn) return;
+
+      const memoryId = String(btn.getAttribute("data-memory-open") || "").trim();
+      if (!memoryId) return;
+
+      const item = safeArray(state.memory).find(function (entry) {
+        return String(entry.id || "") === memoryId;
+      });
+
+      if (!item) return;
+
+      openRail();
+      setRailTab("memory");
+      setRailSelectedItem("memory", memoryId);
+
+      if (els.railViewer) {
+        els.railViewer.hidden = false;
+        els.railViewer.innerHTML =
+          '<div class="nova-viewer-shell">' +
+          '<div class="nova-viewer-card">' +
+          '<div class="nova-viewer-kicker">Memory</div>' +
+          '<div class="nova-viewer-title">' + escapeHtml(String(item.kind || "note")) + '</div>' +
+          '<div class="nova-viewer-body">' + renderSafeText(String(item.text || item.content || item.body || "")) + '</div>' +
+          '</div>' +
+          '</div>';
+      }
+
+      if (els.railTitle) els.railTitle.textContent = "Memory";
+      if (els.railSubtitle) els.railSubtitle.textContent = String(item.kind || "note");
+    });
+  }
+
   function wireSidebar() {
     const toggleButtons = document.querySelectorAll("[data-sidebar-toggle]");
 
@@ -2157,12 +2241,18 @@ async function sendMessage() {
   }
 
   function initShellExtensions() {
-    wireRailTabs();
+    if (typeof wireRailTabs === "function") {
+      wireRailTabs();
+    }
+
     wireSidebar();
     wireRailClose();
     wireWebLinks();
     wireMemoryClicks();
-    setRailTab(state.rail.tab || "artifacts");
+
+    if (typeof setRailTab === "function") {
+      setRailTab(state.rail.tab || "artifacts");
+    }
   }
 
   window.NovaComposerBundle = {
