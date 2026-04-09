@@ -16,9 +16,8 @@ from collections import defaultdict
 from flask import Flask, Response, jsonify, request, send_from_directory
 from flask_cors import CORS
 from helpers.web_utils import (
-    looks_like_url,
-    normalize_url_input,
     should_route_to_web,
+    normalize_url_input,
 )
 
 from helpers.video_utils import build_video_analysis_result
@@ -2331,9 +2330,9 @@ def chat_stream_generator(
     # 🌐 WEB AUTO ROUTE (PASS LOCK)
     # =========================================================
 
-    if _should_route_to_web(user_text):
+    if should_route_to_web(user_text):
         try:
-            url = _normalize_url_input(user_text)
+            url = normalize_url_input(user_text)
 
             if not url:
                 yield sse({
@@ -2417,9 +2416,11 @@ def chat_stream_generator(
     if has_video(attachments):
         try:
             video_result = build_video_analysis_result(
-                attachments=attachments,
-                user_text=user_text,
-            )
+    attachments=attachments,
+    user_text=user_text,
+    safe_list=safe_list,
+    normalize_text=normalize_text,
+)
 
             if not video_result.get("ok"):
                 yield sse(

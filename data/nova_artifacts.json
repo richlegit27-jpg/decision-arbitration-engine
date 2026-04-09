@@ -1,5 +1,26 @@
 [
   {
+    "id": "artifact_836ade3d75784894a2cace0f9c1b6328",
+    "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
+    "message_id": "assistant_c678436ee96f4984ba3458da3a3b007d",
+    "kind": "chat_reply",
+    "title": "Response: Hi! What do you need?",
+    "body": "Hi! What do you need?",
+    "preview": "Hi! What do you need?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-09T14:20:34.049383+00:00",
+    "updated_at": "2026-04-09T14:20:34.050368+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! What do you need?",
+      "bullets": [
+        "Hi! What do you need?"
+      ]
+    }
+  },
+  {
     "id": "artifact_2720ef06d56d4a55aa65f7de65e89a5d",
     "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
     "message_id": "assistant_80a7b02a11374d61b92c715f7b161aa7",
