@@ -1455,41 +1455,44 @@ item.viewer_kind ||
   );
 }
 
-function setRailTab(tabName) {
-  const nextTab = String(tabName || "artifacts");
-  state.rail.tab = nextTab;
 
-  openRail();
+ function setRailTab(tab) {
+  const t = String(tab || "").trim();
+  if (!t) return;
 
-  els.railTabs.forEach(function (button) {
-    const isActive = String(button.getAttribute("data-rail-tab") || "") === nextTab;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-selected", isActive ? "true" : "false");
-    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  if (!state.rail) state.rail = {};
+  state.rail.tab = t;
+
+  /* highlight tabs */
+  document.querySelectorAll("[data-rail-tab]").forEach(function (btn) {
+    const btnTab = String(btn.getAttribute("data-rail-tab") || "").trim();
+    if (btnTab === t) {
+      btn.classList.add("is-active");
+    } else {
+      btn.classList.remove("is-active");
+    }
   });
 
-  els.railPanels.forEach(function (panel) {
-    const isActive = String(panel.getAttribute("data-rail-panel") || "") === nextTab;
-    panel.hidden = !isActive;
-    panel.classList.toggle("is-active", isActive);
-  });
+  /* toggle panels */
+  const artifactsPanel = document.querySelector("[data-rail-artifacts]");
+  const memoryPanel = document.querySelector("[data-rail-memory]");
+  const webPanel = document.querySelector("[data-rail-web]");
 
-  if (els.railViewer) {
-    els.railViewer.hidden = false;
+  if (artifactsPanel) artifactsPanel.hidden = t !== "artifacts";
+  if (memoryPanel) memoryPanel.hidden = t !== "memory";
+  if (webPanel) webPanel.hidden = t !== "web";
+
+  /* render */
+  if (t === "artifacts" && typeof renderArtifacts === "function") {
+    renderArtifacts();
   }
 
-  if (els.railTitle) {
-    els.railTitle.textContent =
-      nextTab === "memory" ? "Memory" :
-      nextTab === "web" ? "Web" :
-      "Artifacts";
+  if (t === "memory" && typeof renderMemory === "function") {
+    renderMemory();
   }
 
-  if (els.railSubtitle) {
-    els.railSubtitle.textContent =
-      nextTab === "memory" ? "Saved context and notes" :
-      nextTab === "web" ? "Fetched pages and results" :
-      "Saved outputs for this workspace";
+  if (t === "web" && typeof renderWeb === "function") {
+    renderWeb();
   }
 }
 
@@ -2482,16 +2485,48 @@ boot();
 initShellExtensions();
 syncRailReopenVisibility();
 
+/* HARD LOCK: REOPEN BUTTON */
 const btn = document.getElementById("rail-reopen-btn");
-
 if (btn) {
   btn.onclick = function () {
-    document.body.classList.add("is-rail-open");
-
-    if (window.els && els.rail) {
-      els.rail.classList.add("is-open");
-    }
+    openRail();
   };
 }
+
+/* HARD LOCK: TAB BUTTONS */
+document.querySelectorAll("[data-rail-tab]").forEach(function (tabBtn) {
+  tabBtn.onclick = function (e) {
+    e.preventDefault();
+
+    const tab = String(tabBtn.getAttribute("data-rail-tab") || "").trim();
+    if (!tab) return;
+
+    openRail();
+
+    if (typeof setRailTab === "function") {
+      setRailTab(tab);
+    }
+
+    if (tab === "artifacts" && typeof renderArtifacts === "function") {
+      renderArtifacts();
+    }
+
+    if (tab === "memory" && typeof renderMemory === "function") {
+      renderMemory();
+    }
+
+    if (tab === "web" && typeof renderWeb === "function") {
+      renderWeb();
+    }
+  };
+});
+
+/* HARD LOCK: CLOSE BUTTON */
+document.querySelectorAll("[data-rail-close]").forEach(function (closeBtn) {
+  closeBtn.onclick = function (e) {
+    e.preventDefault();
+    closeRail();
+  };
+});
 
 })();
