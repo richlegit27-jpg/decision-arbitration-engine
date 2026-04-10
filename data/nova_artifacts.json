@@ -1,5 +1,89 @@
 [
   {
+    "id": "artifact_e191628954854e5f96f5b7174786ba46",
+    "session_id": "session_b429cad26e134d57bb4e5a0354b146f8",
+    "message_id": "assistant_9a6f0b8fd31e4293bd0a0c503e8e9f93",
+    "kind": "chat_reply",
+    "title": "Response: Hi! What would you like to do?",
+    "body": "Hi! What would you like to do?",
+    "preview": "Hi! What would you like to do?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-10T05:23:44.076073+00:00",
+    "updated_at": "2026-04-10T05:23:44.077689+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! What would you like to do?",
+      "bullets": [
+        "Hi! What would you like to do?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_cf9b6fc2171c4acdae11858c351cdefa",
+    "session_id": "session_b429cad26e134d57bb4e5a0354b146f8",
+    "message_id": "assistant_6a0380d069fb4e7ca09e4c9e6f4ccdd3",
+    "kind": "chat_reply",
+    "title": "Response: Hello! What do you need?",
+    "body": "Hello! What do you need?",
+    "preview": "Hello! What do you need?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-10T05:11:39.016425+00:00",
+    "updated_at": "2026-04-10T05:11:39.017505+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hello! What do you need?",
+      "bullets": [
+        "Hello! What do you need?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_de80850d1b5e4261978c4c001c319917",
+    "session_id": "session_b429cad26e134d57bb4e5a0354b146f8",
+    "message_id": "assistant_6faa0386d6d142d3ad9b708471794c0c",
+    "kind": "chat_reply",
+    "title": "Response: Hello! What would you like to do?",
+    "body": "Hello! What would you like to do?",
+    "preview": "Hello! What would you like to do?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-10T05:10:44.766122+00:00",
+    "updated_at": "2026-04-10T05:10:44.767119+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hello! What would you like to do?",
+      "bullets": [
+        "Hello! What would you like to do?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_e8ccec6ad31844aeba9c1779e223a7f7",
+    "session_id": "session_b429cad26e134d57bb4e5a0354b146f8",
+    "message_id": "assistant_3ac5d8a72da241f7a26128618d8cd709",
+    "kind": "chat_reply",
+    "title": "Response: Hi! What can I do for you?",
+    "body": "Hi! What can I do for you?",
+    "preview": "Hi! What can I do for you?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-10T05:09:30.864437+00:00",
+    "updated_at": "2026-04-10T05:13:34.472697+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! What can I do for you?",
+      "bullets": [
+        "Hi! What can I do for you?"
+      ]
+    }
+  },
+  {
     "id": "artifact_3fbc5b92533b4520bd85ece5495b9e76",
     "session_id": "session_b429cad26e134d57bb4e5a0354b146f8",
     "message_id": "assistant_01d262e1981642e98cce76dcb3d120d4",

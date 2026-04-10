@@ -243,11 +243,44 @@ function attachmentSummary(attachment) {
     },
   };
 
-  function openRail() {
-    if (!els.rail) return;
-    els.rail.classList.add("is-open");
-    document.body.classList.add("is-rail-open");
+function syncRailReopenVisibility() {
+  const el = document.querySelector("[data-rail-reopen-wrap]");
+  if (!el) return;
+
+  const open =
+    document.body.classList.contains("is-rail-open") ||
+    (els.rail && els.rail.classList.contains("is-open"));
+
+  el.hidden = open;
+}
+
+function openRail() {
+  if (!els.rail) return;
+
+  els.rail.classList.add("is-open");
+  document.body.classList.add("is-rail-open");
+
+  if (els.railPanel) {
+    els.railPanel.hidden = false;
   }
+
+  if (els.railTabs && els.railTabs.length) {
+    const activeTab =
+      state.rail && state.rail.tab ? state.rail.tab : "artifacts";
+
+    setRailTab(activeTab);
+  }
+
+  if (state.rail && state.rail.selectedType && state.rail.selectedId) {
+    setRailSelectedItem(state.rail.selectedType, state.rail.selectedId);
+  }
+
+  if (typeof renderArtifacts === "function") renderArtifacts();
+  if (typeof renderMemory === "function") renderMemory();
+  if (typeof renderWeb === "function") renderWeb();
+
+  syncRailReopenVisibility();
+}
 
   function closeRail() {
     if (!els.rail) return;
@@ -2416,6 +2449,49 @@ function initShellExtensions() {
     await consumeChatStream(payload);
   }
 
-  boot();
-  initShellExtensions();
+  async function regenerateMessage(targetAssistantId) {
+    if (state.stream.running) {
+      showToast("A generation is already running.", "info");
+      return;
+    }
+
+    const targetId = String(targetAssistantId || "").trim();
+    if (!targetId) {
+      showToast("Nothing to regenerate.", "error");
+      return;
+    }
+
+    const userMessage = currentUserMessageForRegenerate(targetId);
+    if (!userMessage) {
+      showToast("Could not find the user message for regenerate.", "error");
+      return;
+    }
+
+    removeMessageById(targetId);
+
+    const payload = getSendPayload({
+      user_text: String(userMessage.text || ""),
+      regenerate_of: targetId,
+      attachments: safeArray(userMessage.attachments),
+    });
+
+    await consumeChatStream(payload);
+  }
+
+boot();
+initShellExtensions();
+syncRailReopenVisibility();
+
+const btn = document.getElementById("rail-reopen-btn");
+
+if (btn) {
+  btn.onclick = function () {
+    document.body.classList.add("is-rail-open");
+
+    if (window.els && els.rail) {
+      els.rail.classList.add("is-open");
+    }
+  };
+}
+
 })();

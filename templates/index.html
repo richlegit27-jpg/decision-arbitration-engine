@@ -241,10 +241,17 @@
     </aside>
   </div>
 
-    <div class="nova-sidebar-backdrop" data-sidebar-backdrop hidden></div>
+  <div class="nova-sidebar-backdrop" data-sidebar-backdrop hidden></div>
 
-    <script src="/static/js/nova-composer-bundle.js?v=renderweb-fix-2026-04-08-004"></script>
-</body>
-</html>
+  <div id="rail-reopen-root">
+    <button
+      id="rail-reopen-btn"
+      type="button"
+      aria-label="Open right panel"
+      onclick="(function(){document.body.classList.add('is-rail-open');var rail=document.querySelector('.nova-rail');if(rail){rail.classList.add('is-open');}})()"
+    >☰</button>
+  </div>
+
+  <script src="/static/js/nova-composer-bundle.js?v=renderweb-fix-2026-04-08-004"></script>
 </body>
 </html>
