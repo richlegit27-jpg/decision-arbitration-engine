@@ -1,5 +1,153 @@
 [
   {
+    "id": "artifact_7c5d4789271746769fa193b6fadf5dae",
+    "session_id": "session_e59d7036f71a4b1b8005d8593dd47435",
+    "message_id": "assistant_2afa59aa8b0245788e44772ae41f7519",
+    "kind": "chat_reply",
+    "title": "Response: Hi! How can I help?",
+    "body": "Hi! How can I help?",
+    "preview": "Hi! How can I help?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-10T23:06:47.889261+00:00",
+    "updated_at": "2026-04-10T23:06:47.890877+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! How can I help?",
+      "bullets": [
+        "Hi! How can I help?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_5862d04b89c54b21bc22ce02d37ad16b",
+    "session_id": "session_e59d7036f71a4b1b8005d8593dd47435",
+    "message_id": "assistant_4d22d15786824e498b2d59d2f2573998",
+    "kind": "chat_reply",
+    "title": "Response: yo — what’s up?",
+    "body": "yo — what’s up?",
+    "preview": "yo — what’s up?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-10T22:53:00.185614+00:00",
+    "updated_at": "2026-04-10T22:53:00.187345+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "yo — what’s up?",
+      "bullets": [
+        "yo — what’s up?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_7d9a0f904ecc42f9904b05052dc0c8d6",
+    "session_id": "session_18987fccde5d4512b9c07fcf014378c2",
+    "message_id": "assistant_99fde59fff744c3aa5fb9759f4bd83cd",
+    "kind": "chat_reply",
+    "title": "Response: Hi! How can I help?",
+    "body": "Hi! How can I help?",
+    "preview": "Hi! How can I help?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-10T21:35:33.654617+00:00",
+    "updated_at": "2026-04-10T21:35:33.655712+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! How can I help?",
+      "bullets": [
+        "Hi! How can I help?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_17ae445c15dc42f980fbec9d9533045a",
+    "session_id": "session_b429cad26e134d57bb4e5a0354b146f8",
+    "message_id": "assistant_46dbaa66b3be47588887fb592c1b89e4",
+    "kind": "chat_reply",
+    "title": "Response: Hi! What do you want to make or ask?",
+    "body": "Hi! What do you want to make or ask?",
+    "preview": "Hi! What do you want to make or ask?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-10T21:27:57.189656+00:00",
+    "updated_at": "2026-04-10T21:27:57.191218+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! What do you want to make or ask?",
+      "bullets": [
+        "Hi! What do you want to make or ask?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_fadc67c712a34851a17e903270c71db5",
+    "session_id": "session_b429cad26e134d57bb4e5a0354b146f8",
+    "message_id": "assistant_3298fbc8eaee4bd48153af85488281e4",
+    "kind": "chat_reply",
+    "title": "Response: Hi! What do you want to create?",
+    "body": "Hi! What do you want to create?",
+    "preview": "Hi! What do you want to create?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-10T19:53:20.319655+00:00",
+    "updated_at": "2026-04-10T20:54:47.896908+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! What do you want to create?",
+      "bullets": [
+        "Hi! What do you want to create?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_fe3f87281b6e4a83843f75bf952f77b2",
+    "session_id": "session_b429cad26e134d57bb4e5a0354b146f8",
+    "message_id": "assistant_49d49d3d84314e4483f994cf9056d15a",
+    "kind": "chat_reply",
+    "title": "Response: Hi! What do you need?",
+    "body": "Hi! What do you need?",
+    "preview": "Hi! What do you need?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-10T19:09:22.533171+00:00",
+    "updated_at": "2026-04-10T21:00:01.178919+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! What do you need?",
+      "bullets": [
+        "Hi! What do you need?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_20182edd6d614489a68cd5864f1b75cf",
+    "session_id": "session_b429cad26e134d57bb4e5a0354b146f8",
+    "message_id": "assistant_aa75a793f70c4784a628ca7170e2405e",
+    "kind": "chat_reply",
+    "title": "Response: car, sleek modern design, cinematic lighting, realistic reflections, detailed bo",
+    "body": "car, sleek modern design, cinematic lighting, realistic reflections, detailed bodywork, dynamic angle, high-resolution, studio-quality, sharp focus, ultra-detailed## Image:\n![image](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEWCAYAAABkW7XSAAAACXBIWXMAAAsSAAALEgHS3X78AAAgAElEQVR4nO3de3BU9Z3/8fd0D9nZ3QkY8xBLO4LkApV4JFFEAjK2WxI2g8b2lM3lS2c0w6x0g1J6q6uCq4H0kqV1n1x1Qf0xQm0Q9Qk1Jm7M8g3p1QxJYwYQwQWJjY3N3v3v3+f7+e2b7vP8mV1dXf2f5+Xf2v9f1v8f7n3nPec5z3nM0AAAAAAAgJwW3wAAAAAAAABgFQkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAQGQJDAAAAAAAAEBkCQwAAAAAAABAZAkMAAAAAAAAwO8G1Y0m0m8kQwAAAABJRU5ErkJggg==)",
+    "preview": "car, sleek modern design, cinematic lighting, realistic reflections, detailed bodywork, dynamic angle, high-resolution,…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-10T07:34:27.135295+00:00",
+    "updated_at": "2026-04-10T07:34:53.510164+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "car, sleek modern design, cinematic lighting, realistic reflections, detailed bodywork, dynamic angle, high-resolution, studio-quality, sharp focus, ultra-detailed## Image:",
+      "bullets": [
+        "car, sleek modern design, cinematic lighting, realistic reflections, detailed bodywork, dynamic angle, high-resolution, studio-quality, sha…",
+        "![image](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEWCAYAAABkW7XSAAAACXBIWXMAAAsSAAALEgHS3X78AAAgAElEQVR4nO3de3BU9Z3/8fd0D9nZ3QkY…"
+      ]
+    }
+  },
+  {
     "id": "artifact_e191628954854e5f96f5b7174786ba46",
     "session_id": "session_b429cad26e134d57bb4e5a0354b146f8",
     "message_id": "assistant_9a6f0b8fd31e4293bd0a0c503e8e9f93",
@@ -73,7 +221,7 @@
     "image_url": "",
     "source_url": "",
     "created_at": "2026-04-10T05:09:30.864437+00:00",
-    "updated_at": "2026-04-10T05:13:34.472697+00:00",
+    "updated_at": "2026-04-10T07:09:38.700062+00:00",
     "meta": {
       "source": "send",
       "source_url": "",
