@@ -1578,7 +1578,7 @@ function renderArtifacts() {
 
       if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, { stream: false });
 
       const parts = buffer.split("\n\n");
       buffer = parts.pop() || "";
@@ -2178,6 +2178,28 @@ async function consumeChatJson(payload) {
       return {};
     });
 
+    if (Array.isArray(data.artifacts) && data.artifacts.length) {
+      state.artifacts = Array.isArray(state.artifacts) ? state.artifacts : [];
+
+      data.artifacts.forEach(function (artifact) {
+        if (!artifact || !artifact.id) return;
+
+        const existingIndex = state.artifacts.findIndex(function (item) {
+          return String(item.id || "") === String(artifact.id || "");
+        });
+
+        if (existingIndex >= 0) {
+          state.artifacts[existingIndex] = artifact;
+        } else {
+          state.artifacts.unshift(artifact);
+        }
+      });
+
+      if (typeof renderArtifacts === "function") {
+        renderArtifacts();
+      }
+    }
+
     if (!response.ok || data.ok === false) {
       const message = String(data.error || "Chat failed.");
       showToast(message, "error");
@@ -2296,9 +2318,8 @@ async function sendMessage() {
     showToast("Image request sent.", "success");
     return;
   }
-
-  await consumeChatStream(payload);
-  showToast("Message sent.", "success");
+    await consumeChatJson(payload);
+    showToast("Message sent.", "success");
 }
 
 async function regenerateMessage(targetAssistantId) {

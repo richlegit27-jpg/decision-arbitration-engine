@@ -8173,6 +8173,8 @@ def api_chat() -> Any:
         requested_session_id = str(data.get("session_id") or "").strip()
         user_text = normalize_text(data.get("user_text") or "")
         attachments = normalize_attachments(safe_list(data.get("attachments")))
+        regenerate_of = str(data.get("regenerate_of") or "").strip()
+        wants_stream = bool(data.get("stream"))
 
         if user_text.strip().lower().startswith("/image"):
             prompt = normalize_text(user_text)[6:].strip()
@@ -8186,6 +8188,14 @@ def api_chat() -> Any:
                         "user_text": user_text,
                     },
                 }), 200
+
+            store = load_sessions_store()
+            session = find_session(store, requested_session_id) if requested_session_id else None
+            if not session:
+                session = ensure_active_session(store)
+
+            store["active_session_id"] = session["id"]
+            save_sessions_store(store)
 
             image_result = generate_image(prompt)
 
@@ -8238,10 +8248,49 @@ def api_chat() -> Any:
                 },
             }
 
+            append_message(session, make_user_message(user_text, attachments))
+            append_message(session, assistant_message)
+            save_sessions_store(store)
+
+            artifact = {
+                "id": make_id("artifact"),
+                "kind": "image_generation",
+                "session_id": session["id"],
+                "title": f"Image: {prompt[:80]}",
+                "preview": f"Generated image for: {prompt}",
+                "created_at": now_iso(),
+                "updated_at": now_iso(),
+                "viewer": {
+                    "kind": "image_generation",
+                    "title": f"Image: {prompt[:80]}",
+                    "body": f"Generated image for: {prompt}",
+                    "image_url": image_url,
+                    "analysis_text": f"Generated image for: {prompt}",
+                    "bullets": [
+                        f"Prompt: {prompt}",
+                        "Image generated successfully.",
+                    ],
+                },
+                "meta": {
+                    "prompt": prompt,
+                    "image_url": image_url,
+                    "source": "image_generation",
+                },
+            }
+
+            try:
+                artifact_store = load_artifacts_store()
+                artifact_items = safe_list(artifact_store.get("artifacts"))
+                artifact_items.insert(0, artifact)
+                artifact_store["artifacts"] = artifact_items
+                save_artifacts_store(artifact_store)
+            except Exception:
+                pass
+
             return jsonify({
                 "ok": True,
                 "assistant_message": assistant_message,
-                "artifacts": [],
+                "artifacts": [artifact],
                 "memory": [],
                 "debug": {
                     "tool": "image",
@@ -8250,9 +8299,6 @@ def api_chat() -> Any:
                 },
             }), 200
 
-        # -------------------------
-        # SESSION RESOLVE (KEEP THIS)
-        # -------------------------
         store = load_sessions_store()
         session = find_session(store, requested_session_id) if requested_session_id else None
         if not session:
@@ -8262,11 +8308,11 @@ def api_chat() -> Any:
         save_sessions_store(store)
 
         if not regenerate_of and not user_text.strip() and not attachments:
-            return jsonify({"ok": False, "error": "user_text or attachments required"}), 400
+            return jsonify({
+                "ok": False,
+                "error": "user_text or attachments required",
+            }), 400
 
-        # -------------------------
-        # STREAM PATH (ONLY DELEGATION)
-        # -------------------------
         if wants_stream:
             return Response(
                 chat_stream_generator(
@@ -8283,17 +8329,22 @@ def api_chat() -> Any:
                 },
             )
 
-        # -------------------------
-        # NON-STREAM PATH (DELEGATE)
-        # -------------------------
-        result = chat_single_response(
-            session_id=session["id"],
-            user_text=user_text,
-            attachments=attachments,
-            regenerate_of=regenerate_of,
-        )
+result = chat_single_response(
+    session_id=session["id"],
+    user_text=user_text,
+    attachments=attachments,
+    regenerate_of=regenerate_of,
+)
 
-        return jsonify(result)
+try:
+    assistant_msg = result.get("assistant_message") or result.get("message")
+
+    if assistant_msg and isinstance(assistant_msg, dict):
+        save_artifact_from_assistant(assistant_msg, session["id"])
+except Exception:
+    pass
+
+return jsonify(result)
 
     except Exception as exc:
         return jsonify({

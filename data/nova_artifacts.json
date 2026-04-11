@@ -1,5 +1,152 @@
 [
   {
+    "id": "artifact_6ca9ae4bfebd4cbeab3b9f90a358d509",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_b17408d1deea43c1a2d7bdd3d2b4febc",
+    "kind": "chat_reply",
+    "title": "Response: Hello world!",
+    "body": "Hello world!",
+    "preview": "Hello world!",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T04:46:56.434728+00:00",
+    "updated_at": "2026-04-11T04:46:56.440343+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hello world!",
+      "bullets": [
+        "Hello world!"
+      ]
+    }
+  },
+  {
+    "id": "artifact_3c905b61b43b4a668f6550f4bda43eb2",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_ab8a66c87900411895d2d67a52691fb3",
+    "kind": "chat_reply",
+    "title": "Response: I’m doing well, thanks. How are you?",
+    "body": "I’m doing well, thanks. How are you?",
+    "preview": "I’m doing well, thanks. How are you?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T04:45:38.847188+00:00",
+    "updated_at": "2026-04-11T04:45:38.849494+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "I’m doing well, thanks. How are you?",
+      "bullets": [
+        "I’m doing well, thanks. How are you?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_41e910beb8da4711a4b4bedcd207c319",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_9c5331afe0314f1eb916845b793ef3b3",
+    "kind": "chat_reply",
+    "title": "Response: Why don’t skeletons fight each other? They don’t have the guts.",
+    "body": "Why don’t skeletons fight each other? They don’t have the guts.",
+    "preview": "Why don’t skeletons fight each other? They don’t have the guts.",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T04:18:19.848285+00:00",
+    "updated_at": "2026-04-11T04:18:19.854356+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Why don’t skeletons fight each other? They don’t have the guts.",
+      "bullets": [
+        "Why don’t skeletons fight each other? They don’t have the guts."
+      ]
+    }
+  },
+  {
+    "id": "artifact_ab9ff3bfafd64ccd830d44d66d3e1a51",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_a9242e5ad35e457cbfc7512f9a5c1eb1",
+    "kind": "chat_reply",
+    "title": "Response: Hi! What can I do for you?",
+    "body": "Hi! What can I do for you?",
+    "preview": "Hi! What can I do for you?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T04:18:02.163229+00:00",
+    "updated_at": "2026-04-11T04:45:30.626277+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! What can I do for you?",
+      "bullets": [
+        "Hi! What can I do for you?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_1b18c4df57424615a53b7ab29a99d0ae",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_bd5d8158e2d3401bb4c7845eee69649b",
+    "kind": "chat_reply",
+    "title": "Response: Hi! How can I help?",
+    "body": "Hi! How can I help?",
+    "preview": "Hi! How can I help?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T04:15:29.147367+00:00",
+    "updated_at": "2026-04-11T04:46:37.830290+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! How can I help?",
+      "bullets": [
+        "Hi! How can I help?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_213f7841820e44ca8c5cca0890057b36",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_585cc5336a9a44eb835b63dfaf60740b",
+    "kind": "chat_reply",
+    "title": "Response: Hello! What do you need?",
+    "body": "Hello! What do you need?",
+    "preview": "Hello! What do you need?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T04:11:39.773066+00:00",
+    "updated_at": "2026-04-11T04:11:39.778725+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hello! What do you need?",
+      "bullets": [
+        "Hello! What do you need?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_1e77e1c7850a442793bd8be2aecc4c10",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_592e9b15743b435cb6bda2c6cc81a3e1",
+    "kind": "chat_reply",
+    "title": "Response: Hello! How can I help?",
+    "body": "Hello! How can I help?",
+    "preview": "Hello! How can I help?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T04:11:32.143222+00:00",
+    "updated_at": "2026-04-11T04:11:32.147743+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hello! How can I help?",
+      "bullets": [
+        "Hello! How can I help?"
+      ]
+    }
+  },
+  {
     "id": "artifact_f92b8446cd904127bc2795b6d8a01db9",
     "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
     "message_id": "assistant_e6ddad787e0e4a338a1ba5477381df8e",
