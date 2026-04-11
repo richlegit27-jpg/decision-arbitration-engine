@@ -3012,3 +3012,23 @@ body.is-sidebar-open .nova-sidebar {
   line-height: 1.4;
   color: #e6eaf0;
 }
+
+.nova-message-card.is-grouped-top {
+  margin-top: 6px;
+}
+
+.nova-message-card.is-grouped-bottom {
+  margin-bottom: 6px;
+}
+
+.nova-message-card.message-card--assistant.is-grouped-top,
+.nova-message-card.message-card--user.is-grouped-top {
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+.nova-message-card.message-card--assistant.is-grouped-bottom,
+.nova-message-card.message-card--user.is-grouped-bottom {
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}

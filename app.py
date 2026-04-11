@@ -1116,78 +1116,37 @@ def _build_routed_artifact_meta(text: str, kind: str, message: dict[str, Any]) -
 
     return base
 
-def save_artifact_from_assistant(message: dict[str, Any], session_id: str) -> None:
-    if not isinstance(message, dict):
-        return
-
-    text = normalize_text(message.get("text") or "").strip()
+def save_artifact_from_assistant(message: dict, session_id: str):
+    text = normalize_text((message or {}).get("text") or "").strip()
     if not text:
         return
 
-    message_id = str(message.get("id") or "").strip()
-    if not message_id:
-        return
+    meta = dict((message or {}).get("meta") or {})
+    kind = normalize_text(meta.get("source") or "chat_reply").strip() or "chat_reply"
 
-    session_id = str(session_id or "").strip()
-    if not session_id:
-        return
-
-    artifacts = load_artifacts()
-
-    existing_index = -1
-    existing_artifact: dict[str, Any] | None = None
-
-    for idx, item in enumerate(artifacts):
-        if str(item.get("message_id") or "").strip() == message_id:
-            existing_index = idx
-            existing_artifact = item
-            break
-
-    created_at = str(message.get("created_at") or now_iso())
-    updated_at = now_iso()
-
-    detected_kind = _detect_routed_artifact_kind(message, text)
-    detected_title = _build_routed_artifact_title(message, text, detected_kind)
-    artifact_meta = _build_routed_artifact_meta(text, detected_kind, message)
-    routed_image_url = str(artifact_meta.get("image_url") or "").strip()
-    routed_source_url = str(artifact_meta.get("source_url") or "").strip()
-
-    new_artifact = {
-        "id": (
-            str(existing_artifact.get("id") or "")
-            if existing_artifact
-            else make_id("artifact")
-        ),
-	"session_id": session_id,
-        "message_id": message_id,
-        "kind": detected_kind,
-        "title": detected_title,
-        "body": text,
-        "preview": summarize_text(text, 120),
-        "image_url": routed_image_url,
-        "source_url": routed_source_url,
-        "created_at": (
-            str(existing_artifact.get("created_at") or created_at)
-            if existing_artifact
-            else created_at
-        ),
-        "updated_at": updated_at,
-        "meta": artifact_meta,
+    artifact = {
+        "id": make_id("artifact"),
+        "kind": "chat_reply" if kind == "assistant" else kind,
+        "session_id": session_id,
+        "title": text[:60] or "Reply",
+        "preview": text[:120] or "Assistant reply",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+        "viewer": {
+            "kind": "chat_reply" if kind == "assistant" else kind,
+            "title": text[:60] or "Reply",
+            "body": text,
+        },
+        "meta": {
+            "source": "assistant",
+        },
     }
 
-    if existing_index >= 0 and existing_artifact:
-        artifacts[existing_index] = _choose_better_artifact(existing_artifact, new_artifact)
-        save_artifacts(artifacts)
-        return
-
-    for idx, item in enumerate(artifacts[:ARTIFACT_DUPLICATE_WINDOW]):
-        if _artifacts_equivalent(item, new_artifact):
-            artifacts[idx] = _choose_better_artifact(item, new_artifact)
-            save_artifacts(artifacts)
-            return
-
-    artifacts.insert(0, new_artifact)
-    save_artifacts(artifacts)
+    store = load_artifacts_store()
+    items = safe_list(store.get("artifacts"))
+    items.insert(0, artifact)
+    store["artifacts"] = items
+    save_artifacts_store(store)
 
 def session_contract_payload(session: dict[str, Any]) -> dict[str, Any]:
     return {
@@ -8256,8 +8215,8 @@ def api_chat() -> Any:
                 "id": make_id("artifact"),
                 "kind": "image_generation",
                 "session_id": session["id"],
-                "title": f"Image: {prompt[:80]}",
-                "preview": f"Generated image for: {prompt}",
+                "title": (prompt[:60] or "Generated Image"),
+                "preview": (prompt[:120] or "Generated image"),
                 "created_at": now_iso(),
                 "updated_at": now_iso(),
                 "viewer": {
@@ -8329,100 +8288,28 @@ def api_chat() -> Any:
                 },
             )
 
-result = chat_single_response(
-    session_id=session["id"],
-    user_text=user_text,
-    attachments=attachments,
-    regenerate_of=regenerate_of,
-)
+        result = chat_single_response(
+            session_id=session["id"],
+            user_text=user_text,
+            attachments=attachments,
+            regenerate_of=regenerate_of,
+        )
 
-try:
-    assistant_msg = result.get("assistant_message") or result.get("message")
+        try:
+            assistant_msg = result.get("assistant_message") or result.get("message")
 
-    if assistant_msg and isinstance(assistant_msg, dict):
-        save_artifact_from_assistant(assistant_msg, session["id"])
-except Exception:
-    pass
+            if assistant_msg and isinstance(assistant_msg, dict):
+                save_artifact_from_assistant(assistant_msg, session["id"])
+        except Exception:
+            pass
 
-return jsonify(result)
+        return jsonify(result)
 
     except Exception as exc:
         return jsonify({
             "ok": False,
             "error": str(exc) or "api_chat failed",
         }), 500
-
-@app.post("/api/web/fetch")
-def api_web_fetch() -> Any:
-    data = request.get_json(silent=True) or {}
-
-    requested_session_id = str(data.get("session_id") or "").strip()
-    raw_url = clean_web_input(data.get("url") or data.get("user_text") or "")
-    url = extract_url(raw_url) or normalize_url(raw_url)
-    if not url:
-        return jsonify({
-            "ok": False,
-            "error": "A valid URL is required.",
-        }), 400
-
-    store = load_sessions_store()
-    session = find_session(store, requested_session_id) if requested_session_id else None
-    if not session:
-        session = ensure_active_session(store)
-
-    store["active_session_id"] = session["id"]
-    save_sessions_store(store)
-
-    result = fetch_web(url)
-    if not result.get("ok"):
-        return jsonify({
-            "ok": False,
-            "error": result.get("error") or "Web fetch failed.",
-            "debug": {
-                "tool": "web",
-                "url": result.get("url") or url,
-            },
-        }), 500
-
-    text = build_web_result_text(result)
-    meta = build_web_result_meta(result)
-
-    user_msg = make_user_message(url, [])
-    assistant_msg = make_assistant_message(
-        text,
-        source="web_fetch",
-        meta=meta,
-    )
-
-    append_message(session, user_msg)
-    append_message(session, assistant_msg)
-
-    try:
-        save_artifact_from_assistant(assistant_msg, session["id"])
-    except Exception:
-        pass
-
-    retrieval_debug = build_retrieval_debug(session, raw_url)
-
-    return jsonify({
-        "ok": True,
-        "session_id": session["id"],
-        "message": assistant_msg,
-        "messages": session_messages(session),
-        "artifacts": load_artifacts(),
-        "memory": load_memory(),
-        "debug": {
-            "tool": "web",
-            "url": result.get("url") or "",
-            "ssl_verified": bool(result.get("ssl_verified")),
-            "status_code": int(result.get("status_code") or 0),
-            "retrieval": retrieval_debug,
-        },
-    })
-
-@app.route("/api/uploads/<path:filename>")
-def serve_upload(filename: str):
-    return send_from_directory(str(UPLOADS_DIR), filename)
 
 # =========================================================
 # 🔒 SESSION SWITCH (BACKEND LOCK)
@@ -8463,6 +8350,18 @@ def api_sessions_switch():
             "ok": False,
             "error": str(e)
         }), 500
+
+@app.route("/api/uploads/<path:filename>", methods=["GET"])
+def api_uploads(filename: str):
+    safe_name = Path(str(filename or "")).name.strip()
+    if not safe_name:
+        return jsonify({"ok": False, "error": "Missing filename."}), 404
+
+    file_path = UPLOADS_DIR / safe_name
+    if not file_path.exists() or not file_path.is_file():
+        return jsonify({"ok": False, "error": "File not found."}), 404
+
+    return send_from_directory(str(UPLOADS_DIR), safe_name)
 
 # =========================================================
 # MAIN
