@@ -354,34 +354,58 @@
     if (sessionBtn) sessionBtn.classList.toggle("is-active", !!state.showCurrentSessionOnly);
   }
 
-  function cardHtml(item) {
-    const id = artifactId(item);
-    const active = id && id === state.activeArtifactId ? " active" : "";
-    const imageUrl = artifactImageUrl(item);
-    const previewText = artifactContent(item);
-    const sessionId = artifactSessionId(item);
+function cardHtml(item) {
+  const id = artifactId(item);
+  const active = id && id === state.activeArtifactId ? " active" : "";
+  const imageUrl = artifactImageUrl(item);
+  const previewText = artifactContent(item);
+  const sessionId = artifactSessionId(item);
+  const kind = artifactKind(item);
+  const title = artifactTitle(item);
 
-    return `
-      <button class="nova-artifact-card${active}" type="button" data-artifact-id="${esc(id)}">
+  const thumb = imageUrl && isImageUrl(imageUrl)
+    ? `
+      <div class="nova-artifact-card-thumb-wrap">
+        <img class="nova-artifact-card-thumb" src="${esc(imageUrl)}" alt="${esc(title)}"/>
+      </div>
+    `
+    : `
+      <div class="nova-artifact-card-thumb-wrap is-placeholder">
+        <div class="nova-artifact-card-thumb-fallback">${esc(kind.toUpperCase())}</div>
+      </div>
+    `;
+
+  const preview = previewText
+    ? esc(summarizeText(previewText, 140))
+    : "";
+
+  return `
+    <button class="nova-artifact-card nova-artifact-card--rich${active}" type="button" data-artifact-id="${esc(id)}">
+      
+      ${thumb}
+
+      <div class="nova-artifact-card-main">
+
         <div class="nova-artifact-card-top">
-          <span class="nova-artifact-kind">${esc(artifactKind(item))}</span>
+          <span class="nova-artifact-kind">${esc(kind)}</span>
           <div class="nova-artifact-card-top-right">
             ${artifactPinned(item) ? `<span class="nova-artifact-session-chip is-pinned">Pinned</span>` : ``}
-            <span class="nova-artifact-time" title="${esc(formatTime(item.updated_at || item.created_at || ""))}">${esc(formatTimeAgo(item.updated_at || item.created_at || ""))}</span>
+            <span class="nova-artifact-time">${esc(formatTimeAgo(item.updated_at || item.created_at || ""))}</span>
           </div>
         </div>
-        <div class="nova-artifact-card-title">${esc(artifactTitle(item))}</div>
-        ${imageUrl && isImageUrl(imageUrl)
-          ? `<div class="nova-artifact-card-preview">Image artifact ready to open.</div>`
-          : previewText
-            ? `<div class="nova-artifact-card-preview">${esc(summarizeText(previewText, 180))}</div>`
-            : ``}
+
+        <div class="nova-artifact-card-title">${esc(title)}</div>
+
+        ${preview ? `<div class="nova-artifact-card-preview">${preview}</div>` : ``}
+
         <div class="nova-artifact-card-bottom">
           <span class="nova-artifact-session-chip">${esc(sessionId || "no session")}</span>
         </div>
-      </button>
-    `;
-  }
+
+      </div>
+    </button>
+  `;
+}
 
   function viewerHtml(item) {
     if (!item) {

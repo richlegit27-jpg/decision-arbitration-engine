@@ -7,7 +7,7 @@ import re
 import time
 import uuid
 import math
-
+import base64
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -3089,6 +3089,62 @@ def build_video_analysis_result(
         "bullets": bullets,
     }
 
+def generate_image(prompt: str) -> dict[str, Any]:
+    prompt = normalize_text(prompt).strip()
+    if not prompt:
+        return {
+            "ok": False,
+            "error": "Missing image prompt.",
+        }
+
+    try:
+        from openai import OpenAI
+
+        client = OpenAI()
+
+        model = os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1")
+        size = os.getenv("NOVA_IMAGE_SIZE", "1024x1024")
+
+        result = client.images.generate(
+            model=model,
+            prompt=prompt,
+            size=size,
+        )
+
+        image_base64 = ""
+        data = getattr(result, "data", None) or []
+        if data:
+            first = data[0]
+            image_base64 = getattr(first, "b64_json", "") or ""
+
+        if not image_base64:
+            return {
+                "ok": False,
+                "error": "Image API returned no image data.",
+            }
+
+        uploads_dir = BASE_DIR / "uploads"
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+
+        filename = f"generated_{make_id('img')}.png"
+        file_path = uploads_dir / filename
+
+        import base64
+        file_path.write_bytes(base64.b64decode(image_base64))
+
+        return {
+            "ok": True,
+            "url": f"/api/uploads/{filename}",
+            "image_url": f"/api/uploads/{filename}",
+            "filename": filename,
+        }
+
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": str(e),
+        }
+
 def chat_stream_generator(
 
     *,
@@ -3105,7 +3161,6 @@ def chat_stream_generator(
 
     locked_session_id = str(session.get("id") or session_id or "")
     attachments = normalize_attachments(attachments)
-
     target_message = find_message(session, regenerate_of) if regenerate_of else None
     assistant_message_id = (target_message or {}).get("id") if target_message else make_id("assistant")
     assistant_created_at = now_iso()
@@ -3125,38 +3180,57 @@ def chat_stream_generator(
     # =========================================================
     # 🌍 CURRENT INFO AUTO ROUTE
     # =========================================================
-    if detect_tool_intent(user_text) == "current_info":
-        try:
-            current_info = answer_current_info_query(user_text)
 
-            if not current_info.get("ok"):
+    if detect_tool_intent(user_text) == "image":
+        try:
+            prompt = normalize_text(user_text)[6:].strip()
+
+            if not prompt:
                 yield sse({
                     "type": "error",
                     "ok": False,
                     "session_id": locked_session_id,
                     "message_id": assistant_message_id,
                     "assistant_message_id": assistant_message_id,
-                    "error": current_info.get("error") or "Current-info lookup failed.",
-                    "debug": {
-                        "tool": "current_info",
-                        "query": user_text,
-                    },
+                    "error": "Missing image prompt.",
+                    "debug": {"tool": "image"},
                 })
                 return
 
-            msg = make_assistant_message(
-                normalize_text(current_info.get("text") or "").strip() or "No live answer generated.",
+            # 🔥 HARD TEST (no API yet)
+            fake_url = "https://via.placeholder.com/512?text=IMAGE+WORKING"
+
+            assistant_message = make_assistant_message(
+                f"![Generated image]({fake_url})",
                 message_id=assistant_message_id,
-                source="web_fetch",
-                meta=build_current_info_meta(current_info),
+                source="image_generation",
+                pending=False,
+                streaming=False,
+                error=False,
+                stopped=False,
+                attachments=[{
+                    "id": make_id("attachment"),
+                    "filename": "generated-image.png",
+                    "mime_type": "image/png",
+                    "url": fake_url,
+                    "status": "uploaded",
+                }],
+                meta={
+                    "image_url": fake_url,
+                    "source": "image_generation",
+                    "analysis_text": f"Generated image for: {prompt}",
+                    "bullets": [f"Prompt: {prompt}"],
+                },
             )
 
-            append_message(session, msg)
+            append_message(session, assistant_message)
 
             try:
-                save_artifact_from_assistant(msg, session["id"])
+                save_artifact_from_assistant(assistant_message, session["id"])
             except Exception:
                 pass
+
+            save_sessions_store(store)
 
             yield sse({
                 "type": "final",
@@ -3164,30 +3238,26 @@ def chat_stream_generator(
                 "session_id": locked_session_id,
                 "message_id": assistant_message_id,
                 "assistant_message_id": assistant_message_id,
-                "message": msg,
+                "message": assistant_message,
                 "messages": session_messages(session),
                 "artifacts": load_artifacts(),
                 "memory": load_memory(),
                 "debug": {
-                    "tool": "current_info",
-                    "query": current_info.get("query") or user_text,
-                    "source_count": len(safe_list(current_info.get("sources"))),
+                    "tool": "image",
+                    "mode": "FAKE_TEST",
                 },
             })
             return
 
-        except Exception as exc:
+        except Exception as e:
             yield sse({
                 "type": "error",
                 "ok": False,
                 "session_id": locked_session_id,
                 "message_id": assistant_message_id,
                 "assistant_message_id": assistant_message_id,
-                "error": str(exc) or "Current-info route failed.",
-                "debug": {
-                    "tool": "current_info",
-                    "query": user_text,
-                },
+                "error": str(e),
+                "debug": {"tool": "image"},
             })
             return
 
@@ -6982,11 +7052,6 @@ def attach_ui_envelope(
 
 
 
-
-
-
-
-
 # =========================================================
 # FETCH WEB HARDENING + VIDEO PIPELINE LOCK
 # =========================================================
@@ -7723,6 +7788,106 @@ def chat_single_response(
         pass
 
     # -------------------------
+    # IMAGE TOOL
+    # -------------------------
+
+    if detect_tool_intent(user_text) == "image":
+        return {
+            "ok": False,
+            "error": "IMAGE BLOCK HIT",
+            "session_id": locked_session_id,
+            "active_session_id": locked_session_id,
+            "debug": {
+                "tool": "image",
+                "user_text": user_text,
+            },
+        }
+
+        image_result = generate_image(prompt)
+
+        if not image_result.get("ok"):
+            return {
+                "ok": False,
+                "error": image_result.get("error") or "Image generation failed.",
+                "session_id": locked_session_id,
+                "active_session_id": locked_session_id,
+                "debug": {"tool": "image", "prompt": prompt},
+            }
+
+        image_url = normalize_text(
+            image_result.get("image_url")
+            or image_result.get("url")
+            or ""
+        ).strip()
+
+        if not image_url:
+            return {
+                "ok": False,
+                "error": "Image generation returned no image URL.",
+                "session_id": locked_session_id,
+                "active_session_id": locked_session_id,
+                "debug": {
+                    "tool": "image",
+                    "prompt": prompt,
+                    "image_result": image_result,
+                },
+            }
+
+        assistant_message = make_assistant_message(
+            f"Generated image for: {prompt}",
+            message_id=assistant_message_id,
+            source="image_generation",
+            pending=False,
+            streaming=False,
+            stopped=False,
+            error=False,
+            attachments=[{
+                "id": make_id("attachment"),
+                "filename": "generated-image.png",
+                "mime_type": "image/png",
+                "url": image_url,
+                "status": "uploaded",
+            }],
+            meta={
+                "image_url": image_url,
+                "source": "image_generation",
+                "analysis_text": f"Generated image for: {prompt}",
+                "bullets": [
+                    f"Prompt: {prompt}",
+                    "Image generated successfully.",
+                ],
+            },
+        )
+
+        if target_message:
+            replace_message(session, assistant_message_id, assistant_message)
+        else:
+            append_message(session, assistant_message)
+
+        recalc_session(session)
+        save_sessions_store(store)
+
+        try:
+            save_artifact_from_assistant(assistant_message, session["id"])
+        except Exception:
+            pass
+
+        return {
+            "ok": True,
+            "assistant_message": assistant_message,
+            "session": session_contract_payload(session)["session"],
+            "session_id": session["id"],
+            "active_session_id": session["id"],
+            "artifacts": load_artifacts(),
+            "memory": load_memory(),
+            "debug": {
+                "tool": "image",
+                "prompt": prompt,
+                "image_url": image_url,
+            },
+        }
+
+    # -------------------------
     # CURRENT INFO AUTO ROUTE
     # -------------------------
     if detect_tool_intent(user_text) == "current_info":
@@ -8008,8 +8173,82 @@ def api_chat() -> Any:
         requested_session_id = str(data.get("session_id") or "").strip()
         user_text = normalize_text(data.get("user_text") or "")
         attachments = normalize_attachments(safe_list(data.get("attachments")))
-        regenerate_of = str(data.get("regenerate_of") or "").strip() or None
-        wants_stream = bool(data.get("stream", True))
+
+        if user_text.strip().lower().startswith("/image"):
+            prompt = normalize_text(user_text)[6:].strip()
+
+            if not prompt:
+                return jsonify({
+                    "ok": False,
+                    "error": "Missing image prompt.",
+                    "debug": {
+                        "tool": "image",
+                        "user_text": user_text,
+                    },
+                }), 200
+
+            image_result = generate_image(prompt)
+
+            if not image_result.get("ok"):
+                return jsonify({
+                    "ok": False,
+                    "error": image_result.get("error") or "Image generation failed.",
+                    "debug": {
+                        "tool": "image",
+                        "prompt": prompt,
+                    },
+                }), 200
+
+            image_url = normalize_text(
+                image_result.get("image_url")
+                or image_result.get("url")
+                or ""
+            ).strip()
+
+            if not image_url:
+                return jsonify({
+                    "ok": False,
+                    "error": "Image generation returned no image URL.",
+                    "debug": {
+                        "tool": "image",
+                        "prompt": prompt,
+                        "image_result": image_result,
+                    },
+                }), 200
+
+            assistant_message = {
+                "id": make_id("assistant"),
+                "role": "assistant",
+                "text": f"Generated image for: {prompt}",
+                "attachments": [{
+                    "id": make_id("attachment"),
+                    "filename": "generated-image.png",
+                    "mime_type": "image/png",
+                    "url": image_url,
+                    "status": "uploaded",
+                }],
+                "meta": {
+                    "image_url": image_url,
+                    "source": "image_generation",
+                    "analysis_text": f"Generated image for: {prompt}",
+                    "bullets": [
+                        f"Prompt: {prompt}",
+                        "Image generated successfully.",
+                    ],
+                },
+            }
+
+            return jsonify({
+                "ok": True,
+                "assistant_message": assistant_message,
+                "artifacts": [],
+                "memory": [],
+                "debug": {
+                    "tool": "image",
+                    "prompt": prompt,
+                    "image_url": image_url,
+                },
+            }), 200
 
         # -------------------------
         # SESSION RESOLVE (KEEP THIS)
@@ -8133,6 +8372,46 @@ def api_web_fetch() -> Any:
 @app.route("/api/uploads/<path:filename>")
 def serve_upload(filename: str):
     return send_from_directory(str(UPLOADS_DIR), filename)
+
+# =========================================================
+# 🔒 SESSION SWITCH (BACKEND LOCK)
+# =========================================================
+
+@app.route("/api/sessions/switch", methods=["POST"])
+def api_sessions_switch():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        session_id = str(data.get("session_id") or "").strip()
+
+        if not session_id:
+            return jsonify({
+                "ok": False,
+                "error": "Missing session_id"
+            }), 400
+
+        store = load_sessions_store()
+        session = find_session(store, session_id)
+
+        if not session:
+            return jsonify({
+                "ok": False,
+                "error": "Session not found"
+            }), 404
+
+        store["active_session_id"] = session_id
+        save_sessions_store(store)
+
+        return jsonify({
+            "ok": True,
+            "session": {"id": session_id},
+            "active_session_id": session_id
+        })
+
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "error": str(e)
+        }), 500
 
 # =========================================================
 # MAIN

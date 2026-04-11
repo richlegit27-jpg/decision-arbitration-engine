@@ -1,5 +1,494 @@
 [
   {
+    "id": "artifact_f92b8446cd904127bc2795b6d8a01db9",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_e6ddad787e0e4a338a1ba5477381df8e",
+    "kind": "chat_reply",
+    "title": "Response: A minimalist abstract test image, clean geometric shapes, neutral background, ba",
+    "body": "A minimalist abstract test image, clean geometric shapes, neutral background, balanced composition, soft lighting, modern design aesthetic",
+    "preview": "A minimalist abstract test image, clean geometric shapes, neutral background, balanced composition, soft lighting, mode…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:56:12.724108+00:00",
+    "updated_at": "2026-04-11T02:56:12.725428+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "A minimalist abstract test image, clean geometric shapes, neutral background, balanced composition, soft lighting, modern design aesthetic",
+      "bullets": [
+        "A minimalist abstract test image, clean geometric shapes, neutral background, balanced composition, soft lighting, modern design aesthetic"
+      ]
+    }
+  },
+  {
+    "id": "artifact_053fa5f4ad224e22999c30932f05169d",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_beaec869ab22407f841403df247f2a26",
+    "kind": "chat_reply",
+    "title": "Response: A futuristic cyberpunk car cruising through a neon-soaked city at night, glowing",
+    "body": "A futuristic cyberpunk car cruising through a neon-soaked city at night, glowing accents, wet streets, cinematic reflections, ultra-detailed, dramatic lighting, high-tech dystopian atmosphere",
+    "preview": "A futuristic cyberpunk car cruising through a neon-soaked city at night, glowing accents, wet streets, cinematic reflec…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:53:47.735082+00:00",
+    "updated_at": "2026-04-11T02:53:47.736409+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "A futuristic cyberpunk car cruising through a neon-soaked city at night, glowing accents, wet streets, cinematic reflections, ultra-detailed, dramatic lighting, high-tech dystopian atmosphere",
+      "bullets": [
+        "A futuristic cyberpunk car cruising through a neon-soaked city at night, glowing accents, wet streets, cinematic reflections, ultra-detaile…"
+      ]
+    }
+  },
+  {
+    "id": "artifact_15064d99a53245f0b17b9bf2bd6a5c33",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_24281c0cc6aa4ea5a7a5dca1fc2042d6",
+    "kind": "chat_reply",
+    "title": "Response: I can help with a neutral, non-stereotyped prompt. For example:",
+    "body": "I can help with a neutral, non-stereotyped prompt. For example:\n\nA realistic portrait of a Jewish person, natural lighting, everyday clothing, respectful representation, detailed facial features, candid street photography style\n\nIf you want, I can make it more specific by age, setting, style, or mood.",
+    "preview": "I can help with a neutral, non-stereotyped prompt. For example:\n\nA realistic portrait of a Jewish person, natural light…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:51:50.816380+00:00",
+    "updated_at": "2026-04-11T02:51:50.821847+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "I can help with a neutral, non-stereotyped prompt. For example:",
+      "bullets": [
+        "I can help with a neutral, non-stereotyped prompt. For example:",
+        "A realistic portrait of a Jewish person, natural lighting, everyday clothing, respectful representation, detailed facial features, candid s…",
+        "If you want, I can make it more specific by age, setting, style, or mood."
+      ]
+    }
+  },
+  {
+    "id": "artifact_966be1385bcf4c9a905d688cb3911214",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_1218f33eda5141f8a499ff2bdb76e1cb",
+    "kind": "chat_reply",
+    "title": "Response: A happy golden retriever running through a sunny park, photorealistic, soft natu",
+    "body": "A happy golden retriever running through a sunny park, photorealistic, soft natural light, detailed fur, dynamic motion, vibrant colors, joyful atmosphere",
+    "preview": "A happy golden retriever running through a sunny park, photorealistic, soft natural light, detailed fur, dynamic motion…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:49:07.815493+00:00",
+    "updated_at": "2026-04-11T02:49:07.820710+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "A happy golden retriever running through a sunny park, photorealistic, soft natural light, detailed fur, dynamic motion, vibrant colors, joyful atmosphere",
+      "bullets": [
+        "A happy golden retriever running through a sunny park, photorealistic, soft natural light, detailed fur, dynamic motion, vibrant colors, jo…"
+      ]
+    }
+  },
+  {
+    "id": "artifact_4ef115cc0c2d4756b5c35defde67b05f",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_d9ddc7dff92a447b89f6fa7a4814016e",
+    "kind": "chat_reply",
+    "title": "Response: A futuristic cyberpunk car racing through a neon-soaked megacity at night, glowi",
+    "body": "A futuristic cyberpunk car racing through a neon-soaked megacity at night, glowing accents, reflective wet streets, cinematic lighting, ultra-detailed, high contrast, dynamic perspective, sci-fi atmosphere",
+    "preview": "A futuristic cyberpunk car racing through a neon-soaked megacity at night, glowing accents, reflective wet streets, cin…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:47:04.952096+00:00",
+    "updated_at": "2026-04-11T02:47:04.953506+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "A futuristic cyberpunk car racing through a neon-soaked megacity at night, glowing accents, reflective wet streets, cinematic lighting, ultra-detailed, high contrast, dynamic perspective, sci-fi atmosphere",
+      "bullets": [
+        "A futuristic cyberpunk car racing through a neon-soaked megacity at night, glowing accents, reflective wet streets, cinematic lighting, ult…"
+      ]
+    }
+  },
+  {
+    "id": "artifact_075aa7ec7f34463ba37319f44fa98e95",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_46300c52069e49f48c3ea75a0388678b",
+    "kind": "chat_reply",
+    "title": "Response: A silver supercar drifting on a mountain road, golden hour lighting, photorealis",
+    "body": "A silver supercar drifting on a mountain road, golden hour lighting, photorealistic, dynamic motion, detailed reflections, cinematic angle, dramatic scenery",
+    "preview": "A silver supercar drifting on a mountain road, golden hour lighting, photorealistic, dynamic motion, detailed reflectio…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:40:44.405558+00:00",
+    "updated_at": "2026-04-11T02:40:44.409850+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "A silver supercar drifting on a mountain road, golden hour lighting, photorealistic, dynamic motion, detailed reflections, cinematic angle, dramatic scenery",
+      "bullets": [
+        "A silver supercar drifting on a mountain road, golden hour lighting, photorealistic, dynamic motion, detailed reflections, cinematic angle,…"
+      ]
+    }
+  },
+  {
+    "id": "artifact_3334746812f449a59830008168efd5f2",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_30a5ebd2c84f41a7aa77eb02a5e0b755",
+    "kind": "chat_reply",
+    "title": "Response: A futuristic cyberpunk car cruising through a neon-soaked city at night, glowing",
+    "body": "A futuristic cyberpunk car cruising through a neon-soaked city at night, glowing accents, wet streets reflecting pink and blue lights, cinematic composition, ultra-detailed, high contrast, atmospheric fog",
+    "preview": "A futuristic cyberpunk car cruising through a neon-soaked city at night, glowing accents, wet streets reflecting pink a…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:33:19.654440+00:00",
+    "updated_at": "2026-04-11T02:33:19.656413+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "A futuristic cyberpunk car cruising through a neon-soaked city at night, glowing accents, wet streets reflecting pink and blue lights, cinematic composition, ultra-detailed, high contrast, atmospheric fog",
+      "bullets": [
+        "A futuristic cyberpunk car cruising through a neon-soaked city at night, glowing accents, wet streets reflecting pink and blue lights, cine…"
+      ]
+    }
+  },
+  {
+    "id": "artifact_3ae1b63ed15344b0bd79714601827a72",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_0414d68652d94c8e853b07b348fba426",
+    "kind": "chat_reply",
+    "title": "Response: A futuristic cyberpunk car racing through a neon-soaked city at night, glowing a",
+    "body": "A futuristic cyberpunk car racing through a neon-soaked city at night, glowing accents, sleek angular design, wet streets reflecting pink and blue lights, cinematic composition, ultra-detailed, high contrast, dynamic motion blur",
+    "preview": "A futuristic cyberpunk car racing through a neon-soaked city at night, glowing accents, sleek angular design, wet stree…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:31:20.556570+00:00",
+    "updated_at": "2026-04-11T02:31:20.557868+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "A futuristic cyberpunk car racing through a neon-soaked city at night, glowing accents, sleek angular design, wet streets reflecting pink and blue lights, cinematic composition, ultra-detailed, high contrast, dynamic motion blur",
+      "bullets": [
+        "A futuristic cyberpunk car racing through a neon-soaked city at night, glowing accents, sleek angular design, wet streets reflecting pink a…"
+      ]
+    }
+  },
+  {
+    "id": "artifact_0edef3d1c8ff49218df6df4c0b3a5ad4",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_8729e1a44b6e4afc9d1539b8df61b46e",
+    "kind": "chat_reply",
+    "title": "Response: A luxury black sedan parked under city lights at night, photorealistic, cinemati",
+    "body": "A luxury black sedan parked under city lights at night, photorealistic, cinematic composition, glossy reflections, ultra-detailed, moody urban atmosphere",
+    "preview": "A luxury black sedan parked under city lights at night, photorealistic, cinematic composition, glossy reflections, ultr…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:31:05.502991+00:00",
+    "updated_at": "2026-04-11T02:31:05.508225+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "A luxury black sedan parked under city lights at night, photorealistic, cinematic composition, glossy reflections, ultra-detailed, moody urban atmosphere",
+      "bullets": [
+        "A luxury black sedan parked under city lights at night, photorealistic, cinematic composition, glossy reflections, ultra-detailed, moody ur…"
+      ]
+    }
+  },
+  {
+    "id": "artifact_8489b3935bf545a58184fe99e06a2006",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_35128cf39a974b7b97919ae01c275f7f",
+    "kind": "chat_reply",
+    "title": "Response: A sleek red sports car parked under neon city lights at night, photorealistic, c",
+    "body": "A sleek red sports car parked under neon city lights at night, photorealistic, cinematic composition, glossy reflections, ultra-detailed, dramatic shadows, high contrast",
+    "preview": "A sleek red sports car parked under neon city lights at night, photorealistic, cinematic composition, glossy reflection…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:26:34.384641+00:00",
+    "updated_at": "2026-04-11T02:26:34.386006+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "A sleek red sports car parked under neon city lights at night, photorealistic, cinematic composition, glossy reflections, ultra-detailed, dramatic shadows, high contrast",
+      "bullets": [
+        "A sleek red sports car parked under neon city lights at night, photorealistic, cinematic composition, glossy reflections, ultra-detailed, d…"
+      ]
+    }
+  },
+  {
+    "id": "artifact_f5a484e72756487ba2d5353249930f69",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_4652ec9d448541a39b8a119ee9057cdb",
+    "kind": "chat_reply",
+    "title": "Response: A sleek red sports car on a winding coastal highway at sunset, photorealistic, c",
+    "body": "A sleek red sports car on a winding coastal highway at sunset, photorealistic, cinematic lighting, glossy paint, dynamic angle, highly detailed, dramatic sky",
+    "preview": "A sleek red sports car on a winding coastal highway at sunset, photorealistic, cinematic lighting, glossy paint, dynami…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:25:01.244092+00:00",
+    "updated_at": "2026-04-11T02:25:01.248607+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "A sleek red sports car on a winding coastal highway at sunset, photorealistic, cinematic lighting, glossy paint, dynamic angle, highly detailed, dramatic sky",
+      "bullets": [
+        "A sleek red sports car on a winding coastal highway at sunset, photorealistic, cinematic lighting, glossy paint, dynamic angle, highly deta…"
+      ]
+    }
+  },
+  {
+    "id": "artifact_4f2279bd41764346be3f89b8a942ea91",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_03fa3d0e3eec4644b4e30bb22c85f278",
+    "kind": "chat_reply",
+    "title": "Response: A futuristic electric car speeding through a neon-lit city at night, cinematic m",
+    "body": "A futuristic electric car speeding through a neon-lit city at night, cinematic motion blur, glossy reflections, ultra-detailed, cyberpunk aesthetic, dramatic lighting",
+    "preview": "A futuristic electric car speeding through a neon-lit city at night, cinematic motion blur, glossy reflections, ultra-d…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:24:49.587579+00:00",
+    "updated_at": "2026-04-11T02:24:49.591634+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "A futuristic electric car speeding through a neon-lit city at night, cinematic motion blur, glossy reflections, ultra-detailed, cyberpunk aesthetic, dramatic lighting",
+      "bullets": [
+        "A futuristic electric car speeding through a neon-lit city at night, cinematic motion blur, glossy reflections, ultra-detailed, cyberpunk a…"
+      ]
+    }
+  },
+  {
+    "id": "artifact_42c6ac9b72904f989bd0a7dda60a5417",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_1537a008f3ed4d5b80bdeefc64ff31d9",
+    "kind": "chat_reply",
+    "title": "Response: A red sports car speeding along a coastal highway at sunset, glossy finish, dyna",
+    "body": "A red sports car speeding along a coastal highway at sunset, glossy finish, dynamic motion blur, cinematic lighting, photorealistic, ultra-detailed, dramatic sky, low-angle shot",
+    "preview": "A red sports car speeding along a coastal highway at sunset, glossy finish, dynamic motion blur, cinematic lighting, ph…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:18:19.753878+00:00",
+    "updated_at": "2026-04-11T02:18:19.755101+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "A red sports car speeding along a coastal highway at sunset, glossy finish, dynamic motion blur, cinematic lighting, photorealistic, ultra-detailed, dramatic sky, low-angle shot",
+      "bullets": [
+        "A red sports car speeding along a coastal highway at sunset, glossy finish, dynamic motion blur, cinematic lighting, photorealistic, ultra-…"
+      ]
+    }
+  },
+  {
+    "id": "artifact_0f1f92de98074eac9f8d9b004494a06b",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_d00408a288d1408dab06d8869223cd5c",
+    "kind": "chat_reply",
+    "title": "Response: A sleek modern car parked on a quiet city street at dusk, cinematic lighting, ph",
+    "body": "A sleek modern car parked on a quiet city street at dusk, cinematic lighting, photorealistic, highly detailed reflections, shallow depth of field, moody atmosphere",
+    "preview": "A sleek modern car parked on a quiet city street at dusk, cinematic lighting, photorealistic, highly detailed reflectio…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:17:02.637111+00:00",
+    "updated_at": "2026-04-11T02:17:02.641584+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "A sleek modern car parked on a quiet city street at dusk, cinematic lighting, photorealistic, highly detailed reflections, shallow depth of field, moody atmosphere",
+      "bullets": [
+        "A sleek modern car parked on a quiet city street at dusk, cinematic lighting, photorealistic, highly detailed reflections, shallow depth of…"
+      ]
+    }
+  },
+  {
+    "id": "artifact_0ab563739377457aa04d067bc128c604",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_ebe6987d258549dcac603959ba6e5658",
+    "kind": "chat_reply",
+    "title": "Response: A sad girl sitting by a rain-streaked window, soft natural lighting, melancholy ",
+    "body": "A sad girl sitting by a rain-streaked window, soft natural lighting, melancholy mood, realistic style, detailed facial expression, muted colors, cinematic composition",
+    "preview": "A sad girl sitting by a rain-streaked window, soft natural lighting, melancholy mood, realistic style, detailed facial…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:14:07.034667+00:00",
+    "updated_at": "2026-04-11T02:14:07.039221+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "A sad girl sitting by a rain-streaked window, soft natural lighting, melancholy mood, realistic style, detailed facial expression, muted colors, cinematic composition",
+      "bullets": [
+        "A sad girl sitting by a rain-streaked window, soft natural lighting, melancholy mood, realistic style, detailed facial expression, muted co…"
+      ]
+    }
+  },
+  {
+    "id": "artifact_e5f0ed731e194340bd3ef1c96f402881",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_61c4d385213e43b89281bc7ebeeaa259",
+    "kind": "chat_reply",
+    "title": "Response: Could you clarify what you want for “/image car”?",
+    "body": "Could you clarify what you want for “/image car”?\n\nExamples:\n- A prompt to generate an image of a car\n- A specific style: realistic, cartoon, cyberpunk, vintage, etc.\n- A type of car: sports car, SUV, race car, classic car\n\nIf you want, I can give you a ready-to-use prompt like:\n\n`A sleek red sports car parked on a city street at sunset, photorealistic, cinematic lighting, high detail`",
+    "preview": "Could you clarify what you want for “/image car”?\n\nExamples:\n- A prompt to generate an image of a car\n- A specific styl…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T02:06:50.637729+00:00",
+    "updated_at": "2026-04-11T02:06:50.642344+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Could you clarify what you want for “/image car”?",
+      "bullets": [
+        "Could you clarify what you want for “/image car”?",
+        "Examples:",
+        "A prompt to generate an image of a car",
+        "A specific style: realistic, cartoon, cyberpunk, vintage, etc.",
+        "A type of car: sports car, SUV, race car, classic car"
+      ]
+    }
+  },
+  {
+    "id": "artifact_f49f8550e6944961b674338af2321db3",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_7b34fab4fb5b4b3dab48cc8977d2d7fe",
+    "kind": "chat_reply",
+    "title": "Response: Nah — I’m not a killer. I’m just an AI here to help with info, ideas, writing, p",
+    "body": "Nah — I’m not a killer. I’m just an AI here to help with info, ideas, writing, problem-solving, and whatever else you need. If you meant it jokingly, I can still match the vibe.",
+    "preview": "Nah — I’m not a killer. I’m just an AI here to help with info, ideas, writing, problem-solving, and whatever else you n…",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T00:28:59.272717+00:00",
+    "updated_at": "2026-04-11T00:28:59.274419+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Nah — I’m not a killer. I’m just an AI here to help with info, ideas, writing, problem-solving, and whatever else you need. If you meant it jokingly, I can still match the vibe.",
+      "bullets": [
+        "Nah — I’m not a killer. I’m just an AI here to help with info, ideas, writing, problem-solving, and whatever else you need. If you meant it…"
+      ]
+    }
+  },
+  {
+    "id": "artifact_b9c50db3172c4b2c88ebf99fa5c026ea",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_77abc5d672824ceaaa38c281486e158e",
+    "kind": "chat_reply",
+    "title": "Response: I’m Nova, homie.",
+    "body": "I’m Nova, homie.",
+    "preview": "I’m Nova, homie.",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T00:28:20.363668+00:00",
+    "updated_at": "2026-04-11T00:28:20.365308+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "I’m Nova, homie.",
+      "bullets": [
+        "I’m Nova, homie."
+      ]
+    }
+  },
+  {
+    "id": "artifact_59ebecc3001245a7973dcdbeccc991d4",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_e4fd7d5cc17242229a4c943f9fdbdbc6",
+    "kind": "chat_reply",
+    "title": "Response: Hi! What can I help you with?",
+    "body": "Hi! What can I help you with?",
+    "preview": "Hi! What can I help you with?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T00:15:30.145347+00:00",
+    "updated_at": "2026-04-11T00:24:02.230279+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! What can I help you with?",
+      "bullets": [
+        "Hi! What can I help you with?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_9d008df0cb524025bd020fb0f8af81f9",
+    "session_id": "session_e59d7036f71a4b1b8005d8593dd47435",
+    "message_id": "assistant_0814d1533e134cc6bae5dfe81f12ad8d",
+    "kind": "chat_reply",
+    "title": "Response: Hi! What can I help you with?",
+    "body": "Hi! What can I help you with?",
+    "preview": "Hi! What can I help you with?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T00:14:15.633721+00:00",
+    "updated_at": "2026-04-11T00:14:15.635427+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! What can I help you with?",
+      "bullets": [
+        "Hi! What can I help you with?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_fd736ca85df24a089d6d537522ca6d9d",
+    "session_id": "session_e59d7036f71a4b1b8005d8593dd47435",
+    "message_id": "assistant_9c6bcd29bb2943059a8e0857f40ded18",
+    "kind": "chat_reply",
+    "title": "Response: Hi! What can I help with?",
+    "body": "Hi! What can I help with?",
+    "preview": "Hi! What can I help with?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T00:14:06.357529+00:00",
+    "updated_at": "2026-04-11T00:14:06.359157+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! What can I help with?",
+      "bullets": [
+        "Hi! What can I help with?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_bb691145e4624aaba444d2eb24549ee4",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_01d87c6327a34b6bbb08d5e163e38d26",
+    "kind": "chat_reply",
+    "title": "Response: Hi! What can I help with?",
+    "body": "Hi! What can I help with?",
+    "preview": "Hi! What can I help with?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T00:08:58.542933+00:00",
+    "updated_at": "2026-04-11T00:08:58.544487+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! What can I help with?",
+      "bullets": [
+        "Hi! What can I help with?"
+      ]
+    }
+  },
+  {
+    "id": "artifact_176de47ea6ff481b9ce31e5b648c8af8",
+    "session_id": "session_44ad967c28224e6bb9fe14985fc3aad1",
+    "message_id": "assistant_1657c1128b5b4867941378b4daa39846",
+    "kind": "chat_reply",
+    "title": "Response: Hi! How can I help?",
+    "body": "Hi! How can I help?",
+    "preview": "Hi! How can I help?",
+    "image_url": "",
+    "source_url": "",
+    "created_at": "2026-04-11T00:02:49.282342+00:00",
+    "updated_at": "2026-04-11T00:33:13.737337+00:00",
+    "meta": {
+      "source": "send",
+      "source_url": "",
+      "analysis_text": "Hi! How can I help?",
+      "bullets": [
+        "Hi! How can I help?"
+      ]
+    }
+  },
+  {
     "id": "artifact_7c5d4789271746769fa193b6fadf5dae",
     "session_id": "session_e59d7036f71a4b1b8005d8593dd47435",
     "message_id": "assistant_2afa59aa8b0245788e44772ae41f7519",
