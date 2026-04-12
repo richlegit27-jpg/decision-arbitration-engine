@@ -314,6 +314,8 @@ function attachmentSummary(attachment) {
     railViewer: qs("[data-rail-viewer]"),
     railTabs: qsa("[data-rail-tab]"),
     railPanels: qsa("[data-rail-panel]"),
+    voiceButton: qs('[data-action="voice"]'),
+    ttsToggleButton: document.querySelector('[data-action="tts-toggle"]'),
   };
 
 const state = {
@@ -324,6 +326,7 @@ const state = {
   artifacts: [],
   memory: [],
   pendingUploads: [],
+  pendingArtifactOpenId: "",
   uploadInFlightCount: 0,
   stream: {
     controller: null,
@@ -333,6 +336,21 @@ const state = {
     placeholderId: "",
     buffer: "",
   },
+
+  voice: {
+    recording: false,
+    mediaRecorder: null,
+    chunks: [],
+    stream: null,
+    busy: false,
+  },
+
+  tts: {
+    enabled: false,
+    playing: false,
+    audio: null,
+  },
+
   rail: {
     tab: "artifacts",
     selectedId: "",
@@ -652,38 +670,38 @@ async function openArtifactFromStateOrBackend(artifactId) {
     renderSessionList();
   }
 
-  function applyStatePayload(payload) {
-    const data = payload && typeof payload === "object" ? payload : {};
+function applyStatePayload(payload) {
+  const data = payload && typeof payload === "object" ? payload : {};
 
-    state.activeSessionId = String(
-      data.active_session_id ||
-        data.session_id ||
-        (data.session && data.session.id) ||
-        state.activeSessionId ||
-        ""
-    );
+  state.activeSessionId = String(
+    data.active_session_id ||
+      data.session_id ||
+      (data.session && data.session.id) ||
+      state.activeSessionId ||
+      ""
+  ).trim();
 
-    if (Array.isArray(data.sessions)) {
-      setSessions(data.sessions);
-    }
-
-if (data.session && Array.isArray(data.session.messages)) {
-  state.messages = data.session.messages.map(normalizeMessage);
-} else if (Array.isArray(data.messages)) {
-  state.messages = data.messages.map(normalizeMessage);
-} else if (data.assistant_message) {
-  upsertMessage(normalizeMessage(data.assistant_message));
-}
-
-    state.artifacts = safeArray(data.artifacts);
-    state.memory = safeArray(data.memory);
-
-    renderSessionList();
-    renderChat();
-    renderArtifacts();
-    renderMemory();
-    updateTopbarFromState();
+  if (Array.isArray(data.sessions)) {
+    setSessions(data.sessions);
   }
+
+  if (data.session && Array.isArray(data.session.messages)) {
+    state.messages = data.session.messages.map(normalizeMessage);
+  } else if (Array.isArray(data.messages)) {
+    state.messages = data.messages.map(normalizeMessage);
+  } else if (data.assistant_message) {
+    upsertMessage(normalizeMessage(data.assistant_message));
+  }
+
+  state.artifacts = safeArray(data.artifacts);
+  state.memory = safeArray(data.memory);
+
+  renderSessionList();
+  renderChat();
+  renderArtifacts();
+  renderMemory();
+  updateTopbarFromState();
+}
 
   function currentUserMessageForRegenerate(targetAssistantId) {
     const targetId = String(targetAssistantId || "");
@@ -921,59 +939,59 @@ function renderAttachmentBlock(attachment) {
     );
   }
 
-  function renderMessageCard(message) {
-    const role = String(message.role || "assistant");
-    const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
-    const attachments = safeArray(message.attachments);
+function renderMessageCard(message) {
+  const role = String(message.role || "assistant");
+  const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
+  const attachments = safeArray(message.attachments);
 
-    const attachmentsHtml = attachments.length
-      ? '<div class="message-attachments">' +
-        attachments.map(renderAttachmentBlock).join("") +
-        "</div>"
-      : "";
+  const attachmentsHtml = attachments.length
+    ? '<div class="message-attachments">' +
+      attachments.map(renderAttachmentBlock).join("") +
+      "</div>"
+    : "";
 
-    const bodyHtml = message.text
-      ? '<div class="message-card__body">' + renderSafeText(message.text) + "</div>"
-      : message.pending || message.streaming
-      ? '<div class="message-card__body"><span class="message-card__cursor">▋</span></div>'
-      : "";
+  const bodyHtml = message.text
+    ? '<div class="message-card__body">' + renderSafeText(message.text) + "</div>"
+    : message.pending || message.streaming
+    ? '<div class="message-card__body"><span class="message-card__typing"><span class="message-card__dot"></span><span class="message-card__dot"></span><span class="message-card__dot"></span></span></div>'
+    : "";
 
-    const metaBits = [];
-    if (message.pending || message.streaming) metaBits.push("Streaming");
-    if (message.error) metaBits.push("Error");
-    if (message.stopped) metaBits.push("Stopped");
-    if (message.source) metaBits.push(message.source);
+  const metaBits = [];
+  if (message.pending || message.streaming) metaBits.push("Streaming");
+  if (message.error) metaBits.push("Error");
+  if (message.stopped) metaBits.push("Stopped");
+  if (message.source) metaBits.push(message.source);
 
-    const metaHtml = metaBits.length
-      ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
-      : "";
+  const metaHtml = metaBits.length
+    ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
+    : "";
 
-    return (
-      '<article class="message-card ' +
-      roleClass +
-      '" data-message-id="' +
-      escapeHtml(message.id) +
-      '">' +
-      '<div class="message-card__header">' +
-      '<div class="message-card__role">' +
-      escapeHtml(role === "user" ? "You" : "Nova") +
-      "</div>" +
-      metaHtml +
-      "</div>" +
-      bodyHtml +
-      attachmentsHtml +
-      renderMessageActions(message) +
-      "</article>"
-    );
-  }
+  return (
+    '<article class="message-card ' +
+    roleClass +
+    '" data-message-id="' +
+    escapeHtml(message.id) +
+    '">' +
+    '<div class="message-card__header">' +
+    '<div class="message-card__role">' +
+    escapeHtml(role === "user" ? "You" : "Nova") +
+    "</div>" +
+    metaHtml +
+    "</div>" +
+    bodyHtml +
+    attachmentsHtml +
+    renderMessageActions(message) +
+    "</article>"
+  );
+}
 
-  function renderChat() {
-    if (!els.chatThread) return;
-    setChatEmptyVisible(state.messages.length === 0);
-    els.chatThread.innerHTML = state.messages.map(renderMessageCard).join("");
-    updateTopbarFromState();
-    scrollChatToBottom(true);
-  }
+function renderChat() {
+  if (!els.chatThread) return;
+  setChatEmptyVisible(state.messages.length === 0);
+  els.chatThread.innerHTML = state.messages.map(renderMessageCard).join("");
+  updateTopbarFromState();
+  scrollChatToBottom(true);
+}
 
 function renderSessionList() {
   if (!els.sessionList) return;
@@ -1016,6 +1034,19 @@ function renderSessionList() {
         ) +
         "</div>" +
         "</button>" +
+        '<div class="nova-session-card-actions">' +
+        '<button type="button" class="nova-session-card-action" data-pin-session="' +
+        escapeHtml(session.id) +
+        '">' +
+        (session.pinned ? "Unpin" : "Pin") +
+        "</button>" +
+        '<button type="button" class="nova-session-card-action" data-rename-session="' +
+        escapeHtml(session.id) +
+        '">Rename</button>' +
+        '<button type="button" class="nova-session-card-action" data-delete-session="' +
+        escapeHtml(session.id) +
+        '">Delete</button>' +
+        "</div>" +
         "</div>"
       );
     })
@@ -1025,7 +1056,7 @@ function renderSessionList() {
 function renderArtifacts() {
   if (!els.artifactList) return;
 
-  const items = safeArray(state.artifacts);
+  const activeSessionId = String(state.activeSessionId || "").trim();
   const searchQuery = String(
     (state.rail && state.rail.artifactSearch) || ""
   ).trim().toLowerCase();
@@ -1033,9 +1064,12 @@ function renderArtifacts() {
     (state.rail && state.rail.artifactFilter) || "all"
   ).trim().toLowerCase();
 
-  if (els.artifactEmpty) {
-    els.artifactEmpty.hidden = items.length > 0;
-  }
+  const allArtifacts = safeArray(state.artifacts);
+
+  const sessionArtifacts = allArtifacts.filter(function (item) {
+    if (!activeSessionId) return true;
+    return String(item && item.session_id ? item.session_id : "").trim() === activeSessionId;
+  });
 
   function getKindBadge(kind) {
     const kindLabel = String(kind || "artifact").toLowerCase();
@@ -1063,49 +1097,167 @@ function renderArtifacts() {
     return "Other";
   }
 
-  const normalized = items.map(function (item) {
-    const viewer = item && typeof item.viewer === "object" ? item.viewer : {};
-    const id = String(item.id || "");
-    const title = String(viewer.title || item.title || "Artifact");
-    const preview = String(viewer.body || item.preview || item.body || "");
-    const kind = String(viewer.kind || item.kind || "artifact");
-    const kindBadge = getKindBadge(kind);
-    const imageUrl = String(
-      viewer.image_url || item.image_url || item.url || ""
-    ).trim();
-    const createdAt = String(item.created_at || item.updated_at || "");
+  const normalized = sessionArtifacts
+    .map(function (item) {
+      const viewer = item && typeof item.viewer === "object" ? item.viewer : {};
+      const meta = item && typeof item.meta === "object" ? item.meta : {};
 
-    return {
-      raw: item,
-      id: id,
-      title: title,
-      preview: preview,
-      kind: kind,
-      kindBadge: kindBadge,
-      imageUrl: imageUrl,
-      createdAt: createdAt,
-    };
-  });
+      const id = String(item.id || "").trim();
+      const title = String(
+        viewer.title || item.title || item.name || "Artifact"
+      ).trim();
 
-  const filtered = normalized.filter(function (item) {
-    const haystack = (
-      String(item.title || "") +
-      " " +
-      String(item.preview || "") +
-      " " +
-      String(item.kind || "") +
-      " " +
-      String(item.kindBadge || "")
-    ).toLowerCase();
+      const preview = String(
+        viewer.body ||
+          item.preview ||
+          item.body ||
+          item.content ||
+          item.summary ||
+          ""
+      ).trim();
 
-    const matchesSearch = !searchQuery || haystack.includes(searchQuery);
-    const matchesFilter =
-      activeFilter === "all" || item.kindBadge === activeFilter;
+      const kind = String(
+        viewer.kind || item.kind || "artifact"
+      ).trim();
 
-    return matchesSearch && matchesFilter;
-  });
+      const kindBadge = getKindBadge(kind);
 
-  filtered.sort(function (a, b) {
+      const thumbUrl = String(
+        viewer.image_url ||
+          item.image_url ||
+          meta.image_url ||
+          ""
+      ).trim();
+
+      const createdAt = String(
+        item.updated_at || item.created_at || ""
+      ).trim();
+
+      let timeLabel = "";
+      if (createdAt) {
+        try {
+          const date = new Date(createdAt);
+          timeLabel = Number.isNaN(date.getTime())
+            ? createdAt
+            : date.toLocaleString([], {
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              });
+        } catch (error) {
+          timeLabel = createdAt;
+        }
+      }
+
+      const haystack = [
+        title,
+        preview,
+        kind,
+        kindBadge,
+        String(item.session_id || "")
+      ]
+        .join("\n")
+        .toLowerCase();
+
+      return {
+        raw: item,
+        id: id,
+        title: title,
+        preview: preview,
+        kind: kind,
+        kindBadge: kindBadge,
+        thumbUrl: thumbUrl,
+        createdAt: createdAt,
+        timeLabel: timeLabel,
+        haystack: haystack,
+      };
+    })
+    .filter(function (entry) {
+      if (!entry.id) return false;
+
+      const matchesSearch = !searchQuery || entry.haystack.indexOf(searchQuery) >= 0;
+      const matchesFilter =
+        activeFilter === "all" || entry.kindBadge === activeFilter;
+
+      return matchesSearch && matchesFilter;
+    });
+
+  const controlsHtml =
+    '<div class="rail-artifact-tools">' +
+      '<input type="text" class="rail-artifact-search" data-artifact-search placeholder="Search artifacts..." value="' +
+        escapeHtml((state.rail && state.rail.artifactSearch) || "") +
+      '">' +
+      '<div class="rail-artifact-filters">' +
+        '<button type="button" class="rail-filter-pill' +
+          (activeFilter === "all" ? " is-active" : "") +
+          '" data-artifact-filter="all">All</button>' +
+        '<button type="button" class="rail-filter-pill' +
+          (activeFilter === "image" ? " is-active" : "") +
+          '" data-artifact-filter="image">Image</button>' +
+        '<button type="button" class="rail-filter-pill' +
+          (activeFilter === "web" ? " is-active" : "") +
+          '" data-artifact-filter="web">Web</button>' +
+        '<button type="button" class="rail-filter-pill' +
+          (activeFilter === "chat" ? " is-active" : "") +
+          '" data-artifact-filter="chat">Chat</button>' +
+        '<button type="button" class="rail-filter-pill' +
+          (activeFilter === "analysis" ? " is-active" : "") +
+          '" data-artifact-filter="analysis">Analysis</button>' +
+      "</div>" +
+    "</div>";
+
+  if (!sessionArtifacts.length) {
+    els.artifactList.innerHTML =
+      controlsHtml +
+      '<div class="nova-artifact-empty">' +
+      '<div class="nova-artifact-empty-title">No artifacts for this session</div>' +
+      '<div class="nova-artifact-empty-copy">Create an image, web result, analysis, or chat artifact in this session to see it here.</div>' +
+      "</div>";
+
+    if (
+      state.rail &&
+      state.rail.selectedKind === "artifact" &&
+      els.railViewer
+    ) {
+      els.railViewer.hidden = false;
+      els.railViewer.innerHTML =
+        '<div class="nova-viewer-shell">' +
+        '<div class="nova-viewer-empty">' +
+        '<div class="nova-viewer-empty-title">No artifact selected</div>' +
+        '<div class="nova-viewer-empty-copy">This session does not have any artifacts yet.</div>' +
+        "</div>" +
+        "</div>";
+    }
+    return;
+  }
+
+  if (!normalized.length) {
+    els.artifactList.innerHTML =
+      controlsHtml +
+      '<div class="nova-artifact-empty">' +
+      '<div class="nova-artifact-empty-title">No matching artifacts</div>' +
+      '<div class="nova-artifact-empty-copy">Try a different search or filter.</div>' +
+      "</div>";
+
+    if (
+      state.rail &&
+      state.rail.selectedKind === "artifact" &&
+      els.railViewer
+    ) {
+      els.railViewer.hidden = false;
+      els.railViewer.innerHTML =
+        '<div class="nova-viewer-shell">' +
+        '<div class="nova-viewer-empty">' +
+        '<div class="nova-viewer-empty-title">Nothing matches this filter</div>' +
+        '<div class="nova-viewer-empty-copy">Change the search text or filter pills to show more artifacts.</div>' +
+        "</div>" +
+        "</div>";
+    }
+    return;
+  }
+
+  normalized.sort(function (a, b) {
     const groupDiff = getGroupOrder(a.kindBadge) - getGroupOrder(b.kindBadge);
     if (groupDiff !== 0) return groupDiff;
 
@@ -1114,151 +1266,100 @@ function renderArtifacts() {
     return bt - at;
   });
 
-  const groups = {};
-  filtered.forEach(function (item) {
-    if (!groups[item.kindBadge]) groups[item.kindBadge] = [];
-    groups[item.kindBadge].push(item);
+  const grouped = {};
+  normalized.forEach(function (entry) {
+    const key = entry.kindBadge || "artifact";
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(entry);
   });
 
-  const controlsHtml =
-    '<div class="rail-artifact-tools">' +
-    '<input type="text" class="rail-artifact-search" data-artifact-search placeholder="Search artifacts..." value="' +
-    escapeHtml((state.rail && state.rail.artifactSearch) || "") +
-    '">' +
-    '<div class="rail-artifact-filters">' +
-    '<button type="button" class="rail-filter-pill' +
-    (activeFilter === "all" ? " is-active" : "") +
-    '" data-artifact-filter="all">All</button>' +
-    '<button type="button" class="rail-filter-pill' +
-    (activeFilter === "image" ? " is-active" : "") +
-    '" data-artifact-filter="image">Image</button>' +
-    '<button type="button" class="rail-filter-pill' +
-    (activeFilter === "web" ? " is-active" : "") +
-    '" data-artifact-filter="web">Web</button>' +
-    '<button type="button" class="rail-filter-pill' +
-    (activeFilter === "chat" ? " is-active" : "") +
-    '" data-artifact-filter="chat">Chat</button>' +
-    '<button type="button" class="rail-filter-pill' +
-    (activeFilter === "analysis" ? " is-active" : "") +
-    '" data-artifact-filter="analysis">Analysis</button>' +
-    "</div>" +
-    "</div>";
-
-  if (!filtered.length) {
-    els.artifactList.innerHTML =
-      controlsHtml +
-      '<div class="nova-viewer-empty">' +
-      '<div class="nova-viewer-empty-title">No matching artifacts</div>' +
-      '<div class="nova-viewer-empty-copy">Try a different search or filter.</div>' +
-      "</div>";
-    return;
-  }
-
-  const orderedGroups = ["image", "web", "chat", "analysis", "artifact"]
-    .filter(function (key) {
-      return Array.isArray(groups[key]) && groups[key].length > 0;
+  const orderedGroups = Object.keys(grouped)
+    .sort(function (a, b) {
+      return getGroupOrder(a) - getGroupOrder(b);
     })
-    .map(function (key) {
-      const entries = groups[key];
-
-      const cards = entries
+    .map(function (groupKey) {
+      const cardsHtml = grouped[groupKey]
         .map(function (entry) {
-          const active =
-            state.rail.tab === "artifacts" &&
+          const isActive =
+            state.rail &&
             state.rail.selectedKind === "artifact" &&
-            String(state.rail.selectedId || "") === entry.id;
-
-          const showThumb =
-            entry.kindBadge === "image" &&
-            entry.imageUrl &&
-            !entry.imageUrl.endsWith("#");
+            String(state.rail.selectedId || "").trim() === entry.id;
 
           return (
-            '<button type="button" class="rail-item' +
-            (active ? " is-active" : "") +
+            '<div class="nova-artifact-card' +
+            (isActive ? " is-active" : "") +
             '" data-artifact-open="' +
             escapeHtml(entry.id) +
             '">' +
-            (showThumb
-              ? '<div class="rail-item__thumb-wrap">' +
-                '<img class="rail-item__thumb" src="' +
-                escapeHtml(entry.imageUrl) +
-                '" alt="' +
+              '<div class="nova-artifact-card-top">' +
+                '<span class="nova-artifact-card-kind">' +
+                  escapeHtml(entry.kindBadge) +
+                "</span>" +
+                (entry.timeLabel
+                  ? '<span class="nova-artifact-card-time">' +
+                    escapeHtml(entry.timeLabel) +
+                    "</span>"
+                  : "") +
+              "</div>" +
+              '<div class="nova-artifact-card-title">' +
                 escapeHtml(entry.title) +
-                '">' +
-                "</div>"
-              : "") +
-            '<div class="rail-item__title">' +
-            escapeHtml(entry.title) +
-            "</div>" +
-            '<div class="rail-item__preview">' +
-            escapeHtml(summarizeText(entry.preview, 100)) +
-            "</div>" +
-            '<div class="rail-item__meta">' +
-            '<span class="rail-badge rail-badge--' +
-            escapeHtml(entry.kindBadge) +
-            '">' +
-            escapeHtml(entry.kindBadge) +
-            "</span>" +
-            "</div>" +
-            "</button>"
+              "</div>" +
+              (entry.preview
+                ? '<div class="nova-artifact-card-preview">' +
+                  escapeHtml(entry.preview.slice(0, 200)) +
+                  "</div>"
+                : "") +
+              (entry.thumbUrl
+                ? '<img class="nova-artifact-card-thumb" src="' +
+                  escapeHtml(entry.thumbUrl) +
+                  '" alt="' +
+                  escapeHtml(entry.title) +
+                  '" loading="lazy" />'
+                : "") +
+            "</div>"
           );
         })
         .join("");
 
       return (
-        '<section class="rail-group">' +
-        '<div class="rail-group__title">' +
-        escapeHtml(getGroupTitle(key)) +
-        "</div>" +
-        '<div class="rail-group__items">' +
-        cards +
-        "</div>" +
+        '<section class="nova-artifact-group">' +
+          '<div class="nova-artifact-group-title">' +
+            escapeHtml(getGroupTitle(groupKey)) +
+          "</div>" +
+          '<div class="nova-artifact-list">' +
+            cardsHtml +
+          "</div>" +
         "</section>"
       );
     })
     .join("");
 
   els.artifactList.innerHTML = controlsHtml + orderedGroups;
-}
 
-  function renderMemory() {
-    if (!els.memoryList) return;
+  if (
+    state.rail &&
+    state.rail.selectedKind === "artifact" &&
+    state.rail.selectedId
+  ) {
+    const selectedStillVisible = normalized.some(function (entry) {
+      return entry.id === String(state.rail.selectedId || "").trim();
+    });
 
-    const items = safeArray(state.memory);
-    if (els.memoryEmpty) {
-      els.memoryEmpty.hidden = items.length > 0;
+    if (!selectedStillVisible) {
+      state.rail.selectedId = "";
+      if (els.railViewer) {
+        els.railViewer.hidden = false;
+        els.railViewer.innerHTML =
+          '<div class="nova-viewer-shell">' +
+          '<div class="nova-viewer-empty">' +
+          '<div class="nova-viewer-empty-title">Selected artifact hidden</div>' +
+          '<div class="nova-viewer-empty-copy">Your current search, filter, or session no longer includes the previously selected artifact.</div>' +
+          "</div>" +
+          "</div>";
+      }
     }
-
-    els.memoryList.innerHTML = items.length
-      ? items
-          .map(function (item) {
-            const id = String(item.id || "");
-            const text = String(item.text || item.content || item.body || "");
-            const kind = String(item.kind || "note");
-            const active =
-              state.rail.tab === "memory" &&
-              state.rail.selectedKind === "memory" &&
-              String(state.rail.selectedId || "") === id;
-
-            return (
-              '<button type="button" class="rail-item' +
-              (active ? " is-active" : "") +
-              '" data-memory-open="' +
-              escapeHtml(id) +
-              '">' +
-              '<div class="rail-item__title">' +
-              escapeHtml(kind) +
-              "</div>" +
-              '<div class="rail-item__preview">' +
-              escapeHtml(summarizeText(text, 120)) +
-              "</div>" +
-              "</button>"
-            );
-          })
-          .join("")
-      : "";
   }
+}
 
   async function apiGet(url) {
     const response = await fetch(url, {
@@ -1355,408 +1456,270 @@ function renderArtifacts() {
       reason: "Stopped before switching sessions.",
     });
   }
-    function queueTokenFlush(messageId) {
-      tokenMessageId = String(messageId || tokenMessageId || "").trim();
-      if (!tokenMessageId) return;
-      if (tokenFlushQueued) return;
 
-      tokenFlushQueued = true;
+let tokenTextBuffer = null;
+let tokenMessageId = null;
+let tokenFlushQueued = false;
 
-      requestAnimationFrame(function () {
-        tokenFlushQueued = false;
+function queueTokenFlush(messageId) {
+  return;
+}
 
-        const id = String(tokenMessageId || "").trim();
-        const chunk = tokenTextBuffer;
-        tokenTextBuffer = "";
+function flushTokensNow() {
+  return;
+}
 
-        if (!id || !chunk) return;
+function finalizeStreamMessage(payload) {
+  const data = payload && typeof payload === "object" ? payload : {};
 
-        let msg = findMessageById(id);
-
-        if (!msg) {
-          msg = upsertMessage({
-            id,
-            role: "assistant",
-            text: "",
-            pending: true,
-            streaming: true,
-            error: false,
-            stopped: false,
-            source: "send",
-            attachments: [],
-            meta: {},
-          });
-        }
-
-        upsertMessage({
-          ...msg,
-          text: String(msg.text || "") + String(chunk || ""),
-          pending: true,
-          streaming: true,
-          error: false,
-          stopped: false,
-        });
-
-	renderChat();
-	scrollChatToBottom(true);
-      });
-    }
-
-    function flushTokensNow() {
-      if (!tokenTextBuffer || !tokenMessageId) return;
-
-      let msg = findMessageById(tokenMessageId);
-
-      if (!msg) {
-        msg = upsertMessage({
-          id: tokenMessageId,
-          role: "assistant",
-          text: "",
-          pending: true,
-          streaming: true,
-          error: false,
-          stopped: false,
-          source: "send",
-          attachments: [],
-          meta: {},
-        });
-      }
-
-      upsertMessage({
-        ...msg,
-        text: String(msg.text || "") + String(tokenTextBuffer || ""),
-        pending: true,
-        streaming: true,
-        error: false,
-        stopped: false,
-      });
-
-      tokenTextBuffer = "";
-      renderChat();
-      scrollChatToBottom(true);
-    }
-
-async function loadState() {
-    const payload = await apiGet("/api/state");
-    applyStatePayload(payload);
+  if (!state.stream) {
+    state.stream = {
+      running: false,
+      controller: null,
+      targetMessageId: "",
+      buffer: "",
+      startedAt: 0,
+    };
   }
 
-async function consumeChatStreamStable(payload) {
-  if (state.stream && state.stream.running) {
-    showToast("A generation is already running.", "info");
-    return;
-  }
+  const targetId = String(
+    state.stream.targetMessageId ||
+    data.message_id ||
+    data.id ||
+    ""
+  ).trim();
 
-  const outgoing = Object.assign({}, payload || {});
-  const userText = String(outgoing.user_text || "");
-  const memoryUsed = selectRelevantMemory(userText, 3);
+  const finalText = String(
+    data.text ||
+    data.response ||
+    data.output_text ||
+    data.assistant_text ||
+    state.stream.buffer ||
+    ""
+  );
 
-  if (memoryUsed.length) {
-    const memoryContext = memoryUsed
-      .map(function (item, index) {
-        return (
-          (index + 1) +
-          ". [" +
-          String(item.kind || "note") +
-          "] " +
-          memoryText(item)
-        );
-      })
-      .join("\n");
+  const attachments = Array.isArray(data.attachments) ? data.attachments : [];
+  const meta =
+    data.meta && typeof data.meta === "object"
+      ? data.meta
+      : {};
 
-    outgoing.user_text =
-      userText +
-      "\n\n[Relevant memory context]\n" +
-      memoryContext +
-      "\n[/Relevant memory context]";
-  }
-
-  outgoing.stream = true;
-
-  state.stream = state.stream || {};
-  state.stream.running = true;
-  state.stream.messageId = "";
-  state.stream.placeholderId = "";
-  state.stream.buffer = "";
-  state.stream.controller = new AbortController();
-
-  let tokenTextBuffer = "";
-  let tokenMessageId = "";
-  let tokenFlushQueued = false;
-
-  function queueTokenFlush(messageId) {
-    tokenMessageId = String(messageId || tokenMessageId || "").trim();
-    if (!tokenMessageId) return;
-    if (tokenFlushQueued) return;
-
-    tokenFlushQueued = true;
-
-    requestAnimationFrame(function () {
-      tokenFlushQueued = false;
-
-      const id = String(tokenMessageId || "").trim();
-      const chunk = tokenTextBuffer;
-      tokenTextBuffer = "";
-
-      if (!id || !chunk) return;
-
-      let msg = findMessageById(id);
-
-      if (!msg) {
-        msg = upsertMessage({
-          id: id,
-          role: "assistant",
-          text: "",
-          pending: true,
-          streaming: true,
-          error: false,
-          stopped: false,
-          source: "send",
-          attachments: [],
-          meta: {},
-        });
-      }
-
-      upsertMessage({
-        ...msg,
-        text: String(msg.text || "") + String(chunk || ""),
-        pending: true,
-        streaming: true,
-        error: false,
-        stopped: false,
-      });
-
-      renderChat();
-      scrollChatToBottom(true);
-    });
-  }
-
-  function flushTokensNow() {
-    if (!tokenTextBuffer || !tokenMessageId) return;
-
-    let msg = findMessageById(tokenMessageId);
-
-    if (!msg) {
-      msg = upsertMessage({
-        id: tokenMessageId,
-        role: "assistant",
-        text: "",
-        pending: true,
-        streaming: true,
-        error: false,
-        stopped: false,
-        source: "send",
-        attachments: [],
-        meta: {},
-      });
-    }
-
-    upsertMessage({
-      ...msg,
-      text: String(msg.text || "") + String(tokenTextBuffer || ""),
-      pending: true,
-      streaming: true,
-      error: false,
-      stopped: false,
-    });
-
-    tokenTextBuffer = "";
-    renderChat();
-    scrollChatToBottom(true);
-  }
-
-function handleStreamEvent(event) {
-  const type = String((event && event.type) || "");
-
-  if (type === "start") {
-    const id = String(
-      event.message_id ||
-      event.assistant_message_id ||
-      makeId("assistant")
-    );
-
-    state.stream.messageId = id;
-    state.stream.placeholderId = id;
-    tokenMessageId = id;
-    tokenTextBuffer = "";
-
-    upsertMessage({
-      id: id,
+  if (targetId) {
+    upsertMessage(normalizeMessage({
+      id: targetId,
       role: "assistant",
-      text: "",
-      pending: true,
-      streaming: true,
-      error: false,
-      stopped: false,
-      source: event.mode || "send",
-      attachments: [],
-      meta: {},
-    });
-
-    renderChat();
-    scrollChatToBottom(true);
-    return;
-  }
-
-  if (type === "token") {
-    const id = String(
-      event.message_id ||
-      event.assistant_message_id ||
-      state.stream.messageId ||
-      makeId("assistant")
-    );
-
-    state.stream.messageId = id;
-    state.stream.placeholderId = id;
-    tokenMessageId = id;
-    tokenTextBuffer += String(event.token || "");
-
-    queueTokenFlush(id);
-    return;
-  }
-
-  if (type === "final") {
-    flushTokensNow();
-
-    const finalMsg = normalizeMessage(
-      event.message || {
-        id: state.stream.messageId || makeId("assistant"),
-        role: "assistant",
-        text: "",
-      }
-    );
-
-    upsertMessage({
-      ...finalMsg,
-      pending: false,
+      text: finalText,
       streaming: false,
-      stopped: false,
-      error: false,
-    });
-
-      if (Array.isArray(event.memory)) {
-        state.memory = event.memory.map(normalizeMemoryItem);
-        renderMemory();
-      }
-
-    if (Array.isArray(event.artifacts)) {
-      state.artifacts = event.artifacts;
-      renderArtifacts();
-    }
-
-    if (Array.isArray(event.memory)) {
-      state.memory = event.memory.map(normalizeMemoryItem);
-      renderMemory();
-    }
-
-    if (event.session_id) {
-      state.activeSessionId = String(event.session_id || "");
-    }
-
-    finishStreamUi({
-      statusText: "Ready",
-      statusState: "idle",
-    });
-    updateTopbarFromState();
-    scrollChatToBottom(true);
-    return;
-  }
-
-  if (type === "error") {
-    flushTokensNow();
-
-    const id = String(
-      event.message_id ||
-      event.assistant_message_id ||
-      state.stream.messageId ||
-      makeId("assistant")
-    );
-
-    const existing = findMessageById(id);
-
-    upsertMessage({
-      ...(existing || {
-        id: id,
-        role: "assistant",
-        text: "",
-        attachments: [],
-        meta: {},
-      }),
-      text: String(event.error || "Generation failed."),
       pending: false,
-      streaming: false,
-      stopped: false,
-      error: true,
-    });
-
-    renderChat();
-    finishStreamUi({
-      statusText: "Error",
-      statusState: "error",
-    });
-    updateTopbarFromState();
-    scrollChatToBottom(true);
-  }
-}
-
-  try {
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream, application/json",
-      },
-      body: JSON.stringify(outgoing),
-      signal: state.stream.controller.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error("Request failed: " + response.status);
-    }
-
-const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-
-if (contentType.includes("application/json")) {
-  const data = await response.json().catch(function () {
-    return {};
-  });
-
-  if (data.session_id) {
-    state.activeSessionId = String(data.session_id || "");
-  } else if (data.session && data.session.id) {
-    state.activeSessionId = String(data.session.id || "");
+      error: false,
+      stopped: true,
+      attachments: attachments,
+      meta: meta,
+    }));
   }
 
-  if (Array.isArray(data.sessions)) {
-    setSessions(data.sessions);
-  }
+  state.stream.running = false;
+  state.stream.controller = null;
+  state.stream.targetMessageId = "";
+  state.stream.buffer = "";
+  state.stream.startedAt = 0;
 
-if (data.session && Array.isArray(data.session.messages)) {
-  state.messages = data.session.messages.map(normalizeMessage);
-} else if (Array.isArray(data.messages)) {
-  state.messages = data.messages.map(normalizeMessage);
-} else if (data.assistant_message) {
-  upsertMessage(normalizeMessage(data.assistant_message));
-}
+  if (data.session && Array.isArray(data.session.messages)) {
+    state.messages = data.session.messages.map(normalizeMessage);
+  } else if (Array.isArray(data.messages)) {
+    state.messages = data.messages.map(normalizeMessage);
+  }
 
   if (Array.isArray(data.artifacts)) {
     state.artifacts = data.artifacts;
-    renderArtifacts();
   }
 
   if (Array.isArray(data.memory)) {
     state.memory = data.memory;
-    renderMemory();
   }
 
-  renderSessionList();
   renderChat();
+  renderArtifacts();
+  renderMemory();
   updateTopbarFromState();
-  scrollChatToBottom(true);
-  finishStreamUi({ statusState: "idle", statusText: "Ready" });
-  return;
+  scrollChatToBottom();
 }
+
+function handleStreamEvent(event) {
+  const payload = event && typeof event === "object" ? event : {};
+
+  const type = String(
+    payload.type ||
+    payload.event ||
+    payload.kind ||
+    ""
+  ).trim().toLowerCase();
+
+  if (!state.stream) {
+    state.stream = {
+      running: false,
+      controller: null,
+      targetMessageId: "",
+      buffer: "",
+      startedAt: 0,
+      messageId: "",
+      placeholderId: "",
+    };
+  }
+
+  if (!state.stream.targetMessageId) {
+    const messageId = String(
+      payload.message_id ||
+      payload.id ||
+      ("assistant_" + Date.now())
+    ).trim();
+
+    state.stream.targetMessageId = messageId;
+    state.stream.messageId = messageId;
+    state.stream.placeholderId = messageId;
+
+    upsertMessage(normalizeMessage({
+      id: messageId,
+      role: "assistant",
+      text: "",
+      streaming: true,
+      pending: false,
+      error: false,
+      stopped: false,
+      attachments: [],
+      meta: {},
+    }));
+
+    renderChat();
+    scrollChatToBottom(true);
+  }
+
+  const targetId = String(state.stream.targetMessageId || "").trim();
+  if (!targetId) return;
+
+  const delta =
+    typeof payload.delta === "string" ? payload.delta :
+    typeof payload.token === "string" ? payload.token :
+    typeof payload.text_delta === "string" ? payload.text_delta :
+    typeof payload.chunk === "string" ? payload.chunk :
+    "";
+
+  if (delta) {
+    state.stream.buffer = String(state.stream.buffer || "") + delta;
+
+    upsertMessage(normalizeMessage({
+      id: targetId,
+      role: "assistant",
+      text: state.stream.buffer,
+      streaming: true,
+      pending: false,
+      error: false,
+      stopped: false,
+      attachments: [],
+      meta: {},
+    }));
+
+    renderChat();
+    scrollChatToBottom(true);
+    return;
+  }
+
+  if (
+    type === "final" ||
+    type === "done" ||
+    type === "complete" ||
+    payload.done === true ||
+    payload.final === true
+  ) {
+    finalizeStreamMessage(payload);
+    return;
+  }
+
+  if (payload.error) {
+    upsertMessage(normalizeMessage({
+      id: targetId,
+      role: "assistant",
+      text: String(payload.error || "Stream failed."),
+      streaming: false,
+      pending: false,
+      error: true,
+      stopped: true,
+      attachments: [],
+      meta: {},
+    }));
+
+    state.stream.running = false;
+    state.stream.controller = null;
+    state.stream.targetMessageId = "";
+    state.stream.buffer = "";
+    state.stream.startedAt = 0;
+    state.stream.messageId = "";
+    state.stream.placeholderId = "";
+
+    renderChat();
+    scrollChatToBottom(true);
+  }
+}
+
+async function consumeChatStreamStable(payload) {
+try {
+  const response = await fetch("/api/chat", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream, application/json",
+    },
+    body: JSON.stringify(outgoing),
+    signal: state.stream.controller.signal,
+  });
+
+  if (!response.ok) {
+    throw new Error("Request failed: " + response.status);
+  }
+
+  const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+
+  if (contentType.includes("application/json")) {
+    const data = await response.json().catch(function () {
+      return {};
+    });
+
+    if (data.session_id) {
+      state.activeSessionId = String(data.session_id || "");
+    } else if (data.session && data.session.id) {
+      state.activeSessionId = String(data.session.id || "");
+    }
+
+    if (Array.isArray(data.sessions)) {
+      setSessions(data.sessions);
+    }
+
+    if (data.session && Array.isArray(data.session.messages)) {
+      state.messages = data.session.messages.map(normalizeMessage);
+    } else if (Array.isArray(data.messages)) {
+      state.messages = data.messages.map(normalizeMessage);
+    } else if (data.assistant_message) {
+      upsertMessage(normalizeMessage(data.assistant_message));
+    }
+
+    if (Array.isArray(data.artifacts)) {
+      state.artifacts = data.artifacts;
+      renderArtifacts();
+    }
+
+    if (Array.isArray(data.memory)) {
+      state.memory = data.memory;
+      renderMemory();
+    }
+
+    renderSessionList();
+    renderChat();
+    updateTopbarFromState();
+    scrollChatToBottom(true);
+    finishStreamUi({ statusState: "idle", statusText: "Ready" });
+    return;
+  }
 
     if (!response.body || typeof response.body.getReader !== "function") {
       throw new Error("Streaming response body is unavailable.");
@@ -1878,35 +1841,51 @@ if (!findMessageById(state.stream.messageId || "")) {
 }
 
 async function openSessionFromBackend(sessionId) {
-  const id = String(sessionId || "").trim();
-  if (!id) return;
+  const targetSessionId = String(sessionId || "").trim();
+  if (!targetSessionId) return false;
 
-  await stopStreamBeforeSessionChange();
+  try {
+    const response = await fetch("/api/sessions/switch", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        session_id: targetSessionId,
+      }),
+    });
 
-  const session = safeArray(state.sessions).find(function (item) {
-    return String(item.id || "") === id;
-  });
+    const payload = await response.json().catch(function () {
+      return {};
+    });
 
-  if (!session) {
-    showToast("Session not found.", "error");
-    return;
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error || "Session switch failed");
+    }
+
+    applyStatePayload(payload);
+
+    state.activeSessionId = String(
+      payload.active_session_id ||
+      payload.session_id ||
+      (payload.session && payload.session.id) ||
+      targetSessionId
+    ).trim();
+
+    renderSessionList();
+    renderChat();
+    renderArtifacts();
+    renderMemory();
+    updateTopbarFromState();
+
+    return true;
+  } catch (error) {
+    warn("openSessionFromBackend failed", error);
+    showToast("Session open failed", "error");
+    return false;
   }
-
-  state.activeSessionId = id;
-  state.messages = safeArray(session.messages).map(normalizeMessage);
-
-  clearPendingUploads();
-
-  if (els.chatInput) {
-    els.chatInput.value = "";
-    autoResizeTextarea();
-  }
-
-  renderSessionList();
-  renderChat();
-  renderArtifacts();
-  renderMemory();
-  updateTopbarFromState();
 }
 
 async function openSession(sessionId) {
@@ -1914,153 +1893,245 @@ async function openSession(sessionId) {
 }
 
 function artifactViewerHtml(artifact) {
-  const item = artifact && typeof artifact === "object" ? artifact : {};
-  const viewer = item.viewer && typeof item.viewer === "object" ? item.viewer : {};
+  if (!artifact || typeof artifact !== "object") {
+    return (
+      '<div class="nova-viewer-shell">' +
+      '<div class="nova-viewer-empty">' +
+      '<div class="nova-viewer-empty-title">No artifact selected</div>' +
+      '<div class="nova-viewer-empty-copy">Pick an artifact from the right panel to inspect it here.</div>' +
+      "</div>" +
+      "</div>"
+    );
+  }
+
+  const viewer =
+    artifact && typeof artifact.viewer === "object" && artifact.viewer
+      ? artifact.viewer
+      : {};
+
+  const meta =
+    artifact && typeof artifact.meta === "object" && artifact.meta
+      ? artifact.meta
+      : {};
+
+  const kind = String(viewer.kind || artifact.kind || "artifact").trim();
 
   const title = String(
-    viewer.title ||
-      item.title ||
-      item.name ||
-      "Artifact"
-  );
-
-  const kind = String(
-    viewer.kind ||
-      item.kind ||      
-item.viewer_kind ||
-      "artifact"
-  );
+    viewer.title || artifact.title || artifact.name || "Untitled artifact"
+  ).trim();
 
   const body = String(
     viewer.body ||
-      item.body ||
-      item.content ||
-      item.summary ||
-      item.preview ||
+      artifact.body ||
+      artifact.content ||
+      artifact.summary ||
+      artifact.preview ||
       ""
-  );
+  ).trim();
 
-  const imageUrl = String(
-    viewer.image_url ||
-      item.image_url ||
-      item.url ||
-      ""
-  );
-
-  const videoUrl = String(
-    viewer.video_url ||
-      item.video_url ||
-      ""
-  );
-
-  const audioUrl = String(
-    viewer.audio_url ||
-      item.audio_url ||
-      ""
-  );
+  const preview = String(artifact.preview || "").trim();
 
   const sourceUrl = String(
     viewer.source_url ||
-      item.source_url ||
+      artifact.source_url ||
+      meta.source_url ||
+      meta.url ||
       ""
-  );
+  ).trim();
+
+  const imageUrl = String(
+    viewer.image_url ||
+      artifact.image_url ||
+      meta.image_url ||
+      ""
+  ).trim();
+
+  const videoUrl = String(
+    viewer.video_url ||
+      artifact.video_url ||
+      meta.video_url ||
+      ""
+  ).trim();
+
+  const audioUrl = String(
+    viewer.audio_url ||
+      artifact.audio_url ||
+      meta.audio_url ||
+      ""
+  ).trim();
 
   const analysisText = String(
     viewer.analysis_text ||
-      item.analysis_text ||
+      artifact.analysis_text ||
+      meta.analysis_text ||
       ""
-  );
+  ).trim();
 
-  const bullets = Array.isArray(viewer.bullets) ? viewer.bullets : [];
+  const bullets = Array.isArray(viewer.bullets)
+    ? viewer.bullets
+    : Array.isArray(meta.bullets)
+    ? meta.bullets
+    : [];
 
-  const imageBlock = imageUrl
-    ? '<div class="rail-viewer__media">' +
-      '<img src="' +
+  const cleanBullets = bullets
+    .map(function (item) {
+      return String(item || "").trim();
+    })
+    .filter(Boolean);
+
+  const prettyKind = kind
+    .replace(/[_\-]+/g, " ")
+    .replace(/\b\w/g, function (m) {
+      return m.toUpperCase();
+    });
+
+  const subtitle = String(
+    artifact.session_id ? prettyKind + " • session artifact" : prettyKind
+  ).trim();
+
+  const sourceBadge = sourceUrl
+    ? '<a class="nova-artifact-viewer-source-badge" href="' +
+      escapeHtml(sourceUrl) +
+      '" target="_blank" rel="noreferrer noopener">Source</a>'
+    : "";
+
+  const whenText = String(
+    artifact.updated_at || artifact.created_at || ""
+  ).trim();
+
+  let whenLabel = "";
+  if (whenText) {
+    try {
+      const d = new Date(whenText);
+      whenLabel = Number.isNaN(d.getTime())
+        ? whenText
+        : d.toLocaleString([], {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          });
+    } catch (error) {
+      whenLabel = whenText;
+    }
+  }
+
+  let html = "";
+
+  html += '<article class="nova-artifact-viewer-shell">';
+
+  html += '<header class="nova-artifact-viewer-header">';
+
+  html += '<div class="nova-artifact-viewer-meta">';
+  html +=
+    '<span class="nova-artifact-viewer-kind">' +
+    escapeHtml(prettyKind) +
+    "</span>";
+  if (whenLabel) {
+    html +=
+      '<span class="nova-artifact-viewer-date">' +
+      escapeHtml(whenLabel) +
+      "</span>";
+  }
+  html += sourceBadge;
+  html += "</div>";
+
+  html += '<div class="nova-artifact-viewer-title-wrap">';
+  html +=
+    '<h3 class="nova-artifact-viewer-title">' +
+    escapeHtml(title) +
+    "</h3>";
+  html +=
+    '<div class="nova-artifact-viewer-subtitle">' +
+    escapeHtml(subtitle) +
+    "</div>";
+  html += "</div>";
+
+  if (sourceUrl) {
+    html += '<div class="nova-artifact-viewer-actions">';
+    html +=
+      '<a class="nova-artifact-viewer-link" href="' +
+      escapeHtml(sourceUrl) +
+      '" target="_blank" rel="noreferrer noopener">Open source</a>';
+    html += "</div>";
+  }
+
+  html += "</header>";
+
+  if (imageUrl) {
+    html += '<div class="nova-artifact-viewer-media">';
+    html +=
+      '<img class="nova-artifact-viewer-image" src="' +
       escapeHtml(imageUrl) +
       '" alt="' +
       escapeHtml(title) +
-      '" class="rail-viewer__image">' +
-      "</div>"
-    : "";
+      '" loading="lazy" />';
+    html += "</div>";
+  }
 
-  const videoBlock = videoUrl
-    ? '<div class="rail-viewer__media">' +
-      '<video controls preload="metadata" class="rail-viewer__video">' +
-      '<source src="' +
+  if (videoUrl) {
+    html += '<div class="nova-artifact-viewer-media">';
+    html +=
+      '<video class="nova-artifact-viewer-video" controls preload="metadata" src="' +
       escapeHtml(videoUrl) +
-      '">' +
-      "</video>" +
-      "</div>"
-    : "";
+      '"></video>';
+    html += "</div>";
+  }
 
-  const audioBlock = audioUrl
-    ? '<div class="rail-viewer__media">' +
-      '<audio controls class="rail-viewer__audio">' +
-      '<source src="' +
+  if (audioUrl) {
+    html += '<div class="nova-artifact-viewer-media">';
+    html +=
+      '<audio class="nova-artifact-viewer-audio" controls preload="metadata" src="' +
       escapeHtml(audioUrl) +
-      '">' +
-      "</audio>" +
-      "</div>"
-    : "";
+      '"></audio>';
+    html += "</div>";
+  }
 
-  const sourceBlock = sourceUrl
-    ? '<div class="rail-viewer__links">' +
-      '<a href="' +
-      escapeHtml(sourceUrl) +
-      '" target="_blank" rel="noopener noreferrer" class="rail-viewer__link">Open source</a>' +
-      "</div>"
-    : "";
+  if (analysisText) {
+    html += '<section class="nova-artifact-viewer-section">';
+    html +=
+      '<div class="nova-artifact-viewer-section-title">Analysis</div>';
+    html += '<div class="nova-artifact-viewer-copy">';
+    html += escapeHtml(analysisText).replace(/\n/g, "<br>");
+    html += "</div>";
+    html += "</section>";
+  }
 
-  const analysisBlock = analysisText
-    ? '<div class="rail-viewer__section">' +
-      '<div class="rail-viewer__label">Analysis</div>' +
-      '<div class="rail-viewer__body">' +
-      renderSafeText(analysisText) +
-      "</div>" +
-      "</div>"
-    : "";
+  if (cleanBullets.length) {
+    html += '<section class="nova-artifact-viewer-section">';
+    html +=
+      '<div class="nova-artifact-viewer-section-title">Highlights</div>';
+    html += '<ul class="nova-artifact-viewer-bullets">';
+    html += cleanBullets
+      .map(function (item) {
+        return "<li>" + escapeHtml(item) + "</li>";
+      })
+      .join("");
+    html += "</ul>";
+    html += "</section>";
+  }
 
-  const bulletsBlock = bullets.length
-    ? '<div class="rail-viewer__section">' +
-      '<div class="rail-viewer__label">Highlights</div>' +
-      '<ul class="rail-viewer__bullets">' +
-      bullets
-        .map(function (bullet) {
-          return "<li>" + escapeHtml(String(bullet || "")) + "</li>";
-        })
-        .join("") +
-      "</ul>" +
-      "</div>"
-    : "";
+  if (body) {
+    html += '<section class="nova-artifact-viewer-section">';
+    html +=
+      '<div class="nova-artifact-viewer-section-title">Details</div>';
+    html += '<div class="nova-artifact-viewer-copy">';
+    html += escapeHtml(body).replace(/\n/g, "<br>");
+    html += "</div>";
+    html += "</section>";
+  }
 
-  const bodyBlock = body
-    ? '<div class="rail-viewer__section">' +
-      '<div class="rail-viewer__label">Content</div>' +
-      '<div class="rail-viewer__body">' +
-      renderSafeText(body) +
-      "</div>" +
-      "</div>"
-    : "";
+  if (preview && preview !== body) {
+    html += '<div class="nova-artifact-viewer-preview">';
+    html += escapeHtml(preview).replace(/\n/g, "<br>");
+    html += "</div>";
+  }
 
-  return (
-    '<div class="rail-viewer__card">' +
-    '<div class="rail-viewer__eyebrow">' +
-    escapeHtml(kind) +
-    "</div>" +
-    '<div class="rail-viewer__title">' +
-    escapeHtml(title) +
-    "</div>" +
-    imageBlock +
-    videoBlock +
-    audioBlock +
-    sourceBlock +
-    analysisBlock +
-    bulletsBlock +
-    bodyBlock +
-    "</div>"
-  );
+  html += "</article>";
+
+  return html;
 }
-
 
  function setRailTab(tab) {
   const t = String(tab || "").trim();
@@ -2102,21 +2173,50 @@ item.viewer_kind ||
   }
 }
 
-function setRailSelectedItem(kind, itemId) {
-  state.rail.selectedKind = String(kind || "");
-  state.rail.selectedId = String(itemId || "");
+function cssEscape(value) {
+  const text = String(value || "");
+  if (window.CSS && typeof window.CSS.escape === "function") {
+    return window.CSS.escape(text);
+  }
+  return text.replace(/"/g, '\\"');
+}
 
-  qsa(".rail-item", els.rail).forEach(function (node) {
-    const artifactId = String(node.getAttribute("data-artifact-open") || "");
-    const webId = String(node.getAttribute("data-web-open") || "");
-    const memoryId = String(node.getAttribute("data-memory-open") || "");
-    const isActive =
-      (kind === "artifact" && artifactId && artifactId === state.rail.selectedId) ||
-      (kind === "web" && webId && webId === state.rail.selectedId) ||
-      (kind === "memory" && memoryId && memoryId === state.rail.selectedId);
+function setRailSelectedItem(kind, id) {
+  if (!state.rail) state.rail = {};
+  state.rail.selectedKind = String(kind || "").trim();
+  state.rail.selectedId = String(id || "").trim();
 
-    node.classList.toggle("is-active", isActive);
-  });
+  document
+    .querySelectorAll("[data-artifact-id], [data-memory-id], [data-web-id]")
+    .forEach(function (node) {
+      node.classList.remove("is-active");
+    });
+
+  let selector = "";
+  if (state.rail.selectedKind === "artifact") {
+    selector = '[data-artifact-id="' + cssEscape(state.rail.selectedId) + '"]';
+  } else if (state.rail.selectedKind === "memory") {
+    selector = '[data-memory-id="' + cssEscape(state.rail.selectedId) + '"]';
+  } else if (state.rail.selectedKind === "web") {
+    selector = '[data-web-id="' + cssEscape(state.rail.selectedId) + '"]';
+  }
+
+  if (!selector) return;
+
+  const target = document.querySelector(selector);
+  if (!target) return;
+
+  target.classList.add("is-active");
+
+  try {
+    target.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+  } catch (error) {
+    target.scrollIntoView();
+  }
 }
 
 function findNewestImageArtifact(items) {
@@ -2150,8 +2250,10 @@ async function openArtifactFromStateOrBackend(artifactId) {
   }
 
   if (!artifact) {
-    state.rail.selectedId = "";
-    state.rail.selectedKind = "";
+    if (state.rail) {
+      state.rail.selectedId = "";
+      state.rail.selectedKind = "";
+    }
 
     openRail();
     setRailTab("artifacts");
@@ -2162,12 +2264,64 @@ async function openArtifactFromStateOrBackend(artifactId) {
         '<div class="nova-viewer-shell">' +
         '<div class="nova-viewer-empty">' +
         '<div class="nova-viewer-empty-title">Artifact not found</div>' +
-        '<div class="nova-viewer-empty-copy">This artifact is not available in the current state.</div>' +
+        '<div class="nova-viewer-empty-copy">This artifact is no longer available in the current state.</div>' +
         "</div>" +
         "</div>";
     }
 
+    if (els.railTitle) {
+      els.railTitle.textContent = "Artifacts";
+    }
+
+    if (els.railSubtitle) {
+      els.railSubtitle.textContent = "Unavailable item";
+    }
+
     showToast("Artifact not found.", "error");
+    return;
+  }
+
+  const artifactSessionId = String(
+    artifact.session_id ||
+      (artifact.viewer && artifact.viewer.session_id) ||
+      ""
+  ).trim();
+
+  const currentSessionId = String(state.activeSessionId || "").trim();
+
+  if (artifactSessionId && artifactSessionId !== currentSessionId) {
+    try {
+      state.pendingArtifactOpenId = id;
+      await openSessionFromBackend(artifactSessionId);
+
+      artifact =
+        typeof findArtifactById === "function" ? findArtifactById(id) : null;
+
+      if (!artifact) {
+        const payload = await apiGet("/api/state");
+        applyStatePayload(payload);
+        artifact =
+          typeof findArtifactById === "function" ? findArtifactById(id) : null;
+      }
+    } catch (error) {
+      warn("artifact session open failed", error);
+      showToast("Session switch failed.", "error");
+      return;
+    }
+  }
+
+  if (!artifact) {
+    if (els.railViewer) {
+      els.railViewer.hidden = false;
+      els.railViewer.innerHTML =
+        '<div class="nova-viewer-shell">' +
+        '<div class="nova-viewer-empty">' +
+        '<div class="nova-viewer-empty-title">Artifact unavailable</div>' +
+        '<div class="nova-viewer-empty-copy">The session switched, but this artifact could not be reopened.</div>' +
+        "</div>" +
+        "</div>";
+    }
+    showToast("Artifact could not be reopened after session switch.", "error");
     return;
   }
 
@@ -2186,7 +2340,9 @@ async function openArtifactFromStateOrBackend(artifactId) {
 
   if (els.railSubtitle) {
     const viewer =
-      artifact.viewer && typeof artifact.viewer === "object" ? artifact.viewer : {};
+      artifact.viewer && typeof artifact.viewer === "object"
+        ? artifact.viewer
+        : {};
     els.railSubtitle.textContent = String(
       viewer.title || artifact.title || artifact.name || "Artifact"
     );
@@ -2469,34 +2625,12 @@ async function consumeChatJson(payload) {
   }
 }
 
+
 async function sendMessage() {
-  const text = els.chatInput ? normalizeText(els.chatInput.value) : "";
-  const attachments = state.pendingUploads
-    .filter(function (item) {
-      return String(item.status || "") === "uploaded";
-    })
-    .map(normalizeAttachment);
+  const text = String((els.chatInput && els.chatInput.value) || "").trim();
+  const attachments = state.pendingUploads.slice();
 
-  const hasUploading = state.pendingUploads.some(function (item) {
-    return String(item.status || "") === "uploading";
-  });
-
-  const hasUploadErrors = state.pendingUploads.some(function (item) {
-    return String(item.status || "") === "error";
-  });
-
-  if (hasUploading) {
-    showToast("Uploads are still in progress.", "info");
-    throw new Error("Please wait for uploads to finish.");
-  }
-
-  if (hasUploadErrors) {
-    showToast("Remove failed uploads before sending.", "error");
-    throw new Error("Remove failed uploads before sending.");
-  }
-
-  if (!text.trim() && !attachments.length) {
-    showToast("Nothing to send yet.", "info");
+  if (!text && !attachments.length) {
     return;
   }
 
@@ -2531,8 +2665,45 @@ async function sendMessage() {
       await consumeChatJson(payload);
       showToast("Image request sent.", "success");
     } else {
+      const pendingAssistantId = makeId("assistant");
+
+      upsertMessage(
+        normalizeMessage({
+          id: pendingAssistantId,
+          role: "assistant",
+          text: "",
+          created_at: new Date().toISOString(),
+          pending: true,
+          streaming: true,
+          error: false,
+          stopped: false,
+          attachments: [],
+          meta: {},
+        })
+      );
+
+      if (!state.stream) {
+        state.stream = {
+          running: false,
+          controller: null,
+          targetMessageId: "",
+          buffer: "",
+          startedAt: 0,
+          messageId: "",
+          placeholderId: "",
+        };
+      }
+
+      state.stream.targetMessageId = pendingAssistantId;
+      state.stream.messageId = pendingAssistantId;
+      state.stream.placeholderId = pendingAssistantId;
+
+      renderChat();
+      scrollChatToBottom(true);
+
+      payload.placeholder_id = pendingAssistantId;
       await consumeChatStream(payload);
-      showToast("Message sent.", "success");
+     
     }
   } catch (error) {
     warn("sendMessage failed", error);
@@ -2619,9 +2790,585 @@ function handleComposerSubmit(event) {
   });
 }
 
+async function renameSession(sessionId) {
+  const id = String(sessionId || "").trim();
+  if (!id) return;
+
+  const session = safeArray(state.sessions).find(function (item) {
+    return String(item.id || "") === id;
+  });
+
+  const currentTitle = String((session && session.title) || "Untitled chat");
+  const nextTitle = window.prompt("Rename session", currentTitle);
+
+  if (nextTitle == null) return;
+
+  const title = String(nextTitle || "").trim();
+  if (!title) {
+    showToast("Title cannot be empty.", "error");
+    return;
+  }
+
+  const payload = await apiPost("/api/sessions/rename", {
+    session_id: id,
+    title: title,
+  });
+
+  applyStatePayload(payload || {});
+  await loadState();
+  showToast("Session renamed.", "success");
+}
+
+async function togglePinSession(sessionId) {
+  const id = String(sessionId || "").trim();
+  if (!id) return;
+
+  const session = safeArray(state.sessions).find(function (item) {
+    return String(item.id || "") === id;
+  });
+
+  const pinned = !!(session && session.pinned);
+
+  const payload = await apiPost("/api/sessions/pin", {
+    session_id: id,
+    pinned: !pinned,
+  });
+
+  applyStatePayload(payload || {});
+  await loadState();
+  showToast(!pinned ? "Session pinned." : "Session unpinned.", "success");
+}
+
+async function deleteSession(sessionId) {
+  const id = String(sessionId || "").trim();
+  if (!id) return;
+
+  const session = safeArray(state.sessions).find(function (item) {
+    return String(item.id || "") === id;
+  });
+
+  const title = String((session && session.title) || "this session");
+  const confirmed = window.confirm('Delete "' + title + '"?');
+  if (!confirmed) return;
+
+  const payload = await apiPost("/api/sessions/delete", {
+    session_id: id,
+  });
+
+  applyStatePayload(payload || {});
+  await loadState();
+  showToast("Session deleted.", "success");
+}
+
+async function recordVoiceOnce() {
+  if (
+    !navigator.mediaDevices ||
+    typeof navigator.mediaDevices.getUserMedia !== "function"
+  ) {
+    throw new Error("Voice recording is not supported in this browser.");
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const preferredMime =
+    typeof MediaRecorder !== "undefined" &&
+    typeof MediaRecorder.isTypeSupported === "function" &&
+    MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : "audio/webm";
+
+  const recorder = new MediaRecorder(stream, preferredMime ? { mimeType: preferredMime } : undefined);
+
+  state.voice.recording = true;
+  state.voice.mediaRecorder = recorder;
+  state.voice.stream = stream;
+  state.voice.chunks = [];
+
+  recorder.addEventListener("dataavailable", function (event) {
+    if (event && event.data && event.data.size > 0) {
+      state.voice.chunks.push(event.data);
+    }
+  });
+
+  recorder.start();
+  showToast("Recording... click voice again to stop.", "info");
+
+  return new Promise(function (resolve, reject) {
+    recorder.addEventListener("stop", function () {
+      try {
+        const mimeType = recorder.mimeType || "audio/webm";
+        const blob = new Blob(state.voice.chunks.slice(), { type: mimeType });
+
+        if (state.voice.stream) {
+          state.voice.stream.getTracks().forEach(function (track) {
+            try {
+              track.stop();
+            } catch (_) {}
+          });
+        }
+
+        state.voice.recording = false;
+        state.voice.mediaRecorder = null;
+        state.voice.stream = null;
+        state.voice.chunks = [];
+
+        resolve(blob);
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    recorder.addEventListener("error", function (event) {
+      if (state.voice.stream) {
+        state.voice.stream.getTracks().forEach(function (track) {
+          try {
+            track.stop();
+          } catch (_) {}
+        });
+      }
+
+      state.voice.recording = false;
+      state.voice.mediaRecorder = null;
+      state.voice.stream = null;
+      state.voice.chunks = [];
+
+      reject(
+        new Error(
+          (event && event.error && event.error.message) ||
+            "Voice recorder failed."
+        )
+      );
+    });
+  });
+}
+
+async function transcribeVoice(blob) {
+  const form = new FormData();
+  form.append("file", blob, "voice.webm");
+
+  const response = await fetch("/api/voice/transcribe", {
+    method: "POST",
+    credentials: "same-origin",
+    body: form,
+  });
+
+  const data = await response.json().catch(function () {
+    return {};
+  });
+
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.error || "Voice transcription failed.");
+  }
+
+  const text = normalizeText(data.text || "").trim();
+
+  if (!text) {
+    showToast("No speech detected.", "info");
+    return;
+  }
+
+  if (els.chatInput) {
+    const current = normalizeText(els.chatInput.value || "").trim();
+    els.chatInput.value = current ? current + "\n" + text : text;
+    autoResizeTextarea();
+    els.chatInput.focus();
+  }
+
+  showToast("Voice ready. Sending...", "success");
+
+  await sendMessage();
+}
+let activeVoiceRecordingPromise = null;
+
+function updateVoiceButtonUi() {
+  if (!els.voiceButton) return;
+
+  const recording = !!(state.voice && state.voice.recording);
+  const busy = !!(state.voice && state.voice.busy);
+
+  els.voiceButton.classList.toggle("is-recording", recording);
+  els.voiceButton.classList.toggle("is-busy", busy);
+
+  if (recording) {
+    els.voiceButton.setAttribute("aria-label", "Stop voice recording");
+    els.voiceButton.setAttribute("title", "Stop voice recording");
+  } else if (busy) {
+    els.voiceButton.setAttribute("aria-label", "Voice busy");
+    els.voiceButton.setAttribute("title", "Voice busy");
+  } else {
+    els.voiceButton.setAttribute("aria-label", "Voice");
+    els.voiceButton.setAttribute("title", "Voice");
+  }
+
+  els.voiceButton.disabled = busy && !recording;
+}
+
+function updateTtsToggleUi() {
+  if (!els.ttsToggleButton) return;
+
+  if (!state.tts) {
+    state.tts = {
+      enabled: true,
+      playing: false,
+      audio: null,
+    };
+  }
+
+  const muted = state.tts.enabled === false;
+  const playing = !!state.tts.playing;
+
+  els.ttsToggleButton.classList.toggle("is-muted", muted);
+  els.ttsToggleButton.classList.toggle("is-playing", playing);
+  els.ttsToggleButton.textContent = muted ? "🔇" : "🔊";
+
+  if (muted) {
+    els.ttsToggleButton.setAttribute("aria-label", "Voice replies muted");
+    els.ttsToggleButton.setAttribute("title", "Voice replies muted");
+  } else if (playing) {
+    els.ttsToggleButton.setAttribute("aria-label", "Voice replies playing");
+    els.ttsToggleButton.setAttribute("title", "Voice replies playing");
+  } else {
+    els.ttsToggleButton.setAttribute("aria-label", "Voice replies on");
+    els.ttsToggleButton.setAttribute("title", "Voice replies on");
+  }
+}
+
+function toggleTtsMute() {
+  if (!state.tts) {
+    state.tts = {
+      enabled: false,
+      playing: false,
+      audio: null,
+    };
+  }
+
+  if (state.tts.playing && state.tts.audio) {
+    stopCurrentTtsPlayback();
+    showToast("Voice stopped.", "info");
+    return;
+  }
+
+  state.tts.enabled = !state.tts.enabled;
+  updateTtsToggleUi();
+
+  showToast(
+    state.tts.enabled ? "Voice replies on." : "Voice replies muted.",
+    "info"
+  );
+}
+
+async function recordVoiceOnce() {
+  if (
+    !navigator.mediaDevices ||
+    typeof navigator.mediaDevices.getUserMedia !== "function"
+  ) {
+    throw new Error("Voice recording is not supported in this browser.");
+  }
+
+  if (typeof MediaRecorder === "undefined") {
+    throw new Error("MediaRecorder is not available in this browser.");
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+  const preferredMime =
+    typeof MediaRecorder.isTypeSupported === "function" &&
+    MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : "audio/webm";
+
+  const recorder = new MediaRecorder(
+    stream,
+    preferredMime ? { mimeType: preferredMime } : undefined
+  );
+
+  state.voice.recording = true;
+  state.voice.mediaRecorder = recorder;
+  state.voice.stream = stream;
+  state.voice.chunks = [];
+  updateVoiceButtonUi();
+
+  recorder.addEventListener("dataavailable", function (event) {
+    if (event && event.data && event.data.size > 0) {
+      state.voice.chunks.push(event.data);
+    }
+  });
+
+  recorder.start();
+  showToast("Recording...", "info");
+
+  return new Promise(function (resolve, reject) {
+    recorder.addEventListener("stop", function () {
+      try {
+        const mimeType = recorder.mimeType || "audio/webm";
+        const blob = new Blob(state.voice.chunks.slice(), { type: mimeType });
+
+        if (state.voice.stream) {
+          state.voice.stream.getTracks().forEach(function (track) {
+            try {
+              track.stop();
+            } catch (_) {}
+          });
+        }
+
+        state.voice.recording = false;
+        state.voice.mediaRecorder = null;
+        state.voice.stream = null;
+        state.voice.chunks = [];
+        updateVoiceButtonUi();
+
+        resolve(blob);
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    recorder.addEventListener("error", function (event) {
+      if (state.voice.stream) {
+        state.voice.stream.getTracks().forEach(function (track) {
+          try {
+            track.stop();
+          } catch (_) {}
+        });
+      }
+
+      state.voice.recording = false;
+      state.voice.mediaRecorder = null;
+      state.voice.stream = null;
+      state.voice.chunks = [];
+      updateVoiceButtonUi();
+
+      reject(
+        new Error(
+          (event && event.error && event.error.message) ||
+            "Voice recorder failed."
+        )
+      );
+    });
+  });
+}
+
+async function transcribeVoice(blob) {
+  if (!blob || !blob.size) {
+    throw new Error("Recorded voice blob is empty.");
+  }
+
+  const form = new FormData();
+  form.append("file", blob, "voice.webm");
+
+  showToast("Transcribing voice...", "info");
+
+  const response = await fetch("/api/voice/transcribe", {
+    method: "POST",
+    credentials: "same-origin",
+    body: form,
+  });
+
+  const data = await response.json().catch(function () {
+    return {};
+  });
+
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.error || "Voice transcription failed.");
+  }
+
+  const text = normalizeText(data.text || "").trim();
+
+  if (!text) {
+    showToast("No speech detected.", "info");
+    return;
+  }
+
+  if (els.chatInput) {
+    els.chatInput.value = text;
+    autoResizeTextarea();
+    els.chatInput.focus();
+  }
+
+  showToast("Voice ready. Sending...", "success");
+  await sendMessage();
+}
+
+async function handleMicClick() {
+  if (!state.voice) {
+    state.voice = {
+      recording: false,
+      mediaRecorder: null,
+      chunks: [],
+      stream: null,
+      busy: false,
+    };
+  }
+
+  if (state.voice.busy) {
+    showToast("Voice is busy.", "info");
+    return;
+  }
+
+  if (!state.voice.recording) {
+    state.voice.busy = true;
+    updateVoiceButtonUi();
+
+    try {
+      activeVoiceRecordingPromise = recordVoiceOnce();
+    } finally {
+      state.voice.busy = false;
+      updateVoiceButtonUi();
+    }
+    return;
+  }
+
+  const recorder = state.voice.mediaRecorder;
+  if (!recorder) {
+    state.voice.recording = false;
+    state.voice.busy = false;
+    updateVoiceButtonUi();
+    throw new Error("Voice recorder is not ready.");
+  }
+
+  state.voice.busy = true;
+  updateVoiceButtonUi();
+
+  try {
+    recorder.stop();
+
+    const blob = await activeVoiceRecordingPromise;
+    activeVoiceRecordingPromise = null;
+
+    await transcribeVoice(blob);
+  } finally {
+    state.voice.busy = false;
+    updateVoiceButtonUi();
+  }
+}
+
+async function requestVoiceReply(text) {
+  const cleanText = normalizeText(text || "").trim();
+  if (!cleanText) return null;
+
+  const response = await fetch("/api/voice/reply", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      text: cleanText,
+      voice: "alloy",
+      format: "mp3",
+    }),
+  });
+
+  const data = await response.json().catch(function () {
+    return {};
+  });
+
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.error || "Voice reply failed.");
+  }
+
+  return data;
+}
+
+function stopCurrentTtsPlayback() {
+  if (!state.tts) return;
+
+  if (state.tts.audio) {
+    try {
+      state.tts.audio.pause();
+    } catch (_) {}
+  }
+
+  state.tts.audio = null;
+  state.tts.playing = false;
+  updateTtsToggleUi();
+}
+
+async function playVoiceReplyFromText(text) {
+  const cleanText = normalizeText(text || "").trim();
+  if (!cleanText) return;
+
+  if (!state.tts) {
+    state.tts = {
+      enabled: false,
+      playing: false,
+      audio: null,
+    };
+  }
+
+  if (state.tts.enabled === false) return;
+
+  stopCurrentTtsPlayback();
+
+  const payload = await requestVoiceReply(cleanText);
+  const url = String((payload && payload.url) || "").trim();
+  if (!url) {
+    throw new Error("Voice reply URL missing.");
+  }
+
+  const absoluteUrl = url.startsWith("http")
+    ? url
+    : window.location.origin + url;
+
+  log("TTS URL:", absoluteUrl);
+
+  const audio = new Audio();
+  audio.preload = "auto";
+  audio.src = absoluteUrl;
+  audio.load();
+
+  state.tts.audio = audio;
+  state.tts.playing = true;
+  updateTtsToggleUi();
+
+  audio.addEventListener("ended", function () {
+    state.tts.playing = false;
+    state.tts.audio = null;
+    updateTtsToggleUi();
+  });
+
+  audio.addEventListener("error", function () {
+    state.tts.playing = false;
+    state.tts.audio = null;
+    updateTtsToggleUi();
+    showToast("Voice playback failed.", "error");
+  });
+
+  audio.addEventListener("pause", function () {
+    if (!audio.ended) {
+      state.tts.playing = false;
+      state.tts.audio = null;
+      updateTtsToggleUi();
+    }
+  });
+
+  await audio.play();
+}
+
 function bindEvents() {
   if (els.composerForm) {
     els.composerForm.addEventListener("submit", handleComposerSubmit);
+  }
+
+if (els.ttsToggleButton) {
+  els.ttsToggleButton.addEventListener("click", function (event) {
+    event.preventDefault();
+    toggleTtsMute();
+  });
+}
+
+  if (els.voiceButton) {
+    els.voiceButton.addEventListener("click", function (event) {
+      event.preventDefault();
+
+      handleMicClick().catch(function (error) {
+        warn("voice failed", error);
+        showToast(
+          error && error.message ? error.message : "Voice failed.",
+          "error"
+        );
+      });
+    });
   }
 
   if (els.sendButton) {
@@ -2650,10 +3397,14 @@ function bindEvents() {
 
   if (els.attachInput) {
     els.attachInput.addEventListener("change", function (event) {
-      const files = event && event.target && event.target.files ? event.target.files : [];
+      const files =
+        event && event.target && event.target.files ? event.target.files : [];
       uploadFiles(files).catch(function (error) {
         warn("upload files failed", error);
-        showToast(error && error.message ? error.message : "Upload failed.", "error");
+        showToast(
+          error && error.message ? error.message : "Upload failed.",
+          "error"
+        );
       });
     });
   }
@@ -2670,13 +3421,76 @@ function bindEvents() {
       event.preventDefault();
       createNewChat().catch(function (error) {
         warn("new chat failed", error);
-        showToast(error && error.message ? error.message : "New chat failed.", "error");
+        showToast(
+          error && error.message ? error.message : "New chat failed.",
+          "error"
+        );
       });
     });
   }
 
   if (els.sessionList) {
     els.sessionList.addEventListener("click", function (event) {
+      const pinButton = event.target.closest("[data-pin-session]");
+      if (pinButton) {
+        event.preventDefault();
+
+        const sessionId = String(
+          pinButton.getAttribute("data-pin-session") || ""
+        ).trim();
+
+        if (!sessionId) return;
+
+        togglePinSession(sessionId).catch(function (error) {
+          warn("pin session failed", error);
+          showToast(
+            error && error.message ? error.message : "Pin failed.",
+            "error"
+          );
+        });
+        return;
+      }
+
+      const renameButton = event.target.closest("[data-rename-session]");
+      if (renameButton) {
+        event.preventDefault();
+
+        const sessionId = String(
+          renameButton.getAttribute("data-rename-session") || ""
+        ).trim();
+
+        if (!sessionId) return;
+
+        renameSession(sessionId).catch(function (error) {
+          warn("rename session failed", error);
+          showToast(
+            error && error.message ? error.message : "Rename failed.",
+            "error"
+          );
+        });
+        return;
+      }
+
+      const deleteButton = event.target.closest("[data-delete-session]");
+      if (deleteButton) {
+        event.preventDefault();
+
+        const sessionId = String(
+          deleteButton.getAttribute("data-delete-session") || ""
+        ).trim();
+
+        if (!sessionId) return;
+
+        deleteSession(sessionId).catch(function (error) {
+          warn("delete session failed", error);
+          showToast(
+            error && error.message ? error.message : "Delete failed.",
+            "error"
+          );
+        });
+        return;
+      }
+
       const sessionButton = event.target.closest("[data-open-session]");
       if (!sessionButton) return;
 
@@ -2690,84 +3504,11 @@ function bindEvents() {
 
       openSession(sessionId).catch(function (error) {
         warn("open session failed", error);
-        showToast(error && error.message ? error.message : "Open session failed.", "error");
+        showToast(
+          error && error.message ? error.message : "Open session failed.",
+          "error"
+        );
       });
-    });
-  }
-
-  if (els.artifactList) {
-    els.artifactList.addEventListener("click", async function (event) {
-      const filterButton = event.target.closest("[data-artifact-filter]");
-      if (filterButton) {
-        event.preventDefault();
-        state.rail.artifactFilter = String(
-          filterButton.getAttribute("data-artifact-filter") || "all"
-        ).trim().toLowerCase();
-        renderArtifacts();
-        return;
-      }
-
-      const artifactButton = event.target.closest("[data-artifact-open]");
-      if (!artifactButton) return;
-
-      event.preventDefault();
-
-      const artifactId = String(
-        artifactButton.getAttribute("data-artifact-open") || ""
-      ).trim();
-
-      if (!artifactId) return;
-
-      try {
-        await openArtifactFromStateOrBackend(artifactId);
-      } catch (error) {
-        warn("open artifact failed", error);
-        showToast("Failed to open artifact.", "error");
-      }
-    });
-
-    els.artifactList.addEventListener("input", function (event) {
-      const searchInput = event.target.closest("[data-artifact-search]");
-      if (!searchInput) return;
-
-      state.rail.artifactSearch = String(searchInput.value || "");
-      renderArtifacts();
-    });
-  }
-
-  if (els.chatThread) {
-    els.chatThread.addEventListener("click", function (event) {
-      const copyButton = event.target.closest("[data-copy-message]");
-      if (copyButton) {
-        const messageId = String(
-          copyButton.getAttribute("data-copy-message") || ""
-        ).trim();
-
-        if (messageId) {
-          copyMessage(messageId).catch(function (error) {
-            warn("copy failed", error);
-            showToast("Copy failed.", "error");
-          });
-        }
-        return;
-      }
-
-      const regenerateButton = event.target.closest("[data-regenerate-message]");
-      if (regenerateButton) {
-        const targetId = String(
-          regenerateButton.getAttribute("data-regenerate-message") || ""
-        ).trim();
-
-        if (targetId) {
-          regenerateMessage(targetId).catch(function (error) {
-            warn("regenerate failed", error);
-            showToast(
-              error && error.message ? error.message : "Regenerate failed.",
-              "error"
-            );
-          });
-        }
-      }
     });
   }
 
@@ -2777,6 +3518,7 @@ function bindEvents() {
   if (typeof wireRailTabs === "function") wireRailTabs();
   if (typeof wireMemoryClicks === "function") wireMemoryClicks();
 }
+
 
 async function boot() {
   if (state.booted) return;
@@ -2788,6 +3530,8 @@ async function boot() {
   renderPendingUploads();
   setBusyUi(false);
   setTopbar("Nova", "Fast local AI workspace", "Ready", "idle");
+  updateVoiceButtonUi();
+  updateTtsToggleUi();
 
   try {
     await loadState();
@@ -3291,18 +4035,106 @@ function mergeAssistantReplyIntoState(payload) {
   }
 }
 
-async function consumeChatStream(payload) {
+function consumeChatStream(payload) {
   return consumeChatStreamStable(payload);
 }
 
+function wireArtifactClicks() {
+  if (!els.artifactList || els.artifactList.dataset.bound === "1") return;
+  els.artifactList.dataset.bound = "1";
 
+  els.artifactList.addEventListener("click", async function (event) {
+    const card = event.target.closest("[data-artifact-open]");
+    if (!card) return;
 
+    const artifactId = String(
+      card.getAttribute("data-artifact-open") || ""
+    ).trim();
 
+    if (!artifactId) return;
 
+    await openArtifactFromStateOrBackend(artifactId);
+  });
+}
 
+function wireArtifactControls() {
+  if (!els.artifactList || els.artifactList.dataset.controlsBound === "1") return;
+  els.artifactList.dataset.controlsBound = "1";
 
+  els.artifactList.addEventListener("click", function (event) {
+    const filterBtn = event.target.closest("[data-artifact-filter]");
+    if (!filterBtn) return;
 
+    const nextFilter = String(
+      filterBtn.getAttribute("data-artifact-filter") || "all"
+    ).trim().toLowerCase();
 
+    if (!state.rail) state.rail = {};
+    state.rail.artifactFilter = nextFilter || "all";
+
+    renderArtifacts();
+  });
+
+  els.artifactList.addEventListener("input", function (event) {
+    const input = event.target.closest("[data-artifact-search]");
+    if (!input) return;
+
+    if (!state.rail) state.rail = {};
+    state.rail.artifactSearch = String(input.value || "");
+
+    renderArtifacts();
+  });
+}
+
+function syncArtifactViewerToActiveSession() {
+  if (!state.rail || state.rail.tab !== "artifacts") return;
+
+  const activeSessionId = String(state.activeSessionId || "").trim();
+  const items = safeArray(state.artifacts).filter(function (item) {
+    if (!activeSessionId) return true;
+    return String(item.session_id || "").trim() === activeSessionId;
+  });
+
+  if (!items.length) {
+    state.rail.selectedId = "";
+    state.rail.selectedKind = "artifact";
+
+    if (els.railViewer) {
+      els.railViewer.hidden = false;
+      els.railViewer.innerHTML =
+        '<div class="nova-viewer-shell">' +
+        '<div class="nova-viewer-empty">' +
+        '<div class="nova-viewer-empty-title">No artifact selected</div>' +
+        '<div class="nova-viewer-empty-copy">This session does not have any artifacts yet.</div>' +
+        "</div>" +
+        "</div>";
+    }
+    return;
+  }
+
+  const currentSelectedId = String(state.rail.selectedId || "").trim();
+  const selectedStillExists = items.some(function (item) {
+    return String(item.id || "").trim() === currentSelectedId;
+  });
+
+  if (selectedStillExists && currentSelectedId) {
+    openArtifactFromStateOrBackend(currentSelectedId);
+    return;
+  }
+
+  const firstId = String(items[0].id || "").trim();
+  if (!firstId) return;
+
+  state.rail.selectedKind = "artifact";
+  state.rail.selectedId = firstId;
+  openArtifactFromStateOrBackend(firstId);
+}
+
+async function loadState() {
+  const payload = await apiGet("/api/state");
+  applyStatePayload(payload || {});
+  return payload;
+}
 boot();
 
 if (typeof initShellExtensions === "function") {
@@ -3311,6 +4143,18 @@ if (typeof initShellExtensions === "function") {
 
 if (typeof syncRailReopenVisibility === "function") {
   syncRailReopenVisibility();
+}
+
+if (typeof wireSessionClicks === "function") {
+  wireSessionClicks();
+}
+
+if (typeof wireArtifactClicks === "function") {
+  wireArtifactClicks();
+}
+
+if (typeof wireArtifactControls === "function") {
+  wireArtifactControls();
 }
 
 if (typeof wireMemoryClicks === "function") {

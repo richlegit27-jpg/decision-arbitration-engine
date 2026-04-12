@@ -1,37 +1,42 @@
 ﻿from __future__ import annotations
 
+import base64
 import json
+import math
 import mimetypes
 import os
 import re
+import requests
 import time
 import uuid
-import math
-import base64
+from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Generator
-from collections import defaultdict
+from urllib.parse import parse_qs, unquote, urlparse
+
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse, parse_qs, unquote
 from flask import Flask, Response, jsonify, request, send_from_directory
 from flask_cors import CORS
-from helpers.web_utils import (
-    should_route_to_web,
-    normalize_url_input,
-)
 
 from helpers.video_utils import build_video_analysis_result
+from helpers.web_utils import (
+    normalize_url_input,
+    should_route_to_web,
+)
 
+# =========================================================
+# CONFIG (clean + unified)
+# =========================================================
 
-WEB_FETCH_TIMEOUT = 12
-WEB_FETCH_TEXT_LIMIT = 6000
+WEB_FETCH_TIMEOUT = 20
+WEB_FETCH_TEXT_LIMIT = 4000
 WEB_SEARCH_TIMEOUT = 12
 WEB_SEARCH_MAX_RESULTS = 5
 CURRENT_INFO_FETCH_LIMIT = 3
-
 CURRENT_INFO_HINTS = {
+
     "latest", "today", "current", "recent", "recently", "updated", "update",
     "news", "headlines", "record", "score", "scores", "standing", "standings",
     "schedule", "weather", "forecast", "temperature", "stock", "stocks",
@@ -387,7 +392,6 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
 
-
 # =========================================================
 # APP
 # =========================================================
@@ -397,6 +401,10 @@ app = Flask(
     static_folder=str(STATIC_DIR),
     template_folder=str(TEMPLATES_DIR),
 )
+
+UPLOADS_DIR = BASE_DIR / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+UPLOAD_FOLDER = str(UPLOADS_DIR)
 CORS(app)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
@@ -489,12 +497,47 @@ def save_sessions_store(store: dict[str, Any]) -> None:
 
 def load_artifacts() -> list[dict[str, Any]]:
     ensure_store_files()
-    items = read_json(ARTIFACTS_FILE, [])
-    return items if isinstance(items, list) else []
+    raw = read_json(ARTIFACTS_FILE, [])
+
+    if isinstance(raw, list):
+        return [item for item in raw if isinstance(item, dict)]
+
+    if isinstance(raw, dict):
+        items = raw.get("artifacts", [])
+        if isinstance(items, list):
+            return [item for item in items if isinstance(item, dict)]
+
+    return []
 
 
 def save_artifacts(items: list[dict[str, Any]]) -> None:
-    write_json(ARTIFACTS_FILE, items)
+    clean_items = [item for item in safe_list(items) if isinstance(item, dict)]
+    write_json(ARTIFACTS_FILE, clean_items)
+
+
+def load_artifacts_store() -> dict[str, Any]:
+    ensure_store_files()
+    raw = read_json(ARTIFACTS_FILE, [])
+
+    if isinstance(raw, dict):
+        artifacts = raw.get("artifacts", [])
+        return {
+            "artifacts": [item for item in safe_list(artifacts) if isinstance(item, dict)]
+        }
+
+    if isinstance(raw, list):
+        return {
+            "artifacts": [item for item in raw if isinstance(item, dict)]
+        }
+
+    return {"artifacts": []}
+
+
+def save_artifacts_store(store: dict[str, Any]) -> None:
+    artifacts = []
+    if isinstance(store, dict):
+        artifacts = [item for item in safe_list(store.get("artifacts")) if isinstance(item, dict)]
+    write_json(ARTIFACTS_FILE, artifacts)
 
 def build_artifact_viewer(artifact: dict[str, Any]) -> dict[str, Any]:
     meta = artifact.get("meta") if isinstance(artifact.get("meta"), dict) else {}
@@ -1021,6 +1064,43 @@ def _detect_routed_artifact_kind(message: dict[str, Any], text: str) -> str:
     source_url = str(meta.get("source_url") or message.get("source_url") or "").strip()
     image_url = str(meta.get("image_url") or message.get("image_url") or "").strip()
     video_url = str(meta.get("video_url") or message.get("video_url") or "").strip()
+    audio_url = str(meta.get("audio_url") or message.get("audio_url") or "").strip()
+
+    if source == "video_analysis":
+        return "video_analysis"
+
+    if source == "voice_reply":
+        return "voice_reply"
+
+    attachment_url = _first_attachment_url(message)
+    attachment_mime = _first_attachment_mime(message)
+
+    if video_url:
+        return "video_analysis"
+
+    if audio_url:
+        return "voice_reply"
+
+    if image_url:
+        return "image_generation"
+
+    if attachment_url and attachment_mime.startswith("image/"):
+        return "image_generation"
+
+    if source_url:
+        return "web_result"
+
+    if source in {"web", "web_fetch"}:
+        return "web_result"
+
+    return _detect_artifact_kind(text)
+
+def _detect_routed_artifact_kind(message: dict[str, Any], text: str) -> str:
+    meta = message.get("meta") if isinstance(message.get("meta"), dict) else {}
+    source = str(message.get("source") or "").strip().lower()
+    source_url = str(meta.get("source_url") or message.get("source_url") or "").strip()
+    image_url = str(meta.get("image_url") or message.get("image_url") or "").strip()
+    video_url = str(meta.get("video_url") or message.get("video_url") or "").strip()
 
     if source == "video_analysis":
         return "video_analysis"
@@ -1067,12 +1147,44 @@ def _build_routed_artifact_title(message: dict[str, Any], text: str, kind: str) 
 
     return _build_artifact_title(text, kind)
 
+def build_voice_artifact_from_result(
+    voice_result: dict[str, Any],
+    session_id: str,
+) -> dict[str, Any]:
+    text = normalize_text(voice_result.get("text") or "").strip()
+    audio_url = normalize_text(voice_result.get("url") or "").strip()
+    mime_type = normalize_text(voice_result.get("mime_type") or "").strip() or "audio/mpeg"
+    voice = normalize_text(voice_result.get("voice") or "alloy").strip() or "alloy"
+    filename = normalize_text(voice_result.get("filename") or "").strip()
+    audio_format = normalize_text(voice_result.get("format") or "mp3").strip() or "mp3"
+
+    return {
+        "title": "Voice Reply",
+        "kind": "voice_reply",
+        "body": text or "Voice reply ready.",
+        "session_id": session_id,
+        "meta": {
+            "audio_url": audio_url,
+            "mime_type": mime_type,
+            "voice": voice,
+            "filename": filename,
+            "format": audio_format,
+        },
+        "viewer": {
+            "kind": "voice_reply",
+            "title": "Voice Reply",
+            "body": text,
+            "audio_url": audio_url,
+        },
+    }
+
 def _build_routed_artifact_meta(text: str, kind: str, message: dict[str, Any]) -> dict[str, Any]:
     base = _build_artifact_meta(text, kind, message)
     meta = message.get("meta") if isinstance(message.get("meta"), dict) else {}
 
     image_url = str(meta.get("image_url") or message.get("image_url") or "").strip()
     video_url = str(meta.get("video_url") or message.get("video_url") or "").strip()
+    audio_url = str(meta.get("audio_url") or message.get("audio_url") or "").strip()
 
     if not image_url:
         attachment_url = _first_attachment_url(message)
@@ -1086,33 +1198,10 @@ def _build_routed_artifact_meta(text: str, kind: str, message: dict[str, Any]) -
         base["image_url"] = image_url
     if video_url:
         base["video_url"] = video_url
+    if audio_url:
+        base["audio_url"] = audio_url
     if source_url:
         base["source_url"] = source_url
-
-    if kind == "image_generation":
-        base["analysis_text"] = summarize_text("Generated image artifact.", 240)
-        if not base.get("bullets"):
-            base["bullets"] = ["Generated image saved to artifacts."]
-
-    elif kind == "video_analysis":
-        if not base.get("analysis_text"):
-            base["analysis_text"] = summarize_text("Video analysis artifact.", 240)
-        if not base.get("bullets"):
-            base["bullets"] = ["Video saved to artifacts."]
-
-    elif kind == "web_result":
-        if source_url:
-            base["analysis_text"] = summarize_text(f"Web result captured from {source_url}", 240)
-        else:
-            base["analysis_text"] = summarize_text("Web result captured.", 240)
-        if not base.get("bullets"):
-            bullets: list[str] = []
-            if source_url:
-                bullets.append(summarize_text(source_url, 140))
-            first_line = normalize_text(text).strip().split("\n")[0].strip() if normalize_text(text).strip() else ""
-            if first_line:
-                bullets.append(summarize_text(first_line, 140))
-            base["bullets"] = bullets[:5]
 
     return base
 
@@ -3608,6 +3697,126 @@ def api_state() -> Any:
     return jsonify(state_payload())
 
 
+@app.post("/api/voice/transcribe")
+def api_voice_transcribe() -> Any:
+    uploaded = request.files.get("file")
+    if not uploaded:
+        return jsonify({"ok": False, "error": "Missing audio file."}), 400
+
+    suffix = Path(uploaded.filename or "voice.webm").suffix or ".webm"
+    temp_name = f"voice_{uuid.uuid4().hex}{suffix}"
+    temp_path = UPLOADS_DIR / temp_name
+    uploaded.save(temp_path)
+
+    try:
+        with open(temp_path, "rb") as audio_file:
+            transcript = OPENAI_CLIENT.audio.transcriptions.create(
+                model="gpt-4o-mini-transcribe",
+                file=audio_file,
+                response_format="json",
+            )
+
+        text = ""
+        if isinstance(transcript, dict):
+            text = str(transcript.get("text") or "").strip()
+        else:
+            text = str(getattr(transcript, "text", "") or "").strip()
+
+        return jsonify({
+            "ok": True,
+            "text": text,
+            "filename": temp_name,
+        })
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "error": str(e),
+        }), 500
+
+@app.post("/api/voice/reply")
+def api_voice_reply():
+    data = request.get_json(silent=True) or {}
+
+    text = normalize_text(data.get("text") or "").strip()
+    voice = normalize_text(data.get("voice") or "alloy").strip() or "alloy"
+    audio_format = normalize_text(data.get("format") or "mp3").strip().lower() or "mp3"
+
+    if not text:
+        return jsonify({"ok": False, "error": "Missing text."}), 400
+
+    if OPENAI_CLIENT is None:
+        return jsonify({"ok": False, "error": "OpenAI client is not configured."}), 500
+
+    allowed_formats = {"mp3", "wav", "opus", "aac", "flac", "pcm"}
+    if audio_format not in allowed_formats:
+        audio_format = "mp3"
+
+    ext_map = {
+        "mp3": ".mp3",
+        "wav": ".wav",
+        "opus": ".opus",
+        "aac": ".aac",
+        "flac": ".flac",
+        "pcm": ".pcm",
+    }
+
+    temp_name = f"tts_{uuid.uuid4().hex}{ext_map.get(audio_format, '.mp3')}"
+    temp_path = UPLOADS_DIR / temp_name
+
+    try:
+        response = OPENAI_CLIENT.audio.speech.create(
+            model="gpt-4o-mini-tts",
+            voice=voice,
+            input=text,
+            response_format=audio_format,
+        )
+
+        audio_bytes = None
+
+        if hasattr(response, "read"):
+            audio_bytes = response.read()
+        elif hasattr(response, "content"):
+            audio_bytes = response.content
+        elif isinstance(response, (bytes, bytearray)):
+            audio_bytes = bytes(response)
+
+        if not audio_bytes:
+            return jsonify({"ok": False, "error": "TTS returned empty audio."}), 500
+
+        temp_path.write_bytes(audio_bytes)
+
+        audio_url = f"/api/uploads/{temp_name}"
+        mime_type = mimetypes.guess_type(temp_name)[0] or "audio/mpeg"
+
+        assistant_message = {
+            "id": make_id("assistant"),
+            "role": "assistant",
+            "text": text,
+            "attachments": [],
+            "meta": {
+                "source": "voice_reply",
+                "audio_url": audio_url,
+                "mime_type": mime_type,
+            },
+        }
+
+        try:
+            save_artifact_from_assistant(assistant_message, "voice_reply")
+        except Exception:
+            pass
+
+        return jsonify({
+            "ok": True,
+            "assistant_message": assistant_message,
+            "session_id": "voice_reply",
+        })
+
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "error": str(e),
+        }), 500
+   
 @app.post("/api/upload")
 def api_upload() -> Any:
     uploaded = request.files.get("file")
@@ -7203,6 +7412,36 @@ def build_web_artifact_from_fetch_result(
         },
     }
 
+def build_voice_artifact_from_result(
+    voice_result: dict[str, Any],
+    session_id: str,
+) -> dict[str, Any]:
+    text = normalize_text(voice_result.get("text") or "").strip()
+    audio_url = normalize_text(voice_result.get("url") or "").strip()
+    mime_type = normalize_text(voice_result.get("mime_type") or "").strip() or "audio/mpeg"
+    voice = normalize_text(voice_result.get("voice") or "alloy").strip() or "alloy"
+    filename = normalize_text(voice_result.get("filename") or "").strip()
+    audio_format = normalize_text(voice_result.get("format") or "mp3").strip() or "mp3"
+
+    return {
+        "title": "Voice Reply",
+        "kind": "voice_reply",
+        "body": text or "Voice reply ready.",
+        "session_id": session_id,
+        "meta": {
+            "audio_url": audio_url,
+            "mime_type": mime_type,
+            "voice": voice,
+            "filename": filename,
+            "format": audio_format,
+        },
+        "viewer": {
+            "kind": "voice_reply",
+            "title": "Voice Reply",
+            "body": text,
+            "audio_url": audio_url,
+        },
+    }
 
 def detect_video_attachments(
     attachments: list[dict[str, Any]] | None = None,
@@ -8224,11 +8463,6 @@ def api_chat() -> Any:
                     "title": f"Image: {prompt[:80]}",
                     "body": f"Generated image for: {prompt}",
                     "image_url": image_url,
-                    "analysis_text": f"Generated image for: {prompt}",
-                    "bullets": [
-                        f"Prompt: {prompt}",
-                        "Image generated successfully.",
-                    ],
                 },
                 "meta": {
                     "prompt": prompt,
@@ -8297,7 +8531,6 @@ def api_chat() -> Any:
 
         try:
             assistant_msg = result.get("assistant_message") or result.get("message")
-
             if assistant_msg and isinstance(assistant_msg, dict):
                 save_artifact_from_assistant(assistant_msg, session["id"])
         except Exception:
@@ -8310,6 +8543,10 @@ def api_chat() -> Any:
             "ok": False,
             "error": str(exc) or "api_chat failed",
         }), 500
+
+@app.route("/api/uploads/<path:filename>")
+def serve_upload(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
 
 # =========================================================
 # 🔒 SESSION SWITCH (BACKEND LOCK)
@@ -8350,18 +8587,6 @@ def api_sessions_switch():
             "ok": False,
             "error": str(e)
         }), 500
-
-@app.route("/api/uploads/<path:filename>", methods=["GET"])
-def api_uploads(filename: str):
-    safe_name = Path(str(filename or "")).name.strip()
-    if not safe_name:
-        return jsonify({"ok": False, "error": "Missing filename."}), 404
-
-    file_path = UPLOADS_DIR / safe_name
-    if not file_path.exists() or not file_path.is_file():
-        return jsonify({"ok": False, "error": "File not found."}), 404
-
-    return send_from_directory(str(UPLOADS_DIR), safe_name)
 
 # =========================================================
 # MAIN
