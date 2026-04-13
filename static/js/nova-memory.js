@@ -1,337 +1,297 @@
-(() => {
+(function () {
   "use strict";
 
-  if (window.__novaMemoryLoaded) return;
-  window.__novaMemoryLoaded = true;
+  var VERSION = "memory-split-2026-04-12-001";
 
-  const Nova = (window.Nova = window.Nova || {});
-  Nova.memory = Nova.memory || {};
+  function bridge() {
+    return window.NovaMemoryBridge || null;
+  }
 
-  const API = {
-    list: "/api/memory",
-    add: "/api/memory/add",
-    delete: "/api/memory/delete",
-  };
+  function text(value) {
+    return String(value == null ? "" : value).trim();
+  }
 
-  function byId(id) {
-    return document.getElementById(id);
+  function safeArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function safeObject(value) {
+    return value && typeof value === "object" ? value : {};
+  }
+
+  function fallbackEscapeHtml(value) {
+    return text(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function getState() {
+    var b = bridge();
+    return b && typeof b.getState === "function" ? b.getState() : {};
+  }
+
+  function getElements() {
+    var b = bridge();
+    return b && typeof b.getElements === "function" ? b.getElements() : {};
   }
 
   function escapeHtml(value) {
-    return String(value ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
+    var b = bridge();
+    if (b && typeof b.escapeHtml === "function") {
+      return b.escapeHtml(value);
+    }
+    return fallbackEscapeHtml(value);
   }
 
-  async function parseJsonSafe(response) {
-    const text = await response.text();
+  function formatTimeAgo(value) {
+    var b = bridge();
+    if (b && typeof b.formatTimeAgo === "function") {
+      return b.formatTimeAgo(value);
+    }
+    return text(value);
+  }
+
+  function showToast(message, kind) {
+    var b = bridge();
+    if (b && typeof b.showToast === "function") {
+      b.showToast(message, kind);
+    }
+  }
+
+  function warn() {
+    var b = bridge();
+    if (b && typeof b.warn === "function") {
+      b.warn.apply(null, arguments);
+      return;
+    }
     try {
-      return text ? JSON.parse(text) : {};
-    } catch {
-      return {};
+      console.warn.apply(console, arguments);
+    } catch (error) {}
+  }
+
+  function openRail() {
+    var b = bridge();
+    if (b && typeof b.openRail === "function") {
+      b.openRail();
     }
   }
 
-  async function apiGet(url) {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
-      credentials: "same-origin",
-    });
-
-    const data = await parseJsonSafe(response);
-    if (!response.ok) {
-      throw new Error(data.error || `GET failed: ${url}`);
+  function setRailTab(tabName) {
+    var b = bridge();
+    if (b && typeof b.setRailTab === "function") {
+      b.setRailTab(tabName);
     }
-    return data;
   }
 
-  async function apiPost(url, payload) {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      credentials: "same-origin",
-      body: JSON.stringify(payload || {}),
-    });
-
-    const data = await parseJsonSafe(response);
-    if (!response.ok) {
-      throw new Error(data.error || `POST failed: ${url}`);
+  function setRailSelectedItem(kind, itemId) {
+    var b = bridge();
+    if (b && typeof b.setRailSelectedItem === "function") {
+      b.setRailSelectedItem(kind, itemId);
     }
-    return data;
   }
 
-  function getStateBucket() {
-    Nova.state = Nova.state || {};
-    if (!Array.isArray(Nova.state.memoryItems)) {
-      Nova.state.memoryItems = [];
+  function apiPost(url, body, extra) {
+    var b = bridge();
+    if (b && typeof b.apiPost === "function") {
+      return b.apiPost(url, body, extra);
     }
-    return Nova.state;
+    return Promise.reject(new Error("NovaMemoryBridge.apiPost unavailable"));
   }
 
-  function normalizeMemoryItems(payload) {
-    const candidates = [
-      payload?.items,
-      payload?.memory,
-      payload?.memories,
-      payload?.data?.items,
-      payload?.data?.memory,
-      payload?.data?.memories,
-    ];
+  function refreshState() {
+    var b = bridge();
+    if (b && typeof b.refreshState === "function") {
+      return b.refreshState();
+    }
+    return Promise.resolve();
+  }
 
-    for (const value of candidates) {
-      if (Array.isArray(value)) return value;
+  function normalizeMemoryItem(item) {
+    var b = bridge();
+    if (b && typeof b.normalizeMemoryItem === "function") {
+      return b.normalizeMemoryItem(item);
     }
 
-    return [];
+    var entry = safeObject(item);
+    return {
+      id: text(entry.id),
+      kind: text(entry.kind || "note"),
+      source: text(entry.source || ""),
+      text: text(entry.text || entry.content || entry.body || ""),
+      preview: text(entry.preview || entry.text || entry.content || entry.body || ""),
+      created_at: text(entry.created_at || ""),
+      updated_at: text(entry.updated_at || ""),
+    };
   }
 
-  function resolveMemoryId(item) {
-    return String(
-      item?.id ||
-      item?.memory_id ||
-      item?.uuid ||
-      ""
-    ).trim();
+  function currentMemoryItems() {
+    var state = safeObject(getState());
+    return safeArray(state.memory).map(normalizeMemoryItem);
   }
 
-  function resolveMemoryKind(item) {
-    return String(
-      item?.kind ||
-      item?.type ||
-      item?.category ||
-      "memory"
-    ).trim() || "memory";
+  function memoryViewerHtml(item) {
+    var entry = normalizeMemoryItem(item);
+    var kind = escapeHtml(entry.kind || "note");
+    var source = escapeHtml(entry.source || "unknown");
+    var createdAt = escapeHtml(formatTimeAgo(entry.updated_at || entry.created_at || ""));
+    var body = escapeHtml(entry.text || entry.preview || "");
+
+    return (
+      '<div class="nova-memory-viewer">' +
+        '<div class="nova-viewer-header">' +
+          '<div class="nova-viewer-kicker">Memory</div>' +
+          '<h3 class="nova-viewer-title">' + kind + "</h3>" +
+          '<div class="nova-viewer-meta">source=' + source + " · " + createdAt + "</div>" +
+        "</div>" +
+        '<div class="nova-viewer-body">' +
+          '<pre style="white-space:pre-wrap;word-break:break-word;margin:0;">' + body + "</pre>" +
+        "</div>" +
+      "</div>"
+    );
   }
 
-  function resolveMemoryValue(item) {
-    return String(
-      item?.value ||
-      item?.text ||
-      item?.content ||
-      item?.memory ||
-      ""
-    ).trim();
+  function renderMemoryListItem(item) {
+    var entry = normalizeMemoryItem(item);
+
+    return (
+      '<article class="nova-memory-card" data-memory-id="' + escapeHtml(entry.id) + '">' +
+        '<button type="button" class="nova-memory-open" data-memory-open="' + escapeHtml(entry.id) + '">' +
+          '<div class="nova-memory-card-top">' +
+            '<span class="nova-memory-kind">' + escapeHtml(entry.kind || "note") + "</span>" +
+            '<span class="nova-memory-time">' + escapeHtml(formatTimeAgo(entry.updated_at || entry.created_at || "")) + "</span>" +
+          "</div>" +
+          '<div class="nova-memory-preview">' + escapeHtml(entry.preview || entry.text || "Untitled memory") + "</div>" +
+        "</button>" +
+        '<div class="nova-memory-actions">' +
+          '<button type="button" class="nova-memory-delete" data-memory-delete="' + escapeHtml(entry.id) + '">Delete</button>' +
+        "</div>" +
+      "</article>"
+    );
   }
 
-  function resolveTimestamp(item) {
-    return String(
-      item?.updated_at ||
-      item?.created_at ||
-      item?.timestamp ||
-      item?.time ||
-      ""
-    ).trim();
-  }
+  function renderMemory() {
+    var els = safeObject(getElements());
+    if (!els.memoryList) return;
 
-  function formatTimeLabel(item) {
-    const raw = resolveTimestamp(item);
-    if (!raw) return "saved";
+    var items = currentMemoryItems();
 
-    const date = new Date(raw);
-    if (Number.isNaN(date.getTime())) return "saved";
-
-    return date.toLocaleString([], {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  }
-
-  function render() {
-    const state = getStateBucket();
-    const memoryList = byId("memoryList");
-    if (!memoryList) return;
-
-    const items = Array.isArray(state.memoryItems) ? state.memoryItems : [];
+    if (els.memoryEmpty) {
+      els.memoryEmpty.hidden = items.length > 0;
+    }
 
     if (!items.length) {
-      memoryList.innerHTML = `<div class="memory-empty">No saved memory yet.</div>`;
+      els.memoryList.innerHTML = "";
       return;
     }
 
-    memoryList.innerHTML = items
-      .map((item) => {
-        const id = resolveMemoryId(item);
-        const kind = resolveMemoryKind(item);
-        const value = resolveMemoryValue(item);
-        const meta = formatTimeLabel(item);
+    els.memoryList.innerHTML = items.map(renderMemoryListItem).join("");
+  }
 
-        return `
-          <div class="memory-card" data-memory-id="${escapeHtml(id)}">
-            <div class="memory-main">
-              <div class="memory-kind">${escapeHtml(kind)}</div>
-              <div class="memory-value">${escapeHtml(value || "(empty)")}</div>
-              <div class="memory-meta">${escapeHtml(meta)}</div>
-            </div>
-            <div class="memory-actions">
-              <button
-                class="icon-btn"
-                type="button"
-                data-memory-delete="${escapeHtml(id)}"
-                aria-label="Delete memory"
-                title="Delete memory"
-              >
-                🗑
-              </button>
-            </div>
-          </div>
-        `;
+  function openMemoryItem(memoryId) {
+    var els = safeObject(getElements());
+    var items = currentMemoryItems();
+
+    var found = null;
+    for (var i = 0; i < items.length; i += 1) {
+      if (text(items[i].id) === text(memoryId)) {
+        found = items[i];
+        break;
+      }
+    }
+
+    if (!found) {
+      showToast("Memory not found", "error");
+      return;
+    }
+
+    openRail();
+    setRailTab("memory");
+    setRailSelectedItem("memory", found.id);
+
+    if (els.railViewer) {
+      els.railViewer.innerHTML = memoryViewerHtml(found);
+    }
+
+    highlightSelectedMemory(found.id);
+  }
+
+  function highlightSelectedMemory(memoryId) {
+    var els = safeObject(getElements());
+    if (!els.memoryList) return;
+
+    var nodes = els.memoryList.querySelectorAll("[data-memory-id]");
+    for (var i = 0; i < nodes.length; i += 1) {
+      var node = nodes[i];
+      var isActive = text(node.getAttribute("data-memory-id")) === text(memoryId);
+      node.classList.toggle("is-active", isActive);
+    }
+  }
+
+  function deleteMemory(memoryId) {
+    if (!memoryId) return;
+
+    apiPost("/api/memory/delete", { memory_id: memoryId })
+      .then(function () {
+        showToast("Memory deleted", "success");
+        return refreshState();
       })
-      .join("");
+      .then(function () {
+        renderMemory();
+      })
+      .catch(function (error) {
+        warn("memory delete failed", error);
+        showToast("Memory delete failed", "error");
+      });
   }
 
-  async function refresh() {
-    const payload = await apiGet(API.list);
-    const state = getStateBucket();
-    state.memoryItems = normalizeMemoryItems(payload);
-    render();
-    return state.memoryItems;
-  }
-
-  async function addMemoryFromValue(rawValue) {
-    const value = String(rawValue || "").trim();
-    if (!value) return false;
-
-    await apiPost(API.add, {
-      value,
-      text: value,
-      content: value,
-      kind: "note",
-      type: "note",
-    });
-
-    const memoryInput = byId("memoryInput");
-    if (memoryInput) {
-      memoryInput.value = "";
+  function bindMemoryClicks() {
+    var els = safeObject(getElements());
+    if (!els.memoryList || els.memoryList.dataset.boundMemorySplit === "1") {
+      return;
     }
 
-    await refresh();
-    return true;
-  }
+    els.memoryList.dataset.boundMemorySplit = "1";
 
-  async function deleteMemory(memoryId) {
-    const id = String(memoryId || "").trim();
-    if (!id) return false;
+    els.memoryList.addEventListener("click", function (event) {
+      var openBtn = event.target.closest("[data-memory-open]");
+      if (openBtn) {
+        var memoryId = text(openBtn.getAttribute("data-memory-open"));
+        if (memoryId) {
+          openMemoryItem(memoryId);
+        }
+        return;
+      }
 
-    await apiPost(API.delete, {
-      id,
-      memory_id: id,
-    });
-
-    const state = getStateBucket();
-    state.memoryItems = (state.memoryItems || []).filter(
-      (item) => resolveMemoryId(item) !== id
-    );
-    render();
-
-    try {
-      await refresh();
-    } catch (error) {
-      console.error("Nova memory refresh after delete failed:", error);
-    }
-
-    return true;
-  }
-
-  function bindAddButton() {
-    const addMemoryBtn = byId("addMemoryBtn");
-    const memoryInput = byId("memoryInput");
-
-    if (!addMemoryBtn || addMemoryBtn.__novaMemoryAddBound) return;
-    addMemoryBtn.__novaMemoryAddBound = true;
-
-    addMemoryBtn.addEventListener("click", async (event) => {
-      event.preventDefault();
-
-      try {
-        const value = memoryInput ? memoryInput.value : "";
-        await addMemoryFromValue(value);
-      } catch (error) {
-        console.error("Nova add memory failed:", error);
+      var deleteBtn = event.target.closest("[data-memory-delete]");
+      if (deleteBtn) {
+        var deleteId = text(deleteBtn.getAttribute("data-memory-delete"));
+        if (deleteId) {
+          deleteMemory(deleteId);
+        }
       }
     });
   }
 
-  function bindInputEnter() {
-    const memoryInput = byId("memoryInput");
-    if (!memoryInput || memoryInput.__novaMemoryEnterBound) return;
-
-    memoryInput.__novaMemoryEnterBound = true;
-    memoryInput.addEventListener("keydown", async (event) => {
-      if (event.key !== "Enter") return;
-      event.preventDefault();
-
-      try {
-        await addMemoryFromValue(memoryInput.value);
-      } catch (error) {
-        console.error("Nova add memory by enter failed:", error);
-      }
-    });
+  function boot() {
+    bindMemoryClicks();
+    renderMemory();
   }
 
-  function bindListEvents() {
-    const memoryList = byId("memoryList");
-    if (!memoryList || memoryList.__novaMemoryListBound) return;
-
-    memoryList.__novaMemoryListBound = true;
-    memoryList.addEventListener("click", async (event) => {
-      const deleteBtn = event.target.closest("[data-memory-delete]");
-      if (!deleteBtn) return;
-
-      event.preventDefault();
-
-      try {
-        await deleteMemory(deleteBtn.getAttribute("data-memory-delete"));
-      } catch (error) {
-        console.error("Nova delete memory failed:", error);
-      }
-    });
-  }
-
-  async function bootstrap() {
-    bindAddButton();
-    bindInputEnter();
-    bindListEvents();
-
-    try {
-      await refresh();
-    } catch (error) {
-      console.error("Nova memory bootstrap failed:", error);
-      render();
-    }
-
-    return true;
-  }
-
-  Nova.memory.refresh = refresh;
-  Nova.memory.render = render;
-  Nova.memory.addMemoryFromValue = addMemoryFromValue;
-  Nova.memory.deleteMemory = deleteMemory;
-  Nova.memory.bootstrap = bootstrap;
+  window.NovaMemoryModule = {
+    version: VERSION,
+    bind: bindMemoryClicks,
+    render: renderMemory,
+    open: openMemoryItem,
+    viewerHtml: memoryViewerHtml,
+    boot: boot,
+  };
 
   if (document.readyState === "loading") {
-    document.addEventListener(
-      "DOMContentLoaded",
-      () => {
-        bootstrap().catch((error) => {
-          console.error("Nova memory DOM bootstrap failed:", error);
-        });
-      },
-      { once: true }
-    );
+    document.addEventListener("DOMContentLoaded", boot);
   } else {
-    bootstrap().catch((error) => {
-      console.error("Nova memory immediate bootstrap failed:", error);
-    });
+    boot();
   }
 })();

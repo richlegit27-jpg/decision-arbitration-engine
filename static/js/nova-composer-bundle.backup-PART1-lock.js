@@ -337,15 +337,6 @@ const state = {
     buffer: "",
   },
 
-  tokenRender: {
-    queue: "",
-    timer: null,
-    targetMessageId: "",
-    flushMs: 28,
-  },
-
-  imageGenPlaceholderId: null,
-
   voice: {
     recording: false,
     mediaRecorder: null,
@@ -368,7 +359,7 @@ const state = {
     artifactFilter: "all",
   },
 };
-
+  
 function syncRailReopenVisibility() {
   const el = document.querySelector("[data-rail-reopen-wrap]");
   if (!el) return;
@@ -650,17 +641,6 @@ async function openArtifactFromStateOrBackend(artifactId) {
     return message;
   }
 
-function removeMessage(messageId) {
-  const id = String(messageId || "").trim();
-  if (!id) return;
-
-  state.messages = (state.messages || []).filter(function (msg) {
-    return String((msg && msg.id) || "") !== id;
-  });
-
-  renderChat();
-}
-
   function removeMessageById(messageId) {
     const before = state.messages.length;
     state.messages = state.messages.filter(function (item) {
@@ -696,7 +676,6 @@ function applyStatePayload(payload) {
   state.activeSessionId = String(
     data.active_session_id ||
       data.session_id ||
-      (data.active_session && data.active_session.id) ||
       (data.session && data.session.id) ||
       state.activeSessionId ||
       ""
@@ -706,9 +685,7 @@ function applyStatePayload(payload) {
     setSessions(data.sessions);
   }
 
-  if (data.active_session && Array.isArray(data.active_session.messages)) {
-    state.messages = data.active_session.messages.map(normalizeMessage);
-  } else if (data.session && Array.isArray(data.session.messages)) {
+  if (data.session && Array.isArray(data.session.messages)) {
     state.messages = data.session.messages.map(normalizeMessage);
   } else if (Array.isArray(data.messages)) {
     state.messages = data.messages.map(normalizeMessage);
@@ -718,30 +695,12 @@ function applyStatePayload(payload) {
 
   state.artifacts = safeArray(data.artifacts);
   state.memory = safeArray(data.memory);
-  state.web = safeArray(data.web);
 
   renderSessionList();
   renderChat();
   renderArtifacts();
   renderMemory();
-
-  if (typeof renderWeb === "function") {
-    renderWeb();
-  }
-
   updateTopbarFromState();
-}
-
-// 🔥 send state to right panel (CRITICAL LINK)
-try {
-  window.dispatchEvent(new CustomEvent("nova:composer-state", {
-    detail: {
-      session_id: state.activeSessionId,
-      artifacts: state.artifacts || []
-    }
-  }));
-} catch (e) {
-  console.warn("composer-state dispatch failed", e);
 }
 
   function currentUserMessageForRegenerate(targetAssistantId) {
@@ -956,6 +915,164 @@ function renderAttachmentBlock(attachment) {
   );
 }
 
+function colorizeText(text) {
+  const safe = String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  let html = safe;
+
+  html = html.replace(/```(\w+)?\n?([\s\S]*?)```/g, function (_, lang, code) {
+    const language = String(lang || "text").trim();
+    const cleanCode = String(code || "").trim();
+
+    const encoded = cleanCode
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+    return (
+      '<div class="nova-code-shell">' +
+        '<div class="nova-code-topbar">' +
+          '<span class="nova-code-lang">' + language + '</span>' +
+          '<button class="nova-code-copy" type="button" data-copy-code="' + encoded + '">Copy</button>' +
+        '</div>' +
+        '<div class="nova-code-block">' +
+          '<pre><code>' + cleanCode + '</code></pre>' +
+        '</div>' +
+      '</div>'
+    );
+  });
+
+  html = html.replace(/`([^`]+)`/g, '<span class="nova-inline-code">$1</span>');
+  html = html.replace(/^### (.*)$/gm, '<div class="nova-h3">$1</div>');
+  html = html.replace(/^## (.*)$/gm, '<div class="nova-h2">$1</div>');
+  html = html.replace(/^# (.*)$/gm, '<div class="nova-h1">$1</div>');
+  html = html.replace(/\*\*(.*?)\*\*/g, '<span class="nova-bold">$1</span>');
+  html = html.replace(/\*(.*?)\*/g, '<span class="nova-italic">$1</span>');
+
+  html = html.replace(
+    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer" class="nova-link">$1</a>'
+  );
+
+  html = html.replace(
+    /(^|\s)(https?:\/\/[^\s<]+)/g,
+    function (_, prefix, url) {
+      return prefix + '<a href="' + url + '" target="_blank" rel="noopener noreferrer" class="nova-link">' + url + '</a>';
+    }
+  );
+
+  html = html.replace(
+    /(?:^|\n)((?:- .*(?:\n|$))+)/g,
+    function (match, block) {
+      const items = block
+        .trim()
+        .split("\n")
+        .map(function (line) {
+          return '<li>' + line.replace(/^- /, "") + '</li>';
+        })
+        .join("");
+      return '\n<ul class="nova-list">' + items + '</ul>\n';
+    }
+  );
+
+  html = html.replace(
+    /(?:^|\n)((?:\d+\. .*(?:\n|$))+)/g,
+    function (match, block) {
+      const items = block
+        .trim()
+        .split("\n")
+        .map(function (line) {
+          return '<li>' + line.replace(/^\d+\. /, "") + '</li>';
+        })
+        .join("");
+      return '\n<ol class="nova-list nova-list--ordered">' + items + '</ol>\n';
+    }
+  );
+
+  html = html.replace(/\n/g, "<br>");
+
+  html = html
+    .replace(/<\/ul><br>/g, "</ul>")
+    .replace(/<\/ol><br>/g, "</ol>")
+    .replace(/<br><ul/g, "<ul")
+    .replace(/<br><ol/g, "<ol");
+
+  return html;
+}
+
+function renderMessageCard(message) {
+  const role = String(message.role || "assistant");
+  const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
+  const attachments = safeArray(message.attachments);
+
+  const attachmentsHtml = attachments.length
+    ? '<div class="message-attachments">' +
+      attachments.map(renderAttachmentBlock).join("") +
+      "</div>"
+    : "";
+
+  const renderedText = role === "assistant"
+    ? colorizeText(message.text || "")
+    : renderSafeText(message.text || "");
+
+  const bodyHtml = message.text
+    ? '<div class="message-card__body">' + renderedText + "</div>"
+    : message.pending || message.streaming
+    ? '<div class="message-card__body"><span class="message-card__typing"><span class="message-card__dot"></span><span class="message-card__dot"></span><span class="message-card__dot"></span></span></div>'
+    : "";
+
+  const metaBits = [];
+  if (message.pending || message.streaming) metaBits.push("Streaming");
+  if (message.error) metaBits.push("Error");
+  if (message.stopped) metaBits.push("Stopped");
+  if (message.source) metaBits.push(message.source);
+
+  const metaHtml = metaBits.length
+    ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
+    : "";
+
+  return (
+    '<article class="message-card ' +
+    roleClass +
+    '" data-message-id="' +
+    escapeHtml(message.id || "") +
+    '">' +
+    '<div class="message-card__header">' +
+    '<div class="message-card__role">' +
+    escapeHtml(role === "user" ? "You" : "Nova") +
+    "</div>" +
+    metaHtml +
+    "</div>" +
+    bodyHtml +
+    attachmentsHtml +
+    renderMessageActions(message) +
+    "</article>"
+  );
+}
+
+function renderChat(forceBottom) {
+  if (!els.chatThread) return;
+
+  const thread = els.chatThread;
+  const nearBottom =
+    (thread.scrollHeight - thread.scrollTop - thread.clientHeight) < 120;
+
+  setChatEmptyVisible(state.messages.length === 0);
+  els.chatThread.innerHTML = state.messages.map(renderMessageCard).join("");
+  updateTopbarFromState();
+
+  if (forceBottom || nearBottom) {
+    requestAnimationFrame(function () {
+      scrollChatToBottom(true);
+    });
+  }
+}
+
   function renderMessageActions(message) {
     if (String(message.role) !== "assistant") return "";
 
@@ -979,60 +1096,6 @@ function renderAttachmentBlock(attachment) {
       "</div>"
     );
   }
-
-function renderMessageCard(message) {
-  const role = String(message.role || "assistant");
-  const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
-  const attachments = safeArray(message.attachments);
-
-  const attachmentsHtml = attachments.length
-    ? '<div class="message-attachments">' +
-      attachments.map(renderAttachmentBlock).join("") +
-      "</div>"
-    : "";
-
-  const bodyHtml = message.text
-    ? '<div class="message-card__body">' + renderSafeText(message.text) + "</div>"
-    : message.pending || message.streaming
-    ? '<div class="message-card__body"><span class="message-card__typing"><span class="message-card__dot"></span><span class="message-card__dot"></span><span class="message-card__dot"></span></span></div>'
-    : "";
-
-  const metaBits = [];
-  if (message.pending || message.streaming) metaBits.push("Streaming");
-  if (message.error) metaBits.push("Error");
-  if (message.stopped) metaBits.push("Stopped");
-  if (message.source) metaBits.push(message.source);
-
-  const metaHtml = metaBits.length
-    ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
-    : "";
-
-  return (
-    '<article class="message-card ' +
-    roleClass +
-    '" data-message-id="' +
-    escapeHtml(message.id) +
-    '">' +
-    '<div class="message-card__header">' +
-    '<div class="message-card__role">' +
-    escapeHtml(role === "user" ? "You" : "Nova") +
-    "</div>" +
-    metaHtml +
-    "</div>" +
-    bodyHtml +
-    attachmentsHtml +
-    renderMessageActions(message) +
-    "</article>"
-  );
-}
-
-function renderChat() {
-  if (!els.chatThread) return;
-  setChatEmptyVisible(state.messages.length === 0);
-  els.chatThread.innerHTML = state.messages.map(renderMessageCard).join("");
-  updateTopbarFromState();
-  scrollChatToBottom(true);
-}
 
 function renderSessionList() {
   if (!els.sessionList) return;
@@ -1498,367 +1561,57 @@ function renderArtifacts() {
     });
   }
 
-let tokenTextBuffer = null;
-let tokenMessageId = null;
-let tokenFlushQueued = false;
 
-function queueTokenFlush(messageId) {
-  return;
-}
 
-function flushTokensNow() {
-  return;
-}
-
-function finalizeStreamMessage(payload) {
-  const data = payload && typeof payload === "object" ? payload : {};
-
-  if (!state.stream) {
-    state.stream = {
-      running: false,
-      controller: null,
-      targetMessageId: "",
-      buffer: "",
-      startedAt: 0,
-    };
-  }
-
-  const targetId = String(
-    state.stream.targetMessageId ||
-    data.message_id ||
-    data.id ||
-    ""
-  ).trim();
-
-  const finalText = String(
-    data.text ||
-    data.response ||
-    data.output_text ||
-    data.assistant_text ||
-    state.stream.buffer ||
-    ""
-  );
-
-  const attachments = Array.isArray(data.attachments) ? data.attachments : [];
-  const meta =
-    data.meta && typeof data.meta === "object"
-      ? data.meta
-      : {};
-
-  if (targetId) {
-    upsertMessage(normalizeMessage({
-      id: targetId,
-      role: "assistant",
-      text: finalText,
-      streaming: false,
-      pending: false,
-      error: false,
-      stopped: true,
-      attachments: attachments,
-      meta: meta,
-    }));
-  }
-
-  state.stream.running = false;
-  state.stream.controller = null;
-  state.stream.targetMessageId = "";
-  state.stream.buffer = "";
-  state.stream.startedAt = 0;
-
-  if (data.session && Array.isArray(data.session.messages)) {
-    state.messages = data.session.messages.map(normalizeMessage);
-  } else if (Array.isArray(data.messages)) {
-    state.messages = data.messages.map(normalizeMessage);
-  }
-
-  if (Array.isArray(data.artifacts)) {
-    state.artifacts = data.artifacts;
-  }
-
-  if (Array.isArray(data.memory)) {
-    state.memory = data.memory;
-  }
-
-  renderChat();
-  renderArtifacts();
-  renderMemory();
-  updateTopbarFromState();
-  scrollChatToBottom();
-}
-
-function handleStreamEvent(event) {
-  const payload = event && typeof event === "object" ? event : {};
-
-  const type = String(
-    payload.type ||
-    payload.event ||
-    payload.kind ||
-    ""
-  ).trim().toLowerCase();
-
-if (type === "token" || type === "delta" || type === "chunk") {
-  const chunkText = String(
-    payload.text ||
-    payload.delta ||
-    payload.token ||
-    ""
-  );
-
-  if (state.stream && state.stream.targetMessageId && chunkText) {
-    queueIncomingTokens(state.stream.targetMessageId, chunkText);
-  }
-
-  return;
-}
-
-  if (!state.stream) {
-    state.stream = {
-      running: false,
-      controller: null,
-      targetMessageId: "",
-      buffer: "",
-      startedAt: 0,
-      messageId: "",
-      placeholderId: "",
-    };
-  }
-
-  if (!state.stream.targetMessageId) {
-    const messageId = String(
-      payload.message_id ||
-      payload.id ||
-      ("assistant_" + Date.now())
-    ).trim();
-
-    state.stream.targetMessageId = messageId;
-    state.stream.messageId = messageId;
-    state.stream.placeholderId = messageId;
-
-    upsertMessage(normalizeMessage({
-      id: messageId,
-      role: "assistant",
-      text: "",
-      streaming: true,
-      pending: false,
-      error: false,
-      stopped: false,
-      attachments: [],
-      meta: {},
-    }));
-
-    renderChat();
-    scrollChatToBottom(true);
-  }
-
-  const targetId = String(state.stream.targetMessageId || "").trim();
-  if (!targetId) return;
-
-  const delta =
-    typeof payload.delta === "string" ? payload.delta :
-    typeof payload.token === "string" ? payload.token :
-    typeof payload.text_delta === "string" ? payload.text_delta :
-    typeof payload.chunk === "string" ? payload.chunk :
-    "";
-
-  if (delta) {
-    state.stream.buffer = String(state.stream.buffer || "") + delta;
-
-    upsertMessage(normalizeMessage({
-      id: targetId,
-      role: "assistant",
-      text: state.stream.buffer,
-      streaming: true,
-      pending: false,
-      error: false,
-      stopped: false,
-      attachments: [],
-      meta: {},
-    }));
-
-    renderChat();
-    scrollChatToBottom(true);
-    return;
-  }
-
-  if (
-    type === "final" ||
-    type === "done" ||
-    type === "complete" ||
-    payload.done === true ||
-    payload.final === true
-  ) {
-    finalizeStreamMessage(payload);
-    return;
-  }
-
-  if (payload.error) {
-    upsertMessage(normalizeMessage({
-      id: targetId,
-      role: "assistant",
-      text: String(payload.error || "Stream failed."),
-      streaming: false,
-      pending: false,
-      error: true,
-      stopped: true,
-      attachments: [],
-      meta: {},
-    }));
-
-    state.stream.running = false;
-    state.stream.controller = null;
-    state.stream.targetMessageId = "";
-    state.stream.buffer = "";
-    state.stream.startedAt = 0;
-    state.stream.messageId = "";
-    state.stream.placeholderId = "";
-
-    renderChat();
-    scrollChatToBottom(true);
-  }
-}
-
-async function consumeChatStreamStable(payload) {
-  if (!state.stream) {
-    state.stream = {
-      running: false,
-      controller: null,
-      targetMessageId: "",
-      buffer: "",
-      startedAt: 0,
-      messageId: "",
-      placeholderId: "",
-    };
-  }
-
-  if (!state.stream.controller) {
-    state.stream.controller = new AbortController();
-  }
-
-  state.stream.running = true;
-  state.stream.buffer = state.stream.buffer || "";
-
+if (!findMessageById(state.stream.messageId || "")) {
   try {
-    const response = await fetch("/api/chat", {
-      method: "POST",
+    const fallbackResponse = await fetch("/api/state", {
+      method: "GET",
       credentials: "same-origin",
       headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream, application/json",
+        Accept: "application/json",
       },
-      body: JSON.stringify(payload || {}),
-      signal: state.stream.controller.signal,
     });
 
-    if (!response.ok) {
-      throw new Error("Request failed: " + response.status);
+    const fallbackData = await fallbackResponse.json().catch(function () {
+      return {};
+    });
+
+    if (fallbackData && Array.isArray(fallbackData.sessions)) {
+      setSessions(fallbackData.sessions);
     }
 
-    const contentType = String(
-      response.headers.get("content-type") || ""
-    ).toLowerCase();
+    if (fallbackData && Array.isArray(fallbackData.memory)) {
+      state.memory = fallbackData.memory;
+      renderMemory();
+    }
 
-    if (contentType.includes("application/json")) {
-      const data = await response.json().catch(function () {
-        return {};
-      });
+    if (fallbackData && Array.isArray(fallbackData.artifacts)) {
+      state.artifacts = fallbackData.artifacts;
+      renderArtifacts();
+    }
 
-      if (data.session_id) {
-        state.activeSessionId = String(data.session_id || "");
-      } else if (data.session && data.session.id) {
-        state.activeSessionId = String(data.session.id || "");
-      }
-
-      if (Array.isArray(data.sessions)) {
-        setSessions(data.sessions);
-      }
-
-      if (data.session && Array.isArray(data.session.messages)) {
-        state.messages = data.session.messages.map(normalizeMessage);
-      } else if (Array.isArray(data.messages)) {
-        state.messages = data.messages.map(normalizeMessage);
-      } else if (data.assistant_message) {
-        upsertMessage(normalizeMessage(data.assistant_message));
-      }
-
-      if (Array.isArray(data.artifacts)) {
-        state.artifacts = data.artifacts;
-        renderArtifacts();
-      }
-
-      if (Array.isArray(data.memory)) {
-        state.memory = data.memory;
-        renderMemory();
-      }
-
-      renderSessionList();
+    if (
+      fallbackData &&
+      fallbackData.active_session &&
+      Array.isArray(fallbackData.active_session.messages)
+    ) {
+      state.messages = fallbackData.active_session.messages.map(normalizeMessage);
       renderChat();
+      renderSessionList();
       updateTopbarFromState();
       scrollChatToBottom(true);
-      flushTokensNow();
-      clearTokenRenderState();
-      finishStreamUi({ statusState: "idle", statusText: "Ready" });
-      return;
     }
-
-    if (!response.body || typeof response.body.getReader !== "function") {
-      throw new Error("Streaming response body is unavailable.");
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const result = await reader.read();
-      const done = result.done;
-      const value = result.value;
-
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      const parts = buffer.split("\n\n");
-      buffer = parts.pop() || "";
-
-      for (let part of parts) {
-        part = String(part || "").trim();
-        if (!part.startsWith("data:")) continue;
-
-        const jsonStr = part.replace(/^data:\s*/, "");
-        if (!jsonStr || jsonStr === "[DONE]") continue;
-
-        try {
-          const evt = JSON.parse(jsonStr);
-          handleStreamEvent(evt);
-        } catch (error) {
-          warn("stream event parse failed", error);
-        }
-      }
-    }
-
-    if (buffer.trim().startsWith("data:")) {
-      try {
-        const trailing = JSON.parse(
-          buffer.trim().replace(/^data:\s*/, "")
-        );
-        handleStreamEvent(trailing);
-      } catch (error) {
-        warn("trailing stream event parse failed", error);
-      }
-    }
-
-    flushTokensNow();
-    clearTokenRenderState();
-    finalizeStreamMessage({});
-    renderChat();
-    renderSessionList();
-    updateTopbarFromState();
-    scrollChatToBottom(true);
-    finishStreamUi({ statusState: "idle", statusText: "Ready" });
   } catch (error) {
-    flushTokensNow();
-    clearTokenRenderState();
+    warn("post-stream fallback state refresh failed", error);
+  }
+}
 
+    if (state.stream.running) {
+      finishStreamUi({ statusState: "idle", statusText: "Ready" });
+      updateTopbarFromState();
+    }
+  } catch (error) {
     if (error && error.name === "AbortError") {
       finishStreamUi({ statusState: "idle", statusText: "Stopped" });
       updateTopbarFromState();
@@ -1869,15 +1622,59 @@ async function consumeChatStreamStable(payload) {
     updateTopbarFromState();
     throw error;
   } finally {
-    if (state.stream) {
-      state.stream.running = false;
-      state.stream.controller = null;
-      state.stream.buffer = "";
-      state.stream.placeholderId = "";
-      state.stream.messageId = "";
-      state.stream.targetMessageId = "";
-      state.stream.startedAt = 0;
+    state.stream.running = false;
+    state.stream.controller = null;
+    state.stream.buffer = "";
+    state.stream.placeholderId = "";
+    state.stream.messageId = "";
+  }
+}
+
+async function openSessionFromBackend(sessionId) {
+  const targetSessionId = String(sessionId || "").trim();
+  if (!targetSessionId) return false;
+
+  try {
+    const response = await fetch("/api/sessions/switch", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        session_id: targetSessionId,
+      }),
+    });
+
+    const payload = await response.json().catch(function () {
+      return {};
+    });
+
+    if (!response.ok || payload.ok === false) {
+      throw new Error(payload.error || "Session switch failed");
     }
+
+    applyStatePayload(payload);
+
+    state.activeSessionId = String(
+      payload.active_session_id ||
+      payload.session_id ||
+      (payload.session && payload.session.id) ||
+      targetSessionId
+    ).trim();
+
+    renderSessionList();
+    renderChat();
+    renderArtifacts();
+    renderMemory();
+    updateTopbarFromState();
+
+    return true;
+  } catch (error) {
+    warn("openSessionFromBackend failed", error);
+    showToast("Session open failed", "error");
+    return false;
   }
 }
 
@@ -2126,7 +1923,7 @@ function artifactViewerHtml(artifact) {
   return html;
 }
 
- function setRailTab(tab) {
+function setRailTab(tab) {
   const t = String(tab || "").trim();
   if (!t) return;
 
@@ -2143,14 +1940,19 @@ function artifactViewerHtml(artifact) {
     }
   });
 
-  /* toggle panels */
-  const artifactsPanel = document.querySelector("[data-rail-artifacts]");
-  const memoryPanel = document.querySelector("[data-rail-memory]");
-  const webPanel = document.querySelector("[data-rail-web]");
+  /* ✅ FIXED: correct selector */
+  const panels = document.querySelectorAll("[data-rail-panel]");
 
-  if (artifactsPanel) artifactsPanel.hidden = t !== "artifacts";
-  if (memoryPanel) memoryPanel.hidden = t !== "memory";
-  if (webPanel) webPanel.hidden = t !== "web";
+  panels.forEach(function (panel) {
+    const panelName = String(panel.getAttribute("data-rail-panel") || "").trim();
+    panel.hidden = panelName !== t;
+
+    if (panelName === t) {
+      panel.classList.add("is-active");
+    } else {
+      panel.classList.remove("is-active");
+    }
+  });
 
   /* render */
   if (t === "artifacts" && typeof renderArtifacts === "function") {
@@ -2361,92 +2163,144 @@ function setPendingUploadItem(nextItem) {
 
 async function uploadOneFile(file) {
   const tempId = makeId("att_local");
-
   setPendingUploadItem({
     id: tempId,
-    filename: String(file && file.name ? file.name : ""),
-    name: String(file && file.name ? file.name : ""),
-    stored_name: "",
-    file_url: "",
-    url: "",
-    mime_type: String((file && file.type) || "application/octet-stream"),
-    size: Number((file && file.size) || 0),
+    name: file && file.name ? file.name : "upload",
+    filename: file && file.name ? file.name : "upload",
+    mime_type: file && file.type ? file.type : "application/octet-stream",
+    size: file && typeof file.size === "number" ? file.size : 0,
     status: "uploading",
-    upload_error: "",
   });
 
-  state.uploadInFlightCount = Math.max(0, Number(state.uploadInFlightCount || 0)) + 1;
-  setBusyUi(state.stream && state.stream.running);
+  const formData = new FormData();
+  formData.append("file", file);
 
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
+    state.uploadInFlightCount += 1;
+    setBusyUi(state.stream.running);
 
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      credentials: "same-origin",
-      body: formData,
-    });
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        credentials: "same-origin",
+        body: formData,
+      });
 
-    const data = await response.json().catch(function () {
-      return {};
-    });
+      const data = await response.json().catch(function () {
+        return {};
+      });
 
-    if (!response.ok || data.ok === false) {
-      throw new Error(data.error || "Upload failed.");
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || "Upload failed.");
+      }
+
+           state.pendingUploads = state.pendingUploads.filter(function (item) {
+        return String(item.id) !== String(tempId);
+      });
+
+      const uploadedAttachment = Object.assign({}, normalizeAttachment(data.attachment || data), {
+        status: "uploaded",
+        upload_error: "",
+      });
+
+      setPendingUploadItem(uploadedAttachment);
+      showToast("Uploaded: " + (uploadedAttachment.filename || uploadedAttachment.name || "attachment"), "success");
+      return normalizeAttachment(uploadedAttachment); 
+
+    } catch (error) {
+      warn("upload failed", error);
+
+      const errorText = error && error.message ? error.message : "Upload failed.";
+
+      setPendingUploadItem({
+        id: tempId,
+        name: file && file.name ? file.name : "upload",
+        filename: file && file.name ? file.name : "upload",
+        mime_type: file && file.type ? file.type : "application/octet-stream",
+        size: file && typeof file.size === "number" ? file.size : 0,
+        status: "error",
+        upload_error: errorText,
+      });
+
+           showToast("Upload failed: " + (file && file.name ? file.name : "attachment"), "error");
+      throw error;   
+
+    } finally {
+      state.uploadInFlightCount = Math.max(0, state.uploadInFlightCount - 1);
+      setBusyUi(state.stream.running);
+      renderPendingUploads();
     }
-
-    const uploadedAttachment = normalizeAttachment({
-      id: tempId,
-      filename: String(data.original_filename || file.name || ""),
-      name: String(data.original_filename || file.name || ""),
-      stored_name: String(data.filename || ""),
-      file_url: String(data.file_url || data.url || ""),
-      url: String(data.url || data.file_url || ""),
-      mime_type: String(data.mime_type || file.type || "application/octet-stream"),
-      size: Number(data.size || file.size || 0),
-      status: "uploaded",
-      upload_error: "",
-    });
-
-    setPendingUploadItem(uploadedAttachment);
-uploadedAttachment.status = "done";
-    showToast(
-      "Uploaded: " + (uploadedAttachment.filename || uploadedAttachment.name || "attachment"),
-      "success"
-    );
-    return normalizeAttachment(uploadedAttachment);
-  } catch (error) {
-if (!(error instanceof TypeError)) {
-  warn("upload failed", error);
-}
-
-    const errorText = error && error.message ? error.message : "Upload failed.";
-
-    setPendingUploadItem({
-      id: tempId,
-      filename: String(file && file.name ? file.name : ""),
-      name: String(file && file.name ? file.name : ""),
-      stored_name: "",
-      file_url: "",
-      url: "",
-      mime_type: String((file && file.type) || "application/octet-stream"),
-      size: Number((file && file.size) || 0),
-      status: "error",
-      upload_error: errorText,
-    });
-
-    showToast(
-      "Upload failed: " + (file && file.name ? file.name : "attachment"),
-      "error"
-    );
-    throw error;
-  } finally {
-    state.uploadInFlightCount = Math.max(0, state.uploadInFlightCount - 1);
-    setBusyUi(state.stream && state.stream.running);
-    renderPendingUploads();
   }
-}
+
+
+async function uploadOneFile(file) {
+  const tempId = makeId("att_local");
+  setPendingUploadItem({
+    id: tempId,
+    name: file && file.name ? file.name : "upload",
+    filename: file && file.name ? file.name : "upload",
+    mime_type: file && file.type ? file.type : "application/octet-stream",
+    size: file && typeof file.size === "number" ? file.size : 0,
+    status: "uploading",
+  });
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+    state.uploadInFlightCount += 1;
+    setBusyUi(state.stream.running);
+
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        credentials: "same-origin",
+        body: formData,
+      });
+
+      const data = await response.json().catch(function () {
+        return {};
+      });
+
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || "Upload failed.");
+      }
+
+           state.pendingUploads = state.pendingUploads.filter(function (item) {
+        return String(item.id) !== String(tempId);
+      });
+
+      const uploadedAttachment = Object.assign({}, normalizeAttachment(data.attachment || data), {
+        status: "uploaded",
+        upload_error: "",
+      });
+
+      setPendingUploadItem(uploadedAttachment);
+      showToast("Uploaded: " + (uploadedAttachment.filename || uploadedAttachment.name || "attachment"), "success");
+      return normalizeAttachment(uploadedAttachment); 
+
+    } catch (error) {
+      warn("upload failed", error);
+
+      const errorText = error && error.message ? error.message : "Upload failed.";
+
+      setPendingUploadItem({
+        id: tempId,
+        name: file && file.name ? file.name : "upload",
+        filename: file && file.name ? file.name : "upload",
+        mime_type: file && file.type ? file.type : "application/octet-stream",
+        size: file && typeof file.size === "number" ? file.size : 0,
+        status: "error",
+        upload_error: errorText,
+      });
+
+           showToast("Upload failed: " + (file && file.name ? file.name : "attachment"), "error");
+      throw error;   
+
+    } finally {
+      state.uploadInFlightCount = Math.max(0, state.uploadInFlightCount - 1);
+      setBusyUi(state.stream.running);
+      renderPendingUploads();
+    }
+  }
 
   async function uploadFiles(fileList) {
     const files = Array.from(fileList || []);
@@ -2566,51 +2420,10 @@ async function consumeChatJson(payload) {
   }
 }
 
+
 async function sendMessage() {
   const text = String((els.chatInput && els.chatInput.value) || "").trim();
-  if (/^\/image|generate image|create image|draw/i.test(text)) {
-    const tempId = "gen_" + Date.now();
-
-    upsertMessage(normalizeMessage({
-      id: tempId,
-      role: "assistant",
-      text: "🎨 Generating image...",
-      pending: true,
-      streaming: false,
-      error: false,
-      stopped: false,
-      attachments: [],
-    }));
-
-    state.imageGenPlaceholderId = tempId;
-  }
-
-  const attachments = state.pendingUploads
-    .filter(function (item) {
-      return (
-        item &&
-        item.status === "uploaded" &&
-        (
-          String(item.stored_name || "").trim() ||
-          String(item.file_url || "").trim() ||
-          String(item.url || "").trim()
-        )
-      );
-    })
-    .map(function (item) {
-      return {
-        id: String(item.id || ""),
-        filename: String(item.filename || item.name || ""),
-        name: String(item.name || item.filename || ""),
-        stored_name: String(item.stored_name || ""),
-        file_url: String(item.file_url || ""),
-        url: String(item.url || item.file_url || ""),
-        mime_type: String(item.mime_type || "application/octet-stream"),
-        size: Number(item.size || 0),
-        status: "uploaded",
-        upload_error: "",
-      };
-    });
+  const attachments = state.pendingUploads.slice();
 
   if (!text && !attachments.length) {
     return;
@@ -2685,16 +2498,6 @@ async function sendMessage() {
 
       payload.placeholder_id = pendingAssistantId;
       await consumeChatStream(payload);
-      if (state.imageGenPlaceholderId) {
-        removeMessage(state.imageGenPlaceholderId);
-        state.imageGenPlaceholderId = null;
-      }
-
-// REMOVE IMAGE PLACEHOLDER AFTER RESPONSE STARTS
-if (state.imageGenPlaceholderId) {
-  removeMessage(state.imageGenPlaceholderId);
-  state.imageGenPlaceholderId = null;
-}
      
     }
   } catch (error) {
@@ -2741,8 +2544,6 @@ function stopGeneration() {
     state.stream.controller.abort();
     showToast("Generation stopped.", "info");
   } catch (_) {}
-  flushTokensNow();
-  clearTokenRenderState();
   finishStreamUi();
 }
 
@@ -3858,21 +3659,69 @@ function renderMemory() {
   const items = (Array.isArray(state.memory) ? state.memory : []).map(normalizeMemoryItem);
   state.memory = items;
 
+  let html = '<button type="button" class="nova-btn" data-memory-add>+ Add Memory</button>';
+
   if (!items.length) {
     empty.hidden = false;
-    list.innerHTML = "";
+    list.innerHTML = html;
     return;
   }
 
   empty.hidden = true;
-  list.innerHTML = items.map(function (m) {
+
+  html += items.map(function (m) {
+    const id = escapeHtml(m.id || "");
+    const title = escapeHtml(summarizeMemoryText(m.preview || m.text, 120) || "Memory item");
+    const kind = escapeHtml(m.kind || "note");
+
     return (
-      '<button class="nova-rail-card" type="button" data-memory-open="' + escapeHtml(m.id) + '">' +
-      '<div class="nova-rail-card-title">' + escapeHtml(summarizeMemoryText(m.preview || m.text, 120) || "Memory item") + "</div>" +
-      '<div class="nova-rail-card-meta">' + escapeHtml(m.kind || "note") + "</div>" +
-      "</button>"
+      '<div class="nova-rail-card" data-memory-id="' + id + '">' +
+        '<button type="button" class="nova-rail-card-main" data-memory-open="' + id + '">' +
+          '<div class="nova-rail-card-title">' + title + '</div>' +
+          '<div class="nova-rail-card-meta">' + kind + '</div>' +
+        '</button>' +
+        '<button type="button" class="nova-rail-card-delete" data-memory-delete="' + id + '">✕</button>' +
+      '</div>'
     );
   }).join("");
+
+  list.innerHTML = html;
+}
+
+function wireMemoryControls() {
+  if (document.body.dataset.memoryControlsBound === "1") return;
+  document.body.dataset.memoryControlsBound = "1";
+
+  document.addEventListener("click", async function (event) {
+    const addBtn = event.target.closest("[data-memory-add]");
+    if (addBtn) {
+      const text = window.prompt("Enter memory:");
+      if (!text) return;
+
+      try {
+        await apiPost("/api/memory/add", { text: text });
+        const payload = await apiGet("/api/state");
+        applyStatePayload(payload || {});
+      } catch (error) {
+        console.warn("[NovaComposerBundle] memory add failed", error);
+      }
+      return;
+    }
+
+    const delBtn = event.target.closest("[data-memory-delete]");
+    if (delBtn) {
+      const id = String(delBtn.getAttribute("data-memory-delete") || "").trim();
+      if (!id) return;
+
+      try {
+        await apiPost("/api/memory/delete", { id: id });
+        const payload = await apiGet("/api/state");
+        applyStatePayload(payload || {});
+      } catch (error) {
+        console.warn("[NovaComposerBundle] memory delete failed", error);
+      }
+    }
+  });
 }
 
 function renderMemoryViewer(item) {
@@ -4014,9 +3863,22 @@ function mergeAssistantReplyIntoState(payload) {
     state.artifacts = finalEvent.artifacts.slice();
   }
 
-  if (finalEvent && Array.isArray(finalEvent.memory)) {
-    state.memory = finalEvent.memory.map(normalizeMemoryItem);
+  if (finalEvent && Array.isArray(finalEvent.memory) && finalEvent.memory.length) {
+  const incoming = finalEvent.memory.map(normalizeMemoryItem);
+  const existing = Array.isArray(state.memory) ? state.memory : [];
+  const merged = incoming.slice();
+
+  for (let i = 0; i < existing.length; i += 1) {
+    const alreadyThere = merged.find(function (m) {
+      return String(m.id || "") === String(existing[i].id || "");
+    });
+    if (!alreadyThere) {
+      merged.push(normalizeMemoryItem(existing[i]));
+    }
   }
+
+  state.memory = merged;
+}
 
   renderReplyUi();
 
@@ -4027,10 +3889,6 @@ function mergeAssistantReplyIntoState(payload) {
   if (typeof renderSessions === "function") {
     renderSessions();
   }
-}
-
-function consumeChatStream(payload) {
-  return consumeChatStreamStable(payload);
 }
 
 function wireArtifactClicks() {
@@ -4129,6 +3987,7 @@ async function loadState() {
   applyStatePayload(payload || {});
   return payload;
 }
+
 boot();
 
 if (typeof initShellExtensions === "function") {
@@ -4153,6 +4012,10 @@ if (typeof wireArtifactControls === "function") {
 
 if (typeof wireMemoryClicks === "function") {
   wireMemoryClicks();
+}
+
+if (typeof wireMemoryControls === "function") {
+  wireMemoryControls();
 }
 
 if (typeof renderMemory === "function") {

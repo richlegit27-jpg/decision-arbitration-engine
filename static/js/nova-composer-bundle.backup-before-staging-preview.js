@@ -318,6 +318,7 @@ function attachmentSummary(attachment) {
     ttsToggleButton: document.querySelector('[data-action="tts-toggle"]'),
   };
 
+
 const state = {
   booted: false,
   activeSessionId: "",
@@ -336,15 +337,6 @@ const state = {
     placeholderId: "",
     buffer: "",
   },
-
-  tokenRender: {
-    queue: "",
-    timer: null,
-    targetMessageId: "",
-    flushMs: 28,
-  },
-
-  imageGenPlaceholderId: null,
 
   voice: {
     recording: false,
@@ -369,6 +361,196 @@ const state = {
   },
 };
 
+// ==============================
+// ATTACHMENT BUTTON → UPLOAD PIPELINE
+// ==============================
+
+if (els.attachButton && els.attachInput) {
+  els.attachButton.addEventListener("click", function () {
+    els.attachInput.click();
+  });
+
+  els.attachInput.addEventListener("change", async function (event) {
+    const files = Array.from((event.target && event.target.files) || []);
+    if (!files.length) return;
+
+    for (const file of files) {
+      const pending = {
+        id: makeId("upload"),
+        filename: file.name,
+        stored_name: "",
+        url: "",
+        mime_type: file.type || "application/octet-stream",
+        size: file.size || 0,
+        status: "uploading",
+        upload_error: "",
+      };
+
+      state.pendingUploads.push(pending);
+      renderPendingUploads();
+
+      try {
+        state.uploadInFlightCount++;
+
+        const form = new FormData();
+        form.append("file", file);
+
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          credentials: "same-origin",
+          body: form,
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || data.ok === false) {
+          throw new Error(data.error || "Upload failed");
+        }
+
+        pending.status = "uploaded";
+        pending.stored_name = String(data.filename || file.name);
+        pending.url = resolveUploadUrl(data.url || data.file_url || "");
+      } catch (err) {
+        pending.status = "error";
+        pending.upload_error = String(err.message || err);
+        warn("upload failed", err);
+      } finally {
+        state.uploadInFlightCount--;
+        renderPendingUploads();
+      }
+    }
+
+    // allow re-select same file
+    els.attachInput.value = "";
+  });
+}
+
+if (els.uploadStaging) {
+  els.uploadStaging.addEventListener("click", function (event) {
+    const btn = event.target.closest("[data-upload-remove]");
+    if (!btn) return;
+
+    const id = String(btn.getAttribute("data-upload-remove") || "");
+    state.pendingUploads = state.pendingUploads.filter(function (item) {
+      return String(item.id) !== id;
+    });
+
+    renderPendingUploads();
+  });
+}
+
+// ==============================
+// DRAG + DROP UPLOAD
+// ==============================
+
+function uploadSelectedFiles(files) {
+  const list = Array.from(files || []);
+  if (!list.length) return Promise.resolve();
+
+  return (async function () {
+    for (const file of list) {
+      const pending = {
+        id: makeId("upload"),
+        filename: file.name,
+        stored_name: "",
+        url: "",
+        mime_type: file.type || "application/octet-stream",
+        size: file.size || 0,
+        status: "uploading",
+        upload_error: "",
+      };
+
+      state.pendingUploads.push(pending);
+      renderPendingUploads();
+
+      try {
+        state.uploadInFlightCount++;
+
+        const form = new FormData();
+        form.append("file", file);
+
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          credentials: "same-origin",
+          body: form,
+        });
+
+        const data = await response.json().catch(function () {
+          return {};
+        });
+
+        if (!response.ok || data.ok === false) {
+          throw new Error(data.error || "Upload failed");
+        }
+
+        pending.status = "uploaded";
+        pending.stored_name = String(data.filename || file.name);
+        pending.url = resolveUploadUrl(data.url || data.file_url || "");
+      } catch (err) {
+        pending.status = "error";
+        pending.upload_error = String(err && err.message ? err.message : err);
+        warn("upload failed", err);
+      } finally {
+        state.uploadInFlightCount = Math.max(0, state.uploadInFlightCount - 1);
+        renderPendingUploads();
+      }
+    }
+  })();
+}
+
+// ==============================
+// PASTE IMAGE UPLOAD
+// ==============================
+
+document.addEventListener("paste", function (event) {
+  const items = Array.from((event.clipboardData && event.clipboardData.items) || []);
+  if (!items.length) return;
+
+  const files = items
+    .filter(function (item) {
+      return item && item.kind === "file";
+    })
+    .map(function (item) {
+      return item.getAsFile();
+    })
+    .filter(Boolean);
+
+  if (!files.length) return;
+
+  uploadSelectedFiles(files).catch(function (error) {
+    warn("paste upload failed", error);
+    showToast("Paste upload failed", "error");
+  });
+});
+
+if (els.chatThread) {
+  ["dragenter", "dragover"].forEach(function (eventName) {
+    els.chatThread.addEventListener(eventName, function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      els.chatThread.classList.add("is-dragover");
+    });
+  });
+
+  ["dragleave", "dragend", "drop"].forEach(function (eventName) {
+    els.chatThread.addEventListener(eventName, function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      els.chatThread.classList.remove("is-dragover");
+    });
+  });
+
+  els.chatThread.addEventListener("drop", function (event) {
+    const files = Array.from((event.dataTransfer && event.dataTransfer.files) || []);
+    if (!files.length) return;
+
+    uploadSelectedFiles(files).catch(function (error) {
+      warn("drag-drop upload failed", error);
+      showToast("Drop upload failed", "error");
+    });
+  });
+}
+  
 function syncRailReopenVisibility() {
   const el = document.querySelector("[data-rail-reopen-wrap]");
   if (!el) return;
@@ -649,17 +831,6 @@ async function openArtifactFromStateOrBackend(artifactId) {
     renderChat();
     return message;
   }
-
-function removeMessage(messageId) {
-  const id = String(messageId || "").trim();
-  if (!id) return;
-
-  state.messages = (state.messages || []).filter(function (msg) {
-    return String((msg && msg.id) || "") !== id;
-  });
-
-  renderChat();
-}
 
   function removeMessageById(messageId) {
     const before = state.messages.length;
@@ -1596,21 +1767,6 @@ function handleStreamEvent(event) {
     ""
   ).trim().toLowerCase();
 
-if (type === "token" || type === "delta" || type === "chunk") {
-  const chunkText = String(
-    payload.text ||
-    payload.delta ||
-    payload.token ||
-    ""
-  );
-
-  if (state.stream && state.stream.targetMessageId && chunkText) {
-    queueIncomingTokens(state.stream.targetMessageId, chunkText);
-  }
-
-  return;
-}
-
   if (!state.stream) {
     state.stream = {
       running: false,
@@ -1794,8 +1950,6 @@ async function consumeChatStreamStable(payload) {
       renderChat();
       updateTopbarFromState();
       scrollChatToBottom(true);
-      flushTokensNow();
-      clearTokenRenderState();
       finishStreamUi({ statusState: "idle", statusText: "Ready" });
       return;
     }
@@ -1825,6 +1979,7 @@ async function consumeChatStreamStable(payload) {
         if (!part.startsWith("data:")) continue;
 
         const jsonStr = part.replace(/^data:\s*/, "");
+
         if (!jsonStr || jsonStr === "[DONE]") continue;
 
         try {
@@ -1848,7 +2003,6 @@ async function consumeChatStreamStable(payload) {
     }
 
     flushTokensNow();
-    clearTokenRenderState();
     finalizeStreamMessage({});
     renderChat();
     renderSessionList();
@@ -1856,9 +2010,6 @@ async function consumeChatStreamStable(payload) {
     scrollChatToBottom(true);
     finishStreamUi({ statusState: "idle", statusText: "Ready" });
   } catch (error) {
-    flushTokensNow();
-    clearTokenRenderState();
-
     if (error && error.name === "AbortError") {
       finishStreamUi({ statusState: "idle", statusText: "Stopped" });
       updateTopbarFromState();
@@ -1875,8 +2026,6 @@ async function consumeChatStreamStable(payload) {
       state.stream.buffer = "";
       state.stream.placeholderId = "";
       state.stream.messageId = "";
-      state.stream.targetMessageId = "";
-      state.stream.startedAt = 0;
     }
   }
 }
@@ -2361,92 +2510,144 @@ function setPendingUploadItem(nextItem) {
 
 async function uploadOneFile(file) {
   const tempId = makeId("att_local");
-
   setPendingUploadItem({
     id: tempId,
-    filename: String(file && file.name ? file.name : ""),
-    name: String(file && file.name ? file.name : ""),
-    stored_name: "",
-    file_url: "",
-    url: "",
-    mime_type: String((file && file.type) || "application/octet-stream"),
-    size: Number((file && file.size) || 0),
+    name: file && file.name ? file.name : "upload",
+    filename: file && file.name ? file.name : "upload",
+    mime_type: file && file.type ? file.type : "application/octet-stream",
+    size: file && typeof file.size === "number" ? file.size : 0,
     status: "uploading",
-    upload_error: "",
   });
 
-  state.uploadInFlightCount = Math.max(0, Number(state.uploadInFlightCount || 0)) + 1;
-  setBusyUi(state.stream && state.stream.running);
+  const formData = new FormData();
+  formData.append("file", file);
 
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
+    state.uploadInFlightCount += 1;
+    setBusyUi(state.stream.running);
 
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      credentials: "same-origin",
-      body: formData,
-    });
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        credentials: "same-origin",
+        body: formData,
+      });
 
-    const data = await response.json().catch(function () {
-      return {};
-    });
+      const data = await response.json().catch(function () {
+        return {};
+      });
 
-    if (!response.ok || data.ok === false) {
-      throw new Error(data.error || "Upload failed.");
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || "Upload failed.");
+      }
+
+           state.pendingUploads = state.pendingUploads.filter(function (item) {
+        return String(item.id) !== String(tempId);
+      });
+
+      const uploadedAttachment = Object.assign({}, normalizeAttachment(data.attachment || data), {
+        status: "uploaded",
+        upload_error: "",
+      });
+
+      setPendingUploadItem(uploadedAttachment);
+      showToast("Uploaded: " + (uploadedAttachment.filename || uploadedAttachment.name || "attachment"), "success");
+      return normalizeAttachment(uploadedAttachment); 
+
+    } catch (error) {
+      warn("upload failed", error);
+
+      const errorText = error && error.message ? error.message : "Upload failed.";
+
+      setPendingUploadItem({
+        id: tempId,
+        name: file && file.name ? file.name : "upload",
+        filename: file && file.name ? file.name : "upload",
+        mime_type: file && file.type ? file.type : "application/octet-stream",
+        size: file && typeof file.size === "number" ? file.size : 0,
+        status: "error",
+        upload_error: errorText,
+      });
+
+           showToast("Upload failed: " + (file && file.name ? file.name : "attachment"), "error");
+      throw error;   
+
+    } finally {
+      state.uploadInFlightCount = Math.max(0, state.uploadInFlightCount - 1);
+      setBusyUi(state.stream.running);
+      renderPendingUploads();
     }
-
-    const uploadedAttachment = normalizeAttachment({
-      id: tempId,
-      filename: String(data.original_filename || file.name || ""),
-      name: String(data.original_filename || file.name || ""),
-      stored_name: String(data.filename || ""),
-      file_url: String(data.file_url || data.url || ""),
-      url: String(data.url || data.file_url || ""),
-      mime_type: String(data.mime_type || file.type || "application/octet-stream"),
-      size: Number(data.size || file.size || 0),
-      status: "uploaded",
-      upload_error: "",
-    });
-
-    setPendingUploadItem(uploadedAttachment);
-uploadedAttachment.status = "done";
-    showToast(
-      "Uploaded: " + (uploadedAttachment.filename || uploadedAttachment.name || "attachment"),
-      "success"
-    );
-    return normalizeAttachment(uploadedAttachment);
-  } catch (error) {
-if (!(error instanceof TypeError)) {
-  warn("upload failed", error);
-}
-
-    const errorText = error && error.message ? error.message : "Upload failed.";
-
-    setPendingUploadItem({
-      id: tempId,
-      filename: String(file && file.name ? file.name : ""),
-      name: String(file && file.name ? file.name : ""),
-      stored_name: "",
-      file_url: "",
-      url: "",
-      mime_type: String((file && file.type) || "application/octet-stream"),
-      size: Number((file && file.size) || 0),
-      status: "error",
-      upload_error: errorText,
-    });
-
-    showToast(
-      "Upload failed: " + (file && file.name ? file.name : "attachment"),
-      "error"
-    );
-    throw error;
-  } finally {
-    state.uploadInFlightCount = Math.max(0, state.uploadInFlightCount - 1);
-    setBusyUi(state.stream && state.stream.running);
-    renderPendingUploads();
   }
-}
+
+
+async function uploadOneFile(file) {
+  const tempId = makeId("att_local");
+  setPendingUploadItem({
+    id: tempId,
+    name: file && file.name ? file.name : "upload",
+    filename: file && file.name ? file.name : "upload",
+    mime_type: file && file.type ? file.type : "application/octet-stream",
+    size: file && typeof file.size === "number" ? file.size : 0,
+    status: "uploading",
+  });
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+    state.uploadInFlightCount += 1;
+    setBusyUi(state.stream.running);
+
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        credentials: "same-origin",
+        body: formData,
+      });
+
+      const data = await response.json().catch(function () {
+        return {};
+      });
+
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || "Upload failed.");
+      }
+
+           state.pendingUploads = state.pendingUploads.filter(function (item) {
+        return String(item.id) !== String(tempId);
+      });
+
+      const uploadedAttachment = Object.assign({}, normalizeAttachment(data.attachment || data), {
+        status: "uploaded",
+        upload_error: "",
+      });
+
+      setPendingUploadItem(uploadedAttachment);
+      showToast("Uploaded: " + (uploadedAttachment.filename || uploadedAttachment.name || "attachment"), "success");
+      return normalizeAttachment(uploadedAttachment); 
+
+    } catch (error) {
+      warn("upload failed", error);
+
+      const errorText = error && error.message ? error.message : "Upload failed.";
+
+      setPendingUploadItem({
+        id: tempId,
+        name: file && file.name ? file.name : "upload",
+        filename: file && file.name ? file.name : "upload",
+        mime_type: file && file.type ? file.type : "application/octet-stream",
+        size: file && typeof file.size === "number" ? file.size : 0,
+        status: "error",
+        upload_error: errorText,
+      });
+
+           showToast("Upload failed: " + (file && file.name ? file.name : "attachment"), "error");
+      throw error;   
+
+    } finally {
+      state.uploadInFlightCount = Math.max(0, state.uploadInFlightCount - 1);
+      setBusyUi(state.stream.running);
+      renderPendingUploads();
+    }
+  }
 
   async function uploadFiles(fileList) {
     const files = Array.from(fileList || []);
@@ -2566,51 +2767,10 @@ async function consumeChatJson(payload) {
   }
 }
 
+
 async function sendMessage() {
   const text = String((els.chatInput && els.chatInput.value) || "").trim();
-  if (/^\/image|generate image|create image|draw/i.test(text)) {
-    const tempId = "gen_" + Date.now();
-
-    upsertMessage(normalizeMessage({
-      id: tempId,
-      role: "assistant",
-      text: "🎨 Generating image...",
-      pending: true,
-      streaming: false,
-      error: false,
-      stopped: false,
-      attachments: [],
-    }));
-
-    state.imageGenPlaceholderId = tempId;
-  }
-
-  const attachments = state.pendingUploads
-    .filter(function (item) {
-      return (
-        item &&
-        item.status === "uploaded" &&
-        (
-          String(item.stored_name || "").trim() ||
-          String(item.file_url || "").trim() ||
-          String(item.url || "").trim()
-        )
-      );
-    })
-    .map(function (item) {
-      return {
-        id: String(item.id || ""),
-        filename: String(item.filename || item.name || ""),
-        name: String(item.name || item.filename || ""),
-        stored_name: String(item.stored_name || ""),
-        file_url: String(item.file_url || ""),
-        url: String(item.url || item.file_url || ""),
-        mime_type: String(item.mime_type || "application/octet-stream"),
-        size: Number(item.size || 0),
-        status: "uploaded",
-        upload_error: "",
-      };
-    });
+  const attachments = state.pendingUploads.slice();
 
   if (!text && !attachments.length) {
     return;
@@ -2685,16 +2845,6 @@ async function sendMessage() {
 
       payload.placeholder_id = pendingAssistantId;
       await consumeChatStream(payload);
-      if (state.imageGenPlaceholderId) {
-        removeMessage(state.imageGenPlaceholderId);
-        state.imageGenPlaceholderId = null;
-      }
-
-// REMOVE IMAGE PLACEHOLDER AFTER RESPONSE STARTS
-if (state.imageGenPlaceholderId) {
-  removeMessage(state.imageGenPlaceholderId);
-  state.imageGenPlaceholderId = null;
-}
      
     }
   } catch (error) {
@@ -2741,8 +2891,6 @@ function stopGeneration() {
     state.stream.controller.abort();
     showToast("Generation stopped.", "info");
   } catch (_) {}
-  flushTokensNow();
-  clearTokenRenderState();
   finishStreamUi();
 }
 

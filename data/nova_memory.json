@@ -1,94 +1,33 @@
 [
   {
+    "id": "memory_eec7ff82460d4d9ba8271c2120beb99f",
+    "kind": "preference",
+    "text": "to go to the gym later",
+    "source": "assistant",
+    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
+    "created_at": "2026-04-12T08:26:25.661960+00:00",
+    "updated_at": "2026-04-12T08:26:25.661960+00:00"
+  },
+  {
     "id": "memory_f135945919bd4e6c90fd7d2cfbc2c7f8",
     "kind": "preference",
     "text": "concise direct replies",
     "source": "assistant",
     "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
     "created_at": "2026-04-08T13:29:30.683868+00:00",
-    "updated_at": "2026-04-08T13:29:30.683868+00:00"
+    "updated_at": "2026-04-08T13:29:30.683868+00:00",
+    "preview": "concise direct replies",
+    "merge_variants": [
+      "concise direct replies with no fluff."
+    ]
   },
   {
-    "id": "memory_1c7b3e7202d648fa9697ff54c15b5b95",
-    "kind": "instruction",
-    "text": "I prefer concise direct replies",
+    "id": "memory_91bf1f58cf2a41489ff18af4d5d2bbad",
+    "kind": "profile",
+    "text": "richardd can you remember",
     "source": "assistant",
-    "session_id": "session_eecc987a87b64ef5989228fbaed205b8",
-    "created_at": "2026-04-08T13:29:30.683868+00:00",
-    "updated_at": "2026-04-08T13:29:30.683868+00:00"
-  },
-  {
-    "id": "memory_7f06f143eafa4166902befd9e40f1484",
-    "kind": "instruction",
-    "text": "I want short answers",
-    "source": "assistant",
-    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
-    "created_at": "2026-04-08T07:57:56.913837+00:00",
-    "updated_at": "2026-04-08T07:57:56.913837+00:00"
-  },
-  {
-    "id": "mem_0ff08f9495484ba1a8fb303af536182d",
-    "kind": "preference",
-    "text": "short answers",
-    "source": "assistant",
-    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
-    "created_at": "2026-04-08T05:07:55.625336+00:00",
-    "updated_at": "2026-04-08T07:57:56.913837+00:00"
-  },
-  {
-    "id": "mem_f99a13e56ea845a8aa1fd6eb21577872",
-    "text": "short direct answers",
-    "kind": "preference",
-    "source": "memory",
-    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
-    "created_at": "2026-04-08T07:35:29.577452+00:00",
-    "updated_at": "2026-04-08T07:35:29.577452+00:00",
-    "uses": 1
-  },
-  {
-    "id": "mem_02a67dcf0149475cb4f0ef8a6a7f31a1",
-    "text": "I want short direct answers",
-    "kind": "instruction",
-    "source": "memory",
-    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
-    "created_at": "2026-04-08T07:35:29.577452+00:00",
-    "updated_at": "2026-04-08T07:35:29.577452+00:00",
-    "uses": 1
-  },
-  {
-    "id": "mem_a52d8d87edd648a387dc79c8f93569e2",
-    "text": "concise direct replies.",
-    "kind": "preference",
-    "source": "memory",
-    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
-    "created_at": "2026-04-08T05:13:31.073517+00:00",
-    "updated_at": "2026-04-08T05:13:31.073517+00:00"
-  },
-  {
-    "id": "mem_21c2d55169e84d609c00a88d9055e87a",
-    "text": "concise direct replies with no fluff.",
-    "kind": "preference",
-    "source": "memory",
-    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
-    "created_at": "2026-04-08T03:11:04.280184+00:00",
-    "updated_at": "2026-04-08T03:11:04.280184+00:00"
-  },
-  {
-    "id": "mem_724259355ab64abfb1bd1c139d22329f",
-    "text": "Nova memory system",
-    "kind": "project",
-    "source": "memory",
-    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
-    "created_at": "2026-04-08T02:47:10.019749+00:00",
-    "updated_at": "2026-04-08T02:47:10.019749+00:00"
-  },
-  {
-    "id": "mem_b4cc560f632c426791153e44aa1b8d84",
-    "text": "dark UI and I am working on Nova memory system",
-    "kind": "preference",
-    "source": "memory",
-    "session_id": "session_73abe796d86b4100b9478e15000de9bc",
-    "created_at": "2026-04-08T02:47:10.019749+00:00",
-    "updated_at": "2026-04-08T02:47:10.019749+00:00"
+    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
+    "created_at": "2026-04-12T08:00:48.430955+00:00",
+    "updated_at": "2026-04-12T08:00:48.430955+00:00"
   }
 ]

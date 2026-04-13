@@ -3,19 +3,20 @@
 
   const API = {
     list: "/api/sessions",
-    create: "/api/sessions/create",
+
+    create: "/api/sessions/new",
+
     read(id) {
       return `/api/sessions/${encodeURIComponent(id)}`;
     },
-    rename(id) {
-      return `/api/sessions/${encodeURIComponent(id)}/rename`;
-    },
-    pin(id) {
-      return `/api/sessions/${encodeURIComponent(id)}/pin`;
-    },
-    remove(id) {
-      return `/api/sessions/${encodeURIComponent(id)}`;
-    },
+
+    switch: "/api/sessions/switch",
+
+    rename: "/api/sessions/rename",
+
+    pin: "/api/sessions/pin",
+
+    remove: "/api/sessions/delete",
   };
 
   const state = {
@@ -34,10 +35,6 @@
 
   function q(sel) {
     return document.querySelector(sel);
-  }
-
-  function qq(sel) {
-    return Array.from(document.querySelectorAll(sel));
   }
 
   function escapeHtml(value) {
@@ -108,6 +105,7 @@
       },
       body: options?.body ? JSON.stringify(options.body) : undefined,
       cache: "no-store",
+      credentials: "same-origin",
     });
 
     let payload = {};
@@ -118,7 +116,9 @@
     }
 
     if (!response.ok || payload.ok === false) {
-      const error = new Error(payload.message || `HTTP ${response.status}`);
+      const error = new Error(
+        payload.error || payload.message || `HTTP ${response.status}`
+      );
       error.payload = payload;
       error.status = response.status;
       throw error;
@@ -131,6 +131,7 @@
     if (!session || typeof session !== "object") {
       return null;
     }
+
     return {
       id: String(session.id || ""),
       title: String(session.title || "New Chat"),
@@ -140,11 +141,16 @@
       message_count: Number(session.message_count || 0),
       last_message_preview: String(session.last_message_preview || ""),
       messages: Array.isArray(session.messages) ? session.messages : [],
+      archived: !!session.archived,
+      meta: session.meta && typeof session.meta === "object" ? session.meta : {},
     };
   }
 
   function applyBackendState(payload, explicitActiveSessionId) {
-    const incomingSessions = Array.isArray(payload?.sessions) ? payload.sessions : [];
+    const incomingSessions = Array.isArray(payload?.sessions)
+      ? payload.sessions
+      : [];
+
     state.sessions = incomingSessions.map(normalizeSession).filter(Boolean);
 
     const backendSession = normalizeSession(payload?.session);
@@ -157,7 +163,12 @@
 
     state.activeSessionId = preferredId;
 
-    if (backendSession && !state.sessions.some((s) => s.id === backendSession.id)) {
+    if (
+      backendSession &&
+      !state.sessions.some(function (s) {
+        return s.id === backendSession.id;
+      })
+    ) {
       state.sessions.unshift(backendSession);
     }
 
@@ -186,36 +197,65 @@
     );
   }
 
-  async function reloadFromBackend(preferredSessionId) {
-    state.loading = true;
-    setStatus("Loading...");
-    try {
-      const payload = preferredSessionId
-        ? await api(API.read(preferredSessionId))
-        : await api(API.list);
+async function reloadFromBackend(preferredSessionId) {
+  state.loading = true;
+  setStatus("Loading...");
 
-      applyBackendState(payload, preferredSessionId);
-      setStatus("");
-      return payload;
-    } finally {
-      state.loading = false;
+  try {
+    let payload = null;
+    let resolvedPreferredId = preferredSessionId || "";
+
+    if (preferredSessionId) {
+      try {
+        payload = await api(API.read(preferredSessionId));
+      } catch (err) {
+        if (err?.status === 404) {
+          try {
+            localStorage.removeItem("nova_active_session_id");
+          } catch (_) {}
+
+          state.activeSessionId = "";
+          resolvedPreferredId = "";
+          payload = await api(API.list);
+        } else {
+          throw err;
+        }
+      }
+    } else {
+      payload = await api(API.list);
     }
+
+    applyBackendState(payload, resolvedPreferredId);
+    setStatus("");
+    return payload;
+  } finally {
+    state.loading = false;
   }
+}
 
   async function createSession() {
     setStatus("Creating...");
+
     const payload = await api(API.create, {
       method: "POST",
       body: {},
     });
+
     applyBackendState(payload, payload?.session?.id || "");
+    setStatus("");
     return payload;
   }
 
   async function selectSession(sessionId) {
     if (!sessionId) return null;
+
     setStatus("Switching...");
-    const payload = await api(API.read(sessionId));
+
+    const payload = await api(API.switch, {
+      method: "POST",
+      body: { session_id: sessionId },
+    });
+
     applyBackendState(payload, sessionId);
     setStatus("");
     return payload;
@@ -223,34 +263,52 @@
 
   async function renameSession(sessionId, title) {
     if (!sessionId) return null;
+
     setStatus("Renaming...");
-    const payload = await api(API.rename(sessionId), {
+
+    const payload = await api(API.rename, {
       method: "POST",
-      body: { title },
+      body: {
+        session_id: sessionId,
+        title: String(title || "").trim(),
+      },
     });
-    applyBackendState(payload, payload?.session?.id || sessionId);
+
+    applyBackendState(payload, sessionId);
     setStatus("");
     return payload;
   }
 
   async function pinSession(sessionId, pinned) {
     if (!sessionId) return null;
+
     setStatus(pinned ? "Pinning..." : "Unpinning...");
-    const payload = await api(API.pin(sessionId), {
+
+    const payload = await api(API.pin, {
       method: "POST",
-      body: { pinned: !!pinned },
+      body: {
+        session_id: sessionId,
+        pinned: !!pinned,
+      },
     });
-    applyBackendState(payload, payload?.session?.id || sessionId);
+
+    applyBackendState(payload, sessionId);
     setStatus("");
     return payload;
   }
 
   async function deleteSession(sessionId) {
     if (!sessionId) return null;
+
     setStatus("Deleting...");
-    const payload = await api(API.remove(sessionId), {
-      method: "DELETE",
+
+    const payload = await api(API.remove, {
+      method: "POST",
+      body: {
+        session_id: sessionId,
+      },
     });
+
     applyBackendState(payload, payload?.session?.id || "");
     setStatus("");
     return payload;
@@ -262,7 +320,7 @@
       return;
     }
 
-    const sessions = [...state.sessions].sort((a, b) => {
+    const sessions = [...state.sessions].sort(function (a, b) {
       if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
       return String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
     });
@@ -278,7 +336,7 @@
     }
 
     els.list.innerHTML = sessions
-      .map((session) => {
+      .map(function (session) {
         const isActive = session.id === state.activeSessionId;
         const title = escapeHtml(session.title || "New Chat");
         const preview = escapeHtml(session.last_message_preview || "");
@@ -286,7 +344,13 @@
 
         return `
           <div class="nova-session-item ${isActive ? "is-active" : ""}" data-session-id="${escapeHtml(session.id)}">
-            <button type="button" class="nova-session-main" data-action="select" data-session-id="${escapeHtml(session.id)}" title="${title}">
+            <button
+              type="button"
+              class="nova-session-main"
+              data-action="select"
+              data-session-id="${escapeHtml(session.id)}"
+              title="${title}"
+            >
               <span class="nova-session-title-row">
                 <span class="nova-session-title">${title}</span>
                 ${session.pinned ? '<span class="nova-session-pin-badge">📌</span>' : ""}
@@ -298,11 +362,30 @@
             </button>
 
             <div class="nova-session-actions">
-              <button type="button" class="nova-session-action" data-action="rename" data-session-id="${escapeHtml(session.id)}" title="Rename">✎</button>
-              <button type="button" class="nova-session-action" data-action="pin" data-session-id="${escapeHtml(session.id)}" data-pinned="${session.pinned ? "1" : "0"}" title="${session.pinned ? "Unpin" : "Pin"}">
-                ${session.pinned ? "★" : "☆"}
-              </button>
-              <button type="button" class="nova-session-action danger" data-action="delete" data-session-id="${escapeHtml(session.id)}" title="Delete">🗑</button>
+              <button
+                type="button"
+                class="nova-session-action"
+                data-action="rename"
+                data-session-id="${escapeHtml(session.id)}"
+                title="Rename"
+              >✎</button>
+
+              <button
+                type="button"
+                class="nova-session-action"
+                data-action="pin"
+                data-session-id="${escapeHtml(session.id)}"
+                data-pinned="${session.pinned ? "1" : "0"}"
+                title="${session.pinned ? "Unpin" : "Pin"}"
+              >${session.pinned ? "★" : "☆"}</button>
+
+              <button
+                type="button"
+                class="nova-session-action danger"
+                data-action="delete"
+                data-session-id="${escapeHtml(session.id)}"
+                title="Delete"
+              >🗑</button>
             </div>
           </div>
         `;
@@ -314,7 +397,9 @@
     if (!els.newBtn || els.newBtn.dataset.novaBound === "1") {
       return;
     }
+
     els.newBtn.dataset.novaBound = "1";
+
     els.newBtn.addEventListener("click", async function () {
       try {
         await createSession();
@@ -331,6 +416,7 @@
     }
 
     els.list.dataset.novaBound = "1";
+
     els.list.addEventListener("click", async function (event) {
       const btn = event.target.closest("[data-action]");
       if (!btn) return;
@@ -345,9 +431,17 @@
         }
 
         if (action === "rename") {
-          const current = state.sessions.find((s) => s.id === sessionId);
-          const nextTitle = window.prompt("Rename session", current?.title || "New Chat");
+          const current = state.sessions.find(function (s) {
+            return s.id === sessionId;
+          });
+
+          const nextTitle = window.prompt(
+            "Rename session",
+            current?.title || "New Chat"
+          );
+
           if (nextTitle === null) return;
+
           await renameSession(sessionId, nextTitle);
           return;
         }
@@ -361,6 +455,7 @@
         if (action === "delete") {
           const okay = window.confirm("Delete this session?");
           if (!okay) return;
+
           await deleteSession(sessionId);
         }
       } catch (err) {
@@ -371,18 +466,24 @@
   }
 
   function wireEvents() {
-    document.addEventListener("nova:request-session-reload", async function (event) {
-      try {
-        await reloadFromBackend(event?.detail?.sessionId || state.activeSessionId || "");
-      } catch (err) {
-        console.error("NovaSessionRail reload failed:", err);
-        setStatus(err?.payload?.message || err?.message || "Reload failed");
+    document.addEventListener(
+      "nova:request-session-reload",
+      async function (event) {
+        try {
+          await reloadFromBackend(
+            event?.detail?.sessionId || state.activeSessionId || ""
+          );
+        } catch (err) {
+          console.error("NovaSessionRail reload failed:", err);
+          setStatus(err?.payload?.message || err?.message || "Reload failed");
+        }
       }
-    });
+    );
 
     document.addEventListener("nova:select-session", async function (event) {
       const sessionId = event?.detail?.sessionId || "";
       if (!sessionId) return;
+
       try {
         await selectSession(sessionId);
       } catch (err) {
