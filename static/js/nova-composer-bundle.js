@@ -182,6 +182,102 @@ function resolveUploadUrl(url) {
       .replace(/\r/g, "\n");
   }
 
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function executionStatusLabel(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (value === "running") return "Running";
+  if (value === "planned") return "Planned";
+  if (value === "failed") return "Failed";
+  if (value === "completed") return "Completed";
+  return "Active";
+}
+
+function executionStepSymbol(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (value === "completed") return "✓";
+  if (value === "running") return "•";
+  if (value === "failed") return "!";
+  return "○";
+}
+
+function normalizeExecution(raw) {
+  if (!raw || typeof raw !== "object") return null;
+
+  const rawSteps = Array.isArray(raw.steps) ? raw.steps : [];
+  const steps = rawSteps
+    .map(function (step, index) {
+      if (!step || typeof step !== "object") return null;
+      return {
+        id: String(step.id || ("s" + (index + 1))).trim(),
+        title: String(step.title || ("Step " + (index + 1))).trim(),
+        status: String(step.status || "planned").trim().toLowerCase(),
+        notes: String(step.notes || "").trim(),
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    id: String(raw.id || "").trim(),
+    mode: String(raw.mode || "plan_run").trim(),
+    goal: String(raw.goal || "").trim(),
+    status: String(raw.status || "planned").trim().toLowerCase(),
+    current_step: String(raw.current_step || "").trim(),
+    summary: String(raw.summary || "").trim(),
+    steps: steps,
+  };
+}
+
+function getMessageExecution(message) {
+  if (!message || typeof message !== "object") return null;
+
+  const meta =
+    message.meta && typeof message.meta === "object" ? message.meta : {};
+  const debug =
+    message.debug && typeof message.debug === "object" ? message.debug : {};
+
+  return normalizeExecution(
+    meta.execution ||
+    message.execution ||
+    debug.execution ||
+    null
+  );
+}
+
+function renderExecutionCard(execution) {
+  const exec = normalizeExecution(execution);
+  if (!exec) return "";
+
+  const completedCount = exec.steps.filter(s => s.status === "completed").length;
+
+  const stepsHtml = exec.steps.map(function (step) {
+    return `
+      <div class="execution-step">
+        <div class="execution-step-symbol">${executionStepSymbol(step.status)}</div>
+        <div class="execution-step-title">${escapeHtml(step.title)}</div>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div class="execution-card">
+      <div class="execution-goal">${escapeHtml(exec.goal)}</div>
+      <div class="execution-meta">
+        ${executionStatusLabel(exec.status)} • ${completedCount}/${exec.steps.length}
+      </div>
+      <div class="execution-steps">${stepsHtml}</div>
+      ${exec.summary ? `<div class="execution-summary">${escapeHtml(exec.summary)}</div>` : ""}
+    </div>
+  `;
+}
+
   function safeArray(value) {
     return Array.isArray(value) ? value : [];
   }
@@ -328,6 +424,7 @@ const state = {
   pendingUploads: [],
   pendingArtifactOpenId: "",
   uploadInFlightCount: 0,
+  isSending: false,
   stream: {
     controller: null,
     running: false,
@@ -634,43 +731,99 @@ async function openArtifactFromStateOrBackend(artifactId) {
     }) || null;
   }
 
-  function upsertMessage(rawMessage) {
-    const message = normalizeMessage(rawMessage);
-    const index = state.messages.findIndex(function (item) {
-      return String(item.id) === String(message.id);
-    });
-
-    if (index >= 0) {
-      state.messages[index] = Object.assign({}, state.messages[index], message);
-    } else {
-      state.messages.push(message);
-    }
-
-    renderChat();
-    return message;
-  }
-
-function removeMessage(messageId) {
-  const id = String(messageId || "").trim();
-  if (!id) return;
-
-  state.messages = (state.messages || []).filter(function (msg) {
-    return String((msg && msg.id) || "") !== id;
+function upsertMessage(rawMessage) {
+  const message = normalizeMessage(rawMessage);
+  const index = state.messages.findIndex(function (item) {
+    return String(item.id) === String(message.id);
   });
 
+  if (index >= 0) {
+    state.messages[index] = Object.assign({}, state.messages[index], message, {
+      isNew: false,
+    });
+  } else {
+    state.messages.push(Object.assign({}, message, { isNew: true }));
+  }
+
   renderChat();
+  return message;
 }
 
-  function removeMessageById(messageId) {
-    const before = state.messages.length;
-    state.messages = state.messages.filter(function (item) {
-      return String(item.id) !== String(messageId);
-    });
-
-    if (state.messages.length !== before) {
-      renderChat();
-    }
+function ensureTokenRenderState() {
+  if (!state.tokenRender) {
+    state.tokenRender = {
+      queue: "",
+      timer: null,
+      targetMessageId: "",
+      flushMs: 18,
+    };
   }
+  return state.tokenRender;
+}
+
+function flushTokensNow() {
+  const t = ensureTokenRenderState();
+
+  if (!t.queue || !t.targetMessageId) {
+    t.queue = "";
+    return;
+  }
+
+  const msg = (state.messages || []).find(function (m) {
+    return String((m && m.id) || "") === String(t.targetMessageId);
+  });
+
+  if (!msg) {
+    t.queue = "";
+    return;
+  }
+
+  const nextChunk = String(t.queue || "");
+  t.queue = "";
+
+  upsertMessage({
+    ...msg,
+    text: String(msg.text || "") + nextChunk,
+    streaming: true,
+    pending: false,
+  });
+}
+
+function scheduleTokenFlush() {
+  const t = ensureTokenRenderState();
+  if (t.timer) return;
+
+  t.timer = setTimeout(function () {
+    t.timer = null;
+    flushTokensNow();
+  }, Number(t.flushMs || 18));
+}
+
+function queueIncomingTokens(messageId, chunk) {
+  const t = ensureTokenRenderState();
+  const nextChunk = String(chunk || "");
+  if (!nextChunk) return;
+
+  if (t.targetMessageId && t.targetMessageId !== messageId) {
+    flushTokensNow();
+  }
+
+  t.targetMessageId = String(messageId || "");
+  t.queue = String(t.queue || "") + nextChunk;
+  scheduleTokenFlush();
+}
+
+function clearTokenRenderState() {
+  const t = ensureTokenRenderState();
+
+  if (t.timer) {
+    clearTimeout(t.timer);
+    t.timer = null;
+  }
+
+  t.queue = "";
+  t.targetMessageId = "";
+}
 
   function setSessions(list) {
     state.sessions = safeArray(list).map(function (item) {
@@ -983,6 +1136,7 @@ function renderAttachmentBlock(attachment) {
 function renderMessageCard(message) {
   const role = String(message.role || "assistant");
   const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
+  const newClass = message && message.isNew ? " is-new" : "";
   const attachments = safeArray(message.attachments);
 
   const attachmentsHtml = attachments.length
@@ -1010,6 +1164,7 @@ function renderMessageCard(message) {
   return (
     '<article class="message-card ' +
     roleClass +
+    newClass +
     '" data-message-id="' +
     escapeHtml(message.id) +
     '">' +
@@ -1028,10 +1183,16 @@ function renderMessageCard(message) {
 
 function renderChat() {
   if (!els.chatThread) return;
+
   setChatEmptyVisible(state.messages.length === 0);
   els.chatThread.innerHTML = state.messages.map(renderMessageCard).join("");
   updateTopbarFromState();
   scrollChatToBottom(true);
+
+  state.messages = state.messages.map(function (msg) {
+    if (!msg || !msg.isNew) return msg;
+    return Object.assign({}, msg, { isNew: false });
+  });
 }
 
 function renderSessionList() {
@@ -1510,6 +1671,26 @@ function flushTokensNow() {
   return;
 }
 
+function mergeExecutionIntoMessage(message, incomingExecution) {
+  const baseMessage = message && typeof message === "object" ? message : {};
+  const current = getMessageExecution(baseMessage) || {};
+  const next = normalizeExecution(
+    Object.assign({}, current, incomingExecution || {})
+  );
+
+  const meta =
+    baseMessage.meta && typeof baseMessage.meta === "object"
+      ? Object.assign({}, baseMessage.meta)
+      : {};
+
+  meta.execution = next;
+
+  return Object.assign({}, baseMessage, {
+    meta: meta,
+    execution: next,
+  });
+}
+
 function finalizeStreamMessage(payload) {
   const data = payload && typeof payload === "object" ? payload : {};
 
@@ -1717,6 +1898,19 @@ if (type === "token" || type === "delta" || type === "chunk") {
   }
 }
 
+  const eventExecution =
+    event && event.execution && typeof event.execution === "object"
+      ? event.execution
+      : null;
+
+  if (eventExecution && state.stream && state.stream.targetMessageId) {
+    const currentMsg = findMessageById(state.stream.targetMessageId);
+    if (currentMsg) {
+      upsertMessage(mergeExecutionIntoMessage(currentMsg, eventExecution));
+      renderChat();
+    }
+  }
+
 async function consumeChatStreamStable(payload) {
   if (!state.stream) {
     state.stream = {
@@ -1757,6 +1951,9 @@ async function consumeChatStreamStable(payload) {
       response.headers.get("content-type") || ""
     ).toLowerCase();
 
+    // ==============================
+    // JSON FALLBACK PATH (FIXED)
+    // ==============================
     if (contentType.includes("application/json")) {
       const data = await response.json().catch(function () {
         return {};
@@ -1776,7 +1973,20 @@ async function consumeChatStreamStable(payload) {
         state.messages = data.session.messages.map(normalizeMessage);
       } else if (Array.isArray(data.messages)) {
         state.messages = data.messages.map(normalizeMessage);
-      } else if (data.assistant_message) {
+      }
+
+      if (data && data.assistant_message && typeof data.assistant_message === "object") {
+        if (!data.assistant_message.meta || typeof data.assistant_message.meta !== "object") {
+          data.assistant_message.meta = {};
+        }
+
+        if (!data.assistant_message.meta.execution) {
+          data.assistant_message.meta.execution =
+            data.execution ||
+            (data.debug && data.debug.execution) ||
+            null;
+        }
+
         upsertMessage(normalizeMessage(data.assistant_message));
       }
 
@@ -1800,6 +2010,9 @@ async function consumeChatStreamStable(payload) {
       return;
     }
 
+    // ==============================
+    // STREAM PATH (UNCHANGED)
+    // ==============================
     if (!response.body || typeof response.body.getReader !== "function") {
       throw new Error("Streaming response body is unavailable.");
     }
@@ -1810,12 +2023,9 @@ async function consumeChatStreamStable(payload) {
 
     while (true) {
       const result = await reader.read();
-      const done = result.done;
-      const value = result.value;
+      if (result.done) break;
 
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(result.value, { stream: true });
 
       const parts = buffer.split("\n\n");
       buffer = parts.pop() || "";
@@ -1855,6 +2065,7 @@ async function consumeChatStreamStable(payload) {
     updateTopbarFromState();
     scrollChatToBottom(true);
     finishStreamUi({ statusState: "idle", statusText: "Ready" });
+
   } catch (error) {
     flushTokensNow();
     clearTokenRenderState();
@@ -1868,6 +2079,7 @@ async function consumeChatStreamStable(payload) {
     finishStreamUi({ statusState: "error", statusText: "Error" });
     updateTopbarFromState();
     throw error;
+
   } finally {
     if (state.stream) {
       state.stream.running = false;
@@ -1879,6 +2091,46 @@ async function consumeChatStreamStable(payload) {
       state.stream.startedAt = 0;
     }
   }
+}
+
+async function openSessionFromBackend(sessionId) {
+  const id = String(sessionId || "").trim();
+  if (!id) {
+    throw new Error("Missing session id.");
+  }
+
+  const payload = await apiGet("/api/sessions/" + encodeURIComponent(id));
+
+  if (!payload || payload.ok === false) {
+    throw new Error(
+      (payload && payload.error) || "Failed to open session."
+    );
+  }
+
+  if (payload.session && typeof payload.session === "object") {
+    state.activeSessionId = String(payload.session.id || id);
+    state.messages = Array.isArray(payload.session.messages)
+      ? payload.session.messages.map(normalizeMessage)
+      : [];
+  } else {
+    state.activeSessionId = id;
+  }
+
+  try {
+    const statePayload = await apiGet("/api/state");
+    applyStatePayload(statePayload);
+  } catch (error) {
+    warn("state refresh after session open failed", error);
+  }
+
+  renderSessionList();
+  renderChat();
+  renderArtifacts();
+  renderMemory();
+  updateTopbarFromState();
+  scrollChatToBottom(true);
+
+  return payload;
 }
 
 async function openSession(sessionId) {
@@ -1896,6 +2148,54 @@ function artifactViewerHtml(artifact) {
       "</div>"
     );
   }
+
+function executionArtifactHtml(execution) {
+  const exec = execution && typeof execution === "object" ? execution : {};
+  const goal = escapeHtml(exec.goal || "Execution");
+  const status = escapeHtml(exec.status || "completed");
+  const summary = escapeHtml(exec.summary || "");
+  const currentStep = escapeHtml(exec.current_step || "");
+  const steps = Array.isArray(exec.steps) ? exec.steps : [];
+
+  const stepsHtml = steps.map(function (step) {
+    const title = escapeHtml(step && step.title ? step.title : "Step");
+    const stepStatus = escapeHtml(step && step.status ? step.status : "planned");
+    const notes = step && step.notes
+      ? '<div class="execution-artifact-step-notes">' + escapeHtml(step.notes) + "</div>"
+      : "";
+
+    return [
+      '<div class="execution-artifact-step">',
+      '  <div class="execution-artifact-step-row">',
+      '    <span class="execution-artifact-step-title">' + title + "</span>",
+      '    <span class="execution-artifact-step-status">' + stepStatus + "</span>",
+      "  </div>",
+      notes,
+      "</div>"
+    ].join("");
+  }).join("");
+
+  return [
+    '<div class="execution-artifact-shell">',
+    '  <div class="execution-artifact-goal-wrap">',
+    '    <div class="execution-artifact-label">Goal</div>',
+    '    <div class="execution-artifact-goal">' + goal + "</div>",
+    "  </div>",
+    '  <div class="execution-artifact-meta">',
+    '    <div><span class="execution-artifact-label">Status</span><div class="execution-artifact-status">' + status + "</div></div>",
+    currentStep
+      ? '    <div><span class="execution-artifact-label">Current step</span><div class="execution-artifact-current">' + currentStep + "</div></div>"
+      : "",
+    "  </div>",
+    stepsHtml
+      ? '  <div class="execution-artifact-steps-wrap"><div class="execution-artifact-label">Steps</div><div class="execution-artifact-steps">' + stepsHtml + "</div></div>"
+      : "",
+    summary
+      ? '  <div class="execution-artifact-summary-wrap"><div class="execution-artifact-label">Summary</div><div class="execution-artifact-summary">' + summary + "</div></div>"
+      : "",
+    "</div>"
+  ].join("");
+}
 
   const viewer =
     artifact && typeof artifact.viewer === "object" && artifact.viewer
@@ -2472,23 +2772,10 @@ if (!(error instanceof TypeError)) {
   return {
     session_id: String(state.activeSessionId || ""),
     user_text: userText,
-    stream: !isImageCommand,
+    stream: false,
     regenerate_of: source.regenerate_of ? String(source.regenerate_of) : "",
     attachments: safeArray(source.attachments).map(normalizeAttachment),
   };
-}
-
-
-function appendUserMessageLocal(text, attachments) {
-  const message = normalizeMessage({
-    id: makeId("user"),
-    role: "user",
-    text: text,
-    attachments: safeArray(attachments).map(normalizeAttachment),
-    created_at: new Date().toISOString(),
-  });
-  upsertMessage(message);
-  return message;
 }
 
 async function consumeChatJson(payload) {
@@ -2536,6 +2823,19 @@ async function consumeChatJson(payload) {
       throw new Error(message);
     }
 
+    if (data && data.assistant_message && typeof data.assistant_message === "object") {
+      if (!data.assistant_message.meta || typeof data.assistant_message.meta !== "object") {
+        data.assistant_message.meta = {};
+      }
+
+      if (!data.assistant_message.meta.execution) {
+        data.assistant_message.meta.execution =
+          data.execution ||
+          (data.debug && data.debug.execution) ||
+          null;
+      }
+    }
+
     applyStatePayload(data || {});
 
     if (data && data.session && data.session.id) {
@@ -2566,136 +2866,182 @@ async function consumeChatJson(payload) {
   }
 }
 
+function appendUserMessageLocal(text, attachments) {
+  const message = normalizeMessage({
+    id: makeId("user"),
+    role: "user",
+    text: text,
+    attachments: safeArray(attachments).map(normalizeAttachment),
+    created_at: new Date().toISOString(),
+  });
+
+  upsertMessage(message);
+  return message;
+}
+
 async function sendMessage() {
-  const text = String((els.chatInput && els.chatInput.value) || "").trim();
-  if (/^\/image|generate image|create image|draw/i.test(text)) {
-    const tempId = "gen_" + Date.now();
-
-    upsertMessage(normalizeMessage({
-      id: tempId,
-      role: "assistant",
-      text: "🎨 Generating image...",
-      pending: true,
-      streaming: false,
-      error: false,
-      stopped: false,
-      attachments: [],
-    }));
-
-    state.imageGenPlaceholderId = tempId;
-  }
-
-  const attachments = state.pendingUploads
-    .filter(function (item) {
-      return (
-        item &&
-        item.status === "uploaded" &&
-        (
-          String(item.stored_name || "").trim() ||
-          String(item.file_url || "").trim() ||
-          String(item.url || "").trim()
-        )
-      );
-    })
-    .map(function (item) {
-      return {
-        id: String(item.id || ""),
-        filename: String(item.filename || item.name || ""),
-        name: String(item.name || item.filename || ""),
-        stored_name: String(item.stored_name || ""),
-        file_url: String(item.file_url || ""),
-        url: String(item.url || item.file_url || ""),
-        mime_type: String(item.mime_type || "application/octet-stream"),
-        size: Number(item.size || 0),
-        status: "uploaded",
-        upload_error: "",
-      };
-    });
-
-  if (!text && !attachments.length) {
+  if (state.isSending) {
     return;
   }
 
-  if (!state.activeSessionId) {
-    const created = await apiPost("/api/sessions/new", {});
-    if (created && created.session && created.session.id) {
-      state.activeSessionId = String(created.session.id);
-    } else if (created && created.active_session_id) {
-      state.activeSessionId = String(created.active_session_id);
-    }
-    await loadState();
-  }
-
-  appendUserMessageLocal(text, attachments);
-
-  if (els.chatInput) {
-    els.chatInput.value = "";
-    autoResizeTextarea();
-  }
-
-  clearPendingUploads();
-
-  const payload = getSendPayload({
-    user_text: text,
-    attachments: attachments,
-  });
+  state.isSending = true;
 
   try {
-    const isImageCommand = String(text || "").trim().toLowerCase().startsWith("/image");
+    console.log("[NovaComposerBundle] sendMessage entered", {
+      text: els && els.composerInput ? els.composerInput.value : null,
+      stream: state && state.stream ? state.stream : null,
+      pendingUploads: state && state.pendingUploads ? state.pendingUploads.length : null,
+    });
+
+    const text = String(
+      (els.composerInput && els.composerInput.value) ||
+      (els.chatInput && els.chatInput.value) ||
+      ""
+    ).trim();
+
+    console.log("[NovaComposerBundle] resolved send text", { text });
+
+    const isImageCommand = /^\/image|generate image|create image|draw/i.test(text);
+
+    if (isImageCommand) {
+      const tempId = "gen_" + Date.now();
+
+      upsertMessage(normalizeMessage({
+        id: tempId,
+        role: "assistant",
+        text: "🎨 Generating image...",
+        pending: true,
+        streaming: false,
+        error: false,
+        stopped: false,
+        attachments: [],
+      }));
+
+      state.imageGenPlaceholderId = tempId;
+    }
+
+    const attachments = state.pendingUploads
+      .filter(function (item) {
+        return (
+          item &&
+          item.status === "uploaded" &&
+          (
+            String(item.stored_name || "").trim() ||
+            String(item.file_url || "").trim() ||
+            String(item.url || "").trim()
+          )
+        );
+      })
+      .map(function (item) {
+        return {
+          id: String(item.id || ""),
+          filename: String(item.filename || item.name || ""),
+          name: String(item.name || item.filename || ""),
+          stored_name: String(item.stored_name || ""),
+          file_url: String(item.file_url || ""),
+          url: String(item.url || item.file_url || ""),
+          mime_type: String(item.mime_type || "application/octet-stream"),
+          size: Number(item.size || 0),
+          status: "uploaded",
+          upload_error: "",
+        };
+      });
+
+    if (!text && !attachments.length) {
+      console.log("[NovaComposerBundle] blocked: empty text and no attachments");
+      return;
+    }
+
+    if (!state.activeSessionId) {
+      const created = await apiPost("/api/sessions/new", {});
+      if (created && created.session && created.session.id) {
+        state.activeSessionId = String(created.session.id);
+      } else if (created && created.active_session_id) {
+        state.activeSessionId = String(created.active_session_id);
+      }
+      await loadState();
+    }
+
+    upsertMessage(normalizeMessage({
+      id: "user_" + Date.now(),
+      role: "user",
+      text: text,
+      attachments: attachments || [],
+      pending: false,
+      streaming: false,
+      error: false,
+      stopped: false,
+    }));
+
+    renderChat();
+    scrollChatToBottom(true);
+
+    if (els.composerInput) {
+      els.composerInput.value = "";
+    }
+    if (els.chatInput) {
+      els.chatInput.value = "";
+    }
+    autoResizeTextarea();
+
+    clearPendingUploads();
+
+    const payload = getSendPayload({
+      user_text: text,
+      attachments: attachments,
+    });
+
+    console.log("[NovaComposerBundle] sending payload", payload);
 
     if (isImageCommand) {
       await consumeChatJson(payload);
       showToast("Image request sent.", "success");
-    } else {
-      const pendingAssistantId = makeId("assistant");
+      return;
+    }
 
-      upsertMessage(
-        normalizeMessage({
-          id: pendingAssistantId,
-          role: "assistant",
-          text: "",
-          created_at: new Date().toISOString(),
-          pending: true,
-          streaming: true,
-          error: false,
-          stopped: false,
-          attachments: [],
-          meta: {},
-        })
-      );
+    const pendingAssistantId = makeId("assistant");
 
-      if (!state.stream) {
-        state.stream = {
-          running: false,
-          controller: null,
-          targetMessageId: "",
-          buffer: "",
-          startedAt: 0,
-          messageId: "",
-          placeholderId: "",
-        };
-      }
+    upsertMessage(
+      normalizeMessage({
+        id: pendingAssistantId,
+        role: "assistant",
+        text: "",
+        created_at: new Date().toISOString(),
+        pending: true,
+        streaming: true,
+        error: false,
+        stopped: false,
+        attachments: [],
+        meta: {},
+      })
+    );
 
-      state.stream.targetMessageId = pendingAssistantId;
-      state.stream.messageId = pendingAssistantId;
-      state.stream.placeholderId = pendingAssistantId;
+    if (!state.stream) {
+      state.stream = {
+        running: false,
+        controller: null,
+        targetMessageId: "",
+        buffer: "",
+        startedAt: 0,
+        messageId: "",
+        placeholderId: "",
+      };
+    }
 
-      renderChat();
-      scrollChatToBottom(true);
+    state.stream.running = false;
+    state.stream.targetMessageId = pendingAssistantId;
+    state.stream.messageId = pendingAssistantId;
+    state.stream.placeholderId = pendingAssistantId;
 
-      payload.placeholder_id = pendingAssistantId;
-      await consumeChatStream(payload);
-      if (state.imageGenPlaceholderId) {
-        removeMessage(state.imageGenPlaceholderId);
-        state.imageGenPlaceholderId = null;
-      }
+    renderChat();
+    scrollChatToBottom(true);
 
-// REMOVE IMAGE PLACEHOLDER AFTER RESPONSE STARTS
-if (state.imageGenPlaceholderId) {
-  removeMessage(state.imageGenPlaceholderId);
-  state.imageGenPlaceholderId = null;
-}
-     
+    payload.placeholder_id = pendingAssistantId;
+    await consumeChatJson(payload);
+
+    if (state.imageGenPlaceholderId) {
+      removeMessage(state.imageGenPlaceholderId);
+      state.imageGenPlaceholderId = null;
     }
   } catch (error) {
     warn("sendMessage failed", error);
@@ -2703,6 +3049,8 @@ if (state.imageGenPlaceholderId) {
       error && error.message ? error.message : "Send failed.",
       "error"
     );
+  } finally {
+    state.isSending = false;
   }
 }
 
@@ -2747,16 +3095,34 @@ function stopGeneration() {
 }
 
 async function createNewChat() {
-  if (state.stream.running) {
+  if (state.stream && state.stream.running) {
     stopGeneration();
   }
-  await apiPost("/api/sessions/new", {});
+
+  const created = await apiPost("/api/sessions/new", {});
   clearPendingUploads();
+
+  if (els.composerInput) {
+    els.composerInput.value = "";
+  }
   if (els.chatInput) {
     els.chatInput.value = "";
     autoResizeTextarea();
   }
+
   await loadState();
+
+  if (created && created.session && created.session.id) {
+    state.activeSessionId = String(created.session.id || "");
+  } else if (created && created.active_session_id) {
+    state.activeSessionId = String(created.active_session_id || "");
+  }
+
+  state.messages = [];
+  renderChat();
+  renderSessionList();
+  updateTopbarFromState();
+  scrollChatToBottom(true);
 }
 
 async function copyMessage(messageId) {
@@ -3336,56 +3702,45 @@ async function playVoiceReplyFromText(text) {
     }
   });
 
-  await audio.play();
+  try {
+    await audio.play();
+  } catch (error) {
+    warn("TTS play failed", error);
+    showToast("Audio device not available.", "error");
+
+    state.tts.playing = false;
+    state.tts.audio = null;
+    updateTtsToggleUi();
+  }
+}
+
+async function handleComposerSubmit(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  await sendMessage();
 }
 
 function bindEvents() {
-  if (els.composerForm) {
-    els.composerForm.addEventListener("submit", handleComposerSubmit);
-  }
-
-if (els.ttsToggleButton) {
-  els.ttsToggleButton.addEventListener("click", function (event) {
-    event.preventDefault();
-    toggleTtsMute();
-  });
-}
-
-  if (els.voiceButton) {
-    els.voiceButton.addEventListener("click", function (event) {
-      event.preventDefault();
-
-      handleMicClick().catch(function (error) {
-        warn("voice failed", error);
-        showToast(
-          error && error.message ? error.message : "Voice failed.",
-          "error"
-        );
-      });
-    });
-  }
-
-  if (els.sendButton) {
-    els.sendButton.addEventListener("click", function (event) {
-      event.preventDefault();
-      handleComposerSubmit(event);
-    });
-  }
-
   if (els.chatInput) {
-    els.chatInput.addEventListener("input", autoResizeTextarea);
     els.chatInput.addEventListener("keydown", function (event) {
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
+        event.stopPropagation();
         handleComposerSubmit(event);
       }
     });
   }
 
-  if (els.attachButton) {
-    els.attachButton.addEventListener("click", function (event) {
+  if (els.composerForm) {
+    els.composerForm.addEventListener("submit", handleComposerSubmit);
+  }
+
+  if (els.ttsToggleButton) {
+    els.ttsToggleButton.addEventListener("click", function (event) {
       event.preventDefault();
-      openAttachPicker();
+      toggleTtsMute();
     });
   }
 
@@ -3413,6 +3768,7 @@ if (els.ttsToggleButton) {
   if (els.newChatButton) {
     els.newChatButton.addEventListener("click", function (event) {
       event.preventDefault();
+      event.stopPropagation();
       createNewChat().catch(function (error) {
         warn("new chat failed", error);
         showToast(
@@ -3512,7 +3868,6 @@ if (els.ttsToggleButton) {
   if (typeof wireRailTabs === "function") wireRailTabs();
   if (typeof wireMemoryClicks === "function") wireMemoryClicks();
 }
-
 
 async function boot() {
   if (state.booted) return;

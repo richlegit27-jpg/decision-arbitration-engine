@@ -36,6 +36,49 @@ class ArtifactService:
         atomic_write_json(self.artifacts_file, self.artifacts)
 
     # -----------------------
+    # INTERNAL HELPERS
+    # -----------------------
+
+    def _clean_text(self, value: Any) -> str:
+        return " ".join(str(value or "").strip().lower().split())
+
+    def _normalize_execution_signature(self, execution: Dict[str, Any] | None) -> Dict[str, Any]:
+        execution = execution if isinstance(execution, dict) else {}
+
+        steps = execution.get("steps") if isinstance(execution.get("steps"), list) else []
+        normalized_steps: List[str] = []
+
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+
+            title = self._clean_text(step.get("title"))
+            status = self._clean_text(step.get("status"))
+            notes = self._clean_text(step.get("notes"))
+            normalized_steps.append(f"{title}|{status}|{notes}")
+
+        return {
+            "goal": self._clean_text(execution.get("goal")),
+            "summary": self._clean_text(execution.get("summary")),
+            "status": self._clean_text(execution.get("status")),
+            "steps": normalized_steps,
+        }
+
+    def _execution_equivalent(
+        self,
+        left: Dict[str, Any] | None,
+        right: Dict[str, Any] | None,
+    ) -> bool:
+        a = self._normalize_execution_signature(left)
+        b = self._normalize_execution_signature(right)
+        return (
+            a["goal"] == b["goal"]
+            and a["summary"] == b["summary"]
+            and a["status"] == b["status"]
+            and a["steps"] == b["steps"]
+        )
+
+    # -----------------------
     # GETTERS
     # -----------------------
 
@@ -62,6 +105,53 @@ class ArtifactService:
             if str(a.get("session_id") or "").strip() == str(session_id).strip()
         ]
         return newest_first(matches, "updated_at")
+
+    def get_latest_execution_run_for_session(self, session_id: str | None) -> Optional[dict]:
+        if not session_id:
+            return None
+
+        session_id = str(session_id).strip()
+        for artifact in newest_first(self.artifacts, "updated_at"):
+            normalized = normalize_artifact(artifact)
+            if str(normalized.get("session_id") or "").strip() != session_id:
+                continue
+            if str(normalized.get("kind") or "").strip() != "execution_run":
+                continue
+            return normalized
+
+        return None
+
+    def find_latest_execution_run_by_goal(
+        self,
+        session_id: str | None,
+        goal: str | None,
+    ) -> Optional[dict]:
+        if not session_id:
+            return None
+
+        target_session = str(session_id).strip()
+        target_goal = self._clean_text(goal)
+
+        if not target_goal:
+            return None
+
+        for artifact in newest_first(self.artifacts, "updated_at"):
+            normalized = normalize_artifact(artifact)
+
+            if str(normalized.get("session_id") or "").strip() != target_session:
+                continue
+
+            if str(normalized.get("kind") or "").strip() != "execution_run":
+                continue
+
+            meta = normalized.get("meta") if isinstance(normalized.get("meta"), dict) else {}
+            execution = meta.get("execution") if isinstance(meta, dict) else {}
+            existing_goal = self._clean_text(execution.get("goal") if isinstance(execution, dict) else "")
+
+            if existing_goal == target_goal:
+                return normalized
+
+        return None
 
     # -----------------------
     # CREATE / UPDATE
@@ -118,6 +208,60 @@ class ArtifactService:
 
         self._save()
         return True
+
+    def save_execution_run(self, session_id: str, execution: Dict[str, Any] | None) -> Optional[dict]:
+        if not session_id or not isinstance(execution, dict):
+            return None
+
+        goal = str(execution.get("goal") or "Execution").strip() or "Execution"
+        status = str(execution.get("status") or "planned").strip() or "planned"
+        summary = str(execution.get("summary") or "").strip()
+        current_step = str(execution.get("current_step") or "").strip()
+        steps = execution.get("steps") if isinstance(execution.get("steps"), list) else []
+
+        execution_payload = {
+            "id": str(execution.get("id") or "").strip(),
+            "mode": str(execution.get("mode") or "plan_run").strip(),
+            "goal": goal,
+            "status": status,
+            "current_step": current_step,
+            "summary": summary,
+            "steps": steps,
+            "started_at": str(execution.get("started_at") or "").strip(),
+            "updated_at": str(execution.get("updated_at") or "").strip(),
+        }
+
+        existing = self.find_latest_execution_run_by_goal(session_id=session_id, goal=goal)
+
+        if existing:
+            existing_meta = existing.get("meta") if isinstance(existing.get("meta"), dict) else {}
+            existing_execution = existing_meta.get("execution") if isinstance(existing_meta, dict) else {}
+
+            if self._execution_equivalent(existing_execution, execution_payload):
+                return existing
+
+            updated = dict(existing)
+            updated["kind"] = "execution_run"
+            updated["title"] = f"Execution: {goal[:80]}"
+            updated["body"] = summary
+            updated["session_id"] = str(session_id).strip()
+            updated["source"] = "execution"
+            updated["meta"] = {
+                "execution": execution_payload
+            }
+            updated["updated_at"] = iso_now()
+            return self.upsert(updated)
+
+        return self.create(
+            kind="execution_run",
+            title=f"Execution: {goal[:80]}",
+            body=summary,
+            session_id=str(session_id).strip(),
+            source="execution",
+            meta={
+                "execution": execution_payload
+            },
+        )
 
     # -----------------------
     # PAYLOADS

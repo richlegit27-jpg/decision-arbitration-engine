@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import base64
+import re
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
-from urllib.parse import urlparse, unquote
+from urllib.parse import unquote, urlparse
 
 from openai import OpenAI
 
@@ -49,6 +52,505 @@ class ChatService:
             max_follow_links=5,
         )
 
+    # ==============================
+    # EXECUTION SYSTEM
+    # ==============================
+
+    # ==============================
+    # EXECUTION SYSTEM
+    # ==============================
+
+    def _iso_now(self) -> str:
+        return datetime.now(timezone.utc).isoformat()
+
+    def _clean_execution_text(self, value: str | None) -> str:
+        text = str(value or "").strip().lower()
+        text = re.sub(r"\s+", " ", text)
+        return text
+
+    def _normalize_steps_signature(self, steps) -> List[str]:
+        if not isinstance(steps, list):
+            return []
+
+        normalized: List[str] = []
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            title = self._clean_execution_text(step.get("title"))
+            status = self._clean_execution_text(step.get("status"))
+            notes = self._clean_execution_text(step.get("notes"))
+            normalized.append(f"{title}|{status}|{notes}")
+        return normalized
+
+    def _looks_like_execution(self, text: str, decision: dict | None) -> bool:
+        t = str(text or "").lower().strip()
+        if not t:
+            return False
+
+        triggers = [
+            "plan",
+            "steps",
+            "step by step",
+            "research",
+            "compare",
+            "analyze",
+            "build",
+            "roadmap",
+            "best",
+            "approach",
+        ]
+
+        if any(x in t for x in triggers):
+            return True
+
+        if isinstance(decision, dict):
+            if decision.get("mode") in ("planning", "analysis"):
+                return True
+            if decision.get("use_tools"):
+                return True
+
+        return len(t.split()) >= 12
+
+    def _execution_step_titles_for_goal(self, goal: str) -> list[str]:
+        lowered = str(goal or "").lower()
+
+        if "hosting" in lowered:
+            return [
+                "Identify hosting options",
+                "Compare tradeoffs",
+                "Recommend best fit",
+            ]
+
+        if "plan" in lowered:
+            return [
+                "Define the goal",
+                "Break into steps",
+                "Return recommendation",
+            ]
+
+        if any(word in lowered for word in ("analyze", "audit", "review", "inspect")):
+            return [
+                "Inspect the request",
+                "Extract key findings",
+                "Summarize the result",
+            ]
+
+        return [
+            "Understand request",
+            "Process task",
+            "Return result",
+        ]
+
+    def _build_execution(
+        self,
+        user_text: str,
+        assistant_text: str,
+        decision: dict | None,
+    ) -> dict | None:
+        if not self._looks_like_execution(user_text, decision):
+            return None
+
+        goal = str(user_text or "").strip()
+        step_titles = self._execution_step_titles_for_goal(goal)
+        now_iso = self._iso_now()
+
+        step_objs = []
+        for i, title in enumerate(step_titles, start=1):
+            step_objs.append(
+                {
+                    "id": f"s{i}",
+                    "title": title,
+                    "status": "planned",
+                    "notes": "",
+                }
+            )
+
+        return {
+            "id": f"exec_{uuid.uuid4().hex[:12]}",
+            "mode": "plan_run",
+            "goal": goal,
+            "status": "planned",
+            "current_step": step_titles[0] if step_titles else "",
+            "summary": str(assistant_text or "")[:200],
+            "steps": step_objs,
+            "started_at": now_iso,
+            "updated_at": now_iso,
+        }
+
+    def _execution_mark_running(self, execution: dict | None, step_index: int = 0) -> dict | None:
+        if not isinstance(execution, dict):
+            return execution
+
+        steps = execution.get("steps")
+        if not isinstance(steps, list) or not steps:
+            execution["status"] = "running"
+            execution["updated_at"] = self._iso_now()
+            return execution
+
+        for idx, step in enumerate(steps):
+            if not isinstance(step, dict):
+                continue
+            if idx < step_index and step.get("status") != "failed":
+                step["status"] = "completed"
+            elif idx == step_index:
+                step["status"] = "running"
+                execution["current_step"] = str(step.get("title") or "").strip()
+            elif step.get("status") != "failed":
+                step["status"] = "planned"
+
+        execution["status"] = "running"
+        execution["updated_at"] = self._iso_now()
+        return execution
+
+    def _execution_mark_completed(self, execution: dict | None, assistant_text: str = "") -> dict | None:
+        if not isinstance(execution, dict):
+            return execution
+
+        steps = execution.get("steps")
+        if isinstance(steps, list):
+            for step in steps:
+                if isinstance(step, dict) and step.get("status") != "failed":
+                    step["status"] = "completed"
+
+        execution["status"] = "completed"
+        execution["current_step"] = ""
+        execution["summary"] = str(assistant_text or execution.get("summary") or "")[:200]
+        execution["updated_at"] = self._iso_now()
+        return execution
+
+    def _execution_mark_failed(self, execution: dict | None, error_text: str = "") -> dict | None:
+        if not isinstance(execution, dict):
+            return execution
+
+        steps = execution.get("steps")
+        if isinstance(steps, list):
+            for step in steps:
+                if isinstance(step, dict) and step.get("status") == "running":
+                    step["status"] = "failed"
+                    if error_text:
+                        step["notes"] = str(error_text)[:200]
+
+        execution["status"] = "failed"
+        execution["summary"] = str(error_text or execution.get("summary") or "")[:200]
+        execution["updated_at"] = self._iso_now()
+        return execution
+
+    def _is_duplicate_execution(self, session_id: str, execution: dict | None) -> bool:
+        if not session_id or not isinstance(execution, dict):
+            return False
+
+        if not hasattr(self.artifacts, "get_latest_execution_run_for_session"):
+            return False
+
+        latest = self.artifacts.get_latest_execution_run_for_session(session_id)
+        if not latest:
+            return False
+
+        latest_meta = latest.get("meta") if isinstance(latest, dict) else {}
+        latest_execution = (
+            latest_meta.get("execution")
+            if isinstance(latest_meta, dict)
+            else {}
+        )
+        if not isinstance(latest_execution, dict):
+            return False
+
+        new_goal = self._clean_execution_text(execution.get("goal"))
+        old_goal = self._clean_execution_text(latest_execution.get("goal"))
+
+        new_summary = self._clean_execution_text(execution.get("summary"))
+        old_summary = self._clean_execution_text(latest_execution.get("summary"))
+
+        new_steps = self._normalize_steps_signature(execution.get("steps"))
+        old_steps = self._normalize_steps_signature(latest_execution.get("steps"))
+
+        if not new_goal or not old_goal:
+            return False
+
+        return (
+            new_goal == old_goal
+            and new_summary == old_summary
+            and new_steps == old_steps
+        )
+
+    def _persist_execution_artifact(self, session_id: str, execution: dict | None) -> None:
+        if not session_id or not isinstance(execution, dict):
+            return
+
+        if self._is_duplicate_execution(session_id=session_id, execution=execution):
+            return
+
+        if hasattr(self.artifacts, "save_execution_run"):
+            self.artifacts.save_execution_run(
+                session_id=session_id,
+                execution=execution,
+            )
+
+    def _attach_execution(self, payload, user_text, assistant_msg, decision, session_id=""):
+        execution = self._build_execution(
+            user_text=user_text,
+            assistant_text=str(assistant_msg.get("text") or ""),
+            decision=decision,
+        )
+
+        if not execution:
+            return payload
+
+        steps = execution.get("steps") if isinstance(execution.get("steps"), list) else []
+        if steps:
+            for i in range(len(steps)):
+                execution = self._execution_mark_running(execution, step_index=i)
+
+        execution = self._execution_mark_completed(
+            execution,
+            assistant_text=str(assistant_msg.get("text") or ""),
+        )
+
+        payload["execution"] = execution
+
+        payload.setdefault("debug", {})
+        payload["debug"]["execution"] = execution
+
+        payload.setdefault("assistant_message", {})
+        payload["assistant_message"].setdefault("meta", {})
+        payload["assistant_message"]["meta"]["execution"] = execution
+
+        try:
+            self._persist_execution_artifact(session_id=session_id, execution=execution)
+        except Exception as e:
+            payload["debug"]["execution_persist_error"] = str(e)
+
+        return payload
+
+
+    def handle(self, user_text: str, session_id: str = "", attachments=None):
+        attachments = attachments or []
+        user_text = str(user_text or "").strip()
+
+        user_msg = new_message(
+            role="user",
+            text=user_text,
+            attachments=attachments,
+            meta={},
+        )
+
+        if not user_text:
+            assistant_msg = new_message(
+                role="assistant",
+                text="Please enter a message.",
+                attachments=[],
+                meta={},
+            )
+            return {
+                "ok": True,
+                "assistant_message": assistant_msg,
+                "session": {
+                    "id": session_id or "",
+                    "messages": [user_msg, assistant_msg] if user_text else [assistant_msg],
+                },
+                "debug": {
+                    "route": "chat_service.handle",
+                    "attachments_count": len(attachments),
+                    "empty_input": True,
+                },
+            }
+
+        def extract_response_text(resp) -> str:
+            try:
+                output_text = getattr(resp, "output_text", None)
+                if output_text:
+                    return str(output_text).strip()
+            except Exception:
+                pass
+
+            try:
+                data = resp.model_dump()
+            except Exception:
+                data = None
+
+            if isinstance(data, dict):
+                text_parts = []
+                output = data.get("output") or []
+                for item in output:
+                    if not isinstance(item, dict):
+                        continue
+                    content = item.get("content") or []
+                    for part in content:
+                        if not isinstance(part, dict):
+                            continue
+                        if part.get("type") in ("output_text", "text"):
+                            text_value = part.get("text")
+                            if text_value:
+                                text_parts.append(str(text_value))
+
+                if text_parts:
+                    return "\n".join(text_parts).strip()
+
+            return "I’m here, but the model returned an empty response."
+
+        debug = {
+            "route": "chat_service.handle",
+            "attachments_count": len(attachments),
+        }
+
+        try:
+            response = self.client.responses.create(
+                model="gpt-5.4",
+                input=user_text,
+            )
+            assistant_text = extract_response_text(response)
+            debug["model"] = "gpt-5.4"
+            debug["used_openai"] = True
+        except Exception as e:
+            assistant_text = f"Model error: {e}"
+            debug["used_openai"] = False
+            debug["model_error"] = str(e)
+
+        assistant_msg = new_message(
+            role="assistant",
+            text=assistant_text,
+            attachments=[],
+            meta={},
+        )
+
+        payload = {
+            "ok": True,
+            "assistant_message": assistant_msg,
+            "session": {
+                "id": session_id or "",
+                "messages": [user_msg, assistant_msg],
+            },
+            "debug": debug,
+        }
+
+        return self._attach_execution(
+            payload,
+            user_text,
+            assistant_msg,
+            {},
+            session_id=session_id,
+        )
+
+      
+    def _execution_step_titles_for_goal(self, goal: str) -> list[str]:
+        lowered = str(goal or "").lower()
+
+        if "hosting" in lowered:
+            return [
+                "Identify hosting options",
+                "Compare tradeoffs",
+                "Recommend best fit",
+            ]
+
+        if "plan" in lowered:
+            return [
+                "Define the goal",
+                "Break into steps",
+                "Return recommendation",
+            ]
+
+        return [
+            "Understand request",
+            "Process task",
+            "Return result",
+        ]
+
+    def _build_execution_planned(
+        self,
+        user_text: str,
+        assistant_text: str,
+        decision: dict | None,
+    ) -> dict | None:
+        if not self._looks_like_execution(user_text, decision):
+            return None
+
+        goal = str(user_text or "").strip()
+        step_titles = self._execution_step_titles_for_goal(goal)
+        now_iso = self._iso_now()
+
+        steps = []
+        for i, title in enumerate(step_titles, start=1):
+            steps.append(
+                {
+                    "id": f"s{i}",
+                    "title": title,
+                    "status": "planned",
+                    "notes": "",
+                }
+            )
+
+        return {
+            "id": f"exec_{uuid.uuid4().hex[:12]}",
+            "mode": "plan_run",
+            "goal": goal,
+            "status": "planned",
+            "current_step": step_titles[0] if step_titles else "",
+            "summary": str(assistant_text or "")[:200],
+            "steps": steps,
+            "started_at": now_iso,
+            "updated_at": now_iso,
+        }
+
+    def _execution_mark_running(self, execution: dict | None, step_index: int = 0) -> dict | None:
+        if not isinstance(execution, dict):
+            return execution
+
+        steps = execution.get("steps")
+        if not isinstance(steps, list) or not steps:
+            execution["status"] = "running"
+            execution["updated_at"] = self._iso_now()
+            return execution
+
+        for step in steps:
+            if isinstance(step, dict) and step.get("status") not in ("completed", "failed"):
+                step["status"] = "planned"
+
+        target = steps[min(max(step_index, 0), len(steps) - 1)]
+        if isinstance(target, dict):
+            target["status"] = "running"
+            execution["current_step"] = str(target.get("title") or "").strip()
+
+        execution["status"] = "running"
+        execution["updated_at"] = self._iso_now()
+        return execution
+
+    def _execution_mark_completed(self, execution: dict | None, assistant_text: str = "") -> dict | None:
+        if not isinstance(execution, dict):
+            return execution
+
+        steps = execution.get("steps")
+        if isinstance(steps, list):
+            for step in steps:
+                if isinstance(step, dict) and step.get("status") != "failed":
+                    step["status"] = "completed"
+
+        execution["status"] = "completed"
+        execution["current_step"] = ""
+        execution["summary"] = str(assistant_text or execution.get("summary") or "")[:200]
+        execution["updated_at"] = self._iso_now()
+        return execution
+
+    def _execution_mark_failed(self, execution: dict | None, error_text: str = "") -> dict | None:
+        if not isinstance(execution, dict):
+            return execution
+
+        steps = execution.get("steps")
+        if isinstance(steps, list):
+            for step in steps:
+                if isinstance(step, dict) and step.get("status") == "running":
+                    step["status"] = "failed"
+                    if error_text:
+                        step["notes"] = str(error_text)[:200]
+
+        execution["status"] = "failed"
+        execution["summary"] = str(error_text or execution.get("summary") or "")[:200]
+        execution["updated_at"] = self._iso_now()
+        return execution
+
+    # ==============================
+    # IMAGE HELPERS
+    # ==============================
+
     def _is_image_generation_request(self, user_text: str) -> bool:
         text = str(user_text or "").strip().lower()
         if not text:
@@ -69,10 +571,12 @@ class ChatService:
         text = str(user_text or "").strip()
         lowered = text.lower()
 
+        # /image command support
         if lowered.startswith("/image"):
             prompt = text[6:].strip()
             return prompt or "Generate an image."
 
+        # natural language triggers
         prefixes = (
             "generate an image of ",
             "generate an image ",
@@ -91,254 +595,5 @@ class ChatService:
                 prompt = text[len(prefix):].strip()
                 return prompt or text
 
-        return text
-
-    def _generate_image_attachment(self, prompt: str) -> dict:
-        response = self.client.images.generate(
-            model="gpt-image-1",
-            prompt=prompt,
-            size="1024x1024",
-        )
-
-        image_b64 = ""
-        data_items = getattr(response, "data", None) or []
-        if data_items:
-            first = data_items[0]
-            image_b64 = str(getattr(first, "b64_json", "") or "").strip()
-            if not image_b64 and isinstance(first, dict):
-                image_b64 = str(first.get("b64_json") or "").strip()
-
-        if not image_b64:
-            raise ValueError("Image generation returned no image data.")
-
-        filename = f"generated_{__import__('uuid').uuid4().hex}.png"
-        save_path = Path(UPLOADS_DIR) / filename
-        save_path.write_bytes(base64.b64decode(image_b64))
-
-        return {
-            "id": f"att_{filename}",
-            "filename": filename,
-            "name": filename,
-            "stored_name": filename,
-            "file_url": f"/api/uploads/{filename}",
-            "url": f"/api/uploads/{filename}",
-            "mime_type": "image/png",
-            "size": save_path.stat().st_size if save_path.exists() else 0,
-            "status": "uploaded",
-            "upload_error": "",
-        }
-
-    def _image_attachment_to_data_url(self, attachment: dict) -> str:
-        mime_type = str(attachment.get("mime_type") or "image/jpeg").strip() or "image/jpeg"
-
-        candidates: list[str] = []
-
-        for key in ("stored_name", "filename", "name", "original_filename"):
-            value = str(attachment.get(key) or "").strip()
-            if value:
-                candidates.append(value)
-
-        for key in ("url", "file_url"):
-            value = str(attachment.get(key) or "").strip()
-            if not value:
-                continue
-
-            parsed = urlparse(value)
-            path = parsed.path or value
-            if "/api/uploads/" in path:
-                candidates.append(path.split("/api/uploads/", 1)[1])
-            elif "/uploads/" in path:
-                candidates.append(path.split("/uploads/", 1)[1])
-            else:
-                candidates.append(Path(path).name)
-
-        seen: set[str] = set()
-        for raw_name in candidates:
-            name = unquote(Path(raw_name).name)
-            if not name or name in seen:
-                continue
-            seen.add(name)
-
-            file_path = Path(UPLOADS_DIR) / name
-            if file_path.exists() and file_path.is_file():
-                encoded = base64.b64encode(file_path.read_bytes()).decode("utf-8")
-                return f"data:{mime_type};base64,{encoded}"
-
-        raise FileNotFoundError(
-            "Could not locate uploaded image on disk for attachment keys: "
-            + ", ".join(sorted(attachment.keys()))
-        )
-
-    def handle(
-        self,
-        user_text: str,
-        session_id: str,
-        attachments: List[dict] | None = None,
-    ) -> dict:
-        attachments = attachments or []
-
-        session = self.sessions.get_by_id(session_id)
-        if not session:
-            session = self.sessions.create("New Chat")
-            session_id = session["id"]
-
-        if self._is_image_generation_request(user_text):
-            prompt = self._image_prompt_from_text(user_text)
-            generated_attachment = self._generate_image_attachment(prompt)
-
-            user_msg = new_message("user", user_text, attachments=attachments)
-            self.sessions.append_message(session_id, user_msg)
-
-            assistant_text = f"Generated image for: {prompt}"
-            assistant_msg = new_message(
-                "assistant",
-                assistant_text,
-                attachments=[generated_attachment],
-            )
-            self.sessions.append_message(session_id, assistant_msg)
-
-            refreshed_session = self.sessions.get_by_id(session_id) or session
-
-            return {
-                "ok": True,
-                "session_id": session_id,
-                "session": refreshed_session,
-                "assistant_message": assistant_msg,
-                "debug": {
-                    "mode": "image_generation",
-                    "prompt": prompt,
-                    "generated_filename": generated_attachment.get("stored_name", ""),
-                },
-            }
-
-        memory_context = self.memory.memory_context(
-            query=user_text,
-            mode="chat",
-            session_id=session_id,
-            limit=6,
-        )
-
-        ranked_memory_items = self.memory_ranker.rank_memories(
-            user_text=user_text,
-            memory_items=memory_context.get("items", []),
-            max_items=6,
-        )
-
-        if ranked_memory_items:
-            memory_context = {
-                **memory_context,
-                "items": ranked_memory_items,
-            }
-
-        decision = self.agent.decide(
-            user_text=user_text,
-            attachments=attachments,
-            memory_context=memory_context,
-        )
-
-        if decision.get("use_memory"):
-            memory_context = self.memory.memory_context(
-                query=user_text,
-                mode=str(decision.get("mode") or "chat"),
-                session_id=session_id,
-                limit=6,
-            )
-
-            ranked_memory_items = self.memory_ranker.rank_memories(
-                user_text=user_text,
-                memory_items=memory_context.get("items", []),
-                max_items=6,
-            )
-
-            if ranked_memory_items:
-                memory_context = {
-                    **memory_context,
-                    "items": ranked_memory_items,
-                }
-
-            decision = self.agent.decide(
-                user_text=user_text,
-                attachments=attachments,
-                memory_context=memory_context,
-            )
-
-        decision["_memory_context"] = memory_context
-        decision["_session"] = session
-        decision["_attachments"] = attachments
-
-        user_msg = new_message("user", user_text, attachments=attachments)
-        self.sessions.append_message(session_id, user_msg)
-
-        autonomy_result = self.autonomy.execute(
-            user_text=user_text,
-            decision=decision,
-            session_id=session_id,
-        )
-
-        assistant_text = str(autonomy_result.get("response_text") or "").strip()
-
-        image_attachments = [
-            a for a in attachments
-            if isinstance(a, dict) and str(a.get("mime_type") or "").startswith("image/")
-        ]
-
-        if image_attachments:
-            try:
-                content = [
-                    {
-                        "type": "input_text",
-                        "text": user_text or "Describe this image.",
-                    }
-                ]
-
-                used_images = 0
-                for img in image_attachments:
-                    data_url = self._image_attachment_to_data_url(img)
-                    content.append(
-                        {
-                            "type": "input_image",
-                            "image_url": data_url,
-                        }
-                    )
-                    used_images += 1
-
-                if used_images > 0:
-                    response = self.client.responses.create(
-                        model="gpt-4.1-mini",
-                        input=[
-                            {
-                                "role": "user",
-                                "content": content,
-                            }
-                        ],
-                    )
-
-                    vision_text = str(getattr(response, "output_text", "") or "").strip()
-                    if vision_text:
-                        assistant_text = vision_text
-            except Exception as e:
-                assistant_text = f"[Vision error] {e}"
-
-        if not assistant_text:
-            assistant_text = "Nova completed the task, but no response text was produced."
-
-        assistant_msg = new_message("assistant", assistant_text)
-        self.sessions.append_message(session_id, assistant_msg)
-
-        refreshed_session = self.sessions.get_by_id(session_id)
-        if refreshed_session:
-            session = refreshed_session
-
-        return {
-            "ok": True,
-            "session_id": session_id,
-            "session": session,
-            "assistant_message": assistant_msg,
-            "debug": {
-                "decision": decision,
-                "memory_items_used": len(memory_context.get("items", [])),
-                "attachments_count": len(attachments),
-                "image_attachments_count": len(image_attachments),
-                "used_vision": bool(image_attachments),
-            },
-        }
+        # fallback → return original text
+        return text or "Generate an image."
