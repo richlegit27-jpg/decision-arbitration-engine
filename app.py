@@ -158,10 +158,30 @@ def api_chat():
             session_id=session_id,
             attachments=attachments,
         )
-        return jsonify(result)
+
+        if not isinstance(result, dict):
+            result = {
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": str(result),
+                }
+            }
+
+        payload = {
+            "assistant_message": result.get("assistant_message"),
+            "session": result.get("session") or session_service.get_by_id(session_id),
+            "sessions": result.get("sessions") or session_service.get_all(),
+            "active_session_id": result.get("active_session_id") or session_service.active_session_id,
+            "artifacts": result.get("artifacts") or artifact_service.build_list_payload(),
+            "memory": result.get("memory") or memory_service.build_list_payload(),
+            "saved_artifact": result.get("saved_artifact"),
+            "debug": result.get("debug"),
+        }
+
+        payload = {k: v for k, v in payload.items() if v is not None}
+        return json_ok(**payload)
     except Exception as exc:
         return json_error(str(exc), 500)
-
 
 # -----------------------
 # SESSIONS
@@ -198,8 +218,9 @@ def api_sessions_new():
         session=session,
         sessions=session_service.get_all(),
         active_session_id=session_service.active_session_id,
+        artifacts=artifact_service.build_list_payload(),
+        memory=memory_service.build_list_payload(),
     )
-
 
 @app.post("/api/sessions/switch")
 def api_sessions_switch():
@@ -440,7 +461,7 @@ def api_upload():
                 "error": "Empty file.",
             }), 400
 
-        original_name = os.path.basename(str(file.filename))
+        original_name = os.path.basename(str(file.filename or "upload"))
         safe_name = secure_filename(original_name) or "upload.bin"
 
         base, ext = os.path.splitext(safe_name)
