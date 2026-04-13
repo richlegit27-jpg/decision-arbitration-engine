@@ -4029,20 +4029,6 @@ function mergeAssistantReplyIntoState(payload) {
   }
 }
 
-function clearTokenRenderState() {
-  if (!state) return;
-  state.tokenRender = {
-    buffer: "",
-    text: "",
-    messageId: "",
-    targetMessageId: "",
-    placeholderId: "",
-    startedAt: 0,
-    lastFlushAt: 0,
-    pending: false
-  };
-}
-
 function consumeChatStream(payload) {
   return consumeChatStreamStable(payload);
 }
