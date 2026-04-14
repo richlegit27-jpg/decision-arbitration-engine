@@ -56,10 +56,6 @@ class ChatService:
     # EXECUTION SYSTEM
     # ==============================
 
-    # ==============================
-    # EXECUTION SYSTEM
-    # ==============================
-
     def _iso_now(self) -> str:
         return datetime.now(timezone.utc).isoformat()
 
@@ -322,7 +318,6 @@ class ChatService:
 
         return payload
 
-
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         attachments = attachments or []
         user_text = str(user_text or "").strip()
@@ -333,6 +328,47 @@ class ChatService:
             attachments=attachments,
             meta={},
         )
+
+        lowered = user_text.lower()
+
+        if lowered.startswith("/image"):
+            prompt = user_text[6:].strip()
+
+            if not prompt:
+                prompt = "a detailed realistic image"
+
+            result = self._handle_image_generation(prompt)
+
+            assistant_msg = new_message(
+                role="assistant",
+                text=result.get("text") or f"Generated image for: {prompt}",
+                attachments=[],
+                meta={},
+            )
+
+            payload = {
+                "ok": True,
+                "assistant_message": assistant_msg,
+                "session": {
+                    "id": session_id or "",
+                    "messages": [user_msg, assistant_msg],
+                },
+                "saved_artifact": result,
+                "debug": {
+                    "route": "chat_service.handle",
+                    "route_taken": "image_generation",
+                    "prompt": prompt,
+                    "attachments_count": len(attachments),
+                },
+            }
+
+            return self._attach_execution(
+                payload,
+                user_text,
+                assistant_msg,
+                {"route": "image_generation"},
+                session_id=session_id,
+            )
 
         if not user_text:
             assistant_msg = new_message(
@@ -431,30 +467,6 @@ class ChatService:
             session_id=session_id,
         )
 
-      
-    def _execution_step_titles_for_goal(self, goal: str) -> list[str]:
-        lowered = str(goal or "").lower()
-
-        if "hosting" in lowered:
-            return [
-                "Identify hosting options",
-                "Compare tradeoffs",
-                "Recommend best fit",
-            ]
-
-        if "plan" in lowered:
-            return [
-                "Define the goal",
-                "Break into steps",
-                "Return recommendation",
-            ]
-
-        return [
-            "Understand request",
-            "Process task",
-            "Return result",
-        ]
-
     def _build_execution_planned(
         self,
         user_text: str,
@@ -491,65 +503,47 @@ class ChatService:
             "updated_at": now_iso,
         }
 
-    def _execution_mark_running(self, execution: dict | None, step_index: int = 0) -> dict | None:
-        if not isinstance(execution, dict):
-            return execution
-
-        steps = execution.get("steps")
-        if not isinstance(steps, list) or not steps:
-            execution["status"] = "running"
-            execution["updated_at"] = self._iso_now()
-            return execution
-
-        for step in steps:
-            if isinstance(step, dict) and step.get("status") not in ("completed", "failed"):
-                step["status"] = "planned"
-
-        target = steps[min(max(step_index, 0), len(steps) - 1)]
-        if isinstance(target, dict):
-            target["status"] = "running"
-            execution["current_step"] = str(target.get("title") or "").strip()
-
-        execution["status"] = "running"
-        execution["updated_at"] = self._iso_now()
-        return execution
-
-    def _execution_mark_completed(self, execution: dict | None, assistant_text: str = "") -> dict | None:
-        if not isinstance(execution, dict):
-            return execution
-
-        steps = execution.get("steps")
-        if isinstance(steps, list):
-            for step in steps:
-                if isinstance(step, dict) and step.get("status") != "failed":
-                    step["status"] = "completed"
-
-        execution["status"] = "completed"
-        execution["current_step"] = ""
-        execution["summary"] = str(assistant_text or execution.get("summary") or "")[:200]
-        execution["updated_at"] = self._iso_now()
-        return execution
-
-    def _execution_mark_failed(self, execution: dict | None, error_text: str = "") -> dict | None:
-        if not isinstance(execution, dict):
-            return execution
-
-        steps = execution.get("steps")
-        if isinstance(steps, list):
-            for step in steps:
-                if isinstance(step, dict) and step.get("status") == "running":
-                    step["status"] = "failed"
-                    if error_text:
-                        step["notes"] = str(error_text)[:200]
-
-        execution["status"] = "failed"
-        execution["summary"] = str(error_text or execution.get("summary") or "")[:200]
-        execution["updated_at"] = self._iso_now()
-        return execution
-
     # ==============================
     # IMAGE HELPERS
     # ==============================
+
+    def _handle_image_generation(self, prompt: str) -> dict:
+        prompt = str(prompt or "").strip()
+        if not prompt:
+            prompt = "a detailed realistic image"
+
+        response = self.client.images.generate(
+            model="gpt-image-1",
+            prompt=prompt,
+            size="1024x1024",
+        )
+
+        image_b64 = None
+        data = getattr(response, "data", None) or []
+        if data and hasattr(data[0], "b64_json"):
+            image_b64 = data[0].b64_json
+        elif data and isinstance(data[0], dict):
+            image_b64 = data[0].get("b64_json")
+
+        if not image_b64:
+            raise ValueError("Image generation returned no image data.")
+
+        image_bytes = base64.b64decode(image_b64)
+
+        filename = f"generated_{uuid.uuid4().hex}.png"
+        output_path = Path(UPLOADS_DIR) / filename
+        output_path.write_bytes(image_bytes)
+
+        image_url = f"/api/uploads/{filename}"
+
+        return {
+            "kind": "image_generation",
+            "title": f"Generated image: {prompt[:80]}",
+            "text": f"Generated image for: {prompt}",
+            "image_url": image_url,
+            "url": image_url,
+            "prompt": prompt,
+        }
 
     def _is_image_generation_request(self, user_text: str) -> bool:
         text = str(user_text or "").strip().lower()
@@ -571,12 +565,10 @@ class ChatService:
         text = str(user_text or "").strip()
         lowered = text.lower()
 
-        # /image command support
-        if lowered.startswith("/image"):
+        if "/image" in lowered:
             prompt = text[6:].strip()
             return prompt or "Generate an image."
 
-        # natural language triggers
         prefixes = (
             "generate an image of ",
             "generate an image ",
@@ -595,5 +587,4 @@ class ChatService:
                 prompt = text[len(prefix):].strip()
                 return prompt or text
 
-        # fallback → return original text
         return text or "Generate an image."

@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   function findArtifactById(artifactId) {
@@ -194,7 +194,7 @@ function resolveUploadUrl(url) {
     const text = normalizeText(value).trim();
     const max = Number(limit || 100);
     if (text.length <= max) return text;
-    return text.slice(0, Math.max(0, max - 1)).trimEnd() + "…";
+    return text.slice(0, Math.max(0, max - 1)).trimEnd() + "â€¦";
   }
 
   function isImageMime(mime) {
@@ -248,11 +248,21 @@ function resolveUploadUrl(url) {
 
 function normalizeMessage(raw) {
   const item = raw && typeof raw === "object" ? raw : {};
+  const meta = item.meta && typeof item.meta === "object" ? item.meta : {};
+  const artifact = item.artifact && typeof item.artifact === "object" ? item.artifact : {};
+  const viewer = item.viewer && typeof item.viewer === "object" ? item.viewer : {};
+
+  const imageUrl = resolveUploadUrl(
+    item.image_url ||
+    artifact.image_url ||
+    viewer.image_url ||
+    meta.image_url ||
+    ""
+  );
 
   return {
     id: String(item.id || makeId("msg")),
     role: String(item.role || "assistant"),
-
     text: normalizeText(
       (item.ui && item.ui.message && item.ui.message.text) ||
       item.text ||
@@ -261,19 +271,17 @@ function normalizeMessage(raw) {
       item.message ||
       ""
     ),
-
     created_at: String(item.created_at || new Date().toISOString()),
-
     pending: Boolean(item.pending),
     streaming: Boolean(item.streaming),
     stopped: Boolean(item.stopped),
     error: Boolean(item.error),
-
     source: String(item.source || ""),
-
     ui: item.ui && typeof item.ui === "object" ? item.ui : {},
-    meta: item.meta && typeof item.meta === "object" ? item.meta : {},
-
+    meta: meta,
+    artifact: artifact,
+    viewer: viewer,
+    image_url: imageUrl,
     attachments: safeArray(item.attachments).map(normalizeAttachment),
   };
 }
@@ -281,7 +289,7 @@ function normalizeMessage(raw) {
 function attachmentSummary(attachment) {
     const name = attachment.filename || attachment.name || "attachment";
     const size = formatBytes(attachment.size);
-    return size ? name + " · " + size : name;
+    return size ? name + " Â· " + size : name;
   }
 
   const els = {
@@ -328,14 +336,19 @@ const state = {
   pendingUploads: [],
   pendingArtifactOpenId: "",
   uploadInFlightCount: 0,
-  stream: {
-    controller: null,
-    running: false,
-    messageId: "",
-    mode: "",
-    placeholderId: "",
-    buffer: "",
-  },
+stream: {
+  controller: null,
+  running: false,
+  messageId: "",
+  mode: "",
+  placeholderId: "",
+  buffer: "",
+},
+
+execution: {
+  active: false,
+  steps: [],
+},
 
   tokenRender: {
     queue: "",
@@ -368,6 +381,47 @@ const state = {
     artifactFilter: "all",
   },
 };
+
+function renderExecution() {
+  const container =
+    document.querySelector("#execution-panel") ||
+    document.querySelector("[data-execution-panel]");
+
+  if (!container) return;
+
+  if (
+    !state.execution ||
+    !state.execution.active ||
+    !Array.isArray(state.execution.steps) ||
+    !state.execution.steps.length
+  ) {
+    container.innerHTML = "";
+    container.hidden = true;
+    return;
+  }
+
+  container.hidden = false;
+
+  container.innerHTML = state.execution.steps
+    .map(function (step) {
+      const status = String(step.status || "planned").toLowerCase();
+      let icon = "○";
+
+      if (status === "completed" || status === "done") icon = "✓";
+      else if (status === "running") icon = "→";
+      else if (status === "failed" || status === "error") icon = "⚠";
+
+      return (
+        '<div class="exec-step exec-' + escapeHtml(status) + '">' +
+          '<span class="exec-icon">' + icon + '</span>' +
+          '<span class="exec-text">' +
+            escapeHtml(step.title || step.text || "") +
+          '</span>' +
+        '</div>'
+      );
+    })
+    .join("");
+}
 
 function syncRailReopenVisibility() {
   const el = document.querySelector("[data-rail-reopen-wrap]");
@@ -525,21 +579,39 @@ async function openArtifactFromStateOrBackend(artifactId) {
     }
   }
 
-  function setBusyUi(isBusy) {
-    if (els.sendButton) {
-      els.sendButton.disabled = Boolean(isBusy);
-    }
-    if (els.stopButton) {
-      els.stopButton.hidden = !isBusy;
-      els.stopButton.disabled = !isBusy;
-    }
-    if (els.chatInput) {
-      els.chatInput.disabled = false;
-    }
-    if (els.attachButton) {
-      els.attachButton.disabled = Boolean(isBusy && state.uploadInFlightCount > 0);
-    }
+function setBusyUi(isBusy) {
+  if (els.sendButton) {
+    els.sendButton.disabled = Boolean(isBusy);
   }
+  if (els.stopButton) {
+    els.stopButton.hidden = !isBusy;
+    els.stopButton.disabled = !isBusy;
+  }
+  if (els.chatInput) {
+    els.chatInput.disabled = false;
+  }
+  if (els.attachButton) {
+    els.attachButton.disabled = Boolean(isBusy && state.uploadInFlightCount > 0);
+  }
+}
+
+if (els.sendButton) {
+  els.sendButton.onclick = function (event) {
+    event.preventDefault();
+    console.log("SEND BUTTON CLICKED");
+    sendMessage();
+  };
+}
+
+if (els.chatInput) {
+  els.chatInput.addEventListener("input", autoResizeTextarea);
+  els.chatInput.addEventListener("keydown", function (event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage();
+    }
+  });
+}
 
   function autoResizeTextarea() {
     if (!els.chatInput) return;
@@ -712,7 +784,11 @@ function applyStatePayload(payload) {
     state.messages = data.session.messages.map(normalizeMessage);
   } else if (Array.isArray(data.messages)) {
     state.messages = data.messages.map(normalizeMessage);
-  } else if (data.assistant_message) {
+  } else {
+    state.messages = state.messages || [];
+  }
+
+  if (data.assistant_message) {
     upsertMessage(normalizeMessage(data.assistant_message));
   }
 
@@ -730,18 +806,17 @@ function applyStatePayload(payload) {
   }
 
   updateTopbarFromState();
-}
 
-// 🔥 send state to right panel (CRITICAL LINK)
-try {
-  window.dispatchEvent(new CustomEvent("nova:composer-state", {
-    detail: {
-      session_id: state.activeSessionId,
-      artifacts: state.artifacts || []
-    }
-  }));
-} catch (e) {
-  console.warn("composer-state dispatch failed", e);
+  try {
+    window.dispatchEvent(new CustomEvent("nova:composer-state", {
+      detail: {
+        session_id: state.activeSessionId,
+        artifacts: state.artifacts || []
+      }
+    }));
+  } catch (e) {
+    console.warn("composer-state dispatch failed", e);
+  }
 }
 
   function currentUserMessageForRegenerate(targetAssistantId) {
@@ -795,12 +870,12 @@ try {
     const removeButton = removable
       ? '<button type="button" class="nova-upload-chip__remove" data-upload-remove="' +
         escapeHtml(item.id) +
-        '" aria-label="Remove attachment">×</button>'
+        '" aria-label="Remove attachment">Ã—</button>'
       : "";
 
     const statusHtml =
       status === "uploading"
-        ? '<span class="nova-upload-chip__status">Uploading…</span>'
+        ? '<span class="nova-upload-chip__status">Uploadingâ€¦</span>'
         : status === "error"
         ? '<span class="nova-upload-chip__status nova-upload-chip__status--error">' +
           escapeHtml(error || "Upload failed") +
@@ -853,7 +928,7 @@ function renderAttachmentBlock(attachment) {
   if (mime) sub.push(mime);
   if (item.size) sub.push(formatBytes(item.size));
 
-  const subText = sub.join(" · ");
+  const subText = sub.join(" Â· ");
 
   if (item.url && isImageMime(mime)) {
     return (
@@ -942,7 +1017,7 @@ function renderAttachmentBlock(attachment) {
     '<a href="' +
     escapeHtml(href || "#") +
     '" target="_blank" rel="noopener noreferrer" class="message-attachment__file-link">' +
-    '<div class="message-attachment__icon">📎</div>' +
+    '<div class="message-attachment__icon">ðŸ“Ž</div>' +
     '<div class="message-attachment__footer">' +
     '<div class="message-attachment__name">' +
     escapeHtml(name) +
@@ -985,10 +1060,33 @@ function renderMessageCard(message) {
   const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
   const attachments = safeArray(message.attachments);
 
-  const attachmentsHtml = attachments.length
+  const imageUrl = resolveUploadUrl(
+    message.image_url ||
+    (message.artifact && message.artifact.image_url) ||
+    (message.viewer && message.viewer.image_url) ||
+    (message.meta && message.meta.image_url) ||
+    ""
+  );
+
+  const imageHtml = imageUrl
     ? '<div class="message-attachments">' +
-      attachments.map(renderAttachmentBlock).join("") +
-      "</div>"
+        '<div class="message-attachment message-attachment--image">' +
+          '<a href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noopener noreferrer">' +
+            '<img src="' + escapeHtml(imageUrl) + '" alt="Generated image" class="message-attachment__image">' +
+          '</a>' +
+          '<div class="message-attachment__footer">' +
+            '<a href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noopener noreferrer" class="message-attachment__name">Generated image</a>' +
+            '<div class="message-attachment__actions">' +
+              '<a href="' + escapeHtml(imageUrl) + '" download class="message-attachment__action">Download</a>' +
+              '<button type="button" class="message-attachment__action" data-copy-url="' + escapeHtml(imageUrl) + '">Copy URL</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    : "";
+
+  const attachmentsHtml = attachments.length
+    ? '<div class="message-attachments">' + attachments.map(renderAttachmentBlock).join("") + "</div>"
     : "";
 
   const bodyHtml = message.text
@@ -1020,12 +1118,13 @@ function renderMessageCard(message) {
     metaHtml +
     "</div>" +
     bodyHtml +
+    imageHtml +
     attachmentsHtml +
     renderMessageActions(message) +
     "</article>"
   );
-}
-
+}          
+ 
 function renderChat() {
   if (!els.chatThread) return;
   setChatEmptyVisible(state.messages.length === 0);
@@ -1062,7 +1161,7 @@ function renderSessionList() {
         '<div class="nova-session-card-title">' +
         escapeHtml(session.title || "Untitled chat") +
         "</div>" +
-        (session.pinned ? '<div class="nova-session-card-pin">📌</div>' : "") +
+        (session.pinned ? '<div class="nova-session-card-pin">ðŸ“Œ</div>' : "") +
         "</div>" +
         '<div class="nova-session-card-preview">' +
         escapeHtml(session.last_message_preview || "No messages yet") +
@@ -1498,92 +1597,120 @@ function renderArtifacts() {
     });
   }
 
-let tokenTextBuffer = null;
-let tokenMessageId = null;
-let tokenFlushQueued = false;
-
 function queueTokenFlush(messageId) {
-  return;
+  if (!messageId) return;
+  if (tokenFlushQueued) return;
+
+  tokenFlushQueued = true;
+
+  if (tokenRafId) {
+    try {
+      cancelAnimationFrame(tokenRafId);
+    } catch (_) {}
+    tokenRafId = 0;
+  }
+
+  tokenRafId = requestAnimationFrame(function () {
+    flushTokensNow();
+  });
+}
+ 
+function clearTokenRenderState() {
+  tokenTextBuffer = "";
+  tokenMessageId = "";
+  tokenFlushQueued = false;
+  tokenLastFlushAt = 0;
+
+  if (tokenRafId) {
+    try {
+      cancelAnimationFrame(tokenRafId);
+    } catch (_) {}
+  }
+
+  tokenRafId = 0;
 }
 
 function flushTokensNow() {
   return;
 }
 
-function finalizeStreamMessage(payload) {
-  const data = payload && typeof payload === "object" ? payload : {};
-
-  if (!state.stream) {
-    state.stream = {
-      running: false,
-      controller: null,
-      targetMessageId: "",
+function ensureTokenRenderState() {
+  if (!state.tokenRender) {
+    state.tokenRender = {
       buffer: "",
-      startedAt: 0,
+      targetMessageId: "",
+      scheduled: false,
+      lastFlushAt: 0,
+      rafId: 0,
     };
   }
+  return state.tokenRender;
+}
 
-  const targetId = String(
-    state.stream.targetMessageId ||
-    data.message_id ||
-    data.id ||
-    ""
-  ).trim();
+function clearTokenRenderState() {
+  const tr = ensureTokenRenderState();
 
-  const finalText = String(
-    data.text ||
-    data.response ||
-    data.output_text ||
-    data.assistant_text ||
-    state.stream.buffer ||
-    ""
-  );
-
-  const attachments = Array.isArray(data.attachments) ? data.attachments : [];
-  const meta =
-    data.meta && typeof data.meta === "object"
-      ? data.meta
-      : {};
-
-  if (targetId) {
-    upsertMessage(normalizeMessage({
-      id: targetId,
-      role: "assistant",
-      text: finalText,
-      streaming: false,
-      pending: false,
-      error: false,
-      stopped: true,
-      attachments: attachments,
-      meta: meta,
-    }));
+  if (tr.rafId) {
+    try {
+      cancelAnimationFrame(tr.rafId);
+    } catch (_) {}
   }
 
-  state.stream.running = false;
-  state.stream.controller = null;
-  state.stream.targetMessageId = "";
-  state.stream.buffer = "";
-  state.stream.startedAt = 0;
+  tr.buffer = "";
+  tr.targetMessageId = "";
+  tr.scheduled = false;
+  tr.lastFlushAt = 0;
+  tr.rafId = 0;
+}
 
-  if (data.session && Array.isArray(data.session.messages)) {
-    state.messages = data.session.messages.map(normalizeMessage);
-  } else if (Array.isArray(data.messages)) {
-    state.messages = data.messages.map(normalizeMessage);
+function appendTextToMessage(messageId, chunk) {
+  if (!messageId || !chunk) return;
+
+  const index = state.messages.findIndex(function (msg) {
+    return msg && msg.id === messageId;
+  });
+
+  if (index === -1) return;
+
+  const current = state.messages[index] || {};
+  const nextText = String(current.text || "") + String(chunk || "");
+
+  state.messages[index] = normalizeMessage({
+    ...current,
+    text: nextText,
+    pending: false,
+    streaming: true,
+    error: false,
+  });
+}
+
+function flushTokensNow() {
+  const tr = ensureTokenRenderState();
+  if (!tr.targetMessageId || !tr.buffer) {
+    tr.scheduled = false;
+    tr.rafId = 0;
+    return;
   }
 
-  if (Array.isArray(data.artifacts)) {
-    state.artifacts = data.artifacts;
-  }
+  const chunk = tr.buffer;
+  tr.buffer = "";
+  tr.scheduled = false;
+  tr.rafId = 0;
+  tr.lastFlushAt = Date.now();
 
-  if (Array.isArray(data.memory)) {
-    state.memory = data.memory;
-  }
-
+  appendTextToMessage(tr.targetMessageId, chunk);
   renderChat();
-  renderArtifacts();
-  renderMemory();
-  updateTopbarFromState();
-  scrollChatToBottom();
+  scrollChatToBottom(true);
+}
+
+function scheduleTokenFlush() {
+  const tr = ensureTokenRenderState();
+  if (tr.scheduled) return;
+
+  tr.scheduled = true;
+  tr.rafId = requestAnimationFrame(function () {
+    flushTokensNow();
+  });
 }
 
 function handleStreamEvent(event) {
@@ -1596,20 +1723,20 @@ function handleStreamEvent(event) {
     ""
   ).trim().toLowerCase();
 
-if (type === "token" || type === "delta" || type === "chunk") {
-  const chunkText = String(
-    payload.text ||
-    payload.delta ||
-    payload.token ||
-    ""
-  );
+  if (payload.execution && Array.isArray(payload.execution.steps)) {
+    state.execution.active = true;
+    state.execution.steps = payload.execution.steps.map(function (step, index) {
+      return {
+        id: String(step.id || ("step_" + index)),
+        title: String(step.title || step.text || ""),
+        status: String(step.status || "planned"),
+        notes: String(step.notes || ""),
+      };
+    });
 
-  if (state.stream && state.stream.targetMessageId && chunkText) {
-    queueIncomingTokens(state.stream.targetMessageId, chunkText);
+    renderExecution();
+    return;
   }
-
-  return;
-}
 
   if (!state.stream) {
     state.stream = {
@@ -1621,6 +1748,23 @@ if (type === "token" || type === "delta" || type === "chunk") {
       messageId: "",
       placeholderId: "",
     };
+  }
+
+  if (type === "token" || type === "delta" || type === "chunk") {
+    const chunkText = String(
+      payload.text ||
+      payload.delta ||
+      payload.token ||
+      payload.text_delta ||
+      payload.chunk ||
+      ""
+    );
+
+    if (state.stream.targetMessageId && chunkText) {
+      queueIncomingTokens(state.stream.targetMessageId, chunkText);
+    }
+
+    return;
   }
 
   if (!state.stream.targetMessageId) {
@@ -1661,37 +1805,45 @@ if (type === "token" || type === "delta" || type === "chunk") {
     "";
 
   if (delta) {
-    state.stream.buffer = String(state.stream.buffer || "") + delta;
-
-    upsertMessage(normalizeMessage({
-      id: targetId,
-      role: "assistant",
-      text: state.stream.buffer,
-      streaming: true,
-      pending: false,
-      error: false,
-      stopped: false,
-      attachments: [],
-      meta: {},
-    }));
-
-    renderChat();
-    scrollChatToBottom(true);
+    queueIncomingTokens(targetId, delta);
     return;
   }
 
-  if (
+   if (
     type === "final" ||
     type === "done" ||
     type === "complete" ||
     payload.done === true ||
     payload.final === true
   ) {
+    flushTokensNow();
+
+    state.execution = {
+      active: true,
+      steps: [
+        { text: "Thinking...", status: "done" },
+        { text: "Response ready", status: "done" },
+      ],
+    };
+    renderExecution();
+
     finalizeStreamMessage(payload);
+    clearTokenRenderState();
     return;
   }
 
   if (payload.error) {
+    flushTokensNow();
+
+    state.execution = {
+      active: true,
+      steps: [
+        { text: "Thinking...", status: "done" },
+        { text: "Response failed", status: "error" },
+      ],
+    };
+    renderExecution();
+
     upsertMessage(normalizeMessage({
       id: targetId,
       role: "assistant",
@@ -1703,6 +1855,8 @@ if (type === "token" || type === "delta" || type === "chunk") {
       attachments: [],
       meta: {},
     }));
+
+    clearTokenRenderState();
 
     state.stream.running = false;
     state.stream.controller = null;
@@ -1717,172 +1871,123 @@ if (type === "token" || type === "delta" || type === "chunk") {
   }
 }
 
-async function consumeChatStreamStable(payload) {
-  if (!state.stream) {
-    state.stream = {
-      running: false,
-      controller: null,
-      targetMessageId: "",
-      buffer: "",
-      startedAt: 0,
-      messageId: "",
-      placeholderId: "",
+function finalizeStreamMessage(payload) {
+  flushTokensNow();
+  clearTokenRenderState();
+
+  const data = payload && typeof payload === "object" ? payload : {};
+  const targetId = String(
+    data.message_id ||
+    data.id ||
+    (state.stream && (state.stream.targetMessageId || state.stream.messageId)) ||
+    ("assistant_" + Date.now())
+  ).trim();
+
+  const existingIndex = state.messages.findIndex(function (msg) {
+    return msg && msg.id === targetId;
+  });
+
+  const existing = existingIndex >= 0 ? state.messages[existingIndex] : null;
+
+  const finalText = String(
+    data.text ||
+    data.message ||
+    data.content ||
+    (existing && existing.text) ||
+    ""
+  );
+
+  upsertMessage(normalizeMessage({
+    id: targetId,
+    role: "assistant",
+    text: finalText,
+    streaming: false,
+    pending: false,
+    error: false,
+    stopped: false,
+    attachments: Array.isArray(data.attachments) ? data.attachments : [],
+    meta: data.meta && typeof data.meta === "object" ? data.meta : {},
+  }));
+
+  if (data.execution && Array.isArray(data.execution.steps)) {
+    state.execution.active = true;
+    state.execution.steps = data.execution.steps.map(function (step, index) {
+      return {
+        id: String(step.id || ("step_" + index)),
+        title: String(step.title || step.text || ""),
+        text: String(step.text || step.title || ""),
+        status: String(step.status || "planned"),
+        notes: String(step.notes || ""),
+      };
+    });
+  } else if (state.execution && state.execution.active) {
+    state.execution = {
+      active: true,
+      steps: [
+        { text: "Thinking...", status: "done" },
+        { text: "Response ready", status: "done" },
+      ],
     };
   }
 
-  if (!state.stream.controller) {
-    state.stream.controller = new AbortController();
+  renderExecution();
+
+  if (data.session_id) {
+    state.activeSessionId = String(data.session_id || "");
+  } else if (data.session && data.session.id) {
+    state.activeSessionId = String(data.session.id || "");
   }
 
-  state.stream.running = true;
-  state.stream.buffer = state.stream.buffer || "";
-
-  try {
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream, application/json",
-      },
-      body: JSON.stringify(payload || {}),
-      signal: state.stream.controller.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error("Request failed: " + response.status);
-    }
-
-    const contentType = String(
-      response.headers.get("content-type") || ""
-    ).toLowerCase();
-
-    if (contentType.includes("application/json")) {
-      const data = await response.json().catch(function () {
-        return {};
-      });
-
-      if (data.session_id) {
-        state.activeSessionId = String(data.session_id || "");
-      } else if (data.session && data.session.id) {
-        state.activeSessionId = String(data.session.id || "");
-      }
-
-      if (Array.isArray(data.sessions)) {
-        setSessions(data.sessions);
-      }
-
-      if (data.session && Array.isArray(data.session.messages)) {
-        state.messages = data.session.messages.map(normalizeMessage);
-      } else if (Array.isArray(data.messages)) {
-        state.messages = data.messages.map(normalizeMessage);
-      } else if (data.assistant_message) {
-        upsertMessage(normalizeMessage(data.assistant_message));
-      }
-
-      if (Array.isArray(data.artifacts)) {
-        state.artifacts = data.artifacts;
-        renderArtifacts();
-      }
-
-      if (Array.isArray(data.memory)) {
-        state.memory = data.memory;
-        renderMemory();
-      }
-
-      renderSessionList();
-      renderChat();
-      updateTopbarFromState();
-      scrollChatToBottom(true);
-      flushTokensNow();
-      clearTokenRenderState();
-      finishStreamUi({ statusState: "idle", statusText: "Ready" });
-      return;
-    }
-
-    if (!response.body || typeof response.body.getReader !== "function") {
-      throw new Error("Streaming response body is unavailable.");
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const result = await reader.read();
-      const done = result.done;
-      const value = result.value;
-
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      const parts = buffer.split("\n\n");
-      buffer = parts.pop() || "";
-
-      for (let part of parts) {
-        part = String(part || "").trim();
-        if (!part.startsWith("data:")) continue;
-
-        const jsonStr = part.replace(/^data:\s*/, "");
-        if (!jsonStr || jsonStr === "[DONE]") continue;
-
-        try {
-          const evt = JSON.parse(jsonStr);
-          handleStreamEvent(evt);
-        } catch (error) {
-          warn("stream event parse failed", error);
-        }
-      }
-    }
-
-    if (buffer.trim().startsWith("data:")) {
-      try {
-        const trailing = JSON.parse(
-          buffer.trim().replace(/^data:\s*/, "")
-        );
-        handleStreamEvent(trailing);
-      } catch (error) {
-        warn("trailing stream event parse failed", error);
-      }
-    }
-
-    flushTokensNow();
-    clearTokenRenderState();
-    finalizeStreamMessage({});
-    renderChat();
-    renderSessionList();
-    updateTopbarFromState();
-    scrollChatToBottom(true);
-    finishStreamUi({ statusState: "idle", statusText: "Ready" });
-  } catch (error) {
-    flushTokensNow();
-    clearTokenRenderState();
-
-    if (error && error.name === "AbortError") {
-      finishStreamUi({ statusState: "idle", statusText: "Stopped" });
-      updateTopbarFromState();
-      return;
-    }
-
-    finishStreamUi({ statusState: "error", statusText: "Error" });
-    updateTopbarFromState();
-    throw error;
-  } finally {
-    if (state.stream) {
-      state.stream.running = false;
-      state.stream.controller = null;
-      state.stream.buffer = "";
-      state.stream.placeholderId = "";
-      state.stream.messageId = "";
-      state.stream.targetMessageId = "";
-      state.stream.startedAt = 0;
-    }
+  if (Array.isArray(data.sessions)) {
+    setSessions(data.sessions);
   }
+
+  if (Array.isArray(data.artifacts)) {
+    state.artifacts = data.artifacts;
+    renderArtifacts();
+  }
+
+  if (Array.isArray(data.memory)) {
+    state.memory = data.memory;
+    renderMemory();
+  }
+
+  if (state.stream) {
+    state.stream.running = false;
+    state.stream.controller = null;
+    state.stream.targetMessageId = "";
+    state.stream.buffer = "";
+    state.stream.startedAt = 0;
+    state.stream.messageId = "";
+    state.stream.placeholderId = "";
+  }
+
+  renderChat();
+  renderSessionList();
+  updateTopbarFromState();
+  scrollChatToBottom(true);
+  finishStreamUi({ statusState: "idle", statusText: "Ready" });
 }
 
 async function openSession(sessionId) {
-  return openSessionFromBackend(sessionId);
+  const id = String(sessionId || "").trim();
+  if (!id) return null;
+
+  await stopStreamBeforeSessionChange();
+
+  const payload = await apiPost("/api/sessions/switch", {
+    session_id: id,
+  });
+
+  applyStatePayload(payload || {});
+  renderSessionList();
+  renderChat();
+  renderArtifacts();
+  renderMemory();
+  updateTopbarFromState();
+  scrollChatToBottom(true);
+
+  return payload;
 }
 
 function artifactViewerHtml(artifact) {
@@ -1979,7 +2084,7 @@ function artifactViewerHtml(artifact) {
     });
 
   const subtitle = String(
-    artifact.session_id ? prettyKind + " • session artifact" : prettyKind
+    artifact.session_id ? prettyKind + " â€¢ session artifact" : prettyKind
   ).trim();
 
   const sourceBadge = sourceUrl
@@ -2492,6 +2597,21 @@ function appendUserMessageLocal(text, attachments) {
 }
 
 async function consumeChatJson(payload) {
+  state.stream = state.stream || {
+    running: false,
+    controller: null,
+    buffer: "",
+    placeholderId: "",
+    messageId: "",
+    targetMessageId: "",
+    startedAt: 0,
+  };
+
+  state.execution = state.execution || {
+    active: false,
+    steps: [],
+  };
+
   if (state.stream.running) {
     showToast("A generation is already running.", "info");
     throw new Error("A generation is already running.");
@@ -2536,12 +2656,44 @@ async function consumeChatJson(payload) {
       throw new Error(message);
     }
 
+    // FIX: attach generated image to assistant message
+    if (data && data.saved_artifact && data.saved_artifact.image_url) {
+      if (!data.assistant_message) {
+        data.assistant_message = {};
+      }
+
+      data.assistant_message.image_url = data.saved_artifact.image_url;
+      data.assistant_message.artifact = data.saved_artifact;
+    }
+
     applyStatePayload(data || {});
 
     if (data && data.session && data.session.id) {
       state.activeSessionId = String(data.session.id || "");
     } else if (data && data.session_id) {
       state.activeSessionId = String(data.session_id || "");
+    }
+
+    state.execution = state.execution || {
+      active: false,
+      steps: [],
+    };
+
+    if (data.execution && Array.isArray(data.execution.steps)) {
+      state.execution.active = true;
+      state.execution.steps = data.execution.steps.map(function (step, index) {
+        return {
+          id: String(step.id || ("step_" + index)),
+          title: String(step.title || step.text || ""),
+          status: String(step.status || "planned"),
+          notes: String(step.notes || ""),
+        };
+      });
+      renderExecution();
+    } else {
+      state.execution.active = false;
+      state.execution.steps = [];
+      renderExecution();
     }
 
     renderSessionList();
@@ -2551,9 +2703,22 @@ async function consumeChatJson(payload) {
     updateTopbarFromState();
     scrollChatToBottom(true);
 
+    flushTokensNow();
+    clearTokenRenderState();
+
+    if (state.stream) {
+      state.stream.running = false;
+      state.stream.controller = null;
+      state.stream.buffer = "";
+      state.stream.placeholderId = "";
+      state.stream.messageId = "";
+      state.stream.targetMessageId = "";
+      state.stream.startedAt = 0;
+    }
+
     finishStreamUi({
-      statusText: "Ready",
       statusState: "idle",
+      statusText: "Ready",
     });
 
     return data;
@@ -2567,7 +2732,15 @@ async function consumeChatJson(payload) {
 }
 
 async function sendMessage() {
-  const text = String((els.chatInput && els.chatInput.value) || "").trim();
+  const inputEl = els.chatInput || document.querySelector("[data-chat-input]") || document.querySelector("textarea");
+  const text = String((inputEl && inputEl.value) || "").trim();
+
+  console.log("sendMessage ENTERED", {
+    hasInput: !!inputEl,
+    text: text,
+    inputValue: inputEl ? inputEl.value : null
+  });
+
   if (/^\/image|generate image|create image|draw/i.test(text)) {
     const tempId = "gen_" + Date.now();
 
@@ -2613,17 +2786,33 @@ async function sendMessage() {
     });
 
   if (!text && !attachments.length) {
+    console.log("SEND BLOCKED: empty text and no attachments");
+    showToast("Type a message first.", "info");
     return;
   }
 
+  state.execution.active = false;
+  state.execution.steps = [];
+  renderExecution();
+
+  console.log("ACTIVE SESSION BEFORE", state.activeSessionId);
+
   if (!state.activeSessionId) {
+    console.log("CREATING NEW SESSION...");
+
     const created = await apiPost("/api/sessions/new", {});
+    console.log("SESSION CREATE RESPONSE", created);
+
     if (created && created.session && created.session.id) {
       state.activeSessionId = String(created.session.id);
     } else if (created && created.active_session_id) {
       state.activeSessionId = String(created.active_session_id);
     }
+
+    console.log("ACTIVE SESSION AFTER CREATE", state.activeSessionId);
+
     await loadState();
+    console.log("LOAD STATE FINISHED");
   }
 
   appendUserMessageLocal(text, attachments);
@@ -2635,13 +2824,14 @@ async function sendMessage() {
 
   clearPendingUploads();
 
-  const payload = getSendPayload({
-    user_text: text,
-    attachments: attachments,
-  });
-
   try {
     const isImageCommand = String(text || "").trim().toLowerCase().startsWith("/image");
+
+    const payload = {
+      user_text: text,
+      session_id: String(state.activeSessionId || ""),
+      attachments: attachments,
+    };
 
     if (isImageCommand) {
       await consumeChatJson(payload);
@@ -2680,17 +2870,45 @@ async function sendMessage() {
       state.stream.messageId = pendingAssistantId;
       state.stream.placeholderId = pendingAssistantId;
 
-      renderChat();
-      scrollChatToBottom(true);
+const tr = ensureTokenRenderState();
+tr.targetMessageId = pendingAssistantId;
+tr.buffer = "";
+tr.scheduled = false;
+tr.lastFlushAt = 0;
+if (tr.rafId) {
+  try {
+    cancelAnimationFrame(tr.rafId);
+  } catch (_) {}
+  tr.rafId = 0;
+}
 
-      payload.placeholder_id = pendingAssistantId;
-      await consumeChatStream(payload);
-      if (state.imageGenPlaceholderId) {
-        removeMessage(state.imageGenPlaceholderId);
-        state.imageGenPlaceholderId = null;
-      }
+renderChat();
+scrollChatToBottom(true);
 
-// REMOVE IMAGE PLACEHOLDER AFTER RESPONSE STARTS
+payload.placeholder_id = pendingAssistantId;
+
+console.log("ABOUT TO SEND /api/chat", payload);
+
+try {
+  await consumeChatJson(payload);
+} catch (err) {
+  finishStreamUi({
+    statusText: "Error",
+    statusState: "error",
+  });
+
+  showToast("Chat failed", "error");
+
+  upsertMessage(
+    normalizeMessage({
+      id: makeId("assistant_error"),
+      role: "assistant",
+      text: "⚠️ Something went wrong sending the message.",
+      error: true,
+    })
+  );
+}
+
 if (state.imageGenPlaceholderId) {
   removeMessage(state.imageGenPlaceholderId);
   state.imageGenPlaceholderId = null;
@@ -2732,6 +2950,7 @@ async function regenerateMessage(targetAssistantId) {
     attachments: safeArray(userMessage.attachments),
   });
 
+console.log("ABOUT TO SEND /api/chat", payload);
   await consumeChatStream(payload);
 }
 
@@ -2752,6 +2971,7 @@ async function createNewChat() {
   }
   await apiPost("/api/sessions/new", {});
   clearPendingUploads();
+
   if (els.chatInput) {
     els.chatInput.value = "";
     autoResizeTextarea();
@@ -3012,7 +3232,7 @@ function updateTtsToggleUi() {
 
   els.ttsToggleButton.classList.toggle("is-muted", muted);
   els.ttsToggleButton.classList.toggle("is-playing", playing);
-  els.ttsToggleButton.textContent = muted ? "🔇" : "🔊";
+  els.ttsToggleButton.textContent = muted ? "ðŸ”‡" : "ðŸ”Š";
 
   if (muted) {
     els.ttsToggleButton.setAttribute("aria-label", "Voice replies muted");
@@ -3365,29 +3585,13 @@ if (els.ttsToggleButton) {
     });
   }
 
-  if (els.sendButton) {
-    els.sendButton.addEventListener("click", function (event) {
-      event.preventDefault();
-      handleComposerSubmit(event);
-    });
-  }
 
-  if (els.chatInput) {
-    els.chatInput.addEventListener("input", autoResizeTextarea);
-    els.chatInput.addEventListener("keydown", function (event) {
-      if (event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
-        handleComposerSubmit(event);
-      }
-    });
-  }
-
-  if (els.attachButton) {
-    els.attachButton.addEventListener("click", function (event) {
-      event.preventDefault();
-      openAttachPicker();
-    });
-  }
+if (els.attachButton) {
+  els.attachButton.addEventListener("click", function (event) {
+    event.preventDefault();
+    openAttachPicker();
+  });
+}
 
   if (els.attachInput) {
     els.attachInput.addEventListener("change", function (event) {
@@ -3792,7 +3996,7 @@ function summarizeMemoryText(value, limit) {
   const max = typeof limit === "number" ? limit : 140;
   if (!text) return "";
   if (text.length <= max) return text;
-  return text.slice(0, max) + "…";
+  return text.slice(0, max) + "â€¦";
 }
 
 function findMemoryById(memoryId) {
@@ -3899,7 +4103,7 @@ function renderMemoryViewer(item) {
     '<div class="nova-viewer-title">' + escapeHtml(item.kind || "note") + "</div>" +
     '<div class="nova-viewer-meta">' +
     escapeHtml(item.source || "memory") +
-    (item.session_id ? " · " + escapeHtml(item.session_id) : "") +
+    (item.session_id ? " Â· " + escapeHtml(item.session_id) : "") +
     "</div>" +
     '<pre class="nova-artifact-meta-pre">' + escapeHtml(item.text || item.preview || "") + "</pre>" +
     "</div>" +
@@ -4043,6 +4247,199 @@ function clearTokenRenderState() {
   };
 }
 
+async function consumeChatStreamStable(payload) {
+  if (!state.stream) {
+    state.stream = {
+      running: false,
+      controller: null,
+      targetMessageId: "",
+      buffer: "",
+      startedAt: 0,
+      messageId: "",
+      placeholderId: "",
+    };
+  }
+
+  if (state.stream.controller) {
+    try {
+      state.stream.controller.abort();
+    } catch (_) {}
+  }
+
+  state.stream.controller = new AbortController();
+  state.stream.running = true;
+  state.stream.startedAt = Date.now();
+
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream, application/json",
+      },
+      body: JSON.stringify(payload || {}),
+      signal: state.stream.controller.signal,
+    });
+
+    const contentType = String(
+      response.headers.get("content-type") || ""
+    ).toLowerCase();
+
+    if (!response.ok) {
+      let raw = "";
+      try {
+        raw = await response.text();
+      } catch (_) {}
+
+      throw new Error(raw || ("Request failed: " + response.status));
+    }
+
+    if (contentType.includes("application/json")) {
+      const data = await response.json().catch(function () {
+        return {};
+      });
+
+      if (data.session_id) {
+        state.activeSessionId = String(data.session_id || "");
+      } else if (data.session && data.session.id) {
+        state.activeSessionId = String(data.session.id || "");
+      }
+
+      if (Array.isArray(data.sessions)) {
+        setSessions(data.sessions);
+      }
+
+      if (data.session && Array.isArray(data.session.messages)) {
+        state.messages = data.session.messages.map(normalizeMessage);
+      } else if (Array.isArray(data.messages)) {
+        state.messages = data.messages.map(normalizeMessage);
+      } else if (data.assistant_message) {
+        upsertMessage(normalizeMessage(data.assistant_message));
+      }
+
+      if (Array.isArray(data.artifacts)) {
+        state.artifacts = data.artifacts;
+        renderArtifacts();
+      }
+
+      if (Array.isArray(data.memory)) {
+        state.memory = data.memory;
+        renderMemory();
+      }
+
+      flushTokensNow();
+      clearTokenRenderState();
+      finishStreamUi({ statusState: "idle", statusText: "Ready" });
+      renderSessionList();
+      renderChat();
+      updateTopbarFromState();
+      scrollChatToBottom(true);
+      return;
+    }
+
+    if (!response.body || typeof response.body.getReader !== "function") {
+      throw new Error("Streaming response body is unavailable.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let sawDoneMarker = false;
+    let sawAnyEvent = false;
+
+    while (true) {
+      const result = await reader.read();
+      const done = result.done;
+      const value = result.value;
+
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() || "";
+
+      for (let part of parts) {
+        part = String(part || "").trim();
+        if (!part) continue;
+        if (!part.startsWith("data:")) continue;
+
+        const jsonStr = part.replace(/^data:\s*/, "").trim();
+        if (!jsonStr) continue;
+
+        if (jsonStr === "[DONE]") {
+          sawDoneMarker = true;
+          break;
+        }
+
+        try {
+          const evt = JSON.parse(jsonStr);
+          sawAnyEvent = true;
+          handleStreamEvent(evt);
+        } catch (error) {
+          console.error("stream event parse failed", jsonStr, error);
+        }
+      }
+
+      if (sawDoneMarker) {
+        break;
+      }
+    }
+
+    const trailing = String(buffer || "").trim();
+    if (trailing.startsWith("data:")) {
+      const trailingJson = trailing.replace(/^data:\s*/, "").trim();
+      if (trailingJson && trailingJson !== "[DONE]") {
+        try {
+          const evt = JSON.parse(trailingJson);
+          sawAnyEvent = true;
+          handleStreamEvent(evt);
+        } catch (error) {
+          console.error("trailing stream event parse failed", trailingJson, error);
+        }
+      } else if (trailingJson === "[DONE]") {
+        sawDoneMarker = true;
+      }
+    }
+
+    flushTokensNow();
+
+    if (state.stream && state.stream.targetMessageId) {
+      finalizeStreamMessage({});
+    }
+
+    clearTokenRenderState();
+    finishStreamUi({ statusState: "idle", statusText: "Ready" });
+    renderChat();
+    renderSessionList();
+    updateTopbarFromState();
+    scrollChatToBottom(true);
+  } catch (error) {
+    flushTokensNow();
+    clearTokenRenderState();
+
+    if (error && error.name === "AbortError") {
+      finishStreamUi({ statusState: "idle", statusText: "Stopped" });
+      updateTopbarFromState();
+      return;
+    }
+
+    finishStreamUi({ statusState: "error", statusText: "Error" });
+    updateTopbarFromState();
+    throw error;
+  } finally {
+    if (state.stream) {
+      state.stream.running = false;
+      state.stream.controller = null;
+      state.stream.buffer = "";
+      state.stream.placeholderId = "";
+      state.stream.messageId = "";
+      state.stream.targetMessageId = "";
+      state.stream.startedAt = 0;
+    }
+  }
+}
 function consumeChatStream(payload) {
   return consumeChatStreamStable(payload);
 }

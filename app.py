@@ -574,7 +574,6 @@ def api_state():
 # -----------------------
 # CHAT
 # -----------------------
-
 @app.post("/api/chat")
 def api_chat():
     data = request_json()
