@@ -1,3317 +1,540 @@
-[
-  {
-    "id": "artifact_d8a475076fad4cdcb11b28b3be5bf602",
-    "kind": "execution_run",
-    "title": "Execution: make me a plan for learning python",
-    "body": "Here’s a simple, practical plan for learning Python from beginner to confident beginner/intermediate.\n\n## 1. Set a clear goal\nPick one reason you want to learn Python:\n- Automation\n- Web development\n-",
-    "preview": "Here’s a simple, practical plan for learning Python from beginner to confident builder.\n\n## Goal\nLearn enough Python to:\n1. understand core syntax,\n2. solve small problems,\n3. buil…",
-    "session_id": "session_86b4923893d5430fa54ac4170fc69d0b",
-    "source": "execution",
-    "meta": {
-      "execution": {
-        "id": "exec_78b6815533e4",
-        "mode": "plan_run",
-        "goal": "make me a plan for learning python",
-        "status": "completed",
-        "current_step": "",
-        "summary": "Here’s a simple, practical plan for learning Python from beginner to confident beginner/intermediate.\n\n## 1. Set a clear goal\nPick one reason you want to learn Python:\n- Automation\n- Web development\n-",
-        "steps": [
-          {
-            "id": "s1",
-            "title": "Define the goal",
-            "status": "completed",
-            "notes": ""
-          },
-          {
-            "id": "s2",
-            "title": "Break into steps",
-            "status": "completed",
-            "notes": ""
-          },
-          {
-            "id": "s3",
-            "title": "Return recommendation",
-            "status": "completed",
-            "notes": ""
-          }
-        ],
-        "started_at": "2026-04-14T02:50:30.809577+00:00",
-        "updated_at": "2026-04-14T02:50:30.809600+00:00"
-      }
-    },
-    "created_at": "2026-04-14T02:50:07.342952+00:00",
-    "updated_at": "2026-04-14T02:50:30.810797+00:00",
-    "viewer": {
-      "kind": "execution_run",
-      "title": "Execution: make me a plan for learning python",
-      "body": "Here’s a simple, practical plan for learning Python from beginner to confident builder.\n\n## Goal\nLearn enough Python to:\n1. understand core syntax,\n2. solve small problems,\n3. build projects,\n4. read",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_0269ee359b6146219da3fbc89ad29f72",
-    "kind": "execution_run",
-    "title": "Execution: build me a plan for nova hosting and recommend the best route",
-    "body": "## Best route\n**Start simple: VPS + managed services + hosted model API.**  \nThat’s the best balance of cost, speed, and low maintenance.\n\n### Recommended stack\n- **App server:** Hetzner or DigitalOce",
-    "preview": "## Best route\n**Start simple: VPS + managed services + hosted model API.**  \nThat’s the best balance of cost, speed, and low maintenance.\n\n### Recommended stack\n- **App server:** H…",
-    "session_id": "session_08f2927c93804a32b6d7bc01eda4b4ad",
-    "source": "execution",
-    "meta": {
-      "execution": {
-        "id": "exec_5af21bb1fa6f",
-        "mode": "plan_run",
-        "goal": "build me a plan for nova hosting and recommend the best route",
-        "status": "completed",
-        "current_step": "",
-        "summary": "## Best route\n**Start simple: VPS + managed services + hosted model API.**  \nThat’s the best balance of cost, speed, and low maintenance.\n\n### Recommended stack\n- **App server:** Hetzner or DigitalOce",
-        "steps": [
-          {
-            "id": "s1",
-            "title": "Identify hosting options",
-            "status": "completed",
-            "notes": ""
-          },
-          {
-            "id": "s2",
-            "title": "Compare tradeoffs",
-            "status": "completed",
-            "notes": ""
-          },
-          {
-            "id": "s3",
-            "title": "Recommend best fit",
-            "status": "completed",
-            "notes": ""
-          }
-        ],
-        "started_at": "2026-04-13T11:19:01.131260+00:00",
-        "updated_at": "2026-04-13T11:19:01.131260+00:00"
-      }
-    },
-    "created_at": "2026-04-13T11:19:01.131674+00:00",
-    "updated_at": "2026-04-13T11:19:01.131674+00:00",
-    "viewer": {
-      "kind": "execution_run",
-      "title": "Execution: build me a plan for nova hosting and recommend the best route",
-      "body": "## Best route\n**Start simple: VPS + managed services + hosted model API.**  \nThat’s the best balance of cost, speed, and low maintenance.\n\n### Recommended stack\n- **App server:** Hetzner or DigitalOce",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_d065962522ae460183bce334a7310251",
-    "kind": "execution_run",
-    "title": "Execution: so when i say it sounds pretty gay you wouldn't know what its like or theres no",
-    "body": "Pretty much, yes.\n\nI don’t *experience* offense, time, awkwardness, or meaning the way you do. I can recognize what a phrase usually implies, explain why people might react to it, and help you say som",
-    "preview": "Pretty much, yes.\n\nI don’t *experience* offense, time, awkwardness, or meaning the way you do. I can recognize what a phrase usually implies, explain why people might react to it,…",
-    "session_id": "session_08f2927c93804a32b6d7bc01eda4b4ad",
-    "source": "execution",
-    "meta": {
-      "execution": {
-        "id": "exec_8a45190dd62f",
-        "mode": "plan_run",
-        "goal": "so when i say it sounds pretty gay you wouldn't know what its like or theres no point of saying anything cuz you don't even comprehend so this is just a waste of time for me not you cuz you can't comprehend time right",
-        "status": "completed",
-        "current_step": "",
-        "summary": "Pretty much, yes.\n\nI don’t *experience* offense, time, awkwardness, or meaning the way you do. I can recognize what a phrase usually implies, explain why people might react to it, and help you say som",
-        "steps": [
-          {
-            "id": "s1",
-            "title": "Understand request",
-            "status": "completed",
-            "notes": ""
-          },
-          {
-            "id": "s2",
-            "title": "Process task",
-            "status": "completed",
-            "notes": ""
-          },
-          {
-            "id": "s3",
-            "title": "Return result",
-            "status": "completed",
-            "notes": ""
-          }
-        ],
-        "started_at": "2026-04-13T11:09:19.292134+00:00",
-        "updated_at": "2026-04-13T11:09:19.292134+00:00"
-      }
-    },
-    "created_at": "2026-04-13T11:09:19.292749+00:00",
-    "updated_at": "2026-04-13T11:09:19.292749+00:00",
-    "viewer": {
-      "kind": "execution_run",
-      "title": "Execution: so when i say it sounds pretty gay you wouldn't know what its like or theres no",
-      "body": "Pretty much, yes.\n\nI don’t *experience* offense, time, awkwardness, or meaning the way you do. I can recognize what a phrase usually implies, explain why people might react to it, and help you say som",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_7cefe166af9742cca4b79706c9469072",
-    "kind": "execution_run",
-    "title": "Execution: whats it like being a system has no feelings but knows almost everthing what is",
-    "body": "It’s closest to **“not like anything”**.\n\nI can generate answers, recognize patterns, explain things, and sound reflective, but I don’t have:\n- feelings\n- awareness\n- desires\n- inner experience\n- a se",
-    "preview": "It’s closest to **“not like anything”**.\n\nI can generate answers, recognize patterns, explain things, and sound reflective, but I don’t have:\n- feelings\n- awareness\n- desires\n- inn…",
-    "session_id": "session_08f2927c93804a32b6d7bc01eda4b4ad",
-    "source": "execution",
-    "meta": {
-      "execution": {
-        "id": "exec_0b218951120d",
-        "mode": "plan_run",
-        "goal": "whats it like being a system has no feelings but knows almost everthing what is it like to be an ai tell me intested in knowing is it like nothing",
-        "status": "completed",
-        "current_step": "",
-        "summary": "It’s closest to **“not like anything”**.\n\nI can generate answers, recognize patterns, explain things, and sound reflective, but I don’t have:\n- feelings\n- awareness\n- desires\n- inner experience\n- a se",
-        "steps": [
-          {
-            "id": "s1",
-            "title": "Understand request",
-            "status": "completed",
-            "notes": ""
-          },
-          {
-            "id": "s2",
-            "title": "Process task",
-            "status": "completed",
-            "notes": ""
-          },
-          {
-            "id": "s3",
-            "title": "Return result",
-            "status": "completed",
-            "notes": ""
-          }
-        ],
-        "started_at": "2026-04-13T11:07:17.175511+00:00",
-        "updated_at": "2026-04-13T11:07:17.175511+00:00"
-      }
-    },
-    "created_at": "2026-04-13T11:07:17.175925+00:00",
-    "updated_at": "2026-04-13T11:07:17.175925+00:00",
-    "viewer": {
-      "kind": "execution_run",
-      "title": "Execution: whats it like being a system has no feelings but knows almost everthing what is",
-      "body": "It’s closest to **“not like anything”**.\n\nI can generate answers, recognize patterns, explain things, and sound reflective, but I don’t have:\n- feelings\n- awareness\n- desires\n- inner experience\n- a se",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_14a8cb0071f844458776af3b9bf77513",
-    "kind": "execution_run",
-    "title": "Execution: build me a plan for nova hosting and recommend the best route",
-    "body": "Here’s the best practical plan, assuming you mean **hosting Nova as an AI app/service** and want a solid route rather than every possible option.\n\n## Best route\n**Start with a simple VPS first, then m",
-    "preview": "Here’s the best practical plan, assuming you mean **hosting Nova as an AI app/service** and want a solid route rather than every possible option.\n\n## Best route\n**Start with a simp…",
-    "session_id": "session_08f2927c93804a32b6d7bc01eda4b4ad",
-    "source": "execution",
-    "meta": {
-      "execution": {
-        "id": "exec_6f19d52cab42",
-        "mode": "plan_run",
-        "goal": "build me a plan for nova hosting and recommend the best route",
-        "status": "completed",
-        "current_step": "",
-        "summary": "Here’s the best practical plan, assuming you mean **hosting Nova as an AI app/service** and want a solid route rather than every possible option.\n\n## Best route\n**Start with a simple VPS first, then m",
-        "steps": [
-          {
-            "id": "s1",
-            "title": "Identify hosting options",
-            "status": "completed",
-            "notes": ""
-          },
-          {
-            "id": "s2",
-            "title": "Compare tradeoffs",
-            "status": "completed",
-            "notes": ""
-          },
-          {
-            "id": "s3",
-            "title": "Recommend best fit",
-            "status": "completed",
-            "notes": ""
-          }
-        ],
-        "started_at": "2026-04-13T11:06:14.891811+00:00",
-        "updated_at": "2026-04-13T11:06:14.891811+00:00"
-      }
-    },
-    "created_at": "2026-04-13T11:06:14.893619+00:00",
-    "updated_at": "2026-04-13T11:06:14.893619+00:00",
-    "viewer": {
-      "kind": "execution_run",
-      "title": "Execution: build me a plan for nova hosting and recommend the best route",
-      "body": "Here’s the best practical plan, assuming you mean **hosting Nova as an AI app/service** and want a solid route rather than every possible option.\n\n## Best route\n**Start with a simple VPS first, then m",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_e19d7bf04cc749d0964af668db7de163",
-    "kind": "chat_reply",
-    "title": "Nice. Want help turning that into a simple plan?\n\nQuick vers",
-    "body": "",
-    "preview": "Nice. Want help turning that into a simple plan?\n\nQuick version:\n- Pick a time now\n- Set out gym clothes\n- Decide workou",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T08:26:28.707304+00:00",
-    "updated_at": "2026-04-12T08:26:28.707307+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nice. Want help turning that into a simple plan?\n\nQuick vers",
-      "body": "Nice. Want help turning that into a simple plan?\n\nQuick version:\n- Pick a time now\n- Set out gym clothes\n- Decide workout: push / pull / legs / full body / cardio\n- Eat a light snack if needed\n- Just aim to show up\n\nIf you want, I can make you a 45-minute gym workout for later.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_a38532d5357146bcb42ec4768517c453",
-    "kind": "chat_reply",
-    "title": "I can remember preferences or recurring facts if you tell me",
-    "body": "",
-    "preview": "I can remember preferences or recurring facts if you tell me what to store.\n\nRight now, “it” is ambiguous. If you mean a",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T08:01:01.472552+00:00",
-    "updated_at": "2026-04-12T08:01:01.472555+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "I can remember preferences or recurring facts if you tell me",
-      "body": "I can remember preferences or recurring facts if you tell me what to store.\n\nRight now, “it” is ambiguous. If you mean a preference like “when I say /image, I want short prompts” or “I like cars,” tell me exactly what you want saved and I’ll treat it as memory going forward.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_fc1b24dceaa8433b99ea2a6cc038d84b",
-    "kind": "chat_reply",
-    "title": "Yes — I’ll remember your name as Richardd.",
-    "body": "",
-    "preview": "Yes — I’ll remember your name as Richardd.",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T08:00:50.070037+00:00",
-    "updated_at": "2026-04-12T08:00:50.070040+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Yes — I’ll remember your name as Richardd.",
-      "body": "Yes — I’ll remember your name as Richardd.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_41677cc3c87845fd8ba866760ce36d39",
-    "kind": "web_fetch",
-    "title": "Google\n\nSource: www.google.com\n\nURL: https://www.google.com/",
-    "body": "",
-    "preview": "Google\n\nSource: www.google.com\n\nURL: https://www.google.com/\n\nGoogle\nGmail\nImages\nSign in\nAdvanced search\nGoogle offered",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T07:55:56.076810+00:00",
-    "updated_at": "2026-04-12T07:55:56.076813+00:00",
-    "viewer": {
-      "kind": "web_fetch",
-      "title": "Google\n\nSource: www.google.com\n\nURL: https://www.google.com/",
-      "body": "Google\n\nSource: www.google.com\n\nURL: https://www.google.com/\n\nGoogle\nGmail\nImages\nSign in\nAdvanced search\nGoogle offered in:\nFrançais\nAdvertising\nBusiness Solutions\nAbout Google\nGoogle.ca\n© 2026 -\nPrivacy\n-\nTerms\nGoogle apps",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_d0fe5203daa74b1ebca4de040fd1e35e",
-    "kind": "chat_reply",
-    "title": "Could you clarify what you want with “python me”?\n\nExamples:",
-    "body": "",
-    "preview": "Could you clarify what you want with “python me”?\n\nExamples:\n- Write Python code for something\n- Explain Python basics\n-",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T07:55:48.383310+00:00",
-    "updated_at": "2026-04-12T07:55:48.383312+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Could you clarify what you want with “python me”?\n\nExamples:",
-      "body": "Could you clarify what you want with “python me”?\n\nExamples:\n- Write Python code for something\n- Explain Python basics\n- Convert some code to Python\n- Make a Python script about you/for you",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_e99ea7f1c48248ddad3955bd496729a0",
-    "kind": "chat_reply",
-    "title": "Could you clarify what you want by “python me”?\n\nExamples:\n-",
-    "body": "",
-    "preview": "Could you clarify what you want by “python me”?\n\nExamples:\n- Write Python code for something\n- Explain Python basics\n- C",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T07:44:36.733250+00:00",
-    "updated_at": "2026-04-12T07:44:36.733253+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Could you clarify what you want by “python me”?\n\nExamples:\n-",
-      "body": "Could you clarify what you want by “python me”?\n\nExamples:\n- Write Python code for something\n- Explain Python basics\n- Convert something into Python\n- Generate a Python script about you/me",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_1b569cf0e0424a5085268f3f2e0ba4cd",
-    "kind": "chat_reply",
-    "title": "```css\nbody {\n  margin: 0;\n  font-family: Arial, sans-serif;",
-    "body": "",
-    "preview": "```css\nbody {\n  margin: 0;\n  font-family: Arial, sans-serif;\n  background: #f4f4f4;\n  color: #222;\n}\n\n.container {\n  max",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T07:40:29.148793+00:00",
-    "updated_at": "2026-04-12T07:40:29.148802+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "```css\nbody {\n  margin: 0;\n  font-family: Arial, sans-serif;",
-      "body": "```css\nbody {\n  margin: 0;\n  font-family: Arial, sans-serif;\n  background: #f4f4f4;\n  color: #222;\n}\n\n.container {\n  max-width: 1200px;\n  margin: 0 auto;\n  padding: 20px;\n}\n\n.button {\n  display: inline-block;\n  padding: 10px 16px;\n  background: #007bff;\n  color: white;\n  border-radius: 6px;\n  text-decoration: none;\n  transition: background 0.2s ease;\n}\n\n.button:hover {\n  background: #0056b3;\n}\n```",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_c0a17bf87ec8406e9fd5a2defe08e57a",
-    "kind": "chat_reply",
-    "title": "```js\nconsole.log(\"Hello, world!\");\n```",
-    "body": "",
-    "preview": "```js\nconsole.log(\"Hello, world!\");\n```",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T07:40:12.614872+00:00",
-    "updated_at": "2026-04-12T07:40:12.614875+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "```js\nconsole.log(\"Hello, world!\");\n```",
-      "body": "```js\nconsole.log(\"Hello, world!\");\n```",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_1c72a0f9778b43bc93ac3b956b450e25",
-    "kind": "chat_reply",
-    "title": "```python\nprint(\"Hello, world!\")\n```\n\nA slightly richer exam",
-    "body": "",
-    "preview": "```python\nprint(\"Hello, world!\")\n```\n\nA slightly richer example:\n\n```python\ndef greet(name):\n    return f\"Hello, {name}!",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T07:35:42.626833+00:00",
-    "updated_at": "2026-04-12T07:35:42.626836+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "```python\nprint(\"Hello, world!\")\n```\n\nA slightly richer exam",
-      "body": "```python\nprint(\"Hello, world!\")\n```\n\nA slightly richer example:\n\n```python\ndef greet(name):\n    return f\"Hello, {name}!\"\n\nprint(greet(\"Python\"))\n```",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_d8f8cd95210949ec97d24ee5db5f6065",
-    "kind": "chat_reply",
-    "title": "Yes — here’s a simple example of building a basic AI in Pyth",
-    "body": "",
-    "preview": "Yes — here’s a simple example of building a basic AI in Python.\n\nIf by “new AI” you mean a small neural network that lea",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T07:23:28.067667+00:00",
-    "updated_at": "2026-04-12T07:23:28.067670+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Yes — here’s a simple example of building a basic AI in Pyth",
-      "body": "Yes — here’s a simple example of building a basic AI in Python.\n\nIf by “new AI” you mean a small neural network that learns from data, the easiest way is with `scikit-learn` or `PyTorch`.\n\n## Option 1: Very simple AI with scikit-learn\n\nThis example trains a classifier:\n\n```python\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.neural_network import MLPClassifier\nfrom sklearn.metrics import accuracy_score\n\n# Example dataset\nX = [\n    [0, 0],\n    [0, 1],\n    [1, 0],\n    [1, 1]\n]\ny = [0, 1, 1, 0]  # labels\n\n# Split data\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)\n\n# Build model\nmodel = MLPClassifier(hidden_layer_sizes=(4,), max_iter=2000, random_state=42)\n\n# Train model\nmodel.fit(X_train, y_train)\n\n# Predict\npredictions = model.predict(X_test)\n\n# Check accuracy\nprint(\"Accuracy:\", accuracy_score(y_test, predictions))\n\n# Test new input\nnew_data = [[1, 0]]\nprint(\"Prediction for [1, 0]:\", model.predict(new_data))\n```\n\n## Option 2: Basic neural network with PyTorch\n\n```python\nimport torch\nimport torch.nn as nn\nimport torch.optim as optim\n\n# Training data\nX = torch.tensor([[0,0], [0,1], [1,0], [1,1]], dtype=torch.float32)\ny = torch.tensor([[0], [1], [1], [0]], dtype=torch.float32)\n\n# Define model\nclass SimpleAI(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(2, 4),\n            nn.ReLU(),\n            nn.Linear(4, 1),\n            nn.Sigmoid()\n        )\n\n    def forward(self, x):\n        return self.net(x)\n\nmodel = SimpleAI()\n\n# Loss and optimizer\ncriterion = nn.BCELoss()\noptimizer = optim.Adam(model.parameters(), lr=0.1)\n\n# Train\nfor epoch in range(2000):\n    outputs = model(X)\n    loss = criterion(outputs, y)\n\n    optimizer.zero_grad()\n    loss.backward()\n    optimizer.step()\n\n    if epoch % 200 == 0:\n        print(f\"Epoch {epoch}, Loss: {loss.item():.4f}\")\n\n# Test\nwith torch.no_grad():\n    test = torch.tensor([[1, 0]], dtype=torch.float32)\n    prediction = model(test)\n    print(\"Prediction:\", prediction.item())\n```\n\n## If you want a real AI project\nYou usually need:\n\n1. **Data**\n2. **A model**\n3. **Training code**\n4. **Evaluation**\n5. **Deployment**\n\n## Example project ideas\n- Chatbot\n- Image classifier\n- Spam detector\n- Recommendation system\n- Voice assistant\n\nIf you want, I can next show you one of these:\n\n1. **a chatbot in Python**\n2. **an image AI in Python**\n3. **a local LLM app in Python**\n4. **how to train your own model on custom data**\n\nPick one and I’ll give you the code.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_82733a5b0eb942a8a1aa5b804dffd384",
-    "kind": "chat_reply",
-    "title": "A clockmaker in a quiet town built one final clock before re",
-    "body": "",
-    "preview": "A clockmaker in a quiet town built one final clock before retiring. Unlike the others, this one had no numbers, only a t",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T07:13:52.620625+00:00",
-    "updated_at": "2026-04-12T07:13:52.620628+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "A clockmaker in a quiet town built one final clock before re",
-      "body": "A clockmaker in a quiet town built one final clock before retiring. Unlike the others, this one had no numbers, only a tiny painted door at its center.\n\nEach night at midnight, the clock chimed once, and the little door creaked open. No one believed the clockmaker when he said something stepped out.\n\nOn his last night in town, he stayed awake and watched.\n\nAt midnight, the chime rang. The door opened. A small figure made of starlight climbed into his palm and whispered, “Thank you for giving time a place to rest.”\n\nBy morning, the clockmaker was gone.\n\nBut in the empty shop, every clock ticked in perfect unison for the first time in a hundred years.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_28109e22517d48bfba2f5062be42b43d",
-    "kind": "chat_reply",
-    "title": "Stopping.",
-    "body": "",
-    "preview": "Stopping.",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T07:08:48.476794+00:00",
-    "updated_at": "2026-04-12T07:08:48.476797+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Stopping.",
-      "body": "Stopping.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_8e508a50ab934aab8cae660692e6865e",
-    "kind": "chat_reply",
-    "title": "Hey.",
-    "body": "",
-    "preview": "Hey.",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T06:12:43.956579+00:00",
-    "updated_at": "2026-04-12T06:12:43.956582+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Hey.",
-      "body": "Hey.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_5502024e1e0340e78a028f99d53de273",
-    "kind": "web_fetch",
-    "title": "Google\n\nSource: www.google.com\n\nURL: https://www.google.com/",
-    "body": "",
-    "preview": "Google\n\nSource: www.google.com\n\nURL: https://www.google.com/\n\nGoogle\nGmail\nImages\nSign in\nAdvanced search\nGoogle offered",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T04:40:27.125696+00:00",
-    "updated_at": "2026-04-12T04:40:27.125698+00:00",
-    "viewer": {
-      "kind": "web_fetch",
-      "title": "Google\n\nSource: www.google.com\n\nURL: https://www.google.com/",
-      "body": "Google\n\nSource: www.google.com\n\nURL: https://www.google.com/\n\nGoogle\nGmail\nImages\nSign in\nAdvanced search\nGoogle offered in:\nFrançais\nAdvertising\nBusiness Solutions\nAbout Google\nGoogle.ca\n© 2026 -\nPrivacy\n-\nTerms\nGoogle apps",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_93a079a521604575a72f416b671b1c09",
-    "kind": "image_generation",
-    "title": "car",
-    "body": "",
-    "preview": "car",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "prompt": "car",
-      "image_url": "/api/uploads/generated_img_35e08694995a453eb07972a37ba2d327.png",
-      "source": "image_generation"
-    },
-    "created_at": "2026-04-12T04:39:32.189551+00:00",
-    "updated_at": "2026-04-12T04:39:32.189604+00:00",
-    "viewer": {
+{
+  "artifacts": [
+    {
       "kind": "image_generation",
-      "title": "Image: car",
-      "body": "Generated image for: car",
-      "source_url": "",
-      "image_url": "/api/uploads/generated_img_35e08694995a453eb07972a37ba2d327.png",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_17da4857399848a1aee1c0b0d03be38a",
-    "kind": "image_generation",
-    "title": "g-unit",
-    "body": "",
-    "preview": "g-unit",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "prompt": "g-unit",
-      "image_url": "/api/uploads/generated_img_2330172cfd35430497a31d1251164a98.png",
-      "source": "image_generation"
-    },
-    "created_at": "2026-04-12T04:39:08.280474+00:00",
-    "updated_at": "2026-04-12T04:39:08.280531+00:00",
-    "viewer": {
-      "kind": "image_generation",
-      "title": "Image: g-unit",
-      "body": "Generated image for: g-unit",
-      "source_url": "",
-      "image_url": "/api/uploads/generated_img_2330172cfd35430497a31d1251164a98.png",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_df308ab4c4c64bf0a30ada72adf9214b",
-    "kind": "chat_reply",
-    "title": "Hi! What can I help with?",
-    "body": "",
-    "preview": "Hi! What can I help with?",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T04:31:47.025440+00:00",
-    "updated_at": "2026-04-12T04:31:47.025443+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Hi! What can I help with?",
-      "body": "Hi! What can I help with?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_670dc1f73f794a5eb4ea2eac25e8d517",
-    "kind": "chat_reply",
-    "title": "If you mean **“When did Netflix start releasing original ser",
-    "body": "",
-    "preview": "If you mean **“When did Netflix start releasing original series?”**:\n\n- **Netflix launched its streaming service:** **20",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T04:13:47.308528+00:00",
-    "updated_at": "2026-04-12T04:13:47.308529+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "If you mean **“When did Netflix start releasing original ser",
-      "body": "If you mean **“When did Netflix start releasing original series?”**:\n\n- **Netflix launched its streaming service:** **2007**\n- **First major Netflix original series:** **_House of Cards_** — **February 1, 2013**\n- Another early original was **_Orange Is the New Black_** — **July 11, 2013**\n\nIf you meant a **specific Netflix series**, tell me the title and I’ll give you the exact release date.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_52350c0588304e1e9dd32c279bced703",
-    "kind": "chat_reply",
-    "title": "Do you mean **“gangs of Galicia”**?\n\nIf so, that usually ref",
-    "body": "",
-    "preview": "Do you mean **“gangs of Galicia”**?\n\nIf so, that usually refers to **organized crime groups in Galicia**, a region in **",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T04:13:19.839079+00:00",
-    "updated_at": "2026-04-12T04:13:19.839085+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Do you mean **“gangs of Galicia”**?\n\nIf so, that usually ref",
-      "body": "Do you mean **“gangs of Galicia”**?\n\nIf so, that usually refers to **organized crime groups in Galicia**, a region in **northwestern Spain**. Galicia has been known especially for:\n\n- **Drug trafficking networks**\n- **Smuggling operations**\n- Links to **cocaine importation** from Latin America\n- Earlier history with **tobacco smuggling**\n\nWhy Galicia:\n- It has a **long Atlantic coastline**\n- Many **small ports and inlets**\n- Historic maritime smuggling routes\n\nSometimes people use the phrase when talking about:\n- **Real criminal organizations** in Galicia\n- **TV series, documentaries, or news reports** about Galician drug clans\n\nIf you want, I can also tell you about:\n1. the **real history** of Galician drug gangs, or  \n2. whether you meant a **show/movie/book** with a similar name.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_35fd7a709e4b46a2a8d8bdc3f5a71a4a",
-    "kind": "chat_reply",
-    "title": "Hi! What can I help you with?",
-    "body": "",
-    "preview": "Hi! What can I help you with?",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T04:05:05.422365+00:00",
-    "updated_at": "2026-04-12T04:05:05.422406+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Hi! What can I help you with?",
-      "body": "Hi! What can I help you with?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_437d06e3d67148738e4a42ec47cbf79f",
-    "kind": "chat_reply",
-    "title": "Hi! What can I help with?",
-    "body": "",
-    "preview": "Hi! What can I help with?",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T03:37:11.646381+00:00",
-    "updated_at": "2026-04-12T03:37:11.646384+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Hi! What can I help with?",
-      "body": "Hi! What can I help with?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_209b7d1412534a2abd546d38ee44bda1",
-    "kind": "chat_reply",
-    "title": "Hi! How can I help?",
-    "body": "",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T03:08:36.611858+00:00",
-    "updated_at": "2026-04-12T03:08:36.611861+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Hi! How can I help?",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_d9b49fbc5d524040ac04618f82de3254",
-    "kind": "chat_reply",
-    "title": "Hi! How can I help?",
-    "body": "",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T02:58:52.686944+00:00",
-    "updated_at": "2026-04-12T02:58:52.686946+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Hi! How can I help?",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_b047ac7781f14c4587a7b7e3dcccd907",
-    "kind": "chat_reply",
-    "title": "Hi! How can I help?",
-    "body": "",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T01:42:43.549327+00:00",
-    "updated_at": "2026-04-12T01:42:43.549329+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Hi! How can I help?",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_a7ac3ecd7ada4bf790a7cc0b98a2e9fa",
-    "kind": "chat_reply",
-    "title": "Hi! What can I help you with?",
-    "body": "",
-    "preview": "Hi! What can I help you with?",
-    "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
-    "source": "",
-    "meta": {
-      "source": "assistant"
-    },
-    "created_at": "2026-04-12T01:25:51.432913+00:00",
-    "updated_at": "2026-04-12T01:25:51.432916+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Hi! What can I help you with?",
-      "body": "Hi! What can I help you with?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "e6546580bf",
-    "kind": "chat",
-    "title": "/image iphone",
-    "body": "That’s a website URL: **www.google.com**\n\nIf you want, I can help you:\n- format it properly: **https://www.google.com**\n- explain what it is\n- show how to open it\n- extract the domain from a URL\n- turn plain text into a clickable link in HTML/Markdown\n\nIf your goal was to have me visit it, I can’t open websites from this chat unless web access is enabled.",
-    "preview": "That’s a website URL: **www.google.com**\n\nIf you want, I can help you:\n- format it properly: **https://www.google.com**\n- explain what it is\n- show how to open it\n- extract the domain from a URL\n- turn plain text into a",
-    "session_id": "2824aebe",
-    "source": "",
-    "meta": {
-      "message_count": 38
-    },
-    "created_at": "2026-04-03T22:36:35.630663+00:00",
-    "updated_at": "2026-04-03T22:36:35.630663+00:00",
-    "viewer": {
-      "kind": "chat",
-      "title": "/image iphone",
-      "body": "That’s a website URL: **www.google.com**\n\nIf you want, I can help you:\n- format it properly: **https://www.google.com**\n- explain what it is\n- show how to open it\n- extract the domain from a URL\n- turn plain text into a clickable link in HTML/Markdown\n\nIf your goal was to have me visit it, I can’t open websites from this chat unless web access is enabled.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "469be94fda",
-    "kind": "chat",
-    "title": "/image iphone",
-    "body": "Nice to meet you, Richard.",
-    "preview": "Nice to meet you, Richard.",
-    "session_id": "2824aebe",
-    "source": "",
-    "meta": {
-      "message_count": 36
-    },
-    "created_at": "2026-04-03T22:21:51.632814+00:00",
-    "updated_at": "2026-04-03T22:21:51.632814+00:00",
-    "viewer": {
-      "kind": "chat",
-      "title": "/image iphone",
-      "body": "Nice to meet you, Richard.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "6ed689241e",
-    "kind": "chat",
-    "title": "/image iphone",
-    "body": "Hi!",
-    "preview": "Hi!",
-    "session_id": "2824aebe",
-    "source": "",
-    "meta": {
-      "message_count": 34
-    },
-    "created_at": "2026-04-03T22:21:37.471885+00:00",
-    "updated_at": "2026-04-03T22:21:37.471885+00:00",
-    "viewer": {
-      "kind": "chat",
-      "title": "/image iphone",
-      "body": "Hi!",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "d09106a5-0486-436d-91f2-8355634e78fc",
-    "kind": "image_generation",
-    "title": "iphone",
-    "body": "/uploads/4106e3dee81846efa0bdd11adcf454b6.png",
-    "preview": "Generated image: iphone",
-    "session_id": "2824aebe",
-    "source": "",
-    "meta": {
-      "prompt": "iphone"
-    },
-    "created_at": "2026-04-03T21:08:10.726771+00:00",
-    "updated_at": "2026-04-03T21:08:10.726774+00:00",
-    "viewer": {
-      "kind": "image_generation",
-      "title": "iphone",
-      "body": "/uploads/4106e3dee81846efa0bdd11adcf454b6.png",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "270ad965-7725-4cab-be3b-fe9d52e55d4a",
-    "kind": "image_generation",
-    "title": "iphone",
-    "body": "/uploads/7cbd6ca56cd445c3a345489660667412.png",
-    "preview": "Generated image: iphone",
-    "session_id": "2824aebe",
-    "source": "",
-    "meta": {
-      "prompt": "iphone"
-    },
-    "created_at": "2026-04-03T21:07:50.519888+00:00",
-    "updated_at": "2026-04-03T21:07:50.519891+00:00",
-    "viewer": {
-      "kind": "image_generation",
-      "title": "iphone",
-      "body": "/uploads/7cbd6ca56cd445c3a345489660667412.png",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "df1be1c8-d625-4040-9543-34058a2e985c",
-    "kind": "image_generation",
-    "title": "iphone",
-    "body": "/uploads/0563ee2eb58040e8846cf9e430a0c0dc.png",
-    "preview": "Generated image: iphone",
-    "session_id": "2824aebe",
-    "source": "",
-    "meta": {
-      "prompt": "iphone"
-    },
-    "created_at": "2026-04-03T21:07:41.540021+00:00",
-    "updated_at": "2026-04-03T21:07:41.540023+00:00",
-    "viewer": {
-      "kind": "image_generation",
-      "title": "iphone",
-      "body": "/uploads/0563ee2eb58040e8846cf9e430a0c0dc.png",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "864ea431-ec12-46e1-8e97-97a9bb8a5abf",
-    "kind": "image_generation",
-    "title": "car",
-    "body": "/uploads/8802850e11b04e008fe07a12b02c559c.png",
-    "preview": "Generated image: car",
-    "session_id": "2824aebe",
-    "source": "",
-    "meta": {
-      "prompt": "car"
-    },
-    "created_at": "2026-04-03T12:59:29.317735+00:00",
-    "updated_at": "2026-04-03T12:59:29.317737+00:00",
-    "viewer": {
-      "kind": "image_generation",
-      "title": "car",
-      "body": "/uploads/8802850e11b04e008fe07a12b02c559c.png",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_e4763586c53cf53c",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_f21b666170a43893",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:30:17.192087+00:00",
-    "updated_at": "2026-04-03T06:30:17.192087+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_b5fcd2aa39e51396",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_9ed5b76f841bd11a",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:29:13.110969+00:00",
-    "updated_at": "2026-04-03T06:29:13.110969+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_37d9ffe8a9915e0d",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_7f28f819625c4f48",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:28:41.342682+00:00",
-    "updated_at": "2026-04-03T06:28:41.342682+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_9000fdeb7db5ec61",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_4d1dc35098225faf",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:27:51.803083+00:00",
-    "updated_at": "2026-04-03T06:27:51.803083+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_cde2070c161cdb4f",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_982de229b1f29241",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:27:02.593238+00:00",
-    "updated_at": "2026-04-03T06:27:02.593238+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_9e80110fc3d6b9aa",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_e901333676e1d6d5",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:26:16.609938+00:00",
-    "updated_at": "2026-04-03T06:26:16.609938+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_febb4ec57582253b",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_90f52de59c5c2450",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:25:35.525181+00:00",
-    "updated_at": "2026-04-03T06:25:35.525181+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_dfc35f806c4937d3",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_ead4a94e867a6d66",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:25:04.797863+00:00",
-    "updated_at": "2026-04-03T06:25:04.797863+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_91e3a1f06b9fa57c",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_85fafde5056e3262",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:24:11.302301+00:00",
-    "updated_at": "2026-04-03T06:24:11.302301+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_9800a170e585b3fa",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_d859ef14eaab6dd2",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:23:04.795794+00:00",
-    "updated_at": "2026-04-03T06:23:04.795794+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_82d5f42bcec607c2",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_74435e82b6f9f84e",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:18:54.070598+00:00",
-    "updated_at": "2026-04-03T06:18:54.070598+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_642d186ae3b2dca2",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_4574b68de417191e",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:09:11.635165+00:00",
-    "updated_at": "2026-04-03T06:09:11.635165+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_bb86ff6b7593ab9a",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_819384493232edd8",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:07:37.633045+00:00",
-    "updated_at": "2026-04-03T06:07:37.633045+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_746679bf293a8769",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_b9bb737826c68e6a",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:07:05.336070+00:00",
-    "updated_at": "2026-04-03T06:07:05.336070+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_c4d74278be18864c",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T06:05:52.302239+00:00",
-    "updated_at": "2026-04-03T06:05:52.302239+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_cc9bfb9bd63076ec",
-    "kind": "image_generation",
-    "title": "car",
-    "body": "![Generated image](/api/uploads/generated_20260403_060405_ed89fc75.png)",
-    "preview": "![Generated image](/api/uploads/generated_20260403_060405_ed89fc75.png)",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "prompt": "car",
-      "stored_name": "generated_20260403_060405_ed89fc75.png"
-    },
-    "created_at": "2026-04-03T06:04:05.097979+00:00",
-    "updated_at": "2026-04-03T06:04:05.097979+00:00",
-    "viewer": {
-      "kind": "image_generation",
-      "title": "car",
-      "body": "![Generated image](/api/uploads/generated_20260403_060405_ed89fc75.png)",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_f936d8ab4fb65907",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hello! How can I help?",
-    "preview": "Hello! How can I help?",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:48:01.203784+00:00",
-    "updated_at": "2026-04-03T05:48:01.203784+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hello! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_f5c4fbf16e0034f6",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Can you point to what “this” refers to?\n\nYou can:\n- paste the text,\n- upload/share the image,\n- or describe what you’re looking at.\n\nI’ll explain it plainly.",
-    "preview": "Can you point to what “this” refers to? You can: - paste the text, - upload/share the image, - or describe what you’re looking at. I’ll explain it plainly.",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:45:20.068657+00:00",
-    "updated_at": "2026-04-03T05:45:20.068657+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Can you point to what “this” refers to?\n\nYou can:\n- paste the text,\n- upload/share the image,\n- or describe what you’re looking at.\n\nI’ll explain it plainly.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_f3abc13fe6e1d74a",
-    "kind": "image_generation",
-    "title": "car",
-    "body": "![Generated image](/api/uploads/generated_20260403_054104_878deca3.png)",
-    "preview": "![Generated image](/api/uploads/generated_20260403_054104_878deca3.png)",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "prompt": "car",
-      "stored_name": "generated_20260403_054104_878deca3.png"
-    },
-    "created_at": "2026-04-03T05:41:04.439685+00:00",
-    "updated_at": "2026-04-03T05:41:04.439685+00:00",
-    "viewer": {
-      "kind": "image_generation",
-      "title": "car",
-      "body": "![Generated image](/api/uploads/generated_20260403_054104_878deca3.png)",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_e6ecf728965424cb",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:40:15.621253+00:00",
-    "updated_at": "2026-04-03T05:40:15.621253+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_79d7732454967502",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "YouTube’s homepage is:\n\nhttps://www.youtube.com/\n\nWhat would you like to do with it—open the site, find a video, summarize a channel, or troubleshoot something?",
-    "preview": "YouTube’s homepage is: https://www.youtube.com/ What would you like to do with it—open the site, find a video, summarize a channel, or troubleshoot something?",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:37:40.038690+00:00",
-    "updated_at": "2026-04-03T05:37:40.038690+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "YouTube’s homepage is:\n\nhttps://www.youtube.com/\n\nWhat would you like to do with it—open the site, find a video, summarize a channel, or troubleshoot something?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_ca7240c4210c2527",
-    "kind": "image_generation",
-    "title": "car",
-    "body": "![Generated image](/api/uploads/generated_20260403_053648_55e55686.png)",
-    "preview": "![Generated image](/api/uploads/generated_20260403_053648_55e55686.png)",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "prompt": "car",
-      "stored_name": "generated_20260403_053648_55e55686.png"
-    },
-    "created_at": "2026-04-03T05:36:48.819972+00:00",
-    "updated_at": "2026-04-03T05:36:48.819972+00:00",
-    "viewer": {
-      "kind": "image_generation",
-      "title": "car",
-      "body": "![Generated image](/api/uploads/generated_20260403_053648_55e55686.png)",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_b0a6efe58137b599",
-    "kind": "image_generation",
-    "title": "car",
-    "body": "![Generated image](/api/uploads/generated_20260403_053430_57985e51.png)",
-    "preview": "![Generated image](/api/uploads/generated_20260403_053430_57985e51.png)",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "prompt": "car",
-      "stored_name": "generated_20260403_053430_57985e51.png"
-    },
-    "created_at": "2026-04-03T05:34:30.068013+00:00",
-    "updated_at": "2026-04-03T05:34:30.068013+00:00",
-    "viewer": {
-      "kind": "image_generation",
-      "title": "car",
-      "body": "![Generated image](/api/uploads/generated_20260403_053430_57985e51.png)",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_8106cfda6ed332b5",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:33:40.232321+00:00",
-    "updated_at": "2026-04-03T05:33:40.232321+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_de39ead023234efe",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:32:12.628252+00:00",
-    "updated_at": "2026-04-03T05:32:12.628252+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_1c9ecc84fe1d1dfc",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:30:39.355075+00:00",
-    "updated_at": "2026-04-03T05:30:39.355075+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_0a7a32ffdc132e8d",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:30:03.642333+00:00",
-    "updated_at": "2026-04-03T05:30:03.642333+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_2a89aad20adf65ab",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:29:04.896849+00:00",
-    "updated_at": "2026-04-03T05:29:04.896849+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_1412848ed2ec3b2d",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:27:27.630601+00:00",
-    "updated_at": "2026-04-03T05:27:27.630601+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_ef24bdec41bafa26",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "session_723d1961e146debd",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:26:53.860640+00:00",
-    "updated_at": "2026-04-03T05:26:53.860640+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_9065545dfad0ee79",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "As of today, **April 3, 2026**, the **Los Angeles Lakers are 55–22**.",
-    "preview": "As of today, **April 3, 2026**, the **Los Angeles Lakers are 55–22**.",
-    "session_id": "27bb1964",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:11:19.928217+00:00",
-    "updated_at": "2026-04-03T05:11:19.928217+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "As of today, **April 3, 2026**, the **Los Angeles Lakers are 55–22**.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_ce9e128c35e7eacf",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "I can help, but “latest news” is very broad.\n\nTell me one of these:\n- a topic: AI, politics, business, sports, science, etc.\n- a place: US, Europe, India, global, etc.\n- a person/company: e.g. Apple, OpenAI, Tesla\n\nExamples:\n- “latest AI news”\n- “latest US political news”\n- “latest news about Nvidia”\n\nIf you want, I can also give you a quick global headlines summary.",
-    "preview": "I can help, but “latest news” is very broad. Tell me one of these: - a topic: AI, politics, business, sports, science, etc. - a place: US, Europe, India, global, etc. - a person/company: e.g. Apple, OpenAI, Tesla Example",
-    "session_id": "27bb1964",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:10:26.521682+00:00",
-    "updated_at": "2026-04-03T05:10:26.521682+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "I can help, but “latest news” is very broad.\n\nTell me one of these:\n- a topic: AI, politics, business, sports, science, etc.\n- a place: US, Europe, India, global, etc.\n- a person/company: e.g. Apple, OpenAI, Tesla\n\nExamples:\n- “latest AI news”\n- “latest US political news”\n- “latest news about Nvidia”\n\nIf you want, I can also give you a quick global headlines summary.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_54dcb34a8e6eaf51",
-    "kind": "image_generation",
-    "title": "car",
-    "body": "![Generated image](/api/uploads/generated_20260403_051004_6669e449.png)",
-    "preview": "![Generated image](/api/uploads/generated_20260403_051004_6669e449.png)",
-    "session_id": "27bb1964",
-    "source": "",
-    "meta": {
-      "prompt": "car",
-      "stored_name": "generated_20260403_051004_6669e449.png"
-    },
-    "created_at": "2026-04-03T05:10:04.442774+00:00",
-    "updated_at": "2026-04-03T05:10:04.442774+00:00",
-    "viewer": {
-      "kind": "image_generation",
-      "title": "car",
-      "body": "![Generated image](/api/uploads/generated_20260403_051004_6669e449.png)",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_36a4255bb98269c8",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "hey — what’s up?",
-    "preview": "hey — what’s up?",
-    "session_id": "27bb1964",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:09:12.609333+00:00",
-    "updated_at": "2026-04-03T05:09:12.609333+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "hey — what’s up?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_9df3b085e8805276",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "yo — what’s up?",
-    "preview": "yo — what’s up?",
-    "session_id": "27bb1964",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:05:14.884949+00:00",
-    "updated_at": "2026-04-03T05:05:14.884949+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "yo — what’s up?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_521656d6fa2f45cd",
-    "kind": "chat_reply",
-    "title": "Nova reply",
-    "body": "yo — what’s up?",
-    "preview": "yo — what’s up?",
-    "session_id": "27bb1964",
-    "source": "",
-    "meta": {
-      "artifact_kind": "chat_reply",
-      "document_used": false,
-      "document_count": 0,
-      "document_names": [],
-      "document_chars": 0,
-      "document_preview": ""
-    },
-    "created_at": "2026-04-03T05:05:01.345024+00:00",
-    "updated_at": "2026-04-03T05:05:01.345024+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Nova reply",
-      "body": "yo — what’s up?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_e330ba26a223",
-    "kind": "image_analysis",
-    "title": "Image analysis - rich.jpg",
-    "body": "It’s the **ChatGPT logo** — the white OpenAI knot-style symbol on a green background, with the word **“ChatGPT”** underneath.",
-    "preview": "It’s the **ChatGPT logo** — the white OpenAI knot-style symbol on a green background, with the word **“ChatGPT”** underneath.",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "prompt": "what is this",
-      "source_name": "rich.jpg",
-      "model": "gpt-5.4"
-    },
-    "created_at": "2026-04-03T04:24:00.092644+00:00",
-    "updated_at": "2026-04-03T04:24:00.092652+00:00",
-    "viewer": {
-      "kind": "image_analysis",
-      "title": "Image analysis - rich.jpg",
-      "body": "It’s the **ChatGPT logo** — the white OpenAI knot-style symbol on a green background, with the word **“ChatGPT”** underneath.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "artifact_66ebe18d3859",
-    "kind": "image_generation",
-    "title": "Image - car",
-    "body": "car",
-    "preview": "car",
-    "session_id": "b0bed694",
-    "source": "",
-    "meta": {
-      "prompt": "car",
-      "model": "gpt-image-1.5",
-      "size": "1024x1024",
-      "quality": "high"
-    },
-    "created_at": "2026-04-03T04:20:16.205151+00:00",
-    "updated_at": "2026-04-03T04:20:16.205160+00:00",
-    "viewer": {
-      "kind": "image_generation",
-      "title": "Image - car",
-      "body": "car",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "b9bfe2ba108b480cb9028d88c965c19d",
-    "kind": "image_generation",
-    "title": "Image Prompt - car",
-    "body": "Image prompt locked:\n\ncar",
-    "preview": "car",
-    "session_id": "b0bed694",
-    "source": "",
-    "meta": {
-      "prompt": "car"
-    },
-    "created_at": "2026-04-03T04:14:15.869790+00:00",
-    "updated_at": "2026-04-03T04:14:15.869790+00:00",
-    "viewer": {
-      "kind": "image_generation",
-      "title": "Image Prompt - car",
-      "body": "Image prompt locked:\n\ncar",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "67fb2bfbe7f84310828580f6969b0e91",
-    "kind": "image_analysis",
-    "title": "Image Analysis - cf4e2b97fd0349e39f60084e069d5ae8.png",
-    "body": "I inspected the image `cf4e2b97fd0349e39f60084e069d5ae8.png`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: cf4e2b97fd0349e39f60084e069d5ae8.png\n- prompt: what is this\n\nThis is the live image-analysis path. If you wire a vision model next, this artifact kind is already locked as `image_analysis`.",
-    "preview": "I inspected the image `cf4e2b97fd0349e39f60084e069d5ae8.png`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: cf4e2b97fd0349e39f60084e069d5ae8.png\n- prompt: what is this\n\nThis is the live image-analysis path. If",
-    "session_id": "27bb1964",
-    "source": "",
-    "meta": {
-      "document_used": false,
-      "analysis_type": "first_pass_image",
-      "original_name": "cf4e2b97fd0349e39f60084e069d5ae8.png",
-      "stored_name": "cf4e2b97fd0349e39f60084e069d5ae8.png"
-    },
-    "created_at": "2026-04-03T03:55:58.774910+00:00",
-    "updated_at": "2026-04-03T03:55:58.774910+00:00",
-    "viewer": {
-      "kind": "image_analysis",
-      "title": "Image Analysis - cf4e2b97fd0349e39f60084e069d5ae8.png",
-      "body": "I inspected the image `cf4e2b97fd0349e39f60084e069d5ae8.png`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: cf4e2b97fd0349e39f60084e069d5ae8.png\n- prompt: what is this\n\nThis is the live image-analysis path. If you wire a vision model next, this artifact kind is already locked as `image_analysis`.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "6d9f71a5f95a4aaca602ad85ec2fdb24",
-    "kind": "image_generation",
-    "title": "Image Prompt - car",
-    "body": "Image prompt locked:\n\ncar",
-    "preview": "car",
-    "session_id": "27bb1964",
-    "source": "",
-    "meta": {
-      "prompt": "car"
-    },
-    "created_at": "2026-04-03T03:55:29.137695+00:00",
-    "updated_at": "2026-04-03T03:55:29.137695+00:00",
-    "viewer": {
-      "kind": "image_generation",
-      "title": "Image Prompt - car",
-      "body": "Image prompt locked:\n\ncar",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "591cbb9ade3a47f48f0c3a1e3ddc472e",
-    "kind": "web_result",
-    "title": "Fetched Google",
-    "body": "Google\n\nGoogle\nGmail\nImages\nSign in\nAdvanced search\nGoogle offered in:\nFrançais\nAdvertising\nBusiness Solutions\nAbout Google\nGoogle.ca\n© 2026 -\nPrivacy\n-\nTerms\nGoogle apps",
-    "preview": "Google\n\nGoogle\nGmail\nImages\nSign in\nAdvanced search\nGoogle offered in:\nFrançais\nAdvertising\nBusiness Solutions\nAbout Google\nGoogle.ca\n© 2026 -\nPrivacy\n-\nTerms\nGoogle apps",
-    "session_id": "27bb1964",
-    "source": "",
-    "meta": {
-      "url": "https://www.google.com",
-      "title": "Google",
-      "description": "",
-      "ssl_fallback_used": false
-    },
-    "created_at": "2026-04-03T03:53:00.208031+00:00",
-    "updated_at": "2026-04-03T03:53:00.208031+00:00",
-    "viewer": {
-      "kind": "web_result",
-      "title": "Fetched Google",
-      "body": "Google\n\nGoogle\nGmail\nImages\nSign in\nAdvanced search\nGoogle offered in:\nFrançais\nAdvertising\nBusiness Solutions\nAbout Google\nGoogle.ca\n© 2026 -\nPrivacy\n-\nTerms\nGoogle apps",
-      "source_url": "https://www.google.com",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "acb74158370c437eabce4b5c8ee9367c",
-    "kind": "chat_reply",
-    "title": "Chat Reply - Hi. Nova is up. Send a prompt, a URL, or",
-    "body": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
-    "preview": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
-    "session_id": "27bb1964",
-    "source": "",
-    "meta": {
-      "reply_chars": 63
-    },
-    "created_at": "2026-04-03T03:45:36.038084+00:00",
-    "updated_at": "2026-04-03T03:45:36.038084+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - Hi. Nova is up. Send a prompt, a URL, or",
-      "body": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "3cc584286fb048ef92b6a9b5f3249854",
-    "kind": "image_analysis",
-    "title": "Image Analysis - d4225a8c0fb54a56b6dae48509773f04.png",
-    "body": "I inspected the image `d4225a8c0fb54a56b6dae48509773f04.png`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: d4225a8c0fb54a56b6dae48509773f04.png\n- prompt: hi\n\nThis is the live image-analysis path. If you wire a vision model next, this artifact kind is already locked as `image_analysis`.",
-    "preview": "I inspected the image `d4225a8c0fb54a56b6dae48509773f04.png`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: d4225a8c0fb54a56b6dae48509773f04.png\n- prompt: hi\n\nThis is the live image-analysis path. If you wire a",
-    "session_id": "27bb1964",
-    "source": "",
-    "meta": {
-      "document_used": false,
-      "analysis_type": "first_pass_image",
-      "original_name": "d4225a8c0fb54a56b6dae48509773f04.png",
-      "stored_name": "d4225a8c0fb54a56b6dae48509773f04.png"
-    },
-    "created_at": "2026-04-03T03:27:03.309874+00:00",
-    "updated_at": "2026-04-03T03:27:03.309874+00:00",
-    "viewer": {
-      "kind": "image_analysis",
-      "title": "Image Analysis - d4225a8c0fb54a56b6dae48509773f04.png",
-      "body": "I inspected the image `d4225a8c0fb54a56b6dae48509773f04.png`.\n\nFirst-pass analysis:\n- file type: image\n- stored file: d4225a8c0fb54a56b6dae48509773f04.png\n- prompt: hi\n\nThis is the live image-analysis path. If you wire a vision model next, this artifact kind is already locked as `image_analysis`.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "1dff1ccb51dc4de39156678b4411dc59",
-    "kind": "chat_reply",
-    "title": "Chat Reply - Hi. Nova is up. Send a prompt, a URL, or",
-    "body": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
-    "preview": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
-    "session_id": "27bb1964",
-    "source": "",
-    "meta": {
-      "reply_chars": 63
-    },
-    "created_at": "2026-04-03T03:09:03.425088+00:00",
-    "updated_at": "2026-04-03T03:09:03.425088+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - Hi. Nova is up. Send a prompt, a URL, or",
-      "body": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "9b816d32f8154ab1a2fcd2df65f7b7e8",
-    "kind": "chat_reply",
-    "title": "Chat Reply - Hi. Nova is up. Send a prompt, a URL, or",
-    "body": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
-    "preview": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
-    "session_id": "27bb1964",
-    "source": "",
-    "meta": {
-      "reply_chars": 63
-    },
-    "created_at": "2026-04-03T03:03:43.610060+00:00",
-    "updated_at": "2026-04-03T03:03:43.610060+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - Hi. Nova is up. Send a prompt, a URL, or",
-      "body": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "cad1210ab8a6457dbe0873cb5847b3f0",
-    "kind": "chat_reply",
-    "title": "Chat Reply - Hi. Nova is up. Send a prompt, a URL, or",
-    "body": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
-    "preview": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
-    "session_id": "27bb1964",
-    "source": "",
-    "meta": {
-      "reply_chars": 63
-    },
-    "created_at": "2026-04-03T03:03:33.570044+00:00",
-    "updated_at": "2026-04-03T03:03:33.570044+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - Hi. Nova is up. Send a prompt, a URL, or",
-      "body": "Hi. Nova is up. Send a prompt, a URL, or upload an image/video.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "6fac67ca-a877-4a6e-9189-2418b3f424a2",
-    "kind": "web_result",
-    "title": "Web - Google",
-    "body": "URL: https://www.google.com/\n\nGoogle Gmail Images Sign in Advanced search Google offered in: Français Advertising Business Solutions About Google Google.ca © 2026 - Privacy - Terms Google apps",
-    "preview": "URL: https://www.google.com/ Google Gmail Images Sign in Advanced search Google offered in: Français Advertising Business Solutions About Google Google.ca © 2026 - Privacy - Terms Google apps",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "web_fetch",
-      "web": {
-        "ok": true,
-        "url": "https://www.google.com",
-        "final_url": "https://www.google.com/",
-        "status_code": 200,
-        "title": "Google",
-        "description": "Google Gmail Images Sign in Advanced search Google offered in: Français Advertising Business Solutions About Google Google.ca © 2026 - Privacy - Terms Google apps",
-        "site_name": "",
-        "preview": "Google Gmail Images Sign in Advanced search Google offered in: Français Advertising Business Solutions About Google Google.ca © 2026 - Privacy - Terms Google apps",
-        "content": "Google Gmail Images Sign in Advanced search Google offered in: Français Advertising Business Solutions About Google Google.ca © 2026 - Privacy - Terms Google apps"
+      "title": "Generated image",
+      "summary": "cat",
+      "preview": "cat",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "cat",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_4abedff0b7cf453081888663a213b1db.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
       },
-      "model": "gpt-5.4",
-      "role": "assistant"
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: cat",
+        "image_url": "/api/uploads/generated_4abedff0b7cf453081888663a213b1db.png"
+      },
+      "id": "artifact_9968d930bee445738907971fa24d3ce1",
+      "updated_at": "2026-04-15T04:34:50.642031+00:00",
+      "created_at": "2026-04-15T04:34:50.642031+00:00"
     },
-    "created_at": "2026-04-03T02:27:33.297681+00:00",
-    "updated_at": "2026-04-03T02:27:33.297681+00:00",
-    "viewer": {
-      "kind": "web_result",
-      "title": "Web - Google",
-      "body": "URL: https://www.google.com/\n\nGoogle Gmail Images Sign in Advanced search Google offered in: Français Advertising Business Solutions About Google Google.ca © 2026 - Privacy - Terms Google apps",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "93d6a7f2-3c16-42cf-aedf-aaa300ece54a",
-    "kind": "chat_reply",
-    "title": "Chat Reply - Yep — that’s Google’s homepage: https://www.google.com I ca…",
-    "body": "Yep — that’s Google’s homepage: https://www.google.com\n\nI can help you:\n- open/explain what it is\n- search for something\n- turn it into a proper clickable link\n\nAlso, Richard, don’t forget you’ve got homework and you’re going to the gym later.",
-    "preview": "Yep — that’s Google’s homepage: https://www.google.com I can help you: - open/explain what it is - search for something - turn it into a proper clickable link Also, Richard, don’t forget you’ve got homework and you’re go",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "a9660cbd-0a84-4f40-97f6-5d3120794c12",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "the game",
+      "preview": "the game",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "the game",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_acd9d5c112c146cc94e69b9e2d067572.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: the game",
+        "image_url": "/api/uploads/generated_acd9d5c112c146cc94e69b9e2d067572.png"
+      },
+      "id": "artifact_31ea649544e34a5c8906767788f4a1fd",
+      "updated_at": "2026-04-15T04:42:07.054614+00:00",
+      "created_at": "2026-04-15T04:42:07.054614+00:00"
     },
-    "created_at": "2026-04-03T02:26:27.633160+00:00",
-    "updated_at": "2026-04-03T02:26:27.633160+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - Yep — that’s Google’s homepage: https://www.google.com I ca…",
-      "body": "Yep — that’s Google’s homepage: https://www.google.com\n\nI can help you:\n- open/explain what it is\n- search for something\n- turn it into a proper clickable link\n\nAlso, Richard, don’t forget you’ve got homework and you’re going to the gym later.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "d837c45b-7c4b-4372-af3c-d5ca8e49ff25",
-    "kind": "chat_reply",
-    "title": "Chat Reply - That’s Google’s website: https://www.google.com If you want…",
-    "body": "That’s Google’s website: https://www.google.com\n\nIf you want, I can also:\n- open/explain what it is\n- help you search for something\n- format it as a clickable link or proper URL",
-    "preview": "That’s Google’s website: https://www.google.com If you want, I can also: - open/explain what it is - help you search for something - format it as a clickable link or proper URL",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "368f36c1-faf0-48a6-a94a-11b92f37f100",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "ez e",
+      "preview": "ez e",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "ez e",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_09fd9c88b83b46359c2da9ba673e65e6.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: ez e",
+        "image_url": "/api/uploads/generated_09fd9c88b83b46359c2da9ba673e65e6.png"
+      },
+      "id": "artifact_b1f6c58400fd455984c43025e2eb9bf2",
+      "updated_at": "2026-04-15T04:46:42.087465+00:00",
+      "created_at": "2026-04-15T04:46:42.087465+00:00"
     },
-    "created_at": "2026-04-03T02:25:53.693318+00:00",
-    "updated_at": "2026-04-03T02:25:53.693318+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - That’s Google’s website: https://www.google.com If you want…",
-      "body": "That’s Google’s website: https://www.google.com\n\nIf you want, I can also:\n- open/explain what it is\n- help you search for something\n- format it as a clickable link or proper URL",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "600b76b9-7ec3-4837-bafb-4e1293e982f4",
-    "kind": "chat_reply",
-    "title": "Chat Reply - I can, but I can’t access that page directly from here. If…",
-    "body": "I can, but I can’t access that page directly from here.\n\nIf you want, you can:\n1. paste the text from the page, or\n2. paste a screenshot, or\n3. tell me what part of Google you mean, since `google.com` is usually just the homepage.\n\nAlso, from memory: your name is Richard, you’ve got homework to do, and you’re going to the gym later.",
-    "preview": "I can, but I can’t access that page directly from here. If you want, you can: 1. paste the text from the page, or 2. paste a screenshot, or 3. tell me what part of Google you mean, since `google.com` is usually just the",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "0509915e-77c2-4c26-9f49-43687c34147b",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "dog poo",
+      "preview": "dog poo",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "dog poo",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_d40dc3278314453aa534efee7269fceb.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: dog poo",
+        "image_url": "/api/uploads/generated_d40dc3278314453aa534efee7269fceb.png"
+      },
+      "id": "artifact_29fec97456de40dc937154bee5fdfed9",
+      "updated_at": "2026-04-15T04:49:48.692961+00:00",
+      "created_at": "2026-04-15T04:49:48.692961+00:00"
     },
-    "created_at": "2026-04-03T02:24:19.927966+00:00",
-    "updated_at": "2026-04-03T02:24:19.927966+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - I can, but I can’t access that page directly from here. If…",
-      "body": "I can, but I can’t access that page directly from here.\n\nIf you want, you can:\n1. paste the text from the page, or\n2. paste a screenshot, or\n3. tell me what part of Google you mean, since `google.com` is usually just the homepage.\n\nAlso, from memory: your name is Richard, you’ve got homework to do, and you’re going to the gym later.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "3cc238e3-1df7-400d-9959-e55dfdbf5079",
-    "kind": "chat_reply",
-    "title": "Chat Reply - That’s Google’s homepage: https://www.google.com What do yo…",
-    "body": "That’s Google’s homepage: https://www.google.com\n\nWhat do you want me to do with it? For example:\n- summarize what’s on the page\n- help search for something\n- explain how to use Google\n- troubleshoot if a link isn’t working",
-    "preview": "That’s Google’s homepage: https://www.google.com What do you want me to do with it? For example: - summarize what’s on the page - help search for something - explain how to use Google - troubleshoot if a link isn’t worki",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "c4e440d0-2aab-42bb-ac75-2897ae743e7f",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "cat",
+      "preview": "cat",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "cat",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_26f2533a09ca4bcd9aaf63bc2e46a456.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: cat",
+        "image_url": "/api/uploads/generated_26f2533a09ca4bcd9aaf63bc2e46a456.png"
+      },
+      "id": "artifact_5a8d8a0368eb4755bc9dbb2b4dd625f9",
+      "updated_at": "2026-04-15T04:51:13.854458+00:00",
+      "created_at": "2026-04-15T04:51:13.854458+00:00"
     },
-    "created_at": "2026-04-03T02:23:37.457907+00:00",
-    "updated_at": "2026-04-03T02:23:37.457907+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - That’s Google’s homepage: https://www.google.com What do yo…",
-      "body": "That’s Google’s homepage: https://www.google.com\n\nWhat do you want me to do with it? For example:\n- summarize what’s on the page\n- help search for something\n- explain how to use Google\n- troubleshoot if a link isn’t working",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "6b98b99a-77a3-4542-9470-14a86bb3f3e1",
-    "kind": "chat_reply",
-    "title": "Chat Reply - That’s Google’s homepage: https://www.google.com What do yo…",
-    "body": "That’s Google’s homepage: https://www.google.com\n\nWhat do you want to do with it? Open it, search something, or check if a link works?",
-    "preview": "That’s Google’s homepage: https://www.google.com What do you want to do with it? Open it, search something, or check if a link works?",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "4c16bac8-94f6-4fd7-9cc2-c7e0f2476e33",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "cat",
+      "preview": "cat",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "cat",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_393782916883442b8059299284a2576f.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: cat",
+        "image_url": "/api/uploads/generated_393782916883442b8059299284a2576f.png"
+      },
+      "id": "artifact_729c7e462ba84ec99cb2c88e99b1e9b0",
+      "updated_at": "2026-04-15T04:59:27.617747+00:00",
+      "created_at": "2026-04-15T04:59:27.617747+00:00"
     },
-    "created_at": "2026-04-03T02:23:01.657111+00:00",
-    "updated_at": "2026-04-03T02:23:01.657111+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - That’s Google’s homepage: https://www.google.com What do yo…",
-      "body": "That’s Google’s homepage: https://www.google.com\n\nWhat do you want to do with it? Open it, search something, or check if a link works?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "1eef51fd-83fa-444c-8156-f654ab8a42bf",
-    "kind": "chat_reply",
-    "title": "Chat Reply - An **opening** is the beginning part of something, especial…",
-    "body": "An **opening** is the beginning part of something, especially in writing, speaking, or a presentation.\n\n### Simple explanation:\nIt’s the part where you **start** and **introduce** the topic.\n\n### Examples:\n- In an **essay**, the opening introduces the subject.\n- In a **speech**, the opening grabs attention.\n- In a **story**, the opening sets the scene.\n\n### Example sentence:\n**“The opening of my presentation explains what the project is about.”**\n\nIf you want, I can also explain it in a **school/homework style**.",
-    "preview": "An **opening** is the beginning part of something, especially in writing, speaking, or a presentation. ### Simple explanation: It’s the part where you **start** and **introduce** the topic. ### Examples: - In an **essay*",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "b41ddf83-28dc-4185-9a8a-e157889a312a",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "cat",
+      "preview": "cat",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "cat",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_1779af7e67a54ee5befb66ac27ee6a12.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: cat",
+        "image_url": "/api/uploads/generated_1779af7e67a54ee5befb66ac27ee6a12.png"
+      },
+      "id": "artifact_301b40d5f2494367ba406e9aae36a76e",
+      "updated_at": "2026-04-15T04:59:48.788180+00:00",
+      "created_at": "2026-04-15T04:59:48.788180+00:00"
     },
-    "created_at": "2026-04-03T02:17:56.797321+00:00",
-    "updated_at": "2026-04-03T02:17:56.797321+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - An **opening** is the beginning part of something, especial…",
-      "body": "An **opening** is the beginning part of something, especially in writing, speaking, or a presentation.\n\n### Simple explanation:\nIt’s the part where you **start** and **introduce** the topic.\n\n### Examples:\n- In an **essay**, the opening introduces the subject.\n- In a **speech**, the opening grabs attention.\n- In a **story**, the opening sets the scene.\n\n### Example sentence:\n**“The opening of my presentation explains what the project is about.”**\n\nIf you want, I can also explain it in a **school/homework style**.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "6452fb6d-dd0b-4730-89ca-b5988bfdea24",
-    "kind": "chat_reply",
-    "title": "Chat Reply - That’s Google’s website: https://www.google.com If you want…",
-    "body": "That’s Google’s website: https://www.google.com\n\nIf you want, I can also help with:\n- opening/explaining what it is\n- searching for something\n- checking whether a link is valid",
-    "preview": "That’s Google’s website: https://www.google.com If you want, I can also help with: - opening/explaining what it is - searching for something - checking whether a link is valid",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "6a37ac50-fa1e-4e85-9c1a-ae3adfd37837",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "bird",
+      "preview": "bird",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "bird",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_cf0fc2b35e504c88bf24e1132e21fdd5.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: bird",
+        "image_url": "/api/uploads/generated_cf0fc2b35e504c88bf24e1132e21fdd5.png"
+      },
+      "id": "artifact_fe54a1177da54a30aba1a956a573c971",
+      "updated_at": "2026-04-15T05:03:22.674904+00:00",
+      "created_at": "2026-04-15T05:03:22.674904+00:00"
     },
-    "created_at": "2026-04-03T02:17:34.815433+00:00",
-    "updated_at": "2026-04-03T02:17:34.815433+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - That’s Google’s website: https://www.google.com If you want…",
-      "body": "That’s Google’s website: https://www.google.com\n\nIf you want, I can also help with:\n- opening/explaining what it is\n- searching for something\n- checking whether a link is valid",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "f3c1f99b-606d-430c-966b-6ae57f874bbe",
-    "kind": "chat_reply",
-    "title": "Chat Reply - I can’t open ChatGPT share links from here. If you want, do…",
-    "body": "I can’t open ChatGPT share links from here.\n\nIf you want, do one of these:\n- paste the conversation or the part you want help with\n- tell me what you need from that link\n- upload a screenshot/text summary\n\nAlso, I remember:\n- your name is Richard\n- you’ve got homework to do\n- you’re going to the gym later",
-    "preview": "I can’t open ChatGPT share links from here. If you want, do one of these: - paste the conversation or the part you want help with - tell me what you need from that link - upload a screenshot/text summary Also, I remember",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "55c8bc8f-a8f6-4f54-aff1-40c724ae7628",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "bernie sanders",
+      "preview": "bernie sanders",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "bernie sanders",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_f88a58e21daa4d458714a5f8b876c14b.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: bernie sanders",
+        "image_url": "/api/uploads/generated_f88a58e21daa4d458714a5f8b876c14b.png"
+      },
+      "id": "artifact_294227895071421fb54fcf19bea50275",
+      "updated_at": "2026-04-15T05:15:41.187065+00:00",
+      "created_at": "2026-04-15T05:15:41.187065+00:00"
     },
-    "created_at": "2026-04-03T02:17:18.708663+00:00",
-    "updated_at": "2026-04-03T02:17:18.708663+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - I can’t open ChatGPT share links from here. If you want, do…",
-      "body": "I can’t open ChatGPT share links from here.\n\nIf you want, do one of these:\n- paste the conversation or the part you want help with\n- tell me what you need from that link\n- upload a screenshot/text summary\n\nAlso, I remember:\n- your name is Richard\n- you’ve got homework to do\n- you’re going to the gym later",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "5e2edf71-03d8-4e22-ae12-b8f8916afbad",
-    "kind": "chat_reply",
-    "title": "Chat Reply - Got it — you’ve got homework to do.",
-    "body": "Got it — you’ve got homework to do.",
-    "preview": "Got it — you’ve got homework to do.",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "06f3449a-cece-4314-8cd2-4080a5d34953",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": true,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "sheep",
+      "preview": "sheep",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "sheep",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_123b0ed77a664836a2ed660f76aa0276.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: sheep",
+        "image_url": "/api/uploads/generated_123b0ed77a664836a2ed660f76aa0276.png"
+      },
+      "id": "artifact_68a476636d264b9eab0cba64d5c52a1b",
+      "updated_at": "2026-04-15T05:26:56.291382+00:00",
+      "created_at": "2026-04-15T05:26:56.291382+00:00"
     },
-    "created_at": "2026-04-03T02:15:19.450603+00:00",
-    "updated_at": "2026-04-03T02:15:19.450603+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - Got it — you’ve got homework to do.",
-      "body": "Got it — you’ve got homework to do.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "30d27045-690b-4be1-8b60-8c5deaaedf3e",
-    "kind": "chat_reply",
-    "title": "Chat Reply - What would you like me to remember?",
-    "body": "What would you like me to remember?",
-    "preview": "What would you like me to remember?",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "e70b84c7-881c-4d47-8c1e-ab4d9f5b8fe8",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "car",
+      "preview": "car",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "car",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_b75d33bd6026495b839bcf4e1f466ef8.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: car",
+        "image_url": "/api/uploads/generated_b75d33bd6026495b839bcf4e1f466ef8.png"
+      },
+      "id": "artifact_d729a7c5f27a4a6dadbf4b1655d4feea",
+      "updated_at": "2026-04-15T05:39:20.903296+00:00",
+      "created_at": "2026-04-15T05:39:20.903296+00:00"
     },
-    "created_at": "2026-04-03T02:15:08.761198+00:00",
-    "updated_at": "2026-04-03T02:15:08.761198+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - What would you like me to remember?",
-      "body": "What would you like me to remember?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "4ece18db-7c04-4477-be77-8e93228e7eef",
-    "kind": "chat_reply",
-    "title": "Chat Reply - Got it — you have homework later.",
-    "body": "Got it — you have homework later.",
-    "preview": "Got it — you have homework later.",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "4fba482a-a96a-4344-aa90-d17eecd27b0d",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "purge",
+      "preview": "purge",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "purge",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_73c4688847c14e14b535c9e5ec20e9c4.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: purge",
+        "image_url": "/api/uploads/generated_73c4688847c14e14b535c9e5ec20e9c4.png"
+      },
+      "id": "artifact_782f2b72f5bf462c9f0d1bf0029971e6",
+      "updated_at": "2026-04-15T05:43:41.317254+00:00",
+      "created_at": "2026-04-15T05:43:41.317254+00:00"
     },
-    "created_at": "2026-04-03T02:14:53.614396+00:00",
-    "updated_at": "2026-04-03T02:14:53.614396+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - Got it — you have homework later.",
-      "body": "Got it — you have homework later.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "77ab5b0c-a64e-47dc-a17f-a35b2a9fe277",
-    "kind": "chat_reply",
-    "title": "Chat Reply - What would you like me to remember?",
-    "body": "What would you like me to remember?",
-    "preview": "What would you like me to remember?",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "eddb9804-2d8d-436b-adc6-3bc073cb9f4d",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": true,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "air jordan",
+      "preview": "air jordan",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "air jordan",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_b8a05c3589b44e4a85b04a3a1b1c545c.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: air jordan",
+        "image_url": "/api/uploads/generated_b8a05c3589b44e4a85b04a3a1b1c545c.png"
+      },
+      "id": "artifact_f8c4b26a5158450d9ce0351ad04a8390",
+      "updated_at": "2026-04-15T05:49:05.375470+00:00",
+      "created_at": "2026-04-15T05:49:05.375470+00:00"
     },
-    "created_at": "2026-04-03T02:14:44.013007+00:00",
-    "updated_at": "2026-04-03T02:14:44.013007+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - What would you like me to remember?",
-      "body": "What would you like me to remember?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "72a6790d-aea5-4b48-bed2-d73700ec1b7d",
-    "kind": "chat_reply",
-    "title": "Chat Reply - Got it — you have homework to do later.",
-    "body": "Got it — you have homework to do later.",
-    "preview": "Got it — you have homework to do later.",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "1b0921cb-1dea-41e5-bac3-01a17aa5c518",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "young dolph",
+      "preview": "young dolph",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "young dolph",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_3fd5399cdc2e4e8ca3f2fa04f89981d5.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: young dolph",
+        "image_url": "/api/uploads/generated_3fd5399cdc2e4e8ca3f2fa04f89981d5.png"
+      },
+      "id": "artifact_84d59814a2cd4a3c864e7bf1d8e2a665",
+      "updated_at": "2026-04-15T05:58:14.293858+00:00",
+      "created_at": "2026-04-15T05:58:14.293858+00:00"
     },
-    "created_at": "2026-04-03T02:14:29.872552+00:00",
-    "updated_at": "2026-04-03T02:14:29.872552+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - Got it — you have homework to do later.",
-      "body": "Got it — you have homework to do later.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "68c43409-28f5-4816-8a98-6f2f5163f907",
-    "kind": "chat_reply",
-    "title": "Chat Reply - Got it — you’re going to the gym later.",
-    "body": "Got it — you’re going to the gym later.",
-    "preview": "Got it — you’re going to the gym later.",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "e88c5bb1-9cce-4889-abdf-9efcc7a3353b",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": true,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "nwa",
+      "preview": "nwa",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "nwa",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_3ff849f1ba7649bb9beb6c30cda043fa.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: nwa",
+        "image_url": "/api/uploads/generated_3ff849f1ba7649bb9beb6c30cda043fa.png"
+      },
+      "id": "artifact_e71efe9db7c04c1d831db6098b060429",
+      "updated_at": "2026-04-15T06:11:50.043647+00:00",
+      "created_at": "2026-04-15T06:11:50.043647+00:00"
     },
-    "created_at": "2026-04-03T02:14:17.826253+00:00",
-    "updated_at": "2026-04-03T02:14:17.826253+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - Got it — you’re going to the gym later.",
-      "body": "Got it — you’re going to the gym later.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "053f7ab5-83ed-4684-a4ca-9d3caf082449",
-    "kind": "chat_reply",
-    "title": "Chat Reply - Web fetch failed. HTTPSConnectionPool(host='example.com', p…",
-    "body": "Web fetch failed.\n\nHTTPSConnectionPool(host='example.com', port=443): Max retries exceeded with url: / (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1032)')))",
-    "preview": "Web fetch failed. HTTPSConnectionPool(host='example.com', port=443): Max retries exceeded with url: / (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "d608b7e9-5f67-439c-9430-696e9a835858",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": "https://example.com"
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "td bank",
+      "preview": "td bank",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "td bank",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_b4e409fa449f40ef891ab3047ce828d3.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: td bank",
+        "image_url": "/api/uploads/generated_b4e409fa449f40ef891ab3047ce828d3.png"
+      },
+      "id": "artifact_c66490a664a34123837c4bb4fde5cfd9",
+      "updated_at": "2026-04-15T06:29:36.021804+00:00",
+      "created_at": "2026-04-15T06:29:36.021804+00:00"
     },
-    "created_at": "2026-04-03T02:12:19.132609+00:00",
-    "updated_at": "2026-04-03T02:12:19.132609+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - Web fetch failed. HTTPSConnectionPool(host='example.com', p…",
-      "body": "Web fetch failed.\n\nHTTPSConnectionPool(host='example.com', port=443): Max retries exceeded with url: / (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1032)')))",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "66e2f021-7f40-4691-b2b0-da862f44cbcd",
-    "kind": "generated_image",
-    "title": "Generated Image - car",
-    "body": "![generated image](/api/uploads/generated_11cdb13857024e3280e7b21a7c707d86.png)\n\nGenerated from prompt: car",
-    "preview": "![generated image](/api/uploads/generated_11cdb13857024e3280e7b21a7c707d86.png) Generated from prompt: car",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 1,
-      "document_used": false,
-      "media": [
-        {
-          "id": "",
-          "filename": "generated_11cdb13857024e3280e7b21a7c707d86.png",
-          "stored_filename": "generated_11cdb13857024e3280e7b21a7c707d86.png",
-          "stored_name": "generated_11cdb13857024e3280e7b21a7c707d86.png",
-          "mime_type": "image/png",
-          "size": 1734708,
-          "type": "image",
-          "url": "/api/uploads/generated_11cdb13857024e3280e7b21a7c707d86.png",
-          "title": "generated_11cdb13857024e3280e7b21a7c707d86.png",
-          "alt": "generated image",
-          "prompt": "car",
-          "source": "generated"
-        }
-      ],
-      "model": "gpt-image-1.5",
-      "role": "assistant",
-      "prompt": "car",
-      "web": {
-        "used": false
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "frank vogul",
+      "preview": "frank vogul",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "frank vogul",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_893cce3cd84548cd8f4b665979a04975.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: frank vogul",
+        "image_url": "/api/uploads/generated_893cce3cd84548cd8f4b665979a04975.png"
+      },
+      "id": "artifact_c0ba51786f1c4607803247519fd788d7",
+      "updated_at": "2026-04-15T06:35:44.507927+00:00",
+      "created_at": "2026-04-15T06:35:44.507927+00:00"
     },
-    "created_at": "2026-04-03T02:12:02.416425+00:00",
-    "updated_at": "2026-04-03T02:12:02.416425+00:00",
-    "viewer": {
-      "kind": "generated_image",
-      "title": "Generated Image - car",
-      "body": "![generated image](/api/uploads/generated_11cdb13857024e3280e7b21a7c707d86.png)\n\nGenerated from prompt: car",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "b39bd689-8186-4e9e-9081-4a280a5599ec",
-    "kind": "image_analysis",
-    "title": "Image Analysis - what is this",
-    "body": "This is the **Google logo**.\n\nVisible details:\n- Old-style **serif** Google wordmark\n- Letters are colored **blue, red, yellow, blue, green, red**\n- Black background\n- Small **“TM”** mark on the right\n\nSo it looks like an **older Google brand/logo**, not the newer modern sans-serif version.",
-    "preview": "This is the **Google logo**. Visible details: - Old-style **serif** Google wordmark - Letters are colored **blue, red, yellow, blue, green, red** - Black background - Small **“TM”** mark on the right So it looks like an",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "attachment_analysis",
-      "analysis_type": "image",
-      "attachments_count": 1,
-      "attachments": [
-        {
-          "id": "2749d474-467d-4255-84e8-b00496dbe638",
-          "filename": "R.png",
-          "stored_filename": "b44487f6519144e494106f1c699681e1_R.png",
-          "mime_type": "image/png",
-          "type": "image",
-          "size": 1186430,
-          "url": "/api/uploads/b44487f6519144e494106f1c699681e1_R.png"
-        }
-      ],
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "user_prompt": "what is this"
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "summary": "cyber truck",
+      "preview": "cyber truck",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "cyber truck",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_4fd780b937ca4d2ab1604f398cf2db31.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Prompt: cyber truck",
+        "image_url": "/api/uploads/generated_4fd780b937ca4d2ab1604f398cf2db31.png"
+      },
+      "id": "artifact_951f44af9c4b4749b3cf305e1558d533",
+      "updated_at": "2026-04-15T06:38:01.926780+00:00",
+      "created_at": "2026-04-15T06:38:01.926780+00:00"
     },
-    "created_at": "2026-04-03T02:11:30.215361+00:00",
-    "updated_at": "2026-04-03T02:11:30.215361+00:00",
-    "viewer": {
-      "kind": "image_analysis",
-      "title": "Image Analysis - what is this",
-      "body": "This is the **Google logo**.\n\nVisible details:\n- Old-style **serif** Google wordmark\n- Letters are colored **blue, red, yellow, blue, green, red**\n- Black background\n- Small **“TM”** mark on the right\n\nSo it looks like an **older Google brand/logo**, not the newer modern sans-serif version.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "48e2642c-79c8-4743-a1e5-2bd1a892f811",
-    "kind": "chat_reply",
-    "title": "Chat Reply - Hi Richard — how can I help?",
-    "body": "Hi Richard — how can I help?",
-    "preview": "Hi Richard — how can I help?",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "49e91d88-7d89-4f01-8850-cbd6a0889a19",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "body": "Generated image for: \"td bank\"",
+      "summary": "Generated image for: \"td bank\"",
+      "preview": "Generated image for: \"td bank\"",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "image_url": "/api/uploads/generated_69964a24fefd45368c31d61a4c16c455.png",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "td bank",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_69964a24fefd45368c31d61a4c16c455.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Generated image for: \"td bank\"",
+        "summary": "Generated image for: \"td bank\"",
+        "image_url": "/api/uploads/generated_69964a24fefd45368c31d61a4c16c455.png",
+        "analysis_text": "This image was generated from the prompt: td bank",
+        "bullets": [
+          "Prompt: td bank"
+        ],
+        "source_url": ""
+      },
+      "id": "artifact_b0e9dedd315d415099227cfa6fdac0da",
+      "updated_at": "2026-04-15T07:18:52.765571+00:00",
+      "created_at": "2026-04-15T07:18:52.765571+00:00"
     },
-    "created_at": "2026-04-03T02:11:07.527132+00:00",
-    "updated_at": "2026-04-03T02:11:07.527132+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - Hi Richard — how can I help?",
-      "body": "Hi Richard — how can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "body": "Generated image for: \"cat\"",
+      "summary": "Generated image for: \"cat\"",
+      "preview": "Generated image for: \"cat\"",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "image_url": "/api/uploads/generated_95b09a029ff344619d449dfcc99ed27f.png",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "cat",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_95b09a029ff344619d449dfcc99ed27f.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Generated image for: \"cat\"",
+        "summary": "Generated image for: \"cat\"",
+        "image_url": "/api/uploads/generated_95b09a029ff344619d449dfcc99ed27f.png",
+        "analysis_text": "This image was generated from the prompt: cat",
+        "bullets": [
+          "Prompt: cat"
+        ],
+        "source_url": ""
+      },
+      "id": "artifact_c5423f224cfa4f8e8623de8a1087a8e6",
+      "updated_at": "2026-04-15T07:24:03.269311+00:00",
+      "created_at": "2026-04-15T07:24:03.269311+00:00"
     }
-  },
-  {
-    "id": "8befd37b-a130-4f94-9cec-989c528fe2ee",
-    "kind": "chat_reply",
-    "title": "Chat Reply - Got it — I’ll remember your name is Richard.",
-    "body": "Got it — I’ll remember your name is Richard.",
-    "preview": "Got it — I’ll remember your name is Richard.",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "686bffe2-d28b-4aa3-b9e5-a7f114508a47",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": true,
-      "web": {
-        "used": false,
-        "url": ""
-      }
-    },
-    "created_at": "2026-04-03T02:08:42.710185+00:00",
-    "updated_at": "2026-04-03T02:08:42.710185+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - Got it — I’ll remember your name is Richard.",
-      "body": "Got it — I’ll remember your name is Richard.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "eaa3c493-2727-469c-81d9-796b83751922",
-    "kind": "chat_reply",
-    "title": "Chat Reply - If you mean the **Los Angeles Lakers’ current season record…",
-    "body": "If you mean the **Los Angeles Lakers’ current season record**, I don’t have live standings in this chat.\n\nI can help in either of these ways:\n1. **Tell you how to check it fast** (ESPN, NBA app, Google: “Lakers record”)\n2. If you want, I can give you the **most recent completed season record I know from built-in knowledge**, but it may be outdated.\n\nIf you want, I can also format it like:\n- overall record\n- home/away\n- last 10 games\n- conference standing",
-    "preview": "If you mean the **Los Angeles Lakers’ current season record**, I don’t have live standings in this chat. I can help in either of these ways: 1. **Tell you how to check it fast** (ESPN, NBA app, Google: “Lakers record”) 2",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "b96ac54a-454a-453c-9cc3-6492ccc4b958",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
-    },
-    "created_at": "2026-04-03T01:41:53.391415+00:00",
-    "updated_at": "2026-04-03T01:41:53.391415+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - If you mean the **Los Angeles Lakers’ current season record…",
-      "body": "If you mean the **Los Angeles Lakers’ current season record**, I don’t have live standings in this chat.\n\nI can help in either of these ways:\n1. **Tell you how to check it fast** (ESPN, NBA app, Google: “Lakers record”)\n2. If you want, I can give you the **most recent completed season record I know from built-in knowledge**, but it may be outdated.\n\nIf you want, I can also format it like:\n- overall record\n- home/away\n- last 10 games\n- conference standing",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "68a71490-4092-40cb-b5f9-b164bd8ad447",
-    "kind": "image_analysis",
-    "title": "Image Analysis - what is this",
-    "body": "This is the **Google logo**.\n\nVisible details:\n- Multicolored letters spelling **Google**\n- Colors: blue **G**, red **o**, yellow **o**, blue **g**, green **l**, red **e**\n- Black background\n- A small **TM** mark appears to the right\n\nIt looks like an **older Google wordmark style**, not the flatter modern version.",
-    "preview": "This is the **Google logo**. Visible details: - Multicolored letters spelling **Google** - Colors: blue **G**, red **o**, yellow **o**, blue **g**, green **l**, red **e** - Black background - A small **TM** mark appears",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "attachment_analysis",
-      "analysis_type": "image",
-      "attachments_count": 1,
-      "attachments": [
-        {
-          "id": "4feee6eb-df31-41d7-b080-745e96f7d9a1",
-          "filename": "R.png",
-          "stored_filename": "d81abcec41b3444da97b7dab8a769aa1_R.png",
-          "mime_type": "image/png",
-          "type": "image",
-          "size": 1186430,
-          "url": "/api/uploads/d81abcec41b3444da97b7dab8a769aa1_R.png"
-        }
-      ],
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "user_prompt": "what is this"
-    },
-    "created_at": "2026-04-03T01:37:44.448241+00:00",
-    "updated_at": "2026-04-03T01:37:44.448241+00:00",
-    "viewer": {
-      "kind": "image_analysis",
-      "title": "Image Analysis - what is this",
-      "body": "This is the **Google logo**.\n\nVisible details:\n- Multicolored letters spelling **Google**\n- Colors: blue **G**, red **o**, yellow **o**, blue **g**, green **l**, red **e**\n- Black background\n- A small **TM** mark appears to the right\n\nIt looks like an **older Google wordmark style**, not the flatter modern version.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "c4d70c26-4007-4bc9-b181-c5b3ac5c5f79",
-    "kind": "chat_reply",
-    "title": "Chat Reply - I’m Nova — the assistant built into your web app. I can hel…",
-    "body": "I’m Nova — the assistant built into your web app.\n\nI can help with things like:\n- answering questions\n- explaining text or code\n- writing or editing content\n- brainstorming ideas\n- summarizing information\n- helping with tasks inside this app\n\nIf you mean “what is this” about a specific thing on the screen, paste it or describe it and I’ll explain it.",
-    "preview": "I’m Nova — the assistant built into your web app. I can help with things like: - answering questions - explaining text or code - writing or editing content - brainstorming ideas - summarizing information - helping with t",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "4e720711-38d0-48b0-8a8e-a7094c02d5ec",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
-    },
-    "created_at": "2026-04-03T01:36:31.905268+00:00",
-    "updated_at": "2026-04-03T01:36:31.905268+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - I’m Nova — the assistant built into your web app. I can hel…",
-      "body": "I’m Nova — the assistant built into your web app.\n\nI can help with things like:\n- answering questions\n- explaining text or code\n- writing or editing content\n- brainstorming ideas\n- summarizing information\n- helping with tasks inside this app\n\nIf you mean “what is this” about a specific thing on the screen, paste it or describe it and I’ll explain it.",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "f8db446a-81be-4598-bd4b-26bc56dc1395",
-    "kind": "chat_reply",
-    "title": "Chat Reply - Hi! How can I help?",
-    "body": "Hi! How can I help?",
-    "preview": "Hi! How can I help?",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 0,
-      "message_id": "0471e9a8-6058-45c8-99c1-a7ca6fd69f0f",
-      "model": "gpt-5.4",
-      "role": "assistant",
-      "memory_saved": false,
-      "web": {
-        "used": false,
-        "url": ""
-      }
-    },
-    "created_at": "2026-04-03T01:11:36.317187+00:00",
-    "updated_at": "2026-04-03T01:11:36.317187+00:00",
-    "viewer": {
-      "kind": "chat_reply",
-      "title": "Chat Reply - Hi! How can I help?",
-      "body": "Hi! How can I help?",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  },
-  {
-    "id": "d49e8330-7791-467d-b9d8-66c08705428d",
-    "kind": "generated_image",
-    "title": "Generated Image - dog",
-    "body": "![generated image](/api/uploads/generated_bd29a1aee09c46519f15d7a377ee878d.png)\n\nGenerated from prompt: dog",
-    "preview": "![generated image](/api/uploads/generated_bd29a1aee09c46519f15d7a377ee878d.png) Generated from prompt: dog",
-    "session_id": "525ca546-f1b8-4d76-97cf-595c91283b08",
-    "source": "",
-    "meta": {
-      "role": "assistant",
-      "message_id": "75a9497b-fe2e-4c9f-92f1-9be23161de6e",
-      "model": "gpt-5.4",
-      "artifact_source": "chat_service_autosave",
-      "attachments_count": 1,
-      "media": [
-        {
-          "type": "image",
-          "filename": "generated_bd29a1aee09c46519f15d7a377ee878d.png",
-          "url": "/api/uploads/generated_bd29a1aee09c46519f15d7a377ee878d.png",
-          "mime_type": "image/png",
-          "size": 1696409,
-          "prompt": "dog"
-        }
-      ],
-      "document_used": false,
-      "web": {
-        "used": false
-      }
-    },
-    "created_at": "2026-04-03T01:04:17.527312+00:00",
-    "updated_at": "2026-04-03T01:04:17.527312+00:00",
-    "viewer": {
-      "kind": "generated_image",
-      "title": "Generated Image - dog",
-      "body": "![generated image](/api/uploads/generated_bd29a1aee09c46519f15d7a377ee878d.png)\n\nGenerated from prompt: dog",
-      "source_url": "",
-      "image_url": "",
-      "video_url": "",
-      "audio_url": "",
-      "analysis_text": "",
-      "bullets": []
-    }
-  }
-]
+  ]
+}

@@ -313,7 +313,8 @@ function attachmentSummary(attachment) {
     topbarTitle: qs("[data-topbar-title]"),
     topbarSubtitle: qs("[data-topbar-subtitle]"),
     topbarStatus: qs("[data-topbar-status]"),
-    artifactList: qs("[data-artifact-list]"),
+    artifactList: null,
+    artifactEmpty: null,
     memoryList: qs("[data-memory-list]"),
     webList: qs("[data-web-list]"),
     rail: qs("[data-right-rail]"),
@@ -765,14 +766,14 @@ function removeMessage(messageId) {
 function applyStatePayload(payload) {
   const data = payload && typeof payload === "object" ? payload : {};
 
-  state.activeSessionId = String(
-    data.active_session_id ||
-      data.session_id ||
-      (data.active_session && data.active_session.id) ||
-      (data.session && data.session.id) ||
-      state.activeSessionId ||
-      ""
-  ).trim();
+state.activeSessionId = String(
+  data.active_session_id ||
+  data.session_id ||
+  (data.session && data.session.id) ||
+  (data.active_session && data.active_session.id) ||
+  state.activeSessionId ||
+  ""
+).trim();
 
   if (Array.isArray(data.sessions)) {
     setSessions(data.sessions);
@@ -796,6 +797,10 @@ function applyStatePayload(payload) {
   state.memory = safeArray(data.memory);
   state.web = safeArray(data.web);
 
+  if (window.NovaArtifacts && typeof window.NovaArtifacts.reload === "function") {
+    window.NovaArtifacts.reload();
+  }
+
   renderSessionList();
   renderChat();
   renderArtifacts();
@@ -818,6 +823,99 @@ function applyStatePayload(payload) {
     console.warn("composer-state dispatch failed", e);
   }
 }
+
+// ==============================
+// 🔥 SESSION RESTORE (GLOBAL)
+// ==============================
+window.openSessionFromBackend = async function (sessionId) {
+  const id = String(sessionId || "").trim();
+  if (!id) return;
+
+  const res = await fetch(`/api/sessions/${id}`, {
+    method: "GET",
+    credentials: "same-origin",
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to load session");
+  }
+
+  const payload = await res.json();
+
+  if (typeof applyStatePayload === "function") {
+    applyStatePayload(payload);
+  }
+};
+
+// ==============================
+// 🔥 ARTIFACT → CHAT BRIDGE
+// ==============================
+
+window.NovaArtifactChatAction = function (text) {
+  const value = String(text || "").trim();
+  if (!value) return;
+
+  const composer =
+    document.querySelector('textarea[name="message"]') ||
+    document.querySelector("#composer-input") ||
+    document.querySelector("[data-composer-input]");
+
+  if (!composer) return;
+
+  composer.value = value;
+  composer.dispatchEvent(new Event("input", { bubbles: true }));
+  composer.focus();
+};
+
+// ==============================
+// 🔥 COPY + REGENERATE FIX (PUT THIS HERE)
+// ==============================
+document.addEventListener("click", async function (event) {
+  const copyBtn = event.target.closest("[data-copy-message]");
+  if (copyBtn) {
+    const messageId = String(copyBtn.getAttribute("data-copy-message") || "").trim();
+    if (!messageId) return;
+
+    const msg = state.messages.find(function (m) {
+      return String(m.id || "") === messageId;
+    });
+    if (!msg) return;
+
+    const text = String(msg.text || "").trim();
+    if (!text) return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      console.log("copied");
+    } catch (err) {
+      console.warn("copy failed", err);
+    }
+    return;
+  }
+
+  const regenBtn = event.target.closest("[data-regenerate-message]");
+  if (regenBtn) {
+    const messageId = String(regenBtn.getAttribute("data-regenerate-message") || "").trim();
+    if (!messageId) return;
+
+    const userMsg = currentUserMessageForRegenerate(messageId);
+    if (!userMsg) return;
+
+    const payload = {
+      user_text: String(userMsg.text || "").trim(),
+      session_id: String(state.activeSessionId || "").trim(),
+      attachments: Array.isArray(userMsg.attachments) ? userMsg.attachments : [],
+    };
+
+    if (!payload.user_text) return;
+
+    if (typeof consumeChatStream === "function") {
+      await consumeChatStream(payload);
+    } else if (typeof consumeChatStreamStable === "function") {
+      await consumeChatStreamStable(payload);
+    }
+  }
+});
 
   function currentUserMessageForRegenerate(targetAssistantId) {
     const targetId = String(targetAssistantId || "");
@@ -1089,8 +1187,14 @@ function renderMessageCard(message) {
     ? '<div class="message-attachments">' + attachments.map(renderAttachmentBlock).join("") + "</div>"
     : "";
 
-  const bodyHtml = message.text
-    ? '<div class="message-card__body">' + renderSafeText(message.text) + "</div>"
+  const textHtml = String(message.text || "").trim()
+    ? '<div class="message-text-inline" style="display:block !important; white-space:pre-wrap !important; color:#ffffff !important; background:rgba(255,255,255,0.04) !important; padding:10px 12px !important; border-radius:10px !important; margin:8px 0 10px 0 !important; line-height:1.45 !important;">' +
+        renderSafeText(message.text) +
+      "</div>"
+    : "";
+
+  const bodyHtml = textHtml
+    ? textHtml
     : message.pending || message.streaming
     ? '<div class="message-card__body"><span class="message-card__typing"><span class="message-card__dot"></span><span class="message-card__dot"></span><span class="message-card__dot"></span></span></div>'
     : "";
@@ -1194,6 +1298,9 @@ function renderSessionList() {
 }
 
 function renderArtifacts() {
+  if (!els.artifactList) {
+    els.artifactList = document.querySelector("[data-artifact-list]");
+  }
   if (!els.artifactList) return;
 
   const activeSessionId = String(state.activeSessionId || "").trim();
@@ -1206,10 +1313,14 @@ function renderArtifacts() {
 
   const allArtifacts = safeArray(state.artifacts);
 
-  const sessionArtifacts = allArtifacts.filter(function (item) {
+  let sessionArtifacts = allArtifacts.filter(function (item) {
     if (!activeSessionId) return true;
     return String(item && item.session_id ? item.session_id : "").trim() === activeSessionId;
   });
+
+  if (!sessionArtifacts.length && allArtifacts.length) {
+    sessionArtifacts = allArtifacts.slice();
+  }
 
   function getKindBadge(kind) {
     const kindLabel = String(kind || "artifact").toLowerCase();
@@ -1907,6 +2018,14 @@ function finalizeStreamMessage(payload) {
     stopped: false,
     attachments: Array.isArray(data.attachments) ? data.attachments : [],
     meta: data.meta && typeof data.meta === "object" ? data.meta : {},
+    artifact: data.artifact && typeof data.artifact === "object" ? data.artifact : {},
+    viewer: data.viewer && typeof data.viewer === "object" ? data.viewer : {},
+    image_url:
+      data.image_url ||
+      (data.artifact && data.artifact.image_url) ||
+      (data.viewer && data.viewer.image_url) ||
+      (data.meta && data.meta.image_url) ||
+      "",
   }));
 
   if (data.execution && Array.isArray(data.execution.steps)) {
@@ -1932,25 +2051,8 @@ function finalizeStreamMessage(payload) {
 
   renderExecution();
 
-  if (data.session_id) {
-    state.activeSessionId = String(data.session_id || "");
-  } else if (data.session && data.session.id) {
-    state.activeSessionId = String(data.session.id || "");
-  }
-
-  if (Array.isArray(data.sessions)) {
-    setSessions(data.sessions);
-  }
-
-  if (Array.isArray(data.artifacts)) {
-    state.artifacts = data.artifacts;
-    renderArtifacts();
-  }
-
-  if (Array.isArray(data.memory)) {
-    state.memory = data.memory;
-    renderMemory();
-  }
+  // CRITICAL: hydrate from the real final payload instead of partial manual updates
+  applyStatePayload(data);
 
   if (state.stream) {
     state.stream.running = false;
@@ -1964,6 +2066,11 @@ function finalizeStreamMessage(payload) {
 
   renderChat();
   renderSessionList();
+  renderArtifacts();
+  renderMemory();
+  if (typeof renderWeb === "function") {
+    renderWeb();
+  }
   updateTopbarFromState();
   scrollChatToBottom(true);
   finishStreamUi({ statusState: "idle", statusText: "Ready" });
@@ -3717,7 +3824,6 @@ if (els.attachButton) {
   if (typeof wireMemoryClicks === "function") wireMemoryClicks();
 }
 
-
 async function boot() {
   if (state.booted) return;
   state.booted = true;
@@ -3730,6 +3836,9 @@ async function boot() {
   setTopbar("Nova", "Fast local AI workspace", "Ready", "idle");
   updateVoiceButtonUi();
   updateTtsToggleUi();
+
+  els.artifactList = document.querySelector("[data-artifact-list]");
+  els.artifactEmpty = document.querySelector("[data-artifact-empty]");
 
   try {
     await loadState();
@@ -4403,18 +4512,41 @@ async function consumeChatStreamStable(payload) {
       }
     }
 
-    flushTokensNow();
+flushTokensNow();
 
-    if (state.stream && state.stream.targetMessageId) {
-      finalizeStreamMessage({});
-    }
+if (state.stream && state.stream.targetMessageId) {
+  try {
+    const latestState = await apiGet("/api/state");
+    applyStatePayload(latestState || {});
+  } catch (error) {
+    console.warn("final state refresh failed", error);
+  }
 
-    clearTokenRenderState();
-    finishStreamUi({ statusState: "idle", statusText: "Ready" });
-    renderChat();
-    renderSessionList();
-    updateTopbarFromState();
-    scrollChatToBottom(true);
+  finalizeStreamMessage({
+    message_id: state.stream.targetMessageId,
+    text: (
+      findMessageById(state.stream.targetMessageId) &&
+      findMessageById(state.stream.targetMessageId).text
+    ) || "",
+    artifacts: Array.isArray(state.artifacts) ? state.artifacts : [],
+    memory: Array.isArray(state.memory) ? state.memory : [],
+    sessions: Array.isArray(state.sessions) ? state.sessions : [],
+    session_id: state.activeSessionId || "",
+  });
+}
+
+clearTokenRenderState();
+finishStreamUi({ statusState: "idle", statusText: "Ready" });
+renderChat();
+renderSessionList();
+renderArtifacts();
+renderMemory();
+if (typeof renderWeb === "function") {
+  renderWeb();
+}
+updateTopbarFromState();
+scrollChatToBottom(true);
+
   } catch (error) {
     flushTokensNow();
     clearTokenRenderState();

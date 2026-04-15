@@ -134,6 +134,16 @@
     };
   }
 
+  function groupArtifacts(list) {
+    const groups = {};
+    list.forEach((artifact) => {
+      const group = safeText(artifact?.group) || "Other";
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(artifact);
+    });
+    return groups;
+  }
+
   function mediaFallbackHtml(label, pathValue) {
     const pathLine = safeText(pathValue)
       ? `<div class="artifact-media-fallback-path">${escapeHtml(pathValue)}</div>`
@@ -222,6 +232,10 @@
     `;
   }
 
+  function getActiveArtifact() {
+    return state.artifacts.find((item) => item.id === state.activeArtifactId) || null;
+  }
+
   function renderList() {
     if (!els.list) return;
 
@@ -230,13 +244,25 @@
       return;
     }
 
-    els.list.innerHTML = state.artifacts.map(artifactCardHtml).join("");
+    const groups = groupArtifacts(state.artifacts);
+    let html = "";
+
+    Object.keys(groups).forEach((group) => {
+      html += `
+        <div class="artifact-group">
+          <div class="artifact-group-title">${escapeHtml(group)}</div>
+          ${groups[group].map(artifactCardHtml).join("")}
+        </div>
+      `;
+    });
+
+    els.list.innerHTML = html;
   }
 
   function renderViewer() {
     if (!els.viewer) return;
 
-    const artifact = state.artifacts.find((item) => item.id === state.activeArtifactId);
+    const artifact = getActiveArtifact();
     if (!artifact) {
       els.viewer.innerHTML = `
         <div class="artifact-view-empty">
@@ -252,12 +278,22 @@
       ? `<div class="artifact-view-source"><a href="${escapeHtml(viewer.source_url)}" target="_blank" rel="noreferrer">Open source</a></div>`
       : "";
 
+    const actionsHtml = `
+      <div class="artifact-view-actions">
+        <button type="button" class="artifact-action-btn" data-artifact-action="send_to_chat">Send to chat</button>
+        <button type="button" class="artifact-action-btn" data-artifact-action="copy_text">Copy text</button>
+        ${viewer.image_url ? `<button type="button" class="artifact-action-btn" data-artifact-action="use_image">Use image</button>` : ""}
+        <button type="button" class="artifact-action-btn" data-artifact-action="analyze">Analyze</button>
+      </div>
+    `;
+
     els.viewer.innerHTML = `
       <div class="artifact-view">
         <div class="artifact-view-header">
           <div class="artifact-view-title">${escapeHtml(viewer.title)}</div>
           <div class="artifact-view-kind">${escapeHtml(kindLabel(viewer.kind))}</div>
         </div>
+        ${actionsHtml}
         ${mediaHtml}
         <div class="artifact-view-body">${escapeHtml(viewer.body || "")}</div>
         ${sourceHtml}
@@ -265,6 +301,7 @@
     `;
 
     bindMediaFallbacks();
+    bindViewerActions();
   }
 
   function bindMediaFallbacks() {
@@ -287,10 +324,140 @@
     });
   }
 
+  async function openArtifact(artifactId) {
+    const id = String(artifactId || "").trim();
+    if (!id) return;
+
+    const artifact = state.artifacts.find((a) => String(a.id) === id);
+    if (!artifact) return;
+
+    const sessionId = String(artifact.session_id || "").trim();
+
+    if (sessionId && typeof window.openSessionFromBackend === "function") {
+      try {
+        await window.openSessionFromBackend(sessionId);
+      } catch (err) {
+        console.warn("[NovaArtifacts] session restore failed", err);
+      }
+    }
+
+    state.activeArtifactId = id;
+    renderList();
+    renderViewer();
+  }
+
   function setActiveArtifact(id) {
     state.activeArtifactId = safeText(id);
     renderList();
     renderViewer();
+  }
+
+  function pushArtifactToChat(text) {
+    if (typeof window.NovaArtifactChatAction === "function") {
+      window.NovaArtifactChatAction(text);
+      return true;
+    }
+
+    const composer =
+      document.querySelector('textarea[name="message"]') ||
+      document.querySelector("#composer-input") ||
+      document.querySelector("[data-composer-input]");
+
+    if (!composer) return false;
+
+    composer.value = text;
+    composer.dispatchEvent(new Event("input", { bubbles: true }));
+    composer.focus();
+    return true;
+  }
+
+  async function copyTextToClipboard(text) {
+    const value = safeText(text);
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch (err) {
+      warn("copy failed", err);
+    }
+  }
+
+  function buildArtifactPrompt(artifact, mode) {
+    const viewer = getViewer(artifact);
+    const title = safeText(viewer.title);
+    const body = safeText(viewer.body);
+    const imageUrl = safeText(viewer.image_url);
+    const sourceUrl = safeText(viewer.source_url);
+    const kind = safeText(viewer.kind);
+
+    if (mode === "send_to_chat") {
+      return [
+        `Use this saved artifact in the current chat.`,
+        title ? `Title: ${title}` : "",
+        kind ? `Type: ${kind}` : "",
+        body ? `Content: ${body}` : "",
+        imageUrl ? `Image URL: ${imageUrl}` : "",
+        sourceUrl ? `Source URL: ${sourceUrl}` : "",
+      ].filter(Boolean).join("\n");
+    }
+
+    if (mode === "use_image") {
+      return [
+        `Use this saved image in the current chat.`,
+        title ? `Title: ${title}` : "",
+        imageUrl ? `Image URL: ${imageUrl}` : "",
+      ].filter(Boolean).join("\n");
+    }
+
+    if (mode === "analyze") {
+      return [
+        `Analyze this saved artifact and tell me the important parts.`,
+        title ? `Title: ${title}` : "",
+        kind ? `Type: ${kind}` : "",
+        body ? `Content: ${body}` : "",
+        imageUrl ? `Image URL: ${imageUrl}` : "",
+        sourceUrl ? `Source URL: ${sourceUrl}` : "",
+      ].filter(Boolean).join("\n");
+    }
+
+    return body || title;
+  }
+
+  async function handleArtifactAction(action) {
+    const artifact = getActiveArtifact();
+    if (!artifact) return;
+
+    const viewer = getViewer(artifact);
+
+    if (action === "copy_text") {
+      await copyTextToClipboard(viewer.body || artifact.preview || viewer.title);
+      return;
+    }
+
+    if (action === "send_to_chat") {
+      pushArtifactToChat(buildArtifactPrompt(artifact, "send_to_chat"));
+      return;
+    }
+
+    if (action === "use_image") {
+      pushArtifactToChat(buildArtifactPrompt(artifact, "use_image"));
+      return;
+    }
+
+    if (action === "analyze") {
+      pushArtifactToChat(buildArtifactPrompt(artifact, "analyze"));
+    }
+  }
+
+  function bindViewerActions() {
+    if (!els.viewer) return;
+
+    els.viewer.querySelectorAll("[data-artifact-action]").forEach((btn) => {
+      btn.addEventListener("click", async function () {
+        const action = safeText(btn.getAttribute("data-artifact-action"));
+        if (!action) return;
+        await handleArtifactAction(action);
+      });
+    });
   }
 
   function bindListClicks() {
@@ -299,7 +466,7 @@
     els.list.addEventListener("click", function (event) {
       const card = event.target.closest("[data-artifact-id]");
       if (!card) return;
-      setActiveArtifact(card.getAttribute("data-artifact-id"));
+      openArtifact(card.getAttribute("data-artifact-id"));
     });
   }
 
@@ -350,6 +517,7 @@
   window.NovaArtifacts = {
     reload: loadArtifacts,
     setActiveArtifact,
+    openArtifact,
     getState: function () {
       return { ...state };
     },

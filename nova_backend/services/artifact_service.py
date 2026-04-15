@@ -31,20 +31,62 @@ class ArtifactService:
     def _write_store(self, data: Dict[str, Any]) -> None:
         save_json_file(self.artifacts_file, data)
 
+    # =========================
+    # 🔥 NORMALIZATION CORE
+    # =========================
+    def _normalize_kind(self, kind: str) -> str:
+        k = str(kind or "").lower().strip()
+        if "image" in k:
+            return "image"
+        if "web" in k:
+            return "web"
+        if "analysis" in k:
+            return "analysis"
+        if "chat" in k:
+            return "chat"
+        return "other"
+
+    def _derive_group(self, kind: str) -> str:
+        mapping = {
+            "image": "Images",
+            "web": "Web",
+            "analysis": "Analysis",
+            "chat": "Chat",
+            "other": "Other",
+        }
+        return mapping.get(kind, "Other")
+
+    def _derive_title(self, artifact: Dict[str, Any]) -> str:
+        meta = artifact.get("meta", {}) or {}
+        prompt = str(meta.get("prompt") or "").strip()
+
+        kind = self._normalize_kind(artifact.get("kind"))
+
+        if kind == "image" and prompt:
+            return f"Image: {prompt[:40]}"
+        if kind == "web":
+            return str(meta.get("title") or meta.get("domain") or "Web page")
+        if kind == "analysis":
+            return "Analysis"
+        if kind == "chat":
+            text = str(artifact.get("body") or "").strip()
+            return text[:60] if text else "Chat reply"
+
+        return str(artifact.get("title") or "Artifact")
+
+    def _derive_preview(self, artifact: Dict[str, Any]) -> str:
+        text = str(
+            artifact.get("preview")
+            or artifact.get("body")
+            or artifact.get("content")
+            or ""
+        ).strip()
+        return text[:160]
+
     def _viewer_from_artifact(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
         meta = artifact.get("meta") if isinstance(artifact.get("meta"), dict) else {}
-        content = str(
-            artifact.get("content")
-            or artifact.get("text")
-            or artifact.get("body")
-            or ""
-        ).strip()
 
-        filename = str(
-            meta.get("filename")
-            or artifact.get("filename")
-            or ""
-        ).strip()
+        filename = str(meta.get("filename") or "").strip()
 
         image_url = str(
             artifact.get("image_url")
@@ -52,100 +94,58 @@ class ArtifactService:
             or (f"/api/uploads/{filename}" if filename else "")
         ).strip()
 
-        viewer = {
-            "kind": str(artifact.get("kind") or meta.get("kind") or "artifact"),
-            "title": str(artifact.get("title") or meta.get("title") or "Untitled artifact"),
-            "body": content or str(meta.get("summary") or meta.get("body") or "").strip(),
-            "source_url": str(
-                artifact.get("source_url")
-                or meta.get("source_url")
-                or meta.get("url")
-                or ""
-            ).strip(),
+        return {
+            "kind": artifact.get("kind"),
+            "title": artifact.get("title"),
+            "body": artifact.get("body") or "",
             "image_url": image_url,
-            "video_url": str(
-                artifact.get("video_url")
-                or meta.get("video_url")
-                or ""
-            ).strip(),
-            "audio_url": str(
-                artifact.get("audio_url")
-                or meta.get("audio_url")
-                or ""
-            ).strip(),
+            "video_url": artifact.get("video_url") or "",
+            "audio_url": artifact.get("audio_url") or "",
+            "source_url": meta.get("source_url") or meta.get("url") or "",
             "filename": filename,
         }
-        return viewer
 
     def _normalize_artifact(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
-        normalized = dict(artifact or {})
-        normalized["viewer"] = self._viewer_from_artifact(normalized)
-        normalized = self.media.normalize_artifact_media(normalized)
+        a = dict(artifact or {})
 
-        meta = normalized.get("meta")
-        if not isinstance(meta, dict):
-            meta = {}
-            normalized["meta"] = meta
+        a["kind"] = self._normalize_kind(a.get("kind"))
+        a["group"] = self._derive_group(a["kind"])
 
-        viewer = normalized.get("viewer") if isinstance(normalized.get("viewer"), dict) else {}
+        if not a.get("title"):
+            a["title"] = self._derive_title(a)
 
-        if not meta.get("filename") and viewer.get("image_url", "").startswith("/api/uploads/"):
-            meta["filename"] = viewer["image_url"].split("/api/uploads/", 1)[1]
+        a["preview"] = self._derive_preview(a)
 
-        if viewer.get("image_url") and not meta.get("image_url"):
-            meta["image_url"] = viewer["image_url"]
+        if not a.get("session_id"):
+            a["session_id"] = ""
 
-        normalized["preview"] = str(
-            normalized.get("preview")
-            or viewer.get("body")
-            or viewer.get("title")
-            or ""
-        ).strip()[:200]
+        a["viewer"] = self._viewer_from_artifact(a)
+        a = self.media.normalize_artifact_media(a)
 
-        return normalized
+        return a
 
+    # =========================
+    # CORE API
+    # =========================
     def all(self) -> List[Dict[str, Any]]:
         return self._read_store().get("artifacts", [])
 
     def build_list_payload(self) -> List[Dict[str, Any]]:
-        artifacts = self.all()
-        normalized = [self._normalize_artifact(item) for item in artifacts if isinstance(item, dict)]
-        normalized.sort(
-            key=lambda x: str(x.get("updated_at") or x.get("created_at") or ""),
-            reverse=True,
-        )
-        return normalized
+        items = [self._normalize_artifact(x) for x in self.all()]
+        items.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
+        return items
 
     def build_view_payload(self, artifact_id: str) -> Optional[Dict[str, Any]]:
-        artifact_id = str(artifact_id or "").strip()
-        if not artifact_id:
-            return None
-
         for item in self.all():
-            if str(item.get("id") or "").strip() == artifact_id:
+            if str(item.get("id")) == str(artifact_id):
                 return self._normalize_artifact(item)
         return None
 
     def save_artifact(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
         data = self._read_store()
-        artifacts = data.get("artifacts", [])
+        items = data.get("artifacts", [])
 
         artifact = dict(artifact or {})
-        meta = artifact.get("meta")
-        if not isinstance(meta, dict):
-            meta = {}
-            artifact["meta"] = meta
-
-        filename = str(
-            meta.get("filename")
-            or artifact.get("filename")
-            or ""
-        ).strip()
-
-        if filename and not meta.get("image_url") and not artifact.get("image_url"):
-            image_url = f"/api/uploads/{filename}"
-            meta["image_url"] = image_url
-            artifact["image_url"] = image_url
 
         now = iso_now()
 
@@ -158,15 +158,19 @@ class ArtifactService:
             artifact["created_at"] = now
 
         replaced = False
-        for idx, existing in enumerate(artifacts):
-            if str(existing.get("id") or "") == str(artifact["id"]):
-                artifacts[idx] = artifact
+        for i, existing in enumerate(items):
+            if existing.get("id") == artifact["id"]:
+                items[i] = artifact
                 replaced = True
                 break
 
         if not replaced:
-            artifacts.append(artifact)
+            items.append(artifact)
 
-        data["artifacts"] = artifacts
+        data["artifacts"] = items
         self._write_store(data)
+
         return self._normalize_artifact(artifact)
+
+    def create(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
+        return self.save_artifact(artifact)

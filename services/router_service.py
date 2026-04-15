@@ -1,5 +1,7 @@
 @app.post("/api/chat")
 def api_chat():
+@app.post("/api/chat")
+def api_chat():
     try:
         data = parse_json_body()
         session_id = (data.get("session_id") or get_active_session_id() or "").strip()
@@ -9,19 +11,22 @@ def api_chat():
         if not user_text and not attachments:
             return jsonify({"ok": False, "error": "Missing message"}), 400
 
-        store = load_sessions_store()
-        session = find_session(store, session_id)
+        result = chat_service.handle(
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
 
-        if not session:
-            session = make_session("New chat")
-            store["sessions"].insert(0, session)
-            store["active_session_id"] = session["id"]
-            session_id = session["id"]
+        return jsonify(result)
 
-        route = route_request(user_text, attachments)
-        route_meta = build_route_meta(route)
-
-        # ------------------------------
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": str(exc),
+            "trace": traceback.format_exc(),
+            "route_build": ROUTE_BUILD,
+        }), 500
+            # ------------------------------
         # USER MESSAGE
         # ------------------------------
         user_msg = append_message(

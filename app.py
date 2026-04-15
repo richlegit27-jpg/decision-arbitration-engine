@@ -50,7 +50,6 @@ ensure_dir(UPLOADS_DIR)
 
 app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
 
-
 # -----------------------
 # SERVICES
 # -----------------------
@@ -70,6 +69,10 @@ chat_service = ChatService(
     recon_service=recon_service,
 )
 
+print("CHAT SERVICE OBJ =", chat_service)
+print("CHAT SERVICE TYPE =", type(chat_service))
+print("CHAT SERVICE MODULE =", type(chat_service).__module__)
+print("CHAT SERVICE HAS HANDLE =", hasattr(chat_service, "handle"))
 
 # -----------------------
 # HELPERS
@@ -699,16 +702,83 @@ def api_chat():
                 }
             }
 
+        # persist artifact with readable text for UI
+        saved_artifact = result.get("saved_artifact")
+        if isinstance(saved_artifact, dict):
+            try:
+                artifact_payload = dict(saved_artifact)
+
+                text = (
+                    artifact_payload.get("text")
+                    or artifact_payload.get("body")
+                    or artifact_payload.get("analysis_text")
+                    or ((artifact_payload.get("viewer") or {}).get("body"))
+                    or ((result.get("assistant_message") or {}).get("text"))
+                    or "Generated artifact"
+                )
+
+                artifact_payload["body"] = text
+                artifact_payload["preview"] = text[:140]
+
+                viewer = artifact_payload.get("viewer")
+                if not isinstance(viewer, dict):
+                    viewer = {}
+                viewer["body"] = text
+                artifact_payload["viewer"] = viewer
+
+                artifact_service.create(
+                    kind=artifact_payload.get("kind", "chat"),
+                    title=artifact_payload.get("title", "Generated Artifact"),
+                    session_id=session_id,
+                    payload=artifact_payload,
+                )
+            except Exception as e:
+                result.setdefault("debug", {})
+                result["debug"]["artifact_persist_error"] = str(e)
+
         existing_debug = result.get("debug") if isinstance(result.get("debug"), dict) else {}
 
+        assistant_message = result.get("assistant_message")
+        saved_artifact = result.get("saved_artifact")
+
+        # FORCE TEXT INTO CHAT MESSAGE
+        if isinstance(assistant_message, dict):
+            text = (
+                assistant_message.get("text")
+                or (saved_artifact or {}).get("body")
+                or (saved_artifact or {}).get("text")
+                or ((saved_artifact or {}).get("viewer") or {}).get("body")
+                or "Generated"
+            )
+            assistant_message["text"] = text
+
+        # ATTACH IMAGE TO CHAT MESSAGE
+        if isinstance(assistant_message, dict) and isinstance(saved_artifact, dict):
+            image_url = (
+                saved_artifact.get("image_url")
+                or ((saved_artifact.get("viewer") or {}).get("image_url"))
+                or ((saved_artifact.get("meta") or {}).get("image_url"))
+                or ""
+            )
+
+            if image_url:
+                assistant_message = dict(assistant_message)
+                assistant_message["image_url"] = image_url
+
+                meta = assistant_message.get("meta")
+                if not isinstance(meta, dict):
+                    meta = {}
+                meta["image_url"] = image_url
+                assistant_message["meta"] = meta
+
         payload = {
-            "assistant_message": result.get("assistant_message"),
+            "assistant_message": assistant_message,
             "session": result.get("session") or session_service.get_session(session_id),
             "sessions": result.get("sessions") or session_service.get_all(),
             "active_session_id": result.get("active_session_id") or session_service.active_session_id,
             "artifacts": result.get("artifacts") or artifact_service.build_list_payload(),
             "memory": result.get("memory") or memory_service.build_list_payload(),
-            "saved_artifact": result.get("saved_artifact"),
+            "saved_artifact": saved_artifact,
             "debug": {
                 **existing_debug,
                 "decision": decision,
@@ -723,14 +793,8 @@ def api_chat():
         return json_error(
             str(exc),
             500,
-            debug={
-                "decision": decision,
-            },
+            debug={"decision": decision},
         )
-
-# -----------------------
-# SESSIONS
-# -----------------------
 
 @app.get("/api/sessions")
 def api_sessions():
