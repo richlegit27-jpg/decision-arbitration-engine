@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import base64
 import os
@@ -352,58 +352,25 @@ class ChatService:
         return artifact
 
     def _categorize_memory(self, text: str) -> str:
-        t = self._safe_str(text).strip().lower()
-        if not t:
-            return "note"
+        t = self._safe_str(text).lower()
 
-        # project first so "I'm building ..." does not get caught by "I'm"
-        if any(x in t for x in [
-            "i'm building",
-            "i am building",
-            "my project",
-            "i'm working on",
-            "i am working on",
-            "building nova",
-            "working on nova",
-        ]):
+        # preference
+        if any(x in t for x in ["i prefer", "i like", "i usually", "i always", "i want"]):
+            return "preference"
+
+        # identity / profile
+        if any(x in t for x in ["my name is", "i am", "i'm", "i was", "i live"]):
+            return "profile"
+
+        # project
+        if any(x in t for x in ["i'm building", "my project", "i'm working on", "app", "nova"]):
             return "project"
 
         # goal
-        if any(x in t for x in [
-            "my goal",
-            "i want to",
-            "i plan to",
-            "i need to finish",
-            "i'm trying to",
-            "i am trying to",
-        ]):
+        if any(x in t for x in ["i want to", "my goal", "i plan to"]):
             return "goal"
 
-        # preference
-        if any(x in t for x in [
-            "i prefer",
-            "i like",
-            "i usually",
-            "i always",
-            "my favorite",
-            "my favourite",
-            "please use",
-            "always use",
-        ]):
-            return "preference"
-
-        # identity / profile last among strong categories
-        if any(x in t for x in [
-            "my name is",
-            "i was",
-            "i live",
-            "i use ",
-            "i work ",
-            "i am ",
-            "i'm ",
-        ]):
-            return "profile"
-
+        # default
         return "note"
 
     def _should_auto_inject_memory(self, user_text: str, decision: dict | None = None) -> bool:
@@ -438,381 +405,6 @@ class ChatService:
             return False
 
         return True
-
-    # ==============================
-    # MEMORY RECALL HELPERS
-    # ==============================
-
-    def _is_memory_recall_request(self, user_text: str) -> bool:
-        text = self._safe_str(user_text).strip().lower()
-        if not text:
-            return False
-
-        triggers = [
-            "what is my name",
-            "who am i",
-            "what do you know about me",
-            "what do you remember about me",
-            "what do you remember",
-            "do you remember me",
-            "what are my preferences",
-            "what do i like",
-            "what am i building",
-            "what is my goal",
-        ]
-        return any(trigger in text for trigger in triggers)
-
-    def _tokenize_memory_text(self, text: str) -> list[str]:
-        raw = self._safe_str(text).lower()
-        cleaned = []
-        current = []
-
-        for ch in raw:
-            if ch.isalnum():
-                current.append(ch)
-            else:
-                if current:
-                    cleaned.append("".join(current))
-                    current = []
-        if current:
-            cleaned.append("".join(current))
-
-        stop_words = {
-            "what", "is", "my", "do", "you", "about", "me", "the", "a", "an",
-            "i", "am", "are", "to", "of", "and", "it", "that"
-        }
-        return [token for token in cleaned if token and token not in stop_words]
-
-    def _extract_name_from_memory_text(self, text: str) -> str:
-        raw = self._safe_str(text).strip()
-        if not raw:
-            return ""
-
-        lowered = raw.lower()
-
-        prefixes = [
-            "my name is ",
-            "user name is ",
-            "name is ",
-        ]
-        for prefix in prefixes:
-            idx = lowered.find(prefix)
-            if idx >= 0:
-                value = raw[idx + len(prefix):].strip(" .,:;!-")
-                return value
-
-        return ""
-
-    def _score_memory_match(self, user_text: str, memory_item: dict) -> float:
-        memory_item = memory_item or {}
-        memory_text = self._safe_str(memory_item.get("text")).strip()
-        memory_kind = self._safe_str(memory_item.get("kind")).strip().lower()
-        if not memory_text:
-            return 0.0
-
-        query = self._safe_str(user_text).strip().lower()
-        memory_lower = memory_text.lower()
-
-        score = 0.0
-
-        query_tokens = set(self._tokenize_memory_text(query))
-        memory_tokens = set(self._tokenize_memory_text(memory_text))
-        overlap = query_tokens.intersection(memory_tokens)
-        score += float(len(overlap)) * 2.0
-
-        if query in {"what is my name", "who am i"}:
-            if memory_kind == "profile":
-                score += 5.0
-            if "name" in memory_lower:
-                score += 10.0
-            if self._extract_name_from_memory_text(memory_text):
-                score += 15.0
-
-        if "what do you remember about me" in query or "what do you know about me" in query:
-            score += 3.0
-
-        if "what do i like" in query or "preferences" in query:
-            if memory_kind == "preference":
-                score += 8.0
-
-        if "what am i building" in query:
-            if memory_kind == "project":
-                score += 8.0
-            if "building" in memory_lower or "working on" in memory_lower:
-                score += 4.0
-
-        if "what is my goal" in query:
-            if memory_kind == "goal":
-                score += 8.0
-            if "goal" in memory_lower or "plan" in memory_lower:
-                score += 4.0
-
-        if memory_lower in query or query in memory_lower:
-            score += 2.0
-
-        return score
-
-    def _find_best_memory_match(self, user_text: str) -> dict:
-        try:
-            memory_items = self.memory.get_all_memory()
-        except Exception:
-            memory_items = []
-
-        best_item = {}
-        best_score = 0.0
-
-        for item in memory_items or []:
-            score = self._score_memory_match(user_text, item)
-            if score > best_score:
-                best_score = score
-                best_item = item or {}
-
-        return {
-            "item": best_item,
-            "score": best_score,
-        }
-
-    def _build_memory_recall_text(self, user_text: str, memory_item: dict) -> str:
-        query = self._safe_str(user_text).strip().lower()
-        memory_item = memory_item or {}
-        memory_text = self._safe_str(memory_item.get("text")).strip()
-        memory_kind = self._safe_str(memory_item.get("kind")).strip().lower()
-
-        if not memory_text:
-            return "I do not have any relevant saved memory for that yet."
-
-        if query in {"what is my name", "who am i"}:
-            extracted_name = self._extract_name_from_memory_text(memory_text)
-            if extracted_name:
-                return f"Your name is {extracted_name}."
-            return memory_text
-
-        if "what do i like" in query or "preferences" in query:
-            if memory_kind == "preference":
-                return f"I remember this preference: {memory_text}"
-            return memory_text
-
-        if "what am i building" in query:
-            if memory_kind == "project":
-                return f"You are building: {memory_text}"
-            return memory_text
-
-        if "what is my goal" in query:
-            if memory_kind == "goal":
-                return f"Your goal is: {memory_text}"
-            return memory_text
-
-        if "what do you remember about me" in query or "what do you know about me" in query:
-            return f"I remember this about you: {memory_text}"
-
-        return memory_text
-
-    # ==============================
-    # MEMORY INTENT HELPERS
-    # ==============================
-
-    def _normalize_memory_text(self, user_text: str) -> str:
-        text = self._safe_str(user_text).strip()
-        if not text:
-            return ""
-
-        prefixes = [
-            "remember that ",
-            "remember ",
-            "note that ",
-            "note this ",
-            "for future reference ",
-            "keep in mind that ",
-            "don't forget that ",
-            "do not forget that ",
-            "save this: ",
-            "save this ",
-            "store this: ",
-            "store this ",
-        ]
-
-        lowered = text.lower()
-        for prefix in prefixes:
-            if lowered.startswith(prefix):
-                text = text[len(prefix):].strip()
-                break
-
-        text = text.strip(" .:-")
-        return text
-
-    def _infer_memory_category(self, memory_text: str) -> str:
-        text = self._safe_str(memory_text).strip().lower()
-        if not text:
-            return "general"
-
-        preference_markers = [
-            "i prefer",
-            "i like",
-            "i love",
-            "i want",
-            "i need",
-            "my favorite",
-            "my favourite",
-            "always use",
-            "please use",
-        ]
-        profile_markers = [
-            "my name is",
-            "i am ",
-            "i'm ",
-            "i live",
-            "i work",
-            "i use ",
-        ]
-        project_markers = [
-            "i'm building",
-            "i am building",
-            "my project",
-            "i'm working on",
-            "i am working on",
-            "nova",
-            "app",
-            "platform",
-        ]
-        goal_markers = [
-            "my goal",
-            "i want to finish",
-            "i'm trying to",
-            "i am trying to",
-            "i plan to",
-            "i need to finish",
-        ]
-
-        if any(marker in text for marker in preference_markers):
-            return "preference"
-        if any(marker in text for marker in project_markers):
-            return "project"
-        if any(marker in text for marker in goal_markers):
-            return "goal"
-        if any(marker in text for marker in profile_markers):
-            return "profile"
-        return "general"
-
-    def _detect_memory_intent(self, user_text: str) -> dict:
-        raw_text = self._safe_str(user_text).strip()
-        text = raw_text.lower()
-
-        if not raw_text:
-            return {
-                "should_force_memory": False,
-                "memory_text": "",
-                "memory_category": "general",
-                "reason": "",
-                "confidence": 0.0,
-            }
-
-        explicit_prefixes = [
-            "remember that ",
-            "remember ",
-            "note that ",
-            "note this ",
-            "for future reference ",
-            "keep in mind that ",
-            "don't forget that ",
-            "do not forget that ",
-            "save this ",
-            "save this: ",
-            "store this ",
-            "store this: ",
-        ]
-
-        explicit_match = any(text.startswith(prefix) for prefix in explicit_prefixes)
-        normalized = self._normalize_memory_text(raw_text)
-        category = self._infer_memory_category(normalized)
-
-        if explicit_match and normalized:
-            return {
-                "should_force_memory": True,
-                "memory_text": normalized,
-                "memory_category": category,
-                "reason": "explicit_memory_command",
-                "confidence": 1.0,
-            }
-
-        auto_markers = [
-            "my name is",
-            "i prefer",
-            "i like",
-            "i'm building",
-            "i am building",
-            "i'm working on",
-            "i am working on",
-            "my goal",
-            "i want to finish",
-            "i need",
-            "always use",
-            "please use",
-        ]
-
-        auto_match = any(marker in text for marker in auto_markers)
-        if auto_match and normalized:
-            return {
-                "should_force_memory": True,
-                "memory_text": normalized,
-                "memory_category": category,
-                "reason": "auto_memory_signal",
-                "confidence": 0.8,
-            }
-
-        return {
-            "should_force_memory": False,
-            "memory_text": "",
-            "memory_category": "general",
-            "reason": "",
-            "confidence": 0.0,
-        }
-
-    def _memory_already_exists(self, memory_text: str) -> bool:
-        text = self._safe_str(memory_text).strip().lower()
-        if not text:
-            return False
-
-        try:
-            memory_items = self.memory.get_all_memory()
-        except Exception:
-            return False
-
-        for item in memory_items or []:
-            existing = self._safe_str((item or {}).get("text")).strip().lower()
-            if existing == text:
-                return True
-        return False
-
-    def _write_memory_if_needed(self, decision: dict, session_id: str) -> dict:
-        result = {
-            "memory_written": False,
-            "memory_skipped_duplicate": False,
-            "memory_error": "",
-        }
-
-        should_force = bool((decision or {}).get("should_force_memory"))
-        memory_text = self._safe_str((decision or {}).get("memory_text")).strip()
-        memory_category = self._safe_str((decision or {}).get("memory_category")).strip() or "general"
-
-        if not should_force or not memory_text:
-            return result
-
-        try:
-            if self._memory_already_exists(memory_text):
-                result["memory_skipped_duplicate"] = True
-                return result
-
-            self.memory.add_memory(
-                text=memory_text,
-                kind=memory_category,
-                source="router_auto",
-                session_id=session_id or "",
-            )
-            result["memory_written"] = True
-            return result
-        except Exception as e:
-            result["memory_error"] = str(e)
-            return result
 
     # ==============================
     # CORE TIME / TEXT HELPERS
@@ -880,7 +472,7 @@ class ChatService:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "Iâ€™m here, but the model returned an empty response."
+        return "I’m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -2070,7 +1662,11 @@ class ChatService:
 
     # ==============================
     # MODEL HELPERS
-    # ===============================
+    # ==============================
+
+    # ==============================
+    # MODEL HELPERS
+    # ==============================
 
     def _build_chat_input(
         self,
@@ -2253,30 +1849,41 @@ class ChatService:
         session_id: str,
         attachments=None,
     ) -> dict:
-        attachments = attachments or []
-        user_msg = self._build_user_message(user_text, attachments=attachments)
+        user_msg = self._build_user_message(user_text, attachments=attachments or [])
 
-        match = self._find_best_memory_match(user_text)
-        best_item = match.get("item") or {}
-        best_score = float(match.get("score") or 0.0)
+        memory_items = self._rank_memory_context(
+            user_text=user_text,
+            limit=int(decision.get("memory_limit") or self.memory_limit),
+            session_id=session_id,
+        )
 
-        if best_score <= 0.0:
-            recall_text = "I do not have any relevant saved memory for that yet."
+        if memory_items:
+            lines = []
+            limit = int(decision.get("memory_limit") or self.memory_limit)
+
+            for item in memory_items[:limit]:
+                text = self._safe_str(item.get("text"))
+                kind = self._safe_str(item.get("kind"))
+
+                if not text:
+                    continue
+
+                if kind:
+                    lines.append(f"- [{kind}] {text}")
+                else:
+                    lines.append(f"- {text}")
+
+            assistant_text = "Here’s what I remember that seems relevant right now:\n" + "\n".join(lines)
         else:
-            recall_text = self._build_memory_recall_text(user_text, best_item)
+            assistant_text = "I do not have any relevant saved memory for that yet."
 
         assistant_msg = self._build_assistant_message(
-            text=recall_text,
-            meta={
-                "memory_recall": True,
-                "memory_match_score": best_score,
-                "memory_match_kind": self._safe_str(best_item.get("kind")),
-                "memory_match_text": self._safe_str(best_item.get("text")),
-            },
+            text=assistant_text,
+            meta={"memory_recall": True},
             attachments=[],
         )
 
-        response = self._finalize_response(
+        return self._finalize_response(
             session_id=session_id,
             user_text=user_text,
             user_msg=user_msg,
@@ -2284,14 +1891,6 @@ class ChatService:
             decision=decision,
             saved_artifact=None,
         )
-
-        response.setdefault("debug", {})
-        response["debug"]["memory_recall"] = {
-            "score": best_score,
-            "matched_kind": self._safe_str(best_item.get("kind")),
-            "matched_text": self._safe_str(best_item.get("text")),
-        }
-        return response
 
     def _execute_planning(
         self,
@@ -2704,6 +2303,8 @@ class ChatService:
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         attachments = attachments or []
+        user_text = self._safe_str(user_text)
+
         session_id = self._ensure_session_id(session_id)
 
         if "research" in (user_text or "").lower():
@@ -2714,9 +2315,6 @@ class ChatService:
             session_id=session_id,
             attachments=attachments,
         )
-
-        if self._is_memory_recall_request(user_text):
-            decision["route"] = self.ROUTE_MEMORY_RECALL
 
         if not user_text:
             user_msg = self._build_user_message("", attachments=attachments)

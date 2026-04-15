@@ -7293,3 +7293,234 @@ button.nova-memory-card,
   outline-offset: -10px;
   background: rgba(124, 156, 255, 0.06);
 }
+
+/* ==============================
+   ARTIFACT VIEWER — POWER UI
+============================== */
+
+.artifact-view {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.artifact-view-header__kind {
+  font-size: 11px;
+  text-transform: uppercase;
+  opacity: 0.6;
+  letter-spacing: 1px;
+}
+
+.artifact-view-header__title {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.artifact-view-header__summary {
+  font-size: 14px;
+  opacity: 0.8;
+  line-height: 1.5;
+}
+
+/* ==============================
+   SECTIONS
+============================== */
+
+.artifact-view-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.artifact-view-section__title {
+  font-size: 12px;
+  text-transform: uppercase;
+  opacity: 0.6;
+  letter-spacing: 1px;
+}
+
+/* ==============================
+   BULLETS
+============================== */
+
+.artifact-bullets {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.artifact-bullets li {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+  margin-bottom: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ==============================
+   LINKS
+============================== */
+
+.artifact-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.artifact-link-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(0, 150, 255, 0.08);
+  color: #4da3ff;
+  text-decoration: none;
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+
+.artifact-link-item:hover {
+  background: rgba(0, 150, 255, 0.2);
+}
+
+/* ==============================
+   IMAGE GRID
+============================== */
+
+.artifact-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.artifact-image-card {
+  display: block;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #111;
+}
+
+.artifact-image-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ==============================
+   MEDIA
+============================== */
+
+.artifact-media-card {
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+}
+
+.artifact-media-image {
+  width: 100%;
+  display: block;
+}
+
+.artifact-media-video {
+  width: 100%;
+}
+
+.artifact-media-audio {
+  width: 100%;
+}
+
+/* ==============================
+   BODY
+============================== */
+
+.artifact-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.artifact-body p {
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0.9;
+}
+
+/* ==============================
+   META
+============================== */
+
+.artifact-meta-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.artifact-meta-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.artifact-meta-link {
+  color: #4da3ff;
+  text-decoration: none;
+}
+
+.artifact-meta-link:hover {
+  text-decoration: underline;
+}
+
+/* ==============================
+   ARTIFACT LIST (LEFT SIDE)
+============================== */
+
+.artifact-card {
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.artifact-card:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.artifact-card--active {
+  background: rgba(0,150,255,0.12);
+  border: 1px solid rgba(0,150,255,0.3);
+}
+
+.artifact-card__top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.artifact-card__title {
+  font-size: 14px;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.artifact-card__preview {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-top: 4px;
+}
+
+/* ==============================
+   EMPTY STATE
+============================== */
+
+.artifact-empty {
+  opacity: 0.6;
+  font-size: 13px;
+  padding: 12px;
+  text-align: center;
+}

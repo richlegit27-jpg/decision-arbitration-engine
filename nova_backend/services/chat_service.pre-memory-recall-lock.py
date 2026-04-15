@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import base64
 import os
@@ -440,174 +440,6 @@ class ChatService:
         return True
 
     # ==============================
-    # MEMORY RECALL HELPERS
-    # ==============================
-
-    def _is_memory_recall_request(self, user_text: str) -> bool:
-        text = self._safe_str(user_text).strip().lower()
-        if not text:
-            return False
-
-        triggers = [
-            "what is my name",
-            "who am i",
-            "what do you know about me",
-            "what do you remember about me",
-            "what do you remember",
-            "do you remember me",
-            "what are my preferences",
-            "what do i like",
-            "what am i building",
-            "what is my goal",
-        ]
-        return any(trigger in text for trigger in triggers)
-
-    def _tokenize_memory_text(self, text: str) -> list[str]:
-        raw = self._safe_str(text).lower()
-        cleaned = []
-        current = []
-
-        for ch in raw:
-            if ch.isalnum():
-                current.append(ch)
-            else:
-                if current:
-                    cleaned.append("".join(current))
-                    current = []
-        if current:
-            cleaned.append("".join(current))
-
-        stop_words = {
-            "what", "is", "my", "do", "you", "about", "me", "the", "a", "an",
-            "i", "am", "are", "to", "of", "and", "it", "that"
-        }
-        return [token for token in cleaned if token and token not in stop_words]
-
-    def _extract_name_from_memory_text(self, text: str) -> str:
-        raw = self._safe_str(text).strip()
-        if not raw:
-            return ""
-
-        lowered = raw.lower()
-
-        prefixes = [
-            "my name is ",
-            "user name is ",
-            "name is ",
-        ]
-        for prefix in prefixes:
-            idx = lowered.find(prefix)
-            if idx >= 0:
-                value = raw[idx + len(prefix):].strip(" .,:;!-")
-                return value
-
-        return ""
-
-    def _score_memory_match(self, user_text: str, memory_item: dict) -> float:
-        memory_item = memory_item or {}
-        memory_text = self._safe_str(memory_item.get("text")).strip()
-        memory_kind = self._safe_str(memory_item.get("kind")).strip().lower()
-        if not memory_text:
-            return 0.0
-
-        query = self._safe_str(user_text).strip().lower()
-        memory_lower = memory_text.lower()
-
-        score = 0.0
-
-        query_tokens = set(self._tokenize_memory_text(query))
-        memory_tokens = set(self._tokenize_memory_text(memory_text))
-        overlap = query_tokens.intersection(memory_tokens)
-        score += float(len(overlap)) * 2.0
-
-        if query in {"what is my name", "who am i"}:
-            if memory_kind == "profile":
-                score += 5.0
-            if "name" in memory_lower:
-                score += 10.0
-            if self._extract_name_from_memory_text(memory_text):
-                score += 15.0
-
-        if "what do you remember about me" in query or "what do you know about me" in query:
-            score += 3.0
-
-        if "what do i like" in query or "preferences" in query:
-            if memory_kind == "preference":
-                score += 8.0
-
-        if "what am i building" in query:
-            if memory_kind == "project":
-                score += 8.0
-            if "building" in memory_lower or "working on" in memory_lower:
-                score += 4.0
-
-        if "what is my goal" in query:
-            if memory_kind == "goal":
-                score += 8.0
-            if "goal" in memory_lower or "plan" in memory_lower:
-                score += 4.0
-
-        if memory_lower in query or query in memory_lower:
-            score += 2.0
-
-        return score
-
-    def _find_best_memory_match(self, user_text: str) -> dict:
-        try:
-            memory_items = self.memory.get_all_memory()
-        except Exception:
-            memory_items = []
-
-        best_item = {}
-        best_score = 0.0
-
-        for item in memory_items or []:
-            score = self._score_memory_match(user_text, item)
-            if score > best_score:
-                best_score = score
-                best_item = item or {}
-
-        return {
-            "item": best_item,
-            "score": best_score,
-        }
-
-    def _build_memory_recall_text(self, user_text: str, memory_item: dict) -> str:
-        query = self._safe_str(user_text).strip().lower()
-        memory_item = memory_item or {}
-        memory_text = self._safe_str(memory_item.get("text")).strip()
-        memory_kind = self._safe_str(memory_item.get("kind")).strip().lower()
-
-        if not memory_text:
-            return "I do not have any relevant saved memory for that yet."
-
-        if query in {"what is my name", "who am i"}:
-            extracted_name = self._extract_name_from_memory_text(memory_text)
-            if extracted_name:
-                return f"Your name is {extracted_name}."
-            return memory_text
-
-        if "what do i like" in query or "preferences" in query:
-            if memory_kind == "preference":
-                return f"I remember this preference: {memory_text}"
-            return memory_text
-
-        if "what am i building" in query:
-            if memory_kind == "project":
-                return f"You are building: {memory_text}"
-            return memory_text
-
-        if "what is my goal" in query:
-            if memory_kind == "goal":
-                return f"Your goal is: {memory_text}"
-            return memory_text
-
-        if "what do you remember about me" in query or "what do you know about me" in query:
-            return f"I remember this about you: {memory_text}"
-
-        return memory_text
-
-    # ==============================
     # MEMORY INTENT HELPERS
     # ==============================
 
@@ -880,7 +712,7 @@ class ChatService:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "Iâ€™m here, but the model returned an empty response."
+        return "I’m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -2070,7 +1902,11 @@ class ChatService:
 
     # ==============================
     # MODEL HELPERS
-    # ===============================
+    # ==============================
+
+    # ==============================
+    # MODEL HELPERS
+    # ==============================
 
     def _build_chat_input(
         self,
@@ -2253,30 +2089,41 @@ class ChatService:
         session_id: str,
         attachments=None,
     ) -> dict:
-        attachments = attachments or []
-        user_msg = self._build_user_message(user_text, attachments=attachments)
+        user_msg = self._build_user_message(user_text, attachments=attachments or [])
 
-        match = self._find_best_memory_match(user_text)
-        best_item = match.get("item") or {}
-        best_score = float(match.get("score") or 0.0)
+        memory_items = self._rank_memory_context(
+            user_text=user_text,
+            limit=int(decision.get("memory_limit") or self.memory_limit),
+            session_id=session_id,
+        )
 
-        if best_score <= 0.0:
-            recall_text = "I do not have any relevant saved memory for that yet."
+        if memory_items:
+            lines = []
+            limit = int(decision.get("memory_limit") or self.memory_limit)
+
+            for item in memory_items[:limit]:
+                text = self._safe_str(item.get("text"))
+                kind = self._safe_str(item.get("kind"))
+
+                if not text:
+                    continue
+
+                if kind:
+                    lines.append(f"- [{kind}] {text}")
+                else:
+                    lines.append(f"- {text}")
+
+            assistant_text = "Here’s what I remember that seems relevant right now:\n" + "\n".join(lines)
         else:
-            recall_text = self._build_memory_recall_text(user_text, best_item)
+            assistant_text = "I do not have any relevant saved memory for that yet."
 
         assistant_msg = self._build_assistant_message(
-            text=recall_text,
-            meta={
-                "memory_recall": True,
-                "memory_match_score": best_score,
-                "memory_match_kind": self._safe_str(best_item.get("kind")),
-                "memory_match_text": self._safe_str(best_item.get("text")),
-            },
+            text=assistant_text,
+            meta={"memory_recall": True},
             attachments=[],
         )
 
-        response = self._finalize_response(
+        return self._finalize_response(
             session_id=session_id,
             user_text=user_text,
             user_msg=user_msg,
@@ -2284,14 +2131,6 @@ class ChatService:
             decision=decision,
             saved_artifact=None,
         )
-
-        response.setdefault("debug", {})
-        response["debug"]["memory_recall"] = {
-            "score": best_score,
-            "matched_kind": self._safe_str(best_item.get("kind")),
-            "matched_text": self._safe_str(best_item.get("text")),
-        }
-        return response
 
     def _execute_planning(
         self,
@@ -2704,6 +2543,8 @@ class ChatService:
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         attachments = attachments or []
+        user_text = self._safe_str(user_text)
+
         session_id = self._ensure_session_id(session_id)
 
         if "research" in (user_text or "").lower():
@@ -2714,9 +2555,6 @@ class ChatService:
             session_id=session_id,
             attachments=attachments,
         )
-
-        if self._is_memory_recall_request(user_text):
-            decision["route"] = self.ROUTE_MEMORY_RECALL
 
         if not user_text:
             user_msg = self._build_user_message("", attachments=attachments)

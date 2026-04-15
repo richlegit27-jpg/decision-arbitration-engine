@@ -535,6 +535,108 @@
       "id": "artifact_c5423f224cfa4f8e8623de8a1087a8e6",
       "updated_at": "2026-04-15T07:24:03.269311+00:00",
       "created_at": "2026-04-15T07:24:03.269311+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "body": "Generated image for: \"car\"",
+      "summary": "Generated image for: \"car\"",
+      "preview": "Generated image for: \"car\"",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "image_url": "/api/uploads/generated_eb474459f9cb44679551eeffaaa9dfdf.png",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "car",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_eb474459f9cb44679551eeffaaa9dfdf.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Generated image for: \"car\"",
+        "summary": "Generated image for: \"car\"",
+        "image_url": "/api/uploads/generated_eb474459f9cb44679551eeffaaa9dfdf.png",
+        "analysis_text": "This image was generated from the prompt: car",
+        "bullets": [
+          "Prompt: car"
+        ],
+        "source_url": ""
+      },
+      "id": "artifact_06680645b0eb463aa06e120a44821e69",
+      "updated_at": "2026-04-15T14:18:12.298673+00:00",
+      "created_at": "2026-04-15T14:18:12.298673+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "body": "Generated image for: \"red car\"",
+      "summary": "Generated image for: \"red car\"",
+      "preview": "Generated image for: \"red car\"",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "image_url": "/api/uploads/generated_bf9dcb2b1d8e43fe978086fb73ba0dfe.png",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "red car",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_bf9dcb2b1d8e43fe978086fb73ba0dfe.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Generated image for: \"red car\"",
+        "summary": "Generated image for: \"red car\"",
+        "image_url": "/api/uploads/generated_bf9dcb2b1d8e43fe978086fb73ba0dfe.png",
+        "analysis_text": "This image was generated from the prompt: red car",
+        "bullets": [
+          "Prompt: red car"
+        ],
+        "source_url": ""
+      },
+      "id": "artifact_e0eb6ef5ca2346a6806d98465e712484",
+      "updated_at": "2026-04-15T17:31:33.499911+00:00",
+      "created_at": "2026-04-15T17:31:33.499911+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "body": "Generated image for: \"red car\"",
+      "summary": "Generated image for: \"red car\"",
+      "preview": "Generated image for: \"red car\"",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "image_url": "/api/uploads/generated_22a6814a59ba496e9db5b46b393f641e.png",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "red car",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_22a6814a59ba496e9db5b46b393f641e.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Generated image for: \"red car\"",
+        "summary": "Generated image for: \"red car\"",
+        "image_url": "/api/uploads/generated_22a6814a59ba496e9db5b46b393f641e.png",
+        "analysis_text": "This image was generated from the prompt: red car",
+        "bullets": [
+          "Prompt: red car"
+        ],
+        "source_url": ""
+      },
+      "id": "artifact_331f81cce7f64beaa0227a0422d72ca0",
+      "updated_at": "2026-04-15T17:32:31.505679+00:00",
+      "created_at": "2026-04-15T17:32:31.505679+00:00"
     }
   ]
 }

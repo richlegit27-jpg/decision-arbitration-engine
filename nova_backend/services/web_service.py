@@ -1,246 +1,178 @@
 from __future__ import annotations
 
-from typing import Any, Dict
-from urllib.parse import urlparse
+import re
+import hashlib
+from typing import Any, Dict, List
+from urllib.parse import urlparse, urljoin
 
 import requests
 
 
 class WebService:
-    def __init__(self, timeout: int = 12, user_agent: str | None = None):
+    def __init__(self, timeout: int = 12):
         self.timeout = timeout
-        self.user_agent = user_agent or (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0.0.0 Safari/537.36"
-        )
+        self.cache: Dict[str, dict] = {}
 
     # -----------------------
-    # HELPERS
+    # CORE HELPERS
     # -----------------------
 
     def normalize_url(self, url: str) -> str:
-        value = str(url or "").strip()
-        if not value:
+        url = str(url or "").strip()
+        if not url:
             return ""
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+        return url
 
-        if not value.startswith(("http://", "https://")):
-            value = "https://" + value
+    def _hash(self, url: str) -> str:
+        return hashlib.md5(url.encode()).hexdigest()
 
-        return value
-
-    def _headers(self) -> dict:
+    def _headers(self):
         return {
-            "User-Agent": self.user_agent,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "*/*",
         }
 
-    def _extract_title(self, html: str) -> str:
-        text = str(html or "")
-        lower = text.lower()
-
-        start_tag = lower.find("<title>")
-        end_tag = lower.find("</title>")
-
-        if start_tag == -1 or end_tag == -1 or end_tag <= start_tag:
-            return ""
-
-        start = start_tag + len("<title>")
-        return text[start:end_tag].strip()
-
-    def _extract_meta_content(self, html: str, needle: str) -> str:
-        text = str(html or "")
-        lower = text.lower()
-        needle_lower = needle.lower()
-
-        pos = lower.find(needle_lower)
-        if pos == -1:
-            return ""
-
-        content_pos = lower.find('content="', pos)
-        quote = '"'
-        if content_pos == -1:
-            content_pos = lower.find("content='", pos)
-            quote = "'"
-
-        if content_pos == -1:
-            return ""
-
-        start = content_pos + len("content=") + 1
-        end = text.find(quote, start)
-        if end == -1:
-            return ""
-
-        return text[start:end].strip()
+    # -----------------------
+    # EXTRACTION
+    # -----------------------
 
     def _strip_html(self, html: str) -> str:
         text = str(html or "")
-        out = []
-        inside = False
 
-        for ch in text:
-            if ch == "<":
-                inside = True
+        text = re.sub(r"(?is)<script.*?>.*?</script>", " ", text)
+        text = re.sub(r"(?is)<style.*?>.*?</style>", " ", text)
+        text = re.sub(r"<[^>]+>", " ", text)
+
+        text = re.sub(r"\s+", " ", text).strip()
+        return text
+
+    def _extract_links(self, html: str, base_url: str) -> List[str]:
+        links = re.findall(r'href=["\'](.*?)["\']', html, re.I)
+        results = []
+
+        for link in links:
+            if link.startswith("#") or "javascript:" in link:
                 continue
-            if ch == ">":
-                inside = False
-                out.append(" ")
-                continue
-            if not inside:
-                out.append(ch)
+            full = urljoin(base_url, link)
+            if full.startswith("http"):
+                results.append(full)
 
-        cleaned = "".join(out)
-        cleaned = " ".join(cleaned.split())
-        return cleaned.strip()
+        return list(dict.fromkeys(results))[:20]
 
-    def _preview_text(self, text: str, limit: int = 400) -> str:
-        value = str(text or "").strip()
-        if len(value) <= limit:
-            return value
-        return value[:limit].rstrip() + "…"
+    def _extract_images(self, html: str, base_url: str) -> List[str]:
+        imgs = re.findall(r'<img[^>]+src=["\'](.*?)["\']', html, re.I)
+        results = []
+
+        for img in imgs:
+            full = urljoin(base_url, img)
+            if full.startswith("http"):
+                results.append(full)
+
+        return list(dict.fromkeys(results))[:10]
+
+    # -----------------------
+    # INTELLIGENCE
+    # -----------------------
+
+    def _summarize(self, text: str) -> str:
+        parts = re.split(r"\. |\n", text)
+        return ". ".join(parts[:3]).strip()
+
+    def _bullets(self, text: str) -> List[str]:
+        parts = re.split(r"\. |\n", text)
+        bullets = []
+
+        for p in parts:
+            p = p.strip()
+            if 40 < len(p) < 200:
+                bullets.append(p)
+            if len(bullets) >= 5:
+                break
+
+        return bullets
+
+    def _detect_type(self, text: str, url: str) -> str:
+        if "login" in text.lower():
+            return "auth"
+        if len(text) > 2000:
+            return "article"
+        return "general"
 
     # -----------------------
     # FETCH
     # -----------------------
 
     def fetch(self, url: str) -> dict:
-        target = self.normalize_url(url)
-        if not target:
-            return {
-                "ok": False,
-                "error": "Missing URL",
-                "url": "",
-                "ssl_verified": True,
-            }
+        url = self.normalize_url(url)
+        if not url:
+            return {"ok": False, "error": "bad url"}
+
+        key = self._hash(url)
+
+        # CACHE HIT
+        if key in self.cache:
+            return self.cache[key]
 
         try:
-            response = requests.get(
-                target,
-                timeout=self.timeout,
-                headers=self._headers(),
-                allow_redirects=True,
-            )
-            html = response.text
+            r = requests.get(url, timeout=self.timeout, headers=self._headers())
+            html = r.text
 
-            return self._build_result(
-                url=target,
-                final_url=str(response.url or target),
-                status_code=int(response.status_code),
-                html=html,
-                ssl_verified=True,
-                ok=True,
-            )
-        except requests.exceptions.SSLError:
-            try:
-                response = requests.get(
-                    target,
-                    timeout=self.timeout,
-                    headers=self._headers(),
-                    allow_redirects=True,
-                    verify=False,
-                )
-                html = response.text
+            text = self._strip_html(html)
 
-                return self._build_result(
-                    url=target,
-                    final_url=str(response.url or target),
-                    status_code=int(response.status_code),
-                    html=html,
-                    ssl_verified=False,
-                    ok=True,
-                )
-            except Exception as exc:
-                return {
-                    "ok": False,
-                    "error": str(exc),
-                    "url": target,
-                    "ssl_verified": False,
-                }
-        except Exception as exc:
-            return {
-                "ok": False,
-                "error": str(exc),
-                "url": target,
-                "ssl_verified": True,
+            result = {
+                "ok": True,
+                "url": url,
+                "domain": urlparse(url).netloc,
+                "title": self._extract_title(html),
+                "content": text,
+                "summary": self._summarize(text),
+                "bullets": self._bullets(text),
+                "links": self._extract_links(html, url),
+                "images": self._extract_images(html, url),
+                "page_type": self._detect_type(text, url),
             }
 
-    # -----------------------
-    # RESULT BUILDING
-    # -----------------------
+            self.cache[key] = result
+            return result
 
-    def _build_result(
-        self,
-        url: str,
-        final_url: str,
-        status_code: int,
-        html: str,
-        ssl_verified: bool,
-        ok: bool,
-    ) -> dict:
-        title = self._extract_title(html)
-        description = (
-            self._extract_meta_content(html, 'name="description"')
-            or self._extract_meta_content(html, 'property="og:description"')
-        )
-        site_name = self._extract_meta_content(html, 'property="og:site_name"')
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
-        content_text = self._strip_html(html)
-        preview = self._preview_text(content_text, 400)
-        summary = self._preview_text(content_text, 1200)
-
-        parsed = urlparse(final_url or url)
-        domain = parsed.netloc or ""
-
-        return {
-            "ok": ok,
-            "url": url,
-            "final_url": final_url,
-            "domain": domain,
-            "status_code": status_code,
-            "ssl_verified": ssl_verified,
-            "title": title,
-            "description": description,
-            "site_name": site_name,
-            "content": content_text,
-            "preview": preview,
-            "summary": summary,
-            "html": html,
-        }
+    def _extract_title(self, html: str) -> str:
+        m = re.search(r"<title>(.*?)</title>", html, re.I)
+        return m.group(1).strip() if m else ""
 
     # -----------------------
-    # ARTIFACT HELPERS
+    # ARTIFACT
     # -----------------------
 
-    def build_artifact_payload(self, fetch_result: Dict[str, Any]) -> dict:
-        result = dict(fetch_result or {})
-
-        title = str(result.get("title") or "Fetched page").strip() or "Fetched page"
-        summary = str(result.get("summary") or result.get("preview") or "").strip()
-        final_url = str(result.get("final_url") or result.get("url") or "").strip()
+    def build_artifact_payload(self, r: Dict[str, Any]) -> dict:
+        title = r.get("title") or "Web page"
+        summary = r.get("summary") or ""
+        content = r.get("content") or ""
+        url = r.get("url") or ""
 
         return {
             "kind": "web_result",
             "title": title,
-            "body": summary,
-            "source": "web",
+            "summary": summary,
+            "body": summary + "\n\n" + content[:2000],
+            "source_url": url,
             "meta": {
-                "url": final_url,
-                "source_url": final_url,
-                "status_code": result.get("status_code"),
-                "domain": result.get("domain"),
-                "site_name": result.get("site_name"),
-                "description": result.get("description"),
-                "ssl_verified": result.get("ssl_verified"),
+                "domain": r.get("domain"),
+                "page_type": r.get("page_type"),
+                "links": r.get("links"),
+                "images": r.get("images"),
             },
             "viewer": {
-                "kind": "web_result",
                 "title": title,
-                "body": summary,
-                "source_url": final_url,
-                "image_url": "",
-                "video_url": "",
-                "audio_url": "",
-                "analysis_text": "",
-                "bullets": [],
+                "analysis_text": summary,
+                "body": content[:2000],
+                "bullets": r.get("bullets"),
+                "links": r.get("links"),
+                "images": r.get("images"),
+                "source_url": url,
             },
         }

@@ -867,6 +867,48 @@ window.NovaArtifactChatAction = function (text) {
   composer.focus();
 };
 
+window.NovaSendMessage = async function () {
+  if (typeof sendMessage === "function") {
+    return await sendMessage();
+  }
+};
+
+window.NovaSendMessage = async function () {
+  if (typeof sendMessage === "function") {
+    return await sendMessage();
+  }
+};
+
+// 👇 PUT IT RIGHT HERE
+window.NovaAnalyzeArtifactImage = async function (imageUrl, artifact) {
+  const url = String(imageUrl || "").trim();
+  if (!url) return;
+
+  const payload = {
+    user_text: "what is in this image",
+    session_id: String(state.activeSessionId || "").trim(),
+    attachments: [
+      {
+        id: "artifact_image_" + Date.now(),
+        filename: (artifact && artifact.title ? artifact.title : "artifact-image") + ".png",
+        name: (artifact && artifact.title ? artifact.title : "artifact-image") + ".png",
+        mime_type: "image/png",
+        type: "image",
+        source: "artifact",
+        url: url
+      }
+    ]
+  };
+
+  if (typeof consumeChatStream === "function") {
+    return await consumeChatStream(payload);
+  }
+
+  if (typeof consumeChatStreamStable === "function") {
+    return await consumeChatStreamStable(payload);
+  }
+};
+
 // ==============================
 // 🔥 COPY + REGENERATE FIX (PUT THIS HERE)
 // ==============================
@@ -2099,243 +2141,113 @@ async function openSession(sessionId) {
 
 function artifactViewerHtml(artifact) {
   if (!artifact || typeof artifact !== "object") {
-    return (
-      '<div class="nova-viewer-shell">' +
-      '<div class="nova-viewer-empty">' +
-      '<div class="nova-viewer-empty-title">No artifact selected</div>' +
-      '<div class="nova-viewer-empty-copy">Pick an artifact from the right panel to inspect it here.</div>' +
-      "</div>" +
-      "</div>"
-    );
+    return '<div class="artifact-empty">No artifact selected.</div>';
   }
 
-  const viewer =
-    artifact && typeof artifact.viewer === "object" && artifact.viewer
-      ? artifact.viewer
-      : {};
-
-  const meta =
-    artifact && typeof artifact.meta === "object" && artifact.meta
-      ? artifact.meta
-      : {};
+  const viewer = artifact.viewer || {};
+  const meta = artifact.meta || {};
 
   const kind = String(viewer.kind || artifact.kind || "artifact").trim();
+  const title = String(viewer.title || artifact.title || "Artifact").trim();
 
-  const title = String(
-    viewer.title || artifact.title || artifact.name || "Untitled artifact"
+  const summary = String(
+    viewer.analysis_text ||
+    artifact.summary ||
+    artifact.preview ||
+    ""
   ).trim();
 
   const body = String(
     viewer.body ||
-      artifact.body ||
-      artifact.content ||
-      artifact.summary ||
-      artifact.preview ||
-      ""
+    artifact.body ||
+    meta.content ||
+    ""
   ).trim();
-
-  const preview = String(artifact.preview || "").trim();
 
   const sourceUrl = String(
     viewer.source_url ||
-      artifact.source_url ||
-      meta.source_url ||
-      meta.url ||
-      ""
+    artifact.source_url ||
+    meta.url ||
+    ""
   ).trim();
 
-  const imageUrl = String(
-    viewer.image_url ||
-      artifact.image_url ||
-      meta.image_url ||
-      ""
-  ).trim();
+  const bullets = Array.isArray(viewer.bullets) ? viewer.bullets : [];
+  const links = Array.isArray(viewer.links) ? viewer.links : [];
+  const images = Array.isArray(viewer.images) ? viewer.images : [];
 
-  const videoUrl = String(
-    viewer.video_url ||
-      artifact.video_url ||
-      meta.video_url ||
-      ""
-  ).trim();
+  const escapeHtml = (v) =>
+    String(v || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
 
-  const audioUrl = String(
-    viewer.audio_url ||
-      artifact.audio_url ||
-      meta.audio_url ||
-      ""
-  ).trim();
-
-  const analysisText = String(
-    viewer.analysis_text ||
-      artifact.analysis_text ||
-      meta.analysis_text ||
-      ""
-  ).trim();
-
-  const bullets = Array.isArray(viewer.bullets)
-    ? viewer.bullets
-    : Array.isArray(meta.bullets)
-    ? meta.bullets
-    : [];
-
-  const cleanBullets = bullets
-    .map(function (item) {
-      return String(item || "").trim();
-    })
-    .filter(Boolean);
-
-  const prettyKind = kind
-    .replace(/[_\-]+/g, " ")
-    .replace(/\b\w/g, function (m) {
-      return m.toUpperCase();
-    });
-
-  const subtitle = String(
-    artifact.session_id ? prettyKind + " â€¢ session artifact" : prettyKind
-  ).trim();
-
-  const sourceBadge = sourceUrl
-    ? '<a class="nova-artifact-viewer-source-badge" href="' +
-      escapeHtml(sourceUrl) +
-      '" target="_blank" rel="noreferrer noopener">Source</a>'
+  const bulletsHtml = bullets.length
+    ? `<section class="artifact-view-section">
+        <div class="artifact-view-section__title">Highlights</div>
+        <ul class="artifact-bullets">
+          ${bullets.map(b => `<li>${escapeHtml(b)}</li>`).join("")}
+        </ul>
+      </section>`
     : "";
 
-  const whenText = String(
-    artifact.updated_at || artifact.created_at || ""
-  ).trim();
+  const linksHtml = links.length
+    ? `<section class="artifact-view-section">
+        <div class="artifact-view-section__title">Links</div>
+        <div class="artifact-link-list">
+          ${links.map(l => `
+            <a class="artifact-link-item" href="${escapeHtml(l)}" target="_blank">
+              ${escapeHtml(l)}
+            </a>
+          `).join("")}
+        </div>
+      </section>`
+    : "";
 
-  let whenLabel = "";
-  if (whenText) {
-    try {
-      const d = new Date(whenText);
-      whenLabel = Number.isNaN(d.getTime())
-        ? whenText
-        : d.toLocaleString([], {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-          });
-    } catch (error) {
-      whenLabel = whenText;
-    }
-  }
+  const imagesHtml = images.length
+    ? `<section class="artifact-view-section">
+        <div class="artifact-view-section__title">Images</div>
+        <div class="artifact-image-grid">
+          ${images.map(src => `
+            <a href="${escapeHtml(src)}" target="_blank">
+              <img src="${escapeHtml(src)}" />
+            </a>
+          `).join("")}
+        </div>
+      </section>`
+    : "";
 
-  let html = "";
+  const bodyHtml = body
+    ? `<section class="artifact-view-section">
+        <div class="artifact-view-section__title">Content</div>
+        <div class="artifact-body">
+          ${body.split(/\n\n/).map(p => `<p>${escapeHtml(p)}</p>`).join("")}
+        </div>
+      </section>`
+    : "";
 
-  html += '<article class="nova-artifact-viewer-shell">';
+  return `
+    <div class="artifact-view">
+      <div class="artifact-view-header">
+        <div class="artifact-view-header__kind">${escapeHtml(kind)}</div>
+        <div class="artifact-view-header__title">${escapeHtml(title)}</div>
+        ${summary ? `<div class="artifact-view-header__summary">${escapeHtml(summary)}</div>` : ""}
+      </div>
 
-  html += '<header class="nova-artifact-viewer-header">';
+      ${bulletsHtml}
+      ${linksHtml}
+      ${imagesHtml}
+      ${bodyHtml}
 
-  html += '<div class="nova-artifact-viewer-meta">';
-  html +=
-    '<span class="nova-artifact-viewer-kind">' +
-    escapeHtml(prettyKind) +
-    "</span>";
-  if (whenLabel) {
-    html +=
-      '<span class="nova-artifact-viewer-date">' +
-      escapeHtml(whenLabel) +
-      "</span>";
-  }
-  html += sourceBadge;
-  html += "</div>";
-
-  html += '<div class="nova-artifact-viewer-title-wrap">';
-  html +=
-    '<h3 class="nova-artifact-viewer-title">' +
-    escapeHtml(title) +
-    "</h3>";
-  html +=
-    '<div class="nova-artifact-viewer-subtitle">' +
-    escapeHtml(subtitle) +
-    "</div>";
-  html += "</div>";
-
-  if (sourceUrl) {
-    html += '<div class="nova-artifact-viewer-actions">';
-    html +=
-      '<a class="nova-artifact-viewer-link" href="' +
-      escapeHtml(sourceUrl) +
-      '" target="_blank" rel="noreferrer noopener">Open source</a>';
-    html += "</div>";
-  }
-
-  html += "</header>";
-
-  if (imageUrl) {
-    html += '<div class="nova-artifact-viewer-media">';
-    html +=
-      '<img class="nova-artifact-viewer-image" src="' +
-      escapeHtml(imageUrl) +
-      '" alt="' +
-      escapeHtml(title) +
-      '" loading="lazy" />';
-    html += "</div>";
-  }
-
-  if (videoUrl) {
-    html += '<div class="nova-artifact-viewer-media">';
-    html +=
-      '<video class="nova-artifact-viewer-video" controls preload="metadata" src="' +
-      escapeHtml(videoUrl) +
-      '"></video>';
-    html += "</div>";
-  }
-
-  if (audioUrl) {
-    html += '<div class="nova-artifact-viewer-media">';
-    html +=
-      '<audio class="nova-artifact-viewer-audio" controls preload="metadata" src="' +
-      escapeHtml(audioUrl) +
-      '"></audio>';
-    html += "</div>";
-  }
-
-  if (analysisText) {
-    html += '<section class="nova-artifact-viewer-section">';
-    html +=
-      '<div class="nova-artifact-viewer-section-title">Analysis</div>';
-    html += '<div class="nova-artifact-viewer-copy">';
-    html += escapeHtml(analysisText).replace(/\n/g, "<br>");
-    html += "</div>";
-    html += "</section>";
-  }
-
-  if (cleanBullets.length) {
-    html += '<section class="nova-artifact-viewer-section">';
-    html +=
-      '<div class="nova-artifact-viewer-section-title">Highlights</div>';
-    html += '<ul class="nova-artifact-viewer-bullets">';
-    html += cleanBullets
-      .map(function (item) {
-        return "<li>" + escapeHtml(item) + "</li>";
-      })
-      .join("");
-    html += "</ul>";
-    html += "</section>";
-  }
-
-  if (body) {
-    html += '<section class="nova-artifact-viewer-section">';
-    html +=
-      '<div class="nova-artifact-viewer-section-title">Details</div>';
-    html += '<div class="nova-artifact-viewer-copy">';
-    html += escapeHtml(body).replace(/\n/g, "<br>");
-    html += "</div>";
-    html += "</section>";
-  }
-
-  if (preview && preview !== body) {
-    html += '<div class="nova-artifact-viewer-preview">';
-    html += escapeHtml(preview).replace(/\n/g, "<br>");
-    html += "</div>";
-  }
-
-  html += "</article>";
-
-  return html;
+      ${sourceUrl ? `
+        <section class="artifact-view-section">
+          <div class="artifact-view-section__title">Source</div>
+          <a class="artifact-meta-link" href="${escapeHtml(sourceUrl)}" target="_blank">
+            ${escapeHtml(sourceUrl)}
+          </a>
+        </section>
+      ` : ""}
+    </div>
+  `;
 }
 
  function setRailTab(tab) {
@@ -2424,18 +2336,6 @@ function setRailSelectedItem(kind, id) {
   }
 }
 
-function findNewestImageArtifact(items) {
-  return safeArray(items).find(function (item) {
-    const artifact = item && typeof item === "object" ? item : {};
-    const viewer = artifact.viewer && typeof artifact.viewer === "object" ? artifact.viewer : {};
-
-    const kind = String(viewer.kind || artifact.kind || "");
-    const imageUrl = String(viewer.image_url || artifact.image_url || "");
-
-    return kind === "image_generation" || Boolean(imageUrl);
-  }) || null;
-}
-
 async function openArtifactFromStateOrBackend(artifactId) {
   const id = String(artifactId || "").trim();
   if (!id) return;
@@ -2455,13 +2355,9 @@ async function openArtifactFromStateOrBackend(artifactId) {
   }
 
   if (!artifact) {
-    if (state.rail) {
-      state.rail.selectedId = "";
-      state.rail.selectedKind = "";
-    }
-
     openRail();
     setRailTab("artifacts");
+    setRailSelectedItem("artifact", id);
 
     if (els.railViewer) {
       els.railViewer.hidden = false;
@@ -2469,17 +2365,9 @@ async function openArtifactFromStateOrBackend(artifactId) {
         '<div class="nova-viewer-shell">' +
         '<div class="nova-viewer-empty">' +
         '<div class="nova-viewer-empty-title">Artifact not found</div>' +
-        '<div class="nova-viewer-empty-copy">This artifact is no longer available in the current state.</div>' +
+        '<div class="nova-viewer-empty-copy">This artifact is not available in the current state.</div>' +
         "</div>" +
         "</div>";
-    }
-
-    if (els.railTitle) {
-      els.railTitle.textContent = "Artifacts";
-    }
-
-    if (els.railSubtitle) {
-      els.railSubtitle.textContent = "Unavailable item";
     }
 
     showToast("Artifact not found.", "error");
@@ -2492,22 +2380,16 @@ async function openArtifactFromStateOrBackend(artifactId) {
       ""
   ).trim();
 
-  const currentSessionId = String(state.activeSessionId || "").trim();
-
-  if (artifactSessionId && artifactSessionId !== currentSessionId) {
+  if (
+    artifactSessionId &&
+    artifactSessionId !== String(state.activeSessionId || "").trim()
+  ) {
     try {
       state.pendingArtifactOpenId = id;
       await openSessionFromBackend(artifactSessionId);
 
       artifact =
-        typeof findArtifactById === "function" ? findArtifactById(id) : null;
-
-      if (!artifact) {
-        const payload = await apiGet("/api/state");
-        applyStatePayload(payload);
-        artifact =
-          typeof findArtifactById === "function" ? findArtifactById(id) : null;
-      }
+        typeof findArtifactById === "function" ? findArtifactById(id) || artifact : artifact;
     } catch (error) {
       warn("artifact session open failed", error);
       showToast("Session switch failed.", "error");
@@ -2516,25 +2398,38 @@ async function openArtifactFromStateOrBackend(artifactId) {
   }
 
   if (!artifact) {
+    if (state.pendingArtifactOpenId === id) {
+      state.pendingArtifactOpenId = "";
+    }
+
     if (els.railViewer) {
       els.railViewer.hidden = false;
       els.railViewer.innerHTML =
         '<div class="nova-viewer-shell">' +
         '<div class="nova-viewer-empty">' +
-        '<div class="nova-viewer-empty-title">Artifact unavailable</div>' +
-        '<div class="nova-viewer-empty-copy">The session switched, but this artifact could not be reopened.</div>' +
+        '<div class="nova-viewer-empty-title">Artifact reopen failed</div>' +
+        '<div class="nova-viewer-empty-copy">The owning session opened, but this artifact could not be resolved afterward.</div>' +
         "</div>" +
         "</div>";
     }
+
     showToast("Artifact could not be reopened after session switch.", "error");
     return;
   }
+
+  state.pendingArtifactOpenId = "";
+  state.rail = state.rail || {};
+  state.rail.tab = "artifacts";
+  state.rail.selectedKind = "artifact";
+  state.rail.selectedId = id;
 
   openRail();
   setRailTab("artifacts");
   setRailSelectedItem("artifact", id);
 
-  if (els.railViewer) {
+  if (window.NovaArtifacts && typeof window.NovaArtifacts.setActiveArtifactById === "function") {
+    window.NovaArtifacts.setActiveArtifactById(id);
+  } else if (els.railViewer) {
     els.railViewer.hidden = false;
     els.railViewer.innerHTML = artifactViewerHtml(artifact);
   }
@@ -2545,9 +2440,7 @@ async function openArtifactFromStateOrBackend(artifactId) {
 
   if (els.railSubtitle) {
     const viewer =
-      artifact.viewer && typeof artifact.viewer === "object"
-        ? artifact.viewer
-        : {};
+      artifact.viewer && typeof artifact.viewer === "object" ? artifact.viewer : {};
     els.railSubtitle.textContent = String(
       viewer.title || artifact.title || artifact.name || "Artifact"
     );

@@ -1,525 +1,478 @@
 (function () {
-  const TAG = "[NovaArtifacts]";
+  const state = (window.NovaState = window.NovaState || {});
+  state.artifacts = Array.isArray(state.artifacts) ? state.artifacts : [];
+  state.activeArtifactId = state.activeArtifactId || "";
+  state.activeArtifact = state.activeArtifact || null;
 
-  function log(...args) {
-    console.log(TAG, ...args);
+  function qs(selector, root = document) {
+    return root.querySelector(selector);
   }
 
-  function warn(...args) {
-    console.warn(TAG, ...args);
+  function qsa(selector, root = document) {
+    return Array.from(root.querySelectorAll(selector));
   }
 
-  const state = {
-    artifacts: [],
-    activeArtifactId: "",
-    booted: false,
-  };
-
-  const els = {
-    list: null,
-    viewer: null,
-    empty: null,
-  };
-
-  function qs(sel) {
-    return document.querySelector(sel);
+  function safeArray(value) {
+    return Array.isArray(value) ? value : [];
   }
 
-  function safeText(value) {
-    return String(value ?? "").trim();
+  function safeString(value) {
+    return String(value == null ? "" : value);
   }
 
   function escapeHtml(value) {
-    return safeText(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
-  }
-
-  function kindLabel(kind) {
-    const raw = safeText(kind);
-    if (!raw) return "artifact";
-    return raw.replaceAll("_", " ");
+    return safeString(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   function formatDate(value) {
-    const raw = safeText(value);
-    if (!raw) return "";
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
     try {
-      return new Date(raw).toLocaleString();
-    } catch {
-      return raw;
+      return date.toLocaleString();
+    } catch (_) {
+      return "";
     }
   }
 
-  async function apiGet(url) {
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      credentials: "same-origin",
-    });
-
-    if (!res.ok) {
-      throw new Error(`Failed to load artifacts (${res.status})`);
-    }
-
-    return await res.json();
+  function truncate(value, limit = 160) {
+    const text = safeString(value).trim();
+    if (!text) return "";
+    if (text.length <= limit) return text;
+    return text.slice(0, Math.max(0, limit - 3)).trimEnd() + "...";
   }
 
-  function resolveArtifacts(payload) {
-    if (Array.isArray(payload?.artifacts)) return payload.artifacts;
-    if (Array.isArray(payload?.data?.artifacts)) return payload.data.artifacts;
-    if (Array.isArray(payload)) return payload;
-    return [];
+  function isAbsoluteHttpUrl(value) {
+    return /^https?:\/\//i.test(safeString(value));
   }
 
-  function getViewer(artifact) {
-    const viewer = artifact?.viewer && typeof artifact.viewer === "object" ? artifact.viewer : {};
-    const meta = artifact?.meta && typeof artifact.meta === "object" ? artifact.meta : {};
+  function normalizeArtifact(raw) {
+    const artifact = raw && typeof raw === "object" ? { ...raw } : {};
+    const meta = artifact.meta && typeof artifact.meta === "object" ? { ...artifact.meta } : {};
+    const viewer = artifact.viewer && typeof artifact.viewer === "object" ? { ...artifact.viewer } : {};
+
+    const kind = safeString(artifact.kind || viewer.kind || "artifact").trim() || "artifact";
+    const title =
+      safeString(artifact.title || viewer.title || meta.title || meta.domain || "Untitled artifact").trim() ||
+      "Untitled artifact";
+
+    const body =
+      safeString(
+        artifact.body ||
+          viewer.body ||
+          artifact.content ||
+          meta.content ||
+          viewer.analysis_text ||
+          artifact.summary ||
+          artifact.preview
+      ).trim();
+
+    const analysisText =
+      safeString(viewer.analysis_text || artifact.summary || artifact.preview || meta.description || "").trim();
+
+    const sourceUrl =
+      safeString(
+        artifact.source_url ||
+          viewer.source_url ||
+          meta.source_url ||
+          meta.url ||
+          artifact.url ||
+          ""
+      ).trim();
+
+    const bullets = safeArray(viewer.bullets).map((item) => safeString(item).trim()).filter(Boolean);
+    const links = safeArray(viewer.links.length ? viewer.links : meta.links)
+      .map((item) => safeString(item).trim())
+      .filter(Boolean);
+
+    const images = safeArray(viewer.images.length ? viewer.images : meta.images)
+      .map((item) => safeString(item).trim())
+      .filter(Boolean);
+
+    const preview =
+      safeString(
+        artifact.preview ||
+          analysisText ||
+          truncate(body, 200)
+      ).trim();
 
     return {
-      title:
-        safeText(viewer.title) ||
-        safeText(artifact?.title) ||
-        safeText(meta.title) ||
-        "Untitled artifact",
-      body:
-        safeText(viewer.body) ||
-        safeText(artifact?.body) ||
-        safeText(artifact?.content) ||
-        safeText(meta.body) ||
-        safeText(meta.summary),
-      kind:
-        safeText(viewer.kind) ||
-        safeText(artifact?.kind) ||
-        safeText(meta.kind) ||
-        "artifact",
-      image_url:
-        safeText(viewer.image_url) ||
-        safeText(artifact?.image_url) ||
-        safeText(meta.image_url),
-      video_url:
-        safeText(viewer.video_url) ||
-        safeText(artifact?.video_url) ||
-        safeText(meta.video_url),
-      audio_url:
-        safeText(viewer.audio_url) ||
-        safeText(artifact?.audio_url) ||
-        safeText(meta.audio_url),
-      source_url:
-        safeText(viewer.source_url) ||
-        safeText(artifact?.source_url) ||
-        safeText(meta.source_url) ||
-        safeText(meta.url),
-      media_missing:
-        Boolean(viewer.media_missing) ||
-        Boolean(artifact?.media_missing),
-      image_missing:
-        Boolean(viewer.image_missing) ||
-        Boolean(artifact?.image_missing),
-      video_missing:
-        Boolean(viewer.video_missing) ||
-        Boolean(artifact?.video_missing),
-      audio_missing:
-        Boolean(viewer.audio_missing) ||
-        Boolean(artifact?.audio_missing),
-      image_path:
-        safeText(viewer.image_path) || safeText(artifact?.image_path),
-      video_path:
-        safeText(viewer.video_path) || safeText(artifact?.video_path),
-      audio_path:
-        safeText(viewer.audio_path) || safeText(artifact?.audio_path),
+      ...artifact,
+      kind,
+      title,
+      body,
+      preview,
+      source_url: sourceUrl,
+      meta,
+      viewer: {
+        ...viewer,
+        kind,
+        title,
+        body,
+        analysis_text: analysisText,
+        bullets,
+        links,
+        images,
+        source_url: sourceUrl,
+        image_url: safeString(viewer.image_url || artifact.image_url || meta.image_url || "").trim(),
+        video_url: safeString(viewer.video_url || artifact.video_url || meta.video_url || "").trim(),
+        audio_url: safeString(viewer.audio_url || artifact.audio_url || meta.audio_url || "").trim(),
+      },
     };
   }
 
-  function groupArtifacts(list) {
-    const groups = {};
-    list.forEach((artifact) => {
-      const group = safeText(artifact?.group) || "Other";
-      if (!groups[group]) groups[group] = [];
-      groups[group].push(artifact);
-    });
-    return groups;
+  function artifactKindLabel(kind) {
+    const value = safeString(kind).replace(/[_-]+/g, " ").trim();
+    if (!value) return "Artifact";
+    return value.charAt(0).toUpperCase() + value.slice(1);
   }
 
-  function mediaFallbackHtml(label, pathValue) {
-    const pathLine = safeText(pathValue)
-      ? `<div class="artifact-media-fallback-path">${escapeHtml(pathValue)}</div>`
-      : "";
+  function renderBullets(bullets) {
+    const items = safeArray(bullets).filter(Boolean);
+    if (!items.length) return "";
+    return (
+      '<section class="artifact-view-section">' +
+      '<div class="artifact-view-section__title">Highlights</div>' +
+      '<ul class="artifact-bullets">' +
+      items.map((item) => `<li>${escapeHtml(item)}</li>`).join("") +
+      "</ul>" +
+      "</section>"
+    );
+  }
 
-    return `
-      <div class="artifact-media-fallback">
-        <div class="artifact-media-fallback-title">${escapeHtml(label)} unavailable</div>
-        ${pathLine}
-      </div>
-    `;
+  function renderLinks(links) {
+    const items = safeArray(links).filter(Boolean);
+    if (!items.length) return "";
+    return (
+      '<section class="artifact-view-section">' +
+      '<div class="artifact-view-section__title">Links</div>' +
+      '<div class="artifact-link-list">' +
+      items
+        .map((href) => {
+          const label = truncate(href, 110);
+          return (
+            `<a class="artifact-link-item" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">` +
+            `${escapeHtml(label)}` +
+            "</a>"
+          );
+        })
+        .join("") +
+      "</div>" +
+      "</section>"
+    );
+  }
+
+  function renderImages(images) {
+    const items = safeArray(images).filter((src) => isAbsoluteHttpUrl(src));
+    if (!items.length) return "";
+    return (
+      '<section class="artifact-view-section">' +
+      '<div class="artifact-view-section__title">Images</div>' +
+      '<div class="artifact-image-grid">' +
+      items
+        .map(
+          (src) =>
+            `<a class="artifact-image-card" href="${escapeHtml(src)}" target="_blank" rel="noopener noreferrer">` +
+            `<img src="${escapeHtml(src)}" alt="Artifact image" loading="lazy">` +
+            "</a>"
+        )
+        .join("") +
+      "</div>" +
+      "</section>"
+    );
   }
 
   function renderMedia(viewer) {
-    if (viewer.image_url && !viewer.image_missing) {
-      return `
-        <div class="artifact-media-wrap">
-          <img
-            class="artifact-media artifact-image"
-            src="${escapeHtml(viewer.image_url)}"
-            alt="${escapeHtml(viewer.title)}"
-            data-fallback="image"
-            data-path="${escapeHtml(viewer.image_path)}"
-          />
-        </div>
-      `;
-    }
+    const imageUrl = safeString(viewer.image_url).trim();
+    const videoUrl = safeString(viewer.video_url).trim();
+    const audioUrl = safeString(viewer.audio_url).trim();
 
-    if (viewer.video_url && !viewer.video_missing) {
-      return `
-        <div class="artifact-media-wrap">
-          <video
-            class="artifact-media artifact-video"
-            controls
-            preload="metadata"
-            src="${escapeHtml(viewer.video_url)}"
-            data-fallback="video"
-            data-path="${escapeHtml(viewer.video_path)}"
-          ></video>
-        </div>
-      `;
-    }
-
-    if (viewer.audio_url && !viewer.audio_missing) {
-      return `
-        <div class="artifact-media-wrap">
-          <audio
-            class="artifact-media artifact-audio"
-            controls
-            preload="metadata"
-            src="${escapeHtml(viewer.audio_url)}"
-            data-fallback="audio"
-            data-path="${escapeHtml(viewer.audio_path)}"
-          ></audio>
-        </div>
-      `;
-    }
-
-    if (viewer.media_missing || viewer.image_missing) {
-      return mediaFallbackHtml("Image", viewer.image_path);
-    }
-    if (viewer.video_missing) {
-      return mediaFallbackHtml("Video", viewer.video_path);
-    }
-    if (viewer.audio_missing) {
-      return mediaFallbackHtml("Audio", viewer.audio_path);
-    }
-
-    return "";
-  }
-
-  function artifactCardHtml(artifact) {
-    const viewer = getViewer(artifact);
-    const preview = viewer.body || safeText(artifact?.preview) || "";
-    const activeClass = artifact.id === state.activeArtifactId ? " is-active" : "";
-
-    return `
-      <button class="artifact-card${activeClass}" data-artifact-id="${escapeHtml(artifact.id || "")}" type="button">
-        <div class="artifact-card-top">
-          <div class="artifact-card-title">${escapeHtml(viewer.title)}</div>
-          <div class="artifact-card-kind">${escapeHtml(kindLabel(viewer.kind))}</div>
-        </div>
-        <div class="artifact-card-preview">${escapeHtml(preview.slice(0, 160))}</div>
-        <div class="artifact-card-time">${escapeHtml(formatDate(artifact.updated_at || artifact.created_at))}</div>
-      </button>
-    `;
-  }
-
-  function getActiveArtifact() {
-    return state.artifacts.find((item) => item.id === state.activeArtifactId) || null;
-  }
-
-  function renderList() {
-    if (!els.list) return;
-
-    if (!state.artifacts.length) {
-      els.list.innerHTML = `<div class="artifact-empty-list">No artifacts yet.</div>`;
-      return;
-    }
-
-    const groups = groupArtifacts(state.artifacts);
     let html = "";
 
-    Object.keys(groups).forEach((group) => {
-      html += `
-        <div class="artifact-group">
-          <div class="artifact-group-title">${escapeHtml(group)}</div>
-          ${groups[group].map(artifactCardHtml).join("")}
-        </div>
-      `;
-    });
+    if (imageUrl) {
+      html +=
+        '<section class="artifact-view-section">' +
+        '<div class="artifact-view-section__title">Image</div>' +
+        `<a class="artifact-media-card" href="${escapeHtml(imageUrl)}" target="_blank" rel="noopener noreferrer">` +
+        `<img class="artifact-media-image" src="${escapeHtml(imageUrl)}" alt="Artifact image">` +
+        "</a>" +
+        "</section>";
+    }
 
-    els.list.innerHTML = html;
+    if (videoUrl) {
+      html +=
+        '<section class="artifact-view-section">' +
+        '<div class="artifact-view-section__title">Video</div>' +
+        '<div class="artifact-media-card">' +
+        `<video class="artifact-media-video" controls preload="metadata" src="${escapeHtml(videoUrl)}"></video>` +
+        "</div>" +
+        "</section>";
+    }
+
+    if (audioUrl) {
+      html +=
+        '<section class="artifact-view-section">' +
+        '<div class="artifact-view-section__title">Audio</div>' +
+        '<div class="artifact-media-card">' +
+        `<audio class="artifact-media-audio" controls preload="metadata" src="${escapeHtml(audioUrl)}"></audio>` +
+        "</div>" +
+        "</section>";
+    }
+
+    return html;
   }
 
-  function renderViewer() {
-    if (!els.viewer) return;
+  function renderBody(body) {
+    const text = safeString(body).trim();
+    if (!text) return "";
+    const paragraphs = text
+      .split(/\n{2,}/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .slice(0, 40);
 
-    const artifact = getActiveArtifact();
-    if (!artifact) {
-      els.viewer.innerHTML = `
-        <div class="artifact-view-empty">
-          <div class="artifact-view-empty-title">No artifact selected</div>
-        </div>
-      `;
+    if (!paragraphs.length) return "";
+
+    return (
+      '<section class="artifact-view-section">' +
+      '<div class="artifact-view-section__title">Content</div>' +
+      '<div class="artifact-body">' +
+      paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join("") +
+      "</div>" +
+      "</section>"
+    );
+  }
+
+  function renderMeta(meta, artifact) {
+    const rows = [];
+    const domain = safeString(meta.domain || "").trim();
+    const pageType = safeString(meta.page_type || "").trim();
+    const sourceUrl = safeString(artifact.source_url || "").trim();
+    const createdAt = formatDate(artifact.created_at || artifact.updated_at || "");
+    const statusCode = safeString(meta.status_code || "").trim();
+
+    if (domain) rows.push(["Domain", domain]);
+    if (pageType) rows.push(["Page type", pageType]);
+    if (statusCode) rows.push(["Status", statusCode]);
+    if (createdAt) rows.push(["Saved", createdAt]);
+
+    if (!rows.length && !sourceUrl) return "";
+
+    return (
+      '<section class="artifact-view-section">' +
+      '<div class="artifact-view-section__title">Details</div>' +
+      '<div class="artifact-meta-list">' +
+      rows
+        .map(
+          ([label, value]) =>
+            `<div class="artifact-meta-row"><span class="artifact-meta-label">${escapeHtml(label)}</span><span class="artifact-meta-value">${escapeHtml(value)}</span></div>`
+        )
+        .join("") +
+      (sourceUrl
+        ? `<div class="artifact-meta-row"><span class="artifact-meta-label">Source</span><a class="artifact-meta-link" href="${escapeHtml(
+            sourceUrl
+          )}" target="_blank" rel="noopener noreferrer">${escapeHtml(truncate(sourceUrl, 90))}</a></div>`
+        : "") +
+      "</div>" +
+      "</section>"
+    );
+  }
+
+  function buildArtifactCard(artifact) {
+    const active = state.activeArtifactId && artifact.id === state.activeArtifactId;
+    const kindLabel = artifactKindLabel(artifact.kind);
+    const preview =
+      truncate(artifact.preview || artifact.viewer.analysis_text || artifact.body || "", 170) || "No preview yet.";
+    const updated = formatDate(artifact.updated_at || artifact.created_at || "");
+    const cardClasses = ["artifact-card"];
+    if (active) cardClasses.push("artifact-card--active");
+
+    return (
+      `<button class="${cardClasses.join(" ")}" type="button" data-artifact-id="${escapeHtml(artifact.id || "")}">` +
+      '<div class="artifact-card__top">' +
+      `<span class="artifact-card__kind">${escapeHtml(kindLabel)}</span>` +
+      (updated ? `<span class="artifact-card__time">${escapeHtml(updated)}</span>` : "") +
+      "</div>" +
+      `<div class="artifact-card__title">${escapeHtml(artifact.title)}</div>` +
+      `<div class="artifact-card__preview">${escapeHtml(preview)}</div>` +
+      "</button>"
+    );
+  }
+
+  function renderArtifactList() {
+    const listEl =
+      qs("[data-artifact-list]") ||
+      qs("#artifacts-list") ||
+      qs(".artifacts-list");
+
+    if (!listEl) return;
+
+    const items = safeArray(state.artifacts).map(normalizeArtifact);
+    state.artifacts = items;
+
+    if (!items.length) {
+      listEl.innerHTML = '<div class="artifact-empty">No artifacts yet.</div>';
       return;
     }
 
-    const viewer = getViewer(artifact);
-    const mediaHtml = renderMedia(viewer);
-    const sourceHtml = viewer.source_url
-      ? `<div class="artifact-view-source"><a href="${escapeHtml(viewer.source_url)}" target="_blank" rel="noreferrer">Open source</a></div>`
-      : "";
-
-    const actionsHtml = `
-      <div class="artifact-view-actions">
-        <button type="button" class="artifact-action-btn" data-artifact-action="send_to_chat">Send to chat</button>
-        <button type="button" class="artifact-action-btn" data-artifact-action="copy_text">Copy text</button>
-        ${viewer.image_url ? `<button type="button" class="artifact-action-btn" data-artifact-action="use_image">Use image</button>` : ""}
-        <button type="button" class="artifact-action-btn" data-artifact-action="analyze">Analyze</button>
-      </div>
-    `;
-
-    els.viewer.innerHTML = `
-      <div class="artifact-view">
-        <div class="artifact-view-header">
-          <div class="artifact-view-title">${escapeHtml(viewer.title)}</div>
-          <div class="artifact-view-kind">${escapeHtml(kindLabel(viewer.kind))}</div>
-        </div>
-        ${actionsHtml}
-        ${mediaHtml}
-        <div class="artifact-view-body">${escapeHtml(viewer.body || "")}</div>
-        ${sourceHtml}
-      </div>
-    `;
-
-    bindMediaFallbacks();
-    bindViewerActions();
+    listEl.innerHTML = items.map(buildArtifactCard).join("");
   }
 
-  function bindMediaFallbacks() {
-    if (!els.viewer) return;
+  function renderArtifactViewer() {
+    const viewerEl =
+      qs("[data-artifact-viewer]") ||
+      qs("#artifact-viewer") ||
+      qs(".artifact-viewer");
 
-    const mediaEls = els.viewer.querySelectorAll("[data-fallback]");
-    mediaEls.forEach((node) => {
-      const fallbackType = safeText(node.getAttribute("data-fallback")) || "Media";
-      const fallbackPath = safeText(node.getAttribute("data-path"));
+    if (!viewerEl) return;
 
-      node.addEventListener("error", function () {
-        const wrap = node.closest(".artifact-media-wrap");
-        if (!wrap) return;
+    const artifact =
+      normalizeArtifact(
+        state.activeArtifact ||
+          safeArray(state.artifacts).find((item) => item && item.id === state.activeArtifactId) ||
+          null
+      );
 
-        wrap.outerHTML = mediaFallbackHtml(
-          fallbackType.charAt(0).toUpperCase() + fallbackType.slice(1),
-          fallbackPath
-        );
-      });
-    });
+    if (!artifact || !artifact.title) {
+      viewerEl.innerHTML = '<div class="artifact-empty">Select an artifact to view it.</div>';
+      return;
+    }
+
+    const viewer = artifact.viewer || {};
+    const meta = artifact.meta || {};
+    const kindLabel = artifactKindLabel(artifact.kind);
+
+    viewerEl.innerHTML =
+      '<div class="artifact-view">' +
+      '<div class="artifact-view-header">' +
+      `<div class="artifact-view-header__kind">${escapeHtml(kindLabel)}</div>` +
+      `<div class="artifact-view-header__title">${escapeHtml(artifact.title)}</div>` +
+      (viewer.analysis_text
+        ? `<div class="artifact-view-header__summary">${escapeHtml(viewer.analysis_text)}</div>`
+        : "") +
+      "</div>" +
+      renderBullets(viewer.bullets) +
+      renderLinks(viewer.links) +
+      renderImages(viewer.images) +
+      renderMedia(viewer) +
+      renderBody(viewer.body || artifact.body) +
+      renderMeta(meta, artifact) +
+      "</div>";
   }
 
-  async function openArtifact(artifactId) {
-    const id = String(artifactId || "").trim();
+  function setActiveArtifactById(artifactId) {
+    const id = safeString(artifactId).trim();
     if (!id) return;
 
-    const artifact = state.artifacts.find((a) => String(a.id) === id);
+    const artifact = safeArray(state.artifacts)
+      .map(normalizeArtifact)
+      .find((item) => safeString(item.id).trim() === id);
+
     if (!artifact) return;
-
-    const sessionId = String(artifact.session_id || "").trim();
-
-    if (sessionId && typeof window.openSessionFromBackend === "function") {
-      try {
-        await window.openSessionFromBackend(sessionId);
-      } catch (err) {
-        console.warn("[NovaArtifacts] session restore failed", err);
-      }
-    }
 
     state.activeArtifactId = id;
-    renderList();
-    renderViewer();
+    state.activeArtifact = artifact;
+
+    renderArtifactList();
+    renderArtifactViewer();
   }
 
-  function setActiveArtifact(id) {
-    state.activeArtifactId = safeText(id);
-    renderList();
-    renderViewer();
-  }
-
-  function pushArtifactToChat(text) {
-    if (typeof window.NovaArtifactChatAction === "function") {
-      window.NovaArtifactChatAction(text);
-      return true;
-    }
-
-    const composer =
-      document.querySelector('textarea[name="message"]') ||
-      document.querySelector("#composer-input") ||
-      document.querySelector("[data-composer-input]");
-
-    if (!composer) return false;
-
-    composer.value = text;
-    composer.dispatchEvent(new Event("input", { bubbles: true }));
-    composer.focus();
-    return true;
-  }
-
-  async function copyTextToClipboard(text) {
-    const value = safeText(text);
-    if (!value) return;
+  async function fetchArtifacts() {
     try {
-      await navigator.clipboard.writeText(value);
-    } catch (err) {
-      warn("copy failed", err);
-    }
-  }
-
-  function buildArtifactPrompt(artifact, mode) {
-    const viewer = getViewer(artifact);
-    const title = safeText(viewer.title);
-    const body = safeText(viewer.body);
-    const imageUrl = safeText(viewer.image_url);
-    const sourceUrl = safeText(viewer.source_url);
-    const kind = safeText(viewer.kind);
-
-    if (mode === "send_to_chat") {
-      return [
-        `Use this saved artifact in the current chat.`,
-        title ? `Title: ${title}` : "",
-        kind ? `Type: ${kind}` : "",
-        body ? `Content: ${body}` : "",
-        imageUrl ? `Image URL: ${imageUrl}` : "",
-        sourceUrl ? `Source URL: ${sourceUrl}` : "",
-      ].filter(Boolean).join("\n");
-    }
-
-    if (mode === "use_image") {
-      return [
-        `Use this saved image in the current chat.`,
-        title ? `Title: ${title}` : "",
-        imageUrl ? `Image URL: ${imageUrl}` : "",
-      ].filter(Boolean).join("\n");
-    }
-
-    if (mode === "analyze") {
-      return [
-        `Analyze this saved artifact and tell me the important parts.`,
-        title ? `Title: ${title}` : "",
-        kind ? `Type: ${kind}` : "",
-        body ? `Content: ${body}` : "",
-        imageUrl ? `Image URL: ${imageUrl}` : "",
-        sourceUrl ? `Source URL: ${sourceUrl}` : "",
-      ].filter(Boolean).join("\n");
-    }
-
-    return body || title;
-  }
-
-  async function handleArtifactAction(action) {
-    const artifact = getActiveArtifact();
-    if (!artifact) return;
-
-    const viewer = getViewer(artifact);
-
-    if (action === "copy_text") {
-      await copyTextToClipboard(viewer.body || artifact.preview || viewer.title);
-      return;
-    }
-
-    if (action === "send_to_chat") {
-      pushArtifactToChat(buildArtifactPrompt(artifact, "send_to_chat"));
-      return;
-    }
-
-    if (action === "use_image") {
-      pushArtifactToChat(buildArtifactPrompt(artifact, "use_image"));
-      return;
-    }
-
-    if (action === "analyze") {
-      pushArtifactToChat(buildArtifactPrompt(artifact, "analyze"));
-    }
-  }
-
-  function bindViewerActions() {
-    if (!els.viewer) return;
-
-    els.viewer.querySelectorAll("[data-artifact-action]").forEach((btn) => {
-      btn.addEventListener("click", async function () {
-        const action = safeText(btn.getAttribute("data-artifact-action"));
-        if (!action) return;
-        await handleArtifactAction(action);
+      const response = await fetch("/api/artifacts", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
       });
-    });
-  }
 
-  function bindListClicks() {
-    if (!els.list) return;
+      if (!response.ok) {
+        throw new Error(`Artifacts request failed: ${response.status}`);
+      }
 
-    els.list.addEventListener("click", function (event) {
-      const card = event.target.closest("[data-artifact-id]");
-      if (!card) return;
-      openArtifact(card.getAttribute("data-artifact-id"));
-    });
-  }
-
-  async function loadArtifacts() {
-    try {
-      const payload = await apiGet("/api/artifacts");
-      state.artifacts = resolveArtifacts(payload);
+      const payload = await response.json();
+      const artifacts = safeArray(payload.artifacts || payload.items || payload);
+      state.artifacts = artifacts.map(normalizeArtifact);
 
       if (!state.activeArtifactId && state.artifacts.length) {
-        state.activeArtifactId = safeText(state.artifacts[0].id);
-      } else if (
-        state.activeArtifactId &&
-        !state.artifacts.some((item) => item.id === state.activeArtifactId)
-      ) {
-        state.activeArtifactId = state.artifacts.length ? safeText(state.artifacts[0].id) : "";
+        state.activeArtifactId = safeString(state.artifacts[0].id).trim();
+        state.activeArtifact = state.artifacts[0];
+      } else if (state.activeArtifactId) {
+        state.activeArtifact =
+          state.artifacts.find((item) => safeString(item.id).trim() === state.activeArtifactId) || state.artifacts[0] || null;
       }
 
-      renderList();
-      renderViewer();
-    } catch (err) {
-      warn("loadArtifacts failed", err);
-      if (els.list) {
-        els.list.innerHTML = `<div class="artifact-empty-list">Failed to load artifacts.</div>`;
+      renderArtifactList();
+      renderArtifactViewer();
+    } catch (error) {
+      console.error("[NovaArtifacts] fetchArtifacts failed", error);
+      const listEl = qs("[data-artifact-list]") || qs("#artifacts-list") || qs(".artifacts-list");
+      const viewerEl = qs("[data-artifact-viewer]") || qs("#artifact-viewer") || qs(".artifact-viewer");
+      if (listEl) listEl.innerHTML = '<div class="artifact-empty">Failed to load artifacts.</div>';
+      if (viewerEl) viewerEl.innerHTML = '<div class="artifact-empty">Failed to load artifact viewer.</div>';
+    }
+  }
+
+  function bindArtifactEvents() {
+    document.addEventListener("click", async (event) => {
+      const button = event.target.closest("[data-artifact-id]");
+      if (button) {
+        const artifactId = button.getAttribute("data-artifact-id") || "";
+        setActiveArtifactById(artifactId);
+        return;
       }
-      if (els.viewer) {
-        els.viewer.innerHTML = `<div class="artifact-view-empty"><div class="artifact-view-empty-title">Artifacts unavailable</div></div>`;
+
+      const refreshButton = event.target.closest("[data-artifacts-refresh]");
+      if (refreshButton) {
+        await fetchArtifacts();
       }
+    });
+  }
+
+  function bootstrapFromWindowState() {
+    const initialArtifacts = safeArray(
+      (window.__NOVA_STATE__ && window.__NOVA_STATE__.artifacts) ||
+        window.__INITIAL_STATE__?.artifacts ||
+        state.artifacts
+    );
+
+    if (initialArtifacts.length) {
+      state.artifacts = initialArtifacts.map(normalizeArtifact);
+      if (!state.activeArtifactId && state.artifacts.length) {
+        state.activeArtifactId = safeString(state.artifacts[0].id).trim();
+        state.activeArtifact = state.artifacts[0];
+      }
+      renderArtifactList();
+      renderArtifactViewer();
     }
   }
 
   function boot() {
-    els.list = qs("[data-artifacts-list]") || qs("#artifacts-list");
-    els.viewer = qs("[data-artifact-viewer]") || qs("#artifact-viewer");
-    els.empty = qs("[data-artifacts-empty]") || qs("#artifacts-empty");
-
-    bindListClicks();
-    loadArtifacts();
-    state.booted = true;
-    log("boot complete", { artifacts: state.artifacts.length });
+    bindArtifactEvents();
+    bootstrapFromWindowState();
+    fetchArtifacts();
+    console.log("[NovaArtifacts] boot complete", {
+      artifacts: safeArray(state.artifacts).length,
+      activeArtifactId: state.activeArtifactId || "",
+    });
   }
+
+  window.NovaArtifacts = {
+    boot,
+    fetchArtifacts,
+    renderArtifactList,
+    renderArtifactViewer,
+    setActiveArtifactById,
+    normalizeArtifact,
+  };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot, { once: true });
   } else {
     boot();
   }
-
-  window.NovaArtifacts = {
-    reload: loadArtifacts,
-    setActiveArtifact,
-    openArtifact,
-    getState: function () {
-      return { ...state };
-    },
-  };
 })();
