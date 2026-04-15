@@ -243,6 +243,94 @@ class AgentService:
 
         return decision
 
+    def get_locked_preferences(self, memory_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        result = {
+            "response_style": "",
+            "full_file_only": False,
+            "powershell_only": False,
+            "endgame_pace": False,
+        }
+
+        for item in memory_items:
+            if not isinstance(item, dict):
+                continue
+
+            kind = self._clean_text(item.get("kind"))
+            text = self._clean_text(item.get("text") or item.get("content") or "")
+
+            if kind not in {"preference", "style", "instruction"}:
+                continue
+
+            if any(token in text for token in ("concise", "direct", "no fluff", "solution-first")):
+                result["response_style"] = "direct"
+
+            if any(token in text for token in ("full file", "full files", "smff")):
+                result["full_file_only"] = True
+
+            if "powershell me always" in text or "powershell" in text:
+                result["powershell_only"] = True
+
+            if any(token in text for token in ("endgame", "go-go-go", "soldier", "move quickly")):
+                result["endgame_pace"] = True
+
+        return result
+
+    def classify_memory_priority(self, user_text: str) -> dict:
+        text = str(user_text or "").strip().lower()
+
+        identity_triggers = [
+            "who am i",
+            "what do you know about me",
+            "who are you talking to",
+            "tell me about me",
+            "what's my name",
+            "do you remember me",
+            "what do you remember about me",
+        ]
+
+        preference_triggers = [
+            "what do i like",
+            "what are my preferences",
+            "how do i prefer",
+            "what do i prefer",
+            "remember how i like",
+        ]
+
+        project_triggers = [
+            "what am i building",
+            "what project am i working on",
+            "where are we at",
+            "what were we doing",
+            "what's next for nova",
+            "what is nova",
+        ]
+
+        result = {
+            "should_force_memory": False,
+            "memory_reason": "",
+            "memory_category": "general",
+        }
+
+        if any(trigger in text for trigger in identity_triggers):
+            result["should_force_memory"] = True
+            result["memory_reason"] = "identity"
+            result["memory_category"] = "identity"
+            return result
+
+        if any(trigger in text for trigger in preference_triggers):
+            result["should_force_memory"] = True
+            result["memory_reason"] = "preferences"
+            result["memory_category"] = "preferences"
+            return result
+
+        if any(trigger in text for trigger in project_triggers):
+            result["should_force_memory"] = True
+            result["memory_reason"] = "project_context"
+            result["memory_category"] = "project"
+            return result
+
+        return result
+
     def _score_base_modes(
         self,
         user_text: str,

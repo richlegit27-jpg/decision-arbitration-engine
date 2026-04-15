@@ -1,902 +1,357 @@
 (function () {
-  "use strict";
+  const TAG = "[NovaArtifacts]";
 
-  const LOG = "[NovaArtifacts]";
-  const API = {
-    list: "/api/artifacts",
-    read(id) {
-      return "/api/artifacts/" + encodeURIComponent(id);
-    },
-    delete: "/api/artifacts/delete",
-    pin: "/api/artifacts/pin"
-  };
+  function log(...args) {
+    console.log(TAG, ...args);
+  }
+
+  function warn(...args) {
+    console.warn(TAG, ...args);
+  }
 
   const state = {
-    booted: false,
     artifacts: [],
-    filtered: [],
     activeArtifactId: "",
-    activeArtifact: null,
-    activeSessionId: "",
-    filterText: "",
-    showPinnedOnly: false,
-    showCurrentSessionOnly: false,
-    lastListMarkup: "",
-    lastViewerMarkup: "",
-    lastComposerArtifactSignature: "",
-    isLoadingList: false,
-    isOpeningArtifact: false
+    booted: false,
   };
 
-  function log() {
-    try { console.log(LOG, ...arguments); } catch (_) {}
+  const els = {
+    list: null,
+    viewer: null,
+    empty: null,
+  };
+
+  function qs(sel) {
+    return document.querySelector(sel);
   }
 
-  function error() {
-    try { console.error(LOG, ...arguments); } catch (_) {}
+  function safeText(value) {
+    return String(value ?? "").trim();
   }
 
-  function $(id) {
-    return document.getElementById(id);
+  function escapeHtml(value) {
+    return safeText(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
   }
 
-  function safe(value) {
-    return value == null ? "" : String(value);
+  function kindLabel(kind) {
+    const raw = safeText(kind);
+    if (!raw) return "artifact";
+    return raw.replaceAll("_", " ");
   }
 
-  function esc(value) {
-    return safe(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
-  function asArray(value) {
-    return Array.isArray(value) ? value : [];
-  }
-
-  function pretty(value) {
-    if (value == null || value === "") return "—";
-    if (typeof value === "string") return value;
+  function formatDate(value) {
+    const raw = safeText(value);
+    if (!raw) return "";
     try {
-      return JSON.stringify(value, null, 2);
-    } catch (_) {
-      return safe(value);
+      return new Date(raw).toLocaleString();
+    } catch {
+      return raw;
     }
   }
 
-  function setComposerStatus(text) {
-    const el = $("composerStatus");
-    if (el) el.textContent = safe(text || "");
-  }
+  async function apiGet(url) {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+    });
 
-  function dispatch(name, detail) {
-    try {
-      window.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
-    } catch (_) {}
-  }
-
-  function artifactId(item) {
-    return safe(item && (item.id || item.artifact_id || item._id || ""));
-  }
-
-  function artifactRefToId(value) {
-    if (value == null) return "";
-
-    if (typeof value === "string" || typeof value === "number") {
-      return safe(value);
+    if (!res.ok) {
+      throw new Error(`Failed to load artifacts (${res.status})`);
     }
 
-    if (typeof value === "object") {
-      if (value.artifact_id || value.id || value._id) {
-        return safe(value.artifact_id || value.id || value._id);
-      }
+    return await res.json();
+  }
 
-      if (value.artifact && typeof value.artifact === "object") {
-        return artifactId(value.artifact);
-      }
+  function resolveArtifacts(payload) {
+    if (Array.isArray(payload?.artifacts)) return payload.artifacts;
+    if (Array.isArray(payload?.data?.artifacts)) return payload.data.artifacts;
+    if (Array.isArray(payload)) return payload;
+    return [];
+  }
 
-      if (value.detail && typeof value.detail === "object") {
-        return artifactRefToId(value.detail);
-      }
+  function getViewer(artifact) {
+    const viewer = artifact?.viewer && typeof artifact.viewer === "object" ? artifact.viewer : {};
+    const meta = artifact?.meta && typeof artifact.meta === "object" ? artifact.meta : {};
+
+    return {
+      title:
+        safeText(viewer.title) ||
+        safeText(artifact?.title) ||
+        safeText(meta.title) ||
+        "Untitled artifact",
+      body:
+        safeText(viewer.body) ||
+        safeText(artifact?.body) ||
+        safeText(artifact?.content) ||
+        safeText(meta.body) ||
+        safeText(meta.summary),
+      kind:
+        safeText(viewer.kind) ||
+        safeText(artifact?.kind) ||
+        safeText(meta.kind) ||
+        "artifact",
+      image_url:
+        safeText(viewer.image_url) ||
+        safeText(artifact?.image_url) ||
+        safeText(meta.image_url),
+      video_url:
+        safeText(viewer.video_url) ||
+        safeText(artifact?.video_url) ||
+        safeText(meta.video_url),
+      audio_url:
+        safeText(viewer.audio_url) ||
+        safeText(artifact?.audio_url) ||
+        safeText(meta.audio_url),
+      source_url:
+        safeText(viewer.source_url) ||
+        safeText(artifact?.source_url) ||
+        safeText(meta.source_url) ||
+        safeText(meta.url),
+      media_missing:
+        Boolean(viewer.media_missing) ||
+        Boolean(artifact?.media_missing),
+      image_missing:
+        Boolean(viewer.image_missing) ||
+        Boolean(artifact?.image_missing),
+      video_missing:
+        Boolean(viewer.video_missing) ||
+        Boolean(artifact?.video_missing),
+      audio_missing:
+        Boolean(viewer.audio_missing) ||
+        Boolean(artifact?.audio_missing),
+      image_path:
+        safeText(viewer.image_path) || safeText(artifact?.image_path),
+      video_path:
+        safeText(viewer.video_path) || safeText(artifact?.video_path),
+      audio_path:
+        safeText(viewer.audio_path) || safeText(artifact?.audio_path),
+    };
+  }
+
+  function mediaFallbackHtml(label, pathValue) {
+    const pathLine = safeText(pathValue)
+      ? `<div class="artifact-media-fallback-path">${escapeHtml(pathValue)}</div>`
+      : "";
+
+    return `
+      <div class="artifact-media-fallback">
+        <div class="artifact-media-fallback-title">${escapeHtml(label)} unavailable</div>
+        ${pathLine}
+      </div>
+    `;
+  }
+
+  function renderMedia(viewer) {
+    if (viewer.image_url && !viewer.image_missing) {
+      return `
+        <div class="artifact-media-wrap">
+          <img
+            class="artifact-media artifact-image"
+            src="${escapeHtml(viewer.image_url)}"
+            alt="${escapeHtml(viewer.title)}"
+            data-fallback="image"
+            data-path="${escapeHtml(viewer.image_path)}"
+          />
+        </div>
+      `;
+    }
+
+    if (viewer.video_url && !viewer.video_missing) {
+      return `
+        <div class="artifact-media-wrap">
+          <video
+            class="artifact-media artifact-video"
+            controls
+            preload="metadata"
+            src="${escapeHtml(viewer.video_url)}"
+            data-fallback="video"
+            data-path="${escapeHtml(viewer.video_path)}"
+          ></video>
+        </div>
+      `;
+    }
+
+    if (viewer.audio_url && !viewer.audio_missing) {
+      return `
+        <div class="artifact-media-wrap">
+          <audio
+            class="artifact-media artifact-audio"
+            controls
+            preload="metadata"
+            src="${escapeHtml(viewer.audio_url)}"
+            data-fallback="audio"
+            data-path="${escapeHtml(viewer.audio_path)}"
+          ></audio>
+        </div>
+      `;
+    }
+
+    if (viewer.media_missing || viewer.image_missing) {
+      return mediaFallbackHtml("Image", viewer.image_path);
+    }
+    if (viewer.video_missing) {
+      return mediaFallbackHtml("Video", viewer.video_path);
+    }
+    if (viewer.audio_missing) {
+      return mediaFallbackHtml("Audio", viewer.audio_path);
     }
 
     return "";
   }
 
-  function artifactSessionId(item) {
-    return safe(item && (item.session_id || item.sessionId || item.chat_session_id || ""));
-  }
-
-  function artifactKind(item) {
-    return safe(item && (item.kind || item.type || item.artifact_kind || "artifact"));
-  }
-
-  function artifactTitle(item) {
-    return safe(item && (
-      item.title ||
-      item.name ||
-      item.label ||
-      item.filename ||
-      item.kind ||
-      "Untitled artifact"
-    ));
-  }
-
-  function artifactContent(item) {
-    const viewer = item && item.viewer && typeof item.viewer === "object" ? item.viewer : null;
-    return safe(
-      (viewer && (viewer.body || viewer.analysis_text)) ||
-      (item && (
-        item.content ||
-        item.text ||
-        item.body ||
-        item.preview ||
-        item.summary ||
-        item.description ||
-        ""
-      ))
-    );
-  }
-
-  function artifactPinned(item) {
-    return !!(item && item.pinned);
-  }
-
-  function artifactMeta(item) {
-    if (!item || typeof item !== "object") return {};
-    return item.meta && typeof item.meta === "object" ? item.meta : {};
-  }
-
-  function artifactViewer(item) {
-    return item && item.viewer && typeof item.viewer === "object" ? item.viewer : {};
-  }
-
-  function artifactImageUrl(item) {
-    const viewer = artifactViewer(item);
-    const meta = artifactMeta(item);
-    const raw = safe(
-      viewer.image_url ||
-      item.image_url ||
-      meta.image_url ||
-      item.url ||
-      meta.url ||
-      ""
-    );
-    return normalizePossibleMediaUrl(raw);
-  }
-
-  function artifactSourceUrl(item) {
-    const viewer = artifactViewer(item);
-    const meta = artifactMeta(item);
-    return safe(
-      viewer.source_url ||
-      item.source_url ||
-      meta.source_url ||
-      item.url ||
-      meta.url ||
-      ""
-    );
-  }
-
-  function normalizePossibleMediaUrl(value) {
-    const raw = safe(value);
-    if (!raw) return "";
-    if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("/")) {
-      return raw;
-    }
-    return "/api/uploads/" + raw.replace(/^uploads[\\/]/, "");
-  }
-
-  function formatTime(value) {
-    const raw = safe(value);
-    if (!raw) return "";
-    try {
-      const d = new Date(raw);
-      if (Number.isNaN(d.getTime())) return raw;
-      return d.toLocaleString();
-    } catch (_) {
-      return raw;
-    }
-  }
-
-  function formatTimeAgo(value) {
-    const raw = safe(value);
-    if (!raw) return "";
-    try {
-      const d = new Date(raw);
-      if (Number.isNaN(d.getTime())) return raw;
-
-      const diff = Date.now() - d.getTime();
-      const minutes = Math.floor(diff / 60000);
-      if (minutes <= 1) return "Just now";
-      if (minutes < 60) return `${minutes}m ago`;
-      const hours = Math.floor(minutes / 60);
-      if (hours < 24) return `${hours}h ago`;
-      const days = Math.floor(hours / 24);
-      if (days < 7) return `${days}d ago`;
-      return d.toLocaleDateString();
-    } catch (_) {
-      return raw;
-    }
-  }
-
-  function summarizeText(value, limit) {
-    const text = safe(value).trim();
-    const max = typeof limit === "number" ? limit : 180;
-    if (!text) return "";
-    if (text.length <= max) return text;
-    return text.slice(0, max) + "…";
-  }
-
-  function isImageUrl(value) {
-    const text = safe(value);
-    return !!text && (
-      /^https?:\/\//i.test(text) ||
-      text.startsWith("/uploads/") ||
-      text.startsWith("/api/uploads/") ||
-      text.startsWith("uploads/")
-    ) && /\.(png|jpg|jpeg|gif|webp|bmp|svg)(\?.*)?$/i.test(text);
-  }
-
-  function viewerEmptyHtml() {
-    return `
-      <div class="nova-artifact-viewer-empty">
-        <div class="nova-artifact-viewer-empty-inner">
-          <div class="nova-artifact-viewer-empty-icon">◫</div>
-          <div class="nova-artifact-viewer-empty-title">Open an artifact</div>
-          <div class="nova-artifact-viewer-empty-copy">Inspect saved replies, web fetches, images, and backend meta here.</div>
-        </div>
-      </div>
-    `;
-  }
-
-  function listEmptyHtml() {
-    return `
-      <div class="nova-artifact-empty">
-        <div class="nova-artifact-empty-inner">
-          <div class="nova-artifact-empty-icon">◫</div>
-          <div class="nova-artifact-empty-title">No artifacts found</div>
-          <div class="nova-artifact-empty-copy">Try another filter, switch chats, or generate a new result.</div>
-        </div>
-      </div>
-    `;
-  }
-
-  function contentHtml(item) {
-    const raw = artifactContent(item);
-    const imageUrl = artifactImageUrl(item);
-    const sourceUrl = artifactSourceUrl(item);
-
-    if (imageUrl && isImageUrl(imageUrl)) {
-      return `
-        <div class="nova-artifact-image-wrap">
-          <img class="nova-artifact-image" src="${esc(imageUrl)}" alt="Artifact image" />
-          <div class="nova-artifact-image-actions">
-            <a class="nova-subtle-btn" href="${esc(imageUrl)}" target="_blank" rel="noopener noreferrer">Open image</a>
-            <a class="nova-subtle-btn" href="${esc(imageUrl)}" download>Download</a>
-            ${sourceUrl ? `<a class="nova-subtle-btn" href="${esc(sourceUrl)}" target="_blank" rel="noopener noreferrer">Open source</a>` : ``}
-          </div>
-        </div>
-      `;
-    }
-
-    if (!raw) {
-      return `<div class="nova-artifact-empty">No content in this artifact yet.</div>`;
-    }
-
-    return `<pre class="nova-artifact-content-pre">${esc(raw)}</pre>`;
-  }
-
-  function sortArtifacts(items) {
-    return asArray(items).slice().sort(function (a, b) {
-      const ap = artifactPinned(a) ? 1 : 0;
-      const bp = artifactPinned(b) ? 1 : 0;
-      if (ap !== bp) return bp - ap;
-
-      const at = safe(a && (a.updated_at || a.created_at || ""));
-      const bt = safe(b && (b.updated_at || b.created_at || ""));
-      return bt.localeCompare(at);
-    });
-  }
-
-  function ensureMountStructure() {
-    const mount = $("artifactsMount");
-    if (!mount) return null;
-
-    if ($("artifactListPane") && $("artifactViewerPane") && $("artifactSearchInput")) {
-      return mount;
-    }
-
-    mount.innerHTML = `
-      <div class="nova-artifact-workspace">
-        <div class="nova-artifact-list-pane">
-          <div class="nova-artifact-toolbar">
-            <input
-              id="artifactSearchInput"
-              class="nova-artifact-search"
-              type="text"
-              placeholder="Search artifacts"
-              aria-label="Search artifacts"
-            />
-            <div class="nova-artifact-toolbar-actions">
-              <button id="artifactPinnedFilterBtn" class="nova-subtle-btn" type="button">Pinned</button>
-              <button id="artifactSessionFilterBtn" class="nova-subtle-btn" type="button">This Chat</button>
-              <button id="artifactRefreshBtn" class="nova-subtle-btn" type="button">Refresh</button>
-            </div>
-          </div>
-          <div id="artifactFilterSummary" class="nova-artifact-filter-summary"></div>
-          <div id="artifactListPane" class="nova-artifact-list"></div>
-        </div>
-        <div id="artifactViewerPane" class="nova-artifact-viewer-pane">
-          ${viewerEmptyHtml()}
-        </div>
-      </div>
-    `;
-    return mount;
-  }
-
-  function renderFilterSummary() {
-    const el = $("artifactFilterSummary");
-    if (!el) return;
-    const parts = [];
-    parts.push(`${state.filtered.length} shown`);
-    parts.push(`${state.artifacts.length} total`);
-    if (state.showPinnedOnly) parts.push("pinned");
-    if (state.showCurrentSessionOnly) parts.push("this chat");
-    if (state.filterText) parts.push(`search: ${state.filterText}`);
-    el.textContent = parts.join(" • ");
-
-    const pinnedBtn = $("artifactPinnedFilterBtn");
-    const sessionBtn = $("artifactSessionFilterBtn");
-    if (pinnedBtn) pinnedBtn.classList.toggle("is-active", !!state.showPinnedOnly);
-    if (sessionBtn) sessionBtn.classList.toggle("is-active", !!state.showCurrentSessionOnly);
-  }
-
-function cardHtml(item) {
-  const id = artifactId(item);
-  const active = id && id === state.activeArtifactId ? " active" : "";
-  const imageUrl = artifactImageUrl(item);
-  const previewText = artifactContent(item);
-  const sessionId = artifactSessionId(item);
-  const kind = artifactKind(item);
-  const title = artifactTitle(item);
-
-  const thumb = imageUrl && isImageUrl(imageUrl)
-    ? `
-      <div class="nova-artifact-card-thumb-wrap">
-        <img class="nova-artifact-card-thumb" src="${esc(imageUrl)}" alt="${esc(title)}"/>
-      </div>
-    `
-    : `
-      <div class="nova-artifact-card-thumb-wrap is-placeholder">
-        <div class="nova-artifact-card-thumb-fallback">${esc(kind.toUpperCase())}</div>
-      </div>
-    `;
-
-  const preview = previewText
-    ? esc(summarizeText(previewText, 140))
-    : "";
-
-  return `
-    <button class="nova-artifact-card nova-artifact-card--rich${active}" type="button" data-artifact-id="${esc(id)}">
-      
-      ${thumb}
-
-      <div class="nova-artifact-card-main">
-
-        <div class="nova-artifact-card-top">
-          <span class="nova-artifact-kind">${esc(kind)}</span>
-          <div class="nova-artifact-card-top-right">
-            ${artifactPinned(item) ? `<span class="nova-artifact-session-chip is-pinned">Pinned</span>` : ``}
-            <span class="nova-artifact-time">${esc(formatTimeAgo(item.updated_at || item.created_at || ""))}</span>
-          </div>
-        </div>
-
-        <div class="nova-artifact-card-title">${esc(title)}</div>
-
-        ${preview ? `<div class="nova-artifact-card-preview">${preview}</div>` : ``}
-
-        <div class="nova-artifact-card-bottom">
-          <span class="nova-artifact-session-chip">${esc(sessionId || "no session")}</span>
-        </div>
-
-      </div>
-    </button>
-  `;
-}
-
-  function viewerHtml(item) {
-    if (!item) {
-      return viewerEmptyHtml();
-    }
-
-    const id = artifactId(item);
-    const kind = artifactKind(item);
-    const title = artifactTitle(item);
-    const sessionId = artifactSessionId(item);
-    const pinned = artifactPinned(item);
-    const meta = artifactMeta(item);
-    const sourceUrl = artifactSourceUrl(item);
-    const rawMeta = {
-      id: item.id,
-      kind: item.kind,
-      pinned: !!item.pinned,
-      session_id: item.session_id,
-      title: item.title,
-      created_at: item.created_at,
-      updated_at: item.updated_at,
-      meta: item.meta || {},
-      viewer: item.viewer || null,
-      web: item.web || null,
-      debug: item.debug || null,
-      extra: item.extra || null
-    };
+  function artifactCardHtml(artifact) {
+    const viewer = getViewer(artifact);
+    const preview = viewer.body || safeText(artifact?.preview) || "";
+    const activeClass = artifact.id === state.activeArtifactId ? " is-active" : "";
 
     return `
-      <div class="nova-artifact-viewer">
-        <div class="nova-artifact-viewer-header">
-          <div class="nova-artifact-viewer-title-wrap">
-            <div class="nova-artifact-viewer-topline">
-              <span class="nova-artifact-kind">${esc(kind)}</span>
-              ${pinned ? `<span class="nova-artifact-session-chip is-pinned">Pinned</span>` : ``}
-              ${id ? `<span class="nova-artifact-id">id ${esc(id)}</span>` : ``}
-            </div>
-            <div class="nova-artifact-viewer-title">${esc(title)}</div>
-            <div class="nova-artifact-viewer-meta-line">
-              ${item.created_at ? `<span>Created: ${esc(formatTime(item.created_at))}</span>` : ``}
-              ${item.updated_at ? `<span>Updated: ${esc(formatTime(item.updated_at))}</span>` : ``}
-              ${sessionId ? `<span>Session: ${esc(sessionId)}</span>` : ``}
-              ${sourceUrl ? `<a href="${esc(sourceUrl)}" target="_blank" rel="noopener noreferrer">Source</a>` : ``}
-            </div>
-          </div>
-
-          <div class="nova-artifact-viewer-actions">
-            ${sessionId ? `<button id="artifactJumpSessionBtn" class="nova-subtle-btn" type="button" data-session-id="${esc(sessionId)}">Jump to session</button>` : ``}
-            <button id="artifactPinBtn" class="nova-subtle-btn" type="button">${pinned ? "Unpin" : "Pin"}</button>
-            <button id="artifactRefreshMetaBtn" class="nova-subtle-btn" type="button">Refresh meta</button>
-            <button id="artifactDeleteBtn" class="nova-subtle-btn danger" type="button">Delete</button>
-            <button id="artifactCopyBtn" class="nova-subtle-btn" type="button">Copy content</button>
-            <button id="artifactCopyMetaBtn" class="nova-subtle-btn" type="button">Copy meta</button>
-          </div>
+      <button class="artifact-card${activeClass}" data-artifact-id="${escapeHtml(artifact.id || "")}" type="button">
+        <div class="artifact-card-top">
+          <div class="artifact-card-title">${escapeHtml(viewer.title)}</div>
+          <div class="artifact-card-kind">${escapeHtml(kindLabel(viewer.kind))}</div>
         </div>
-
-        <div class="nova-artifact-viewer-grid">
-          <div class="nova-artifact-viewer-block nova-artifact-viewer-block-content">
-            <div class="nova-artifact-viewer-block-title">Content</div>
-            <div class="nova-artifact-viewer-content">${contentHtml(item)}</div>
-          </div>
-
-          <div class="nova-artifact-viewer-block">
-            <div class="nova-artifact-viewer-block-title">Backend meta</div>
-            <pre class="nova-artifact-meta-pre">${esc(pretty(meta))}</pre>
-          </div>
-
-          <div class="nova-artifact-viewer-block">
-            <div class="nova-artifact-viewer-block-title">Raw meta</div>
-            <pre class="nova-artifact-meta-pre">${esc(pretty(rawMeta))}</pre>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  function applyFilter() {
-    const query = safe(state.filterText).trim().toLowerCase();
-    const currentSessionId = safe(state.activeSessionId);
-
-    state.filtered = sortArtifacts(state.artifacts).filter(function (item) {
-      if (state.showPinnedOnly && !artifactPinned(item)) return false;
-      if (state.showCurrentSessionOnly && currentSessionId && artifactSessionId(item) !== currentSessionId) return false;
-
-      if (!query) return true;
-
-      const haystack = [
-        artifactTitle(item),
-        artifactKind(item),
-        artifactContent(item),
-        pretty(artifactMeta(item))
-      ].join(" ").toLowerCase();
-
-      return haystack.indexOf(query) >= 0;
-    });
-  }
-
-  function renderListLoading() {
-    const pane = $("artifactListPane");
-    if (!pane) return;
-    pane.innerHTML = `
-      <div class="nova-artifact-list-loading">
-        <div class="nova-artifact-skeleton"></div>
-        <div class="nova-artifact-skeleton"></div>
-        <div class="nova-artifact-skeleton"></div>
-      </div>
+        <div class="artifact-card-preview">${escapeHtml(preview.slice(0, 160))}</div>
+        <div class="artifact-card-time">${escapeHtml(formatDate(artifact.updated_at || artifact.created_at))}</div>
+      </button>
     `;
   }
 
   function renderList() {
-    renderFilterSummary();
+    if (!els.list) return;
 
-    const pane = $("artifactListPane");
-    if (!pane) return;
-
-    const markup = state.filtered.length
-      ? state.filtered.map(cardHtml).join("")
-      : listEmptyHtml();
-
-    if (markup !== state.lastListMarkup) {
-      pane.innerHTML = markup;
-      state.lastListMarkup = markup;
+    if (!state.artifacts.length) {
+      els.list.innerHTML = `<div class="artifact-empty-list">No artifacts yet.</div>`;
+      return;
     }
 
-    dispatch("nova:artifact-count-changed", {
-      count: state.artifacts.length,
-      filtered: state.filtered.length
-    });
+    els.list.innerHTML = state.artifacts.map(artifactCardHtml).join("");
   }
 
   function renderViewer() {
-    const pane = $("artifactViewerPane");
-    if (!pane) return;
+    if (!els.viewer) return;
 
-    const markup = viewerHtml(state.activeArtifact);
-    if (markup !== state.lastViewerMarkup) {
-      pane.innerHTML = markup;
-      state.lastViewerMarkup = markup;
+    const artifact = state.artifacts.find((item) => item.id === state.activeArtifactId);
+    if (!artifact) {
+      els.viewer.innerHTML = `
+        <div class="artifact-view-empty">
+          <div class="artifact-view-empty-title">No artifact selected</div>
+        </div>
+      `;
+      return;
     }
+
+    const viewer = getViewer(artifact);
+    const mediaHtml = renderMedia(viewer);
+    const sourceHtml = viewer.source_url
+      ? `<div class="artifact-view-source"><a href="${escapeHtml(viewer.source_url)}" target="_blank" rel="noreferrer">Open source</a></div>`
+      : "";
+
+    els.viewer.innerHTML = `
+      <div class="artifact-view">
+        <div class="artifact-view-header">
+          <div class="artifact-view-title">${escapeHtml(viewer.title)}</div>
+          <div class="artifact-view-kind">${escapeHtml(kindLabel(viewer.kind))}</div>
+        </div>
+        ${mediaHtml}
+        <div class="artifact-view-body">${escapeHtml(viewer.body || "")}</div>
+        ${sourceHtml}
+      </div>
+    `;
+
+    bindMediaFallbacks();
   }
 
-  function setArtifacts(nextArtifacts) {
-    state.artifacts = sortArtifacts(nextArtifacts);
-    applyFilter();
+  function bindMediaFallbacks() {
+    if (!els.viewer) return;
 
-    if (state.activeArtifactId) {
-      const fresh = state.artifacts.find(function (item) {
-        return artifactId(item) === state.activeArtifactId;
+    const mediaEls = els.viewer.querySelectorAll("[data-fallback]");
+    mediaEls.forEach((node) => {
+      const fallbackType = safeText(node.getAttribute("data-fallback")) || "Media";
+      const fallbackPath = safeText(node.getAttribute("data-path"));
+
+      node.addEventListener("error", function () {
+        const wrap = node.closest(".artifact-media-wrap");
+        if (!wrap) return;
+
+        wrap.outerHTML = mediaFallbackHtml(
+          fallbackType.charAt(0).toUpperCase() + fallbackType.slice(1),
+          fallbackPath
+        );
       });
-      if (fresh) {
-        state.activeArtifact = fresh;
-      }
-    }
+    });
+  }
 
-    if (!state.activeArtifact && state.artifacts.length) {
-      state.activeArtifact = state.artifacts[0];
-      state.activeArtifactId = artifactId(state.activeArtifact);
-    }
-
+  function setActiveArtifact(id) {
+    state.activeArtifactId = safeText(id);
     renderList();
     renderViewer();
   }
 
-  async function readJson(res) {
-    try {
-      return await res.json();
-    } catch (_) {
-      return null;
-    }
-  }
+  function bindListClicks() {
+    if (!els.list) return;
 
-  async function postJson(url, body) {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body || {})
+    els.list.addEventListener("click", function (event) {
+      const card = event.target.closest("[data-artifact-id]");
+      if (!card) return;
+      setActiveArtifact(card.getAttribute("data-artifact-id"));
     });
-    const data = await readJson(res);
-    if (!res.ok) {
-      throw new Error(safe(data && (data.error || data.message)) || `Request failed (${res.status})`);
-    }
-    return data || {};
   }
 
-  async function loadArtifacts(options) {
-    const opts = options || {};
-    if (state.isLoadingList) return;
-    state.isLoadingList = true;
-
-    if (!opts.silent) setComposerStatus("Loading artifacts…");
-    renderListLoading();
-
+  async function loadArtifacts() {
     try {
-      const res = await fetch(API.list, { method: "GET" });
-      const data = await readJson(res);
+      const payload = await apiGet("/api/artifacts");
+      state.artifacts = resolveArtifacts(payload);
 
-      if (!res.ok) {
-        throw new Error(safe(data && (data.error || data.message)) || "Failed to load artifacts");
+      if (!state.activeArtifactId && state.artifacts.length) {
+        state.activeArtifactId = safeText(state.artifacts[0].id);
+      } else if (
+        state.activeArtifactId &&
+        !state.artifacts.some((item) => item.id === state.activeArtifactId)
+      ) {
+        state.activeArtifactId = state.artifacts.length ? safeText(state.artifacts[0].id) : "";
       }
 
-      const items = data && (data.artifacts || data.items || data.results || data);
-      setArtifacts(asArray(items));
-
-      if (!opts.silent) setComposerStatus(`Artifacts loaded (${state.artifacts.length})`);
-    } catch (e) {
-      error("loadArtifacts failed", e);
-      if (!opts.silent) setComposerStatus(safe(e.message || "Artifact load failed."));
-      state.filtered = [];
-      state.lastListMarkup = "";
-      renderList();
-      state.activeArtifact = null;
-      state.activeArtifactId = "";
-      state.lastViewerMarkup = "";
-      renderViewer();
-    } finally {
-      state.isLoadingList = false;
-    }
-  }
-
-  async function openArtifact(id, options) {
-    const opts = options || {};
-    const wanted = artifactRefToId(id);
-
-    if (!wanted) {
-      error("openArtifact received invalid id", id);
-      if (!opts.silent) setComposerStatus("Artifact open failed: invalid artifact id");
-      return;
-    }
-
-    if (!opts.force && state.activeArtifactId === wanted && state.activeArtifact) {
-      renderViewer();
-      return;
-    }
-
-    if (state.isOpeningArtifact) return;
-    state.isOpeningArtifact = true;
-
-    if (!opts.silent) setComposerStatus("Opening artifact…");
-
-    try {
-      const res = await fetch(API.read(wanted), { method: "GET" });
-      const data = await readJson(res);
-
-      if (!res.ok) {
-        throw new Error(safe(data && (data.error || data.message)) || "Failed to load artifact");
-      }
-
-      const item = data && data.artifact ? data.artifact : data;
-      state.activeArtifactId = artifactId(item);
-      state.activeArtifact = item;
-
-      const existingIndex = state.artifacts.findIndex(function (a) {
-        return artifactId(a) === state.activeArtifactId;
-      });
-
-      if (existingIndex >= 0) {
-        state.artifacts[existingIndex] = item;
-      } else {
-        state.artifacts.unshift(item);
-      }
-
-      applyFilter();
-      state.lastListMarkup = "";
       renderList();
       renderViewer();
-
-      dispatch("nova:artifact-opened", {
-        artifact_id: state.activeArtifactId,
-        artifact: item,
-        session_id: artifactSessionId(item)
-      });
-
-      if (!opts.silent) setComposerStatus("Artifact opened");
-    } catch (e) {
-      error("openArtifact failed", e);
-      if (!opts.silent) setComposerStatus(safe(e.message || "Artifact open failed."));
-    } finally {
-      state.isOpeningArtifact = false;
+    } catch (err) {
+      warn("loadArtifacts failed", err);
+      if (els.list) {
+        els.list.innerHTML = `<div class="artifact-empty-list">Failed to load artifacts.</div>`;
+      }
+      if (els.viewer) {
+        els.viewer.innerHTML = `<div class="artifact-view-empty"><div class="artifact-view-empty-title">Artifacts unavailable</div></div>`;
+      }
     }
   }
 
-  async function togglePinActiveArtifact() {
-    if (!state.activeArtifact) return;
-    try {
-      setComposerStatus("Saving pin…");
-      await postJson(API.pin, { artifact_id: artifactId(state.activeArtifact) });
-      await loadArtifacts({ silent: true });
-      await openArtifact(artifactId(state.activeArtifact), { silent: true, force: true });
-      setComposerStatus("Pin saved.");
-    } catch (e) {
-      setComposerStatus(safe(e.message || "Pin failed."));
-    }
-  }
+  function boot() {
+    els.list = qs("[data-artifacts-list]") || qs("#artifacts-list");
+    els.viewer = qs("[data-artifact-viewer]") || qs("#artifact-viewer");
+    els.empty = qs("[data-artifacts-empty]") || qs("#artifacts-empty");
 
-  async function deleteActiveArtifact() {
-    if (!state.activeArtifact) return;
-    if (!window.confirm("Delete this artifact?")) return;
-
-    try {
-      setComposerStatus("Deleting artifact…");
-      const id = artifactId(state.activeArtifact);
-      const result = await postJson(API.delete, { artifact_id: id });
-
-      state.activeArtifact = null;
-      state.activeArtifactId = "";
-      state.lastViewerMarkup = "";
-      await loadArtifacts({ silent: true });
-
-      const nextId = safe(result && result.next_artifact_id);
-      if (nextId) {
-        await openArtifact(nextId, { silent: true, force: true });
-      } else {
-        renderViewer();
-      }
-
-      setComposerStatus("Artifact deleted.");
-    } catch (e) {
-      setComposerStatus(safe(e.message || "Delete failed."));
-    }
-  }
-
-  async function refreshActiveArtifact() {
-    if (!state.activeArtifactId) return;
-    await openArtifact(state.activeArtifactId, { silent: true, force: true });
-    setComposerStatus("Artifact refreshed.");
-  }
-
-  function copyText(text, okText) {
-    navigator.clipboard.writeText(safe(text || ""))
-      .then(function () {
-        setComposerStatus(okText || "Copied.");
-      })
-      .catch(function (e) {
-        setComposerStatus(safe(e.message || "Copy failed."));
-      });
-  }
-
-  function bindMountEvents() {
-    const mount = $("artifactsMount");
-    if (!mount) return;
-
-    mount.addEventListener("click", function (event) {
-      const target = event.target;
-      if (!target) return;
-
-      const artifactCard = target.closest(".nova-artifact-card");
-      if (artifactCard) {
-        openArtifact(artifactCard.dataset.artifactId || artifactCard.getAttribute("data-artifact-id"));
-        return;
-      }
-
-      const card = target.closest("[data-artifact-id]");
-      if (card) {
-        openArtifact(card.getAttribute("data-artifact-id"));
-        return;
-      }
-
-      const refreshBtn = target.closest("#artifactRefreshBtn");
-      if (refreshBtn) {
-        loadArtifacts();
-        return;
-      }
-
-      const pinnedBtn = target.closest("#artifactPinnedFilterBtn");
-      if (pinnedBtn) {
-        state.showPinnedOnly = !state.showPinnedOnly;
-        state.lastListMarkup = "";
-        applyFilter();
-        renderList();
-        return;
-      }
-
-      const sessionBtn = target.closest("#artifactSessionFilterBtn");
-      if (sessionBtn) {
-        state.showCurrentSessionOnly = !state.showCurrentSessionOnly;
-        state.lastListMarkup = "";
-        applyFilter();
-        renderList();
-        return;
-      }
-
-      const pinBtn = target.closest("#artifactPinBtn");
-      if (pinBtn) {
-        togglePinActiveArtifact();
-        return;
-      }
-
-      const deleteBtn = target.closest("#artifactDeleteBtn");
-      if (deleteBtn) {
-        deleteActiveArtifact();
-        return;
-      }
-
-      const refreshMetaBtn = target.closest("#artifactRefreshMetaBtn");
-      if (refreshMetaBtn) {
-        refreshActiveArtifact();
-        return;
-      }
-
-      const jumpBtn = target.closest("#artifactJumpSessionBtn");
-      if (jumpBtn) {
-        dispatch("nova:jump-to-session", {
-          session_id: safe(jumpBtn.getAttribute("data-session-id")),
-          source: "artifact-viewer"
-        });
-        return;
-      }
-
-      const copyBtn = target.closest("#artifactCopyBtn");
-      if (copyBtn) {
-        copyText(artifactContent(state.activeArtifact), "Artifact content copied.");
-        return;
-      }
-
-      const copyMetaBtn = target.closest("#artifactCopyMetaBtn");
-      if (copyMetaBtn) {
-        copyText(pretty(state.activeArtifact), "Artifact meta copied.");
-      }
-    });
-
-    mount.addEventListener("input", function (event) {
-      const search = event.target.closest("#artifactSearchInput");
-      if (!search) return;
-      state.filterText = safe(search.value);
-      state.lastListMarkup = "";
-      applyFilter();
-      renderList();
-    });
-  }
-
-  function bindEvents() {
-    window.addEventListener("nova:composer-state", function (event) {
-      const detail = event && event.detail ? event.detail : {};
-      const sessionId = safe(detail.session_id || detail.sessionId || "");
-      const artifacts = asArray(detail.artifacts);
-
-      state.activeSessionId = sessionId;
-
-      const signature = JSON.stringify({
-        sessionId: sessionId,
-        artifacts: artifacts.map(function (item) {
-          return {
-            id: artifactId(item),
-            title: artifactTitle(item),
-            kind: artifactKind(item),
-            pinned: artifactPinned(item),
-            updated_at: safe(item && (item.updated_at || item.created_at || "")),
-            session_id: artifactSessionId(item)
-          };
-        })
-      });
-
-      if (signature === state.lastComposerArtifactSignature) return;
-      state.lastComposerArtifactSignature = signature;
-
-      setArtifacts(artifacts);
-    });
-
-    window.addEventListener("nova:artifact-opened", function (event) {
-      const detail = event && event.detail ? event.detail : {};
-      if (!detail.artifact || typeof detail.artifact !== "object") return;
-      state.activeArtifactId = safe(detail.artifact_id || artifactId(detail.artifact));
-      state.activeArtifact = detail.artifact;
-      renderViewer();
-    });
-  }
-
-  async function boot() {
-    if (state.booted) return;
+    bindListClicks();
+    loadArtifacts();
     state.booted = true;
-
-    ensureMountStructure();
-    bindMountEvents();
-    bindEvents();
-    await loadArtifacts({ silent: false });
-
-    log("boot complete", {
-      artifacts: state.artifacts.length
-    });
+    log("boot complete", { artifacts: state.artifacts.length });
   }
-
-  window.NovaArtifacts = {
-    state: state,
-    boot: boot,
-    loadArtifacts: loadArtifacts,
-    openArtifact: openArtifact
-  };
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
+    document.addEventListener("DOMContentLoaded", boot, { once: true });
   } else {
     boot();
   }
+
+  window.NovaArtifacts = {
+    reload: loadArtifacts,
+    setActiveArtifact,
+    getState: function () {
+      return { ...state };
+    },
+  };
 })();

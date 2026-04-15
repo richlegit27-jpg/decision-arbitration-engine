@@ -1,26 +1,36 @@
 (function () {
   "use strict";
 
-  var VERSION = "memory-split-2026-04-12-001";
+  const state = {
+    items: [],
+    filtered: [],
+    loading: false,
+    query: "",
+    kind: "all",
+    selectedId: "",
+  };
 
-  function bridge() {
-    return window.NovaMemoryBridge || null;
+  const els = {
+    panel: null,
+    list: null,
+    empty: null,
+    search: null,
+    kind: null,
+    refresh: null,
+    addBtn: null,
+    addText: null,
+    addKind: null,
+    addSource: null,
+    status: null,
+    count: null,
+  };
+
+  function q(selector) {
+    return document.querySelector(selector);
   }
 
-  function text(value) {
-    return String(value == null ? "" : value).trim();
-  }
-
-  function safeArray(value) {
-    return Array.isArray(value) ? value : [];
-  }
-
-  function safeObject(value) {
-    return value && typeof value === "object" ? value : {};
-  }
-
-  function fallbackEscapeHtml(value) {
-    return text(value)
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
@@ -28,270 +38,329 @@
       .replace(/'/g, "&#39;");
   }
 
-  function getState() {
-    var b = bridge();
-    return b && typeof b.getState === "function" ? b.getState() : {};
+  function shortText(value, maxLen) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    if (text.length <= maxLen) return text;
+    return text.slice(0, maxLen - 1) + "…";
   }
 
-  function getElements() {
-    var b = bridge();
-    return b && typeof b.getElements === "function" ? b.getElements() : {};
-  }
-
-  function escapeHtml(value) {
-    var b = bridge();
-    if (b && typeof b.escapeHtml === "function") {
-      return b.escapeHtml(value);
-    }
-    return fallbackEscapeHtml(value);
-  }
-
-  function formatTimeAgo(value) {
-    var b = bridge();
-    if (b && typeof b.formatTimeAgo === "function") {
-      return b.formatTimeAgo(value);
-    }
-    return text(value);
-  }
-
-  function showToast(message, kind) {
-    var b = bridge();
-    if (b && typeof b.showToast === "function") {
-      b.showToast(message, kind);
-    }
-  }
-
-  function warn() {
-    var b = bridge();
-    if (b && typeof b.warn === "function") {
-      b.warn.apply(null, arguments);
-      return;
-    }
+  function formatDate(value) {
+    if (!value) return "";
     try {
-      console.warn.apply(console, arguments);
-    } catch (error) {}
-  }
-
-  function openRail() {
-    var b = bridge();
-    if (b && typeof b.openRail === "function") {
-      b.openRail();
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return String(value);
+      return d.toLocaleString();
+    } catch (err) {
+      return String(value || "");
     }
   }
 
-  function setRailTab(tabName) {
-    var b = bridge();
-    if (b && typeof b.setRailTab === "function") {
-      b.setRailTab(tabName);
-    }
-  }
+  async function api(url, options) {
+    const res = await fetch(url, {
+      method: options && options.method ? options.method : "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: options && options.body ? JSON.stringify(options.body) : undefined,
+    });
 
-  function setRailSelectedItem(kind, itemId) {
-    var b = bridge();
-    if (b && typeof b.setRailSelectedItem === "function") {
-      b.setRailSelectedItem(kind, itemId);
-    }
-  }
-
-  function apiPost(url, body, extra) {
-    var b = bridge();
-    if (b && typeof b.apiPost === "function") {
-      return b.apiPost(url, body, extra);
-    }
-    return Promise.reject(new Error("NovaMemoryBridge.apiPost unavailable"));
-  }
-
-  function refreshState() {
-    var b = bridge();
-    if (b && typeof b.refreshState === "function") {
-      return b.refreshState();
-    }
-    return Promise.resolve();
-  }
-
-  function normalizeMemoryItem(item) {
-    var b = bridge();
-    if (b && typeof b.normalizeMemoryItem === "function") {
-      return b.normalizeMemoryItem(item);
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (err) {
+      data = null;
     }
 
-    var entry = safeObject(item);
-    return {
-      id: text(entry.id),
-      kind: text(entry.kind || "note"),
-      source: text(entry.source || ""),
-      text: text(entry.text || entry.content || entry.body || ""),
-      preview: text(entry.preview || entry.text || entry.content || entry.body || ""),
-      created_at: text(entry.created_at || ""),
-      updated_at: text(entry.updated_at || ""),
-    };
+    if (!res.ok) {
+      const message =
+        (data && (data.error || data.message)) ||
+        `HTTP ${res.status}`;
+      throw new Error(message);
+    }
+
+    return data || {};
   }
 
-  function currentMemoryItems() {
-    var state = safeObject(getState());
-    return safeArray(state.memory).map(normalizeMemoryItem);
+  function getMemoryItems(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload.memory)) return payload.memory;
+    if (payload.memory && Array.isArray(payload.memory.items)) return payload.memory.items;
+    if (payload.items && Array.isArray(payload.items)) return payload.items;
+    return [];
   }
 
-  function memoryViewerHtml(item) {
-    var entry = normalizeMemoryItem(item);
-    var kind = escapeHtml(entry.kind || "note");
-    var source = escapeHtml(entry.source || "unknown");
-    var createdAt = escapeHtml(formatTimeAgo(entry.updated_at || entry.created_at || ""));
-    var body = escapeHtml(entry.text || entry.preview || "");
-
-    return (
-      '<div class="nova-memory-viewer">' +
-        '<div class="nova-viewer-header">' +
-          '<div class="nova-viewer-kicker">Memory</div>' +
-          '<h3 class="nova-viewer-title">' + kind + "</h3>" +
-          '<div class="nova-viewer-meta">source=' + source + " · " + createdAt + "</div>" +
-        "</div>" +
-        '<div class="nova-viewer-body">' +
-          '<pre style="white-space:pre-wrap;word-break:break-word;margin:0;">' + body + "</pre>" +
-        "</div>" +
-      "</div>"
-    );
+  function getKinds(items) {
+    const kinds = new Set();
+    items.forEach(function (item) {
+      const kind = String(item.kind || "").trim();
+      if (kind) kinds.add(kind);
+    });
+    return ["all"].concat(Array.from(kinds).sort());
   }
 
-  function renderMemoryListItem(item) {
-    var entry = normalizeMemoryItem(item);
-
-    return (
-      '<article class="nova-memory-card" data-memory-id="' + escapeHtml(entry.id) + '">' +
-        '<button type="button" class="nova-memory-open" data-memory-open="' + escapeHtml(entry.id) + '">' +
-          '<div class="nova-memory-card-top">' +
-            '<span class="nova-memory-kind">' + escapeHtml(entry.kind || "note") + "</span>" +
-            '<span class="nova-memory-time">' + escapeHtml(formatTimeAgo(entry.updated_at || entry.created_at || "")) + "</span>" +
-          "</div>" +
-          '<div class="nova-memory-preview">' + escapeHtml(entry.preview || entry.text || "Untitled memory") + "</div>" +
-        "</button>" +
-        '<div class="nova-memory-actions">' +
-          '<button type="button" class="nova-memory-delete" data-memory-delete="' + escapeHtml(entry.id) + '">Delete</button>' +
-        "</div>" +
-      "</article>"
-    );
+  function syncEls() {
+    els.panel = q("[data-memory-panel]");
+    els.list = q("[data-memory-list]");
+    els.empty = q("[data-memory-empty]");
+    els.search = q("[data-memory-search]");
+    els.kind = q("[data-memory-kind]");
+    els.refresh = q("[data-memory-refresh]");
+    els.addBtn = q("[data-memory-add]");
+    els.addText = q("[data-memory-add-text]");
+    els.addKind = q("[data-memory-add-kind]");
+    els.addSource = q("[data-memory-add-source]");
+    els.status = q("[data-memory-status]");
+    els.count = q("[data-memory-count]");
   }
 
-  function renderMemory() {
-    var els = safeObject(getElements());
-    if (!els.memoryList) return;
+  function setStatus(text, type) {
+    if (!els.status) return;
+    els.status.textContent = text || "";
+    els.status.dataset.state = type || "idle";
+  }
 
-    var items = currentMemoryItems();
+  function buildKindOptions() {
+    if (!els.kind) return;
+    const current = state.kind || "all";
+    const kinds = getKinds(state.items);
+    els.kind.innerHTML = kinds
+      .map(function (kind) {
+        return `<option value="${escapeHtml(kind)}"${kind === current ? " selected" : ""}>${escapeHtml(kind)}</option>`;
+      })
+      .join("");
+  }
 
-    if (els.memoryEmpty) {
-      els.memoryEmpty.hidden = items.length > 0;
+  function applyFilters() {
+    const query = String(state.query || "").trim().toLowerCase();
+    const kind = String(state.kind || "all").trim().toLowerCase();
+
+    state.filtered = state.items.filter(function (item) {
+      const itemKind = String(item.kind || "").trim().toLowerCase();
+      const haystack = [
+        item.text,
+        item.kind,
+        item.source,
+        item.session_id,
+        item.preview,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const kindOk = kind === "all" ? true : itemKind === kind;
+      const queryOk = !query ? true : haystack.includes(query);
+
+      return kindOk && queryOk;
+    });
+
+    renderList();
+  }
+
+  function memoryCardHtml(item) {
+    const id = String(item.id || "");
+    const active = id && id === state.selectedId;
+    const kind = String(item.kind || "memory");
+    const text = String(item.text || "");
+    const source = String(item.source || "");
+    const sessionId = String(item.session_id || "");
+    const createdAt = formatDate(item.created_at);
+    const updatedAt = formatDate(item.updated_at);
+
+    return `
+      <article class="nova-memory-card${active ? " is-active" : ""}" data-memory-id="${escapeHtml(id)}">
+        <div class="nova-memory-card__top">
+          <div class="nova-memory-card__badges">
+            <span class="nova-memory-badge">${escapeHtml(kind)}</span>
+            ${source ? `<span class="nova-memory-badge is-soft">${escapeHtml(source)}</span>` : ""}
+          </div>
+          <div class="nova-memory-card__actions">
+            <button class="nova-memory-icon-btn" type="button" data-memory-copy="${escapeHtml(id)}" title="Copy">
+              Copy
+            </button>
+            <button class="nova-memory-icon-btn is-danger" type="button" data-memory-delete="${escapeHtml(id)}" title="Delete">
+              Delete
+            </button>
+          </div>
+        </div>
+
+        <div class="nova-memory-card__text">${escapeHtml(text || "(empty memory)")}</div>
+
+        <div class="nova-memory-card__meta">
+          ${sessionId ? `<div><strong>Session:</strong> ${escapeHtml(shortText(sessionId, 22))}</div>` : ""}
+          ${createdAt ? `<div><strong>Created:</strong> ${escapeHtml(createdAt)}</div>` : ""}
+          ${updatedAt ? `<div><strong>Updated:</strong> ${escapeHtml(updatedAt)}</div>` : ""}
+        </div>
+      </article>
+    `;
+  }
+
+  function renderList() {
+    if (!els.list || !els.empty) return;
+
+    const items = state.filtered || [];
+    if (els.count) {
+      els.count.textContent = `${items.length}`;
     }
 
     if (!items.length) {
-      els.memoryList.innerHTML = "";
+      els.list.innerHTML = "";
+      els.empty.hidden = false;
       return;
     }
 
-    els.memoryList.innerHTML = items.map(renderMemoryListItem).join("");
+    els.empty.hidden = true;
+    els.list.innerHTML = items.map(memoryCardHtml).join("");
   }
 
-  function openMemoryItem(memoryId) {
-    var els = safeObject(getElements());
-    var items = currentMemoryItems();
+  async function loadMemory() {
+    state.loading = true;
+    setStatus("Loading memory…", "loading");
 
-    var found = null;
-    for (var i = 0; i < items.length; i += 1) {
-      if (text(items[i].id) === text(memoryId)) {
-        found = items[i];
-        break;
-      }
+    try {
+      const payload = await api("/api/memory");
+      state.items = getMemoryItems(payload);
+      buildKindOptions();
+      applyFilters();
+      setStatus(`Loaded ${state.items.length} memories`, "ok");
+    } catch (err) {
+      console.error("[NovaMemory] load failed:", err);
+      state.items = [];
+      state.filtered = [];
+      renderList();
+      setStatus(`Memory load failed: ${err.message}`, "error");
+    } finally {
+      state.loading = false;
     }
+  }
 
-    if (!found) {
-      showToast("Memory not found", "error");
+  async function addMemory() {
+    const text = els.addText ? String(els.addText.value || "").trim() : "";
+    const kind = els.addKind ? String(els.addKind.value || "general").trim() : "general";
+    const source = els.addSource ? String(els.addSource.value || "manual").trim() : "manual";
+
+    if (!text) {
+      setStatus("Enter memory text first", "error");
+      if (els.addText) els.addText.focus();
       return;
     }
 
-    openRail();
-    setRailTab("memory");
-    setRailSelectedItem("memory", found.id);
+    setStatus("Saving memory…", "loading");
 
-    if (els.railViewer) {
-      els.railViewer.innerHTML = memoryViewerHtml(found);
-    }
-
-    highlightSelectedMemory(found.id);
-  }
-
-  function highlightSelectedMemory(memoryId) {
-    var els = safeObject(getElements());
-    if (!els.memoryList) return;
-
-    var nodes = els.memoryList.querySelectorAll("[data-memory-id]");
-    for (var i = 0; i < nodes.length; i += 1) {
-      var node = nodes[i];
-      var isActive = text(node.getAttribute("data-memory-id")) === text(memoryId);
-      node.classList.toggle("is-active", isActive);
-    }
-  }
-
-  function deleteMemory(memoryId) {
-    if (!memoryId) return;
-
-    apiPost("/api/memory/delete", { memory_id: memoryId })
-      .then(function () {
-        showToast("Memory deleted", "success");
-        return refreshState();
-      })
-      .then(function () {
-        renderMemory();
-      })
-      .catch(function (error) {
-        warn("memory delete failed", error);
-        showToast("Memory delete failed", "error");
+    try {
+      await api("/api/memory/add", {
+        method: "POST",
+        body: {
+          text,
+          kind,
+          source,
+        },
       });
+
+      if (els.addText) els.addText.value = "";
+      await loadMemory();
+      setStatus("Memory saved", "ok");
+    } catch (err) {
+      console.error("[NovaMemory] add failed:", err);
+      setStatus(`Memory save failed: ${err.message}`, "error");
+    }
   }
 
-  function bindMemoryClicks() {
-    var els = safeObject(getElements());
-    if (!els.memoryList || els.memoryList.dataset.boundMemorySplit === "1") {
+  async function deleteMemory(id) {
+    if (!id) return;
+    setStatus("Deleting memory…", "loading");
+
+    try {
+      await api("/api/memory/delete", {
+        method: "POST",
+        body: { id },
+      });
+
+      if (state.selectedId === id) state.selectedId = "";
+      await loadMemory();
+      setStatus("Memory deleted", "ok");
+    } catch (err) {
+      console.error("[NovaMemory] delete failed:", err);
+      setStatus(`Memory delete failed: ${err.message}`, "error");
+    }
+  }
+
+  async function copyMemory(id) {
+    const item = state.items.find(function (m) {
+      return String(m.id || "") === String(id || "");
+    });
+    if (!item) return;
+
+    try {
+      await navigator.clipboard.writeText(String(item.text || ""));
+      setStatus("Memory copied", "ok");
+    } catch (err) {
+      console.error("[NovaMemory] copy failed:", err);
+      setStatus("Copy failed", "error");
+    }
+  }
+
+  function wireEvents() {
+    if (els.search) {
+      els.search.addEventListener("input", function (e) {
+        state.query = e.target.value || "";
+        applyFilters();
+      });
+    }
+
+    if (els.kind) {
+      els.kind.addEventListener("change", function (e) {
+        state.kind = e.target.value || "all";
+        applyFilters();
+      });
+    }
+
+    if (els.refresh) {
+      els.refresh.addEventListener("click", function () {
+        loadMemory();
+      });
+    }
+
+    if (els.addBtn) {
+      els.addBtn.addEventListener("click", function () {
+        addMemory();
+      });
+    }
+
+    if (els.list) {
+      els.list.addEventListener("click", function (e) {
+        const deleteBtn = e.target.closest("[data-memory-delete]");
+        if (deleteBtn) {
+          deleteMemory(deleteBtn.getAttribute("data-memory-delete"));
+          return;
+        }
+
+        const copyBtn = e.target.closest("[data-memory-copy]");
+        if (copyBtn) {
+          copyMemory(copyBtn.getAttribute("data-memory-copy"));
+          return;
+        }
+
+        const card = e.target.closest("[data-memory-id]");
+        if (card) {
+          state.selectedId = card.getAttribute("data-memory-id") || "";
+          renderList();
+        }
+      });
+    }
+  }
+
+  async function boot() {
+    syncEls();
+    if (!els.panel) {
+      console.warn("[NovaMemory] panel not found");
       return;
     }
 
-    els.memoryList.dataset.boundMemorySplit = "1";
-
-    els.memoryList.addEventListener("click", function (event) {
-      var openBtn = event.target.closest("[data-memory-open]");
-      if (openBtn) {
-        var memoryId = text(openBtn.getAttribute("data-memory-open"));
-        if (memoryId) {
-          openMemoryItem(memoryId);
-        }
-        return;
-      }
-
-      var deleteBtn = event.target.closest("[data-memory-delete]");
-      if (deleteBtn) {
-        var deleteId = text(deleteBtn.getAttribute("data-memory-delete"));
-        if (deleteId) {
-          deleteMemory(deleteId);
-        }
-      }
-    });
+    wireEvents();
+    await loadMemory();
+    console.log("[NovaMemory] boot complete", { items: state.items.length });
   }
 
-  function boot() {
-    bindMemoryClicks();
-    renderMemory();
-  }
-
-  window.NovaMemoryModule = {
-    version: VERSION,
-    bind: bindMemoryClicks,
-    render: renderMemory,
-    open: openMemoryItem,
-    viewerHtml: memoryViewerHtml,
-    boot: boot,
-  };
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
-  } else {
-    boot();
-  }
+  document.addEventListener("DOMContentLoaded", boot);
 })();

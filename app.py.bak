@@ -100,6 +100,7 @@ def json_error(message: str, status: int = 400, **kwargs):
     payload.update(kwargs)
     return jsonify(payload), status
 
+
 def request_json() -> dict:
     data = request.get_json(silent=True)
     return data if isinstance(data, dict) else {}
@@ -108,7 +109,7 @@ def request_json() -> dict:
 def build_common_state_payload(session_id: str = "") -> dict:
     session = None
     if session_id:
-        session = session_service.get_session(session_id)
+        session = session_service.get_by_id(session_id)
     if not session:
         session = session_service.get_active()
 
@@ -201,6 +202,7 @@ def memory_exists_for_session(session_id: str, fact_text: str) -> bool:
 
     return False
 
+def maybe_write_router_memory(user_text: str, session_id: str, decision: dict) -> dict | None:
     if not decision.get("save_memory"):
         return None
 
@@ -241,6 +243,7 @@ def memory_exists_for_session(session_id: str, fact_text: str) -> bool:
         "item": item,
     }
 
+def is_identity_question(user_text: str) -> bool:
     text = str(user_text or "").strip()
     if not text:
         return False
@@ -329,6 +332,7 @@ def find_best_name_memory(session_id: str) -> dict | None:
     return candidates[0]
 
 
+def build_identity_recall_response(user_text: str, session_id: str, decision: dict, router_memory_result: dict | None):
     match = find_best_name_memory(session_id=session_id)
 
     payload = build_common_state_payload(session_id=session_id)
@@ -341,9 +345,19 @@ def find_best_name_memory(session_id: str) -> dict | None:
             {
                 "assistant_message": {
                     "role": "assistant",
+                    "text": f"Your name is {name}.",
                 },
                 "debug": {
                     "decision": decision,
+                    "route_taken": "identity_memory_recall",
+                    "router_memory": router_memory_result,
+                    "memory_used": True,
+                    "memory_items_used": 1,
+                    "memory_recall_type": "identity",
+                    "memory_recall_item_id": item.get("id"),
+                    "memory_recall_text": item.get("text"),
+                    "memory_recall_session_id": item.get("session_id"),
+                    "memory_recall_resolved_name": name,
                 },
             }
         )
@@ -357,12 +371,18 @@ def find_best_name_memory(session_id: str) -> dict | None:
             },
             "debug": {
                 "decision": decision,
+                "route_taken": "identity_memory_recall_miss",
+                "router_memory": router_memory_result,
+                "memory_used": False,
+                "memory_items_used": 0,
+                "memory_recall_type": "identity",
             },
         },
     )
     return json_ok(**payload)
 
 # ==============================
+# MEMORY DOMINANCE HELPERS
 # ==============================
 
 IDENTITY_QUESTION_PATTERNS = [
@@ -392,6 +412,7 @@ def _normalize_name(value: str) -> str:
     return value[:1].upper() + value[1:]
 
 
+def is_identity_question(text: str) -> bool:
     raw = str(text or "").strip()
     if not raw:
         return False
@@ -574,6 +595,7 @@ def api_state():
 # -----------------------
 # CHAT
 # -----------------------
+
 @app.post("/api/chat")
 def api_chat():
     data = request_json()
@@ -599,30 +621,35 @@ def api_chat():
         attachments=attachments,
     )
 
+    router_memory_result = None
     try:
-        # identity recall
-        if any(p.search(user_text) for p in IDENTITY_QUESTION_PATTERNS):
-            best = find_best_name_memory(session_id)
-            payload = build_common_state_payload(session_id=session_id)
+        router_memory_result = maybe_write_router_memory(
+            user_text=user_text,
+            session_id=session_id,
+            decision=decision,
+        )
+    except Exception as memory_exc:
+        app.logger.warning(f"router memory write failed: {memory_exc}")
+        router_memory_result = {
+            "status": "error",
+            "error": str(memory_exc),
+        }
 
-            if best:
-                payload["assistant_message"] = {
-                    "role": "assistant",
-                    "text": f"Your name is {best['name']}.",
-                }
-            else:
-                payload["assistant_message"] = {
-                    "role": "assistant",
-                    "text": "I don’t know your name yet.",
-                }
+    try:
+        # -----------------------
+        # FAST ROUTE: IDENTITY MEMORY RECALL
+        # -----------------------
+        if is_identity_question(user_text):
+            return build_identity_recall_response(
+                user_text=user_text,
+                session_id=session_id,
+                decision=decision,
+                router_memory_result=router_memory_result,
+            )
 
-            payload["debug"] = {
-                "decision": decision,
-                "route_taken": "identity",
-            }
-            return json_ok(**payload)
-
-        # web route
+        # -----------------------
+        # FAST ROUTE: WEB
+        # -----------------------
         if decision.get("route") == "web":
             url = str(decision.get("url") or "").strip()
             if not url:
@@ -630,7 +657,11 @@ def api_chat():
 
             result = web_service.fetch(url)
             if not result.get("ok"):
-                return json_error(result.get("error") or "Fetch failed", 500)
+                return json_error(
+                    result.get("error") or "Fetch failed",
+                    500,
+                    debug={"decision": decision, "web_result": result, "router_memory": router_memory_result},
+                )
 
             artifact_payload = web_service.build_artifact_payload(result)
 
@@ -648,20 +679,31 @@ def api_chat():
                     "debug": {
                         "decision": decision,
                         "route_taken": "web",
+                        "router_memory": router_memory_result,
                     },
                 }
             )
             return json_ok(**payload)
 
-        # recon route
+        # -----------------------
+        # FAST ROUTE: RECON
+        # -----------------------
         if decision.get("route") == "recon":
             url = str(decision.get("url") or "").strip()
             if not url:
-                return json_error("Recon route selected but no URL was found", 400)
+                return json_error(
+                    "Recon route selected but no URL was found",
+                    400,
+                    debug={"decision": decision, "router_memory": router_memory_result},
+                )
 
             result = recon_service.analyze_target(url)
             if not result.get("ok"):
-                return json_error(result.get("error") or "Recon failed", 500)
+                return json_error(
+                    result.get("error") or "Recon failed",
+                    500,
+                    debug={"decision": decision, "recon_result": result, "router_memory": router_memory_result},
+                )
 
             artifact_payload = recon_service.build_artifact_payload(result)
 
@@ -679,12 +721,95 @@ def api_chat():
                     "debug": {
                         "decision": decision,
                         "route_taken": "recon",
+                        "router_memory": router_memory_result,
                     },
                 }
             )
             return json_ok(**payload)
 
-        # default chat
+# ==============================
+# MEMORY RECALL FIX (PHASE 1)
+# ==============================
+
+if "what is my name" in user_text.lower():
+    memory = memory_service.all()
+
+    for item in reversed(memory):
+        text = str(item.get("text", "")).lower()
+
+        if "name" in text:
+            import re
+            match = re.search(r"(?:name is|name:)\s*(\w+)", text)
+            if match:
+                name = match.group(1).capitalize()
+
+                return jsonify({
+                    "ok": True,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": f"Your name is {name}."
+                    }
+                })
+
+# ==============================
+# MEMORY DOMINANCE RECALL (SAFE INSERT)
+# ==============================
+
+if is_identity_question(user_text):
+    best = find_best_name_memory(session_id=session_id)
+
+    if best:
+        return jsonify({
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": f"Your name is {best['name']}."
+            },
+            "debug": {
+                "decision": decision,
+                "route_taken": "identity_memory_recall",
+                "memory_used": True,
+                "memory_items_used": 1,
+                "memory_recall_name": best["name"],
+                "memory_recall_text": best["item"].get("text"),
+                "memory_recall_score": best["score"],
+                "router_memory": router_memory_result,
+            }
+        })
+
+    return jsonify({
+        "ok": True,
+        "assistant_message": {
+            "role": "assistant",
+            "text": "I don’t know your name yet."
+        },
+        "debug": {
+            "decision": decision,
+            "route_taken": "identity_memory_recall_miss",
+            "memory_used": False,
+            "memory_items_used": 0,
+            "router_memory": router_memory_result,
+        }
+    })
+
+    return jsonify({
+        "ok": True,
+        "assistant_message": {
+            "role": "assistant",
+            "text": "I don’t know your name yet. Tell me with “my name is ...” and I’ll remember it."
+        },
+        "debug": {
+            "decision": decision,
+            "route_taken": "identity_memory_recall_miss",
+            "memory_used": False,
+            "memory_items_used": 0,
+            "router_memory": router_memory_result,
+        }
+    })
+
+        # -----------------------
+        # DEFAULT ROUTE: CHAT SERVICE
+        # -----------------------
         result = chat_service.handle(
             user_text=user_text,
             session_id=session_id,
@@ -703,7 +828,7 @@ def api_chat():
 
         payload = {
             "assistant_message": result.get("assistant_message"),
-            "session": result.get("session") or session_service.get_session(session_id),
+            "session": result.get("session") or session_service.get_by_id(session_id),
             "sessions": result.get("sessions") or session_service.get_all(),
             "active_session_id": result.get("active_session_id") or session_service.active_session_id,
             "artifacts": result.get("artifacts") or artifact_service.build_list_payload(),
@@ -713,6 +838,7 @@ def api_chat():
                 **existing_debug,
                 "decision": decision,
                 "route_taken": "chat",
+                "router_memory": router_memory_result,
             },
         }
 
@@ -725,8 +851,10 @@ def api_chat():
             500,
             debug={
                 "decision": decision,
+                "router_memory": router_memory_result,
             },
         )
+
 
 # -----------------------
 # SESSIONS
@@ -743,7 +871,7 @@ def api_sessions():
 
 @app.get("/api/sessions/<session_id>")
 def api_session_by_id(session_id: str):
-    session = session_service.get_session(session_id)
+    session = session_service.get_by_id(session_id)
     if not session:
         return json_error("Session not found", 404)
 
@@ -800,7 +928,7 @@ def api_sessions_rename():
         return json_error("Session not found", 404)
 
     return json_ok(
-        session=session_session_service.get_session(session_id),
+        session=session_service.get_by_id(session_id),
         sessions=session_service.get_all(),
         active_session_id=session_service.active_session_id,
     )
@@ -1034,6 +1162,16 @@ def api_recon_analyze():
         artifact=recon_service.build_artifact_payload(result),
     )
 
+
+# -----------------------
+# UPLOADS
+# -----------------------
+
+@app.get("/api/uploads/<path:filename>")
+def api_uploads(filename: str):
+    return send_from_directory(str(UPLOADS_DIR), filename)
+
+
 @app.post("/api/upload")
 def api_upload():
     try:
@@ -1079,93 +1217,14 @@ def api_upload():
             "error": str(e),
         }), 500
 
-# -----------------------
-# UPLOADS
-# -----------------------
-@app.get("/api/uploads/<path:filename>")
-def api_uploads(filename: str):
-    try:
-        raw_name = str(filename or "").strip().lstrip("/\\")
-        full_path = (UPLOADS_DIR / raw_name).resolve()
-        uploads_root = UPLOADS_DIR.resolve()
 
-        try:
-            full_path.relative_to(uploads_root)
-        except ValueError:
-            app.logger.warning(f"UPLOAD BLOCKED OUTSIDE ROOT: {full_path}")
-            return jsonify({
-                "ok": False,
-                "error": "Invalid upload path",
-                "filename": raw_name,
-            }), 400
-
-        if not full_path.exists() or not full_path.is_file():
-            app.logger.warning(f"UPLOAD MISS: {full_path}")
-            return jsonify({
-                "ok": False,
-                "error": "File not found",
-                "filename": raw_name,
-                "full_path": str(full_path),
-                "uploads_dir": str(uploads_root),
-            }), 404
-
-        app.logger.info(f"UPLOAD HIT: {full_path}")
-        return send_from_directory(
-            directory=str(uploads_root),
-            path=raw_name,
-            as_attachment=False,
-        )
-
-    except TypeError:
-        # Older Flask / Werkzeug compatibility
-        try:
-            raw_name = str(filename or "").strip().lstrip("/\\")
-            full_path = (UPLOADS_DIR / raw_name).resolve()
-            uploads_root = UPLOADS_DIR.resolve()
-
-            try:
-                full_path.relative_to(uploads_root)
-            except ValueError:
-                app.logger.warning(f"UPLOAD BLOCKED OUTSIDE ROOT: {full_path}")
-                return jsonify({
-                    "ok": False,
-                    "error": "Invalid upload path",
-                    "filename": raw_name,
-                }), 400
-
-            if not full_path.exists() or not full_path.is_file():
-                app.logger.warning(f"UPLOAD MISS: {full_path}")
-                return jsonify({
-                    "ok": False,
-                    "error": "File not found",
-                    "filename": raw_name,
-                    "full_path": str(full_path),
-                    "uploads_dir": str(uploads_root),
-                }), 404
-
-            app.logger.info(f"UPLOAD HIT: {full_path}")
-            return send_from_directory(
-                str(uploads_root),
-                raw_name,
-                as_attachment=False,
-            )
-        except Exception as e:
-            app.logger.exception("api_uploads failed (compat path)")
-            return jsonify({
-                "ok": False,
-                "error": str(e),
-                "filename": str(filename or ""),
-            }), 500
-
-    except Exception as e:
-        app.logger.exception("api_uploads failed")
-        return jsonify({
-            "ok": False,
-            "error": str(e),
-            "filename": str(filename or ""),
-        }), 500
 # -----------------------
 # MAIN
 # -----------------------
+
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5001, debug=True)
+    app.run(
+        host="127.0.0.1",
+        port=5001,
+        debug=True,
+    )

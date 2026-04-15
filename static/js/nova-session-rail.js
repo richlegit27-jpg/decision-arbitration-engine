@@ -3,19 +3,13 @@
 
   const API = {
     list: "/api/sessions",
-
     create: "/api/sessions/new",
-
-    read(id) {
-      return `/api/sessions/${encodeURIComponent(id)}`;
+    read() {
+      return "/api/sessions";
     },
-
     switch: "/api/sessions/switch",
-
     rename: "/api/sessions/rename",
-
     pin: "/api/sessions/pin",
-
     remove: "/api/sessions/delete",
   };
 
@@ -154,12 +148,26 @@
     state.sessions = incomingSessions.map(normalizeSession).filter(Boolean);
 
     const backendSession = normalizeSession(payload?.session);
-    const preferredId =
+    const availableIds = new Set(
+      state.sessions.map(function (s) {
+        return s.id;
+      })
+    );
+
+    if (backendSession && backendSession.id) {
+      availableIds.add(backendSession.id);
+    }
+
+    let preferredId =
       explicitActiveSessionId ||
       backendSession?.id ||
       state.activeSessionId ||
       state.sessions[0]?.id ||
       "";
+
+    if (preferredId && !availableIds.has(preferredId)) {
+      preferredId = backendSession?.id || state.sessions[0]?.id || "";
+    }
 
     state.activeSessionId = preferredId;
 
@@ -197,41 +205,51 @@
     );
   }
 
-async function reloadFromBackend(preferredSessionId) {
-  state.loading = true;
-  setStatus("Loading...");
+  async function reloadFromBackend(preferredSessionId) {
+    state.loading = true;
+    setStatus("Loading...");
 
-  try {
-    let payload = null;
-    let resolvedPreferredId = preferredSessionId || "";
+    try {
+      let resolvedPreferredId = preferredSessionId || "";
+      let payload = null;
 
-    if (preferredSessionId) {
       try {
-        payload = await api(API.read(preferredSessionId));
+        payload = await api(API.read());
       } catch (err) {
-        if (err?.status === 404) {
-          try {
-            localStorage.removeItem("nova_active_session_id");
-          } catch (_) {}
+        try {
+          localStorage.removeItem("nova_active_session_id");
+        } catch (_) {}
 
+        if (state.activeSessionId === preferredSessionId) {
           state.activeSessionId = "";
-          resolvedPreferredId = "";
-          payload = await api(API.list);
-        } else {
-          throw err;
         }
+        throw err;
       }
-    } else {
-      payload = await api(API.list);
-    }
 
-    applyBackendState(payload, resolvedPreferredId);
-    setStatus("");
-    return payload;
-  } finally {
-    state.loading = false;
+      const sessionIds = Array.isArray(payload?.sessions)
+        ? payload.sessions.map(function (s) {
+            return String(s?.id || "");
+          })
+        : [];
+
+      if (
+        resolvedPreferredId &&
+        !sessionIds.includes(resolvedPreferredId) &&
+        String(payload?.session?.id || "") !== resolvedPreferredId
+      ) {
+        try {
+          localStorage.removeItem("nova_active_session_id");
+        } catch (_) {}
+        resolvedPreferredId = "";
+      }
+
+      applyBackendState(payload, resolvedPreferredId);
+      setStatus("");
+      return payload;
+    } finally {
+      state.loading = false;
+    }
   }
-}
 
   async function createSession() {
     setStatus("Creating...");

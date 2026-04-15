@@ -29,5 +29,19 @@
     "session_id": "session_f9d9f8eacd0d48209a95520b033f5c66",
     "created_at": "2026-04-12T08:00:48.430955+00:00",
     "updated_at": "2026-04-12T08:00:48.430955+00:00"
+  },
+  {
+    "id": "memory_20260414070252356220",
+    "text": "User name is Richard",
+    "kind": "profile",
+    "source": "router_auto",
+    "session_id": "session_45b59197a5a146998c7f297221930c25",
+    "weight": 1.0,
+    "tags": [],
+    "preview": "User name is Richard",
+    "quality_score": 1.5,
+    "normalized_text": "User name is Richard",
+    "created_at": "2026-04-14T07:02:52.356215+00:00",
+    "updated_at": "2026-04-14T07:02:52.356215+00:00"
   }
 ]

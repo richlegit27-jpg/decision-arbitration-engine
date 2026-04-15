@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import re
 import uuid
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
@@ -35,8 +36,15 @@ class ChatService:
         self.memory = memory_service
         self.artifacts = artifact_service
         self.web = web_service
-        self.recon = recon_service
+        self.recon = recon_service        
+        self.image_model = os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1")
+        self.image_size = os.getenv("NOVA_IMAGE_SIZE", "1024x1024")
 
+        self.uploads_dir = Path(
+            os.getenv("UPLOADS_DIR", r"C:\Users\Owner\nova\uploads")
+        )
+        self.uploads_dir.mkdir(parents=True, exist_ok=True)
+        print("CHATSERVICE INIT uploads_dir =", self.uploads_dir)
         self.client = OpenAI()
 
         self.agent = AgentService()
@@ -337,13 +345,26 @@ class ChatService:
             if not prompt:
                 prompt = "a detailed realistic image"
 
-            result = self._handle_image_generation(prompt)
+            result = self._handle_image_generation(
+                prompt,
+                session_id=session_id,
+                parent_artifact_id="",
+                source_type="generated",
+            )
 
             assistant_msg = new_message(
                 role="assistant",
                 text=result.get("text") or f"Generated image for: {prompt}",
                 attachments=[],
-                meta={},
+                meta={
+                    "image_generation": True,
+                    "image_url": result.get("image_url", ""),
+                    "prompt": result.get("prompt", ""),
+                    "revised_prompt": result.get("revised_prompt", ""),
+                    "parent_artifact_id": result.get("parent_artifact_id", ""),
+                    "source_type": result.get("source_type", "generated"),
+                    "generation_mode": result.get("generation_mode", "text_to_image"),
+                },
             )
 
             payload = {
@@ -353,7 +374,7 @@ class ChatService:
                     "id": session_id or "",
                     "messages": [user_msg, assistant_msg],
                 },
-                "saved_artifact": result,
+                "saved_artifact": result.get("saved_artifact"),
                 "debug": {
                     "route": "chat_service.handle",
                     "route_taken": "image_generation",
@@ -382,7 +403,7 @@ class ChatService:
                 "assistant_message": assistant_msg,
                 "session": {
                     "id": session_id or "",
-                    "messages": [user_msg, assistant_msg] if user_text else [assistant_msg],
+                    "messages": [assistant_msg],
                 },
                 "debug": {
                     "route": "chat_service.handle",
@@ -390,7 +411,6 @@ class ChatService:
                     "empty_input": True,
                 },
             }
-
         def extract_response_text(resp) -> str:
             try:
                 output_text = getattr(resp, "output_text", None)
@@ -507,44 +527,6 @@ class ChatService:
     # IMAGE HELPERS
     # ==============================
 
-    def _handle_image_generation(self, prompt: str) -> dict:
-        prompt = str(prompt or "").strip()
-        if not prompt:
-            prompt = "a detailed realistic image"
-
-        response = self.client.images.generate(
-            model="gpt-image-1",
-            prompt=prompt,
-            size="1024x1024",
-        )
-
-        image_b64 = None
-        data = getattr(response, "data", None) or []
-        if data and hasattr(data[0], "b64_json"):
-            image_b64 = data[0].b64_json
-        elif data and isinstance(data[0], dict):
-            image_b64 = data[0].get("b64_json")
-
-        if not image_b64:
-            raise ValueError("Image generation returned no image data.")
-
-        image_bytes = base64.b64decode(image_b64)
-
-        filename = f"generated_{uuid.uuid4().hex}.png"
-        output_path = Path(UPLOADS_DIR) / filename
-        output_path.write_bytes(image_bytes)
-
-        image_url = f"/api/uploads/{filename}"
-
-        return {
-            "kind": "image_generation",
-            "title": f"Generated image: {prompt[:80]}",
-            "text": f"Generated image for: {prompt}",
-            "image_url": image_url,
-            "url": image_url,
-            "prompt": prompt,
-        }
-
     def _is_image_generation_request(self, user_text: str) -> bool:
         text = str(user_text or "").strip().lower()
         if not text:
@@ -588,3 +570,149 @@ class ChatService:
                 return prompt or text
 
         return text or "Generate an image."
+    def _build_image_generation_meta(
+        self,
+        *,
+        prompt: str,
+        image_url: str,
+        revised_prompt: str = "",
+        parent_artifact_id: str = "",
+        source_type: str = "generated",
+        generation_mode: str = "text_to_image",
+        source_session_id: str = "",
+    ) -> dict:
+        return {
+            "prompt": str(prompt or "").strip(),
+            "revised_prompt": str(revised_prompt or "").strip(),
+            "image_url": str(image_url or "").strip(),
+            "source_type": str(source_type or "generated").strip(),
+            "parent_artifact_id": str(parent_artifact_id or "").strip(),
+            "generation_mode": str(generation_mode or "text_to_image").strip(),
+            "source_session_id": str(source_session_id or "").strip(),
+        }
+
+    def _build_image_generation_artifact(
+        self,
+        *,
+        session_id: str,
+        prompt: str,
+        image_url: str,
+        revised_prompt: str = "",
+        parent_artifact_id: str = "",
+        source_type: str = "generated",
+        generation_mode: str = "text_to_image",
+    ) -> dict:
+        meta = self._build_image_generation_meta(
+            prompt=prompt,
+            image_url=image_url,
+            revised_prompt=revised_prompt,
+            parent_artifact_id=parent_artifact_id,
+            source_type=source_type,
+            generation_mode=generation_mode,
+            source_session_id=session_id,
+        )
+
+        body_parts = []
+        if meta["prompt"]:
+            body_parts.append(f"Prompt: {meta['prompt']}")
+        if meta["revised_prompt"]:
+            body_parts.append(f"Revised prompt: {meta['revised_prompt']}")
+        if meta["parent_artifact_id"]:
+            body_parts.append(f"Parent artifact: {meta['parent_artifact_id']}")
+
+        body = "\n".join(body_parts).strip()
+
+        return {
+            "kind": "image_generation",
+            "title": "Generated image",
+            "summary": meta["prompt"] or "Generated image",
+            "preview": meta["prompt"] or "Generated image",
+            "session_id": session_id,
+            "source": "image_generation",
+            "meta": meta,
+            "viewer": {
+                "kind": "image_generation",
+                "title": "Generated image",
+                "body": body,
+                "image_url": meta["image_url"],
+            },
+        }
+
+    def _save_artifact_fallback(self, artifact: dict):
+        if not isinstance(artifact, dict) or not artifact:
+            return None
+
+        for method_name in (
+            "upsert_artifact",
+            "create_artifact",
+            "create",
+            "save",
+            "add_artifact",
+        ):
+            method = getattr(self.artifacts, method_name, None)
+            if callable(method):
+                try:
+                    return method(artifact)
+                except TypeError:
+                    continue
+
+        raise AttributeError("No supported artifact save method found on artifact service")
+
+    def _handle_image_generation(
+        self,
+        prompt: str,
+        *,
+        session_id: str = "",
+        parent_artifact_id: str = "",
+        source_type: str = "generated",
+    ) -> dict:
+        try:
+            result = self.client.images.generate(
+                model=self.image_model,
+                prompt=prompt,
+                size=self.image_size,
+            )
+
+            image_b64 = result.data[0].b64_json
+            image_bytes = base64.b64decode(image_b64)
+
+            filename = f"generated_{uuid.uuid4().hex[:12]}.png"
+            filepath = self.uploads_dir / filename
+
+            with open(filepath, "wb") as f:
+                f.write(image_bytes)
+
+            image_url = f"/api/uploads/{filename}"
+
+            saved_artifact = None
+            try:
+                saved_artifact = self._persist_image_generation_artifact(
+                    session_id=session_id,
+                    prompt=prompt,
+                    image_url=image_url,
+                    revised_prompt="",
+                    parent_artifact_id=parent_artifact_id,
+                    source_type=source_type,
+                    generation_mode="text_to_image",
+                )
+            except Exception as e:
+                print("Artifact save failed:", e)
+
+            return {
+                "ok": True,
+                "image_url": image_url,
+                "prompt": prompt,
+                "revised_prompt": "",
+                "parent_artifact_id": parent_artifact_id,
+                "source_type": source_type,
+                "generation_mode": "text_to_image",
+                "saved_artifact": saved_artifact,
+                "text": f"Generated image for: {prompt}",
+            }
+
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": str(e),
+                "text": f"Image generation failed: {e}",
+            }

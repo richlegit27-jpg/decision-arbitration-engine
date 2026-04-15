@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nova</title>
-    <link rel="stylesheet" href="/static/css/nova-main.css?v=premium-ui-polish-lock-2026-04-08-001">
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=premium-ui-polish-lock-2026-04-08-001">
+  <link rel="stylesheet" href="/static/css/nova-memory.css?v=memory-panel-2026-04-13-001">
 </head>
 <body>
   <div class="nova-app-shell" data-app-shell>
@@ -61,6 +62,8 @@
           <div class="nova-model-chip">gpt-5.4</div>
         </div>
       </header>
+
+      <div id="execution-panel" class="execution-panel" hidden></div>
 
       <section class="nova-chat-thread" data-chat-thread>
         <div class="nova-empty-state" data-chat-empty hidden>
@@ -207,14 +210,36 @@
       </div>
 
       <div class="nova-rail-panel" data-rail-panel="memory" hidden>
-        <div class="nova-rail-empty" data-memory-empty>
-          <div class="nova-rail-empty-title">No memory yet</div>
-          <div class="nova-rail-empty-copy">
-            Saved preferences and notes will show here.
+        <section data-memory-panel>
+          <div class="nova-memory-toolbar">
+            <input type="text" placeholder="Search memory..." data-memory-search>
+            <select data-memory-kind>
+              <option value="all">all</option>
+            </select>
+            <button type="button" data-memory-refresh>Refresh</button>
           </div>
-        </div>
 
-        <div id="memoryMount"></div>
+          <div class="nova-memory-status-row">
+            <div class="nova-memory-status" data-memory-status></div>
+            <div>Count: <span data-memory-count>0</span></div>
+          </div>
+
+          <div class="nova-memory-add">
+            <input type="text" placeholder="Add memory manually..." data-memory-add-text>
+            <select data-memory-add-kind>
+              <option value="general">general</option>
+              <option value="profile">profile</option>
+              <option value="preference">preference</option>
+              <option value="project">project</option>
+              <option value="workflow">workflow</option>
+            </select>
+            <input type="text" placeholder="source" value="manual" data-memory-add-source>
+            <button type="button" data-memory-add>Add</button>
+          </div>
+
+          <div class="nova-memory-empty" data-memory-empty hidden>No memory saved yet.</div>
+          <div class="nova-memory-list" data-memory-list></div>
+        </section>
       </div>
 
       <div class="nova-rail-panel" data-rail-panel="web" hidden>
@@ -252,9 +277,9 @@
     >☰</button>
   </div>
 
-<script src="/static/js/nova-composer-bundle.js?v=stream-memory-lock-2026-04-13-001"></script>
-<script src="/static/js/nova-memory.js?v=memory-split-2026-04-12-001"></script>
-<script src="/static/js/nova-artifacts.js?v=artifact-split-2026-04-12-001"></script>
-<script src="/static/js/nova-session-rail.js?v=session-split-2026-04-12-001"></script>
+  <script src="/static/js/nova-composer-bundle.js?v=stream-memory-lock-2026-04-13-002"></script>
+  <script src="/static/js/nova-artifacts.js?v=artifact-split-2026-04-12-001"></script>
+  <script src="/static/js/nova-session-rail.js?v=session-split-2026-04-12-001"></script>
+  <script src="/static/js/nova-memory.js?v=memory-panel-2026-04-13-001"></script>
 </body>
 </html>

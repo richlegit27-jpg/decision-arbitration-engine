@@ -1,5 +1,59 @@
 [
   {
+    "id": "artifact_d8a475076fad4cdcb11b28b3be5bf602",
+    "kind": "execution_run",
+    "title": "Execution: make me a plan for learning python",
+    "body": "Here’s a simple, practical plan for learning Python from beginner to confident beginner/intermediate.\n\n## 1. Set a clear goal\nPick one reason you want to learn Python:\n- Automation\n- Web development\n-",
+    "preview": "Here’s a simple, practical plan for learning Python from beginner to confident builder.\n\n## Goal\nLearn enough Python to:\n1. understand core syntax,\n2. solve small problems,\n3. buil…",
+    "session_id": "session_86b4923893d5430fa54ac4170fc69d0b",
+    "source": "execution",
+    "meta": {
+      "execution": {
+        "id": "exec_78b6815533e4",
+        "mode": "plan_run",
+        "goal": "make me a plan for learning python",
+        "status": "completed",
+        "current_step": "",
+        "summary": "Here’s a simple, practical plan for learning Python from beginner to confident beginner/intermediate.\n\n## 1. Set a clear goal\nPick one reason you want to learn Python:\n- Automation\n- Web development\n-",
+        "steps": [
+          {
+            "id": "s1",
+            "title": "Define the goal",
+            "status": "completed",
+            "notes": ""
+          },
+          {
+            "id": "s2",
+            "title": "Break into steps",
+            "status": "completed",
+            "notes": ""
+          },
+          {
+            "id": "s3",
+            "title": "Return recommendation",
+            "status": "completed",
+            "notes": ""
+          }
+        ],
+        "started_at": "2026-04-14T02:50:30.809577+00:00",
+        "updated_at": "2026-04-14T02:50:30.809600+00:00"
+      }
+    },
+    "created_at": "2026-04-14T02:50:07.342952+00:00",
+    "updated_at": "2026-04-14T02:50:30.810797+00:00",
+    "viewer": {
+      "kind": "execution_run",
+      "title": "Execution: make me a plan for learning python",
+      "body": "Here’s a simple, practical plan for learning Python from beginner to confident builder.\n\n## Goal\nLearn enough Python to:\n1. understand core syntax,\n2. solve small problems,\n3. build projects,\n4. read",
+      "source_url": "",
+      "image_url": "",
+      "video_url": "",
+      "audio_url": "",
+      "analysis_text": "",
+      "bullets": []
+    }
+  },
+  {
     "id": "artifact_0269ee359b6146219da3fbc89ad29f72",
     "kind": "execution_run",
     "title": "Execution: build me a plan for nova hosting and recommend the best route",

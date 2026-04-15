@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 from nova_backend.services.memory_hygiene_service import MemoryHygieneService
 from nova_backend.services.memory_cleanup_service import MemoryCleanupService
 from nova_backend.services.memory_promotion_service import MemoryPromotionService
+from nova_backend.utils.safe_file_store import atomic_write_json
 
 
 PREFERENCE_PATTERNS = [
@@ -76,16 +77,22 @@ class MemoryService:
         try:
             if not self.memory_file.exists():
                 return []
-            data = json.loads(self.memory_file.read_text(encoding="utf-8"))
+
+            raw = self.memory_file.read_text(encoding="utf-8").strip()
+            if not raw:
+                return []
+
+            data = json.loads(raw)
+
+            if isinstance(data, dict):
+                data = data.get("memory", [])
+
             return data if isinstance(data, list) else []
         except Exception:
             return []
 
     def _write(self, items: List[dict]) -> None:
-        self.memory_file.write_text(
-            json.dumps(items, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        atomic_write_json(self.memory_file, items)
 
     def _write_all(self, items: List[dict]) -> None:
         self._write(items)
@@ -95,7 +102,9 @@ class MemoryService:
 
     def all(self) -> List[dict]:
         items = self._read()
-        return [self._normalize_item(item) for item in items]
+        normalized = [self._normalize_item(item) for item in items]
+        normalized.sort(key=lambda x: _safe_text(x.get("updated_at")), reverse=True)
+        return normalized
 
     def build_list_payload(self) -> List[dict]:
         return self.all()
@@ -156,6 +165,24 @@ class MemoryService:
         self._write(items)
         return self._normalize_item(item)
 
+    def add_memory(
+        self,
+        text: str,
+        kind: str = "note",
+        source: str = "assistant",
+        session_id: str | None = None,
+        weight: float = 1.0,
+        tags: Optional[List[str]] = None,
+    ) -> Optional[dict]:
+        return self.add(
+            text=text,
+            kind=kind,
+            source=source,
+            session_id=session_id,
+            weight=weight,
+            tags=tags,
+        )
+
     def delete(self, memory_id: str) -> bool:
         memory_id = _safe_text(memory_id)
         if not memory_id:
@@ -169,6 +196,9 @@ class MemoryService:
 
         self._write(kept)
         return True
+
+    def delete_memory(self, memory_id: str) -> bool:
+        return self.delete(memory_id)
 
     # -----------------------
     # CLEANUP + PROMOTION
