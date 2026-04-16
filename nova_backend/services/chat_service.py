@@ -634,6 +634,33 @@ class ChatService:
             "memory_count": len(memory_items),
         }
 
+    def _build_memory_recall_text(self, match: dict, user_text: str = "") -> str:
+        item = match.get("item") or {}
+        score = float(match.get("score") or 0.0)
+
+        if not isinstance(item, dict) or not item:
+            return "I do not have a strong memory match for that yet."
+
+        text = str(item.get("text") or "").strip()
+        kind = str(item.get("kind") or "").strip()
+        source = str(item.get("source") or "").strip()
+
+        if not text:
+            return "I found a memory entry, but it does not contain usable text yet."
+
+        prefix = "Here’s what I remember"
+        if user_text:
+            prefix = "Here’s what I remember about that"
+
+        details = []
+        if kind:
+            details.append(f"kind={kind}")
+        if source:
+            details.append(f"source={source}")
+        details.append(f"score={score:.2f}")
+
+        return f"{prefix}: {text}\n\n[{', '.join(details)}]"
+
     def _extract_name_from_memory_text(self, text: str) -> str:
         text = self._safe_str(text).strip()
         if not text:
@@ -2054,52 +2081,79 @@ class ChatService:
 
     def _execute_memory_recall(
         self,
-        decision: dict,
         user_text: str,
-        session_id: str,
+        session_id: str = "",
         attachments=None,
+        decision: dict | None = None,
+        **kwargs,
     ) -> dict:
-        attachments = attachments or []
-        user_msg = self._build_user_message(user_text, attachments=attachments)
+        from datetime import datetime, timezone
+        import uuid
 
         match = self._find_best_memory_match(user_text)
-        best_item = match.get("item") or {}
-        best_score = float(match.get("score") or 0.0)
-        memory_count = int(match.get("memory_count") or 0)
 
-        if best_score <= 0.0:
-            recall_text = "I do not have any relevant saved memory for that yet."
-        else:
-            recall_text = self._build_memory_recall_text(user_text, best_item)
+        if not isinstance(match, dict):
+            match = {
+                "item": {},
+                "score": 0.0,
+                "memory_count": 0,
+            }
 
-        assistant_msg = self._build_assistant_message(
-            text=recall_text,
-            meta={
-                "memory_recall": True,
-                "memory_match_score": best_score,
-                "memory_match_kind": self._safe_str(best_item.get("kind")),
-                "memory_match_text": self._safe_str(best_item.get("text")),
+        item = match.get("item") or {}
+        if not isinstance(item, dict):
+            item = {}
+
+        recall_text = self._build_memory_recall_text(
+            {
+                "item": item,
+                "score": float(match.get("score") or 0.0),
+                "memory_count": int(match.get("memory_count") or 0),
             },
-            attachments=[],
-        )
-
-        response = self._finalize_response(
-            session_id=session_id,
             user_text=user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision=decision,
-            saved_artifact=None,
         )
 
-        response.setdefault("debug", {})
-        response["debug"]["memory_recall"] = {
-            "score": best_score,
-            "matched_kind": self._safe_str(best_item.get("kind")),
-            "matched_text": self._safe_str(best_item.get("text")),
-            "memory_count": memory_count,
+        now_iso = datetime.now(timezone.utc).isoformat()
+        message_id = f"msg_{uuid.uuid4().hex}"
+
+        assistant_message = {
+            "id": message_id,
+            "role": "assistant",
+            "text": recall_text,
+            "created_at": now_iso,
+            "updated_at": now_iso,
+            "attachments": [],
+            "artifacts": [],
+            "meta": {
+                "memory_recall": True,
+                "memory_count": int(match.get("memory_count") or 0),
+                "matched_kind": str(item.get("kind") or ""),
+                "matched_source": str(item.get("source") or ""),
+                "match_score": float(match.get("score") or 0.0),
+            },
+            "pending": False,
+            "streaming": False,
+            "error": False,
         }
-        return response
+
+        debug = {
+            "handler": "_execute_memory_recall",
+            "memory_recall": {
+                "matched_kind": str(item.get("kind") or ""),
+                "matched_source": str(item.get("source") or ""),
+                "match_score": float(match.get("score") or 0.0),
+                "memory_count": int(match.get("memory_count") or 0),
+            },
+        }
+
+        if isinstance(decision, dict):
+            debug["decision"] = decision
+
+        return {
+            "ok": True,
+            "assistant_message": assistant_message,
+            "session_id": session_id or "",
+            "debug": debug,
+        }
 
     def _execute_planning(
         self,
