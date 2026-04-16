@@ -705,6 +705,74 @@
       "id": "artifact_c54f8766be0a40998a621734c10c6224",
       "updated_at": "2026-04-15T17:35:49.471318+00:00",
       "created_at": "2026-04-15T17:35:49.471318+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "body": "Generated image for: \"blue car\"",
+      "summary": "Generated image for: \"blue car\"",
+      "preview": "Generated image for: \"blue car\"",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "image_url": "/api/uploads/generated_d5976d42b4dc4448b744578fab65fe63.png",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "blue car",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_d5976d42b4dc4448b744578fab65fe63.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Generated image for: \"blue car\"",
+        "summary": "Generated image for: \"blue car\"",
+        "image_url": "/api/uploads/generated_d5976d42b4dc4448b744578fab65fe63.png",
+        "analysis_text": "This image was generated from the prompt: blue car",
+        "bullets": [
+          "Prompt: blue car"
+        ],
+        "source_url": ""
+      },
+      "id": "artifact_3f15334e71fd4b00933137b583f48a7d",
+      "updated_at": "2026-04-15T17:42:48.759088+00:00",
+      "created_at": "2026-04-15T17:42:48.759088+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "title": "Generated image",
+      "body": "Generated image for: \"green car\"",
+      "summary": "Generated image for: \"green car\"",
+      "preview": "Generated image for: \"green car\"",
+      "session_id": "session_45b59197a5a146998c7f297221930c25",
+      "image_url": "/api/uploads/generated_89ae0a4995a34fd9bb417c3b76efd42f.png",
+      "source": "image_generation",
+      "meta": {
+        "prompt": "green car",
+        "revised_prompt": "",
+        "image_url": "/api/uploads/generated_89ae0a4995a34fd9bb417c3b76efd42f.png",
+        "source_type": "generated",
+        "parent_artifact_id": "",
+        "generation_mode": "text_to_image",
+        "source_session_id": "session_45b59197a5a146998c7f297221930c25"
+      },
+      "viewer": {
+        "kind": "image_generation",
+        "title": "Generated image",
+        "body": "Generated image for: \"green car\"",
+        "summary": "Generated image for: \"green car\"",
+        "image_url": "/api/uploads/generated_89ae0a4995a34fd9bb417c3b76efd42f.png",
+        "analysis_text": "This image was generated from the prompt: green car",
+        "bullets": [
+          "Prompt: green car"
+        ],
+        "source_url": ""
+      },
+      "id": "artifact_13be0f55ac344f19b39042959a1f3bfe",
+      "updated_at": "2026-04-15T17:45:39.324459+00:00",
+      "created_at": "2026-04-15T17:45:39.324459+00:00"
     }
   ]
 }

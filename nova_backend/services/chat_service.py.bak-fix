@@ -599,40 +599,100 @@ class ChatService:
 
         return score
 
-    def _find_best_memory_match(self, user_text: str) -> dict:
-        try:
-            raw_memory = self.memory.all()
-        except Exception:
-            raw_memory = []
+def _find_best_memory_match(self, user_text: str) -> dict:
+    try:
+        raw_memory = self.memory.get_all_memory()
+    except Exception:
+        raw_memory = []
 
-        memory_items = []
+    memory_items = []
 
-        if isinstance(raw_memory, list):
-            memory_items = raw_memory
-        elif isinstance(raw_memory, dict):
+    if isinstance(raw_memory, list):
+        memory_items = raw_memory
+
+    elif isinstance(raw_memory, dict):
+        if isinstance(raw_memory.get("memory"), list):
+            memory_items = raw_memory.get("memory") or []
+
+        elif isinstance(raw_memory.get("data"), dict):
             data = raw_memory.get("data") or {}
-            if isinstance(data, dict) and isinstance(data.get("memory"), list):
+            if isinstance(data.get("memory"), list):
                 memory_items = data.get("memory") or []
-            elif isinstance(raw_memory.get("memory"), list):
-                memory_items = raw_memory.get("memory") or []
+
+    # fallback (critical)
+    if not memory_items and isinstance(raw_memory, dict):
+        for v in raw_memory.values():
+            if isinstance(v, list):
+                memory_items = v
+                break
+
+    best_item = {}
+    best_score = 0.0
+
+    for item in memory_items:
+        score = self._score_memory_match(user_text, item)
+        if score > best_score:
+            best_score = score
+            best_item = item
+
+    return {
+        "item": best_item,
+        "score": best_score,
+        "memory_count": len(memory_items),
+    }
+
+if isinstance(raw_memory, list):
+    memory_items = raw_memory
+
+elif isinstance(raw_memory, dict):
+    # try common patterns safely
+    if isinstance(raw_memory.get("memory"), list):
+        memory_items = raw_memory.get("memory") or []
+
+    elif isinstance(raw_memory.get("data"), dict):
+        data = raw_memory.get("data") or {}
+        if isinstance(data.get("memory"), list):
+            memory_items = data.get("memory") or []
+
+# FINAL fallback (critical)
+if not memory_items and isinstance(raw_memory, dict):
+    # flatten any list we can find
+    for v in raw_memory.values():
+        if isinstance(v, list):
+            memory_items = v
+            break
 
         best_item = {}
         best_score = 0.0
+        query = self._safe_str(user_text).strip().lower()
 
         for item in memory_items:
             if not isinstance(item, dict):
                 continue
 
+            memory_text = self._safe_str(item.get("text")).strip()
+            if not memory_text:
+                continue
+
             score = self._score_memory_match(user_text, item)
+
+            # broad recall fallback: if user asks a broad recall question,
+            # choose the first real memory item even with no lexical overlap
+            if score <= 0.0 and (
+                "what do you remember about me" in query
+                or "what do you know about me" in query
+            ):
+                score = 1.0
+
             if score > best_score:
                 best_score = score
                 best_item = item
 
-        return {
-            "item": best_item,
-            "score": best_score,
-            "memory_count": len(memory_items),
-        }
+    return {
+        "item": best_item,
+        "score": best_score,
+        "memory_count": len(memory_items),
+    }
 
     def _extract_name_from_memory_text(self, text: str) -> str:
         text = self._safe_str(text).strip()
@@ -2548,5 +2608,4 @@ class ChatService:
             session_id=session_id,
             attachments=attachments,
         )
-
 
