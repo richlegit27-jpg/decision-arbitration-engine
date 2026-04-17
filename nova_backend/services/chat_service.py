@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import base64   
 import os
@@ -669,7 +669,7 @@ class ChatService:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "Iâ€™m here, but the model returned an empty response."
+        return "I’m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -1322,7 +1322,7 @@ class ChatService:
         next_move = self._safe_str(state.get("next_move"))
         checkpoint = self._safe_str(state.get("checkpoint"))
 
-        lines = ["Current status I’m tracking:"]
+        lines = ["Current status I�m tracking:"]
 
         if active_task:
             lines.append(f"- Active task: {active_task}")
@@ -1346,10 +1346,6 @@ class ChatService:
         if not value:
             return False
         return True
-
-    # =========================
-    # WORKING STATE HELPERS
-    # =========================
 
     # =========================
     # WORKING STATE HELPERS
@@ -2459,7 +2455,7 @@ class ChatService:
                 else:
                     lines.append(f"- {text}")
 
-            assistant_text = "Hereâ€™s what I remember that seems relevant right now:\n" + "\n".join(lines)
+            assistant_text = "Here’s what I remember that seems relevant right now:\n" + "\n".join(lines)
         else:
             assistant_text = "I do not have any relevant saved memory for that yet."
 
@@ -2580,10 +2576,10 @@ class ChatService:
         working_state=None,
         working_context_block="",
     ) -> dict:
+        attachments = attachments or []
+        user_msg = self._build_user_message(user_text, attachments=attachments)
 
-        user_msg = self._build_user_message(user_text, attachments=attachments or [])
-
-        lowered = self._safe_str(user_text).lower()
+        lowered = self._safe_str(user_text).lower().strip()
 
         continuity_triggers = {
             "where are we",
@@ -2607,6 +2603,12 @@ class ChatService:
                 decision=decision,
                 session_id=session_id,
             )
+
+            if working_context_block:
+                chat_input = (
+                    f"{working_context_block}\n\n"
+                    f"{self._safe_str(chat_input)}"
+                ).strip()
 
             assistant_text = ""
 
@@ -2632,6 +2634,39 @@ class ChatService:
 
             except Exception as e:
                 assistant_text = f"Chat failed: {e}"
+
+            if not assistant_text or not assistant_text.strip():
+                assistant_text = "No response generated."
+
+        updates = self._extract_working_state_updates(
+            user_text=user_text,
+            current_state=self._get_working_state(session_id),
+        )
+
+        print("WORKING_STATE_UPDATES =", updates)
+
+        if updates:
+            self._update_working_state(session_id, updates)
+
+        assistant_meta = {}
+        if working_state:
+            assistant_meta["working_state"] = working_state
+        if working_context_block:
+            assistant_meta["working_context_block"] = working_context_block
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            meta=assistant_meta,
+            attachments=[],
+        )
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=None,
+        )
 
             if not assistant_text or not assistant_text.strip():
                 assistant_text = "?? No response generated."
