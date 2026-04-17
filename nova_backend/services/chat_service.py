@@ -545,6 +545,295 @@ class ChatService:
             "collapsed": False,
         }
 
+    def _score_memory_for_text(self, memory_item, user_text: str) -> float:
+        user_text = self._safe_str(user_text).strip().lower()
+        if not user_text:
+            return 0.0
+
+        if isinstance(memory_item, dict):
+            text = self._safe_str(memory_item.get("text"))
+            kind = self._safe_str(memory_item.get("kind"))
+        else:
+            text = self._safe_str(memory_item)
+            kind = ""
+
+        haystack = f"{kind} {text}".strip().lower()
+        if not haystack:
+            return 0.0
+
+        score = 0.0
+
+        user_words = [w for w in re.findall(r"[a-zA-Z0-9_:\\.-]+", user_text) if len(w) > 2]
+        if not user_words:
+            return 0.0
+
+        for word in user_words:
+            if word in haystack:
+                score += 1.0
+
+        if user_text in haystack:
+            score += 4.0
+
+        if kind and kind.lower() in user_text:
+            score += 2.0
+
+        return score
+
+
+    def _select_relevant_memory(self, user_text: str, limit: int = 3):
+        all_memory = self._safe_list(self._load_memory())
+        if not all_memory:
+            return []
+
+        ranked = []
+        for item in all_memory:
+            score = self._score_memory_for_text(item, user_text)
+            if score > 0:
+                ranked.append((score, item))
+
+        ranked.sort(key=lambda x: x[0], reverse=True)
+        return [item for _, item in ranked[:limit]]
+
+
+    def _format_memory_context(self, memory_items) -> str:
+        memory_items = memory_items or []
+        lines = []
+
+        for item in memory_items:
+            if isinstance(item, dict):
+                kind = self._safe_str(item.get("kind")).strip()
+                text = self._safe_str(item.get("text")).strip()
+            else:
+                kind = ""
+                text = self._safe_str(item).strip()
+
+            if not text:
+                continue
+
+            if kind:
+                lines.append(f"- [{kind}] {text}")
+            else:
+                lines.append(f"- {text}")
+
+        return "\n".join(lines).strip()
+
+    def _build_memory_context_for_chat(self, user_text: str, decision=None) -> str:
+        decision = decision or {}
+        use_memory = bool(decision.get("use_memory", True))
+        memory_limit = int(decision.get("memory_limit", 3) or 3)
+
+        if not use_memory:
+            return ""
+
+        # Step 1: try relevant memory
+        relevant_items = self._select_relevant_memory(user_text, limit=memory_limit)
+
+        # Step 2: fallback → recent memory
+        if not relevant_items:
+            try:
+                if hasattr(self, "memory") and self.memory:
+                    if hasattr(self.memory, "all"):
+                        all_items = self.memory.all() or []
+                        relevant_items = all_items[:memory_limit]
+            except Exception:
+                relevant_items = []
+
+        if not relevant_items:
+            return ""
+
+        return self._format_memory_context(relevant_items)
+
+    def _build_memory_recall_text(self, session_id: str = "", user_text: str = "", limit: int = 5) -> str:
+        items = []
+
+        try:
+            if hasattr(self, "memory") and self.memory and hasattr(self.memory, "all"):
+                items = self.memory.all() or []
+        except Exception:
+            items = []
+
+        if not items:
+            return "I do not have any saved memory yet."
+
+        ranked = []
+        for item in items:
+            score = self._score_memory_for_text(item, user_text)
+            ranked.append((score, item))
+
+        ranked.sort(key=lambda x: x[0], reverse=True)
+        best = [item for score, item in ranked if score > 0][:limit]
+
+        chosen = best if best else items[:limit]
+
+        lines = []
+        for item in chosen:
+            if not isinstance(item, dict):
+                text = self._safe_str(item).strip()
+                if not text:
+                    continue
+
+                bad_patterns = [
+                    "wouldn't you want to",
+                    "get laid",
+                    "say hi",
+                    "hello",
+                    "hi",
+                    "thanks",
+                    "thank you",
+                    "lol",
+                    "lmao",
+                    "bro",
+                    "nigga",
+                ]
+                if any(p in text.lower() for p in bad_patterns):
+                    continue
+
+                lines.append(f"- {text}")
+                continue
+
+            text = self._safe_str(item.get("text")).strip()
+            kind = self._safe_str(item.get("kind")).strip()
+            item_session_id = self._safe_str(item.get("session_id")).strip()
+
+            if not text:
+                continue
+
+            bad_patterns = [
+                "wouldn't you want to",
+                "get laid",
+                "say hi",
+                "hello",
+                "hi",
+                "thanks",
+                "thank you",
+                "lol",
+                "lmao",
+                "bro",
+                "nigga",
+            ]
+
+            if any(p in text.lower() for p in bad_patterns):
+                continue
+
+            prefix = "- "
+            if kind:
+                prefix = f"- [{kind}] "
+
+            if session_id and item_session_id and item_session_id == session_id:
+                prefix = prefix.rstrip() + " [this session] "
+
+            lines.append(f"{prefix}{text}")
+
+        if not lines:
+            return "I do not have any saved memory yet."
+
+        return "Here’s what I remember:\n" + "\n".join(lines)
+
+    def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
+        if not isinstance(decision, dict):
+            return
+        if not decision.get("save_memory"):
+            return
+
+        text = self._normalize_memory_text_for_save(user_text)
+        lowered = text.lower()
+
+        should_save = False
+        kind = "note"
+
+        # profile / identity
+        if any(x in lowered for x in ["my name is", "i am ", "i'm ", "call me"]):
+            should_save = True
+            kind = "profile"
+
+        # preferences
+        elif any(
+            x in lowered
+            for x in [
+                "my favorite",
+                "my favourite",
+                "favorite color is",
+                "favourite color is",
+                "i prefer",
+                "i like",
+                "i love",
+                "i enjoy",
+                "i usually",
+                "i always",
+                "from now on",
+                "going forward",
+            ]
+        ):
+            should_save = True
+            kind = "preference"
+
+        # project / work
+        elif any(
+            x in lowered
+            for x in [
+                "i'm building",
+                "i am building",
+                "my project",
+                "i'm working on",
+                "i am working on",
+                "working on",
+                "nova",
+            ]
+        ):
+            should_save = True
+            kind = "project"
+
+        # goals
+        elif any(x in lowered for x in ["i want to", "my goal", "i plan to"]):
+            should_save = True
+            kind = "goal"
+
+        # explicit memory instruction
+        elif "remember that" in lowered:
+            should_save = True
+            kind = "note"
+
+        if not should_save:
+            return
+
+        if not self._should_save_memory_text(text, kind=kind):
+            return
+
+        try:
+            existing_items = []
+            if hasattr(self, "memory") and self.memory and hasattr(self.memory, "all"):
+                existing_items = self.memory.all() or []
+
+            for item in existing_items:
+                if not isinstance(item, dict):
+                    continue
+
+                existing_text = self._normalize_memory_text_for_save(item.get("text", ""))
+                existing_kind = self._safe_str(item.get("kind")).lower().strip()
+                existing_session = self._safe_str(item.get("session_id")).strip()
+
+                if (
+                    existing_text
+                    and existing_text.lower() == text.lower()
+                    and existing_kind == kind
+                    and existing_session == self._safe_str(session_id)
+                ):
+                    return
+
+        except Exception:
+            pass
+
+        try:
+            self._call_first(
+                self.memory,
+                ["add_memory", "create_memory", "save_memory", "create"],
+                text=text,
+                kind=kind,
+                source="router_auto",
+                session_id=session_id,
+            )
+        except Exception as e:
+            print("MEMORY WRITE FAILED:", e)
 
     # =========================
     # PROMPT + CONTINUITY HELPERS (PHASE 4 POLISH)
@@ -645,10 +934,9 @@ class ChatService:
 
         return "\n\n".join([p for p in parts if p]).strip()
 
-
     def _compose_model_messages(self, user_text, session=None, decision=None, memory_context=None):
         session = session or {}
-        memory_context = memory_context or ""
+        memory_context = self._safe_str(memory_context).strip()
 
         system_prompt = self._build_system_prompt(decision=decision)
         continuity_context = self._build_continuity_context(session=session)
@@ -666,7 +954,10 @@ class ChatService:
         if memory_context:
             messages.append({
                 "role": "system",
-                "content": f"Relevant memory:\n{memory_context}"
+                "content": (
+                    "Relevant memory to use only if it helps with the current request:\n"
+                    f"{memory_context}"
+                )
             })
 
         messages.append({
@@ -730,6 +1021,21 @@ class ChatService:
 
         return True
 
+    def _load_memory(self):
+        """
+        Real memory loader wired to Nova MemoryService.
+        """
+        try:
+            if hasattr(self, "memory") and self.memory:
+                if hasattr(self.memory, "all"):
+                    result = self.memory.all()
+                    if isinstance(result, list):
+                        return result
+
+            return []
+
+        except Exception:
+            return []
     # ==============================
     # CORE TIME / TEXT HELPERS
     # ==============================
@@ -1829,8 +2135,10 @@ class ChatService:
         return "\n".join(lines).strip()
 
     def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
+
         if not isinstance(decision, dict):
             return
+
         if not decision.get("save_memory"):
             return
 
@@ -2633,37 +2941,24 @@ class ChatService:
         session_id: str,
         attachments=None,
     ) -> dict:
-        user_msg = self._build_user_message(user_text, attachments=attachments or [])
+        attachments = attachments or []
 
-        memory_items = self._rank_memory_context(
-            user_text=user_text,
-            limit=int(decision.get("memory_limit") or self.memory_limit),
-            session_id=session_id,
+        user_msg = self._build_user_message(
+            user_text,
+            attachments=attachments,
         )
 
-        if memory_items:
-            lines = []
-            limit = int(decision.get("memory_limit") or self.memory_limit)
-
-            for item in memory_items[:limit]:
-                text = self._safe_str(item.get("text"))
-                kind = self._safe_str(item.get("kind"))
-
-                if not text:
-                    continue
-
-                if kind:
-                    lines.append(f"- [{kind}] {text}")
-                else:
-                    lines.append(f"- {text}")
-
-            assistant_text = "Here’s what I remember that seems relevant right now:\n" + "\n".join(lines)
-        else:
-            assistant_text = "I do not have any relevant saved memory for that yet."
+        assistant_text = self._build_memory_recall_text(
+            session_id=session_id,
+            user_text=user_text,
+            limit=int(decision.get("memory_limit") or self.memory_limit),
+        )
 
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
-            meta={"memory_recall": True},
+            meta={
+                "memory_recall": True,
+            },
             attachments=[],
         )
 
@@ -2802,7 +3097,10 @@ class ChatService:
         if wants_where_are_we:
             assistant_text = self._safe_str(self._handle_where_are_we(session_id, user_text))
         else:
-            memory_context = ""
+            memory_context = self._build_memory_context_for_chat(
+                user_text=user_text,
+                decision=decision,
+            )
             session = self.sessions.get_session(session_id) or {}
 
             messages = self._compose_model_messages(
