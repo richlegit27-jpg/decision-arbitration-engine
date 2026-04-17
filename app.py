@@ -13,7 +13,6 @@ from nova_backend.routes.memory_panel_routes import register_memory_panel_routes
 from nova_backend.utils.api_response import ok_response, error_response
 from nova_backend.utils.request_utils import get_json_body, get_str, get_list, normalize_attachments
 from nova_backend.utils.route_guard import guarded_json_route
-
 from nova_backend.config import (
     BASE_DIR,
     DATA_DIR,
@@ -54,6 +53,7 @@ app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
 # SERVICES
 # -----------------------
 
+session_service = SessionService(SESSIONS_FILE)
 session_service = SessionService(str(SESSIONS_FILE))
 artifact_service = ArtifactService(str(ARTIFACTS_FILE))
 memory_service = MemoryService(str(MEMORY_FILE))
@@ -73,6 +73,7 @@ print("CHAT SERVICE OBJ =", chat_service)
 print("CHAT SERVICE TYPE =", type(chat_service))
 print("CHAT SERVICE MODULE =", type(chat_service).__module__)
 print("CHAT SERVICE HAS HANDLE =", hasattr(chat_service, "handle"))
+print("CHAT SERVICE DIR HAS HANDLE =", "handle" in dir(chat_service))
 
 # -----------------------
 # HELPERS
@@ -834,21 +835,43 @@ def api_sessions_new():
 
 @app.post("/api/sessions/switch")
 def api_sessions_switch():
-    data = request_json()
-    session_id = str(data.get("session_id") or "").strip()
+    data = request.get_json(force=True) or {}
+    session_id = data.get("session_id")
 
     if not session_id:
-        return json_error("Missing session_id", 400)
+        return jsonify({"ok": False, "error": "Missing session_id"}), 400
 
     session = session_service.set_active(session_id)
     if not session:
-        return json_error("Session not found", 404)
+        return jsonify({"ok": False, "error": "Session not found"}), 404
 
-    return json_ok(
-        session=session,
-        sessions=session_service.get_all(),
-        active_session_id=session_service.active_session_id,
-    )
+    # 🔥 FULL STATE BUILD (this was missing)
+    messages = session.get("messages", [])
+
+    # safe fallbacks (so frontend never keeps stale data)
+    artifacts = []
+    memory = []
+
+    try:
+        if hasattr(chat_service, "artifacts"):
+            artifacts = chat_service.artifacts.list_for_session(session_id)
+    except Exception:
+        artifacts = []
+
+    try:
+        if hasattr(chat_service, "memory"):
+            memory = chat_service.memory.get_recent(session_id)
+    except Exception:
+        memory = []
+
+    return jsonify({
+        "ok": True,
+        "active_session_id": session_id,
+        "session": session,
+        "messages": messages,
+        "artifacts": artifacts,
+        "memory": memory,
+    })
 
 
 @app.post("/api/sessions/rename")
@@ -1225,6 +1248,7 @@ def api_uploads(filename: str):
         app.logger.exception("api_uploads failed")
         return jsonify({
             "ok": False,
+
             "error": str(e),
             "filename": str(filename or ""),
         }), 500

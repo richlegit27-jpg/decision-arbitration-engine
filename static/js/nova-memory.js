@@ -100,8 +100,8 @@
   }
 
   function syncEls() {
-    els.panel = q("[data-memory-panel]");
-    els.list = q("[data-memory-list]");
+    els.panel = q("[data-memory-panel]") || q("#memory-panel");
+    els.list = q("[data-memory-list]") || q("#memory-list");
     els.empty = q("[data-memory-empty]");
     els.search = q("[data-memory-search]");
     els.kind = q("[data-memory-kind]");
@@ -349,7 +349,6 @@
       });
     }
   }
-
   async function boot() {
     syncEls();
     if (!els.panel) {
@@ -362,5 +361,33 @@
     console.log("[NovaMemory] boot complete", { items: state.items.length });
   }
 
-  document.addEventListener("DOMContentLoaded", boot);
+  function waitForPanelAndBoot() {
+    let tries = 0;
+    const maxTries = 40;
+
+    const tick = async () => {
+      syncEls();
+
+      if (els.panel) {
+        await boot();
+        return;
+      }
+
+      tries += 1;
+      if (tries >= maxTries) {
+        console.warn("[NovaMemory] panel never appeared");
+        return;
+      }
+
+      setTimeout(tick, 100);
+    };
+
+    tick();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", waitForPanelAndBoot);
+  } else {
+    waitForPanelAndBoot();
+  }
 })();

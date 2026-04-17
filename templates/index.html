@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -18,7 +18,7 @@
           aria-label="Toggle sidebar"
           title="Toggle sidebar"
         >
-          ☰
+          â˜°
         </button>
 
         <button
@@ -48,7 +48,7 @@
             aria-label="Toggle sidebar"
             title="Toggle sidebar"
           >
-            ☰
+            â˜°
           </button>
 
           <div class="nova-topbar-copy">
@@ -94,7 +94,7 @@
                 aria-label="Attach"
                 title="Attach"
               >
-                ＋
+                ï¼‹
               </button>
 
               <button
@@ -104,7 +104,7 @@
                 aria-label="Voice"
                 title="Voice"
               >
-                🎤
+                ðŸŽ¤
               </button>
             </div>
 
@@ -116,7 +116,7 @@
                 placeholder="Message Nova..."
               ></textarea>
               <div class="nova-composer-hint">
-                Enter to send · Shift+Enter for newline
+                Enter to send Â· Shift+Enter for newline
               </div>
             </div>
 
@@ -158,7 +158,7 @@
             aria-label="Close right rail"
             title="Close right rail"
           >
-            ×
+            Ã—
           </button>
         </div>
       </div>
@@ -208,40 +208,18 @@
 
         <div class="nova-artifact-list" data-artifact-list></div>
       </div>
+<div id="memory-panel" class="nova-rail-panel" data-rail-panel="memory" data-memory-panel hidden>
+  <div class="rail-panel__header">
+    <div>
+      <h3 class="rail-panel__title">Memory</h3>
+      <p class="rail-panel__subtitle" id="memory-panel-subtitle">
+        Stored context and preferences
+      </p>
+    </div>
+  </div>
 
-      <div class="nova-rail-panel" data-rail-panel="memory" hidden>
-        <section data-memory-panel>
-          <div class="nova-memory-toolbar">
-            <input type="text" placeholder="Search memory..." data-memory-search>
-            <select data-memory-kind>
-              <option value="all">all</option>
-            </select>
-            <button type="button" data-memory-refresh>Refresh</button>
-          </div>
-
-          <div class="nova-memory-status-row">
-            <div class="nova-memory-status" data-memory-status></div>
-            <div>Count: <span data-memory-count>0</span></div>
-          </div>
-
-          <div class="nova-memory-add">
-            <input type="text" placeholder="Add memory manually..." data-memory-add-text>
-            <select data-memory-add-kind>
-              <option value="general">general</option>
-              <option value="profile">profile</option>
-              <option value="preference">preference</option>
-              <option value="project">project</option>
-              <option value="workflow">workflow</option>
-            </select>
-            <input type="text" placeholder="source" value="manual" data-memory-add-source>
-            <button type="button" data-memory-add>Add</button>
-          </div>
-
-          <div class="nova-memory-empty" data-memory-empty hidden>No memory saved yet.</div>
-          <div class="nova-memory-list" data-memory-list></div>
-        </section>
-      </div>
-
+  <div id="memory-list" class="memory-list" data-memory-list></div>
+</div>
       <div class="nova-rail-panel" data-rail-panel="web" hidden>
         <div class="nova-rail-empty" data-web-empty>
           <div class="nova-rail-empty-title">No web results yet</div>
@@ -274,11 +252,11 @@
       type="button"
       aria-label="Open right panel"
       onclick="(function(){document.body.classList.add('is-rail-open');var rail=document.querySelector('.nova-rail');if(rail){rail.classList.add('is-open');}})()"
-    >☰</button>
+    >â˜°</button>
   </div>
 
-  <script src="/static/js/nova-composer-bundle.js?v=stream-memory-lock-2026-04-13-002"></script>
+  <script src="/static/js/nova-composer-bundle.js?v=stream-memory-lock-2026-04-16-004"></script>
   <script src="/static/js/nova-session-rail.js?v=session-split-2026-04-12-001"></script>
-  <script src="/static/js/nova-memory.js?v=memory-panel-2026-04-13-001"></script>
+  <script src="/static/js/nova-memory.js?v=memory-panel-2026-04-15-002"></script>
 </body>
 </html>

@@ -1,409 +1,355 @@
 from __future__ import annotations
 
-import json
-import uuid
 from copy import deepcopy
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
+import uuid
+
+from nova_backend.utils.file_utils import load_json_file, save_json_file
+from nova_backend.utils.time_utils import iso_now
 
 
-def iso_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+WORKING_STATE_KEYS = (
+    "active_task",
+    "current_file",
+    "current_bug",
+    "last_success",
+    "next_move",
+    "checkpoint",
+    "updated_at",
+)
 
 
-def _safe_text(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value)
+def _new_working_state() -> Dict[str, str]:
+    return {
+        "active_task": "",
+        "current_file": "",
+        "current_bug": "",
+        "last_success": "",
+        "next_move": "",
+        "checkpoint": "",
+        "updated_at": "",
+    }
 
 
-def _safe_list(value: Any) -> List[Any]:
-    if isinstance(value, list):
-        return value
-    return []
+def _normalize_working_state(value: Any) -> Dict[str, str]:
+    state = _new_working_state()
+    if isinstance(value, dict):
+        for key in WORKING_STATE_KEYS:
+            if key in value:
+                state[key] = str(value.get(key) or "")
+    return state
 
 
-def _message_preview_from_message(message: Dict[str, Any]) -> str:
-    text = _safe_text(message.get("text")).strip()
-    if not text:
-        return ""
-    return text[:140]
-
-
-def _session_title_from_messages(messages: List[Dict[str, Any]]) -> str:
-    for msg in messages:
-        if _safe_text(msg.get("role")) == "user":
-            text = _safe_text(msg.get("text")).strip()
-            if text:
-                return text[:60]
-    return "New Chat"
+def _session_sort_key(session: Dict[str, Any]) -> tuple:
+    pinned = bool(session.get("pinned", False))
+    updated_at = str(session.get("updated_at") or "")
+    created_at = str(session.get("created_at") or "")
+    stamp = updated_at or created_at
+    return (0 if pinned else 1, stamp)
 
 
 def _normalize_message(message: Dict[str, Any]) -> Dict[str, Any]:
+    msg = dict(message or {})
+    msg.setdefault("id", f"msg_{uuid.uuid4().hex}")
+    msg.setdefault("role", "assistant")
+    msg.setdefault("text", "")
+    msg.setdefault("attachments", [])
+    msg.setdefault("meta", {})
     now = iso_now()
-
-    normalized = {
-        "id": _safe_text(message.get("id")).strip() or f"msg_{uuid.uuid4().hex}",
-        "role": _safe_text(message.get("role")).strip() or "assistant",
-        "text": _safe_text(message.get("text")),
-        "created_at": _safe_text(message.get("created_at")).strip() or now,
-        "updated_at": _safe_text(message.get("updated_at")).strip() or now,
-        "attachments": _safe_list(message.get("attachments")),
-        "artifacts": _safe_list(message.get("artifacts")),
-        "meta": message.get("meta") if isinstance(message.get("meta"), dict) else {},
-    }
-
-    if "pending" in message:
-        normalized["pending"] = bool(message.get("pending"))
-    if "streaming" in message:
-        normalized["streaming"] = bool(message.get("streaming"))
-    if "error" in message:
-        normalized["error"] = bool(message.get("error"))
-
-    return normalized
+    msg.setdefault("created_at", now)
+    msg.setdefault("updated_at", msg.get("created_at") or now)
+    return msg
 
 
 def _normalize_session(session: Dict[str, Any]) -> Dict[str, Any]:
     now = iso_now()
-    messages = [_normalize_message(m) for m in _safe_list(session.get("messages"))]
+    data = dict(session or {})
+    data.setdefault("id", f"session_{uuid.uuid4().hex}")
+    data["title"] = str(data.get("title") or "New Chat").strip() or "New Chat"
+    data["messages"] = [
+        _normalize_message(m) for m in (data.get("messages") or []) if isinstance(m, dict)
+    ]
+    data["pinned"] = bool(data.get("pinned", False))
+    data["created_at"] = str(data.get("created_at") or now)
+    data["updated_at"] = str(data.get("updated_at") or data["created_at"] or now)
+    data["working_state"] = _normalize_working_state(data.get("working_state"))
+    return data
 
-    normalized = {
-        "id": _safe_text(session.get("id")).strip() or f"session_{uuid.uuid4().hex}",
-        "title": _safe_text(session.get("title")).strip() or _session_title_from_messages(messages),
-        "created_at": _safe_text(session.get("created_at")).strip() or now,
-        "updated_at": _safe_text(session.get("updated_at")).strip() or now,
-        "pinned": bool(session.get("pinned", False)),
-        "messages": messages,
-        "message_count": len(messages),
-        "last_message_preview": _message_preview_from_message(messages[-1]) if messages else "",
+
+def new_session(title: str = "New Chat") -> Dict[str, Any]:
+    now = iso_now()
+    return {
+        "id": f"session_{uuid.uuid4().hex}",
+        "title": str(title or "New Chat").strip() or "New Chat",
+        "messages": [],
+        "pinned": False,
+        "created_at": now,
+        "updated_at": now,
+        "working_state": _new_working_state(),
     }
-    return normalized
 
 
 class SessionService:
+
     def __init__(self, sessions_file: str | Path):
         self.sessions_file = Path(sessions_file)
-        self.sessions_file.parent.mkdir(parents=True, exist_ok=True)
         self._bootstrap()
 
-    # ==============================
-    # COMPATIBILITY BRIDGE FOR APP.PY
-    # ==============================
-
     @property
-    def active_session_id(self) -> str:
+    def active_session_id(self):
         return self.get_active_session_id()
 
-    def get_active(self) -> Optional[Dict[str, Any]]:
-        return self.get_active_session()
+    # -----------------------
+    # STORE
+    # -----------------------
 
-    def create(self, title: str = "New Chat") -> Dict[str, Any]:
-        return self.create_session(title)
-
-    def get(self, session_id: str) -> Optional[Dict[str, Any]]:
-        return self.get_session(session_id)
-
-    def get_all(self) -> List[Dict[str, Any]]:
-        return self.list_sessions()
-
-    def list(self) -> List[Dict[str, Any]]:
-        return self.list_sessions()
-
-    def all(self) -> List[Dict[str, Any]]:
-        return self.list_sessions()
-
-    def set_active(self, session_id: str) -> Optional[Dict[str, Any]]:
-        return self.set_active_session(session_id)
-
-    def switch(self, session_id: str) -> Optional[Dict[str, Any]]:
-        return self.set_active_session(session_id)
-
-    def switch_session(self, session_id: str) -> Optional[Dict[str, Any]]:
-        return self.set_active_session(session_id)
-
-    def activate(self, session_id: str) -> Optional[Dict[str, Any]]:
-        return self.set_active_session(session_id)
-
-    def rename(self, session_id: str, title: str) -> Optional[Dict[str, Any]]:
-        return self.rename_session(session_id, title)
-
-    def delete(self, session_id: str) -> bool:
-        return self.delete_session(session_id)
-
-    def pin(self, session_id: str, pinned: Optional[bool] = None) -> Optional[Dict[str, Any]]:
-        return self.pin_session(session_id, pinned)
-
-    def unpin(self, session_id: str) -> Optional[Dict[str, Any]]:
-        return self.pin_session(session_id, False)
-
-    # ==============================
-    # FILE IO
-    # ==============================
     def _bootstrap(self) -> None:
+        self.sessions_file.parent.mkdir(parents=True, exist_ok=True)
+
         if not self.sessions_file.exists():
+            first = new_session("New Chat")
             self._write_store(
                 {
-                    "active_session_id": "",
-                    "sessions": [],
+                    "active_session_id": first["id"],
+                    "sessions": [first],
                 }
             )
             return
 
-        try:
-            store = self._read_store()
-            changed = False
+        store = self._read_store()
+        sessions = self._load_sessions()
+        active = str(store.get("active_session_id") or "").strip()
 
-            if not isinstance(store, dict):
-                store = {"active_session_id": "", "sessions": []}
-                changed = True
+        if not sessions:
+            first = new_session("New Chat")
+            sessions = [first]
+            active = first["id"]
 
-            if "active_session_id" not in store:
-                store["active_session_id"] = ""
-                changed = True
+        if not any(str(s.get("id") or "") == active for s in sessions):
+            active = str(sessions[0].get("id") or "").strip()
 
-            if "sessions" not in store or not isinstance(store["sessions"], list):
-                store["sessions"] = []
-                changed = True
-
-            normalized_sessions = [_normalize_session(s) for s in store["sessions"]]
-            if normalized_sessions != store["sessions"]:
-                store["sessions"] = normalized_sessions
-                changed = True
-
-            if changed:
-                self._write_store(store)
-
-        except Exception:
-            self._write_store(
-                {
-                    "active_session_id": "",
-                    "sessions": [],
-                }
-            )
+        self._save_sessions(sessions, active)
 
     def _read_store(self) -> Dict[str, Any]:
-        try:
-            raw = self.sessions_file.read_text(encoding="utf-8")
-            data = json.loads(raw) if raw.strip() else {}
-            if not isinstance(data, dict):
-                return {"active_session_id": "", "sessions": []}
-            return data
-        except Exception:
+        data = load_json_file(
+            self.sessions_file,
+            {
+                "active_session_id": "",
+                "sessions": [],
+            },
+        )
+
+        if isinstance(data, list):
+            return {
+                "active_session_id": str(data[0].get("id") or "").strip() if data else "",
+                "sessions": data,
+            }
+
+        if not isinstance(data, dict):
             return {"active_session_id": "", "sessions": []}
 
+        data.setdefault("active_session_id", "")
+        data.setdefault("sessions", [])
+        return data
+
     def _write_store(self, store: Dict[str, Any]) -> None:
-        self.sessions_file.write_text(
-            json.dumps(store, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        payload = {
+            "active_session_id": str(store.get("active_session_id") or "").strip(),
+            "sessions": [_normalize_session(s) for s in store.get("sessions", [])],
+        }
+        payload["sessions"] = sorted(payload["sessions"], key=_session_sort_key)
+        save_json_file(self.sessions_file, payload)
 
     def _load_sessions(self) -> List[Dict[str, Any]]:
         store = self._read_store()
-        sessions = store.get("sessions", [])
-        if not isinstance(sessions, list):
-            return []
-        return [_normalize_session(s) for s in sessions]
+        sessions = [_normalize_session(s) for s in store.get("sessions", [])]
+        sessions.sort(key=_session_sort_key)
+        return sessions
 
-    def _save_sessions(self, sessions: List[Dict[str, Any]], active_session_id: Optional[str] = None) -> None:
-        store = self._read_store()
-        current_active = _safe_text(store.get("active_session_id")).strip()
+    def _save_sessions(self, sessions, active_session_id=None):
+        sessions = [_normalize_session(s) for s in sessions]
+        sessions.sort(key=_session_sort_key)
 
-        normalized_sessions = [_normalize_session(s) for s in sessions]
-
-        if active_session_id is None:
-            active_session_id = current_active
+        active = str(active_session_id or "").strip()
+        if not active and sessions:
+            active = str(sessions[0].get("id") or "").strip()
 
         self._write_store(
             {
-                "active_session_id": _safe_text(active_session_id).strip(),
-                "sessions": normalized_sessions,
+                "active_session_id": active,
+                "sessions": sessions,
             }
         )
 
-    def _find_session_index(self, sessions: List[Dict[str, Any]], session_id: str) -> int:
-        for i, session in enumerate(sessions):
-            if _safe_text(session.get("id")).strip() == _safe_text(session_id).strip():
+    def _find(self, sessions, session_id):
+        target = str(session_id or "").strip()
+        for i, s in enumerate(sessions):
+            if str(s.get("id") or "").strip() == target:
                 return i
         return -1
 
-    # ==============================
-    # READ
-    # ==============================
-    def list_sessions(self) -> List[Dict[str, Any]]:
-        store = self._read_store()
-        sessions = [_normalize_session(s) for s in store.get("sessions", [])]
+    # -----------------------
+    # SESSION CONTROL (FIXED)
+    # -----------------------
 
-        sessions.sort(
-            key=lambda s: (
-                0 if s.get("pinned") else 1,
-                -(self._iso_sort_key(s.get("updated_at"))),
-            )
-        )
+    def set_active(self, session_id: str):
+        data = self._read_store()
 
-        return deepcopy(sessions)
+        sessions = data.get("sessions", [])
+        found = None
 
-    def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
-        sessions = self._load_sessions()
-        idx = self._find_session_index(sessions, session_id)
-        if idx < 0:
-            return None
-        return deepcopy(_normalize_session(sessions[idx]))
+        for s in sessions:
+            if s.get("id") == session_id:
+                found = s
+                break
 
-    def get_active_session_id(self) -> str:
-        store = self._read_store()
-        return _safe_text(store.get("active_session_id")).strip()
-
-    def get_active_session(self) -> Optional[Dict[str, Any]]:
-        active_session_id = self.get_active_session_id()
-        if not active_session_id:
-            return None
-        return self.get_session(active_session_id)
-
-    # ==============================
-    # COMPATIBILITY (APP.PY BRIDGE)
-    # ==============================
-    def get_active(self) -> Optional[Dict[str, Any]]:
-        return self.get_active_session()
-
-    def create(self, title: str = "New Chat") -> Dict[str, Any]:
-        return self.create_session(title)
-
-    # ==============================
-    # CREATE / UPDATE
-    # ==============================
-    def create_session(self, title: str = "New Chat") -> Dict[str, Any]:
-        sessions = self._load_sessions()
-        now = iso_now()
-
-        session = {
-            "id": f"session_{uuid.uuid4().hex}",
-            "title": _safe_text(title).strip() or "New Chat",
-            "created_at": now,
-            "updated_at": now,
-            "pinned": False,
-            "messages": [],
-            "message_count": 0,
-            "last_message_preview": "",
-        }
-
-        sessions.insert(0, _normalize_session(session))
-        self._save_sessions(sessions, active_session_id=session["id"])
-        return deepcopy(session)
-
-    def set_active_session(self, session_id: str) -> Optional[Dict[str, Any]]:
-        sessions = self._load_sessions()
-        idx = self._find_session_index(sessions, session_id)
-        if idx < 0:
+        if not found:
             return None
 
-        self._save_sessions(sessions, active_session_id=session_id)
-        return deepcopy(_normalize_session(sessions[idx]))
+        data["active_session_id"] = session_id
+        self._write_store(data)
 
-    def rename_session(self, session_id: str, title: str) -> Optional[Dict[str, Any]]:
-        sessions = self._load_sessions()
-        idx = self._find_session_index(sessions, session_id)
-        if idx < 0:
-            return None
+        return found
 
-        sessions[idx]["title"] = _safe_text(title).strip() or sessions[idx].get("title") or "New Chat"
-        sessions[idx]["updated_at"] = iso_now()
+    def delete(self, session_id: str):
+        data = self._read_store()
 
-        self._save_sessions(sessions)
-        return deepcopy(_normalize_session(sessions[idx]))
+        sessions = data.get("sessions", [])
+        new_sessions = [s for s in sessions if s.get("id") != session_id]
 
-    def pin_session(self, session_id: str, pinned: Optional[bool] = None) -> Optional[Dict[str, Any]]:
-        sessions = self._load_sessions()
-        idx = self._find_session_index(sessions, session_id)
-        if idx < 0:
-            return None
-
-        current = bool(sessions[idx].get("pinned", False))
-        sessions[idx]["pinned"] = (not current) if pinned is None else bool(pinned)
-        sessions[idx]["updated_at"] = iso_now()
-
-        self._save_sessions(sessions)
-        return deepcopy(_normalize_session(sessions[idx]))
-
-    def delete_session(self, session_id: str) -> bool:
-        store = self._read_store()
-        sessions = [_normalize_session(s) for s in store.get("sessions", [])]
-        active_session_id = _safe_text(store.get("active_session_id")).strip()
-
-        idx = self._find_session_index(sessions, session_id)
-        if idx < 0:
+        if len(new_sessions) == len(sessions):
             return False
 
-        sessions.pop(idx)
+        data["sessions"] = new_sessions
 
-        if active_session_id == session_id:
-            active_session_id = sessions[0]["id"] if sessions else ""
+        if data.get("active_session_id") == session_id:
+            data["active_session_id"] = new_sessions[0]["id"] if new_sessions else ""
 
-        self._save_sessions(sessions, active_session_id=active_session_id)
+        self._write_store(data)
+
         return True
 
-    # ==============================
-    # MESSAGE WRITE
-    # ==============================
-    def append_message(self, session_id: str, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    # -----------------------
+    # WORKING STATE
+    # -----------------------
+
+    def get_working_state(self, session_id: str) -> Dict[str, str]:
         sessions = self._load_sessions()
-        idx = self._find_session_index(sessions, session_id)
-        if idx < 0:
+        i = self._find(sessions, session_id)
+        if i < 0:
+            return _new_working_state()
+
+        state = _normalize_working_state(sessions[i].get("working_state"))
+        sessions[i]["working_state"] = state
+        self._save_sessions(sessions, session_id)
+        return state
+
+    def update_working_state(self, session_id: str, patch: Dict[str, Any]):
+        sessions = self._load_sessions()
+        i = self._find(sessions, session_id)
+        if i < 0:
+            return _new_working_state()
+
+        state = _normalize_working_state(sessions[i].get("working_state"))
+
+        for key in WORKING_STATE_KEYS:
+            if key == "updated_at":
+                continue
+            if key in patch:
+                state[key] = str(patch[key] or "").strip()
+
+        state["updated_at"] = iso_now()
+        sessions[i]["working_state"] = state
+        sessions[i]["updated_at"] = state["updated_at"]
+
+        self._save_sessions(sessions, session_id)
+        return deepcopy(state)
+
+    def clear_working_state(self, session_id: str):
+        sessions = self._load_sessions()
+        i = self._find(sessions, session_id)
+        if i < 0:
+            return _new_working_state()
+
+        state = _new_working_state()
+        state["updated_at"] = iso_now()
+
+        sessions[i]["working_state"] = state
+        sessions[i]["updated_at"] = state["updated_at"]
+
+        self._save_sessions(sessions, session_id)
+        return deepcopy(state)
+
+    # -----------------------
+    # CORE METHODS
+    # -----------------------
+
+    def get_active_session_id(self):
+        store = self._read_store()
+        active = str(store.get("active_session_id") or "").strip()
+        if active:
+            return active
+
+        sessions = self._load_sessions()
+        if sessions:
+            return str(sessions[0].get("id") or "").strip()
+        return ""
+
+    def get_session(self, session_id):
+        sessions = self._load_sessions()
+        i = self._find(sessions, session_id)
+        return sessions[i] if i >= 0 else None
+
+    def get_active_session(self):
+        active_id = self.get_active_session_id()
+        if not active_id:
+            return None
+        return self.get_session(active_id)
+
+    def get_active(self):
+        return self.get_active_session()
+
+    def create_session(self, title="New Chat"):
+        sessions = self._load_sessions()
+        s = new_session(title)
+        sessions.insert(0, s)
+        self._save_sessions(sessions, s["id"])
+        return s
+
+    def append_message(self, session_id, message):
+        sessions = self._load_sessions()
+        i = self._find(sessions, session_id)
+        if i < 0:
             return None
 
-        normalized_message = _normalize_message(message)
-        session = sessions[idx]
+        sessions[i]["messages"].append(_normalize_message(message))
+        sessions[i]["updated_at"] = iso_now()
 
-        session_messages = _safe_list(session.get("messages"))
-        session_messages.append(normalized_message)
+        self._save_sessions(sessions, self.get_active_session_id())
+        return sessions[i]
 
-        session["messages"] = session_messages
-        session["message_count"] = len(session_messages)
-        session["last_message_preview"] = _message_preview_from_message(normalized_message)
-        session["updated_at"] = iso_now()
+    # -----------------------
+    # COMPATIBILITY
+    # -----------------------
 
-        # Optional auto-title on first real user message
-        if (_safe_text(session.get("title")).strip() in ("", "New Chat")) and normalized_message.get("role") == "user":
-            candidate = _safe_text(normalized_message.get("text")).strip()
-            if candidate:
-                session["title"] = candidate[:60]
+    def get_all(self):
+        return self._load_sessions()
 
-        sessions[idx] = _normalize_session(session)
-        self._save_sessions(sessions, active_session_id=session_id)
-        return deepcopy(sessions[idx])
+    def list_sessions(self):
+        return self._load_sessions()
 
-    def add_message_to_session(self, session_id: str, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        return self.append_message(session_id, message)
+    def list(self):
+        return self._load_sessions()
 
-    def replace_messages(self, session_id: str, messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        sessions = self._load_sessions()
-        idx = self._find_session_index(sessions, session_id)
-        if idx < 0:
-            return None
+    def all(self):
+        return self._load_sessions()
 
-        normalized_messages = [_normalize_message(m) for m in _safe_list(messages)]
-        sessions[idx]["messages"] = normalized_messages
-        sessions[idx]["message_count"] = len(normalized_messages)
-        sessions[idx]["last_message_preview"] = (
-            _message_preview_from_message(normalized_messages[-1]) if normalized_messages else ""
-        )
-        sessions[idx]["updated_at"] = iso_now()
+    def create(self, title="New Chat"):
+        return self.create_session(title)
 
-        if _safe_text(sessions[idx].get("title")).strip() in ("", "New Chat"):
-            sessions[idx]["title"] = _session_title_from_messages(normalized_messages)
+    def get(self, session_id):
+        return self.get_session(session_id)
 
-        sessions[idx] = _normalize_session(sessions[idx])
-        self._save_sessions(sessions, active_session_id=session_id)
-        return deepcopy(sessions[idx])
-
-    # ==============================
-    # HELPERS
-    # ==============================
-    def _iso_sort_key(self, value: Any) -> float:
-        text = _safe_text(value).strip()
-        if not text:
-            return 0.0
-        try:
-            return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
-        except Exception:
-            return 0.0
+    def get_by_id(self, session_id):
+        return self.get_session(session_id)

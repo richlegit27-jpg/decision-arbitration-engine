@@ -252,6 +252,31 @@ function normalizeMessage(raw) {
   const artifact = item.artifact && typeof item.artifact === "object" ? item.artifact : {};
   const viewer = item.viewer && typeof item.viewer === "object" ? item.viewer : {};
 
+  const role = String(item.role || "assistant");
+  const kind = String(item.kind || "");
+  const text = normalizeText(
+    (item.ui && item.ui.message && item.ui.message.text) ||
+    item.text ||
+    item.content ||
+    item.body ||
+    item.message ||
+    ""
+  );
+
+  const workingContext =
+    item.working_context && typeof item.working_context === "object"
+      ? normalizeWorkingContext(item.working_context)
+      : null;
+
+  const hasWorkingContext =
+    kind === "working_context" ||
+    (workingContext && workingContext.show) ||
+    (workingContext && workingContext.text);
+
+  if (role === "assistant" && !String(text || "").trim() && !hasWorkingContext) {
+    return null;
+  }
+
   const imageUrl = resolveUploadUrl(
     item.image_url ||
     artifact.image_url ||
@@ -262,15 +287,11 @@ function normalizeMessage(raw) {
 
   return {
     id: String(item.id || makeId("msg")),
-    role: String(item.role || "assistant"),
-    text: normalizeText(
-      (item.ui && item.ui.message && item.ui.message.text) ||
-      item.text ||
-      item.content ||
-      item.body ||
-      item.message ||
-      ""
-    ),
+    role: role,
+    kind: kind,
+    text: text,
+    working_context: workingContext,
+    parent_message_id: String(item.parent_message_id || ""),
     created_at: String(item.created_at || new Date().toISOString()),
     pending: Boolean(item.pending),
     streaming: Boolean(item.streaming),
@@ -707,21 +728,73 @@ if (els.chatInput) {
     }) || null;
   }
 
-  function upsertMessage(rawMessage) {
-    const message = normalizeMessage(rawMessage);
-    const index = state.messages.findIndex(function (item) {
-      return String(item.id) === String(message.id);
-    });
+function upsertMessage(rawMessage) {
+  const message = normalizeMessage(rawMessage);
+  if (!message) return null;
 
-    if (index >= 0) {
-      state.messages[index] = Object.assign({}, state.messages[index], message);
-    } else {
-      state.messages.push(message);
-    }
+  const existingIndex = state.messages.findIndex((item) => item && item.id === message.id);
 
-    renderChat();
-    return message;
+  if (existingIndex >= 0) {
+    state.messages[existingIndex] = message;
+  } else {
+    state.messages.push(message);
   }
+
+  renderChat();
+  return message;
+}
+
+function upsertWorkingContextMessage(workingContext, targetMessageId) {
+  const wc = normalizeWorkingContext(workingContext);
+
+  if (!wc.show) return null;
+  if (!targetMessageId) return null;
+
+  const contextMessageId = "working_context_" + String(targetMessageId);
+
+  const contextMessage = normalizeMessage({
+    id: contextMessageId,
+    role: "assistant",
+    kind: "working_context",
+    text: wc.text || "",
+    working_context: wc,
+    parent_message_id: String(targetMessageId),
+    created_at: new Date().toISOString(),
+    pending: false,
+    streaming: false,
+    stopped: false,
+    error: false,
+    source: "working_context",
+    attachments: [],
+    meta: {},
+    artifact: {},
+    viewer: {},
+    image_url: "",
+  });
+
+  if (!contextMessage) return null;
+
+  const existingIndex = state.messages.findIndex(function (msg) {
+    return msg && msg.id === contextMessageId;
+  });
+
+  if (existingIndex >= 0) {
+    state.messages[existingIndex] = contextMessage;
+    return contextMessageId;
+  }
+
+  const targetIndex = state.messages.findIndex(function (msg) {
+    return msg && msg.id === targetMessageId;
+  });
+
+  if (targetIndex >= 0) {
+    state.messages.splice(targetIndex, 0, contextMessage);
+  } else {
+    state.messages.push(contextMessage);
+  }
+
+  return contextMessageId;
+}
 
 function removeMessage(messageId) {
   const id = String(messageId || "").trim();
@@ -789,9 +862,27 @@ state.activeSessionId = String(
     state.messages = state.messages || [];
   }
 
-  if (data.assistant_message) {
-    upsertMessage(normalizeMessage(data.assistant_message));
+if (data.assistant_message) {
+  const assistantMsg = normalizeMessage(data.assistant_message);
+  const hasSessionMessages =
+    (data.active_session && Array.isArray(data.active_session.messages) && data.active_session.messages.length > 0) ||
+    (data.session && Array.isArray(data.session.messages) && data.session.messages.length > 0) ||
+    (Array.isArray(data.messages) && data.messages.length > 0);
+
+  if (assistantMsg && !hasSessionMessages) {
+    const existingAssistant = state.messages.some(function (msg) {
+      return (
+        msg &&
+        msg.role === "assistant" &&
+        String(msg.text || "").trim() === String(assistantMsg.text || "").trim()
+      );
+    });
+
+    if (!existingAssistant) {
+      upsertMessage(assistantMsg);
+    }
   }
+}
 
   state.artifacts = safeArray(data.artifacts);
   state.memory = safeArray(data.memory);
@@ -1196,6 +1287,18 @@ function renderAttachmentBlock(attachment) {
   }
 
 function renderMessageCard(message) {
+  if (!message) return "";
+
+  if (message.kind === "working_context") {
+    return (
+      '<article class="message-card message-card--assistant message-card--working-context" data-message-id="' +
+      escapeHtml(message.id) +
+      '">' +
+      renderWorkingContextCard(message.working_context) +
+      "</article>"
+    );
+  }
+
   const role = String(message.role || "assistant");
   const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
   const attachments = safeArray(message.attachments);
@@ -1269,11 +1372,19 @@ function renderMessageCard(message) {
     renderMessageActions(message) +
     "</article>"
   );
-}          
- 
+}
+
 function renderChat() {
   if (!els.chatThread) return;
   setChatEmptyVisible(state.messages.length === 0);
+
+  log(
+    "renderChat working_context rows",
+    state.messages.filter(function (msg) {
+      return msg && msg.kind === "working_context";
+    })
+  );
+
   els.chatThread.innerHTML = state.messages.map(renderMessageCard).join("");
   updateTopbarFromState();
   scrollChatToBottom(true);
@@ -1931,7 +2042,7 @@ function handleStreamEvent(event) {
     state.stream.messageId = messageId;
     state.stream.placeholderId = messageId;
 
-    upsertMessage(normalizeMessage({
+    upsertMessage({
       id: messageId,
       role: "assistant",
       text: "",
@@ -1941,7 +2052,7 @@ function handleStreamEvent(event) {
       stopped: false,
       attachments: [],
       meta: {},
-    }));
+    });
 
     renderChat();
     scrollChatToBottom(true);
@@ -1997,7 +2108,7 @@ function handleStreamEvent(event) {
     };
     renderExecution();
 
-    upsertMessage(normalizeMessage({
+    upsertMessage({
       id: targetId,
       role: "assistant",
       text: String(payload.error || "Stream failed."),
@@ -2007,7 +2118,7 @@ function handleStreamEvent(event) {
       stopped: true,
       attachments: [],
       meta: {},
-    }));
+    });
 
     clearTokenRenderState();
 
@@ -2050,7 +2161,7 @@ function finalizeStreamMessage(payload) {
     ""
   );
 
-  upsertMessage(normalizeMessage({
+  const finalMessage = normalizeMessage({
     id: targetId,
     role: "assistant",
     text: finalText,
@@ -2068,7 +2179,15 @@ function finalizeStreamMessage(payload) {
       (data.viewer && data.viewer.image_url) ||
       (data.meta && data.meta.image_url) ||
       "",
-  }));
+  });
+
+  if (finalMessage && finalMessage.id) {
+    if (existingIndex >= 0) {
+      state.messages[existingIndex] = finalMessage;
+    } else {
+      state.messages.push(finalMessage);
+    }
+  }
 
   if (data.execution && Array.isArray(data.execution.steps)) {
     state.execution.active = true;
@@ -2093,8 +2212,20 @@ function finalizeStreamMessage(payload) {
 
   renderExecution();
 
-  // CRITICAL: hydrate from the real final payload instead of partial manual updates
   applyStatePayload(data);
+
+  const hydratedAssistantMessage = normalizeMessage(
+    (data && (data.assistant_message || data.message)) || finalMessage || {}
+  );
+
+  if (hydratedAssistantMessage && hydratedAssistantMessage.id) {
+    upsertMessage(hydratedAssistantMessage);
+
+    const workingContext = normalizeWorkingContext(data.working_context);
+    if (workingContext.show) {
+      upsertWorkingContextMessage(workingContext, hydratedAssistantMessage.id);
+    }
+  }
 
   if (state.stream) {
     state.stream.running = false;
@@ -2668,6 +2799,22 @@ async function consumeChatJson(payload) {
 
     applyStatePayload(data || {});
 
+    const assistantMessage = normalizeMessage(
+      (data && (data.assistant_message || data.message)) || {}
+    );
+
+    if (assistantMessage && assistantMessage.id) {
+      upsertMessage(assistantMessage);
+
+      const workingContext = normalizeWorkingContext(
+        data && data.working_context
+      );
+
+      if (workingContext.show) {
+        upsertWorkingContextMessage(workingContext, assistantMessage.id);
+      }
+    }
+
     if (data && data.session && data.session.id) {
       state.activeSessionId = String(data.session.id || "");
     } else if (data && data.session_id) {
@@ -2744,7 +2891,7 @@ async function sendMessage() {
   if (/^\/image|generate image|create image|draw/i.test(text)) {
     const tempId = "gen_" + Date.now();
 
-    upsertMessage(normalizeMessage({
+    upsertMessage({
       id: tempId,
       role: "assistant",
       text: "🎨 Generating image...",
@@ -2753,7 +2900,7 @@ async function sendMessage() {
       error: false,
       stopped: false,
       attachments: [],
-    }));
+    });
 
     state.imageGenPlaceholderId = tempId;
   }
@@ -2839,83 +2986,44 @@ async function sendMessage() {
     } else {
       const pendingAssistantId = makeId("assistant");
 
-      upsertMessage(
-        normalizeMessage({
-          id: pendingAssistantId,
-          role: "assistant",
-          text: "",
-          created_at: new Date().toISOString(),
-          pending: true,
-          streaming: true,
-          error: false,
-          stopped: false,
-          attachments: [],
-          meta: {},
-        })
-      );
+      upsertMessage({
+        id: pendingAssistantId,
+        role: "assistant",
+        text: "",
+        created_at: new Date().toISOString(),
+        pending: true,
+        streaming: true,
+        error: false,
+        stopped: false,
+        attachments: [],
+        meta: {},
+      });
 
-      if (!state.stream) {
-        state.stream = {
-          running: false,
-          controller: null,
-          targetMessageId: "",
-          buffer: "",
-          startedAt: 0,
-          messageId: "",
-          placeholderId: "",
-        };
-      }
-
+      state.stream = state.stream || {};
       state.stream.targetMessageId = pendingAssistantId;
-      state.stream.messageId = pendingAssistantId;
-      state.stream.placeholderId = pendingAssistantId;
 
-const tr = ensureTokenRenderState();
-tr.targetMessageId = pendingAssistantId;
-tr.buffer = "";
-tr.scheduled = false;
-tr.lastFlushAt = 0;
-if (tr.rafId) {
-  try {
-    cancelAnimationFrame(tr.rafId);
-  } catch (_) {}
-  tr.rafId = 0;
-}
+      await consumeChatJson(payload);
+    }
+  } catch (error) {
+    finishStreamUi({
+      statusText: "Error",
+      statusState: "error",
+    });
 
-renderChat();
-scrollChatToBottom(true);
+    showToast("Chat failed", "error");
 
-payload.placeholder_id = pendingAssistantId;
-
-console.log("ABOUT TO SEND /api/chat", payload);
-
-try {
-  await consumeChatJson(payload);
-} catch (err) {
-  finishStreamUi({
-    statusText: "Error",
-    statusState: "error",
-  });
-
-  showToast("Chat failed", "error");
-
-  upsertMessage(
-    normalizeMessage({
+    upsertMessage({
       id: makeId("assistant_error"),
       role: "assistant",
       text: "⚠️ Something went wrong sending the message.",
       error: true,
-    })
-  );
-}
+    });
 
-if (state.imageGenPlaceholderId) {
-  removeMessage(state.imageGenPlaceholderId);
-  state.imageGenPlaceholderId = null;
-}
-     
+    if (state.imageGenPlaceholderId) {
+      removeMessage(state.imageGenPlaceholderId);
+      state.imageGenPlaceholderId = null;
     }
-  } catch (error) {
+
     warn("sendMessage failed", error);
     showToast(
       error && error.message ? error.message : "Send failed.",
@@ -3033,6 +3141,7 @@ async function renameSession(sessionId) {
   showToast("Session renamed.", "success");
 }
 
+
 async function togglePinSession(sessionId) {
   const id = String(sessionId || "").trim();
   if (!id) return;
@@ -3082,202 +3191,6 @@ async function recordVoiceOnce() {
     throw new Error("Voice recording is not supported in this browser.");
   }
 
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  const preferredMime =
-    typeof MediaRecorder !== "undefined" &&
-    typeof MediaRecorder.isTypeSupported === "function" &&
-    MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-      ? "audio/webm;codecs=opus"
-      : "audio/webm";
-
-  const recorder = new MediaRecorder(stream, preferredMime ? { mimeType: preferredMime } : undefined);
-
-  state.voice.recording = true;
-  state.voice.mediaRecorder = recorder;
-  state.voice.stream = stream;
-  state.voice.chunks = [];
-
-  recorder.addEventListener("dataavailable", function (event) {
-    if (event && event.data && event.data.size > 0) {
-      state.voice.chunks.push(event.data);
-    }
-  });
-
-  recorder.start();
-  showToast("Recording... click voice again to stop.", "info");
-
-  return new Promise(function (resolve, reject) {
-    recorder.addEventListener("stop", function () {
-      try {
-        const mimeType = recorder.mimeType || "audio/webm";
-        const blob = new Blob(state.voice.chunks.slice(), { type: mimeType });
-
-        if (state.voice.stream) {
-          state.voice.stream.getTracks().forEach(function (track) {
-            try {
-              track.stop();
-            } catch (_) {}
-          });
-        }
-
-        state.voice.recording = false;
-        state.voice.mediaRecorder = null;
-        state.voice.stream = null;
-        state.voice.chunks = [];
-
-        resolve(blob);
-      } catch (error) {
-        reject(error);
-      }
-    });
-
-    recorder.addEventListener("error", function (event) {
-      if (state.voice.stream) {
-        state.voice.stream.getTracks().forEach(function (track) {
-          try {
-            track.stop();
-          } catch (_) {}
-        });
-      }
-
-      state.voice.recording = false;
-      state.voice.mediaRecorder = null;
-      state.voice.stream = null;
-      state.voice.chunks = [];
-
-      reject(
-        new Error(
-          (event && event.error && event.error.message) ||
-            "Voice recorder failed."
-        )
-      );
-    });
-  });
-}
-
-async function transcribeVoice(blob) {
-  const form = new FormData();
-  form.append("file", blob, "voice.webm");
-
-  const response = await fetch("/api/voice/transcribe", {
-    method: "POST",
-    credentials: "same-origin",
-    body: form,
-  });
-
-  const data = await response.json().catch(function () {
-    return {};
-  });
-
-  if (!response.ok || data.ok === false) {
-    throw new Error(data.error || "Voice transcription failed.");
-  }
-
-  const text = normalizeText(data.text || "").trim();
-
-  if (!text) {
-    showToast("No speech detected.", "info");
-    return;
-  }
-
-  if (els.chatInput) {
-    const current = normalizeText(els.chatInput.value || "").trim();
-    els.chatInput.value = current ? current + "\n" + text : text;
-    autoResizeTextarea();
-    els.chatInput.focus();
-  }
-
-  showToast("Voice ready. Sending...", "success");
-
-  await sendMessage();
-}
-let activeVoiceRecordingPromise = null;
-
-function updateVoiceButtonUi() {
-  if (!els.voiceButton) return;
-
-  const recording = !!(state.voice && state.voice.recording);
-  const busy = !!(state.voice && state.voice.busy);
-
-  els.voiceButton.classList.toggle("is-recording", recording);
-  els.voiceButton.classList.toggle("is-busy", busy);
-
-  if (recording) {
-    els.voiceButton.setAttribute("aria-label", "Stop voice recording");
-    els.voiceButton.setAttribute("title", "Stop voice recording");
-  } else if (busy) {
-    els.voiceButton.setAttribute("aria-label", "Voice busy");
-    els.voiceButton.setAttribute("title", "Voice busy");
-  } else {
-    els.voiceButton.setAttribute("aria-label", "Voice");
-    els.voiceButton.setAttribute("title", "Voice");
-  }
-
-  els.voiceButton.disabled = busy && !recording;
-}
-
-function updateTtsToggleUi() {
-  if (!els.ttsToggleButton) return;
-
-  if (!state.tts) {
-    state.tts = {
-      enabled: true,
-      playing: false,
-      audio: null,
-    };
-  }
-
-  const muted = state.tts.enabled === false;
-  const playing = !!state.tts.playing;
-
-  els.ttsToggleButton.classList.toggle("is-muted", muted);
-  els.ttsToggleButton.classList.toggle("is-playing", playing);
-  els.ttsToggleButton.textContent = muted ? "ðŸ”‡" : "ðŸ”Š";
-
-  if (muted) {
-    els.ttsToggleButton.setAttribute("aria-label", "Voice replies muted");
-    els.ttsToggleButton.setAttribute("title", "Voice replies muted");
-  } else if (playing) {
-    els.ttsToggleButton.setAttribute("aria-label", "Voice replies playing");
-    els.ttsToggleButton.setAttribute("title", "Voice replies playing");
-  } else {
-    els.ttsToggleButton.setAttribute("aria-label", "Voice replies on");
-    els.ttsToggleButton.setAttribute("title", "Voice replies on");
-  }
-}
-
-function toggleTtsMute() {
-  if (!state.tts) {
-    state.tts = {
-      enabled: false,
-      playing: false,
-      audio: null,
-    };
-  }
-
-  if (state.tts.playing && state.tts.audio) {
-    stopCurrentTtsPlayback();
-    showToast("Voice stopped.", "info");
-    return;
-  }
-
-  state.tts.enabled = !state.tts.enabled;
-  updateTtsToggleUi();
-
-  showToast(
-    state.tts.enabled ? "Voice replies on." : "Voice replies muted.",
-    "info"
-  );
-}
-
-async function recordVoiceOnce() {
-  if (
-    !navigator.mediaDevices ||
-    typeof navigator.mediaDevices.getUserMedia !== "function"
-  ) {
-    throw new Error("Voice recording is not supported in this browser.");
-  }
-
   if (typeof MediaRecorder === "undefined") {
     throw new Error("MediaRecorder is not available in this browser.");
   }
@@ -3308,7 +3221,7 @@ async function recordVoiceOnce() {
   });
 
   recorder.start();
-  showToast("Recording...", "info");
+  showToast("Recording... click voice again to stop.", "info");
 
   return new Promise(function (resolve, reject) {
     recorder.addEventListener("stop", function () {
@@ -3332,32 +3245,38 @@ async function recordVoiceOnce() {
 
         resolve(blob);
       } catch (error) {
+        state.voice.recording = false;
+        state.voice.mediaRecorder = null;
+        state.voice.stream = null;
+        state.voice.chunks = [];
+        updateVoiceButtonUi();
+
         reject(error);
       }
     });
 
-    recorder.addEventListener("error", function (event) {
-      if (state.voice.stream) {
-        state.voice.stream.getTracks().forEach(function (track) {
-          try {
-            track.stop();
-          } catch (_) {}
-        });
-      }
-
-      state.voice.recording = false;
-      state.voice.mediaRecorder = null;
-      state.voice.stream = null;
-      state.voice.chunks = [];
-      updateVoiceButtonUi();
-
-      reject(
-        new Error(
-          (event && event.error && event.error.message) ||
-            "Voice recorder failed."
-        )
-      );
+recorder.addEventListener("error", function (event) {
+  if (state.voice.stream) {
+    state.voice.stream.getTracks().forEach(function (track) {
+      try {
+        track.stop();
+      } catch (_) {}
     });
+  }
+
+  state.voice.recording = false;
+  state.voice.mediaRecorder = null;
+  state.voice.stream = null;
+  state.voice.chunks = [];
+  updateVoiceButtonUi();
+
+  reject(
+    new Error(
+      (event && event.error && event.error.message) ||
+        "Voice recorder failed."
+    )
+  );
+});
   });
 }
 
@@ -3400,6 +3319,85 @@ async function transcribeVoice(blob) {
 
   showToast("Voice ready. Sending...", "success");
   await sendMessage();
+}
+
+let activeVoiceRecordingPromise = null;
+
+function updateVoiceButtonUi() {
+  if (!els.voiceButton) return;
+
+  const recording = !!(state.voice && state.voice.recording);
+  const busy = !!(state.voice && state.voice.busy);
+
+  els.voiceButton.classList.toggle("is-recording", recording);
+  els.voiceButton.classList.toggle("is-busy", busy);
+
+  if (recording) {
+    els.voiceButton.setAttribute("aria-label", "Stop voice recording");
+    els.voiceButton.setAttribute("title", "Stop voice recording");
+  } else if (busy) {
+    els.voiceButton.setAttribute("aria-label", "Voice busy");
+    els.voiceButton.setAttribute("title", "Voice busy");
+  } else {
+    els.voiceButton.setAttribute("aria-label", "Voice");
+    els.voiceButton.setAttribute("title", "Voice");
+  }
+
+  els.voiceButton.disabled = busy && !recording;
+}
+
+function updateTtsToggleUi() {
+  if (!els.ttsToggleButton) return;
+
+  if (!state.tts) {
+    state.tts = {
+      enabled: true,
+      playing: false,
+      audio: null,
+    };
+  }
+
+  const muted = state.tts.enabled === false;
+  const playing = !!state.tts.playing;
+
+  els.ttsToggleButton.classList.toggle("is-muted", muted);
+  els.ttsToggleButton.classList.toggle("is-playing", playing);
+  els.ttsToggleButton.textContent = muted ? "🔇" : "🔊";
+
+  if (muted) {
+    els.ttsToggleButton.setAttribute("aria-label", "Voice replies muted");
+    els.ttsToggleButton.setAttribute("title", "Voice replies muted");
+  } else if (playing) {
+    els.ttsToggleButton.setAttribute("aria-label", "Voice replies playing");
+    els.ttsToggleButton.setAttribute("title", "Voice replies playing");
+  } else {
+    els.ttsToggleButton.setAttribute("aria-label", "Voice replies on");
+    els.ttsToggleButton.setAttribute("title", "Voice replies on");
+  }
+}
+
+function toggleTtsMute() {
+  if (!state.tts) {
+    state.tts = {
+      enabled: false,
+      playing: false,
+      audio: null,
+    };
+  }
+
+  if (state.tts.playing && state.tts.audio) {
+    stopCurrentTtsPlayback();
+    showToast("Voice stopped.", "info");
+    return;
+  }
+
+  state.tts.enabled = !state.tts.enabled;
+  updateTtsToggleUi();
+
+  showToast(
+    state.tts.enabled ? "Voice replies on." : "Voice replies muted.",
+    "info"
+  );
 }
 
 async function handleMicClick() {
@@ -3853,6 +3851,67 @@ function renderWeb() {
     : "";
 }
 
+function renderWorkingContextCard(workingContext) {
+  const wc = normalizeWorkingContext(workingContext);
+
+  if (!wc.show) return "";
+
+  const items = [];
+
+  if (wc.state.active_task) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Active task</span><span class="nova-working-context-value">${escapeHtml(wc.state.active_task)}</span></div>`
+    );
+  }
+
+  if (wc.state.current_file) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Current file</span><span class="nova-working-context-value">${escapeHtml(wc.state.current_file)}</span></div>`
+    );
+  }
+
+  if (wc.state.current_bug) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Current bug</span><span class="nova-working-context-value">${escapeHtml(wc.state.current_bug)}</span></div>`
+    );
+  }
+
+  if (wc.state.last_success) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Last success</span><span class="nova-working-context-value">${escapeHtml(wc.state.last_success)}</span></div>`
+    );
+  }
+
+  if (wc.state.next_move) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Next move</span><span class="nova-working-context-value">${escapeHtml(wc.state.next_move)}</span></div>`
+    );
+  }
+
+  if (wc.state.checkpoint) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Checkpoint</span><span class="nova-working-context-value">${escapeHtml(wc.state.checkpoint)}</span></div>`
+    );
+  }
+
+  if (!items.length && wc.text) {
+    items.push(
+      `<pre class="nova-working-context-pre">${escapeHtml(wc.text)}</pre>`
+    );
+  }
+
+  return `
+    <section class="nova-working-context-card" data-working-context-card>
+      <div class="nova-working-context-header">
+        <span class="nova-working-context-kicker">Working context</span>
+      </div>
+      <div class="nova-working-context-body">
+        ${items.join("")}
+      </div>
+    </section>
+  `;
+}
+
 function wireRailClose() {
   const closeBtn = document.querySelector("[data-rail-close]");
   if (!closeBtn) return;
@@ -4033,6 +4092,33 @@ function scoreMemoryAgainstText(item, text) {
 
   if (query && source.indexOf(query) >= 0) score += 3;
   return score;
+}
+
+function normalizeWorkingContext(raw) {
+  const input = raw && typeof raw === "object" ? raw : {};
+  const state =
+    input.state && typeof input.state === "object" ? input.state : {};
+
+  return {
+    show: Boolean(input.show),
+    text: typeof input.text === "string" ? input.text : "",
+    state: {
+      active_task:
+        typeof state.active_task === "string" ? state.active_task : "",
+      current_file:
+        typeof state.current_file === "string" ? state.current_file : "",
+      current_bug:
+        typeof state.current_bug === "string" ? state.current_bug : "",
+      last_success:
+        typeof state.last_success === "string" ? state.last_success : "",
+      next_move:
+        typeof state.next_move === "string" ? state.next_move : "",
+      checkpoint:
+        typeof state.checkpoint === "string" ? state.checkpoint : "",
+      updated_at:
+        typeof state.updated_at === "string" ? state.updated_at : "",
+    },
+  };
 }
 
 function selectRelevantMemory(userText, limit) {
@@ -4317,7 +4403,7 @@ async function consumeChatStreamStable(payload) {
       } else if (Array.isArray(data.messages)) {
         state.messages = data.messages.map(normalizeMessage);
       } else if (data.assistant_message) {
-        upsertMessage(normalizeMessage(data.assistant_message));
+        upsertMessage(data.assistant_message);
       }
 
       if (Array.isArray(data.artifacts)) {
