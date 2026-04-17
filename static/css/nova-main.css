@@ -7524,3 +7524,202 @@ button.nova-memory-card,
   padding: 12px;
   text-align: center;
 }
+
+.message-card--working-context {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.nova-working-context-card {
+  display: block;
+  width: 100%;
+}
+
+.nova-working-context-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.nova-working-context-kicker {
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+
+.nova-working-context-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nova-working-context-row {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 4px;
+  align-items: start;
+}
+
+.nova-working-context-label {
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.nova-working-context-value {
+  display: block;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.nova-working-context-pre {
+  margin: 0;
+  padding: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: inherit;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .nova-working-context-row {
+    grid-template-columns: 1fr;
+    row-gap: 2px;
+  }
+
+  .nova-working-context-label {
+    margin-bottom: 2px;
+  }
+}
+
+.nova-working-context-panel {
+  margin: 0 0 14px 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+}
+
+.message-card--working-context {
+  display: none;
+}
+
+.nova-working-context-card {
+  display: block;
+  width: 100%;
+}
+
+.nova-working-context-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.nova-working-context-kicker {
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.78;
+}
+
+.nova-working-context-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nova-working-context-row {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 4px;
+  align-items: start;
+}
+
+.nova-working-context-label {
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.nova-working-context-value {
+  display: block;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.nova-working-context-pre {
+  margin: 0;
+  padding: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: inherit;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .nova-working-context-row {
+    grid-template-columns: 1fr;
+    row-gap: 2px;
+  }
+
+  .nova-working-context-label {
+    margin-bottom: 2px;
+  }
+}
+
+.nova-working-context-toggle {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0 0 12px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nova-working-context-toggle:hover .nova-working-context-kicker,
+.nova-working-context-toggle:hover .nova-working-context-chevron {
+  opacity: 1;
+}
+
+.nova-working-context-chevron {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.72;
+}
+
+.nova-working-context-panel.is-collapsed .nova-working-context-toggle {
+  margin-bottom: 0;
+}
+
+.nova-working-context-panel.is-collapsed .nova-working-context-body {
+  display: none;
+}

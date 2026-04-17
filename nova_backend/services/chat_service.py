@@ -1,6 +1,6 @@
 ﻿from __future__ import annotations
 
-import base64
+import base64   
 import os
 import re
 import uuid
@@ -481,62 +481,101 @@ class ChatService:
 
         return False
 
-    def _build_working_context_payload(self, session_id):
-        raw_state = self._get_working_state(session_id) or {}
+    def _build_working_context_block(self, session_id: str):
+        state = self._get_working_state(session_id)
 
-        state = {
-            "active_task": self._safe_str(raw_state.get("active_task")),
-            "current_file": self._safe_str(raw_state.get("current_file")),
-            "current_bug": self._safe_str(raw_state.get("current_bug")),
-            "last_success": self._safe_str(raw_state.get("last_success")),
-            "next_move": self._safe_str(raw_state.get("next_move")),
-            "checkpoint": self._safe_str(raw_state.get("checkpoint")),
-            "updated_at": self._safe_str(raw_state.get("updated_at")),
+        rows = [
+            ("Active task", state.get("active_task", "")),
+            ("Current file", state.get("current_file", "")),
+            ("Current bug", state.get("current_bug", "")),
+            ("Last success", state.get("last_success", "")),
+            ("Next move", state.get("next_move", "")),
+            ("Checkpoint", state.get("checkpoint", "")),
+        ]
+
+        lines = []
+        for label, value in rows:
+            value = self._clean_working_state_value(value)
+            if value:
+                lines.append(f"{label}: {value}")
+
+        if not lines:
+            return ""
+
+        return "Working context:\n" + "\n".join(lines)
+
+    def _build_working_context_payload(self, session_id: str) -> dict:
+        state = self._get_working_state(session_id)
+
+        if not isinstance(state, dict):
+            state = {}
+
+        cleaned = {
+            "active_task": self._clean_working_state_value(state.get("active_task", "")),
+            "current_file": self._clean_working_state_value(state.get("current_file", "")),
+            "current_bug": self._clean_working_state_value(state.get("current_bug", "")),
+            "last_success": self._clean_working_state_value(state.get("last_success", "")),
+            "next_move": self._clean_working_state_value(state.get("next_move", "")),
+            "checkpoint": self._clean_working_state_value(state.get("checkpoint", "")),
+            "updated_at": self._safe_str(state.get("updated_at", "")),
         }
 
-        has_any = any(
-            state.get(key)
-            for key in (
-                "active_task",
-                "current_file",
-                "current_bug",
-                "last_success",
-                "next_move",
-                "checkpoint",
-            )
-        )
+        text_lines = []
+        if cleaned["active_task"]:
+            text_lines.append(f"- Active task: {cleaned['active_task']}")
+        if cleaned["current_file"]:
+            text_lines.append(f"- Current file: {cleaned['current_file']}")
+        if cleaned["current_bug"]:
+            text_lines.append(f"- Current bug: {cleaned['current_bug']}")
+        if cleaned["last_success"]:
+            text_lines.append(f"- Last success: {cleaned['last_success']}")
+        if cleaned["next_move"]:
+            text_lines.append(f"- Next move: {cleaned['next_move']}")
+        if cleaned["checkpoint"]:
+            text_lines.append(f"- Checkpoint: {cleaned['checkpoint']}")
 
-        if not has_any:
-            return {
-                "show": False,
-                "text": "",
-                "state": state,
-            }
-
-        lines = ["Working context:"]
-
-        if state["active_task"]:
-            lines.append(f"- Active task: {state['active_task']}")
-        if state["current_file"]:
-            lines.append(f"- Current file: {state['current_file']}")
-        if state["current_bug"]:
-            lines.append(f"- Current bug: {state['current_bug']}")
-        if state["last_success"]:
-            lines.append(f"- Last success: {state['last_success']}")
-        if state["next_move"]:
-            lines.append(f"- Next move: {state['next_move']}")
-        if state["checkpoint"]:
-            lines.append(f"- Checkpoint: {state['checkpoint']}")
+        text = ""
+        if text_lines:
+            text = "Working context:\n" + "\n".join(text_lines)
 
         return {
-            "show": True,
-            "text": "\n".join(lines),
-            "state": state,
+            "show": bool(text_lines),
+            "text": text,
+            "state": cleaned,
+            "collapsed": False,
         }
 
     # =========================
     # WORKING STATE HELPERS
     # =========================
+
+    def _maybe_update_working_state(self, session_id: str, user_text: str):
+        session_id = self._safe_str(session_id).strip()
+        if not session_id:
+            return {}
+
+        current_state = self._get_working_state(session_id)
+        merged = self._extract_working_state_updates(user_text, current_state)
+
+        changed = False
+        for key in (
+            "active_task",
+            "current_file",
+            "current_bug",
+            "last_success",
+            "next_move",
+            "checkpoint",
+        ):
+            old_value = self._clean_working_state_value(current_state.get(key, ""))
+            new_value = self._clean_working_state_value(merged.get(key, ""))
+            if old_value != new_value:
+                changed = True
+                break
+
+        if changed:
+            self._update_working_state(session_id, merged)
+
+        return merged
 
     def _is_valid_state_value(self, value):
         if not value:
@@ -1156,15 +1195,34 @@ class ChatService:
     # WORKING STATE (PHASE 3)
     # ==============================
 
-    def _get_working_state(self, session_id: str) -> dict:
+    def _get_working_state(self, session_id: str):
         state = self._call_first(
             self.sessions,
             ["get_working_state"],
             session_id,
-        ) or {}
-        print("WORKING STATE RAW =", state)
-        return state
+            default={},
+        )
 
+        if not isinstance(state, dict):
+            state = {}
+
+        cleaned = {}
+        for key in (
+            "active_task",
+            "current_file",
+            "current_bug",
+            "last_success",
+            "next_move",
+            "checkpoint",
+            "updated_at",
+        ):
+            value = state.get(key, "")
+            if key == "updated_at":
+                cleaned[key] = self._safe_str(value)
+            else:
+                cleaned[key] = self._clean_working_state_value(value)
+
+        return cleaned
         def extract_line_value(label: str, text: str):
             pattern = rf"(?im)^\s*{re.escape(label)}:\s*(.*)$"
             match = re.search(pattern, text)
@@ -1251,26 +1309,39 @@ class ChatService:
             patch["checkpoint"] = checkpoint_match.group(1).strip()
 
         return patch
-
     def _handle_where_are_we(self, session_id: str) -> str:
         state = self._get_working_state(session_id)
 
         if not isinstance(state, dict) or not state:
-            return "No working state yet."
+            return "No working context yet."
 
-        def show(key: str) -> str:
-            value = self._safe_str(state.get(key))
-            return value if value else "-"
+        active_task = self._safe_str(state.get("active_task"))
+        current_file = self._safe_str(state.get("current_file"))
+        current_bug = self._safe_str(state.get("current_bug"))
+        last_success = self._safe_str(state.get("last_success"))
+        next_move = self._safe_str(state.get("next_move"))
+        checkpoint = self._safe_str(state.get("checkpoint"))
 
-        return (
-            f"Active task: {show('active_task')}\n"
-            f"Current file: {show('current_file')}\n"
-            f"Current bug: {show('current_bug')}\n"
-            f"Last success: {show('last_success')}\n"
-            f"Next move: {show('next_move')}\n"
-            f"Checkpoint: {show('checkpoint')}"
-        )
+        lines = ["Current status I’m tracking:"]
 
+        if active_task:
+            lines.append(f"- Active task: {active_task}")
+        if current_file:
+            lines.append(f"- Current file: `{current_file}`")
+        if current_bug:
+            lines.append(f"- Current bug: {current_bug}")
+        if last_success:
+            lines.append(f"- Last success: {last_success}")
+        if next_move:
+            lines.append(f"- Next move: {next_move}")
+        if checkpoint:
+            lines.append(f"- Checkpoint: {checkpoint}")
+
+        if next_move:
+            lines.append("")
+            lines.append(f"Immediate focus: {next_move}")
+
+        return "\n".join(lines).strip()
     def _is_valid_state_value(self, value):
         if not value:
             return False
@@ -1339,8 +1410,8 @@ class ChatService:
         return True
 
     def _merge_working_state(self, current_state, updates):
-        current_state = current_state or {}
-        updates = updates or {}
+        current_state = current_state if isinstance(current_state, dict) else {}
+        updates = updates if isinstance(updates, dict) else {}
 
         merged = {
             "active_task": "",
@@ -1357,16 +1428,18 @@ class ChatService:
 
             merged[key] = new_value if new_value else old_value
 
+        from datetime import datetime, timezone
         merged["updated_at"] = datetime.now(timezone.utc).isoformat()
-        return merged
+
+        return merged  
 
     def _extract_working_state_updates(self, user_text, current_state):
         text = self._safe_str(user_text).strip()
-        updates = {}
         lower = text.lower()
+        updates = {}
 
         if not text:
-            return {}
+            return self._merge_working_state(current_state or {}, updates)
 
         if text.startswith("Active task:") or "\nCurrent file:" in text:
             lines = [line.strip() for line in text.splitlines() if line.strip()]
@@ -1384,45 +1457,46 @@ class ChatService:
                 for prefix, key in mapping.items():
                     if line_lower.startswith(prefix):
                         value = line[len(prefix):].strip()
-                        value = self._clean_working_state_value(value)
-                        if value:
-                            updates[key] = value
+                        updates[key] = self._clean_working_state_value(value)
                         break
-        else:
-            patterns = {
-                "current_bug": r"(?:the bug is|bug is|issue is|error is|problem is)\s+([^\.]+)",
-                "next_move": r"(?:next step is|next move is|do this next|next is)\s+([^\.]+)",
-                "active_task": r"(?:working on|current task is|active task is)\s+([^\.]+)",
-                "last_success": r"(?:last success was|fixed|working now|good now|stable|restored)\s+([^\.]+)",
-            }
 
-            for key, pattern in patterns.items():
+            return self._merge_working_state(current_state or {}, updates)
+
+        if "c:\\" in lower:
+            for token in text.split():
+                token_clean = token.strip("`\"'(),")
+                if token_clean.lower().startswith("c:\\"):
+                    updates["current_file"] = token_clean
+                    break
+
+        patterns = {
+            "active_task": [
+                r"(?:working on|current task is|active task is)\s+(.+)",
+            ],
+            "current_bug": [
+                r"(?:bug is|error is|issue is|current bug is)\s+(.+)",
+            ],
+            "last_success": [
+                r"(?:last success was|fixed|working now|got working)\s+(.+)",
+            ],
+            "next_move": [
+                r"(?:next move is|next step is|do this next)\s+(.+)",
+            ],
+            "checkpoint": [
+                r"(?:checkpoint is|save point is|phase is)\s+(.+)",
+            ],
+        }
+
+        for key, regexes in patterns.items():
+            for pattern in regexes:
                 match = re.search(pattern, text, re.IGNORECASE)
                 if match:
-                    value = match.group(1).strip()
-                    if " and " in value:
-                        value = value.split(" and ")[0].strip()
+                    candidate = self._clean_working_state_value(match.group(1))
+                    if self._is_valid_state_value(candidate):
+                        updates[key] = candidate
+                    break
 
-                    value = self._clean_working_state_value(value)
-                    if self._is_valid_state_value(value):
-                        updates[key] = value
-
-            if "c:\\" in lower:
-                for token in text.split():
-                    if token.lower().startswith("c:\\"):
-                        updates["current_file"] = token.strip("`\"'(),")
-                        break
-
-        cleaned_updates = {}
-        for key, value in updates.items():
-            cleaned_value = self._clean_working_state_value(value)
-            if cleaned_value:
-                cleaned_updates[key] = cleaned_value
-
-        if current_state:
-            return self._merge_working_state(current_state, cleaned_updates)
-
-        return cleaned_updates
+        return self._merge_working_state(current_state or {}, updates)
 
     def _format_working_state(self, state):
         def c(x): return x if x else " "
@@ -1479,14 +1553,8 @@ class ChatService:
         if not isinstance(patch, dict) or not patch:
             return
 
-        session = self._ensure_session_payload(session_id)
-        current_state = session.get("working_state", {})
-
-        if not isinstance(current_state, dict):
-            current_state = {}
-
-        merged = dict(current_state)
-        merged.update(patch)
+        current_state = self._get_working_state(session_id)
+        merged = self._merge_working_state(current_state, patch)
 
         self._call_first(
             self.sessions,
@@ -2215,36 +2283,6 @@ class ChatService:
         session_id: str = "",
     ) -> str:
         user_text = self._safe_str(user_text)
-        user_lower = user_text.lower().strip()
-        inject_working_state = (
-            bool(session_id)
-            and len(user_lower) >= 2
-            and not any(
-                x in user_lower
-                for x in [
-                    "forget this",
-                    "delete memory",
-                    "clear memory",
-                    "reset memory",
-                ]
-            )
-        )
-
-
-        working_block = ""
-        if inject_working_state:
-            working_block = self._format_working_state_context(session_id)
-
-        print("WORKING BLOCK =", repr(working_block))
-
-        if not self._should_auto_inject_memory(user_text, decision):
-            if working_block:
-                return (
-                    f"{working_block}\n\n"
-                    "User message:\n"
-                    f"{user_text}"
-                )
-            return user_text
 
         memory_items = self._rank_memory_context(
             user_text=user_text,
@@ -2255,8 +2293,6 @@ class ChatService:
         memory_block = self._format_memory_context(memory_items[:3])
 
         sections = []
-        if working_block:
-            sections.append(working_block)
 
         if memory_block:
             sections.append(
@@ -2270,10 +2306,9 @@ class ChatService:
         return (
             "\n\n".join(sections)
             + "\n\nInstructions:\n"
-            + "- Treat the working context as the current project truth.\n"
-            + "- Answer from the working context first when it is relevant.\n"
-            + "- If the user asks what to do next, use Next move and Current bug before asking for more context.\n"
-            + "- Do not ask for context that is already present in the working context.\n\n"
+            + "- Answer clearly and directly.\n"
+            + "- Use relevant memory when it helps.\n"
+            + "- Do not claim missing context if the answer is already available.\n\n"
             + "User message:\n"
             + user_text
         )
@@ -2392,40 +2427,6 @@ class ChatService:
         )
 
         return payload
-
-    # ==============================
-    # EXECUTORS
-    # ==============================
-
-    def _execute_general_chat(
-        self,
-        decision: dict,
-        user_text: str,
-        session_id: str,
-        attachments=None,
-    ) -> dict:
-        user_msg = self._build_user_message(user_text, attachments=attachments or [])
-
-        assistant_text = "TEST_OK"
-
-        print("ASSISTANT_TEXT_RAW =", repr(assistant_text))
-
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text,
-            meta={},
-            attachments=[],
-        )
-
-        print("ASSISTANT_MSG_TEXT =", repr(assistant_msg.get("text")))
-
-        return self._finalize_response(
-            session_id=session_id,
-            user_text=user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision=decision,
-            saved_artifact=None,
-        )
 
     def _execute_memory_recall(
         self,
@@ -2576,7 +2577,10 @@ class ChatService:
         user_text: str,
         session_id: str,
         attachments=None,
+        working_state=None,
+        working_context_block="",
     ) -> dict:
+
         user_msg = self._build_user_message(user_text, attachments=attachments or [])
 
         lowered = self._safe_str(user_text).lower()
@@ -2862,7 +2866,10 @@ class ChatService:
         user_text: str,
         session_id: str = "",
         attachments=None,
+        working_state=None,
+        working_context_block="",
     ) -> dict:
+
         attachments = attachments or []
         route = self._safe_str(decision.get("route")) or self.ROUTE_GENERAL_CHAT
 
@@ -2911,6 +2918,8 @@ class ChatService:
             user_text=user_text,
             session_id=session_id,
             attachments=attachments,
+            working_state=working_state,
+            working_context_block=working_context_block,
         )
 
     def _ensure_session_payload(self, session_id: str) -> dict:
@@ -2964,6 +2973,9 @@ class ChatService:
         user_text = self._safe_str(user_text)
         session_id = self._ensure_session_id(session_id)
 
+        working_state = self._maybe_update_working_state(session_id, user_text)
+        working_context_block = self._build_working_context_block(session_id)
+
         current_state = self._get_working_state(session_id)
         updates = self._extract_working_state_updates(user_text, current_state)
         if updates:
@@ -2996,4 +3008,6 @@ class ChatService:
             user_text=user_text,
             session_id=session_id,
             attachments=attachments,
+            working_state=working_state,
+            working_context_block=working_context_block,
         )

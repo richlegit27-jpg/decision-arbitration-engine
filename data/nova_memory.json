@@ -138,5 +138,19 @@
     "normalized_text": "Active task: fixing working state Current file: C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py Current bug: session restore is inconsistent Next move: tighten extraction logic Checkpoint: system stable",
     "created_at": "2026-04-17T00:25:28.170882+00:00",
     "updated_at": "2026-04-17T00:25:28.170882+00:00"
+  },
+  {
+    "id": "memory_20260417045628510782",
+    "text": "Active task: fixing working state Current file: C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py Current bug: panel row hydration Last success: continuity reply works Next move: verify rows render from session working_state Checkpoint: backend/frontend bridge stable",
+    "kind": "project",
+    "source": "router_auto",
+    "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+    "weight": 1.0,
+    "tags": [],
+    "preview": "Active task: fixing working state Current file: C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py Current bug: panel row hydration L",
+    "quality_score": 5.75,
+    "normalized_text": "Active task: fixing working state Current file: C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py Current bug: panel row hydration Last success: continuity reply works Next move: verify rows render from session working_state Checkpoint: backend/frontend bridge stable",
+    "created_at": "2026-04-17T04:56:28.510776+00:00",
+    "updated_at": "2026-04-17T04:56:28.510776+00:00"
   }
 ]

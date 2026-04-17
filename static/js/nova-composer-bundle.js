@@ -307,6 +307,47 @@ function normalizeMessage(raw) {
   };
 }
 
+function buildWorkingContextFromWorkingState(rawState) {
+  const state = rawState && typeof rawState === "object" ? rawState : {};
+
+  const normalizedState = {
+    active_task: typeof state.active_task === "string" ? state.active_task : "",
+    current_file: typeof state.current_file === "string" ? state.current_file : "",
+    current_bug: typeof state.current_bug === "string" ? state.current_bug : "",
+    last_success: typeof state.last_success === "string" ? state.last_success : "",
+    next_move: typeof state.next_move === "string" ? state.next_move : "",
+    checkpoint: typeof state.checkpoint === "string" ? state.checkpoint : "",
+    updated_at: typeof state.updated_at === "string" ? state.updated_at : "",
+  };
+
+  const lines = [];
+
+  if (normalizedState.active_task) {
+    lines.push("Active task: " + normalizedState.active_task);
+  }
+  if (normalizedState.current_file) {
+    lines.push("Current file: " + normalizedState.current_file);
+  }
+  if (normalizedState.current_bug) {
+    lines.push("Current bug: " + normalizedState.current_bug);
+  }
+  if (normalizedState.last_success) {
+    lines.push("Last success: " + normalizedState.last_success);
+  }
+  if (normalizedState.next_move) {
+    lines.push("Next move: " + normalizedState.next_move);
+  }
+  if (normalizedState.checkpoint) {
+    lines.push("Checkpoint: " + normalizedState.checkpoint);
+  }
+
+  return {
+    show: lines.length > 0,
+    text: lines.length ? "Working context:\n- " + lines.join("\n- ") : "",
+    state: normalizedState,
+  };
+}
+
 function attachmentSummary(attachment) {
     const name = attachment.filename || attachment.name || "attachment";
     const size = formatBytes(attachment.size);
@@ -358,7 +399,23 @@ const state = {
   pendingUploads: [],
   pendingArtifactOpenId: "",
   uploadInFlightCount: 0,
-stream: {
+
+workingContext: {
+  show: false,
+  collapsed: false,
+  text: "",
+  state: {
+    active_task: "",
+    current_file: "",
+    current_bug: "",
+    last_success: "",
+    next_move: "",
+    checkpoint: "",
+    updated_at: "",
+  },
+},
+
+  stream: {
   controller: null,
   running: false,
   messageId: "",
@@ -747,53 +804,13 @@ function upsertMessage(rawMessage) {
 function upsertWorkingContextMessage(workingContext, targetMessageId) {
   const wc = normalizeWorkingContext(workingContext);
 
-  if (!wc.show) return null;
-  if (!targetMessageId) return null;
+  state.workingContext = wc.show ? wc : emptyWorkingContext();
 
-  const contextMessageId = "working_context_" + String(targetMessageId);
-
-  const contextMessage = normalizeMessage({
-    id: contextMessageId,
-    role: "assistant",
-    kind: "working_context",
-    text: wc.text || "",
-    working_context: wc,
-    parent_message_id: String(targetMessageId),
-    created_at: new Date().toISOString(),
-    pending: false,
-    streaming: false,
-    stopped: false,
-    error: false,
-    source: "working_context",
-    attachments: [],
-    meta: {},
-    artifact: {},
-    viewer: {},
-    image_url: "",
+  state.messages = (state.messages || []).filter(function (msg) {
+    return !(msg && msg.kind === "working_context");
   });
 
-  if (!contextMessage) return null;
-
-  const existingIndex = state.messages.findIndex(function (msg) {
-    return msg && msg.id === contextMessageId;
-  });
-
-  if (existingIndex >= 0) {
-    state.messages[existingIndex] = contextMessage;
-    return contextMessageId;
-  }
-
-  const targetIndex = state.messages.findIndex(function (msg) {
-    return msg && msg.id === targetMessageId;
-  });
-
-  if (targetIndex >= 0) {
-    state.messages.splice(targetIndex, 0, contextMessage);
-  } else {
-    state.messages.push(contextMessage);
-  }
-
-  return contextMessageId;
+  return targetMessageId || null;
 }
 
 function removeMessage(messageId) {
@@ -839,14 +856,14 @@ function removeMessage(messageId) {
 function applyStatePayload(payload) {
   const data = payload && typeof payload === "object" ? payload : {};
 
-state.activeSessionId = String(
-  data.active_session_id ||
-  data.session_id ||
-  (data.session && data.session.id) ||
-  (data.active_session && data.active_session.id) ||
-  state.activeSessionId ||
-  ""
-).trim();
+  state.activeSessionId = String(
+    data.active_session_id ||
+    data.session_id ||
+    (data.session && data.session.id) ||
+    (data.active_session && data.active_session.id) ||
+    state.activeSessionId ||
+    ""
+  ).trim();
 
   if (Array.isArray(data.sessions)) {
     setSessions(data.sessions);
@@ -862,27 +879,76 @@ state.activeSessionId = String(
     state.messages = state.messages || [];
   }
 
-if (data.assistant_message) {
-  const assistantMsg = normalizeMessage(data.assistant_message);
-  const hasSessionMessages =
-    (data.active_session && Array.isArray(data.active_session.messages) && data.active_session.messages.length > 0) ||
-    (data.session && Array.isArray(data.session.messages) && data.session.messages.length > 0) ||
-    (Array.isArray(data.messages) && data.messages.length > 0);
+  state.messages = state.messages.filter(function (msg) {
+    return msg && msg.kind !== "working_context";
+  });
 
-  if (assistantMsg && !hasSessionMessages) {
-    const existingAssistant = state.messages.some(function (msg) {
-      return (
-        msg &&
-        msg.role === "assistant" &&
-        String(msg.text || "").trim() === String(assistantMsg.text || "").trim()
-      );
-    });
+  const sessionWorkingState =
+    (data.active_session && data.active_session.working_state) ||
+    (data.session && data.session.working_state) ||
+    {};
 
-    if (!existingAssistant) {
-      upsertMessage(assistantMsg);
+  const explicitWorkingContext =
+    normalizeWorkingContext(
+      (data.working_context && typeof data.working_context === "object"
+        ? data.working_context
+        : null) ||
+      (data.session &&
+      data.session.working_context &&
+      typeof data.session.working_context === "object"
+        ? data.session.working_context
+        : null) ||
+      emptyWorkingContext()
+    );
+
+  const previousWorkingContext = normalizeWorkingContext(
+    state.workingContext || emptyWorkingContext()
+  );
+
+  const sessionWorkingContext =
+    buildWorkingContextFromWorkingState(sessionWorkingState);
+
+  state.workingContext = sessionWorkingContext.show
+    ? Object.assign({}, sessionWorkingContext, {
+        collapsed: previousWorkingContext.collapsed,
+      })
+    : emptyWorkingContext();
+
+  if (data.working_context) {
+    const liveWorkingContext = normalizeWorkingContext(data.working_context);
+    state.workingContext = liveWorkingContext.show
+      ? Object.assign({}, liveWorkingContext, {
+          collapsed: previousWorkingContext.collapsed,
+        })
+      : emptyWorkingContext();
+  }
+
+  if (data.assistant_message) {
+    const assistantMsg = normalizeMessage(data.assistant_message);
+    const hasSessionMessages =
+      (data.active_session &&
+        Array.isArray(data.active_session.messages) &&
+        data.active_session.messages.length > 0) ||
+      (data.session &&
+        Array.isArray(data.session.messages) &&
+        data.session.messages.length > 0) ||
+      (Array.isArray(data.messages) && data.messages.length > 0);
+
+    if (assistantMsg && !hasSessionMessages) {
+      const existingAssistant = state.messages.some(function (msg) {
+        return (
+          msg &&
+          msg.role === "assistant" &&
+          msg.kind !== "working_context" &&
+          String(msg.text || "").trim() === String(assistantMsg.text || "").trim()
+        );
+      });
+
+      if (!existingAssistant) {
+        upsertMessage(assistantMsg);
+      }
     }
   }
-}
 
   state.artifacts = safeArray(data.artifacts);
   state.memory = safeArray(data.memory);
@@ -904,12 +970,14 @@ if (data.assistant_message) {
   updateTopbarFromState();
 
   try {
-    window.dispatchEvent(new CustomEvent("nova:composer-state", {
-      detail: {
-        session_id: state.activeSessionId,
-        artifacts: state.artifacts || []
-      }
-    }));
+    window.dispatchEvent(
+      new CustomEvent("nova:composer-state", {
+        detail: {
+          session_id: state.activeSessionId,
+          artifacts: state.artifacts || [],
+        },
+      })
+    );
   } catch (e) {
     console.warn("composer-state dispatch failed", e);
   }
@@ -1374,10 +1442,221 @@ function renderMessageCard(message) {
   );
 }
 
+function renderWorkingContextPanel() {
+  const wc = normalizeWorkingContext(state.workingContext || emptyWorkingContext());
+
+  if (!wc.show) {
+    return "";
+  }
+
+  const items = [];
+
+  if (wc.state.active_task) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Active task</span><span class="nova-working-context-value">${escapeHtml(wc.state.active_task)}</span></div>`
+    );
+  }
+
+  if (wc.state.current_file) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Current file</span><span class="nova-working-context-value">${escapeHtml(wc.state.current_file)}</span></div>`
+    );
+  }
+
+  if (wc.state.current_bug) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Current bug</span><span class="nova-working-context-value">${escapeHtml(wc.state.current_bug)}</span></div>`
+    );
+  }
+
+  if (wc.state.last_success) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Last success</span><span class="nova-working-context-value">${escapeHtml(wc.state.last_success)}</span></div>`
+    );
+  }
+
+  if (wc.state.next_move) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Next move</span><span class="nova-working-context-value">${escapeHtml(wc.state.next_move)}</span></div>`
+    );
+  }
+
+  if (wc.state.checkpoint) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Checkpoint</span><span class="nova-working-context-value">${escapeHtml(wc.state.checkpoint)}</span></div>`
+    );
+  }
+
+  if (!items.length && wc.text) {
+    items.push(
+      `<pre class="nova-working-context-pre">${escapeHtml(wc.text)}</pre>`
+    );
+  }
+
+  return `
+    <section class="nova-working-context-panel" data-working-context-panel>
+      <div class="nova-working-context-header">
+        <span class="nova-working-context-kicker">Working context</span>
+      </div>
+      <div class="nova-working-context-body">
+        ${items.join("")}
+      </div>
+    </section>
+  `;
+}
+function normalizeWorkingContext(raw) {
+  const input = raw && typeof raw === "object" ? raw : {};
+  const rawState =
+    input.state && typeof input.state === "object" ? input.state : {};
+
+  return {
+    show: Boolean(input.show),
+    collapsed: Boolean(input.collapsed),
+    text: typeof input.text === "string" ? input.text : "",
+    state: {
+      active_task:
+        typeof rawState.active_task === "string" ? rawState.active_task : "",
+      current_file:
+        typeof rawState.current_file === "string" ? rawState.current_file : "",
+      current_bug:
+        typeof rawState.current_bug === "string" ? rawState.current_bug : "",
+      last_success:
+        typeof rawState.last_success === "string" ? rawState.last_success : "",
+      next_move:
+        typeof rawState.next_move === "string" ? rawState.next_move : "",
+      checkpoint:
+        typeof rawState.checkpoint === "string" ? rawState.checkpoint : "",
+      updated_at:
+        typeof rawState.updated_at === "string" ? rawState.updated_at : "",
+    },
+  };
+}
+
+function emptyWorkingContext() {
+  return {
+    show: false,
+    collapsed: false,
+    text: "",
+    state: {
+      active_task: "",
+      current_file: "",
+      current_bug: "",
+      last_success: "",
+      next_move: "",
+      checkpoint: "",
+      updated_at: "",
+    },
+  };
+}
+
+function renderWorkingContextPanel() {
+  const wc = normalizeWorkingContext(state.workingContext || emptyWorkingContext());
+
+  if (!wc.show) {
+    return "";
+  }
+
+  const items = [];
+
+  if (wc.state.active_task) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Active task</span><span class="nova-working-context-value">${escapeHtml(wc.state.active_task)}</span></div>`
+    );
+  }
+
+  if (wc.state.current_file) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Current file</span><span class="nova-working-context-value">${escapeHtml(wc.state.current_file)}</span></div>`
+    );
+  }
+
+  if (wc.state.current_bug) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Current bug</span><span class="nova-working-context-value">${escapeHtml(wc.state.current_bug)}</span></div>`
+    );
+  }
+
+  if (wc.state.last_success) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Last success</span><span class="nova-working-context-value">${escapeHtml(wc.state.last_success)}</span></div>`
+    );
+  }
+
+  if (wc.state.next_move) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Next move</span><span class="nova-working-context-value">${escapeHtml(wc.state.next_move)}</span></div>`
+    );
+  }
+
+  if (wc.state.checkpoint) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Checkpoint</span><span class="nova-working-context-value">${escapeHtml(wc.state.checkpoint)}</span></div>`
+    );
+  }
+
+  if (!items.length && wc.text) {
+    items.push(
+      `<pre class="nova-working-context-pre">${escapeHtml(wc.text)}</pre>`
+    );
+  }
+
+  const collapsedClass = wc.collapsed ? " is-collapsed" : "";
+  const buttonLabel = wc.collapsed ? "Expand working context" : "Collapse working context";
+  const chevron = wc.collapsed ? "▸" : "▾";
+
+  return `
+    <section class="nova-working-context-panel${collapsedClass}" data-working-context-panel>
+      <button
+        type="button"
+        class="nova-working-context-toggle"
+        data-working-context-toggle
+        aria-expanded="${wc.collapsed ? "false" : "true"}"
+        aria-label="${buttonLabel}"
+        title="${buttonLabel}"
+      >
+        <div class="nova-working-context-header">
+          <span class="nova-working-context-kicker">Working context</span>
+          <span class="nova-working-context-chevron" aria-hidden="true">${chevron}</span>
+        </div>
+      </button>
+      <div class="nova-working-context-body"${wc.collapsed ? ' hidden' : ""}>
+        ${items.join("")}
+      </div>
+    </section>
+  `;
+}
+
+function wireWorkingContextPanel() {
+  if (!els.chatThread) return;
+
+  const toggle = els.chatThread.querySelector("[data-working-context-toggle]");
+  if (!toggle) return;
+
+  toggle.onclick = function () {
+    const current = normalizeWorkingContext(state.workingContext || emptyWorkingContext());
+
+    state.workingContext = Object.assign({}, current, {
+      collapsed: !current.collapsed,
+    });
+
+    renderChat();
+  };
+}
+
+
 function renderChat() {
   if (!els.chatThread) return;
+
+  state.messages = (state.messages || []).filter(function (msg) {
+    return !(msg && msg.kind === "working_context");
+  });
+
   setChatEmptyVisible(state.messages.length === 0);
 
+  const workingContextHtml = renderWorkingContextPanel();
+  const messagesHtml = state.messages.map(renderMessageCard).join("");
+
+  log("renderChat workingContext", state.workingContext);
   log(
     "renderChat working_context rows",
     state.messages.filter(function (msg) {
@@ -1385,7 +1664,8 @@ function renderChat() {
     })
   );
 
-  els.chatThread.innerHTML = state.messages.map(renderMessageCard).join("");
+  els.chatThread.innerHTML = workingContextHtml + messagesHtml;
+  wireWorkingContextPanel();
   updateTopbarFromState();
   scrollChatToBottom(true);
 }
@@ -4094,29 +4374,95 @@ function scoreMemoryAgainstText(item, text) {
   return score;
 }
 
-function normalizeWorkingContext(raw) {
-  const input = raw && typeof raw === "object" ? raw : {};
-  const state =
-    input.state && typeof input.state === "object" ? input.state : {};
+function renderWorkingContextPanel() {
+  const wc = normalizeWorkingContext(state.workingContext || emptyWorkingContext());
 
+  if (!wc.show) {
+    return "";
+  }
+
+  const items = [];
+
+  if (wc.state.active_task) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Active task</span><span class="nova-working-context-value">${escapeHtml(wc.state.active_task)}</span></div>`
+    );
+  }
+
+  if (wc.state.current_file) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Current file</span><span class="nova-working-context-value">${escapeHtml(wc.state.current_file)}</span></div>`
+    );
+  }
+
+  if (wc.state.current_bug) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Current bug</span><span class="nova-working-context-value">${escapeHtml(wc.state.current_bug)}</span></div>`
+    );
+  }
+
+  if (wc.state.last_success) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Last success</span><span class="nova-working-context-value">${escapeHtml(wc.state.last_success)}</span></div>`
+    );
+  }
+
+  if (wc.state.next_move) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Next move</span><span class="nova-working-context-value">${escapeHtml(wc.state.next_move)}</span></div>`
+    );
+  }
+
+  if (wc.state.checkpoint) {
+    items.push(
+      `<div class="nova-working-context-row"><span class="nova-working-context-label">Checkpoint</span><span class="nova-working-context-value">${escapeHtml(wc.state.checkpoint)}</span></div>`
+    );
+  }
+
+  if (!items.length && wc.text) {
+    items.push(
+      `<pre class="nova-working-context-pre">${escapeHtml(wc.text)}</pre>`
+    );
+  }
+
+  const collapsedClass = wc.collapsed ? " is-collapsed" : "";
+  const buttonLabel = wc.collapsed ? "Expand working context" : "Collapse working context";
+  const chevron = wc.collapsed ? "▸" : "▾";
+
+  return `
+    <section class="nova-working-context-panel${collapsedClass}" data-working-context-panel>
+      <button
+        type="button"
+        class="nova-working-context-toggle"
+        data-working-context-toggle
+        aria-expanded="${wc.collapsed ? "false" : "true"}"
+        aria-label="${buttonLabel}"
+        title="${buttonLabel}"
+      >
+        <div class="nova-working-context-header">
+          <span class="nova-working-context-kicker">Working context</span>
+          <span class="nova-working-context-chevron" aria-hidden="true">${chevron}</span>
+        </div>
+      </button>
+      <div class="nova-working-context-body"${wc.collapsed ? ' hidden' : ""}>
+        ${items.join("")}
+      </div>
+    </section>
+  `;
+}
+
+function emptyWorkingContext() {
   return {
-    show: Boolean(input.show),
-    text: typeof input.text === "string" ? input.text : "",
+    show: false,
+    text: "",
     state: {
-      active_task:
-        typeof state.active_task === "string" ? state.active_task : "",
-      current_file:
-        typeof state.current_file === "string" ? state.current_file : "",
-      current_bug:
-        typeof state.current_bug === "string" ? state.current_bug : "",
-      last_success:
-        typeof state.last_success === "string" ? state.last_success : "",
-      next_move:
-        typeof state.next_move === "string" ? state.next_move : "",
-      checkpoint:
-        typeof state.checkpoint === "string" ? state.checkpoint : "",
-      updated_at:
-        typeof state.updated_at === "string" ? state.updated_at : "",
+      active_task: "",
+      current_file: "",
+      current_bug: "",
+      last_success: "",
+      next_move: "",
+      checkpoint: "",
+      updated_at: "",
     },
   };
 }
