@@ -1436,43 +1436,118 @@ class ChatService:
             patch["checkpoint"] = checkpoint_match.group(1).strip()
 
         return patch
-    def _handle_where_are_we(self, session_id: str) -> str:
-        state = self._get_working_state(session_id)
 
-        if not isinstance(state, dict) or not state:
-            return "No working context yet."
+    def _handle_where_are_we(self, session_id: str, user_text: str = "") -> str:
+        state = self._get_working_state(session_id) or {}
 
-        active_task = self._safe_str(state.get("active_task"))
-        current_file = self._safe_str(state.get("current_file"))
-        current_bug = self._safe_str(state.get("current_bug"))
-        last_success = self._safe_str(state.get("last_success"))
-        next_move = self._safe_str(state.get("next_move"))
-        checkpoint = self._safe_str(state.get("checkpoint"))
+        active_task = self._safe_str(state.get("active_task")).strip()
+        current_file = self._safe_str(state.get("current_file")).strip()
+        current_bug = self._safe_str(state.get("current_bug")).strip()
+        last_success = self._safe_str(state.get("last_success")).strip()
+        next_move = self._safe_str(state.get("next_move")).strip()
+        checkpoint = self._safe_str(state.get("checkpoint")).strip()
 
-        lines = ["Current status I m tracking:"]
+        lowered = self._safe_str(user_text).lower().strip()
+
+        if not any([active_task, current_file, current_bug, last_success, next_move, checkpoint]):
+            return "I do not have a working context locked in yet."
+
+        if any(
+            phrase in lowered
+            for phrase in [
+                "what file are we in",
+                "current file",
+                "which file",
+                "what file",
+            ]
+        ):
+            if current_file:
+                return f"We’re in `{current_file}`."
+            return "I do not have the current file locked in yet."
+
+        if any(
+            phrase in lowered
+            for phrase in [
+                "what broke",
+                "what is broken",
+                "current bug",
+                "bug",
+                "issue",
+                "error",
+            ]
+        ):
+            if current_bug:
+                return f"What broke: {current_bug}"
+            return "I do not have a current bug locked in."
+
+        if any(
+            phrase in lowered
+            for phrase in [
+                "what did we fix",
+                "what was fixed",
+                "last success",
+                "what worked",
+                "what is working",
+            ]
+        ):
+            if last_success:
+                return f"What we fixed: {last_success}"
+            return "I do not have a last success locked in yet."
+
+        if any(
+            phrase in lowered
+            for phrase in [
+                "what's next",
+                "whats next",
+                "what is next",
+                "next move",
+                "next step",
+                "now what",
+            ]
+        ):
+            if next_move:
+                return f"Next: {next_move}"
+            return "I do not have a next move locked in yet."
+
+        if any(
+            phrase in lowered
+            for phrase in [
+                "checkpoint",
+                "save point",
+                "phase",
+            ]
+        ):
+            if checkpoint:
+                return f"Checkpoint: {checkpoint}"
+            return "I do not have a checkpoint locked in yet."
+
+        lines = []
 
         if active_task:
-            lines.append(f"- Active task: {active_task}")
-        if current_file:
-            lines.append(f"- Current file: `{current_file}`")
+            lines.append(f"Active task: {active_task}")
         if current_bug:
-            lines.append(f"- Current bug: {current_bug}")
+            lines.append(f"Current bug: {current_bug}")
+        if current_file:
+            lines.append(f"Current file: `{current_file}`")
         if last_success:
-            lines.append(f"- Last success: {last_success}")
+            lines.append(f"Last success: {last_success}")
         if next_move:
-            lines.append(f"- Next move: {next_move}")
+            lines.append(f"Next move: {next_move}")
         if checkpoint:
-            lines.append(f"- Checkpoint: {checkpoint}")
+            lines.append(f"Checkpoint: {checkpoint}")
 
-        if next_move:
-            lines.append("")
-            lines.append(f"Immediate focus: {next_move}")
+        if not lines:
+            return "I do not have a working context locked in yet."
 
-        return "\n".join(lines).strip()
-    def _is_valid_state_value(self, value):
-        if not value:
-            return False
-        return True
+        if active_task and next_move:
+            return (
+                f"We’re {active_task}. "
+                f"Next: {next_move}"
+                + (f" Current file: `{current_file}`." if current_file else "")
+                + (f" Current bug: {current_bug}." if current_bug else "")
+            )
+
+        return "\n".join(lines)
 
     # =========================
     # WORKING STATE HELPERS
@@ -2725,7 +2800,7 @@ class ChatService:
         wants_where_are_we = lowered in continuity_triggers
 
         if wants_where_are_we:
-            assistant_text = self._safe_str(self._handle_where_are_we(session_id))
+            assistant_text = self._safe_str(self._handle_where_are_we(session_id, user_text))
         else:
             memory_context = ""
             session = self.sessions.get_session(session_id) or {}
