@@ -545,136 +545,9 @@ class ChatService:
             "collapsed": False,
         }
 
-
     # =========================
-    # PROMPT + CONTINUITY HELPERS (PHASE 4 POLISH)
+    # WORKING STATE HELPERS
     # =========================
-
-    def _normalize_working_state(self, working_state):
-        working_state = working_state or {}
-        keys = [
-            "active_task",
-            "current_file",
-            "current_bug",
-            "last_success",
-            "next_move",
-            "checkpoint",
-        ]
-
-        clean = {}
-        for key in keys:
-            value = working_state.get(key, "")
-            if value is None:
-                value = ""
-            value = str(value).strip()
-            if value:
-                clean[key] = value
-
-        return clean
-
-
-    def _build_working_state_summary(self, working_state):
-        ws = self._normalize_working_state(working_state)
-        if not ws:
-            return ""
-
-        lines = []
-
-        mapping = [
-            ("active_task", "Active task"),
-            ("current_file", "Current file"),
-            ("current_bug", "Current bug"),
-            ("last_success", "Last success"),
-            ("next_move", "Next move"),
-            ("checkpoint", "Checkpoint"),
-        ]
-
-        for key, label in mapping:
-            value = ws.get(key, "").strip()
-            if value:
-                lines.append(f"{label}: {value}")
-
-        if not lines:
-            return ""
-
-        return "Working context:\n" + "\n".join(lines)
-
-
-    def _build_continuity_context(self, session=None):
-        session = session or {}
-        working_state = session.get("working_state") or {}
-
-        summary = self._build_working_state_summary(working_state)
-
-        if not summary:
-            return ""
-
-        return summary
-
-
-    def _build_system_prompt(self, decision=None):
-        parts = []
-
-        parts.append(
-            "You are Nova, a focused AI workspace assistant. "
-            "Be clear, direct, continuity-aware, and useful. "
-            "Prefer action over explanation. "
-            "Do not ramble. "
-            "Preserve the user's momentum."
-        )
-
-        parts.append(
-            "When coding or project-building, be precise and operational. "
-            "Keep outputs structured and grounded in the user's active work."
-        )
-
-        parts.append(
-            "Response style rules: "
-            "be concise, confident, and practical. "
-            "Prefer direct answers first. "
-            "Avoid generic assistant filler. "
-            "When relevant, anchor the reply to the user's active file, bug, or next move. "
-            "Do not repeat the working context unless it improves the reply. "
-            "Use it quietly to stay aligned."
-        )
-
-        if decision and isinstance(decision, dict):
-            mode = (decision.get("mode") or "").strip()
-            if mode:
-                parts.append(f"Current operating mode: {mode}.")
-
-        return "\n\n".join([p for p in parts if p]).strip()
-
-
-    def _compose_model_messages(self, user_text, session=None, decision=None, memory_context=None):
-        session = session or {}
-        memory_context = memory_context or ""
-
-        system_prompt = self._build_system_prompt(decision=decision)
-        continuity_context = self._build_continuity_context(session=session)
-
-        messages = [
-            {"role": "system", "content": system_prompt}
-        ]
-
-        if continuity_context:
-            messages.append({
-                "role": "system",
-                "content": continuity_context
-            })
-
-        if memory_context:
-            messages.append({
-                "role": "system",
-                "content": f"Relevant memory:\n{memory_context}"
-            })
-
-        messages.append({
-            "role": "user",
-            "content": user_text or ""
-        })
-
-        return messages
 
     def _maybe_update_working_state(self, session_id: str, user_text: str):
         session_id = self._safe_str(session_id).strip()
@@ -1449,7 +1322,7 @@ class ChatService:
         next_move = self._safe_str(state.get("next_move"))
         checkpoint = self._safe_str(state.get("checkpoint"))
 
-        lines = ["Current status I m tracking:"]
+        lines = ["Current status I’m tracking:"]
 
         if active_task:
             lines.append(f"- Active task: {active_task}")
@@ -2722,27 +2595,27 @@ class ChatService:
             "what did we fix",
         }
 
-        wants_where_are_we = lowered in continuity_triggers
-
-        if wants_where_are_we:
+        if lowered in continuity_triggers:
             assistant_text = self._safe_str(self._handle_where_are_we(session_id))
         else:
-            memory_context = ""
-            session = self.sessions.get_session(session_id) or {}
-
-            messages = self._compose_model_messages(
+            chat_input = self._build_chat_input(
                 user_text=user_text,
-                session=session,
                 decision=decision,
-                memory_context=memory_context,
+                session_id=session_id,
             )
+
+            if working_context_block:
+                chat_input = (
+                    f"{working_context_block}\n\n"
+                    f"{self._safe_str(chat_input)}"
+                ).strip()
 
             assistant_text = ""
 
             try:
                 response = self.client.responses.create(
                     model=self.chat_model,
-                    input=messages,
+                    input=chat_input,
                 )
 
                 if hasattr(response, "output_text") and response.output_text:
@@ -2780,7 +2653,6 @@ class ChatService:
             assistant_meta["working_state"] = working_state
         if working_context_block:
             assistant_meta["working_context_block"] = working_context_block
-
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
             meta=assistant_meta,
@@ -2794,6 +2666,75 @@ class ChatService:
             assistant_msg=assistant_msg,
             decision=decision,
             saved_artifact=None,
+        )
+
+            if not assistant_text or not assistant_text.strip():
+                assistant_text = "?? No response generated."
+
+        updates = self._extract_working_state_updates(
+            user_text=user_text,
+            current_state=self._get_working_state(session_id),
+        )
+
+        print("WORKING_STATE_UPDATES =", updates)
+
+        if updates:
+            self._update_working_state(session_id, updates)
+
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            meta={},
+            attachments=[],
+        )
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=None,
+        )
+
+        saved_artifact = result.get("saved_artifact") or {}
+
+        saved_artifact = self._upgrade_image_artifact_payload(
+            artifact=saved_artifact,
+            prompt=prompt,
+            revised_prompt=self._safe_str(result.get("revised_prompt")) if isinstance(result, dict) else "",
+            source_type=self._safe_str(result.get("source_type")) or "generated",
+            generation_mode=self._safe_str(result.get("generation_mode")) or "text_to_image",
+        )
+
+        artifact_id = (
+            self._safe_str(saved_artifact.get("id"))
+            or self._safe_str(result.get("parent_artifact_id"))
+        )
+
+        assistant_msg = self._build_assistant_message(
+            text=self._safe_str(saved_artifact.get("summary"))
+            or self._safe_str(result.get("text"))
+            or f"Generated image for: {prompt}",
+            meta={
+                "image_generation": True,
+                "image_url": self._safe_str(result.get("image_url")),
+                "prompt": self._safe_str(result.get("prompt")) or prompt,
+                "revised_prompt": self._safe_str(result.get("revised_prompt")),
+                "artifact_id": artifact_id,
+                "parent_artifact_id": self._safe_str(result.get("parent_artifact_id")),
+                "source_type": self._safe_str(result.get("source_type")) or "generated",
+                "generation_mode": self._safe_str(result.get("generation_mode")) or "text_to_image",
+            },
+            attachments=[],
+        )
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=saved_artifact,
         )
 
     def _execute_web_operator(self, user_text: str, session_id: str) -> dict:
