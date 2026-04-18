@@ -628,7 +628,7 @@ class ChatService:
         # Step 1: try relevant memory
         relevant_items = self._select_relevant_memory(user_text, limit=memory_limit)
 
-        # Step 2: fallback → recent memory
+        # Step 2: fallback â†’ recent memory
         if not relevant_items:
             try:
                 if hasattr(self, "memory") and self.memory:
@@ -727,7 +727,7 @@ class ChatService:
         if not lines:
             return "I do not have any saved memory yet."
 
-        return "Here’s what I remember:\n" + "\n".join(lines)
+        return "Hereâ€™s what I remember:\n" + "\n".join(lines)
 
     def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
         if not isinstance(decision, dict):
@@ -1102,7 +1102,7 @@ class ChatService:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "I’m here, but the model returned an empty response."
+        return "Iâ€™m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -1281,34 +1281,27 @@ class ChatService:
             normalized.append(f"{title}|{status}|{notes}")
         return normalized
 
-    def _looks_like_execution(self, text: str, decision: dict | None) -> bool:
-        t = str(text or "").lower().strip()
-        if not t:
+
+    def _looks_like_execution(self, user_text: str, decision: dict | None = None) -> bool:
+        text = str(user_text or "").strip().lower()
+
+        if not text:
             return False
 
-        triggers = [
-            "plan",
-            "steps",
-            "step by step",
-            "research",
-            "compare",
-            "analyze",
-            "build",
-            "roadmap",
-            "best",
-            "approach",
-        ]
-
-        if any(x in t for x in triggers):
+        # 🔥 DIRECT TRIGGERS (run / execute)
+        if any(x in text for x in ["run it", "execute", "start execution", "run this"]):
             return True
 
-        if isinstance(decision, dict):
-            if decision.get("mode") in ("planning", "analysis"):
-                return True
-            if decision.get("use_tools"):
-                return True
+        # 🔥 PLAN CREATION
+        if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
+            return True
 
-        return len(t.split()) >= 12
+        # 🔥 FALLBACK: coding / structured intent
+        if decision and decision.get("mode") in {"coding", "analysis"}:
+            return True
+
+        return False
+
 
     def _execution_step_titles_for_goal(self, goal: str) -> list[str]:
         lowered = str(goal or "").lower()
@@ -1530,9 +1523,488 @@ class ChatService:
 
         return payload
 
-    # ==============================
-    # SESSION HELPERS
-    # ==============================
+# =========================
+# EXECUTION PROGRESSION (PHASE 5)
+# =========================
+
+    def _looks_like_execution_progression(self, user_text: str) -> bool:
+        text = (user_text or "").lower()
+
+        triggers = [
+            # 🔥 CRITICAL FIX
+            "run it",
+            "run",
+            "execute",
+            "start",
+
+            # existing
+            "advance execution",
+            "next step",
+            "continue execution",
+            "keep going",
+            "proceed",
+            "go next",
+        ]
+
+        return any(t in text for t in triggers)
+
+    def _advance_execution_request(self, user_text: str, session_id: str = "", attachments=None):
+        attachments = attachments or []
+
+        artifacts = self._call_first(
+            self.artifacts,
+            ["list", "get_all", "get_artifacts", "list_artifacts"],
+        ) or []
+        session_id = self._safe_str(session_id)
+
+        latest = None
+        for artifact in reversed(artifacts):
+            if not isinstance(artifact, dict):
+                continue
+            if session_id and self._safe_str(artifact.get("session_id")) != session_id:
+                continue
+            body = self._safe_str(artifact.get("body"))
+            title = self._safe_str(artifact.get("title")).lower()
+            if (
+    		"execution plan" in title.lower()
+   		or "progress:" in body.lower()
+    		or "[>]" in body
+	    ):
+                latest = artifact
+                break
+
+        if not latest:
+            user_msg = self._build_user_message(
+                user_text,
+                attachments=attachments,
+            )
+            assistant_msg = self._build_assistant_message(
+                text="No execution found. Start with a plan first.",
+                attachments=[],
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision={
+                    "route": "execution",
+                    "mode": "execution_progress",
+                    "save_artifact": False,
+                    "save_memory": False,
+                    "use_memory": True,
+                },
+                saved_artifact=None,
+            )
+
+        body_lines = self._safe_str(latest.get("body")).splitlines()
+
+        new_lines = []
+        advanced = False
+        current_index = -1
+
+        for i, line in enumerate(body_lines):
+            if "[>]" in line and not advanced:
+                new_lines.append(line.replace("[>]", "[âœ“]"))
+                advanced = True
+                current_index = i
+            else:
+                new_lines.append(line)
+
+        if advanced:
+            for j in range(current_index + 1, len(new_lines)):
+                if "[ ]" in new_lines[j]:
+                    new_lines[j] = new_lines[j].replace("[ ]", "[>]")
+                    break
+
+        total = sum(1 for l in new_lines if "[ ]" in l or "[>]" in l or "[âœ“]" in l)
+        done = sum(1 for l in new_lines if "[âœ“]" in l)
+
+        updated_body = "\n".join(new_lines)
+        updated_body = re.sub(
+            r"Progress:\s*\d+/\d+",
+            f"Progress: {done}/{total}",
+            updated_body,
+        )
+
+        if done == total and total > 0:
+            if "Current step:" in updated_body:
+                updated_body = re.sub(
+                    r"Current step:\s*.*",
+                    "Current step: Complete",
+                    updated_body,
+                )
+
+        artifact_payload = dict(latest)
+        artifact_payload["body"] = updated_body
+        artifact_payload["preview"] = updated_body[:140]
+
+        saved_artifact = self._call_first(
+            self.artifacts,
+            ["save_artifact", "create", "save"],
+            artifact_payload,
+        )
+
+        assistant_text = f"Step advanced.\n\n{updated_body}"
+
+        user_msg = self._build_user_message(
+            user_text,
+            attachments=attachments,
+        )
+
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            attachments=[],
+        )
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision={
+                "route": "execution",
+                "mode": "execution_progress",
+                "save_artifact": True,
+                "save_memory": False,
+                "use_memory": True,
+            },
+            saved_artifact=saved_artifact,
+        )
+
+    # =========================
+    # AUTO EXECUTION LOOP (PHASE 6)
+    # =========================
+
+    def _looks_like_auto_execution_request(self, user_text: str) -> bool:
+        text = (user_text or "").strip().lower()
+        print("AUTO_EXEC RAW =", repr(user_text))
+        print("AUTO_EXEC NORMALIZED =", repr(text))
+
+        if not text:
+            return False
+
+        triggers = [
+            "run it",
+            "execute it",
+            "continue",
+            "continue execution",
+            "finish the plan",
+            "auto execute",
+            "run the plan",
+            "do it",
+            "run",
+            "execute",
+            "start",
+            "next",
+        ]
+
+        matched = text in triggers or any(t in text for t in triggers)
+        print("AUTO_EXEC MATCHED =", matched)
+        return matched
+
+    def _find_latest_execution_artifact(self, session_id):
+        try:
+            artifacts = (
+                self.artifacts.all()
+                if getattr(self, "artifacts", None) and hasattr(self.artifacts, "all")
+                else []
+            )
+
+            print("EXEC FIND artifacts count =", len(artifacts))
+
+            if not session_id:
+                return None
+
+            matches = []
+            for artifact in artifacts:
+                if not isinstance(artifact, dict):
+                    continue
+
+                artifact_session_id = str(artifact.get("session_id", "")).strip()
+                title = str(artifact.get("title", "")).strip().lower()
+                body = str(artifact.get("body", "")).strip().lower()
+
+                if artifact_session_id != str(session_id).strip():
+                    continue
+
+                if "execution" not in title and "steps:" not in body and "[>]" not in body:
+                    continue
+
+                matches.append(artifact)
+
+            if not matches:
+                print("EXEC FIND no execution artifact for session =", session_id)
+                return None
+
+            matches.sort(
+                key=lambda a: str(
+                    a.get("updated_at")
+                    or a.get("created_at")
+                    or a.get("timestamp")
+                    or ""
+                ),
+                reverse=True,
+            )
+
+            latest = matches[0]
+            print(
+                "EXEC FIND latest execution artifact =",
+                latest.get("id"),
+                latest.get("title"),
+            )
+            return latest
+
+        except Exception as e:
+            print("EXEC FIND failed:", e)
+            return None
+
+    def _refresh_execution_header(self, body: str, current_step: str = ""):
+        text = self._safe_str(body)
+
+        if not text.strip():
+            return text, 0, 0
+
+        lines = text.splitlines()
+        refreshed = []
+        replaced = False
+        done = 0
+        total = 0
+
+        for line in lines:
+            stripped = line.strip()
+
+            if any(x in stripped for x in ["[ ]", "[>]", "[x]", "[X]", "✔"]):
+                total += 1
+
+            if any(x in stripped for x in ["[x]", "[X]", "✔"]):
+                done += 1
+
+            if stripped.lower().startswith("progress:"):
+                refreshed.append(f"Progress: {done}/{total} complete")
+                continue
+
+            if stripped.lower().startswith("current step:"):
+                refreshed.append(f"Current step: {self._safe_str(current_step).strip()}")
+                replaced = True
+                continue
+
+            refreshed.append(line)
+
+        if not replaced and self._safe_str(current_step).strip():
+            if refreshed and refreshed[-1].strip():
+                refreshed.append("")
+            refreshed.append(f"Current step: {self._safe_str(current_step).strip()}")
+
+        return "\n".join(refreshed).strip(), done, total
+
+    def _extract_execution_lines(self, body: str):
+        lines = self._safe_str(body).splitlines()
+        step_indexes = []
+        current_index = -1
+
+        for i, line in enumerate(lines):
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "✔"]):
+                step_indexes.append(i)
+
+            if "[>]" in line:
+                current_index = i
+
+        return lines, step_indexes, current_index
+
+    def _rewrite_execution_progress(self, lines):
+        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "✔"]))
+        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "✔"]))
+
+        updated = "\n".join(lines)
+        updated = re.sub(
+            r"Progress:\s*\d+/\d+",
+            f"Progress: {done}/{total}",
+            updated,
+        )
+
+        current_line = ""
+        for line in lines:
+            if "[>]" in line:
+                current_line = (
+                    line.replace("[>]", "")
+                    .replace("[ ]", "")
+                    .replace("[x]", "")
+                    .replace("[X]", "")
+                    .replace("✔", "")
+                    .strip(" -")
+                    .strip()
+                )
+                break
+
+        if current_line:
+            updated = re.sub(
+                r"Current step:\s*.*",
+                f"Current step: {current_line}",
+                updated,
+            )
+        elif done == total and total > 0:
+            updated = re.sub(
+                r"Current step:\s*.*",
+                "Current step: Complete",
+                updated,
+            )
+
+        return updated, done, total
+
+    def _auto_execute_request(self, user_text: str, session_id: str = "", attachments=None):
+        attachments = attachments or []
+        session_id = self._safe_str(session_id)
+
+        latest = self._find_latest_execution_artifact(session_id=session_id)
+        if not latest:
+            user_msg = self._build_user_message(
+                user_text,
+                attachments=attachments,
+            )
+            assistant_msg = self._build_assistant_message(
+                text="No execution found. Start with a plan first.",
+                attachments=[],
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision={
+                    "route": "execution",
+                    "mode": "auto_execution",
+                    "save_artifact": False,
+                    "save_memory": False,
+                    "use_memory": True,
+                },
+                saved_artifact=None,
+            )
+
+        lines, step_indexes, current_index = self._extract_execution_lines(latest.get("body", ""))
+
+        if not step_indexes:
+            user_msg = self._build_user_message(
+                user_text,
+                attachments=attachments,
+            )
+            assistant_msg = self._build_assistant_message(
+                text="I found an execution artifact, but it has no runnable steps.",
+                attachments=[],
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision={
+                    "route": "execution",
+                    "mode": "auto_execution",
+                    "save_artifact": False,
+                    "save_memory": False,
+                    "use_memory": True,
+                },
+                saved_artifact=None,
+            )
+
+        # if nothing is active, activate the first pending step
+        if current_index == -1:
+            for idx in step_indexes:
+                if "[ ]" in lines[idx]:
+                    lines[idx] = lines[idx].replace("[ ]", "[>]")
+                    current_index = idx
+                    break
+
+        executed_steps = []
+        safety_limit = 3
+
+        while safety_limit > 0 and current_index != -1:
+            current_text = (
+                lines[current_index]
+                .replace("[>]", "")
+                .replace("[ ]", "")
+                .replace("[âœ“]", "")
+                .strip(" -")
+                .strip()
+            )
+            executed_steps.append(current_text)
+
+            # mark current complete
+            lines[current_index] = lines[current_index].replace("[>]", "[x]")
+
+            # move to next pending
+            next_index = -1
+            for idx in step_indexes:
+                if idx > current_index and "[ ]" in lines[idx]:
+                    next_index = idx
+                    break
+
+            if next_index != -1:
+                lines[next_index] = lines[next_index].replace("[ ]", "[>]")
+            current_index = next_index
+            safety_limit -= 1
+
+        updated_body = "\n".join(lines)
+        updated_body, done, total = self._refresh_execution_header(updated_body)
+
+        status_line = "Auto-execution complete." if done >= total and total > 0 else "Auto-execution advanced."
+
+        executed_text = ""
+        if executed_steps:
+            executed_text = "Executed:\n- " + "\n- ".join(executed_steps)
+
+        assistant_text = status_line
+        if executed_text:
+            assistant_text += "\n\n" + executed_text
+        assistant_text += "\n\n" + updated_body
+
+        saved_artifact = (
+            self.artifacts.save_artifact(
+                {
+                    "kind": "execution",
+                    "title": latest.get("title") or "Execution Plan",
+                    "body": updated_body,
+                    "session_id": session_id,
+                    "meta": {
+                        **(latest.get("meta") or {}),
+                        "auto_executed": True,
+                        "done": done,
+                        "total": total,
+                    },
+                }
+            )
+            if getattr(self, "artifacts", None) and hasattr(self.artifacts, "save_artifact")
+            else None
+        )
+
+        user_msg = self._build_user_message(
+            user_text,
+            attachments=attachments,
+        )
+
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            attachments=[],
+        )
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision={
+                "route": "execution",
+                "mode": "auto_execution",
+                "save_artifact": True,
+                "save_memory": False,
+                "use_memory": True,
+            },
+            saved_artifact=saved_artifact,
+        )
+
+        # ==============================
+        # SESSION HELPERS
+        # ==============================
 
     def _ensure_session_id(self, session_id: str = "") -> str:
         sid = self._safe_str(session_id)
@@ -1549,9 +2021,6 @@ class ChatService:
         return f"session_{uuid.uuid4().hex}"
 
     def _persist_message_fallback(self, session_id: str, message: dict) -> None:
-        if not session_id or not isinstance(message, dict):
-            return
-
         result = self._call_first(
             self.sessions,
             ["append_message", "add_message", "save_message", "push_message"],
@@ -1624,1550 +2093,1464 @@ class ChatService:
             return data.get("artifacts")
         return data if isinstance(data, list) else []
 
-    # ==============================
-    # WORKING STATE (PHASE 3)
-    # ==============================
+        # ==============================
+        # WORKING STATE (PHASE 3)
+        # ==============================
 
     def _get_working_state(self, session_id: str):
-        state = self._call_first(
-            self.sessions,
-            ["get_working_state"],
-            session_id,
-            default={},
-        )
-
-        if not isinstance(state, dict):
-            state = {}
-
-        cleaned = {}
-        for key in (
-            "active_task",
-            "current_file",
-            "current_bug",
-            "last_success",
-            "next_move",
-            "checkpoint",
-            "updated_at",
-        ):
-            value = state.get(key, "")
-            if key == "updated_at":
-                cleaned[key] = self._safe_str(value)
-            else:
-                cleaned[key] = self._clean_working_state_value(value)
-
-        return cleaned
-        def extract_line_value(label: str, text: str):
-            pattern = rf"(?im)^\s*{re.escape(label)}:\s*(.*)$"
-            match = re.search(pattern, text)
-            if not match:
-                return None
-            return match.group(1).strip()
-
-        # Authoritative labeled block handling
-        labeled_fields = {
-            "active_task": extract_line_value("Active task", user_clean),
-            "current_file": extract_line_value("Current file", user_clean),
-            "current_bug": extract_line_value("Current bug", user_clean),
-            "last_success": extract_line_value("Last success", user_clean),
-            "next_move": extract_line_value("Next move", user_clean),
-            "checkpoint": extract_line_value("Checkpoint", user_clean),
-        }
-
-        saw_any_labeled_field = any(value is not None for value in labeled_fields.values())
-
-        if saw_any_labeled_field:
-            for key, value in labeled_fields.items():
-                if value is None:
-                    continue
-                clean = value.strip()
-                # Explicit blank or dash clears the field
-                if clean in {"", "-", "-", "none", "null"}:
-                    patch[key] = ""
-                else:
-                    patch[key] = clean[:240]
-            return patch
-
-        # Fallback file extraction from user text only
-        file_match = re.search(
-            r"[A-Za-z]:\\[^\n\r\t]+?\.(?:py|js|html|css|json|md|txt)",
-            user_clean,
-        )
-        if file_match:
-            patch["current_file"] = file_match.group(0).strip()
-
-        # Fallback active task
-        if any(x in user_lower for x in ["nova", "working_state", "working state", "continuity", "memory"]):
-            patch["active_task"] = "build Nova continuity brain"
-
-        # Fallback bug extraction from user text only
-        bug_patterns = [
-            r"current bug is\s+(.+?)(?:\.|$)",
-            r"current issue is\s+(.+?)(?:\.|$)",
-            r"the current bug is\s+(.+?)(?:\.|$)",
-            r"the bug is\s+(.+?)(?:\.|$)",
-        ]
-        for pattern in bug_patterns:
-            match = re.search(pattern, user_clean, re.IGNORECASE)
-            if match:
-                patch["current_bug"] = match.group(1).strip()[:240]
-                break
-
-        if "current_bug" not in patch and any(
-            x in user_lower for x in ["traceback", "error", "failed", "not working", "crash", "broken", "bug"]
-        ):
-            patch["current_bug"] = user_clean.strip()[:240]
-
-        # Fallback next move extraction from user text only
-        next_patterns = [
-            r"next move is\s+(.+?)(?:\.|$)",
-            r"next goal is\s+(.+?)(?:\.|$)",
-            r"next step is\s+(.+?)(?:\.|$)",
-        ]
-        for pattern in next_patterns:
-            match = re.search(pattern, user_clean, re.IGNORECASE)
-            if match:
-                patch["next_move"] = match.group(1).strip()[:240]
-                break
-
-        # Fallback last success only from explicit positive user statements
-        if any(x in user_lower for x in ["fixed", "good now", "stable", "restored", "working again", "passes"]):
-            patch["last_success"] = user_clean.strip()[:240]
-
-        checkpoint_match = re.search(
-            r"(working-state-plan-lock-[0-9\-]+)",
-            user_clean,
-            re.IGNORECASE,
-        )
-        if checkpoint_match:
-            patch["checkpoint"] = checkpoint_match.group(1).strip()
-
-        return patch
-
-    def _handle_where_are_we(self, session_id: str, user_text: str = "") -> str:
-        state = self._get_working_state(session_id) or {}
-
-        active_task = self._safe_str(state.get("active_task")).strip()
-        current_file = self._safe_str(state.get("current_file")).strip()
-        current_bug = self._safe_str(state.get("current_bug")).strip()
-        last_success = self._safe_str(state.get("last_success")).strip()
-        next_move = self._safe_str(state.get("next_move")).strip()
-        checkpoint = self._safe_str(state.get("checkpoint")).strip()
-
-        lowered = self._safe_str(user_text).lower().strip()
-
-        if not any([active_task, current_file, current_bug, last_success, next_move, checkpoint]):
-            return "I do not have a working context locked in yet."
-
-        if any(
-            phrase in lowered
-            for phrase in [
-                "what file are we in",
-                "current file",
-                "which file",
-                "what file",
-            ]
-        ):
-            if current_file:
-                return f"We’re in `{current_file}`."
-            return "I do not have the current file locked in yet."
-
-        if any(
-            phrase in lowered
-            for phrase in [
-                "what broke",
-                "what is broken",
-                "current bug",
-                "bug",
-                "issue",
-                "error",
-            ]
-        ):
-            if current_bug:
-                return f"What broke: {current_bug}"
-            return "I do not have a current bug locked in."
-
-        if any(
-            phrase in lowered
-            for phrase in [
-                "what did we fix",
-                "what was fixed",
-                "last success",
-                "what worked",
-                "what is working",
-            ]
-        ):
-            if last_success:
-                return f"What we fixed: {last_success}"
-            return "I do not have a last success locked in yet."
-
-        if any(
-            phrase in lowered
-            for phrase in [
-                "what's next",
-                "whats next",
-                "what is next",
-                "next move",
-                "next step",
-                "now what",
-            ]
-        ):
-            if next_move:
-                return f"Next: {next_move}"
-            return "I do not have a next move locked in yet."
-
-        if any(
-            phrase in lowered
-            for phrase in [
-                "checkpoint",
-                "save point",
-                "phase",
-            ]
-        ):
-            if checkpoint:
-                return f"Checkpoint: {checkpoint}"
-            return "I do not have a checkpoint locked in yet."
-
-        lines = []
-
-        if active_task:
-            lines.append(f"Active task: {active_task}")
-        if current_bug:
-            lines.append(f"Current bug: {current_bug}")
-        if current_file:
-            lines.append(f"Current file: `{current_file}`")
-        if last_success:
-            lines.append(f"Last success: {last_success}")
-        if next_move:
-            lines.append(f"Next move: {next_move}")
-        if checkpoint:
-            lines.append(f"Checkpoint: {checkpoint}")
-
-        if not lines:
-            return "I do not have a working context locked in yet."
-
-        if active_task and next_move:
-            return (
-                f"We’re {active_task}. "
-                f"Next: {next_move}"
-                + (f" Current file: `{current_file}`." if current_file else "")
-                + (f" Current bug: {current_bug}." if current_bug else "")
+            state = self._call_first(
+                self.sessions,
+                ["get_working_state"],
+                session_id,
+                default={},
             )
 
-        return "\n".join(lines)
+            if not isinstance(state, dict):
+                state = {}
 
-    # =========================
-    # WORKING STATE HELPERS
-    # =========================
+            cleaned = {}
+            for key in (
+                "active_task",
+                "current_file",
+                "current_bug",
+                "last_success",
+                "next_move",
+                "checkpoint",
+                "updated_at",
+            ):
+                value = state.get(key, "")
+                if key == "updated_at":
+                    cleaned[key] = self._safe_str(value)
+                else:
+                    cleaned[key] = self._clean_working_state_value(value)
+
+            return cleaned
+
+    def _handle_where_are_we(self, session_id: str, user_text: str = "") -> str:
+            state = self._get_working_state(session_id) or {}
+
+            active_task = self._safe_str(state.get("active_task")).strip()
+            current_file = self._safe_str(state.get("current_file")).strip()
+            current_bug = self._safe_str(state.get("current_bug")).strip()
+            last_success = self._safe_str(state.get("last_success")).strip()
+            next_move = self._safe_str(state.get("next_move")).strip()
+            checkpoint = self._safe_str(state.get("checkpoint")).strip()
+
+            lowered = self._safe_str(user_text).lower().strip()
+
+            if not any([active_task, current_file, current_bug, last_success, next_move, checkpoint]):
+                return "I do not have a working context locked in yet."
+
+            if any(
+                phrase in lowered
+                for phrase in [
+                    "what file are we in",
+                    "current file",
+                    "which file",
+                    "what file",
+                ]
+            ):
+                if current_file:
+                    return f"Weâ€™re in `{current_file}`."
+                return "I do not have the current file locked in yet."
+
+            if any(
+                phrase in lowered
+                for phrase in [
+                    "what broke",
+                    "what is broken",
+                    "current bug",
+                    "bug",
+                    "issue",
+                    "error",
+                ]
+            ):
+                if current_bug:
+                    return f"What broke: {current_bug}"
+                return "I do not have a current bug locked in."
+
+            if any(
+                phrase in lowered
+                for phrase in [
+                    "what did we fix",
+                    "what was fixed",
+                    "last success",
+                    "what worked",
+                    "what is working",
+                ]
+            ):
+                if last_success:
+                    return f"What we fixed: {last_success}"
+                return "I do not have a last success locked in yet."
+
+            if any(
+                phrase in lowered
+                for phrase in [
+                    "what's next",
+                    "whats next",
+                    "what is next",
+                    "next move",
+                    "next step",
+                    "now what",
+                ]
+            ):
+                if next_move:
+                    return f"Next: {next_move}"
+                return "I do not have a next move locked in yet."
+
+            if any(
+                phrase in lowered
+                for phrase in [
+                    "checkpoint",
+                    "save point",
+                    "phase",
+                ]
+            ):
+                if checkpoint:
+                    return f"Checkpoint: {checkpoint}"
+                return "I do not have a checkpoint locked in yet."
+
+            lines = []
+
+            if active_task:
+                lines.append(f"Active task: {active_task}")
+            if current_bug:
+                lines.append(f"Current bug: {current_bug}")
+            if current_file:
+                lines.append(f"Current file: `{current_file}`")
+            if last_success:
+                lines.append(f"Last success: {last_success}")
+            if next_move:
+                lines.append(f"Next move: {next_move}")
+            if checkpoint:
+                lines.append(f"Checkpoint: {checkpoint}")
+
+            if not lines:
+                return "I do not have a working context locked in yet."
+
+            if active_task and next_move:
+                return (
+                    f"Weâ€™re {active_task}. "
+                    f"Next: {next_move}"
+                    + (f" Current file: `{current_file}`." if current_file else "")
+                    + (f" Current bug: {current_bug}." if current_bug else "")
+                )
+
+            return "\n".join(lines)
+
+        # =========================
+        # WORKING STATE HELPERS
+        # =========================
 
     def _clean_working_state_value(self, value, limit=120):
-        text = self._safe_str(value).strip()
-        if not text:
-            return ""
+            text = self._safe_str(value).strip()
+            if not text:
+                return ""
 
-        text = text.replace("\r", " ").replace("\n", " ")
-        text = re.sub(r"\s+", " ", text).strip()
+            text = text.replace("\r", " ").replace("\n", " ")
+            text = re.sub(r"\s+", " ", text).strip()
 
-        bad_starts = (
-            "yes",
-            "agreed",
-            "recommended",
-            "in short",
-            "what this means",
-        )
+            bad_starts = (
+                "yes",
+                "agreed",
+                "recommended",
+                "in short",
+                "what this means",
+            )
 
-        lower = text.lower()
-        if any(lower.startswith(x) for x in bad_starts):
-            return ""
+            lower = text.lower()
+            if any(lower.startswith(x) for x in bad_starts):
+                return ""
 
-        for splitter in [" and ", " but ", " so "]:
-            if splitter in text:
-                text = text.split(splitter)[0].strip()
+            for splitter in [" and ", " but ", " so "]:
+                if splitter in text:
+                    text = text.split(splitter)[0].strip()
 
-        return text[:limit]
+            return text[:limit]
 
     def _is_valid_state_value(self, value):
-        if not value:
-            return False
-
-        value = str(value).strip()
-        if not value:
-            return False
-
-        if len(value) > 120:
-            return False
-
-        if "\n" in value:
-            return False
-
-        bad_patterns = [
-            "recommended order",
-            "if you want",
-            "you can also",
-            "for example",
-        ]
-
-        lower = value.lower()
-        for p in bad_patterns:
-            if p in lower:
+            if not value:
                 return False
 
-        return True
+            value = str(value).strip()
+            if not value:
+                return False
+
+            if len(value) > 120:
+                return False
+
+            if "\n" in value:
+                return False
+
+            bad_patterns = [
+                "recommended order",
+                "if you want",
+                "you can also",
+                "for example",
+            ]
+
+            lower = value.lower()
+            for p in bad_patterns:
+                if p in lower:
+                    return False
+
+            return True
 
     def _merge_working_state(self, current_state, updates):
-        current_state = current_state if isinstance(current_state, dict) else {}
-        updates = updates if isinstance(updates, dict) else {}
+            current_state = current_state if isinstance(current_state, dict) else {}
+            updates = updates if isinstance(updates, dict) else {}
 
-        merged = {
-            "active_task": "",
-            "current_file": "",
-            "current_bug": "",
-            "last_success": "",
-            "next_move": "",
-            "checkpoint": "",
-        }
-
-        for key in merged.keys():
-            old_value = self._clean_working_state_value(current_state.get(key, ""))
-            new_value = self._clean_working_state_value(updates.get(key, ""))
-
-            merged[key] = new_value if new_value else old_value
-
-        from datetime import datetime, timezone
-        merged["updated_at"] = datetime.now(timezone.utc).isoformat()
-
-        return merged  
-
-    def _extract_working_state_updates(self, user_text, current_state):
-        text = self._safe_str(user_text).strip()
-        lower = text.lower()
-        updates = {}
-
-        if not text:
-            return self._merge_working_state(current_state or {}, updates)
-
-        if text.startswith("Active task:") or "\nCurrent file:" in text:
-            lines = [line.strip() for line in text.splitlines() if line.strip()]
-            mapping = {
-                "active task:": "active_task",
-                "current file:": "current_file",
-                "current bug:": "current_bug",
-                "last success:": "last_success",
-                "next move:": "next_move",
-                "checkpoint:": "checkpoint",
+            merged = {
+                "active_task": "",
+                "current_file": "",
+                "current_bug": "",
+                "last_success": "",
+                "next_move": "",
+                "checkpoint": "",
             }
 
-            for line in lines:
-                line_lower = line.lower()
-                for prefix, key in mapping.items():
-                    if line_lower.startswith(prefix):
-                        value = line[len(prefix):].strip()
-                        updates[key] = self._clean_working_state_value(value)
+            for key in merged.keys():
+                old_value = self._clean_working_state_value(current_state.get(key, ""))
+                new_value = self._clean_working_state_value(updates.get(key, ""))
+
+                merged[key] = new_value if new_value else old_value
+
+            from datetime import datetime, timezone
+            merged["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+            return merged  
+
+    def _extract_working_state_updates(self, user_text, current_state):
+            text = self._safe_str(user_text).strip()
+            lower = text.lower()
+            updates = {}
+
+            if not text:
+                return self._merge_working_state(current_state or {}, updates)
+
+            if text.startswith("Active task:") or "\nCurrent file:" in text:
+                lines = [line.strip() for line in text.splitlines() if line.strip()]
+                mapping = {
+                    "active task:": "active_task",
+                    "current file:": "current_file",
+                    "current bug:": "current_bug",
+                    "last success:": "last_success",
+                    "next move:": "next_move",
+                    "checkpoint:": "checkpoint",
+                }
+
+                for line in lines:
+                    line_lower = line.lower()
+                    for prefix, key in mapping.items():
+                        if line_lower.startswith(prefix):
+                            value = line[len(prefix):].strip()
+                            updates[key] = self._clean_working_state_value(value)
+                            break
+
+                return self._merge_working_state(current_state or {}, updates)
+
+            if "c:\\" in lower:
+                for token in text.split():
+                    token_clean = token.strip("`\"'(),")
+                    if token_clean.lower().startswith("c:\\"):
+                        updates["current_file"] = token_clean
+                        break
+
+            patterns = {
+                "active_task": [
+                    r"(?:working on|current task is|active task is)\s+(.+)",
+                ],
+                "current_bug": [
+                    r"(?:bug is|error is|issue is|current bug is)\s+(.+)",
+                ],
+                "last_success": [
+                    r"(?:last success was|fixed|working now|got working)\s+(.+)",
+                ],
+                "next_move": [
+                    r"(?:next move is|next step is|do this next)\s+(.+)",
+                ],
+                "checkpoint": [
+                    r"(?:checkpoint is|save point is|phase is)\s+(.+)",
+                ],
+            }
+
+            for key, regexes in patterns.items():
+                for pattern in regexes:
+                    match = re.search(pattern, text, re.IGNORECASE)
+                    if match:
+                        candidate = self._clean_working_state_value(match.group(1))
+                        if self._is_valid_state_value(candidate):
+                            updates[key] = candidate
                         break
 
             return self._merge_working_state(current_state or {}, updates)
 
-        if "c:\\" in lower:
-            for token in text.split():
-                token_clean = token.strip("`\"'(),")
-                if token_clean.lower().startswith("c:\\"):
-                    updates["current_file"] = token_clean
-                    break
-
-        patterns = {
-            "active_task": [
-                r"(?:working on|current task is|active task is)\s+(.+)",
-            ],
-            "current_bug": [
-                r"(?:bug is|error is|issue is|current bug is)\s+(.+)",
-            ],
-            "last_success": [
-                r"(?:last success was|fixed|working now|got working)\s+(.+)",
-            ],
-            "next_move": [
-                r"(?:next move is|next step is|do this next)\s+(.+)",
-            ],
-            "checkpoint": [
-                r"(?:checkpoint is|save point is|phase is)\s+(.+)",
-            ],
-        }
-
-        for key, regexes in patterns.items():
-            for pattern in regexes:
-                match = re.search(pattern, text, re.IGNORECASE)
-                if match:
-                    candidate = self._clean_working_state_value(match.group(1))
-                    if self._is_valid_state_value(candidate):
-                        updates[key] = candidate
-                    break
-
-        return self._merge_working_state(current_state or {}, updates)
-
     def _format_working_state(self, state):
-        def c(x): return x if x else " "
-        return (
-            f"Active task: {c(state.get('active_task'))}\n"
-            f"Current file: {c(state.get('current_file'))}\n"
-            f"Current bug: {c(state.get('current_bug'))}\n"
-            f"Last success: {c(state.get('last_success'))}\n"
-            f"Next move: {c(state.get('next_move'))}\n"
-            f"Checkpoint: {c(state.get('checkpoint'))}"
-        )
+            def c(x): return x if x else " "
+            return (
+                f"Active task: {c(state.get('active_task'))}\n"
+                f"Current file: {c(state.get('current_file'))}\n"
+                f"Current bug: {c(state.get('current_bug'))}\n"
+                f"Last success: {c(state.get('last_success'))}\n"
+                f"Next move: {c(state.get('next_move'))}\n"
+                f"Checkpoint: {c(state.get('checkpoint'))}"
+            )
 
     # =========================
     # WORKING STATE HELPERS
     # =========================
-        
+            
     def _format_working_state_context(self, session_id: str) -> str:
-        state = self._get_working_state(session_id)
-        if not isinstance(state, dict) or not state:
-            return ""
+            state = self._get_working_state(session_id)
+            if not isinstance(state, dict) or not state:
+                return ""
 
-        lines = []
+            lines = []
 
-        if self._safe_str(state.get("active_task")):
-            lines.append(f"- Active task: {self._safe_str(state.get('active_task'))}")
-        if self._safe_str(state.get("current_file")):
-            lines.append(f"- Current file: {self._safe_str(state.get('current_file'))}")
-        if self._safe_str(state.get("current_bug")):
-            lines.append(f"- Current bug: {self._safe_str(state.get('current_bug'))}")
-        if self._safe_str(state.get("last_success")):
-            lines.append(f"- Last success: {self._safe_str(state.get('last_success'))}")
-        if self._safe_str(state.get("next_move")):
-            lines.append(f"- Next move: {self._safe_str(state.get('next_move'))}")
-        if self._safe_str(state.get("checkpoint")):
-            lines.append(f"- Checkpoint: {self._safe_str(state.get('checkpoint'))}")
+            if self._safe_str(state.get("active_task")):
+                lines.append(f"- Active task: {self._safe_str(state.get('active_task'))}")
+            if self._safe_str(state.get("current_file")):
+                lines.append(f"- Current file: {self._safe_str(state.get('current_file'))}")
+            if self._safe_str(state.get("current_bug")):
+                lines.append(f"- Current bug: {self._safe_str(state.get('current_bug'))}")
+            if self._safe_str(state.get("last_success")):
+                lines.append(f"- Last success: {self._safe_str(state.get('last_success'))}")
+            if self._safe_str(state.get("next_move")):
+                lines.append(f"- Next move: {self._safe_str(state.get('next_move'))}")
+            if self._safe_str(state.get("checkpoint")):
+                lines.append(f"- Checkpoint: {self._safe_str(state.get('checkpoint'))}")
 
-        if not lines:
-            return ""
+            if not lines:
+                return ""
 
-        return "Working context:\n" + "\n".join(lines)
+            return "Working context:\n" + "\n".join(lines)
 
-    # ==============================
+    # ===============================
     # WORKING STATE (PHASE 3)
-    # ==============================
+    # ===============================
 
     def _get_working_state(self, session_id: str) -> dict:
-        return self._call_first(
-            self.sessions,
-            ["get_working_state"],
-            session_id,
-        ) or {}
+            return self._call_first(
+                self.sessions,
+                ["get_working_state"],
+                session_id,
+            ) or {}
 
     def _update_working_state(self, session_id: str, patch: dict):
-        if not isinstance(patch, dict) or not patch:
-            return
+            if not isinstance(patch, dict) or not patch:
+                return
 
-        current_state = self._get_working_state(session_id)
-        merged = self._merge_working_state(current_state, patch)
+            current_state = self._get_working_state(session_id)
+            merged = self._merge_working_state(current_state, patch)
 
-        self._call_first(
-            self.sessions,
-            ["update_working_state"],
-            session_id,
-            merged,
-        )
-
-    # ==============================
-    # MEMORY HELPERS
-    # ==============================
-
-    def _rank_memory_context(
-        self,
-        user_text: str,
-        limit: int = 5,
-        session_id: str = "",
-    ) -> list[dict]:
-        try:
-            items = self._get_memory_list()
-        except Exception:
-            items = []
-
-        if not isinstance(items, list):
-            items = []
-
-        scored = []
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-
-            score = self._score_memory_item(
-                item=item,
-                user_text=user_text,
-                session_id=session_id,
+            self._call_first(
+                self.sessions,
+                ["update_working_state"],
+                session_id,
+                merged,
             )
 
-            if not self._memory_is_relevant_enough(item, score, user_text):
-                continue
+        # ==============================
+        # MEMORY HELPERS
+        # ==============================
 
-            enriched = dict(item)
-            enriched["_memory_score"] = score
-            scored.append(enriched)
+    def _rank_memory_context(
+            self,
+            user_text: str,
+            limit: int = 5,
+            session_id: str = "",
+        ) -> list[dict]:
+            try:
+                items = self._get_memory_list()
+            except Exception:
+                items = []
 
-        scored.sort(
-            key=lambda x: (
-                float(x.get("_memory_score") or 0.0),
-                self._safe_str(x.get("updated_at") or x.get("created_at")),
-            ),
-            reverse=True,
-        )
+            if not isinstance(items, list):
+                items = []
 
-        return scored[: max(int(limit or 5), 1)]
+            scored = []
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+
+                score = self._score_memory_item(
+                    item=item,
+                    user_text=user_text,
+                    session_id=session_id,
+                )
+
+                if not self._memory_is_relevant_enough(item, score, user_text):
+                    continue
+
+                enriched = dict(item)
+                enriched["_memory_score"] = score
+                scored.append(enriched)
+
+            scored.sort(
+                key=lambda x: (
+                    float(x.get("_memory_score") or 0.0),
+                    self._safe_str(x.get("updated_at") or x.get("created_at")),
+                ),
+                reverse=True,
+            )
+
+            return scored[: max(int(limit or 5), 1)]
 
     def _format_memory_context(self, memory_items: list[dict]) -> str:
-        if not isinstance(memory_items, list) or not memory_items:
-            return ""
+            if not isinstance(memory_items, list) or not memory_items:
+                return ""
 
-        lines = []
-        for item in memory_items[: self.memory_limit]:
-            if not isinstance(item, dict):
-                continue
+            lines = []
+            for item in memory_items[: self.memory_limit]:
+                if not isinstance(item, dict):
+                    continue
 
-            text = self._safe_str(item.get("text"))
-            kind = self._safe_str(item.get("kind"))
-            if not text:
-                continue
+                text = self._safe_str(item.get("text"))
+                kind = self._safe_str(item.get("kind"))
+                if not text:
+                    continue
 
-            if kind:
-                lines.append(f"- [{kind}] {text}")
-            else:
-                lines.append(f"- {text}")
+                if kind:
+                    lines.append(f"- [{kind}] {text}")
+                else:
+                    lines.append(f"- {text}")
 
-        return "\n".join(lines).strip()
+            return "\n".join(lines).strip()
 
     def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
 
-        if not isinstance(decision, dict):
-            return
+            if not isinstance(decision, dict):
+                return
 
-        if not decision.get("save_memory"):
-            return
+            if not decision.get("save_memory"):
+                return
 
-        text = self._safe_str(user_text)
-        lowered = text.lower()
+            text = self._safe_str(user_text)
+            lowered = text.lower()
 
-        should_save = False
-        kind = "note"
-
-        # profile / identity
-        if any(x in lowered for x in ["my name is", "i am ", "i'm ", "call me"]):
-            should_save = True
-            kind = "profile"
-
-        # preferences
-        elif any(
-            x in lowered
-            for x in [
-                "my favorite",
-                "my favourite",
-                "favorite color is",
-                "favourite color is",
-                "i prefer",
-                "i like",
-                "i love",
-                "i enjoy",
-                "i usually",
-                "i always",
-                "from now on",
-            ]
-        ):
-            should_save = True
-            kind = "preference"
-
-        # project / work
-        elif any(
-            x in lowered
-            for x in [
-                "i'm building",
-                "i am building",
-                "my project",
-                "i'm working on",
-                "working on",
-                "nova",
-            ]
-        ):
-            should_save = True
-            kind = "project"
-
-        # goals
-        elif any(x in lowered for x in ["i want to", "my goal", "i plan to"]):
-            should_save = True
-            kind = "goal"
-
-        # explicit memory instruction
-        elif "remember that" in lowered:
-            should_save = True
+            should_save = False
             kind = "note"
 
-        if not should_save:
-            return
+            # profile / identity
+            if any(x in lowered for x in ["my name is", "i am ", "i'm ", "call me"]):
+                should_save = True
+                kind = "profile"
 
-        try:
-            self._call_first(
-                self.memory,
-                ["add_memory", "create_memory", "save_memory", "create"],
-                text=text,
-                kind=kind,
-                source="router_auto",
-                session_id=session_id,
-            )
-        except Exception as e:
-            print("MEMORY WRITE FAILED:", e)
+            # preferences
+            elif any(
+                x in lowered
+                for x in [
+                    "my favorite",
+                    "my favourite",
+                    "favorite color is",
+                    "favourite color is",
+                    "i prefer",
+                    "i like",
+                    "i love",
+                    "i enjoy",
+                    "i usually",
+                    "i always",
+                    "from now on",
+                ]
+            ):
+                should_save = True
+                kind = "preference"
+
+            # project / work
+            elif any(
+                x in lowered
+                for x in [
+                    "i'm building",
+                    "i am building",
+                    "my project",
+                    "i'm working on",
+                    "working on",
+                    "nova",
+                ]
+            ):
+                should_save = True
+                kind = "project"
+
+            # goals
+            elif any(x in lowered for x in ["i want to", "my goal", "i plan to"]):
+                should_save = True
+                kind = "goal"
+
+            # explicit memory instruction
+            elif "remember that" in lowered:
+                should_save = True
+                kind = "note"
+
+            if not should_save:
+                return
+
+            try:
+                self._call_first(
+                    self.memory,
+                    ["add_memory", "create_memory", "save_memory", "create"],
+                    text=text,
+                    kind=kind,
+                    source="router_auto",
+                    session_id=session_id,
+                )
+            except Exception as e:
+                print("MEMORY WRITE FAILED:", e)
 
 
     def _memory_text_tokens(self, value: str) -> set[str]:
-        text = self._safe_str(value).lower()
-        if not text:
-            return set()
+            text = self._safe_str(value).lower()
+            if not text:
+                return set()
 
-        stop_words = {
-            "the", "a", "an", "and", "or", "but", "if", "then", "than",
-            "to", "of", "for", "in", "on", "at", "by", "with", "from",
-            "is", "are", "was", "were", "be", "been", "being",
-            "it", "this", "that", "these", "those",
-            "i", "me", "my", "you", "your", "we", "our",
-            "do", "does", "did", "have", "has", "had",
-            "what", "when", "where", "why", "how",
-            "can", "could", "should", "would", "will",
-            "about", "into", "over", "under", "again", "right", "now",
-        }
+            stop_words = {
+                "the", "a", "an", "and", "or", "but", "if", "then", "than",
+                "to", "of", "for", "in", "on", "at", "by", "with", "from",
+                "is", "are", "was", "were", "be", "been", "being",
+                "it", "this", "that", "these", "those",
+                "i", "me", "my", "you", "your", "we", "our",
+                "do", "does", "did", "have", "has", "had",
+                "what", "when", "where", "why", "how",
+                "can", "could", "should", "would", "will",
+                "about", "into", "over", "under", "again", "right", "now",
+            }
 
-        tokens = set(re.findall(r"[a-z0-9_]{2,}", text))
-        return {token for token in tokens if token not in stop_words}
+            tokens = set(re.findall(r"[a-z0-9_]{2,}", text))
+            return {token for token in tokens if token not in stop_words}
 
 
     def _memory_kind_weight(self, kind: str) -> float:
-        k = self._safe_str(kind).lower()
+            k = self._safe_str(kind).lower()
 
-        if k in {"preference", "profile"}:
-            return 3.0
-        if k in {"project", "goal"}:
-            return 2.5
-        if k in {"identity", "personal"}:
-            return 2.0
-        if k in {"summary", "note"}:
-            return 1.25
-        return 1.0
+            if k in {"preference", "profile"}:
+                return 3.0
+            if k in {"project", "goal"}:
+                return 2.5
+            if k in {"identity", "personal"}:
+                return 2.0
+            if k in {"summary", "note"}:
+                return 1.25
+            return 1.0
 
 
     def _memory_time_bonus(self, item: dict) -> float:
-        created_at = self._safe_str(item.get("updated_at") or item.get("created_at"))
-        if not created_at:
+            created_at = self._safe_str(item.get("updated_at") or item.get("created_at"))
+            if not created_at:
+                return 0.0
+
+            try:
+                dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                now = datetime.now(timezone.utc)
+                age_days = max((now - dt).total_seconds() / 86400.0, 0.0)
+            except Exception:
+                return 0.0
+
+            if age_days <= 1:
+                return 1.5
+            if age_days <= 7:
+                return 1.0
+            if age_days <= 30:
+                return 0.5
             return 0.0
 
-        try:
-            dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-            now = datetime.now(timezone.utc)
-            age_days = max((now - dt).total_seconds() / 86400.0, 0.0)
-        except Exception:
+            try:
+                dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                now = datetime.now(timezone.utc)
+                age_days = max((now - dt).total_seconds() / 86400.0, 0.0)
+            except Exception:
+                return 0.0
+
+            if age_days <= 1:
+                return 1.5
+            if age_days <= 7:
+                return 1.0
+            if age_days <= 30:
+                return 0.5
             return 0.0
-
-        if age_days <= 1:
-            return 1.5
-        if age_days <= 7:
-            return 1.0
-        if age_days <= 30:
-            return 0.5
-        return 0.0
-
-        try:
-            dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-            now = datetime.now(timezone.utc)
-            age_days = max((now - dt).total_seconds() / 86400.0, 0.0)
-        except Exception:
-            return 0.0
-
-        if age_days <= 1:
-            return 1.5
-        if age_days <= 7:
-            return 1.0
-        if age_days <= 30:
-            return 0.5
-        return 0.0
 
     def _memory_session_bonus(self, item: dict, session_id: str = "") -> float:
-        current_session = self._safe_str(session_id)
-        item_session = self._safe_str(item.get("session_id"))
-        if current_session and item_session and current_session == item_session:
-            return 1.5
-        return 0.0
+            current_session = self._safe_str(session_id)
+            item_session = self._safe_str(item.get("session_id"))
+            if current_session and item_session and current_session == item_session:
+                return 1.5
+            return 0.0
 
     def _score_memory_item(self, item: dict, user_text: str, session_id: str = "") -> float:
-        if not isinstance(item, dict):
-            return -999.0
+            if not isinstance(item, dict):
+                return -999.0
 
-        memory_text = self._safe_str(item.get("text"))
-        if not memory_text:
-            return -999.0
+            memory_text = self._safe_str(item.get("text"))
+            if not memory_text:
+                return -999.0
 
-        query = self._safe_str(user_text)
-        query_lower = query.lower()
-        memory_lower = memory_text.lower()
+            query = self._safe_str(user_text)
+            query_lower = query.lower()
+            memory_lower = memory_text.lower()
 
-        query_tokens = self._memory_text_tokens(query)
-        memory_tokens = self._memory_text_tokens(memory_text)
+            query_tokens = self._memory_text_tokens(query)
+            memory_tokens = self._memory_text_tokens(memory_text)
 
-        overlap = query_tokens.intersection(memory_tokens)
-        overlap_score = float(len(overlap)) * 2.0
+            overlap = query_tokens.intersection(memory_tokens)
+            overlap_score = float(len(overlap)) * 2.0
 
-        exact_phrase_score = 0.0
-        if query_lower and query_lower in memory_lower:
-            exact_phrase_score += 5.0
+            exact_phrase_score = 0.0
+            if query_lower and query_lower in memory_lower:
+                exact_phrase_score += 5.0
 
-        contains_named_value = 0.0
-        for token in sorted(query_tokens, key=len, reverse=True):
-            if len(token) >= 4 and token in memory_lower:
-                contains_named_value += 0.75
+            contains_named_value = 0.0
+            for token in sorted(query_tokens, key=len, reverse=True):
+                if len(token) >= 4 and token in memory_lower:
+                    contains_named_value += 0.75
 
-        kind_score = self._memory_kind_weight(item.get("kind"))
-        time_score = self._memory_time_bonus(item)
-        session_score = self._memory_session_bonus(item, session_id=session_id)
+            kind_score = self._memory_kind_weight(item.get("kind"))
+            time_score = self._memory_time_bonus(item)
+            session_score = self._memory_session_bonus(item, session_id=session_id)
 
-        quality_score = 0.0
-        try:
-            quality_score = float(item.get("quality_score") or 0.0)
-        except Exception:
             quality_score = 0.0
+            try:
+                quality_score = float(item.get("quality_score") or 0.0)
+            except Exception:
+                quality_score = 0.0
 
-        generic_penalty = 0.0
-        if len(memory_tokens) <= 3:
-            generic_penalty -= 0.75
-        if memory_lower in {"ok", "yes", "no", "thanks"}:
-            generic_penalty -= 4.0
+            generic_penalty = 0.0
+            if len(memory_tokens) <= 3:
+                generic_penalty -= 0.75
+            if memory_lower in {"ok", "yes", "no", "thanks"}:
+                generic_penalty -= 4.0
 
-        return (
-            overlap_score
-            + exact_phrase_score
-            + contains_named_value
-            + kind_score
-            + time_score
-            + session_score
-            + quality_score
-            + generic_penalty
-        )
+            return (
+                overlap_score
+                + exact_phrase_score
+                + contains_named_value
+                + kind_score
+                + time_score
+                + session_score
+                + quality_score
+                + generic_penalty
+            )
 
     def _memory_is_relevant_enough(self, item: dict, score: float, user_text: str) -> bool:
-        text = self._safe_str(item.get("text"))
-        if not text:
+            text = self._safe_str(item.get("text"))
+            if not text:
+                return False
+
+            query = self._safe_str(user_text).lower()
+
+            if any(x in query for x in ["remember", "memory", "about me", "my project"]):
+                return True
+
+            query_tokens = self._memory_text_tokens(user_text)
+            memory_tokens = self._memory_text_tokens(text)
+            overlap = query_tokens.intersection(memory_tokens)
+
+            if score >= 1.5:
+                return True
+
+            if len(overlap) >= 1:
+                return True
+
+            kind = self._safe_str(item.get("kind")).lower()
+            if kind in {"project", "preference", "profile", "goal"}:
+                return True
+
             return False
 
-        query = self._safe_str(user_text).lower()
-
-        if any(x in query for x in ["remember", "memory", "about me", "my project"]):
-            return True
-
-        query_tokens = self._memory_text_tokens(user_text)
-        memory_tokens = self._memory_text_tokens(text)
-        overlap = query_tokens.intersection(memory_tokens)
-
-        if score >= 1.5:
-            return True
-
-        if len(overlap) >= 1:
-            return True
-
-        kind = self._safe_str(item.get("kind")).lower()
-        if kind in {"project", "preference", "profile", "goal"}:
-            return True
-
-        return False
-
-    # ==============================
-    # IMAGE HELPERS
-    # ==============================
+        # ==============================
+        # IMAGE HELPERS
+        # ==============================
 
     def _is_image_generation_request(self, user_text: str) -> bool:
-        text = str(user_text or "").strip().lower()
+            text = str(user_text or "").strip().lower()
 
-        if not text:
-            return False
+            if not text:
+                return False
 
-        if text.startswith("/image"):
-            return True
+            if text.startswith("/image"):
+                return True
 
-        if "/image" in text:
-            return True
+            if "/image" in text:
+                return True
 
-        triggers = [
-            "generate an image",
-            "generate image",
-            "make an image",
-            "create an image",
-            "draw ",
-            "draw me ",
-        ]
+            triggers = [
+                "generate an image",
+                "generate image",
+                "make an image",
+                "create an image",
+                "draw ",
+                "draw me ",
+            ]
 
-        return any(trigger in text for trigger in triggers)
+            return any(trigger in text for trigger in triggers)
 
     def _image_prompt_from_text(self, user_text: str) -> str:
-        text = str(user_text or "").strip()
-        lowered = text.lower()
+            text = str(user_text or "").strip()
+            lowered = text.lower()
 
-        if lowered.startswith("/image"):
-            prompt = text[6:].strip()
-            return prompt or "Generate an image."
+            if lowered.startswith("/image"):
+                prompt = text[6:].strip()
+                return prompt or "Generate an image."
 
-        prefixes = (
-            "generate an image of ",
-            "generate an image ",
-            "generate image of ",
-            "generate image ",
-            "make an image of ",
-            "make an image ",
-            "create an image of ",
-            "create an image ",
-            "draw me ",
-            "draw ",
-        )
+            prefixes = (
+                "generate an image of ",
+                "generate an image ",
+                "generate image of ",
+                "generate image ",
+                "make an image of ",
+                "make an image ",
+                "create an image of ",
+                "create an image ",
+                "draw me ",
+                "draw ",
+            )
 
-        for prefix in prefixes:
-            if lowered.startswith(prefix):
-                prompt = text[len(prefix):].strip()
-                return prompt or text
+            for prefix in prefixes:
+                if lowered.startswith(prefix):
+                    prompt = text[len(prefix):].strip()
+                    return prompt or text
 
-        return text or "Generate an image."
+            return text or "Generate an image."
 
     def _build_image_generation_meta(
-        self,
-        prompt: str,
-        image_url: str,
-        revised_prompt: str = "",
-        parent_artifact_id: str = "",
-        source_type: str = "generated",
-        generation_mode: str = "text_to_image",
-        source_session_id: str = "",
-    ) -> dict:
-        return {
-            "prompt": str(prompt or "").strip(),
-            "revised_prompt": str(revised_prompt or "").strip(),
-            "image_url": str(image_url or "").strip(),
-            "source_type": str(source_type or "generated").strip(),
-            "parent_artifact_id": str(parent_artifact_id or "").strip(),
-            "generation_mode": str(generation_mode or "text_to_image").strip(),
-            "source_session_id": str(source_session_id or "").strip(),
-        }
+            self,
+            prompt: str,
+            image_url: str,
+            revised_prompt: str = "",
+            parent_artifact_id: str = "",
+            source_type: str = "generated",
+            generation_mode: str = "text_to_image",
+            source_session_id: str = "",
+        ) -> dict:
+            return {
+                "prompt": str(prompt or "").strip(),
+                "revised_prompt": str(revised_prompt or "").strip(),
+                "image_url": str(image_url or "").strip(),
+                "source_type": str(source_type or "generated").strip(),
+                "parent_artifact_id": str(parent_artifact_id or "").strip(),
+                "generation_mode": str(generation_mode or "text_to_image").strip(),
+                "source_session_id": str(source_session_id or "").strip(),
+            }
 
     def _build_image_generation_artifact(
-        self,
-        session_id: str,
-        prompt: str,
-        image_url: str,
-        revised_prompt: str = "",
-        parent_artifact_id: str = "",
-        source_type: str = "generated",
-        generation_mode: str = "text_to_image",
-    ) -> dict:
-        clean_prompt = str(prompt or "").strip()
-        artifact_text = f'Generated image for: "{clean_prompt}"'
+            self,
+            session_id: str,
+            prompt: str,
+            image_url: str,
+            revised_prompt: str = "",
+            parent_artifact_id: str = "",
+            source_type: str = "generated",
+            generation_mode: str = "text_to_image",
+        ) -> dict:
+            clean_prompt = str(prompt or "").strip()
+            artifact_text = f'Generated image for: "{clean_prompt}"'
 
-        meta = self._build_image_generation_meta(
-            prompt=clean_prompt,
-            image_url=image_url,
-            revised_prompt=revised_prompt,
-            parent_artifact_id=parent_artifact_id,
-            source_type=source_type,
-            generation_mode=generation_mode,
-            source_session_id=session_id,
-        )
+            meta = self._build_image_generation_meta(
+                prompt=clean_prompt,
+                image_url=image_url,
+                revised_prompt=revised_prompt,
+                parent_artifact_id=parent_artifact_id,
+                source_type=source_type,
+                generation_mode=generation_mode,
+                source_session_id=session_id,
+            )
 
-        bullets = []
-        if clean_prompt:
-            bullets.append(f"Prompt: {clean_prompt}")
-        if meta["revised_prompt"]:
-            bullets.append(f"Revised prompt: {meta['revised_prompt']}")
-        if meta["parent_artifact_id"]:
-            bullets.append(f"Parent artifact: {meta['parent_artifact_id']}")
+            bullets = []
+            if clean_prompt:
+                bullets.append(f"Prompt: {clean_prompt}")
+            if meta["revised_prompt"]:
+                bullets.append(f"Revised prompt: {meta['revised_prompt']}")
+            if meta["parent_artifact_id"]:
+                bullets.append(f"Parent artifact: {meta['parent_artifact_id']}")
 
-        return {
-            "kind": "image_generation",
-            "title": "Generated image",
-            "body": artifact_text,
-            "summary": artifact_text,
-            "preview": artifact_text,
-            "session_id": session_id,
-            "image_url": image_url,
-            "source": "image_generation",
-            "meta": meta,
-            "viewer": {
+            return {
                 "kind": "image_generation",
                 "title": "Generated image",
                 "body": artifact_text,
                 "summary": artifact_text,
+                "preview": artifact_text,
+                "session_id": session_id,
                 "image_url": image_url,
-                "analysis_text": f"This image was generated from the prompt: {clean_prompt}" if clean_prompt else artifact_text,
-                "bullets": bullets,
-                "source_url": "",
-            },
-        }
+                "source": "image_generation",
+                "meta": meta,
+                "viewer": {
+                    "kind": "image_generation",
+                    "title": "Generated image",
+                    "body": artifact_text,
+                    "summary": artifact_text,
+                    "image_url": image_url,
+                    "analysis_text": f"This image was generated from the prompt: {clean_prompt}" if clean_prompt else artifact_text,
+                    "bullets": bullets,
+                    "source_url": "",
+                },
+            }
 
     def _save_artifact_fallback(self, artifact: dict):
-        if not isinstance(artifact, dict) or not artifact:
-            return None
+            if not isinstance(artifact, dict) or not artifact:
+                return None
 
-        try:
-            return self.artifacts.save_artifact(artifact)
-        except Exception as e:
-            print("ARTIFACT SAVE FAILED:", e)
-            return None
+            try:
+                return self.artifacts.save_artifact(artifact)
+            except Exception as e:
+                print("ARTIFACT SAVE FAILED:", e)
+                return None
 
     def _persist_image_generation_artifact(
-        self,
-        session_id: str,
-        prompt: str,
-        image_url: str,
-        revised_prompt: str = "",
-        parent_artifact_id: str = "",
-        source_type: str = "generated",
-        generation_mode: str = "text_to_image",
-    ):
-        if not session_id or not image_url:
-            return None
+            self,
+            session_id: str,
+            prompt: str,
+            image_url: str,
+            revised_prompt: str = "",
+            parent_artifact_id: str = "",
+            source_type: str = "generated",
+            generation_mode: str = "text_to_image",
+        ):
+            if not session_id or not image_url:
+                return None
 
-        artifact = self._build_image_generation_artifact(
-            session_id=session_id,
-            prompt=prompt,
-            image_url=image_url,
-            revised_prompt=revised_prompt,
-            parent_artifact_id=parent_artifact_id,
-            source_type=source_type,
-            generation_mode=generation_mode,
-        )
-        return self._save_artifact_fallback(artifact)
+            artifact = self._build_image_generation_artifact(
+                session_id=session_id,
+                prompt=prompt,
+                image_url=image_url,
+                revised_prompt=revised_prompt,
+                parent_artifact_id=parent_artifact_id,
+                source_type=source_type,
+                generation_mode=generation_mode,
+            )
+            return self._save_artifact_fallback(artifact)
 
     def _handle_image_generation(
-        self,
-        prompt: str,
-        session_id: str = "",
-        parent_artifact_id: str = "",
-        source_type: str = "generated",
-    ) -> dict:
-        try:
-            result = self.client.images.generate(
-                model=self.image_model,
-                prompt=prompt,
-                size=self.image_size,
-            )
-
-            first = result.data[0] if getattr(result, "data", None) else None
-            image_b64 = getattr(first, "b64_json", None) if first else None
-            if not image_b64:
-                raise ValueError("Image API returned no b64_json")
-
-            image_bytes = base64.b64decode(image_b64)
-            filename = f"generated_{uuid.uuid4().hex}.png"
-            filepath = self.uploads_dir / filename
-
-            with open(filepath, "wb") as f:
-                f.write(image_bytes)
-
-            image_url = f"/api/uploads/{filename}"
-
-            saved_artifact = None
+            self,
+            prompt: str,
+            session_id: str = "",
+            parent_artifact_id: str = "",
+            source_type: str = "generated",
+        ) -> dict:
             try:
-                saved_artifact = self._persist_image_generation_artifact(
-                    session_id=session_id,
+                result = self.client.images.generate(
+                    model=self.image_model,
                     prompt=prompt,
-                    image_url=image_url,
-                    revised_prompt="",
-                    parent_artifact_id=parent_artifact_id,
-                    source_type=source_type,
-                    generation_mode="text_to_image",
-                )
-            except Exception as e:
-                print("IMAGE ARTIFACT SAVE FAILED:", e)
-
-            return {
-                "ok": True,
-                "text": f"Generated image for: {prompt}",
-                "image_url": image_url,
-                "prompt": prompt,
-                "revised_prompt": "",
-                "parent_artifact_id": parent_artifact_id,
-                "source_type": source_type,
-                "generation_mode": "text_to_image",
-                "saved_artifact": saved_artifact,
-            }
-        except Exception as e:
-            return {
-                "ok": False,
-                "text": f"Image generation failed: {e}",
-                "error": str(e),
-                "image_url": "",
-                "prompt": prompt,
-                "revised_prompt": "",
-                "parent_artifact_id": parent_artifact_id,
-                "source_type": source_type,
-                "generation_mode": "text_to_image",
-                "saved_artifact": None,
-            }
-    # ==============================
-    # WEB / ATTACHMENT HELPERS
-    # ==============================
-
-    def _handle_web_fetch(self, url: str, session_id: str = "") -> dict:
-        raw_url = self._safe_str(url)
-        normalized_url = raw_url
-        if normalized_url and not re.match(r"^https?://", normalized_url, re.IGNORECASE):
-            normalized_url = "https://" + normalized_url
-
-        fetched_at = datetime.now(timezone.utc).isoformat()
-
-        try:
-            result = self.web.fetch(normalized_url)
-        except Exception as e:
-            return {
-                "ok": False,
-                "error": f"Web fetch failed: {e}",
-                "url": normalized_url,
-                "debug": {
-                    "route_taken": "web_fetch",
-                    "error": str(e),
-                },
-            }
-
-        if not isinstance(result, dict):
-            result = {}
-
-        artifact = {}
-        try:
-            if hasattr(self.web, "build_artifact_payload") and callable(self.web.build_artifact_payload):
-                artifact = self.web.build_artifact_payload(result) or {}
-        except Exception as e:
-            artifact = {
-                "kind": "web_result",
-                "title": self._safe_str(result.get("title")) or normalized_url,
-                "summary": self._safe_str(result.get("summary")),
-                "body": self._safe_str(result.get("content")),
-                "preview": self._safe_str(result.get("preview")),
-                "source_url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                "meta": {
-                    "description": self._safe_str(result.get("description")),
-                    "site_name": self._safe_str(result.get("site_name")),
-                    "domain": self._safe_str(result.get("domain")),
-                    "content": self._safe_str(result.get("content")),
-                    "url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                    "status_code": result.get("status_code"),
-                    "ssl_verified": result.get("ssl_verified"),
-                    "artifact_build_error": str(e),
-                },
-                "viewer": {
-                    "kind": "web_result",
-                    "title": self._safe_str(result.get("title")) or normalized_url,
-                    "body": self._safe_str(result.get("content")),
-                    "analysis_text": self._safe_str(result.get("summary")),
-                    "bullets": self._safe_list(result.get("bullets")),
-                    "links": self._safe_list(result.get("links")),
-                    "images": self._safe_list(result.get("images")),
-                    "source_url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                },
-            }
-
-        if isinstance(artifact, dict):
-            artifact["session_id"] = session_id or artifact.get("session_id", "")
-            artifact.setdefault("created_at", fetched_at)
-            artifact["updated_at"] = fetched_at
-
-        artifact = self._upgrade_web_artifact_payload(
-            artifact=artifact,
-            result=result,
-            url=normalized_url,
-        )
-
-        saved_artifact = self._save_artifact_fallback(artifact) if artifact else None
-        final_artifact = self._upgrade_web_artifact_payload(
-            artifact=saved_artifact or artifact,
-            result=result,
-            url=normalized_url,
-        )
-
-        summary = self._safe_str(final_artifact.get("summary")) if isinstance(final_artifact, dict) else ""
-        body = self._safe_str(final_artifact.get("body")) if isinstance(final_artifact, dict) else ""
-        title = self._safe_str(final_artifact.get("title")) if isinstance(final_artifact, dict) else normalized_url
-        viewer = self._safe_dict(final_artifact.get("viewer")) if isinstance(final_artifact, dict) else {}
-        meta = self._safe_dict(final_artifact.get("meta")) if isinstance(final_artifact, dict) else {}
-
-        return {
-            "ok": bool(result.get("ok", True)),
-            "text": summary or f"Fetched {title}",
-            "artifact": final_artifact,
-            "viewer": viewer,
-            "url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-            "source_url": self._safe_str(meta.get("source_url")) or self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-            "title": title,
-            "summary": summary,
-            "body": body,
-            "meta": meta,
-            "debug": {
-                "route_taken": "web_fetch",
-                "status_code": result.get("status_code"),
-                "artifact_kind": self._safe_str(final_artifact.get("kind")) if isinstance(final_artifact, dict) else "web_result",
-            },
-        }
-
-    def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
-        attachments = attachments or []
-
-        image_url = ""
-        image_name = ""
-
-        for item in attachments:
-            if not isinstance(item, dict):
-                continue
-
-            att_type = self._safe_str(item.get("type")).lower()
-            mime_type = self._safe_str(item.get("mime_type")).lower()
-            url = self._safe_str(item.get("url"))
-            name = self._safe_str(item.get("name") or item.get("filename") or "image")
-
-            if url and (att_type == "image" or mime_type.startswith("image/")):
-                image_url = url
-                image_name = name
-                break
-
-        if image_url:
-            try:
-                prompt = self._safe_str(user_text) or "what is in this image"
-
-                response = self.client.responses.create(
-                    model=self.chat_model,
-                    input=[
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "input_text", "text": prompt},
-                                {"type": "input_image", "image_url": image_url},
-                            ],
-                        }
-                    ],
+                    size=self.image_size,
                 )
 
-                text = self._extract_response_text(response)
+                first = result.data[0] if getattr(result, "data", None) else None
+                image_b64 = getattr(first, "b64_json", None) if first else None
+                if not image_b64:
+                    raise ValueError("Image API returned no b64_json")
+
+                image_bytes = base64.b64decode(image_b64)
+                filename = f"generated_{uuid.uuid4().hex}.png"
+                filepath = self.uploads_dir / filename
+
+                with open(filepath, "wb") as f:
+                    f.write(image_bytes)
+
+                image_url = f"/api/uploads/{filename}"
+
+                saved_artifact = None
+                try:
+                    saved_artifact = self._persist_image_generation_artifact(
+                        session_id=session_id,
+                        prompt=prompt,
+                        image_url=image_url,
+                        revised_prompt="",
+                        parent_artifact_id=parent_artifact_id,
+                        source_type=source_type,
+                        generation_mode="text_to_image",
+                    )
+                except Exception as e:
+                    print("IMAGE ARTIFACT SAVE FAILED:", e)
 
                 return {
                     "ok": True,
-                    "text": text or f"I analyzed the image: {image_name}",
-                    "saved_artifact": None,
+                    "text": f"Generated image for: {prompt}",
+                    "image_url": image_url,
+                    "prompt": prompt,
+                    "revised_prompt": "",
+                    "parent_artifact_id": parent_artifact_id,
+                    "source_type": source_type,
+                    "generation_mode": "text_to_image",
+                    "saved_artifact": saved_artifact,
                 }
-
             except Exception as e:
                 return {
                     "ok": False,
-                    "text": f"Image analysis failed: {e}",
+                    "text": f"Image generation failed: {e}",
                     "error": str(e),
+                    "image_url": "",
+                    "prompt": prompt,
+                    "revised_prompt": "",
+                    "parent_artifact_id": parent_artifact_id,
+                    "source_type": source_type,
+                    "generation_mode": "text_to_image",
                     "saved_artifact": None,
                 }
+        # ==============================
+        # WEB / ATTACHMENT HELPERS
+        # ==============================
 
-        names = []
-        for item in attachments:
-            if isinstance(item, dict):
-                name = self._safe_str(item.get("name") or item.get("filename"))
-                if name:
-                    names.append(name)
+    def _handle_web_fetch(self, url: str, session_id: str = "") -> dict:
+            raw_url = self._safe_str(url)
+            normalized_url = raw_url
+            if normalized_url and not re.match(r"^https?://", normalized_url, re.IGNORECASE):
+                normalized_url = "https://" + normalized_url
 
-        summary = (
-            f"I analyzed the uploaded attachment(s): {', '.join(names)}."
-            if names
-            else "I analyzed the uploaded attachment(s)."
-        )
+            fetched_at = datetime.now(timezone.utc).isoformat()
 
-        if user_text:
-            summary += f" Request: {user_text}"
+            try:
+                result = self.web.fetch(normalized_url)
+            except Exception as e:
+                return {
+                    "ok": False,
+                    "error": f"Web fetch failed: {e}",
+                    "url": normalized_url,
+                    "debug": {
+                        "route_taken": "web_fetch",
+                        "error": str(e),
+                    },
+                }
 
-        return {
-            "ok": True,
-            "text": summary,
-            "saved_artifact": None,
-        }
+            if not isinstance(result, dict):
+                result = {}
 
-    # ==============================
-    # MODEL HELPERS
-    # ==============================
+            artifact = {}
+            try:
+                if hasattr(self.web, "build_artifact_payload") and callable(self.web.build_artifact_payload):
+                    artifact = self.web.build_artifact_payload(result) or {}
+            except Exception as e:
+                artifact = {
+                    "kind": "web_result",
+                    "title": self._safe_str(result.get("title")) or normalized_url,
+                    "summary": self._safe_str(result.get("summary")),
+                    "body": self._safe_str(result.get("content")),
+                    "preview": self._safe_str(result.get("preview")),
+                    "source_url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
+                    "meta": {
+                        "description": self._safe_str(result.get("description")),
+                        "site_name": self._safe_str(result.get("site_name")),
+                        "domain": self._safe_str(result.get("domain")),
+                        "content": self._safe_str(result.get("content")),
+                        "url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
+                        "status_code": result.get("status_code"),
+                        "ssl_verified": result.get("ssl_verified"),
+                        "artifact_build_error": str(e),
+                    },
+                    "viewer": {
+                        "kind": "web_result",
+                        "title": self._safe_str(result.get("title")) or normalized_url,
+                        "body": self._safe_str(result.get("content")),
+                        "analysis_text": self._safe_str(result.get("summary")),
+                        "bullets": self._safe_list(result.get("bullets")),
+                        "links": self._safe_list(result.get("links")),
+                        "images": self._safe_list(result.get("images")),
+                        "source_url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
+                    },
+                }
+
+            if isinstance(artifact, dict):
+                artifact["session_id"] = session_id or artifact.get("session_id", "")
+                artifact.setdefault("created_at", fetched_at)
+                artifact["updated_at"] = fetched_at
+
+            artifact = self._upgrade_web_artifact_payload(
+                artifact=artifact,
+                result=result,
+                url=normalized_url,
+            )
+
+            saved_artifact = self._save_artifact_fallback(artifact) if artifact else None
+            final_artifact = self._upgrade_web_artifact_payload(
+                artifact=saved_artifact or artifact,
+                result=result,
+                url=normalized_url,
+            )
+
+            summary = self._safe_str(final_artifact.get("summary")) if isinstance(final_artifact, dict) else ""
+            body = self._safe_str(final_artifact.get("body")) if isinstance(final_artifact, dict) else ""
+            title = self._safe_str(final_artifact.get("title")) if isinstance(final_artifact, dict) else normalized_url
+            viewer = self._safe_dict(final_artifact.get("viewer")) if isinstance(final_artifact, dict) else {}
+            meta = self._safe_dict(final_artifact.get("meta")) if isinstance(final_artifact, dict) else {}
+
+            return {
+                "ok": bool(result.get("ok", True)),
+                "text": summary or f"Fetched {title}",
+                "artifact": final_artifact,
+                "viewer": viewer,
+                "url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
+                "source_url": self._safe_str(meta.get("source_url")) or self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
+                "title": title,
+                "summary": summary,
+                "body": body,
+                "meta": meta,
+                "debug": {
+                    "route_taken": "web_fetch",
+                    "status_code": result.get("status_code"),
+                    "artifact_kind": self._safe_str(final_artifact.get("kind")) if isinstance(final_artifact, dict) else "web_result",
+                },
+            }
+
+    def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
+            attachments = attachments or []
+
+            image_url = ""
+            image_name = ""
+
+            for item in attachments:
+                if not isinstance(item, dict):
+                    continue
+
+                att_type = self._safe_str(item.get("type")).lower()
+                mime_type = self._safe_str(item.get("mime_type")).lower()
+                url = self._safe_str(item.get("url"))
+                name = self._safe_str(item.get("name") or item.get("filename") or "image")
+
+                if url and (att_type == "image" or mime_type.startswith("image/")):
+                    image_url = url
+                    image_name = name
+                    break
+
+            if image_url:
+                try:
+                    prompt = self._safe_str(user_text) or "what is in this image"
+
+                    response = self.client.responses.create(
+                        model=self.chat_model,
+                        input=[
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "input_text", "text": prompt},
+                                    {"type": "input_image", "image_url": image_url},
+                                ],
+                            }
+                        ],
+                    )
+
+                    text = self._extract_response_text(response)
+
+                    return {
+                        "ok": True,
+                        "text": text or f"I analyzed the image: {image_name}",
+                        "saved_artifact": None,
+                    }
+
+                except Exception as e:
+                    return {
+                        "ok": False,
+                        "text": f"Image analysis failed: {e}",
+                        "error": str(e),
+                        "saved_artifact": None,
+                    }
+
+            names = []
+            for item in attachments:
+                if isinstance(item, dict):
+                    name = self._safe_str(item.get("name") or item.get("filename"))
+                    if name:
+                        names.append(name)
+
+            summary = (
+                f"I analyzed the uploaded attachment(s): {', '.join(names)}."
+                if names
+                else "I analyzed the uploaded attachment(s)."
+            )
+
+            if user_text:
+                summary += f" Request: {user_text}"
+
+            return {
+                "ok": True,
+                "text": summary,
+                "saved_artifact": None,
+            }
+
+        # ==============================
+        # MODEL HELPERS
+        # ==============================
 
     def _build_chat_input(
-        self,
-        user_text: str,
-        decision: dict,
-        session_id: str = "",
-    ) -> str:
-        user_text = self._safe_str(user_text)
+            self,
+            user_text: str,
+            decision: dict,
+            session_id: str = "",
+        ) -> str:
+            user_text = self._safe_str(user_text)
 
-        memory_items = self._rank_memory_context(
-            user_text=user_text,
-            limit=int(decision.get("memory_limit") or self.memory_limit),
-            session_id=session_id,
-        )
-
-        memory_block = self._format_memory_context(memory_items[:3])
-
-        sections = []
-
-        if memory_block:
-            sections.append(
-                "Relevant memory:\n"
-                f"{memory_block}"
+            memory_items = self._rank_memory_context(
+                user_text=user_text,
+                limit=int(decision.get("memory_limit") or self.memory_limit),
+                session_id=session_id,
             )
 
-        if not sections:
-            return user_text
+            memory_block = self._format_memory_context(memory_items[:3])
 
-        return (
-            "\n\n".join(sections)
-            + "\n\nInstructions:\n"
-            + "- Answer clearly and directly.\n"
-            + "- Use relevant memory when it helps.\n"
-            + "- Do not claim missing context if the answer is already available.\n\n"
-            + "User message:\n"
-            + user_text
-        )
+            sections = []
+
+            if memory_block:
+                sections.append(
+                    "Relevant memory:\n"
+                    f"{memory_block}"
+                )
+
+            if not sections:
+                return user_text
+
+            return (
+                "\n\n".join(sections)
+                + "\n\nInstructions:\n"
+                + "- Answer clearly and directly.\n"
+                + "- Use relevant memory when it helps.\n"
+                + "- Do not claim missing context if the answer is already available.\n\n"
+                + "User message:\n"
+                + user_text
+            )
 
     def _run_chat_model(
-        self,
-        user_text: str,
-        decision: dict,
-        session_id: str = "",
-    ) -> str:
-        prompt = self._build_chat_input(
-            user_text=user_text,
-            decision=decision,
-            session_id=session_id,
-        )
-
-        print("=== NOVA PROMPT START ===")
-        print(prompt[:4000])
-        print("=== NOVA PROMPT END ===")
-
-        try:
-            response = self.client.responses.create(
-                model=self.chat_model,
-                input=prompt,
-            )
-            return self._extract_response_text(response)
-        except Exception as e:
-            return f"Model error: {e}"
-
-    # ==============================
-    # RESPONSE BUILDERS
-    # ==============================
-
-    def _build_user_message(self, user_text: str, attachments=None) -> dict:
-        return new_message(
-            role="user",
-            text=user_text,
-            attachments=attachments or [],
-            meta={},
-        )
-
-    def _build_assistant_message(
-        self,
-        text: str,
-        meta: dict | None = None,
-        attachments=None,
-    ) -> dict:
-        return new_message(
-            role="assistant",
-            text=self._safe_str(text) or "",
-            attachments=attachments or [],
-            meta=meta or {},
-        )
-
-    def _finalize_response(
-        self,
-        session_id: str,
-        user_text: str,
-        user_msg: dict,
-        assistant_msg: dict,
-        decision: dict,
-        saved_artifact=None,
-    ) -> dict:
-        self._maybe_write_memory(decision, user_text, session_id)
-
-        print("FINALIZE_ASSISTANT_TEXT =", repr(assistant_msg.get("text")))
-
-        should_inject_working_context = self._should_inject_working_context(
-            decision=decision,
-            user_text=user_text,
-            assistant_msg=assistant_msg,
-        )
-
-        working_context_payload = self._build_working_context_payload(session_id)
-
-        print("WORKING_CONTEXT_SHOULD_INJECT =", should_inject_working_context)
-        print("WORKING_CONTEXT_PAYLOAD =", working_context_payload)
-
-        self._persist_turn(session_id, user_msg, assistant_msg)
-
-        payload = {
-            "ok": True,
-            "active_session_id": session_id,
-            "assistant_message": assistant_msg,
-            "working_context": {
-                "show": bool(
-                    should_inject_working_context and working_context_payload.get("show")
-                ),
-                "text": working_context_payload.get("text", ""),
-                "state": working_context_payload.get("state", {}),
-            },
-            "session": self._get_session_payload(
-                session_id,
-                fallback_messages=[user_msg, assistant_msg],
-            ),
-            "saved_artifact": saved_artifact,
-            "artifacts": self._get_artifacts_list(),
-            "memory": self._get_memory_list(),
-            "sessions": self._get_sessions_list(),
-            "debug": {
-                "decision": decision,
-                "route": "chat_service.handle",
-                "route_taken": decision.get("route"),
-                "working_context_injected": should_inject_working_context,
-                "working_context_available": working_context_payload.get("show", False),
-                "working_context_payload": working_context_payload,
-            },
-        }
-
-        payload = self._attach_execution(
-            payload,
-            user_text,
-            assistant_msg,
-            decision,
-            session_id=session_id,
-        )
-
-        return payload
-
-    def _execute_memory_recall(
-        self,
-        decision: dict,
-        user_text: str,
-        session_id: str,
-        attachments=None,
-    ) -> dict:
-        attachments = attachments or []
-
-        user_msg = self._build_user_message(
-            user_text,
-            attachments=attachments,
-        )
-
-        assistant_text = self._build_memory_recall_text(
-            session_id=session_id,
-            user_text=user_text,
-            limit=int(decision.get("memory_limit") or self.memory_limit),
-        )
-
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text,
-            meta={
-                "memory_recall": True,
-            },
-            attachments=[],
-        )
-
-        return self._finalize_response(
-            session_id=session_id,
-            user_text=user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision=decision,
-            saved_artifact=None,
-        )
-
-    def _execute_planning(
-        self,
-        decision: dict,
-        user_text: str,
-        session_id: str,
-        attachments=None,
-    ) -> dict:
-        user_msg = self._build_user_message(user_text, attachments=attachments or [])
-        assistant_text = self._run_chat_model(
-            user_text=user_text,
-            decision=decision,
-            session_id=session_id,
-        )
-
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text,
-            meta={"planning": True},
-            attachments=[],
-        )
-
-        return self._finalize_response(
-            session_id=session_id,
-            user_text=user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision=decision,
-            saved_artifact=None,
-        )
-
-    def _execute_web_fetch(
-        self,
-        decision: dict,
-        user_text: str,
-        session_id: str,
-        attachments=None,
-    ) -> dict:
-        user_msg = self._build_user_message(user_text, attachments=attachments or [])
-
-        web_result = self._handle_web_fetch(
-            self._safe_str(decision.get("url")),
-            session_id=session_id,
-        )
-
-        artifact_summary = ""
-        artifact = web_result.get("artifact")
-        if isinstance(artifact, dict):
-            artifact_summary = self._safe_str(artifact.get("summary"))
-
-        assistant_msg = self._build_assistant_message(
-            text=artifact_summary or self._safe_str(web_result.get("summary")) or "Web fetch completed.",
-            meta={
-                "web_fetch": True,
-                "source_url": self._safe_str(web_result.get("source_url")),
-                "title": self._safe_str(web_result.get("title")),
-            },
-            attachments=[],
-        )
-
-        return self._finalize_response(
-            session_id=session_id,
-            user_text=user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision=decision,
-            saved_artifact=web_result.get("artifact"),
-        )
-
-    def _execute_attachment_analysis(
-        self,
-        decision: dict,
-        user_text: str,
-        session_id: str,
-        attachments=None,
-    ) -> dict:
-        attachments = attachments or []
-        user_msg = self._build_user_message(user_text, attachments=attachments)
-        result = self._handle_attachment_analysis(user_text, attachments)
-
-        assistant_msg = self._build_assistant_message(
-            text=self._safe_str(result.get("text")) or "Attachment analysis completed.",
-            meta={"attachment_analysis": True},
-            attachments=[],
-        )
-
-        return self._finalize_response(
-            session_id=session_id,
-            user_text=user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision=decision,
-            saved_artifact=result.get("saved_artifact"),
-        )
-
-    def _execute_general_chat(
-        self,
-        decision: dict,
-        user_text: str,
-        session_id: str,
-        attachments=None,
-        working_state=None,
-        working_context_block="",
-    ) -> dict:
-        attachments = attachments or []
-        user_msg = self._build_user_message(user_text, attachments=attachments)
-
-        lowered = self._safe_str(user_text).lower().strip()
-
-        continuity_triggers = {
-            "where are we",
-            "where are we now",
-            "what are we doing",
-            "what are we doing now",
-            "now what",
-            "what's next",
-            "whats next",
-            "what is next",
-            "what file are we in",
-            "what broke",
-            "what did we fix",
-        }
-
-        wants_where_are_we = lowered in continuity_triggers
-
-        if wants_where_are_we:
-            assistant_text = self._safe_str(self._handle_where_are_we(session_id, user_text))
-        else:
-            memory_context = self._build_memory_context_for_chat(
+            self,
+            user_text: str,
+            decision: dict,
+            session_id: str = "",
+        ) -> str:
+            prompt = self._build_chat_input(
                 user_text=user_text,
                 decision=decision,
-            )
-            session = self.sessions.get_session(session_id) or {}
-
-            messages = self._compose_model_messages(
-                user_text=user_text,
-                session=session,
-                decision=decision,
-                memory_context=memory_context,
+                session_id=session_id,
             )
 
-            assistant_text = ""
+            print("=== NOVA PROMPT START ===")
+            print(prompt[:4000])
+            print("=== NOVA PROMPT END ===")
 
             try:
                 response = self.client.responses.create(
                     model=self.chat_model,
-                    input=messages,
+                    input=prompt,
+                )
+                return self._extract_response_text(response)
+            except Exception as e:
+                return f"Model error: {e}"
+
+        # ==============================
+        # RESPONSE BUILDERS
+        # ==============================
+
+    def _build_user_message(self, text: str, attachments=None, meta=None) -> dict:
+        attachments = attachments or []
+        meta = meta or {}
+        return {
+            "role": "user",
+            "text": self._safe_str(text),
+            "attachments": attachments,
+            "meta": meta,
+        }
+
+    def _build_assistant_message(self, text: str, attachments=None, meta=None) -> dict:
+        attachments = attachments or []
+        meta = meta or {}
+        return {
+            "role": "assistant",
+            "text": self._safe_str(text),
+            "attachments": attachments,
+            "meta": meta,
+        }
+
+
+    def _finalize_response(
+            self,
+            session_id: str,
+            user_text: str,
+            user_msg: dict,
+            assistant_msg: dict,
+            decision: dict,
+            saved_artifact=None,
+        ) -> dict:
+            self._maybe_write_memory(decision, user_text, session_id)
+
+            print("FINALIZE_ASSISTANT_TEXT =", repr(assistant_msg.get("text")))
+
+            should_inject_working_context = self._should_inject_working_context(
+                decision=decision,
+                user_text=user_text,
+                assistant_msg=assistant_msg,
+            )
+
+            working_context_payload = self._build_working_context_payload(session_id)
+
+            print("WORKING_CONTEXT_SHOULD_INJECT =", should_inject_working_context)
+            print("WORKING_CONTEXT_PAYLOAD =", working_context_payload)
+
+            self._persist_turn(session_id, user_msg, assistant_msg)
+
+            payload = {
+                "ok": True,
+                "active_session_id": session_id,
+                "assistant_message": assistant_msg,
+                "working_context": {
+                    "show": bool(
+                        should_inject_working_context and working_context_payload.get("show")
+                    ),
+                    "text": working_context_payload.get("text", ""),
+                    "state": working_context_payload.get("state", {}),
+                },
+                "session": self._get_session_payload(
+                    session_id,
+                    fallback_messages=[user_msg, assistant_msg],
+                ),
+                "saved_artifact": saved_artifact,
+                "artifacts": self._get_artifacts_list(),
+                "memory": self._get_memory_list(),
+                "sessions": self._get_sessions_list(),
+                "debug": {
+                    "decision": decision,
+                    "route": "chat_service.handle",
+                    "route_taken": decision.get("route"),
+                    "working_context_injected": should_inject_working_context,
+                    "working_context_available": working_context_payload.get("show", False),
+                    "working_context_payload": working_context_payload,
+                },
+            }
+
+            payload = self._attach_execution(
+                payload,
+                user_text,
+                assistant_msg,
+                decision,
+                session_id=session_id,
+            )
+
+            return payload
+
+    def _execute_memory_recall(
+            self,
+            decision: dict,
+            user_text: str,
+            session_id: str,
+            attachments=None,
+        ) -> dict:
+            attachments = attachments or []
+
+            user_msg = self._build_user_message(
+                user_text,
+                attachments=attachments,
+            )
+
+            assistant_text = self._build_memory_recall_text(
+                session_id=session_id,
+                user_text=user_text,
+                limit=int(decision.get("memory_limit") or self.memory_limit),
+            )
+
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                meta={
+                    "memory_recall": True,
+                },
+                attachments=[],
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+                saved_artifact=None,
+            )
+
+    def _execute_planning(
+            self,
+            decision: dict,
+            user_text: str,
+            session_id: str,
+            attachments=None,
+        ) -> dict:
+            user_msg = self._build_user_message(user_text, attachments=attachments or [])
+            assistant_text = self._run_chat_model(
+                user_text=user_text,
+                decision=decision,
+                session_id=session_id,
+            )
+
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                meta={"planning": True},
+                attachments=[],
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+                saved_artifact=None,
+            )
+
+    def _execute_web_fetch(
+            self,
+            decision: dict,
+            user_text: str,
+            session_id: str,
+            attachments=None,
+        ) -> dict:
+            user_msg = self._build_user_message(user_text, attachments=attachments or [])
+
+            web_result = self._handle_web_fetch(
+                self._safe_str(decision.get("url")),
+                session_id=session_id,
+            )
+
+            artifact_summary = ""
+            artifact = web_result.get("artifact")
+            if isinstance(artifact, dict):
+                artifact_summary = self._safe_str(artifact.get("summary"))
+
+            assistant_msg = self._build_assistant_message(
+                text=artifact_summary or self._safe_str(web_result.get("summary")) or "Web fetch completed.",
+                meta={
+                    "web_fetch": True,
+                    "source_url": self._safe_str(web_result.get("source_url")),
+                    "title": self._safe_str(web_result.get("title")),
+                },
+                attachments=[],
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+                saved_artifact=web_result.get("artifact"),
+            )
+
+    def _execute_attachment_analysis(
+            self,
+            decision: dict,
+            user_text: str,
+            session_id: str,
+            attachments=None,
+        ) -> dict:
+            attachments = attachments or []
+            user_msg = self._build_user_message(user_text, attachments=attachments)
+            result = self._handle_attachment_analysis(user_text, attachments)
+
+            assistant_msg = self._build_assistant_message(
+                text=self._safe_str(result.get("text")) or "Attachment analysis completed.",
+                meta={"attachment_analysis": True},
+                attachments=[],
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+                saved_artifact=result.get("saved_artifact"),
+            )
+
+    def _execute_general_chat(
+            self,
+            decision: dict,
+            user_text: str,
+            session_id: str,
+            attachments=None,
+            working_state=None,
+            working_context_block="",
+        ) -> dict:
+            attachments = attachments or []
+            user_msg = self._build_user_message(user_text, attachments=attachments)
+
+            lowered = self._safe_str(user_text).lower().strip()
+
+            continuity_triggers = {
+                "where are we",
+                "where are we now",
+                "what are we doing",
+                "what are we doing now",
+                "now what",
+                "what's next",
+                "whats next",
+                "what is next",
+                "what file are we in",
+                "what broke",
+                "what did we fix",
+            }
+
+            wants_where_are_we = lowered in continuity_triggers
+
+            if wants_where_are_we:
+                assistant_text = self._safe_str(self._handle_where_are_we(session_id, user_text))
+            else:
+                memory_context = self._build_memory_context_for_chat(
+                    user_text=user_text,
+                    decision=decision,
+                )
+                session = self.sessions.get_session(session_id) or {}
+
+                messages = self._compose_model_messages(
+                    user_text=user_text,
+                    session=session,
+                    decision=decision,
+                    memory_context=memory_context,
                 )
 
-                if hasattr(response, "output_text") and response.output_text:
-                    assistant_text = self._safe_str(response.output_text).strip()
-                elif hasattr(response, "output") and response.output:
-                    parts = []
-                    for item in response.output:
-                        if hasattr(item, "content") and item.content:
-                            for c in item.content:
-                                text_value = getattr(c, "text", "")
-                                text_value = self._safe_str(text_value).strip()
-                                if text_value:
-                                    parts.append(text_value)
+                assistant_text = ""
 
-                    assistant_text = " ".join(parts).strip()
+                try:
+                    response = self.client.responses.create(
+                        model=self.chat_model,
+                        input=messages,
+                    )
 
-            except Exception as e:
-                assistant_text = f"Chat failed: {e}"
+                    if hasattr(response, "output_text") and response.output_text:
+                        assistant_text = self._safe_str(response.output_text).strip()
+                    elif hasattr(response, "output") and response.output:
+                        parts = []
+                        for item in response.output:
+                            if hasattr(item, "content") and item.content:
+                                for c in item.content:
+                                    text_value = getattr(c, "text", "")
+                                    text_value = self._safe_str(text_value).strip()
+                                    if text_value:
+                                        parts.append(text_value)
 
-            if not assistant_text or not assistant_text.strip():
-                assistant_text = "No response generated."
+                        assistant_text = " ".join(parts).strip()
 
-        updates = self._extract_working_state_updates(
-            user_text=user_text,
-            current_state=self._get_working_state(session_id),
-        )
+                except Exception as e:
+                    assistant_text = f"Chat failed: {e}"
 
-        print("WORKING_STATE_UPDATES =", updates)
+                if not assistant_text or not assistant_text.strip():
+                    assistant_text = "No response generated."
 
-        if updates:
-            self._update_working_state(session_id, updates)
+            updates = self._extract_working_state_updates(
+                user_text=user_text,
+                current_state=self._get_working_state(session_id),
+            )
 
-        assistant_meta = {}
-        if working_state:
-            assistant_meta["working_state"] = working_state
-        if working_context_block:
-            assistant_meta["working_context_block"] = working_context_block
+            print("WORKING_STATE_UPDATES =", updates)
 
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text,
-            meta=assistant_meta,
-            attachments=[],
-        )
+            if updates:
+                self._update_working_state(session_id, updates)
 
-        return self._finalize_response(
-            session_id=session_id,
-            user_text=user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision=decision,
-            saved_artifact=None,
-        )
+            assistant_meta = {}
+            if working_state:
+                assistant_meta["working_state"] = working_state
+            if working_context_block:
+                assistant_meta["working_context_block"] = working_context_block
+
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                meta=assistant_meta,
+                attachments=[],
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+                saved_artifact=None,
+            )
 
     def _execute_web_operator(self, user_text: str, session_id: str) -> dict:
         try:
@@ -3189,95 +3572,21 @@ class ChatService:
                     decision={
                         "route": "web_operator",
                         "mode": "tool",
-                        "confidence": 0.70,
-                        "use_memory": False,
-                        "save_memory": False,
                         "save_artifact": False,
-                        "has_attachments": False,
-                        "url": "",
-                        "memory_limit": self.memory_limit,
-                        "reasons": ["research_trigger", "no_url_detected"],
-                        "session_id": self._safe_str(session_id),
+                        "save_memory": False,
+                        "use_memory": False,
                     },
                     saved_artifact=None,
                 )
 
-            primary = self.web.fetch(base_url)
-            links = self._safe_list(primary.get("links"))[:3]
-
-            collected = [primary]
-            visited = [base_url]
-
-            for link in links:
-                try:
-                    result = self.web.fetch(link)
-                    if isinstance(result, dict) and result.get("ok"):
-                        collected.append(result)
-                        visited.append(link)
-                except Exception:
-                    continue
-
-            combined_bullets = []
-            combined_content = []
-
-            for page in collected:
-                if not isinstance(page, dict):
-                    continue
-                combined_bullets.extend(self._safe_list(page.get("bullets")))
-                combined_content.append(self._safe_str(page.get("content")))
-
-            deduped_bullets = []
-            seen = set()
-            for item in combined_bullets:
-                clean = self._safe_str(item)
-                key = clean.lower()
-                if not clean or key in seen:
-                    continue
-                seen.add(key)
-                deduped_bullets.append(clean)
-
-            deduped_bullets = deduped_bullets[:10]
-            combined_body = "\n\n".join([c for c in combined_content if c])[:8000]
-            summary = "\n".join(deduped_bullets[:5]).strip()
-
-            artifact = {
-                "kind": "web_research",
-                "title": f"Research: {base_url}",
-                "summary": summary or f"Analyzed {len(visited)} page(s).",
-                "body": combined_body,
-                "preview": (summary or combined_body[:300]).strip(),
-                "source": "web_operator",
-                "session_id": session_id or "",
-                "meta": {
-                    "source_url": base_url,
-                    "visited": visited,
-                    "pages_visited": len(visited),
-                },
-                "viewer": {
-                    "kind": "web_research",
-                    "title": f"Research: {base_url}",
-                    "analysis_text": summary or f"Analyzed {len(visited)} page(s).",
-                    "body": combined_body,
-                    "bullets": deduped_bullets,
-                    "links": visited,
-                    "source_url": base_url,
-                },
-            }
-
-            saved_artifact = self._save_artifact_fallback(artifact)
+            summary = f"Web operator is not fully wired yet.\n\nTarget: {base_url}"
 
             user_msg = self._build_user_message(user_text, attachments=[])
-            assistant_text = f"Analyzed {len(visited)} pages.\n\n{summary}".strip()
             assistant_msg = self._build_assistant_message(
-                text=assistant_text,
-                meta={
-                    "web_operator": True,
-                    "source_url": base_url,
-                    "pages_visited": len(visited),
-                },
+                text=summary,
+                meta={"web_operator": True, "url": base_url},
                 attachments=[],
             )
-
             return self._finalize_response(
                 session_id=session_id,
                 user_text=user_text,
@@ -3286,24 +3595,17 @@ class ChatService:
                 decision={
                     "route": "web_operator",
                     "mode": "tool",
-                    "confidence": 0.97,
-                    "use_memory": False,
+                    "save_artifact": False,
                     "save_memory": False,
-                    "save_artifact": True,
-                    "has_attachments": False,
-                    "url": base_url,
-                    "memory_limit": self.memory_limit,
-                    "reasons": ["research_trigger", "phase_6_web_operator"],
-                    "session_id": self._safe_str(session_id),
+                    "use_memory": False,
                 },
-                saved_artifact=saved_artifact,
+                saved_artifact=None,
             )
-
         except Exception as e:
             user_msg = self._build_user_message(user_text, attachments=[])
             assistant_msg = self._build_assistant_message(
                 text=f"Web operator failed: {e}",
-                meta={"web_operator": True, "web_operator_error": str(e)},
+                meta={"web_operator": True, "error": True},
                 attachments=[],
             )
             return self._finalize_response(
@@ -3314,124 +3616,118 @@ class ChatService:
                 decision={
                     "route": "web_operator",
                     "mode": "tool",
-                    "confidence": 0.40,
-                    "use_memory": False,
-                    "save_memory": False,
                     "save_artifact": False,
-                    "has_attachments": False,
-                    "url": "",
-                    "memory_limit": self.memory_limit,
-                    "reasons": ["research_trigger", "phase_6_web_operator_error"],
-                    "session_id": self._safe_str(session_id),
+                    "save_memory": False,
+                    "use_memory": False,
                 },
                 saved_artifact=None,
             )
 
     def _execute_decision(
-        self,
-        decision: dict,
-        user_text: str,
-        session_id: str = "",
-        attachments=None,
-        working_state=None,
-        working_context_block="",
-    ) -> dict:
+            self,
+            decision: dict,
+            user_text: str,
+            session_id: str = "",
+            attachments=None,
+            working_state=None,
+            working_context_block="",
+        ) -> dict:
 
-        attachments = attachments or []
-        route = self._safe_str(decision.get("route")) or self.ROUTE_GENERAL_CHAT
+            attachments = attachments or []
+            route = self._safe_str(decision.get("route")) or self.ROUTE_GENERAL_CHAT
 
-        if route == self.ROUTE_IMAGE_GENERATION:
-            return self._execute_image_generation(
+            if route == self.ROUTE_IMAGE_GENERATION:
+                return self._execute_image_generation(
+                    decision=decision,
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                )
+
+            if route == self.ROUTE_WEB_FETCH:
+                return self._execute_web_fetch(
+                    decision=decision,
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                )
+
+            if route == self.ROUTE_ATTACHMENT_ANALYSIS:
+                return self._execute_attachment_analysis(
+                    decision=decision,
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                )
+
+            if route == self.ROUTE_PLANNING:
+                return self._execute_planning(
+                    decision=decision,
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                )
+
+            if route == self.ROUTE_MEMORY_RECALL:
+                return self._execute_memory_recall(
+                    decision=decision,
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                )
+
+            return self._execute_general_chat(
                 decision=decision,
                 user_text=user_text,
                 session_id=session_id,
                 attachments=attachments,
+                working_state=working_state,
+                working_context_block=working_context_block,
             )
-
-        if route == self.ROUTE_WEB_FETCH:
-            return self._execute_web_fetch(
-                decision=decision,
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-            )
-
-        if route == self.ROUTE_ATTACHMENT_ANALYSIS:
-            return self._execute_attachment_analysis(
-                decision=decision,
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-            )
-
-        if route == self.ROUTE_PLANNING:
-            return self._execute_planning(
-                decision=decision,
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-            )
-
-        if route == self.ROUTE_MEMORY_RECALL:
-            return self._execute_memory_recall(
-                decision=decision,
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-            )
-
-        return self._execute_general_chat(
-            decision=decision,
-            user_text=user_text,
-            session_id=session_id,
-            attachments=attachments,
-            working_state=working_state,
-            working_context_block=working_context_block,
-        )
 
     def _ensure_session_payload(self, session_id: str) -> dict:
-        session = self._call_first(
-            self.sessions,
-            ["get_session", "read_session", "get", "load_session"],
-            session_id,
-        )
-
-        if isinstance(session, dict):
-            session.setdefault("id", session_id)
-            session.setdefault("messages", [])
-            session.setdefault("working_state", {})
-            return session
-
-        created = self._call_first(
-            self.sessions,
-            ["create_session", "new_session", "create", "start_session"],
-        )
-        if isinstance(created, dict):
-            created_id = self._safe_str(created.get("id")) or session_id
             session = self._call_first(
                 self.sessions,
                 ["get_session", "read_session", "get", "load_session"],
-                created_id,
+                session_id,
             )
+
             if isinstance(session, dict):
-                session.setdefault("id", created_id)
+                session.setdefault("id", session_id)
                 session.setdefault("messages", [])
                 session.setdefault("working_state", {})
                 return session
 
+            created = self._call_first(
+                self.sessions,
+                ["create_session", "new_session", "create", "start_session"],
+            )
+            if isinstance(created, dict):
+                created_id = self._safe_str(created.get("id")) or session_id
+                session = self._call_first(
+                    self.sessions,
+                    ["get_session", "read_session", "get", "load_session"],
+                    created_id,
+                )
+                if isinstance(session, dict):
+                    session.setdefault("id", created_id)
+                    session.setdefault("messages", [])
+                    session.setdefault("working_state", {})
+                    return session
+
+                return {
+                    "id": created_id,
+                    "messages": [],
+                    "working_state": {},
+                }
+
             return {
-                "id": created_id,
+                "id": session_id,
                 "messages": [],
                 "working_state": {},
             }
 
-        return {
-            "id": session_id,
-            "messages": [],
-            "working_state": {},
-        }
-
-    # ==============================
+     # ==============================
     # PUBLIC ENTRY
     # ==============================
 
@@ -3439,6 +3735,20 @@ class ChatService:
         attachments = attachments or []
         user_text = self._safe_str(user_text)
         session_id = self._ensure_session_id(session_id)
+
+        auto_exec_match = self._looks_like_auto_execution_request(user_text)
+        print("HANDLE USER_TEXT =", repr(user_text))
+        print("HANDLE AUTO_EXEC_MATCH =", auto_exec_match)
+
+        if auto_exec_match:
+            print("HANDLE ROUTE = auto_execute")
+            return self._auto_execute_request(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+            )
+
+        print("HANDLE ROUTE = normal_chat")
 
         working_state = self._maybe_update_working_state(session_id, user_text)
         working_context_block = self._build_working_context_block(session_id)
