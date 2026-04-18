@@ -19,7 +19,7 @@ from nova_backend.services.memory_service import MemoryService
 from nova_backend.services.recon_service import ReconService
 from nova_backend.services.session_service import SessionService
 from nova_backend.services.web_service import WebService
-
+from nova_backend.services.tool_service import ToolService
 
 class ChatService:
     ROUTE_GENERAL_CHAT = "general_chat"
@@ -57,6 +57,7 @@ class ChatService:
         self.client = OpenAI()
         self.agent = AgentService()
         self.memory_ranker = MemoryRankerService()
+        self.tools = ToolService(base_dir=os.getcwd())
 
         self.autonomy = AutonomyService(
             web_service=self.web,
@@ -836,8 +837,80 @@ class ChatService:
             print("MEMORY WRITE FAILED:", e)
 
     # =========================
-    # PROMPT + CONTINUITY HELPERS (PHASE 4 POLISH)
+    # EXECUTION GUARD HELPERS (STEP TRUTH ENFORCEMENT)
     # =========================
+
+    def _text_has_placeholder_debug_content(self, text: str) -> bool:
+        text = self._safe_str(text).strip().lower()
+        if not text:
+            return True
+
+        placeholder_markers = [
+            "paste exact error here",
+            "step 1",
+            "step 2",
+            "step 3",
+            "how to reproduce:",
+        ]
+        return any(marker in text for marker in placeholder_markers)
+
+    def _has_real_debug_context(self, user_text: str, execution: dict, attachments=None) -> bool:
+        attachments = attachments or []
+        text = self._safe_str(user_text)
+        lowered = text.lower()
+
+        if self._text_has_placeholder_debug_content(text):
+            return False
+
+        if attachments:
+            return True
+
+        signals = 0
+
+        if "traceback" in lowered or "error" in lowered:
+            signals += 1
+
+        if "expected:" in lowered and "actual:" in lowered:
+            signals += 1
+
+        if "reproduce" in lowered:
+            signals += 1
+
+        if "def " in text or "class " in text:
+            signals += 1
+
+        if len(text.strip()) >= 120:
+            signals += 1
+
+        return signals >= 2
+
+    def _step_requires_real_change(self, step_title: str) -> bool:
+        return "apply" in self._safe_str(step_title).lower()
+
+    def _step_requires_verification(self, step_title: str) -> bool:
+        return "verify" in self._safe_str(step_title).lower()
+
+    def _step_output_indicates_real_change(self, step_output: str) -> bool:
+        lowered = self._safe_str(step_output).lower()
+        return any(x in lowered for x in ["changed", "updated", "patched", "modified"])
+
+    def _step_output_indicates_real_verification(self, step_output: str) -> bool:
+        lowered = self._safe_str(step_output).lower()
+        return any(x in lowered for x in ["verified", "tested", "confirmed", "passes"])
+
+    def _can_advance_execution_step(self, execution, user_text, step_title, step_output, attachments=None):
+        if not self._has_real_debug_context(user_text, execution, attachments):
+            return False, "Missing real debugging data (code, error, reproduction)."
+
+        if self._step_requires_real_change(step_title):
+            if not self._step_output_indicates_real_change(step_output):
+                return False, "No real code change detected."
+
+        if self._step_requires_verification(step_title):
+            if not self._step_output_indicates_real_verification(step_output):
+                return False, "No real verification detected."
+
+        return True, ""
 
     # =========================
     # EXECUTION RENDER NORMALIZATION LOCK
@@ -1038,27 +1111,12 @@ class ChatService:
             return {}
 
         current_state = self._get_working_state(session_id)
-        merged = self._extract_working_state_updates(user_text, current_state)
+        updates = self._extract_working_state_updates(user_text, current_state)
 
-        changed = False
-        for key in (
-            "active_task",
-            "current_file",
-            "current_bug",
-            "last_success",
-            "next_move",
-            "checkpoint",
-        ):
-            old_value = self._clean_working_state_value(current_state.get(key, ""))
-            new_value = self._clean_working_state_value(merged.get(key, ""))
-            if old_value != new_value:
-                changed = True
-                break
+        if not isinstance(updates, dict) or not updates:
+            return current_state
 
-        if changed:
-            self._update_working_state(session_id, merged)
-
-        return merged
+        return self._update_working_state(session_id, updates)
 
     def _is_valid_state_value(self, value):
         if not value:
@@ -1591,14 +1649,32 @@ class ChatService:
 
     def _looks_like_execution_progression(self, user_text: str) -> bool:
         text = self._safe_str(user_text).strip().lower()
+        if not text:
+            return False
 
-        # 🔒 STRICT MATCH ONLY
-        return text in {
+        normalized = " ".join(text.split())
+        print("PROGRESS_MATCH_NORMALIZED =", repr(normalized))
+
+        triggers = {
             "run it",
-            "next step",
             "continue",
-            "continue execution",
+            "go on",
+            "next step",
+            "advance",
+            "proceed",
+            "keep going",
         }
+
+        if normalized in triggers:
+            return True
+
+        if normalized.endswith(" run it"):
+            return True
+
+        if "run it" in normalized and len(normalized) <= 40:
+            return True
+
+        return False
 
     def _normalize_execution_state(self, execution):
         if not isinstance(execution, dict):
@@ -1678,6 +1754,8 @@ class ChatService:
     def _advance_execution_request(self, user_text: str, session_id: str = "", attachments=None):
         attachments = attachments or []
         session_id = self._safe_str(session_id)
+        user_text = self._safe_str(user_text)
+        assistant_text = ""
 
         latest = self._find_latest_execution_artifact(session_id=session_id)
         print("ADVANCE LATEST =", latest)
@@ -1715,56 +1793,27 @@ class ChatService:
             attachments=attachments,
         )
 
-        execution = result.get("execution") or {}
+        updated_execution = self._normalize_execution_state(
+            result.get("execution") or execution
+        )
         step_output = self._safe_str(result.get("step_output"))
-        saved_step_artifact = result.get("saved_artifact")
+        saved_artifact = result.get("saved_artifact")
 
-        steps = execution.get("steps") or []
-        goal = self._safe_str(execution.get("goal"))
-
-        lines = [f"Goal: {goal}", "", "Steps:"]
-        for step in steps:
-            status = self._safe_str(step.get("status")).lower()
-            if status == "done":
-                marker = "[✓]"
-            elif status == "current":
-                marker = "[>]"
-            else:
-                marker = "[ ]"
-            lines.append(f"{marker} {self._safe_str(step.get('title'))}")
-
-        lines.append("")
-        lines.append(f"Progress: {execution.get('progress', 0)}/{len(steps)} complete")
-        lines.append(f"Current step: {self._safe_str(execution.get('current_step')) or 'complete'}")
+        plan_body = self._render_execution(updated_execution)
 
         if step_output:
-            lines.append("")
-            lines.append("Last step output:")
-            lines.append(step_output)
-
-        updated_body = "\n".join(lines)
-
-        artifact_payload = dict(latest)
-        artifact_payload["body"] = updated_body
-        artifact_payload["preview"] = updated_body[:140]
-        artifact_payload["execution"] = execution
-
-        saved_artifact = self._call_first(
-            self.artifacts,
-            ["save_artifact", "create", "save", "create_artifact", "add_artifact"],
-            artifact_payload,
-        )
-
-        assistant_text = f"Step advanced.\n\n{updated_body}"
+            assistant_text = step_output
+            if plan_body:
+                assistant_text += "\n\n" + plan_body
+        else:
+            assistant_text = "Step processed."
+            if plan_body:
+                assistant_text += "\n\n" + plan_body
 
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
             attachments=[],
         )
-
-        if isinstance(saved_step_artifact, dict):
-            assistant_msg.setdefault("meta", {})
-            assistant_msg["meta"]["step_artifact_id"] = saved_step_artifact.get("id")
 
         return self._finalize_response(
             session_id=session_id,
@@ -1774,7 +1823,7 @@ class ChatService:
             decision={
                 "route": "execution",
                 "mode": "execution_progress",
-                "save_artifact": True,
+                "save_artifact": bool(saved_artifact),
                 "save_memory": False,
                 "use_memory": True,
             },
@@ -2396,6 +2445,79 @@ class ChatService:
             return data.get("artifacts")
         return data if isinstance(data, list) else []
 
+    def _build_working_state_prompt_block(self, session_id: str) -> str:
+        state = self._get_working_state(session_id) or {}
+        if not isinstance(state, dict) or not state:
+            return ""
+
+        ordered_fields = [
+            ("active_task", "Active task"),
+            ("current_file", "Current file"),
+            ("current_bug", "Current bug"),
+            ("last_success", "Last success"),
+            ("next_move", "Next move"),
+            ("checkpoint", "Checkpoint"),
+        ]
+
+        lines = []
+        for key, label in ordered_fields:
+            value = self._safe_str(state.get(key)).strip()
+            if value:
+                lines.append(f"- {label}: {value}")
+
+        if not lines:
+            return ""
+
+        return "Working state:\n" + "\n".join(lines)
+
+    def _derive_working_state_patch_from_step_output(
+        self,
+        step_title: str,
+        step_output: str,
+        current_state: dict | None = None,
+    ) -> dict:
+        current_state = current_state if isinstance(current_state, dict) else {}
+        step_title = self._safe_str(step_title).strip()
+        step_output = self._safe_str(step_output).strip()
+
+        if not step_output:
+            return {}
+
+        patch = {}
+
+        # basic success memory
+        patch["last_success"] = step_title or "Completed execution step"
+
+        lowered = step_output.lower()
+
+        next_markers = [
+            "next implication",
+            "next move",
+            "next step",
+        ]
+
+        extracted_next = ""
+        for marker in next_markers:
+            idx = lowered.find(marker)
+            if idx != -1:
+                raw = step_output[idx:]
+                parts = raw.split("\n", 1)
+                if len(parts) > 1:
+                    extracted_next = parts[1].strip()
+                else:
+                    extracted_next = raw.strip()
+                break
+
+        if extracted_next:
+            first_line = extracted_next.splitlines()[0].strip(" -:\t")
+            if first_line:
+                patch["next_move"] = first_line
+
+        if step_title and not self._safe_str(current_state.get("active_task")).strip():
+            patch["active_task"] = step_title
+
+        return patch
+
         # ==============================
         # WORKING STATE (PHASE 3)
         # ==============================
@@ -2623,70 +2745,133 @@ class ChatService:
 
             return merged  
 
-    def _extract_working_state_updates(self, user_text, current_state):
-            text = self._safe_str(user_text).strip()
-            lower = text.lower()
-            updates = {}
+    def _extract_working_state_updates(self, user_text: str, current_state: dict | None = None) -> dict:
+        text = self._safe_str(user_text).strip()
+        if not text:
+            return {}
 
-            if not text:
-                return self._merge_working_state(current_state or {}, updates)
+        current_state = current_state if isinstance(current_state, dict) else {}
+        lowered = text.lower()
+        updates = {}
 
-            if text.startswith("Active task:") or "\nCurrent file:" in text:
-                lines = [line.strip() for line in text.splitlines() if line.strip()]
-                mapping = {
-                    "active task:": "active_task",
-                    "current file:": "current_file",
-                    "current bug:": "current_bug",
-                    "last success:": "last_success",
-                    "next move:": "next_move",
-                    "checkpoint:": "checkpoint",
-                }
+        field_aliases = {
+            "active_task": [
+                "active task",
+                "task",
+            ],
+            "current_file": [
+                "current file",
+                "file",
+            ],
+            "current_bug": [
+                "current bug",
+                "bug",
+            ],
+            "last_success": [
+                "last success",
+            ],
+            "next_move": [
+                "next move",
+            ],
+            "checkpoint": [
+                "checkpoint",
+            ],
+        }
 
-                for line in lines:
-                    line_lower = line.lower()
-                    for prefix, key in mapping.items():
-                        if line_lower.startswith(prefix):
-                            value = line[len(prefix):].strip()
-                            updates[key] = self._clean_working_state_value(value)
-                            break
+        def _clean_value(value: str) -> str:
+            value = self._safe_str(value).strip()
+            value = value.strip(" \t\r\n-:;,.")
+            return value
 
-                return self._merge_working_state(current_state or {}, updates)
+        def _set_if_present(field_name: str, value: str):
+            value = _clean_value(value)
+            if value:
+                updates[field_name] = value
 
-            if "c:\\" in lower:
-                for token in text.split():
-                    token_clean = token.strip("`\"'(),")
-                    if token_clean.lower().startswith("c:\\"):
-                        updates["current_file"] = token_clean
+        # -----------------------------
+        # explicit "set X to Y" patterns
+        # -----------------------------
+        for field_name, aliases in field_aliases.items():
+            for alias in aliases:
+                patterns = [
+                    f"set {alias} to ",
+                    f"update {alias} to ",
+                    f"change {alias} to ",
+                    f"{alias} is ",
+                    f"{alias}: ",
+                ]
+                for marker in patterns:
+                    idx = lowered.find(marker)
+                    if idx != -1:
+                        raw_value = text[idx + len(marker):]
+                        _set_if_present(field_name, raw_value)
                         break
+                if field_name in updates:
+                    break
 
-            patterns = {
-                "active_task": [
-                    r"(?:working on|current task is|active task is)\s+(.+)",
-                ],
-                "current_bug": [
-                    r"(?:bug is|error is|issue is|current bug is)\s+(.+)",
-                ],
-                "last_success": [
-                    r"(?:last success was|fixed|working now|got working)\s+(.+)",
-                ],
-                "next_move": [
-                    r"(?:next move is|next step is|do this next)\s+(.+)",
-                ],
-                "checkpoint": [
-                    r"(?:checkpoint is|save point is|phase is)\s+(.+)",
-                ],
-            }
+        # -----------------------------------
+        # compact continuity / status patterns
+        # -----------------------------------
+        continuity_markers = [
+            ("working on ", "active_task"),
+            ("i'm working on ", "active_task"),
+            ("im working on ", "active_task"),
+            ("current task is ", "active_task"),
+            ("my current task is ", "active_task"),
+            ("focus is ", "active_task"),
+            ("next move is ", "next_move"),
+            ("the next move is ", "next_move"),
+            ("current bug is ", "current_bug"),
+            ("the bug is ", "current_bug"),
+            ("last success was ", "last_success"),
+            ("checkpoint is ", "checkpoint"),
+            ("current file is ", "current_file"),
+        ]
 
-            for key, regexes in patterns.items():
-                for pattern in regexes:
-                    match = re.search(pattern, text, re.IGNORECASE)
-                    if match:
-                        candidate = self._clean_working_state_value(match.group(1))
-                        if self._is_valid_state_value(candidate):
-                            updates[key] = candidate
-                        break
+        for marker, field_name in continuity_markers:
+            idx = lowered.find(marker)
+            if idx != -1 and field_name not in updates:
+                raw_value = text[idx + len(marker):]
+                _set_if_present(field_name, raw_value)
 
-            return self._merge_working_state(current_state or {}, updates)
+        # -----------------------------
+        # file path extraction
+        # -----------------------------
+        if "current_file" not in updates:
+            path_match = re.search(
+                r"([A-Za-z]:\\[^\r\n\"'<>|?*]+(?:\.[A-Za-z0-9_]+)?)",
+                text,
+            )
+            if path_match:
+                _set_if_present("current_file", path_match.group(1))
+
+        # -----------------------------------------
+        # preserve state if user says "where are we"
+        # or similar continuity-checking questions
+        # -----------------------------------------
+        continuity_queries = [
+            "where are we",
+            "what are we doing",
+            "what were we doing",
+            "what now",
+            "what's next",
+            "whats next",
+            "status",
+            "recap",
+        ]
+        if any(q in lowered for q in continuity_queries):
+            return {}
+
+        # -----------------------------------------
+        # strip values that just repeat old state
+        # -----------------------------------------
+        deduped = {}
+        for key, value in updates.items():
+            existing = self._safe_str(current_state.get(key)).strip()
+            if self._safe_str(value).strip() and self._safe_str(value).strip() != existing:
+                deduped[key] = value
+
+        return deduped
 
     def _format_working_state(self, state):
             def c(x): return x if x else " "
@@ -2733,29 +2918,101 @@ class ChatService:
     # ===============================
 
     def _get_working_state(self, session_id: str) -> dict:
-            return self._call_first(
-                self.sessions,
-                ["get_working_state"],
-                session_id,
-            ) or {}
+        session_id = self._safe_str(session_id).strip()
+        if not session_id:
+            return {}
+
+        try:
+            session = self.sessions.get_session(session_id) or {}
+        except Exception:
+            session = {}
+
+        state = session.get("working_state")
+
+        if isinstance(state, dict):
+            return dict(state)
+
+        return {}
 
     def _update_working_state(self, session_id: str, patch: dict):
-            if not isinstance(patch, dict) or not patch:
-                return
+        session_id = self._safe_str(session_id).strip()
+        if not session_id:
+            return {}
 
-            current_state = self._get_working_state(session_id)
-            merged = self._merge_working_state(current_state, patch)
+        if not isinstance(patch, dict):
+            patch = {}
 
-            self._call_first(
-                self.sessions,
-                ["update_working_state"],
+        current_state = self._get_working_state(session_id)
+        merged = dict(current_state)
+
+        for key, value in patch.items():
+            if value is None:
+                continue
+            if isinstance(value, str):
+                value = value.strip()
+                if not value:
+                    continue
+            merged[key] = value
+
+        merged["updated_at"] = self._iso_now()
+
+        print("WORKING_STATE_MERGED =", merged)
+
+        # primary path
+        try:
+            updated = self.sessions.update_session(
                 session_id,
-                merged,
-            )
+                {"working_state": merged},
+            ) or {}
+            persisted = updated.get("working_state")
+            print("WORKING_STATE_UPDATED_SESSION =", persisted)
+            if isinstance(persisted, dict):
+                print("FINAL_WORKING_STATE_BEFORE_RETURN =", persisted)
+                return dict(persisted)
+        except Exception as e:
+            print("WORKING_STATE_UPDATE_SESSION_FAILED =", e)
 
-        # ==============================
-        # MEMORY HELPERS
-        # ==============================
+        # fallback: force write into session store
+        try:
+            session = self.sessions.get_session(session_id) or {}
+            if isinstance(session, dict):
+                session["working_state"] = dict(merged)
+
+                sessions = self.sessions.list_sessions() or []
+
+                replaced = False
+                for i, s in enumerate(sessions):
+                    if isinstance(s, dict) and s.get("id") == session_id:
+                        sessions[i] = session
+                        replaced = True
+                        break
+
+                if not replaced:
+                    sessions.append(session)
+
+                save_all = getattr(self.sessions, "_save_sessions", None)
+                if callable(save_all):
+                    save_all(sessions)
+
+                refreshed = self.sessions.get_session(session_id) or {}
+                persisted = refreshed.get("working_state")
+                print("WORKING_STATE_FALLBACK_PERSISTED =", persisted)
+
+                if isinstance(persisted, dict) and any(
+                    (str(v).strip() if v is not None else "") for v in persisted.values()
+                ):
+                    print("FINAL_WORKING_STATE_BEFORE_RETURN =", persisted)
+                    return dict(persisted)
+
+        except Exception as e:
+            print("WORKING_STATE_FALLBACK_FAILED =", e)
+
+        print("FINAL_WORKING_STATE_BEFORE_RETURN =", merged)
+        return dict(merged)
+
+    # ==============================
+    # MEMORY HELPERS
+    # ==============================
 
     def _rank_memory_context(
             self,
@@ -3554,71 +3811,76 @@ class ChatService:
             "meta": meta,
         }
 
-
     def _finalize_response(
-            self,
-            session_id: str,
-            user_text: str,
-            user_msg: dict,
-            assistant_msg: dict,
-            decision: dict,
-            saved_artifact=None,
-        ) -> dict:
-            self._maybe_write_memory(decision, user_text, session_id)
+        self,
+        session_id: str,
+        user_text: str,
+        user_msg: dict,
+        assistant_msg: dict,
+        decision: dict,
+        saved_artifact=None,
+    ) -> dict:
+        self._maybe_write_memory(decision, user_text, session_id)
 
-            print("FINALIZE_ASSISTANT_TEXT =", repr(assistant_msg.get("text")))
+        print("FINALIZE_ASSISTANT_TEXT =", repr(assistant_msg.get("text")))
 
-            should_inject_working_context = self._should_inject_working_context(
-                decision=decision,
-                user_text=user_text,
-                assistant_msg=assistant_msg,
-            )
+        should_inject_working_context = self._should_inject_working_context(
+            decision=decision,
+            user_text=user_text,
+            assistant_msg=assistant_msg,
+        )
 
-            working_context_payload = self._build_working_context_payload(session_id)
+        working_context_payload = self._build_working_context_payload(session_id)
 
-            print("WORKING_CONTEXT_SHOULD_INJECT =", should_inject_working_context)
-            print("WORKING_CONTEXT_PAYLOAD =", working_context_payload)
+        print("WORKING_CONTEXT_SHOULD_INJECT =", should_inject_working_context)
+        print("WORKING_CONTEXT_PAYLOAD =", working_context_payload)
 
-            self._persist_turn(session_id, user_msg, assistant_msg)
+        self._persist_turn(session_id, user_msg, assistant_msg)
 
-            payload = {
-                "ok": True,
-                "active_session_id": session_id,
-                "assistant_message": assistant_msg,
-                "working_context": {
-                    "show": bool(
-                        should_inject_working_context and working_context_payload.get("show")
-                    ),
-                    "text": working_context_payload.get("text", ""),
-                    "state": working_context_payload.get("state", {}),
-                },
-                "session": self._get_session_payload(
-                    session_id,
-                    fallback_messages=[user_msg, assistant_msg],
+        fresh_session = self._get_session_payload(
+            session_id,
+            fallback_messages=[user_msg, assistant_msg],
+        )
+        print(
+            "FINALIZE_FRESH_SESSION_WORKING_STATE =",
+            (fresh_session or {}).get("working_state"),
+        )
+
+        payload = {
+            "ok": True,
+            "active_session_id": session_id,
+            "assistant_message": assistant_msg,
+            "working_context": {
+                "show": bool(
+                    should_inject_working_context and working_context_payload.get("show")
                 ),
-                "saved_artifact": saved_artifact,
-                "artifacts": self._get_artifacts_list(),
-                "memory": self._get_memory_list(),
-                "sessions": self._get_sessions_list(),
-                "debug": {
-                    "decision": decision,
-                    "route": "chat_service.handle",
-                    "route_taken": decision.get("route"),
-                    "working_context_injected": should_inject_working_context,
-                    "working_context_available": working_context_payload.get("show", False),
-                    "working_context_payload": working_context_payload,
-                },
-            }
+                "text": working_context_payload.get("text", ""),
+                "state": working_context_payload.get("state", {}),
+            },
+            "session": fresh_session,
+            "saved_artifact": saved_artifact,
+            "artifacts": self._get_artifacts_list(),
+            "memory": self._get_memory_list(),
+            "sessions": self._get_sessions_list(),
+            "debug": {
+                "decision": decision,
+                "route": "chat_service.handle",
+                "route_taken": decision.get("route"),
+                "working_context_injected": should_inject_working_context,
+                "working_context_available": working_context_payload.get("show", False),
+                "working_context_payload": working_context_payload,
+            },
+        }
 
-            payload = self._attach_execution(
-                payload,
-                user_text,
-                assistant_msg,
-                decision,
-                session_id=session_id,
-            )
+        payload = self._attach_execution(
+            payload,
+            user_text,
+            assistant_msg,
+            decision,
+            session_id=session_id,
+        )
 
-            return payload
+        return payload
 
     def _execute_memory_recall(
             self,
@@ -3788,12 +4050,28 @@ class ChatService:
                     decision=decision,
                 )
                 session = self.sessions.get_session(session_id) or {}
+                working_state_prompt = self._build_working_state_prompt_block(session_id)
+
+                prompt_parts = []
+
+                if working_state_prompt:
+                    prompt_parts.append(working_state_prompt)
+
+                if working_context_block:
+                    prompt_parts.append(working_context_block)
+
+                if memory_context:
+                    prompt_parts.append(memory_context)
+
+                prompt_parts.append(f"User request:\n{user_text}")
+
+                enriched_user_text = "\n\n".join([p for p in prompt_parts if p]).strip()
 
                 messages = self._compose_model_messages(
-                    user_text=user_text,
+                    user_text=enriched_user_text,
                     session=session,
                     decision=decision,
-                    memory_context=memory_context,
+                    memory_context="",
                 )
 
                 assistant_text = ""
@@ -4051,50 +4329,27 @@ class ChatService:
         current_step = steps[current_index] or {}
         step_title = self._safe_str(current_step.get("title")) or f"Step {current_index + 1}"
         goal = self._safe_str(execution.get("goal"))
+
         execution.setdefault("step_results", [])
 
-        system_prompt = (
-            "You are executing one step in Nova's task engine. "
-            "Be concrete, operational, and brief. "
-            "Return useful work product for the current step only. "
-            "If the step is about inspection, analyze the request and constraints. "
-            "If the step is about choosing a path, recommend the safest path and why. "
-            "If the step is about applying a change, describe the exact change that should be made. "
-            "If the step is about verification, describe how to verify success. "
-            "If the step is about summarizing, produce a concise outcome and next move."
-        )
-
+        # -------------------------
+        # CONTEXT BUILD
+        # -------------------------
         working_context = self._build_working_context_block(session_id)
-        memory_context = self._build_memory_context_for_chat(
-            user_text=goal or user_text,
-            decision={"use_memory": True, "memory_limit": self.memory_limit},
-        )
+        working_state_prompt = self._build_working_state_prompt_block(session_id)
 
-        step_prompt_parts = [
-            f"Goal:\n{goal or user_text}",
-            f"Current step:\n{step_title}",
-        ]
+        step_prompt_parts = []
+
+        if working_state_prompt:
+            step_prompt_parts.append(working_state_prompt)
 
         if working_context:
-            step_prompt_parts.append(f"Working context:\n{working_context}")
+            step_prompt_parts.append(working_context)
 
-        if memory_context:
-            step_prompt_parts.append(f"Relevant memory:\n{memory_context}")
+        if goal:
+            step_prompt_parts.append(f"Execution goal:\n{goal}")
 
-        if attachments:
-            attachment_names = []
-            for item in attachments:
-                if isinstance(item, dict):
-                    attachment_names.append(
-                        self._safe_str(item.get("filename"))
-                        or self._safe_str(item.get("stored_name"))
-                        or self._safe_str(item.get("name"))
-                    )
-                else:
-                    attachment_names.append(self._safe_str(item))
-            attachment_names = [x for x in attachment_names if x]
-            if attachment_names:
-                step_prompt_parts.append("Attachments:\n" + ", ".join(attachment_names))
+        step_prompt_parts.append(f"Current step:\n{step_title}")
 
         step_prompt_parts.append(
             "Return plain text with these sections:\n"
@@ -4103,30 +4358,86 @@ class ChatService:
             "3. Next implication"
         )
 
+        # -------------------------
+        # TOOL HOOK
+        # -------------------------
+        tool_bundle = self._maybe_execute_tool(
+            step_title=step_title,
+            user_text=user_text,
+            execution=execution,
+        )
+
+        if tool_bundle:
+            step_prompt_parts.append(f"Tool decision:\n{tool_bundle.get('decision')}")
+            step_prompt_parts.append(f"Tool result:\n{tool_bundle.get('result')}")
+
         step_prompt = "\n\n".join([p for p in step_prompt_parts if p]).strip()
 
+        # -------------------------
+        # MODEL EXECUTION
+        # -------------------------
         step_output = ""
+
         try:
             response = self.client.responses.create(
                 model=self.chat_model,
                 input=[
-                    {"role": "system", "content": system_prompt},
+                    {"role": "system", "content": "You are executing one step. Be concise and operational."},
                     {"role": "user", "content": step_prompt},
                 ],
             )
             step_output = self._extract_response_text(response).strip()
+
         except Exception as e:
             step_output = f"Step execution failed: {e}"
 
-        result_entry = {
-            "index": current_index,
-            "title": step_title,
-            "output": step_output,
-            "created_at": self._iso_now(),
-        }
-        execution["step_results"].append(result_entry)
+        can_advance, reason = self._can_advance_execution_step(
+            execution,
+            user_text,
+            step_title,
+            step_output,
+            attachments,
+        )
 
-        current_step["notes"] = step_output[:800]
+        if not can_advance:
+            execution["status"] = "blocked"
+
+            execution.setdefault("step_results", []).append({
+                "step": step_title,
+                "status": "blocked",
+                "output": reason,
+            })
+
+            return {
+                "execution": execution,
+                "step_output": reason,
+                "saved_artifact": None,
+            }
+
+        # =========================
+        # WORKING STATE UPDATE (CRITICAL)
+        # =========================
+
+        current_state = self._get_working_state(session_id) or {}
+
+        derived_patch = self._derive_working_state_patch_from_step_output(
+            step_title=step_title,
+            step_output=step_output,
+            current_state=current_state,
+        )
+
+        if not derived_patch:
+            derived_patch = {}
+
+        derived_patch.update({
+            "last_success": step_title,
+            "next_move": f"Continue: {step_title}",
+            "updated_at": self._iso_now(),
+        })
+
+        print("WORKING_STATE_PATCH =", derived_patch)
+        persisted_working_state = self._update_working_state(session_id, derived_patch)
+        print("WORKING_STATE_AFTER_UPDATE =", persisted_working_state)
 
         artifact_payload = {
             "kind": "execution_step",
@@ -4142,25 +4453,155 @@ class ChatService:
                 "step_index": current_index,
                 "step_title": step_title,
                 "execution_id": self._safe_str(execution.get("id")),
+                "tool_bundle": tool_bundle or {},
             },
         }
-
-        saved_step_artifact = self._call_first(
-            self.artifacts,
-            ["save_artifact", "create_artifact", "add_artifact", "save", "create"],
-            artifact_payload,
-        )
-
-        execution = self._advance_execution_one_step(execution)
-
-        if execution.get("status") == "complete":
-            execution["current_step"] = "complete"
 
         return {
             "execution": execution,
             "step_output": step_output,
-            "saved_artifact": saved_step_artifact,
+            "saved_artifact": artifact_payload,
         }
+
+    def _maybe_execute_tool(self, step_title: str, user_text: str, execution: dict | None = None) -> dict:
+        tool_decision = self._decide_tool_for_step(
+            step_title=step_title,
+            user_text=user_text,
+            execution=execution,
+        )
+
+        if not tool_decision:
+            return {}
+
+        tool_result = self._run_tool_decision(tool_decision)
+        return {
+            "decision": tool_decision,
+            "result": tool_result,
+        }
+
+    def _guess_path_from_text(self, text: str) -> str:
+        text = self._safe_str(text)
+
+        windows_path_match = re.search(r"([A-Za-z]:\\[^\n\r\t\"']+)", text)
+        if windows_path_match:
+            return windows_path_match.group(1).strip()
+
+        py_path_match = re.search(r"([A-Za-z0-9_./\\-]+\.py)\b", text)
+        if py_path_match:
+            raw = py_path_match.group(1).strip()
+            if os.path.isabs(raw):
+                return raw
+            return os.path.abspath(raw)
+
+        return ""
+
+    def _guess_search_query_from_text(self, text: str) -> str:
+        text = self._safe_str(text)
+
+        m = re.search(r"search for\s+(.+)", text, flags=re.IGNORECASE)
+        if m:
+            return self._safe_str(m.group(1))
+
+        m = re.search(r"find\s+(.+)", text, flags=re.IGNORECASE)
+        if m:
+            return self._safe_str(m.group(1))
+
+        return ""
+
+    def _decide_tool_for_step(self, step_title: str, user_text: str, execution: dict | None = None) -> dict:
+        step_title = self._safe_str(step_title).lower()
+        user_text = self._safe_str(user_text)
+        lowered = user_text.lower()
+        execution = execution or {}
+
+        path = self._guess_path_from_text(user_text) or self._guess_path_from_text(
+            self._safe_str(execution.get("goal"))
+        )
+
+        # read file
+        if any(
+            x in step_title
+            for x in [
+                "inspect",
+                "review",
+                "analyze",
+                "read",
+                "verify",
+                "current state",
+                "constraints",
+            ]
+        ):
+            if path:
+                return {
+                    "tool_name": "read_file",
+                    "args": {"path": path},
+                    "reason": "step suggests inspection and a file path is available",
+                }
+
+        # search inside file
+        if any(x in step_title for x in ["search", "find", "locate", "verify"]):
+            query = self._guess_search_query_from_text(user_text)
+            if path and query:
+                return {
+                    "tool_name": "search_in_file",
+                    "args": {"path": path, "query": query},
+                    "reason": "step suggests search and both path/query are available",
+                }
+
+        # list dir
+        if any(x in step_title for x in ["list files", "directory", "folder", "project structure"]):
+            if path:
+                dir_path = path if os.path.isdir(path) else os.path.dirname(path)
+                if dir_path:
+                    return {
+                        "tool_name": "list_dir",
+                        "args": {"path": dir_path},
+                        "reason": "step suggests directory inspection",
+                    }
+
+        # apply change -> only suggest for now, do not write yet
+        if any(x in step_title for x in ["apply", "change", "modify", "fix"]):
+            if path:
+                return {
+                    "tool_name": "read_file",
+                    "args": {"path": path},
+                    "reason": "step suggests code change; read file first before any write",
+                }
+
+        # fallback heuristic from raw user text
+        if path and any(x in lowered for x in ["bug", "error", "debug", "fix", ".py", "traceback"]):
+            return {
+                "tool_name": "read_file",
+                "args": {"path": path},
+                "reason": "debugging request with file path detected",
+            }
+
+        return {}
+
+    def _run_tool_decision(self, tool_decision: dict) -> dict:
+        if not isinstance(tool_decision, dict):
+            return {}
+
+        tool_name = self._safe_str(tool_decision.get("tool_name"))
+        args = tool_decision.get("args") or {}
+
+        if not tool_name:
+            return {}
+
+        try:
+            if tool_name == "read_file":
+                return self.tools.read_file(args.get("path", ""))
+            if tool_name == "search_in_file":
+                return self.tools.search_in_file(
+                    args.get("path", ""),
+                    args.get("query", ""),
+                )
+            if tool_name == "list_dir":
+                return self.tools.list_dir(args.get("path", ""))
+        except Exception as e:
+            return {"ok": False, "error": str(e), "tool_name": tool_name}
+
+        return {"ok": False, "error": f"Unknown tool: {tool_name}", "tool_name": tool_name}
 
     # ==============================
     # PUBLIC ENTRY
@@ -4168,109 +4609,191 @@ class ChatService:
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         attachments = attachments or []
-        user_text = self._safe_str(user_text)
-        session_id = self._ensure_session_id(session_id)
-        user_msg = self._build_user_message(user_text, attachments=attachments)
 
-        auto_exec_match = self._looks_like_auto_execution_request(user_text)
-        progress_exec_match = self._looks_like_execution_progression(user_text)
+        try:
+            user_text = self._safe_str(user_text)
+            session_id = self._ensure_session_id(session_id)
+            user_msg = self._build_user_message(user_text, attachments=attachments)
 
-        print("HANDLE USER_TEXT =", repr(user_text))
-        print("HANDLE AUTO_EXEC_MATCH =", auto_exec_match)
-        print("HANDLE PROGRESS_EXEC_MATCH =", progress_exec_match)
+            auto_exec_match = self._looks_like_auto_execution_request(user_text)
+            progress_exec_match = self._looks_like_execution_progression(user_text)
 
-        if auto_exec_match:
-            print("HANDLE ROUTE = auto_execute")
-            return self._auto_execute_request(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-            )
+            print("HANDLE USER_TEXT =", repr(user_text))
+            print("HANDLE AUTO_EXEC_MATCH =", auto_exec_match)
+            print("HANDLE PROGRESS_EXEC_MATCH =", progress_exec_match)
 
-        if progress_exec_match:
-            print("HANDLE ROUTE = advance_execution")
-            return self._advance_execution_request(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-            )
-
-        print("HANDLE ROUTE = normal_chat")
-
-        auto_run_after_plan = any(
-            x in self._safe_str(user_text).lower()
-            for x in [
-                "run all",
-                "auto execute",
-                "finish the plan",
-                "do it all",
-                "complete it",
-            ]
-        )
-
-        if self._looks_like_plan_request(user_text):
-            print("AUTO PLAN: generating execution plan")
-            saved_artifact = self._build_execution_plan(user_text, session_id)
-
-            if auto_run_after_plan:
-                print("AUTO PLAN: immediately auto-executing")
+            if auto_exec_match:
+                print("HANDLE ROUTE = auto_execute")
                 return self._auto_execute_request(
-                    user_text="auto execute",
+                    user_text=user_text,
                     session_id=session_id,
                     attachments=attachments,
                 )
 
-            assistant_text = "Execution plan created.\n\nUse 'run it' to advance one step."
-            if isinstance(saved_artifact, dict) and saved_artifact.get("body"):
-                assistant_text += "\n\n" + self._safe_str(saved_artifact.get("body"))
+            if progress_exec_match:
+                print("HANDLE ROUTE = advance_execution")
+                return self._advance_execution_request(
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                )
+
+            print("HANDLE ROUTE = normal_chat")
+
+            auto_run_after_plan = any(
+                x in self._safe_str(user_text).lower()
+                for x in [
+                    "run all",
+                    "auto execute",
+                    "finish the plan",
+                    "do it all",
+                    "complete it",
+                ]
+            )
+
+            latest_execution = self._find_latest_execution_artifact(session_id=session_id)
+
+            if self._looks_like_plan_request(user_text) and not latest_execution:
+                print("AUTO PLAN: generating execution plan")
+                saved_artifact = self._build_execution_plan(user_text, session_id)
+
+                if auto_run_after_plan:
+                    print("AUTO PLAN: immediately auto-executing")
+                    return self._auto_execute_request(
+                        user_text="auto execute",
+                        session_id=session_id,
+                        attachments=attachments,
+                    )
+
+                assistant_text = "Execution plan created.\n\nUse 'run it' to advance one step."
+                if isinstance(saved_artifact, dict) and saved_artifact.get("body"):
+                    assistant_text += "\n\n" + self._safe_str(saved_artifact.get("body"))
+
+                assistant_msg = self._build_assistant_message(
+                    text=assistant_text,
+                    attachments=[],
+                )
+
+                return self._finalize_response(
+                    session_id=session_id,
+                    user_text=user_text,
+                    user_msg=user_msg,
+                    assistant_msg=assistant_msg,
+                    decision={
+                        "route": "execution",
+                        "mode": "plan_creation",
+                        "save_artifact": True,
+                        "save_memory": False,
+                        "use_memory": True,
+                    },
+                    saved_artifact=saved_artifact,
+                )
+
+            working_state = self._maybe_update_working_state(session_id, user_text)
+            working_context_block = self._build_working_context_block(session_id)
+
+            decision = self._decide_route(
+                user_text=user_text,
+                attachments=attachments,
+            )
+
+            assistant_text = ""
+            saved_artifact = None
+
+            if decision.get("route") == "image":
+                return self._handle_image_request(
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                    user_msg=user_msg,
+                    decision=decision,
+                )
+
+            if decision.get("route") == "web":
+                return self._handle_web_request(
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                    user_msg=user_msg,
+                    decision=decision,
+                )
+
+            assistant_text = self._execute_general_chat(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+                decision=decision,
+                working_state=working_state,
+                working_context_block=working_context_block,
+            )
 
             assistant_msg = self._build_assistant_message(
-                text=assistant_text,
+                text=self._safe_str(assistant_text),
                 attachments=[],
             )
+
+            self._maybe_write_memory(decision, user_text, session_id)
 
             return self._finalize_response(
                 session_id=session_id,
                 user_text=user_text,
                 user_msg=user_msg,
                 assistant_msg=assistant_msg,
-                decision={
-                    "route": "execution",
-                    "mode": "plan_creation",
-                    "save_artifact": True,
-                    "save_memory": False,
-                    "use_memory": True,
-                },
+                decision=decision,
                 saved_artifact=saved_artifact,
             )
 
-        working_state = self._maybe_update_working_state(session_id, user_text)
-        working_context_block = self._build_working_context_block(session_id)
+        except Exception as e:
+            import traceback
 
-        current_state = self._get_working_state(session_id)
-        updates = self._extract_working_state_updates(user_text, current_state)
-        if updates:
-            self._update_working_state(session_id, updates)
+            tb = traceback.format_exc()
+            print("HANDLE FAILED:", e)
+            print(tb)
 
-        decision = self._decide_route(
-            user_text=user_text,
-            session_id=session_id,
-            attachments=attachments,
-        )
+            safe_session_id = session_id
+            try:
+                safe_session_id = self._ensure_session_id(session_id)
+            except Exception:
+                pass
 
-        if decision.get("route") == "attachment_analysis":
-            return self._execute_attachment_analysis(
-                decision=decision,
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
+            safe_user_text = ""
+            try:
+                safe_user_text = self._safe_str(user_text)
+            except Exception:
+                safe_user_text = ""
+
+            try:
+                safe_user_msg = self._build_user_message(
+                    safe_user_text,
+                    attachments=attachments or [],
+                )
+            except Exception:
+                safe_user_msg = {
+                    "role": "user",
+                    "text": safe_user_text,
+                    "attachments": attachments or [],
+                }
+
+            assistant_msg = self._build_assistant_message(
+                text=(
+                    "I hit an internal error while handling that request.\n\n"
+                    f"{type(e).__name__}: {self._safe_str(e)}\n\n"
+                    f"{tb}"
+                ),
+                attachments=[],
             )
 
-        return self._execute_general_chat(
-            decision=decision,
-            user_text=user_text,
-            session_id=session_id,
-            attachments=attachments,
-            working_state=working_state,
-            working_context_block=working_context_block,
-        )
+            return self._finalize_response(
+                session_id=safe_session_id,
+                user_text=safe_user_text,
+                user_msg=safe_user_msg,
+                assistant_msg=assistant_msg,
+                decision={
+                    "route": "chat",
+                    "mode": "safe_fallback",
+                    "save_artifact": False,
+                    "save_memory": False,
+                    "use_memory": True,
+                },
+                saved_artifact=None,
+            )
