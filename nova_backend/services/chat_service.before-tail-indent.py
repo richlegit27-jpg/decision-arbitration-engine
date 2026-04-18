@@ -839,71 +839,6 @@ class ChatService:
     # PROMPT + CONTINUITY HELPERS (PHASE 4 POLISH)
     # =========================
 
-    # =========================
-    # EXECUTION RENDER NORMALIZATION LOCK
-    # =========================
-
-    def _execution_status_label(self, execution):
-        execution = execution or {}
-        steps = execution.get("steps") or []
-
-        total = len(steps)
-        done = sum(1 for s in steps if (s or {}).get("done"))
-
-        if total > 0 and done >= total:
-            return "complete"
-
-        idx = execution.get("current_step_index", 0) or 0
-        if 0 <= idx < total:
-            title = str((steps[idx] or {}).get("title") or "").strip()
-            if title:
-                return title
-
-        return "in progress"
-
-    def _render_execution(self, execution, include_prefix=False):
-        execution = execution or {}
-        goal = str(execution.get("goal") or "").strip()
-        steps = execution.get("steps") or []
-
-        total = len(steps)
-        done = sum(1 for s in steps if (s or {}).get("done"))
-        current = self._execution_status_label(execution)
-
-        lines = []
-
-        if include_prefix:
-            prefix = (
-                "Auto-execution complete."
-                if total > 0 and done >= total
-                else "Auto-execution advanced."
-            )
-            lines.append(prefix)
-            lines.append("")
-
-        if goal:
-            lines.append(f"Goal: {goal}")
-            lines.append("")
-
-        lines.append("Steps:")
-        for s in steps:
-            s = s or {}
-            title = str(s.get("title") or "").strip() or "Untitled step"
-            mark = "[x]" if s.get("done") else "[>]"
-            lines.append(f"{mark} {title}")
-
-        lines.append("")
-        lines.append(f"Progress: {done}/{total} complete")
-        lines.append(f"Current step: {current}")
-
-        return "\n".join(lines).strip()
-
-    def _build_execution_assistant_text(self, execution):
-        return self._render_execution(execution, include_prefix=True)
-
-    def _build_execution_artifact_body(self, execution):
-        return self._render_execution(execution, include_prefix=False)
-
     def _normalize_working_state(self, working_state):
         working_state = working_state or {}
         keys = [
@@ -1346,24 +1281,34 @@ class ChatService:
             normalized.append(f"{title}|{status}|{notes}")
         return normalized
 
-
-    def _looks_like_execution(self, user_text: str, decision: dict | None = None) -> bool:
-        text = str(user_text or "").strip().lower()
-
-        if not text:
+    def _looks_like_execution(self, text: str, decision: dict | None) -> bool:
+        t = str(text or "").lower().strip()
+        if not t:
             return False
 
+        triggers = [
+            "plan",
+            "steps",
+            "step by step",
+            "research",
+            "compare",
+            "analyze",
+            "build",
+            "roadmap",
+            "best",
+            "approach",
+        ]
 
-        # 🔥 PLAN CREATION
-        if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
+        if any(x in t for x in triggers):
             return True
 
-        # 🔥 FALLBACK: coding / structured intent
-        if decision and decision.get("mode") in {"coding", "analysis"}:
-            return True
+        if isinstance(decision, dict):
+            if decision.get("mode") in ("planning", "analysis"):
+                return True
+            if decision.get("use_tools"):
+                return True
 
-        return False
-
+        return len(t.split()) >= 12
 
     def _execution_step_titles_for_goal(self, goal: str) -> list[str]:
         lowered = str(goal or "").lower()
@@ -1590,104 +1535,40 @@ class ChatService:
 # =========================
 
     def _looks_like_execution_progression(self, user_text: str) -> bool:
-        text = self._safe_str(user_text).strip().lower()
-
-        # 🔒 STRICT MATCH ONLY
-        return text in {
-            "run it",
+        text = (user_text or "").lower()
+        triggers = [
+            "advance execution",
             "next step",
-            "continue",
             "continue execution",
-        }
-
-    def _normalize_execution_state(self, execution):
-        if not isinstance(execution, dict):
-            execution = {}
-
-        execution.setdefault("goal", "")
-        execution.setdefault("steps", [])
-        execution.setdefault("current_step_index", 0)
-        execution.setdefault("status", "running")
-        execution.setdefault("progress", 0)
-        execution.setdefault("current_step", "")
-
-        steps = execution.get("steps") or []
-        clean_steps = []
-
-        for raw in steps:
-            if isinstance(raw, dict):
-                title = str(raw.get("title") or "").strip()
-                status = str(raw.get("status") or "pending").strip()
-            else:
-                title = str(raw).strip()
-                status = "pending"
-
-            if not title:
-                continue
-
-            if status not in ["pending", "current", "done"]:
-                status = "pending"
-
-            clean_steps.append({
-                "title": title,
-                "status": status
-            })
-
-        execution["steps"] = clean_steps
-        return execution
-
-
-    def _advance_execution_one_step(self, execution):
-        execution = self._normalize_execution_state(dict(execution or {}))
-
-        steps = execution.get("steps") or []
-        step_count = len(steps)
-        current_index = int(execution.get("current_step_index", 0) or 0)
-
-        if step_count == 0:
-            execution["status"] = "complete"
-            execution["current_step"] = "complete"
-            execution["progress"] = 0
-            return execution
-
-        if current_index >= step_count:
-            execution["current_step_index"] = step_count
-            execution["progress"] = step_count
-            execution["current_step"] = "complete"
-            execution["status"] = "complete"
-            return execution
-
-        # ONE STEP ONLY
-        steps[current_index]["status"] = "done"
-        next_index = current_index + 1
-        execution["current_step_index"] = next_index
-
-        if next_index >= step_count:
-            execution["progress"] = step_count
-            execution["current_step"] = "complete"
-            execution["status"] = "complete"
-            for step in steps:
-                step["status"] = "done"
-        else:
-            execution["progress"] = next_index
-            execution["current_step"] = steps[next_index]["title"]
-            execution["status"] = "running"
-
-        return execution
+            "keep going",
+            "proceed",
+            "go next",
+        ]
+        return any(t in text for t in triggers)
 
     def _advance_execution_request(self, user_text: str, session_id: str = "", attachments=None):
         attachments = attachments or []
+
+        artifacts = self._get_artifacts_list()
         session_id = self._safe_str(session_id)
 
-        latest = self._find_latest_execution_artifact(session_id=session_id)
-        print("ADVANCE LATEST =", latest)
-
-        user_msg = self._build_user_message(
-            user_text,
-            attachments=attachments,
-        )
+        latest = None
+        for artifact in reversed(artifacts):
+            if not isinstance(artifact, dict):
+                continue
+            if session_id and self._safe_str(artifact.get("session_id")) != session_id:
+                continue
+            body = self._safe_str(artifact.get("body"))
+            title = self._safe_str(artifact.get("title")).lower()
+            if "execution plan" in title or "progress:" in body:
+                latest = artifact
+                break
 
         if not latest:
+            user_msg = self._build_user_message(
+                user_text,
+                attachments=attachments,
+            )
             assistant_msg = self._build_assistant_message(
                 text="No execution found. Start with a plan first.",
                 attachments=[],
@@ -1707,64 +1588,65 @@ class ChatService:
                 saved_artifact=None,
             )
 
-        execution = latest.get("execution") or {}
-        result = self._execute_current_step(
-            execution=execution,
-            user_text=user_text,
-            session_id=session_id,
-            attachments=attachments,
+        body_lines = self._safe_str(latest.get("body")).splitlines()
+
+        new_lines = []
+        advanced = False
+        current_index = -1
+
+        for i, line in enumerate(body_lines):
+            if "[>]" in line and not advanced:
+                new_lines.append(line.replace("[>]", "[âœ“]"))
+                advanced = True
+                current_index = i
+            else:
+                new_lines.append(line)
+
+        if advanced:
+            for j in range(current_index + 1, len(new_lines)):
+                if "[ ]" in new_lines[j]:
+                    new_lines[j] = new_lines[j].replace("[ ]", "[>]")
+                    break
+
+        total = sum(1 for l in new_lines if "[ ]" in l or "[>]" in l or "[âœ“]" in l)
+        done = sum(1 for l in new_lines if "[âœ“]" in l)
+
+        updated_body = "\n".join(new_lines)
+        updated_body = re.sub(
+            r"Progress:\s*\d+/\d+",
+            f"Progress: {done}/{total}",
+            updated_body,
         )
 
-        execution = result.get("execution") or {}
-        step_output = self._safe_str(result.get("step_output"))
-        saved_step_artifact = result.get("saved_artifact")
-
-        steps = execution.get("steps") or []
-        goal = self._safe_str(execution.get("goal"))
-
-        lines = [f"Goal: {goal}", "", "Steps:"]
-        for step in steps:
-            status = self._safe_str(step.get("status")).lower()
-            if status == "done":
-                marker = "[✓]"
-            elif status == "current":
-                marker = "[>]"
-            else:
-                marker = "[ ]"
-            lines.append(f"{marker} {self._safe_str(step.get('title'))}")
-
-        lines.append("")
-        lines.append(f"Progress: {execution.get('progress', 0)}/{len(steps)} complete")
-        lines.append(f"Current step: {self._safe_str(execution.get('current_step')) or 'complete'}")
-
-        if step_output:
-            lines.append("")
-            lines.append("Last step output:")
-            lines.append(step_output)
-
-        updated_body = "\n".join(lines)
+        if done == total and total > 0:
+            if "Current step:" in updated_body:
+                updated_body = re.sub(
+                    r"Current step:\s*.*",
+                    "Current step: Complete",
+                    updated_body,
+                )
 
         artifact_payload = dict(latest)
         artifact_payload["body"] = updated_body
         artifact_payload["preview"] = updated_body[:140]
-        artifact_payload["execution"] = execution
 
         saved_artifact = self._call_first(
             self.artifacts,
-            ["save_artifact", "create", "save", "create_artifact", "add_artifact"],
+            ["save_artifact", "create", "save"],
             artifact_payload,
         )
 
         assistant_text = f"Step advanced.\n\n{updated_body}"
 
+        user_msg = self._build_user_message(
+            user_text,
+            attachments=attachments,
+        )
+
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
             attachments=[],
         )
-
-        if isinstance(saved_step_artifact, dict):
-            assistant_msg.setdefault("meta", {})
-            assistant_msg["meta"]["step_artifact_id"] = saved_step_artifact.get("id")
 
         return self._finalize_response(
             session_id=session_id,
@@ -1786,365 +1668,36 @@ class ChatService:
     # =========================
 
     def _looks_like_auto_execution_request(self, user_text: str) -> bool:
-        text = self._safe_str(user_text).strip().lower()
-
-        return text in {
-            "run all",
-            "auto execute",
-            "finish the plan",
-            "do it all",
-            "complete it",
-        }
-
-    def _looks_like_plan_request(self, user_text: str) -> bool:
-        text = self._safe_str(user_text).strip().lower()
-        if not text:
-            return False
-
+        text = (user_text or "").lower().strip()
         triggers = [
-            "plan ",
-            "make a plan",
-            "create a plan",
-            "build a plan",
-            "debug ",
-            "fix ",
-            "implement ",
-            "next steps",
-            "step by step",
+            "run it",
+            "execute it",
+            "continue",
+            "continue execution",
+            "finish the plan",
+            "auto execute",
+            "run the plan",
+            "do it",
         ]
+        return any(t in text for t in triggers)
 
-        return any(trigger in text for trigger in triggers)
-
-    def _build_execution_plan(self, user_text: str, session_id: str):
-        goal = self._safe_str(user_text).strip() or "Complete the requested task"
-
-        steps = [
-            "Inspect the current state and constraints",
-            "Choose the safest implementation path",
-            "Apply the required change",
-            "Verify the result",
-            "Summarize outcome and next move",
-        ]
-
-        # 🔥 REAL EXECUTION STATE
-        execution = {
-            "goal": goal,
-            "steps": [
-                {"title": s, "status": "current" if i == 0 else "pending"}
-                for i, s in enumerate(steps)
-            ],
-            "current_step_index": 0,
-            "progress": 0,
-            "current_step": steps[0],
-            "status": "running",
-        }
-
-        lines = [f"Goal: {goal}", "", "Steps:"]
-        for i, step in enumerate(steps):
-            marker = "[>]" if i == 0 else "[ ]"
-            lines.append(f"{marker} {step}")
-
-        lines.append("")
-        lines.append(f"Progress: 0/{len(steps)} complete")
-        lines.append(f"Current step: {steps[0]}")
-
-        body = "\n".join(lines)
-
-        artifact_payload = {
-            "kind": "execution",
-            "title": "Execution Plan",
-            "body": body,
-            "summary": f"Execution plan for: {goal}",
-            "preview": body[:140],
-            "session_id": session_id,
-            "source": "execution",
-
-            # 🔥 CRITICAL (THIS WAS MISSING)
-            "execution": execution,
-
-            "meta": {
-                "auto_generated": True,
-                "auto_executed": False,
-                "complete": False,
-                "done": 0,
-                "total": len(steps),
-                "paused": False,
-            },
-        }
-
-        saved_artifact = None
-
-        try:
-            saved_artifact = self._call_first(
-                self.artifacts,
-                ["save_artifact", "create_artifact", "add_artifact", "save", "create"],
-                artifact_payload,
-            )
-        except Exception as e:
-            print("BUILD EXECUTION PLAN FAILED (positional):", e)
-            saved_artifact = None
-
-        if not saved_artifact:
-            try:
-                saved_artifact = self._call_first(
-                    self.artifacts,
-                    ["save_artifact", "create_artifact", "add_artifact", "save", "create"],
-                    artifact=artifact_payload,
-                )
-            except Exception as e:
-                print("BUILD EXECUTION PLAN FAILED (keyword artifact):", e)
-                saved_artifact = None
-
-        print("BUILD EXECUTION PLAN SAVED =", bool(saved_artifact))
-        print("BUILD EXECUTION PLAN SESSION =", session_id)
-        print("BUILD EXECUTION PLAN ARTIFACT =", saved_artifact)
-
-        return saved_artifact
-
-    # =========================
-    # EXECUTION STEP LOCK HELPERS
-    # =========================
-
-    def _execution_step_count(self, execution):
-        steps = execution.get("steps") or []
-        return len(steps)
-
-    def _execution_current_index(self, execution):
-        try:
-            value = int(execution.get("current_step_index", 0))
-        except Exception:
-            value = 0
-
-        step_count = self._execution_step_count(execution)
-        if step_count <= 0:
-            return 0
-
-        if value < 0:
-            return 0
-        if value > step_count:
-            return step_count
-        return value
-
-    def _execution_progress_count(self, execution):
-        steps = execution.get("steps") or []
-        done = 0
-        for step in steps:
-            if isinstance(step, dict) and step.get("status") == "done":
-                done += 1
-        return done
-
-    def _normalize_execution_state(self, execution):
-        if not isinstance(execution, dict):
-            execution = {}
-
-        execution.setdefault("goal", "")
-        execution.setdefault("steps", [])
-        execution.setdefault("current_step_index", 0)
-        execution.setdefault("status", "running")
-        execution.setdefault("progress", 0)
-        execution.setdefault("current_step", "")
-
-        steps = execution.get("steps") or []
-        clean_steps = []
-
-        for raw_step in steps:
-            if isinstance(raw_step, dict):
-                title = self._safe_str(raw_step.get("title") or raw_step.get("text") or "")
-                status = self._safe_str(raw_step.get("status") or "pending").strip().lower()
-            else:
-                title = self._safe_str(raw_step)
-                status = "pending"
-
-            if not title:
-                continue
-
-            if status not in {"pending", "current", "done"}:
-                status = "pending"
-
-            clean_steps.append({
-                "title": title,
-                "status": status,
-            })
-
-        execution["steps"] = clean_steps
-
-        step_count = len(clean_steps)
-        current_index = self._execution_current_index(execution)
-
-        if step_count == 0:
-            execution["current_step_index"] = 0
-            execution["progress"] = 0
-            execution["current_step"] = ""
-            execution["status"] = "complete"
-            return execution
-
-        done_count = 0
-        for i, step in enumerate(clean_steps):
-            if i < current_index:
-                step["status"] = "done"
-                done_count += 1
-            elif i == current_index and current_index < step_count:
-                step["status"] = "current"
-            else:
-                step["status"] = "pending"
-
-        if current_index >= step_count:
-            for step in clean_steps:
-                step["status"] = "done"
-            execution["current_step_index"] = step_count
-            execution["progress"] = step_count
-            execution["current_step"] = "complete"
-            execution["status"] = "complete"
-            return execution
-
-        execution["current_step_index"] = current_index
-        execution["progress"] = done_count
-        execution["current_step"] = clean_steps[current_index]["title"]
-        execution["status"] = "running"
-        return execution
-
-    def _advance_execution_one_step(self, execution):
-        execution = self._normalize_execution_state(dict(execution or {}))
-
-        steps = execution.get("steps") or []
-        step_count = len(steps)
-        current_index = self._execution_current_index(execution)
-
-        if step_count == 0:
-            execution["status"] = "complete"
-            execution["current_step"] = "complete"
-            execution["progress"] = 0
-            return execution
-
-        if current_index >= step_count:
-            execution["current_step_index"] = step_count
-            execution["progress"] = step_count
-            execution["current_step"] = "complete"
-            execution["status"] = "complete"
-            return execution
-
-        # 🔒 ONE REQUEST = ONE STEP
-        steps[current_index]["status"] = "done"
-        next_index = current_index + 1
-        execution["current_step_index"] = next_index
-
-        if next_index >= step_count:
-            execution["progress"] = step_count
-            execution["current_step"] = "complete"
-            execution["status"] = "complete"
-            for step in steps:
-                step["status"] = "done"
-        else:
-            execution["progress"] = next_index
-            execution["current_step"] = steps[next_index]["title"]
-            execution["status"] = "running"
-
-        return execution
- 
-    def _get_execution_artifacts_source(self):
-        artifacts = []
-
-        try:
-            artifacts = self._call_first(
-                self.artifacts,
-                [
-                    "list_artifacts",
-                    "get_artifacts",
-                    "get_all",
-                    "list",
-                    "all",
-                    "load_artifacts",
-                ],
-            ) or []
-        except Exception:
-            artifacts = []
-
-        if not isinstance(artifacts, list) or not artifacts:
-            try:
-                fallback = self._get_artifacts_list()
-                if isinstance(fallback, list):
-                    artifacts = fallback
-            except Exception:
-                pass
-
-        if isinstance(artifacts, dict):
-            artifacts = list(artifacts.values())
-
-        if not isinstance(artifacts, list):
-            return []
-
-        return [a for a in artifacts if isinstance(a, dict)]
-
-    def _find_latest_execution_artifact(self, session_id: str):
+    def _find_latest_execution_artifact(self, session_id: str = ""):
+        artifacts = self._get_artifacts_list()
         session_id = self._safe_str(session_id)
 
-        try:
-            artifacts = self._call_first(
-                self.artifacts,
-                ["get_artifacts", "list", "all", "get_all"],
-            ) or []
-        except Exception:
-            artifacts = []
-
-        if isinstance(artifacts, dict):
-            if isinstance(artifacts.get("artifacts"), list):
-                artifacts = artifacts.get("artifacts") or []
-            elif isinstance(artifacts.get("items"), list):
-                artifacts = artifacts.get("items") or []
-            else:
-                artifacts = []
-
-        if not isinstance(artifacts, list):
-            return None
-
-        matches = []
-
-        for a in artifacts:
-            if not isinstance(a, dict):
+        for artifact in reversed(artifacts):
+            if not isinstance(artifact, dict):
+                continue
+            if session_id and self._safe_str(artifact.get("session_id")) != session_id:
                 continue
 
-            a_session_id = self._safe_str(a.get("session_id"))
-            a_kind = self._safe_str(a.get("kind")).lower()
-            a_type = self._safe_str(a.get("type")).lower()
-            body = self._safe_str(a.get("body")).lower()
+            body = self._safe_str(artifact.get("body"))
+            title = self._safe_str(artifact.get("title")).lower()
 
-            execution = a.get("execution")
-            meta = a.get("meta") or {}
-            meta_execution = meta.get("execution") if isinstance(meta, dict) else None
+            if "execution plan" in title or "progress:" in body:
+                return artifact
 
-            has_structured_execution = (
-                isinstance(execution, dict) and bool(execution.get("steps"))
-            ) or (
-                isinstance(meta_execution, dict) and bool(meta_execution.get("steps"))
-            )
-
-            is_execution = (
-                a_kind in {"execution", "execution_run"}
-                or a_type in {"execution", "execution_run"}
-                or has_structured_execution
-                or (
-                    "progress:" in body
-                    and "current step:" in body
-                    and "steps:" in body
-                )
-            )
-
-            if not is_execution:
-                continue
-
-            if session_id and a_session_id != session_id:
-                continue
-
-            matches.append(a)
-
-        if not matches:
-            return None
-
-        matches.sort(
-            key=lambda x: self._safe_str(x.get("updated_at")) or self._safe_str(x.get("created_at")),
-            reverse=True,
-        )
-        return matches[0]
+        return None
 
     def _extract_execution_lines(self, body: str):
         lines = self._safe_str(body).splitlines()
@@ -2152,19 +1705,16 @@ class ChatService:
         current_index = -1
 
         for i, line in enumerate(lines):
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "✔", "âœ”"]):
+            if "[âœ“]" in line or "[ ]" in line or "[>]" in line:
                 step_indexes.append(i)
-
             if "[>]" in line:
                 current_index = i
 
         return lines, step_indexes, current_index
 
-    def _refresh_execution_header(self, body: str):
-        lines = self._safe_str(body).splitlines()
-
-        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "✔", "âœ”"]))
-        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "✔", "âœ”"]))
+    def _rewrite_execution_progress(self, lines):
+        total = sum(1 for line in lines if "[âœ“]" in line or "[ ]" in line or "[>]" in line)
+        done = sum(1 for line in lines if "[âœ“]" in line)
 
         updated = "\n".join(lines)
         updated = re.sub(
@@ -2179,10 +1729,7 @@ class ChatService:
                 current_line = (
                     line.replace("[>]", "")
                     .replace("[ ]", "")
-                    .replace("[x]", "")
-                    .replace("[X]", "")
-                    .replace("✔", "")
-                    .replace("âœ”", "")
+                    .replace("[âœ“]", "")
                     .strip(" -")
                     .strip()
                 )
@@ -2208,9 +1755,11 @@ class ChatService:
         session_id = self._safe_str(session_id)
 
         latest = self._find_latest_execution_artifact(session_id=session_id)
-        user_msg = self._build_user_message(user_text, attachments=attachments)
-
         if not latest:
+            user_msg = self._build_user_message(
+                user_text,
+                attachments=attachments,
+            )
             assistant_msg = self._build_assistant_message(
                 text="No execution found. Start with a plan first.",
                 attachments=[],
@@ -2221,8 +1770,8 @@ class ChatService:
                 user_msg=user_msg,
                 assistant_msg=assistant_msg,
                 decision={
-                    "route": "execution_auto",
-                    "mode": "execution_auto",
+                    "route": "execution",
+                    "mode": "auto_execution",
                     "save_artifact": False,
                     "save_memory": False,
                     "use_memory": True,
@@ -2230,60 +1779,100 @@ class ChatService:
                 saved_artifact=None,
             )
 
-        execution = latest.get("execution") or {}
-        execution = self._normalize_execution_state(execution)
+        lines, step_indexes, current_index = self._extract_execution_lines(latest.get("body", ""))
 
-        safety = 0
-        last_step_output = ""
-
-        while execution.get("status") != "complete" and safety < 20:
-            result = self._execute_current_step(
-                execution=execution,
-                user_text=user_text,
-                session_id=session_id,
+        if not step_indexes:
+            user_msg = self._build_user_message(
+                user_text,
                 attachments=attachments,
             )
-            execution = result.get("execution") or execution
-            last_step_output = self._safe_str(result.get("step_output"))
-            safety += 1
+            assistant_msg = self._build_assistant_message(
+                text="I found an execution artifact, but it has no runnable steps.",
+                attachments=[],
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision={
+                    "route": "execution",
+                    "mode": "auto_execution",
+                    "save_artifact": False,
+                    "save_memory": False,
+                    "use_memory": True,
+                },
+                saved_artifact=None,
+            )
 
-        steps = execution.get("steps") or []
-        goal = self._safe_str(execution.get("goal"))
+        # if nothing is active, activate the first pending step
+        if current_index == -1:
+            for idx in step_indexes:
+                if "[ ]" in lines[idx]:
+                    lines[idx] = lines[idx].replace("[ ]", "[>]")
+                    current_index = idx
+                    break
 
-        lines = [f"Goal: {goal}", "", "Steps:"]
-        for step in steps:
-            status = self._safe_str(step.get("status")).lower()
-            if status == "done":
-                marker = "[✓]"
-            elif status == "current":
-                marker = "[>]"
-            else:
-                marker = "[ ]"
-            lines.append(f"{marker} {self._safe_str(step.get('title'))}")
+        executed_steps = []
+        safety_limit = 3
 
-        lines.append("")
-        lines.append(f"Progress: {execution.get('progress', 0)}/{len(steps)} complete")
-        lines.append(f"Current step: {self._safe_str(execution.get('current_step')) or 'complete'}")
+        while safety_limit > 0 and current_index != -1:
+            current_text = (
+                lines[current_index]
+                .replace("[>]", "")
+                .replace("[ ]", "")
+                .replace("[âœ“]", "")
+                .strip(" -")
+                .strip()
+            )
+            executed_steps.append(current_text)
 
-        if last_step_output:
-            lines.append("")
-            lines.append("Last step output:")
-            lines.append(last_step_output)
+            # mark current complete
+            lines[current_index] = lines[current_index].replace("[>]", "[âœ“]")
+
+            # move to next pending
+            next_index = -1
+            for idx in step_indexes:
+                if idx > current_index and "[ ]" in lines[idx]:
+                    next_index = idx
+                    break
+
+            if next_index != -1:
+                lines[next_index] = lines[next_index].replace("[ ]", "[>]")
+            current_index = next_index
+            safety_limit -= 1
 
         updated_body = "\n".join(lines)
+        updated_body, done, total = self._refresh_execution_header(updated_body)
 
-        artifact_payload = dict(latest)
-        artifact_payload["body"] = updated_body
-        artifact_payload["preview"] = updated_body[:140]
-        artifact_payload["execution"] = execution
+        status_line = "Auto-execution complete." if done >= total and total > 0 else "Auto-execution advanced."
 
-        saved_artifact = self._call_first(
-            self.artifacts,
-            ["save_artifact", "create", "save", "create_artifact", "add_artifact"],
-            artifact_payload,
+        executed_text = ""
+        if executed_steps:
+            executed_text = "Executed:\n- " + "\n- ".join(executed_steps)
+
+        assistant_text = status_line
+        if executed_text:
+            assistant_text += "\n\n" + executed_text
+        assistant_text += "\n\n" + updated_body
+
+        saved_artifact = self._save_artifact(
+            kind="execution",
+            title=latest.get("title") or "Execution Plan",
+            body=updated_body,
+            session_id=session_id,
+            meta={
+                **(latest.get("meta") or {}),
+                "auto_executed": True,
+                "done": done,
+                "total": total,
+            },
         )
 
-        assistant_text = f"Execution complete.\n\n{updated_body}"
+        user_msg = self._build_user_message(
+            user_text,
+            attachments=attachments,
+        )
 
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
@@ -2296,8 +1885,8 @@ class ChatService:
             user_msg=user_msg,
             assistant_msg=assistant_msg,
             decision={
-                "route": "execution_auto",
-                "mode": "execution_auto",
+                "route": "execution",
+                "mode": "auto_execution",
                 "save_artifact": True,
                 "save_memory": False,
                 "use_memory": True,
@@ -2309,98 +1898,102 @@ class ChatService:
         # SESSION HELPERS
         # ==============================
 
-    def _ensure_session_id(self, session_id: str = "") -> str:
-        sid = self._safe_str(session_id)
-        if sid:
-            return sid
+        def _ensure_session_id(self, session_id: str = "") -> str:
+            sid = self._safe_str(session_id)
+            if sid:
+                return sid
 
-        created = self._call_first(
-            self.sessions,
-            ["create_session", "new_session", "create", "start_session"],
-        )
-        if isinstance(created, dict):
-            return self._safe_str(created.get("id"))
+            created = self._call_first(
+                self.sessions,
+                ["create_session", "new_session", "create", "start_session"],
+            )
+            if isinstance(created, dict):
+                return self._safe_str(created.get("id"))
 
-        return f"session_{uuid.uuid4().hex}"
+            return f"session_{uuid.uuid4().hex}"
 
-    def _persist_message_fallback(self, session_id: str, message: dict) -> None:
-        result = self._call_first(
-            self.sessions,
-            ["append_message", "add_message", "save_message", "push_message"],
-            session_id,
-            message,
-        )
-        if result is not None:
-            return
 
-        self._call_first(
-            self.sessions,
-            ["append_message", "add_message", "save_message", "push_message"],
-            session_id=session_id,
-            message=message,
-        )
+        def _persist_message_fallback(self, session_id: str, message: dict) -> None:
+            if not session_id or not isinstance(message, dict):
+                return
 
-    def _persist_turn(self, session_id: str, user_msg: dict, assistant_msg: dict) -> None:
-        try:
-            self._persist_message_fallback(session_id, user_msg)
-            self._persist_message_fallback(session_id, assistant_msg)
-        except Exception as e:
-            print("TURN PERSIST FAILED:", e)
+            result = self._call_first(
+                self.sessions,
+                ["append_message", "add_message", "save_message", "push_message"],
+                session_id,
+                message,
+            )
+            if result is not None:
+                return
 
-    def _get_session_payload(self, session_id: str, fallback_messages=None) -> dict:
-        fallback_messages = fallback_messages or []
+            self._call_first(
+                self.sessions,
+                ["append_message", "add_message", "save_message", "push_message"],
+                session_id=session_id,
+                message=message,
+            )
 
-        session_obj = self._call_first(
-            self.sessions,
-            ["get_session", "read_session", "get", "load_session"],
-            session_id,
-        )
-        if isinstance(session_obj, dict):
-            return session_obj
+        def _persist_turn(self, session_id: str, user_msg: dict, assistant_msg: dict) -> None:
+            try:
+                self._persist_message_fallback(session_id, user_msg)
+                self._persist_message_fallback(session_id, assistant_msg)
+            except Exception as e:
+                print("TURN PERSIST FAILED:", e)
 
-        session_obj = self._call_first(
-            self.sessions,
-            ["get_session", "read_session", "get", "load_session"],
-            session_id=session_id,
-        )
-        if isinstance(session_obj, dict):
-            return session_obj
+        def _get_session_payload(self, session_id: str, fallback_messages=None) -> dict:
+            fallback_messages = fallback_messages or []
 
-        return {
-            "id": session_id,
-            "messages": fallback_messages,
-        }
+            session_obj = self._call_first(
+                self.sessions,
+                ["get_session", "read_session", "get", "load_session"],
+                session_id,
+            )
+            if isinstance(session_obj, dict):
+                return session_obj
 
-    def _get_sessions_list(self) -> list:
-        data = self._call_first(
-            self.sessions,
-            ["list_sessions", "get_sessions", "list", "all_sessions"],
-        )
-        return data if isinstance(data, list) else []
+            session_obj = self._call_first(
+                self.sessions,
+                ["get_session", "read_session", "get", "load_session"],
+                session_id=session_id,
+            )
+            if isinstance(session_obj, dict):
+                return session_obj
 
-    def _get_memory_list(self) -> list:
-        data = self._call_first(
-            self.memory,
-            ["list_memory", "get_memory", "list", "all_memory"],
-        )
-        if isinstance(data, dict) and isinstance(data.get("memory"), list):
-            return data.get("memory")
-        return data if isinstance(data, list) else []
+            return {
+                "id": session_id,
+                "messages": fallback_messages,
+            }
 
-    def _get_artifacts_list(self) -> list:
-        data = self._call_first(
-            self.artifacts,
-            ["list_artifacts", "get_artifacts", "list", "all_artifacts"],
-        )
-        if isinstance(data, dict) and isinstance(data.get("artifacts"), list):
-            return data.get("artifacts")
-        return data if isinstance(data, list) else []
+        def _get_sessions_list(self) -> list:
+            data = self._call_first(
+                self.sessions,
+                ["list_sessions", "get_sessions", "list", "all_sessions"],
+            )
+            return data if isinstance(data, list) else []
+
+        def _get_memory_list(self) -> list:
+            data = self._call_first(
+                self.memory,
+                ["list_memory", "get_memory", "list", "all_memory"],
+            )
+            if isinstance(data, dict) and isinstance(data.get("memory"), list):
+                return data.get("memory")
+            return data if isinstance(data, list) else []
+
+        def _get_artifacts_list(self) -> list:
+            data = self._call_first(
+                self.artifacts,
+                ["list_artifacts", "get_artifacts", "list", "all_artifacts"],
+            )
+            if isinstance(data, dict) and isinstance(data.get("artifacts"), list):
+                return data.get("artifacts")
+            return data if isinstance(data, list) else []
 
         # ==============================
         # WORKING STATE (PHASE 3)
         # ==============================
 
-    def _get_working_state(self, session_id: str):
+        def _get_working_state(self, session_id: str):
             state = self._call_first(
                 self.sessions,
                 ["get_working_state"],
@@ -2429,7 +2022,7 @@ class ChatService:
 
             return cleaned
 
-    def _handle_where_are_we(self, session_id: str, user_text: str = "") -> str:
+        def _handle_where_are_we(self, session_id: str, user_text: str = "") -> str:
             state = self._get_working_state(session_id) or {}
 
             active_task = self._safe_str(state.get("active_task")).strip()
@@ -2545,7 +2138,7 @@ class ChatService:
         # WORKING STATE HELPERS
         # =========================
 
-    def _clean_working_state_value(self, value, limit=120):
+        def _clean_working_state_value(self, value, limit=120):
             text = self._safe_str(value).strip()
             if not text:
                 return ""
@@ -2571,7 +2164,7 @@ class ChatService:
 
             return text[:limit]
 
-    def _is_valid_state_value(self, value):
+        def _is_valid_state_value(self, value):
             if not value:
                 return False
 
@@ -2599,7 +2192,7 @@ class ChatService:
 
             return True
 
-    def _merge_working_state(self, current_state, updates):
+        def _merge_working_state(self, current_state, updates):
             current_state = current_state if isinstance(current_state, dict) else {}
             updates = updates if isinstance(updates, dict) else {}
 
@@ -2623,7 +2216,7 @@ class ChatService:
 
             return merged  
 
-    def _extract_working_state_updates(self, user_text, current_state):
+        def _extract_working_state_updates(self, user_text, current_state):
             text = self._safe_str(user_text).strip()
             lower = text.lower()
             updates = {}
@@ -2688,7 +2281,7 @@ class ChatService:
 
             return self._merge_working_state(current_state or {}, updates)
 
-    def _format_working_state(self, state):
+        def _format_working_state(self, state):
             def c(x): return x if x else " "
             return (
                 f"Active task: {c(state.get('active_task'))}\n"
@@ -2699,11 +2292,11 @@ class ChatService:
                 f"Checkpoint: {c(state.get('checkpoint'))}"
             )
 
-    # =========================
-    # WORKING STATE HELPERS
-    # =========================
+        # =========================
+        # WORKING STATE HELPERS
+        # =========================
             
-    def _format_working_state_context(self, session_id: str) -> str:
+        def _format_working_state_context(self, session_id: str) -> str:
             state = self._get_working_state(session_id)
             if not isinstance(state, dict) or not state:
                 return ""
@@ -2728,18 +2321,18 @@ class ChatService:
 
             return "Working context:\n" + "\n".join(lines)
 
-    # ===============================
-    # WORKING STATE (PHASE 3)
-    # ===============================
+        # ==============================
+        # WORKING STATE (PHASE 3)
+        # ==============================
 
-    def _get_working_state(self, session_id: str) -> dict:
+        def _get_working_state(self, session_id: str) -> dict:
             return self._call_first(
                 self.sessions,
                 ["get_working_state"],
                 session_id,
             ) or {}
 
-    def _update_working_state(self, session_id: str, patch: dict):
+        def _update_working_state(self, session_id: str, patch: dict):
             if not isinstance(patch, dict) or not patch:
                 return
 
@@ -2757,7 +2350,7 @@ class ChatService:
         # MEMORY HELPERS
         # ==============================
 
-    def _rank_memory_context(
+        def _rank_memory_context(
             self,
             user_text: str,
             limit: int = 5,
@@ -2799,7 +2392,7 @@ class ChatService:
 
             return scored[: max(int(limit or 5), 1)]
 
-    def _format_memory_context(self, memory_items: list[dict]) -> str:
+        def _format_memory_context(self, memory_items: list[dict]) -> str:
             if not isinstance(memory_items, list) or not memory_items:
                 return ""
 
@@ -2820,7 +2413,7 @@ class ChatService:
 
             return "\n".join(lines).strip()
 
-    def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
+        def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
 
             if not isinstance(decision, dict):
                 return
@@ -2900,7 +2493,7 @@ class ChatService:
                 print("MEMORY WRITE FAILED:", e)
 
 
-    def _memory_text_tokens(self, value: str) -> set[str]:
+        def _memory_text_tokens(self, value: str) -> set[str]:
             text = self._safe_str(value).lower()
             if not text:
                 return set()
@@ -2921,7 +2514,7 @@ class ChatService:
             return {token for token in tokens if token not in stop_words}
 
 
-    def _memory_kind_weight(self, kind: str) -> float:
+        def _memory_kind_weight(self, kind: str) -> float:
             k = self._safe_str(kind).lower()
 
             if k in {"preference", "profile"}:
@@ -2935,7 +2528,7 @@ class ChatService:
             return 1.0
 
 
-    def _memory_time_bonus(self, item: dict) -> float:
+        def _memory_time_bonus(self, item: dict) -> float:
             created_at = self._safe_str(item.get("updated_at") or item.get("created_at"))
             if not created_at:
                 return 0.0
@@ -2970,14 +2563,14 @@ class ChatService:
                 return 0.5
             return 0.0
 
-    def _memory_session_bonus(self, item: dict, session_id: str = "") -> float:
+        def _memory_session_bonus(self, item: dict, session_id: str = "") -> float:
             current_session = self._safe_str(session_id)
             item_session = self._safe_str(item.get("session_id"))
             if current_session and item_session and current_session == item_session:
                 return 1.5
             return 0.0
 
-    def _score_memory_item(self, item: dict, user_text: str, session_id: str = "") -> float:
+        def _score_memory_item(self, item: dict, user_text: str, session_id: str = "") -> float:
             if not isinstance(item, dict):
                 return -999.0
 
@@ -3031,7 +2624,7 @@ class ChatService:
                 + generic_penalty
             )
 
-    def _memory_is_relevant_enough(self, item: dict, score: float, user_text: str) -> bool:
+        def _memory_is_relevant_enough(self, item: dict, score: float, user_text: str) -> bool:
             text = self._safe_str(item.get("text"))
             if not text:
                 return False
@@ -3061,7 +2654,7 @@ class ChatService:
         # IMAGE HELPERS
         # ==============================
 
-    def _is_image_generation_request(self, user_text: str) -> bool:
+        def _is_image_generation_request(self, user_text: str) -> bool:
             text = str(user_text or "").strip().lower()
 
             if not text:
@@ -3084,7 +2677,7 @@ class ChatService:
 
             return any(trigger in text for trigger in triggers)
 
-    def _image_prompt_from_text(self, user_text: str) -> str:
+        def _image_prompt_from_text(self, user_text: str) -> str:
             text = str(user_text or "").strip()
             lowered = text.lower()
 
@@ -3112,7 +2705,7 @@ class ChatService:
 
             return text or "Generate an image."
 
-    def _build_image_generation_meta(
+        def _build_image_generation_meta(
             self,
             prompt: str,
             image_url: str,
@@ -3132,7 +2725,7 @@ class ChatService:
                 "source_session_id": str(source_session_id or "").strip(),
             }
 
-    def _build_image_generation_artifact(
+        def _build_image_generation_artifact(
             self,
             session_id: str,
             prompt: str,
@@ -3185,7 +2778,7 @@ class ChatService:
                 },
             }
 
-    def _save_artifact_fallback(self, artifact: dict):
+        def _save_artifact_fallback(self, artifact: dict):
             if not isinstance(artifact, dict) or not artifact:
                 return None
 
@@ -3195,7 +2788,7 @@ class ChatService:
                 print("ARTIFACT SAVE FAILED:", e)
                 return None
 
-    def _persist_image_generation_artifact(
+        def _persist_image_generation_artifact(
             self,
             session_id: str,
             prompt: str,
@@ -3219,7 +2812,7 @@ class ChatService:
             )
             return self._save_artifact_fallback(artifact)
 
-    def _handle_image_generation(
+        def _handle_image_generation(
             self,
             prompt: str,
             session_id: str = "",
@@ -3289,7 +2882,7 @@ class ChatService:
         # WEB / ATTACHMENT HELPERS
         # ==============================
 
-    def _handle_web_fetch(self, url: str, session_id: str = "") -> dict:
+        def _handle_web_fetch(self, url: str, session_id: str = "") -> dict:
             raw_url = self._safe_str(url)
             normalized_url = raw_url
             if normalized_url and not re.match(r"^https?://", normalized_url, re.IGNORECASE):
@@ -3389,7 +2982,7 @@ class ChatService:
                 },
             }
 
-    def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
+        def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
             attachments = attachments or []
 
             image_url = ""
@@ -3468,7 +3061,7 @@ class ChatService:
         # MODEL HELPERS
         # ==============================
 
-    def _build_chat_input(
+        def _build_chat_input(
             self,
             user_text: str,
             decision: dict,
@@ -3505,7 +3098,7 @@ class ChatService:
                 + user_text
             )
 
-    def _run_chat_model(
+        def _run_chat_model(
             self,
             user_text: str,
             decision: dict,
@@ -3534,28 +3127,28 @@ class ChatService:
         # RESPONSE BUILDERS
         # ==============================
 
-    def _build_user_message(self, text: str, attachments=None, meta=None) -> dict:
-        attachments = attachments or []
-        meta = meta or {}
-        return {
-            "role": "user",
-            "text": self._safe_str(text),
-            "attachments": attachments,
-            "meta": meta,
-        }
+        def _build_user_message(self, user_text: str, attachments=None) -> dict:
+            return new_message(
+                role="user",
+                text=user_text,
+                attachments=attachments or [],
+                meta={},
+            )
 
-    def _build_assistant_message(self, text: str, attachments=None, meta=None) -> dict:
-        attachments = attachments or []
-        meta = meta or {}
-        return {
-            "role": "assistant",
-            "text": self._safe_str(text),
-            "attachments": attachments,
-            "meta": meta,
-        }
+        def _build_assistant_message(
+            self,
+            text: str,
+            meta: dict | None = None,
+            attachments=None,
+        ) -> dict:
+            return new_message(
+                role="assistant",
+                text=self._safe_str(text) or "",
+                attachments=attachments or [],
+                meta=meta or {},
+            )
 
-
-    def _finalize_response(
+        def _finalize_response(
             self,
             session_id: str,
             user_text: str,
@@ -3620,7 +3213,7 @@ class ChatService:
 
             return payload
 
-    def _execute_memory_recall(
+        def _execute_memory_recall(
             self,
             decision: dict,
             user_text: str,
@@ -3657,7 +3250,7 @@ class ChatService:
                 saved_artifact=None,
             )
 
-    def _execute_planning(
+        def _execute_planning(
             self,
             decision: dict,
             user_text: str,
@@ -3686,7 +3279,7 @@ class ChatService:
                 saved_artifact=None,
             )
 
-    def _execute_web_fetch(
+        def _execute_web_fetch(
             self,
             decision: dict,
             user_text: str,
@@ -3724,7 +3317,7 @@ class ChatService:
                 saved_artifact=web_result.get("artifact"),
             )
 
-    def _execute_attachment_analysis(
+        def _execute_attachment_analysis(
             self,
             decision: dict,
             user_text: str,
@@ -3750,7 +3343,7 @@ class ChatService:
                 saved_artifact=result.get("saved_artifact"),
             )
 
-    def _execute_general_chat(
+        def _execute_general_chat(
             self,
             decision: dict,
             user_text: str,
@@ -3855,16 +3448,141 @@ class ChatService:
                 saved_artifact=None,
             )
 
-    def _execute_web_operator(self, user_text: str, session_id: str) -> dict:
-        try:
-            url_match = re.search(r"(https?://[^\s]+)", user_text or "")
-            base_url = url_match.group(1) if url_match else ""
+        def _execute_web_operator(self, user_text: str, session_id: str) -> dict:
+            try:
+                url_match = re.search(r"(https?://[^\s]+)", user_text or "")
+                base_url = url_match.group(1) if url_match else ""
 
-            if not base_url:
+                if not base_url:
+                    user_msg = self._build_user_message(user_text, attachments=[])
+                    assistant_msg = self._build_assistant_message(
+                        text="No URL detected for web operator.",
+                        meta={"web_operator": True},
+                        attachments=[],
+                    )
+                    return self._finalize_response(
+                        session_id=session_id,
+                        user_text=user_text,
+                        user_msg=user_msg,
+                        assistant_msg=assistant_msg,
+                        decision={
+                            "route": "web_operator",
+                            "mode": "tool",
+                            "confidence": 0.70,
+                            "use_memory": False,
+                            "save_memory": False,
+                            "save_artifact": False,
+                            "has_attachments": False,
+                            "url": "",
+                            "memory_limit": self.memory_limit,
+                            "reasons": ["research_trigger", "no_url_detected"],
+                            "session_id": self._safe_str(session_id),
+                        },
+                        saved_artifact=None,
+                    )
+
+                primary = self.web.fetch(base_url)
+                links = self._safe_list(primary.get("links"))[:3]
+
+                collected = [primary]
+                visited = [base_url]
+
+                for link in links:
+                    try:
+                        result = self.web.fetch(link)
+                        if isinstance(result, dict) and result.get("ok"):
+                            collected.append(result)
+                            visited.append(link)
+                    except Exception:
+                        continue
+
+                combined_bullets = []
+                combined_content = []
+
+                for page in collected:
+                    if not isinstance(page, dict):
+                        continue
+                    combined_bullets.extend(self._safe_list(page.get("bullets")))
+                    combined_content.append(self._safe_str(page.get("content")))
+
+                deduped_bullets = []
+                seen = set()
+                for item in combined_bullets:
+                    clean = self._safe_str(item)
+                    key = clean.lower()
+                    if not clean or key in seen:
+                        continue
+                    seen.add(key)
+                    deduped_bullets.append(clean)
+
+                deduped_bullets = deduped_bullets[:10]
+                combined_body = "\n\n".join([c for c in combined_content if c])[:8000]
+                summary = "\n".join(deduped_bullets[:5]).strip()
+
+                artifact = {
+                    "kind": "web_research",
+                    "title": f"Research: {base_url}",
+                    "summary": summary or f"Analyzed {len(visited)} page(s).",
+                    "body": combined_body,
+                    "preview": (summary or combined_body[:300]).strip(),
+                    "source": "web_operator",
+                    "session_id": session_id or "",
+                    "meta": {
+                        "source_url": base_url,
+                        "visited": visited,
+                        "pages_visited": len(visited),
+                    },
+                    "viewer": {
+                        "kind": "web_research",
+                        "title": f"Research: {base_url}",
+                        "analysis_text": summary or f"Analyzed {len(visited)} page(s).",
+                        "body": combined_body,
+                        "bullets": deduped_bullets,
+                        "links": visited,
+                        "source_url": base_url,
+                    },
+                }
+
+                saved_artifact = self._save_artifact_fallback(artifact)
+
+                user_msg = self._build_user_message(user_text, attachments=[])
+                assistant_text = f"Analyzed {len(visited)} pages.\n\n{summary}".strip()
+                assistant_msg = self._build_assistant_message(
+                    text=assistant_text,
+                    meta={
+                        "web_operator": True,
+                        "source_url": base_url,
+                        "pages_visited": len(visited),
+                    },
+                    attachments=[],
+                )
+
+                return self._finalize_response(
+                    session_id=session_id,
+                    user_text=user_text,
+                    user_msg=user_msg,
+                    assistant_msg=assistant_msg,
+                    decision={
+                        "route": "web_operator",
+                        "mode": "tool",
+                        "confidence": 0.97,
+                        "use_memory": False,
+                        "save_memory": False,
+                        "save_artifact": True,
+                        "has_attachments": False,
+                        "url": base_url,
+                        "memory_limit": self.memory_limit,
+                        "reasons": ["research_trigger", "phase_6_web_operator"],
+                        "session_id": self._safe_str(session_id),
+                    },
+                    saved_artifact=saved_artifact,
+                )
+
+            except Exception as e:
                 user_msg = self._build_user_message(user_text, attachments=[])
                 assistant_msg = self._build_assistant_message(
-                    text="No URL detected for web operator.",
-                    meta={"web_operator": True},
+                    text=f"Web operator failed: {e}",
+                    meta={"web_operator": True, "web_operator_error": str(e)},
                     attachments=[],
                 )
                 return self._finalize_response(
@@ -3875,58 +3593,20 @@ class ChatService:
                     decision={
                         "route": "web_operator",
                         "mode": "tool",
-                        "save_artifact": False,
-                        "save_memory": False,
+                        "confidence": 0.40,
                         "use_memory": False,
+                        "save_memory": False,
+                        "save_artifact": False,
+                        "has_attachments": False,
+                        "url": "",
+                        "memory_limit": self.memory_limit,
+                        "reasons": ["research_trigger", "phase_6_web_operator_error"],
+                        "session_id": self._safe_str(session_id),
                     },
                     saved_artifact=None,
                 )
 
-            summary = f"Web operator is not fully wired yet.\n\nTarget: {base_url}"
-
-            user_msg = self._build_user_message(user_text, attachments=[])
-            assistant_msg = self._build_assistant_message(
-                text=summary,
-                meta={"web_operator": True, "url": base_url},
-                attachments=[],
-            )
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision={
-                    "route": "web_operator",
-                    "mode": "tool",
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": False,
-                },
-                saved_artifact=None,
-            )
-        except Exception as e:
-            user_msg = self._build_user_message(user_text, attachments=[])
-            assistant_msg = self._build_assistant_message(
-                text=f"Web operator failed: {e}",
-                meta={"web_operator": True, "error": True},
-                attachments=[],
-            )
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision={
-                    "route": "web_operator",
-                    "mode": "tool",
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": False,
-                },
-                saved_artifact=None,
-            )
-
-    def _execute_decision(
+        def _execute_decision(
             self,
             decision: dict,
             user_text: str,
@@ -3988,289 +3668,99 @@ class ChatService:
                 working_context_block=working_context_block,
             )
 
-    def _ensure_session_payload(self, session_id: str) -> dict:
-        session = self._call_first(
-            self.sessions,
-            ["get_session", "read_session", "get", "load_session"],
-            session_id,
-        )
-
-        if isinstance(session, dict):
-            session.setdefault("id", session_id)
-            session.setdefault("messages", [])
-            session.setdefault("working_state", {})
-            return session
-
-        created = self._call_first(
-            self.sessions,
-            ["create_session", "new_session", "create", "start_session"],
-        )
-        if isinstance(created, dict):
-            created_id = self._safe_str(created.get("id")) or session_id
+        def _ensure_session_payload(self, session_id: str) -> dict:
             session = self._call_first(
                 self.sessions,
                 ["get_session", "read_session", "get", "load_session"],
-                created_id,
+                session_id,
             )
+
             if isinstance(session, dict):
-                session.setdefault("id", created_id)
+                session.setdefault("id", session_id)
                 session.setdefault("messages", [])
                 session.setdefault("working_state", {})
                 return session
 
+            created = self._call_first(
+                self.sessions,
+                ["create_session", "new_session", "create", "start_session"],
+            )
+            if isinstance(created, dict):
+                created_id = self._safe_str(created.get("id")) or session_id
+                session = self._call_first(
+                    self.sessions,
+                    ["get_session", "read_session", "get", "load_session"],
+                    created_id,
+                )
+                if isinstance(session, dict):
+                    session.setdefault("id", created_id)
+                    session.setdefault("messages", [])
+                    session.setdefault("working_state", {})
+                    return session
+
+                return {
+                    "id": created_id,
+                    "messages": [],
+                    "working_state": {},
+                }
+
             return {
-                "id": created_id,
+                "id": session_id,
                 "messages": [],
                 "working_state": {},
             }
 
-        return {
-            "id": session_id,
-            "messages": [],
-            "working_state": {},
-        }
+        # ==============================
+        # PUBLIC ENTRY
+        # ==============================
 
-    def _execute_current_step(self, execution: dict, user_text: str, session_id: str = "", attachments=None) -> dict:
-        attachments = attachments or []
-        execution = self._normalize_execution_state(dict(execution or {}))
+        def handle(self, user_text: str, session_id: str = "", attachments=None):
+            attachments = attachments or []
+            user_text = self._safe_str(user_text)
+            session_id = self._ensure_session_id(session_id)
 
-        steps = execution.get("steps") or []
-        current_index = self._execution_current_index(execution)
-
-        if not steps or current_index >= len(steps):
-            execution["status"] = "complete"
-            execution["current_step"] = "complete"
-            execution["progress"] = len(steps)
-            execution.setdefault("step_results", [])
-            return {
-                "execution": execution,
-                "step_output": "No remaining execution step.",
-                "saved_artifact": None,
-            }
-
-        current_step = steps[current_index] or {}
-        step_title = self._safe_str(current_step.get("title")) or f"Step {current_index + 1}"
-        goal = self._safe_str(execution.get("goal"))
-        execution.setdefault("step_results", [])
-
-        system_prompt = (
-            "You are executing one step in Nova's task engine. "
-            "Be concrete, operational, and brief. "
-            "Return useful work product for the current step only. "
-            "If the step is about inspection, analyze the request and constraints. "
-            "If the step is about choosing a path, recommend the safest path and why. "
-            "If the step is about applying a change, describe the exact change that should be made. "
-            "If the step is about verification, describe how to verify success. "
-            "If the step is about summarizing, produce a concise outcome and next move."
-        )
-
-        working_context = self._build_working_context_block(session_id)
-        memory_context = self._build_memory_context_for_chat(
-            user_text=goal or user_text,
-            decision={"use_memory": True, "memory_limit": self.memory_limit},
-        )
-
-        step_prompt_parts = [
-            f"Goal:\n{goal or user_text}",
-            f"Current step:\n{step_title}",
-        ]
-
-        if working_context:
-            step_prompt_parts.append(f"Working context:\n{working_context}")
-
-        if memory_context:
-            step_prompt_parts.append(f"Relevant memory:\n{memory_context}")
-
-        if attachments:
-            attachment_names = []
-            for item in attachments:
-                if isinstance(item, dict):
-                    attachment_names.append(
-                        self._safe_str(item.get("filename"))
-                        or self._safe_str(item.get("stored_name"))
-                        or self._safe_str(item.get("name"))
-                    )
-                else:
-                    attachment_names.append(self._safe_str(item))
-            attachment_names = [x for x in attachment_names if x]
-            if attachment_names:
-                step_prompt_parts.append("Attachments:\n" + ", ".join(attachment_names))
-
-        step_prompt_parts.append(
-            "Return plain text with these sections:\n"
-            "1. What I did\n"
-            "2. Result\n"
-            "3. Next implication"
-        )
-
-        step_prompt = "\n\n".join([p for p in step_prompt_parts if p]).strip()
-
-        step_output = ""
-        try:
-            response = self.client.responses.create(
-                model=self.chat_model,
-                input=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": step_prompt},
-                ],
-            )
-            step_output = self._extract_response_text(response).strip()
-        except Exception as e:
-            step_output = f"Step execution failed: {e}"
-
-        result_entry = {
-            "index": current_index,
-            "title": step_title,
-            "output": step_output,
-            "created_at": self._iso_now(),
-        }
-        execution["step_results"].append(result_entry)
-
-        current_step["notes"] = step_output[:800]
-
-        artifact_payload = {
-            "kind": "execution_step",
-            "group": "Execution",
-            "title": f"Execution Step {current_index + 1}: {step_title}",
-            "summary": step_output[:200] if step_output else step_title,
-            "preview": step_output[:140] if step_output else step_title,
-            "body": step_output,
-            "session_id": session_id,
-            "source": "execution_step",
-            "meta": {
-                "goal": goal,
-                "step_index": current_index,
-                "step_title": step_title,
-                "execution_id": self._safe_str(execution.get("id")),
-            },
-        }
-
-        saved_step_artifact = self._call_first(
-            self.artifacts,
-            ["save_artifact", "create_artifact", "add_artifact", "save", "create"],
-            artifact_payload,
-        )
-
-        execution = self._advance_execution_one_step(execution)
-
-        if execution.get("status") == "complete":
-            execution["current_step"] = "complete"
-
-        return {
-            "execution": execution,
-            "step_output": step_output,
-            "saved_artifact": saved_step_artifact,
-        }
-
-    # ==============================
-    # PUBLIC ENTRY
-    # ==============================
-
-    def handle(self, user_text: str, session_id: str = "", attachments=None):
-        attachments = attachments or []
-        user_text = self._safe_str(user_text)
-        session_id = self._ensure_session_id(session_id)
-        user_msg = self._build_user_message(user_text, attachments=attachments)
-
-        auto_exec_match = self._looks_like_auto_execution_request(user_text)
-        progress_exec_match = self._looks_like_execution_progression(user_text)
-
-        print("HANDLE USER_TEXT =", repr(user_text))
-        print("HANDLE AUTO_EXEC_MATCH =", auto_exec_match)
-        print("HANDLE PROGRESS_EXEC_MATCH =", progress_exec_match)
-
-        if auto_exec_match:
-            print("HANDLE ROUTE = auto_execute")
-            return self._auto_execute_request(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-            )
-
-        if progress_exec_match:
-            print("HANDLE ROUTE = advance_execution")
-            return self._advance_execution_request(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-            )
-
-        print("HANDLE ROUTE = normal_chat")
-
-        auto_run_after_plan = any(
-            x in self._safe_str(user_text).lower()
-            for x in [
-                "run all",
-                "auto execute",
-                "finish the plan",
-                "do it all",
-                "complete it",
-            ]
-        )
-
-        if self._looks_like_plan_request(user_text):
-            print("AUTO PLAN: generating execution plan")
-            saved_artifact = self._build_execution_plan(user_text, session_id)
-
-            if auto_run_after_plan:
-                print("AUTO PLAN: immediately auto-executing")
+            if self._looks_like_auto_execution_request(user_text):
                 return self._auto_execute_request(
-                    user_text="auto execute",
+                    user_text=user_text,
                     session_id=session_id,
                     attachments=attachments,
                 )
 
-            assistant_text = "Execution plan created.\n\nUse 'run it' to advance one step."
-            if isinstance(saved_artifact, dict) and saved_artifact.get("body"):
-                assistant_text += "\n\n" + self._safe_str(saved_artifact.get("body"))
+            working_state = self._maybe_update_working_state(session_id, user_text)
+            working_context_block = self._build_working_context_block(session_id)
 
-            assistant_msg = self._build_assistant_message(
-                text=assistant_text,
-                attachments=[],
-            )
+            current_state = self._get_working_state(session_id)
+            updates = self._extract_working_state_updates(user_text, current_state)
+            if updates:
+                self._update_working_state(session_id, updates)
 
-            return self._finalize_response(
-                session_id=session_id,
+            decision = self._decide_route(
                 user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision={
-                    "route": "execution",
-                    "mode": "plan_creation",
-                    "save_artifact": True,
-                    "save_memory": False,
-                    "use_memory": True,
-                },
-                saved_artifact=saved_artifact,
+                attachments=attachments,
+                session_id=session_id,
             )
 
-        working_state = self._maybe_update_working_state(session_id, user_text)
-        working_context_block = self._build_working_context_block(session_id)
+            if not user_text:
+                user_msg = self._build_user_message("", attachments=attachments)
+                assistant_msg = self._build_assistant_message(
+                    text="Please enter a message.",
+                    meta={"empty_input": True},
+                    attachments=[],
+                )
+                return self._finalize_response(
+                    session_id=session_id,
+                    user_text="",
+                    user_msg=user_msg,
+                    assistant_msg=assistant_msg,
+                    decision=decision,
+                    saved_artifact=None,
+                )
 
-        current_state = self._get_working_state(session_id)
-        updates = self._extract_working_state_updates(user_text, current_state)
-        if updates:
-            self._update_working_state(session_id, updates)
-
-        decision = self._decide_route(
-            user_text=user_text,
-            session_id=session_id,
-            attachments=attachments,
-        )
-
-        if decision.get("route") == "attachment_analysis":
-            return self._execute_attachment_analysis(
+            return self._execute_decision(
                 decision=decision,
                 user_text=user_text,
                 session_id=session_id,
                 attachments=attachments,
+                working_state=working_state,
+                working_context_block=working_context_block,
             )
-
-        return self._execute_general_chat(
-            decision=decision,
-            user_text=user_text,
-            session_id=session_id,
-            attachments=attachments,
-            working_state=working_state,
-            working_context_block=working_context_block,
-        )

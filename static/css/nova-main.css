@@ -7723,3 +7723,1208 @@ button.nova-memory-card,
 .nova-working-context-panel.is-collapsed .nova-working-context-body {
   display: none;
 }
+
+.nova-working-context-panel {
+  margin: 0 0 14px 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(6px);
+}
+
+.nova-working-context-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0 0 10px 0;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.nova-working-context-toggle-icon {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.nova-working-context-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.82;
+}
+
+.nova-working-context-body {
+  display: grid;
+  gap: 8px;
+}
+
+.nova-working-context-panel.is-collapsed .nova-working-context-body {
+  display: none;
+}
+
+.nova-working-context-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.nova-working-context-label {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.nova-working-context-value {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: break-word;
+  opacity: 0.96;
+}
+
+/* =========================
+   WORKING CONTEXT PANEL — FINAL POLISH
+   ========================= */
+
+.nova-working-context-panel {
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: rgba(255,255,255,0.02);
+  backdrop-filter: blur(6px);
+
+  /* smooth feel */
+  transition: all 0.25s ease;
+}
+
+/* Header (clickable) */
+.nova-working-context-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  opacity: 0.9;
+  user-select: none;
+
+  transition: opacity 0.2s ease;
+}
+
+.nova-working-context-header:hover {
+  opacity: 1;
+}
+
+/* Rows container */
+.nova-working-context-body {
+  overflow: hidden;
+  transition:
+    max-height 0.25s ease,
+    opacity 0.2s ease,
+    transform 0.2s ease;
+
+  max-height: 500px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* COLLAPSED STATE */
+.nova-working-context-panel.collapsed .nova-working-context-body {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* Rows */
+.nova-working-context-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.nova-working-context-row:last-child {
+  border-bottom: none;
+}
+
+/* Labels */
+.nova-working-context-label {
+  opacity: 0.5;
+}
+
+/* Values */
+.nova-working-context-value {
+  font-weight: 500;
+  text-align: right;
+  max-width: 60%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =========================
+   RIGHT PANEL HORIZONTAL OVERFLOW FIX
+   ========================= */
+
+/* kill tiny left-right scroll in the right rail */
+[data-right-rail],
+.nova-right-rail,
+.nova-rail,
+.nova-rail-panel,
+.nova-rail-viewer,
+[data-rail-panel],
+[data-rail-viewer] {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* make inner content respect panel width */
+.nova-rail-panel *,
+.nova-rail-viewer *,
+[data-rail-panel] *,
+[data-rail-viewer] * {
+  box-sizing: border-box;
+}
+
+/* common cause: flex children refuse to shrink */
+.nova-rail-panel > *,
+.nova-rail-viewer > *,
+[data-rail-panel] > *,
+[data-rail-viewer] > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* button rows / action bars should wrap instead of pushing width */
+.nova-artifact-actions,
+.nova-memory-actions,
+.nova-session-actions,
+.nova-rail-actions,
+[data-artifact-actions],
+[data-memory-actions],
+[data-session-actions] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* buttons should not force overflow */
+.nova-artifact-actions button,
+.nova-memory-actions button,
+.nova-session-actions button,
+.nova-rail-actions button,
+[data-artifact-actions] button,
+[data-memory-actions] button,
+[data-session-actions] button {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* text containers inside the rail must be allowed to shrink */
+.nova-rail-title,
+.nova-rail-subtitle,
+.nova-rail-text,
+.nova-artifact-title,
+.nova-memory-title,
+.nova-session-title {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* last-resort protection */
+html,
+body {
+  overflow-x: hidden;
+}
+
+/* =========================
+   RIGHT RAIL HARD OVERFLOW LOCK
+   ========================= */
+
+/* rail containers */
+[data-right-rail],
+.nova-right-rail,
+.nova-rail,
+.nova-rail-panel,
+.nova-rail-viewer,
+[data-rail-panel],
+[data-rail-viewer] {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden !important;
+  box-sizing: border-box;
+}
+
+/* every direct child inside the rail must be allowed to shrink */
+[data-right-rail] > *,
+.nova-right-rail > *,
+.nova-rail > *,
+.nova-rail-panel > *,
+.nova-rail-viewer > *,
+[data-rail-panel] > *,
+[data-rail-viewer] > * {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* common offenders: cards, rows, headers, toolbars, viewers */
+.nova-artifact-card,
+.nova-memory-card,
+.nova-session-card,
+.nova-rail-card,
+.nova-rail-section,
+.nova-rail-header,
+.nova-rail-toolbar,
+.nova-artifact-toolbar,
+.nova-memory-toolbar,
+.nova-session-toolbar,
+.nova-artifact-actions,
+.nova-memory-actions,
+.nova-session-actions,
+.nova-rail-actions,
+[data-artifact-actions],
+[data-memory-actions],
+[data-session-actions] {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0 !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box;
+}
+
+/* force action/button rows to wrap instead of pushing width */
+.nova-artifact-actions,
+.nova-memory-actions,
+.nova-session-actions,
+.nova-rail-actions,
+[data-artifact-actions],
+[data-memory-actions],
+[data-session-actions] {
+  display: flex;
+  flex-wrap: wrap !important;
+  align-items: center;
+  gap: 8px;
+}
+
+/* buttons and pills must not force the container wider */
+.nova-artifact-actions > *,
+.nova-memory-actions > *,
+.nova-session-actions > *,
+.nova-rail-actions > *,
+[data-artifact-actions] > *,
+[data-memory-actions] > *,
+[data-session-actions] > * {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  flex: 0 1 auto !important;
+}
+
+/* text must wrap/shrink instead of creating horizontal scroll */
+.nova-rail-title,
+.nova-rail-subtitle,
+.nova-rail-text,
+.nova-artifact-title,
+.nova-memory-title,
+.nova-session-title,
+.nova-rail-viewer,
+.nova-rail-viewer p,
+.nova-rail-viewer div,
+.nova-rail-viewer span,
+[data-rail-viewer],
+[data-rail-viewer] p,
+[data-rail-viewer] div,
+[data-rail-viewer] span {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+/* form controls inside rail */
+.nova-rail input,
+.nova-rail textarea,
+.nova-rail select,
+[data-right-rail] input,
+[data-right-rail] textarea,
+[data-right-rail] select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* final hard kill for x-overflow only in rail */
+[data-right-rail],
+.nova-right-rail {
+  overflow-y: auto;
+  overflow-x: hidden !important;
+}
+
+/* =========================
+   RIGHT RAIL BUTTON TEXT CLIP FIX
+   ========================= */
+
+.nova-artifact-actions button,
+.nova-memory-actions button,
+.nova-session-actions button,
+.nova-rail-actions button,
+[data-artifact-actions] button,
+[data-memory-actions] button,
+[data-session-actions] button,
+.nova-rail button,
+[data-right-rail] button {
+  min-width: fit-content;
+  max-width: 100%;
+  height: auto;
+  min-height: 32px;
+  padding: 6px 10px;
+  line-height: 1.2;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+/* if buttons contain inner spans/icons, let them breathe too */
+.nova-artifact-actions button *,
+.nova-memory-actions button *,
+.nova-session-actions button *,
+.nova-rail-actions button *,
+[data-artifact-actions] button *,
+[data-memory-actions] button *,
+[data-session-actions] button *,
+.nova-rail button *,
+[data-right-rail] button * {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.2;
+}
+
+/* common pill/button class hardening */
+.nova-btn,
+.nova-button,
+button.nova-btn,
+button.nova-button {
+  min-width: fit-content;
+  height: auto;
+  min-height: 32px;
+  padding: 6px 10px;
+  line-height: 1.2;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  box-sizing: border-box;
+}
+
+/* =========================
+   SESSION RAIL + BUTTON CLIP FIX
+   ========================= */
+
+/* session list should own scrolling, not each session row */
+[data-session-list],
+.nova-session-list {
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+/* session rows/cards must never create their own scrollbars */
+[data-session-list] > *,
+.nova-session-list > *,
+.nova-session-item,
+.nova-session-row,
+.nova-session-card,
+.nova-session-entry {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box;
+}
+
+/* inner wrappers inside a session row must shrink properly */
+.nova-session-item > *,
+.nova-session-row > *,
+.nova-session-card > *,
+.nova-session-entry > *,
+[data-session-list] > * > * {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* kill horizontal scroll on any nested session content */
+.nova-session-item,
+.nova-session-row,
+.nova-session-card,
+.nova-session-entry,
+.nova-session-main,
+.nova-session-content,
+.nova-session-meta,
+.nova-session-title-wrap {
+  overflow-x: hidden !important;
+}
+
+/* text inside sessions must ellipsis, not scroll */
+.nova-session-title,
+.nova-session-name,
+.nova-session-label,
+.nova-session-preview,
+.nova-session-subtitle,
+.nova-session-meta,
+[data-session-list] button,
+[data-session-list] .nova-btn,
+[data-session-list] .nova-button {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  box-sizing: border-box;
+}
+
+/* action rows inside the rail */
+.nova-session-actions,
+.nova-rail-actions,
+[data-session-actions] {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+}
+
+/* buttons: stop clipping the last letter */
+.nova-session-actions button,
+.nova-rail-actions button,
+[data-session-actions] button,
+[data-session-list] button,
+[data-right-rail] button {
+  height: auto !important;
+  min-height: 34px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  padding: 7px 12px !important;
+  line-height: 1.35 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+}
+
+/* inner spans/icons inside buttons */
+.nova-session-actions button span,
+.nova-rail-actions button span,
+[data-session-actions] button span,
+[data-session-list] button span,
+[data-right-rail] button span {
+  display: inline-block !important;
+  line-height: 1.35 !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+
+/* if a generic app button class is overriding, beat it here */
+.nova-btn,
+.nova-button,
+button.nova-btn,
+button.nova-button {
+  height: auto !important;
+  min-height: 34px !important;
+  padding: 7px 12px !important;
+  line-height: 1.35 !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+/* common flex trap: children refuse to shrink */
+.nova-session-item,
+.nova-session-row,
+.nova-session-card,
+.nova-session-entry,
+.nova-session-main,
+.nova-session-content {
+  min-width: 0 !important;
+}
+
+/* =========================
+   SESSION RAIL STABILIZE PATCH
+   ========================= */
+
+/* let the session list be the only scroller */
+[data-session-list],
+.nova-session-list {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* restore normal row/card behavior */
+.nova-session-item,
+.nova-session-row,
+.nova-session-card,
+.nova-session-entry,
+[data-session-list] > * {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* main text area should take remaining space cleanly */
+.nova-session-main,
+.nova-session-content,
+.nova-session-text,
+.nova-session-body,
+.nova-session-title-wrap {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+/* session titles/previews should ellipsis, never overlap */
+.nova-session-title,
+.nova-session-name,
+.nova-session-label,
+.nova-session-preview,
+.nova-session-subtitle,
+.nova-session-meta {
+  display: block !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  line-height: 1.25 !important;
+}
+
+/* action area stays tight and does not crush the text */
+.nova-session-actions,
+.nova-rail-actions,
+[data-session-actions] {
+  flex: 0 0 auto !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+/* buttons: stop bottom clipping */
+.nova-session-actions button,
+.nova-rail-actions button,
+[data-session-actions] button,
+[data-session-list] button {
+  height: auto !important;
+  min-height: 30px !important;
+  padding: 4px 10px !important;
+  line-height: 1.2 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+}
+
+/* inner button text/icons */
+.nova-session-actions button span,
+.nova-rail-actions button span,
+[data-session-actions] button span,
+[data-session-list] button span {
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+}
+
+/* kill per-item scrollbars */
+.nova-session-item *,
+.nova-session-row *,
+.nova-session-card *,
+.nova-session-entry * {
+  scrollbar-width: none;
+}
+
+.nova-session-item *::-webkit-scrollbar,
+.nova-session-row *::-webkit-scrollbar,
+.nova-session-card *::-webkit-scrollbar,
+.nova-session-entry *::-webkit-scrollbar {
+  display: none;
+}
+
+/* =========================
+   SESSION TITLE/SUBTITLE OVERLAP FIX
+   ========================= */
+
+/* force the text area into a clean vertical stack */
+.nova-session-main,
+.nova-session-content,
+.nova-session-text,
+.nova-session-body,
+.nova-session-title-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  overflow: hidden !important;
+}
+
+/* title */
+.nova-session-title,
+.nova-session-name,
+.nova-session-label {
+  display: block !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  position: relative !important;
+}
+
+/* subtitle / preview / meta */
+.nova-session-preview,
+.nova-session-subtitle,
+.nova-session-meta {
+  display: block !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  position: relative !important;
+  opacity: 0.72;
+}
+
+/* if any text nodes/spans inside are absolutely/flex weird, normalize them */
+.nova-session-title *,
+.nova-session-name *,
+.nova-session-label *,
+.nova-session-preview *,
+.nova-session-subtitle *,
+.nova-session-meta * {
+  position: static !important;
+  display: inline !important;
+  line-height: inherit !important;
+  white-space: inherit !important;
+}
+
+/* make the full row align from the top instead of crushing text vertically */
+.nova-session-item,
+.nova-session-row,
+.nova-session-card,
+.nova-session-entry,
+[data-session-list] > * {
+  align-items: flex-start !important;
+}
+
+/* ensure action buttons don't sit on top of the text column */
+.nova-session-actions,
+.nova-rail-actions,
+[data-session-actions] {
+  align-self: center !important;
+}
+
+/* =========================
+   SESSION ROW HEIGHT + TEXT STACK FINAL TIGHTEN
+   ========================= */
+
+/* each session item needs enough vertical room */
+.nova-session-item,
+.nova-session-row,
+.nova-session-card,
+.nova-session-entry,
+[data-session-list] > * {
+  min-height: 56px !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  align-items: stretch !important;
+  box-sizing: border-box !important;
+}
+
+/* text column */
+.nova-session-main,
+.nova-session-content,
+.nova-session-text,
+.nova-session-body,
+.nova-session-title-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  gap: 4px !important;
+  min-height: 40px !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+/* main title */
+.nova-session-title,
+.nova-session-name,
+.nova-session-label {
+  display: block !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 13px !important;
+  line-height: 1.25 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* subtitle/meta */
+.nova-session-preview,
+.nova-session-subtitle,
+.nova-session-meta {
+  display: block !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  opacity: 0.72 !important;
+}
+
+/* prevent nested spans from messing with line boxes */
+.nova-session-title *,
+.nova-session-name *,
+.nova-session-label *,
+.nova-session-preview *,
+.nova-session-subtitle *,
+.nova-session-meta * {
+  display: inline !important;
+  position: static !important;
+  line-height: inherit !important;
+  vertical-align: baseline !important;
+}
+
+/* keep actions vertically centered without crushing text */
+.nova-session-actions,
+.nova-rail-actions,
+[data-session-actions] {
+  align-self: center !important;
+  margin-left: 8px !important;
+}
+
+/* =========================
+   SESSION TITLE / SUBTITLE TRUE SEPARATION FIX
+   ========================= */
+
+/* force container to stack vertically */
+.nova-session-main,
+.nova-session-content,
+.nova-session-title-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  gap: 3px !important;
+}
+
+/* TITLE */
+.nova-session-title {
+  display: block !important;
+  width: 100% !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.3 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* SUBTITLE (this is the key fix) */
+.nova-session-preview,
+.nova-session-subtitle,
+.nova-session-meta {
+  display: block !important;        /* 🔥 FORCE NEW LINE */
+  width: 100% !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  margin-top: 2px !important;       /* spacing from title */
+  opacity: 0.7;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* 🚨 CRITICAL: if subtitle is inline text inside same node */
+.nova-session-title + *,
+.nova-session-name + * {
+  display: block !important;
+  margin-top: 2px !important;
+}
+
+/* =========================
+   SESSION RAIL REAL MARKUP FIX
+   ========================= */
+
+.nova-session-list,
+[data-session-list] {
+  overflow-x: hidden;
+}
+
+.nova-session-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.nova-session-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  overflow: hidden;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.nova-session-title-row,
+.nova-session-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+.nova-session-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nova-session-count {
+  flex: 0 0 auto;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.nova-session-preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.72;
+}
+
+.nova-session-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: fit-content;
+}
+
+.nova-session-action {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+/* =========================
+   SESSION RAIL FINAL TEXT WIDTH FIX
+   ========================= */
+
+.nova-session-main {
+  gap: 2px;
+}
+
+.nova-session-meta-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  width: 100%;
+}
+
+.nova-session-count,
+.nova-session-preview {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.nova-session-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =========================
+   SESSION COUNT BADGE POLISH
+   ========================= */
+
+.nova-session-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+.nova-session-count {
+  flex: 0 0 auto;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.75);
+  white-space: nowrap;
+}
+
+/* preview gets priority width */
+.nova-session-preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =========================
+   SESSION RAIL BASE (CLEAN RESET)
+   ========================= */
+
+.nova-session-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+}
+
+.nova-session-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.nova-session-title {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nova-session-meta-row {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.nova-session-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nova-session-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.nova-session-action {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* SESSION RAIL CLEAN BASE */
+
+.nova-session-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+}
+
+.nova-session-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.nova-session-title-row,
+.nova-session-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.nova-session-title,
+.nova-session-preview {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nova-session-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.nova-session-meta-row {
+  font-size: 11px;
+  opacity: 0.72;
+}
+
+.nova-session-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+}
+
+.nova-session-action {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* === FORCE SESSION CLICKABILITY === */
+
+.nova-session-item,
+.nova-session-main {
+  position: relative;
+  z-index: 5;
+  pointer-events: auto;
+}
+
+/* Kill any invisible overlays */
+.nova-left-sidebar::before,
+.nova-left-sidebar::after,
+.nova-sidebar-backdrop {
+  pointer-events: none !important;
+}
+
+/* Make sure buttons are clickable */
+.nova-session-main {
+  cursor: pointer;
+}
+
+/* === SESSION RAIL CLICK FORCE FIX === */
+
+
+/* kill invisible blockers */
+.nova-left-sidebar::before,
+.nova-left-sidebar::after,
+.nova-sidebar-backdrop,
+.nova-sidebar-backdrop::before,
+.nova-sidebar-backdrop::after,
+[data-sidebar-backdrop],
+[data-left-rail-overlay],
+[data-overlay],
+[data-backdrop] {
+  pointer-events: none !important;
+}
+
+/* === SESSION RAIL HITBOX FIX === */
+
+.nova-session-item {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  column-gap: 8px !important;
+}
+
+.nova-session-main {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  position: relative !important;
+  z-index: 1 !important;
+  pointer-events: auto !important;
+}
+
+.nova-session-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  position: relative !important;
+  z-index: 2 !important;
+  flex: 0 0 auto !important;
+  pointer-events: auto !important;
+}
+
+.nova-session-action {
+  position: relative !important;
+  z-index: 3 !important;
+  pointer-events: auto !important;
+}

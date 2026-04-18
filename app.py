@@ -727,12 +727,12 @@ def api_chat():
                 viewer["body"] = text
                 artifact_payload["viewer"] = viewer
 
-                artifact_service.create(
-                    kind=artifact_payload.get("kind", "chat"),
-                    title=artifact_payload.get("title", "Generated Artifact"),
-                    session_id=session_id,
-                    payload=artifact_payload,
-                )
+                artifact_payload["kind"] = artifact_payload.get("kind", "chat")
+                artifact_payload["title"] = artifact_payload.get("title", "Generated Artifact")
+                artifact_payload["session_id"] = session_id
+
+                artifact_service.save_artifact(artifact_payload)
+
             except Exception as e:
                 result.setdefault("debug", {})
                 result["debug"]["artifact_persist_error"] = str(e)

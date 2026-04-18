@@ -773,6 +773,2081 @@
       "id": "artifact_13be0f55ac344f19b39042959a1f3bfe",
       "updated_at": "2026-04-15T17:45:39.324459+00:00",
       "created_at": "2026-04-15T17:45:39.324459+00:00"
+    },
+    {
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "kind": "execution_run",
+      "title": "Execution Plan",
+      "body": "Goal: plan the next steps to fix working-state panel hydration\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nCurrent step: Inspect the current state and constraints",
+      "viewer": {
+        "kind": "execution_run",
+        "title": "Execution Plan",
+        "body": "Goal: plan the next steps to fix working-state panel hydration\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nCurrent step: Inspect the current state and constraints",
+        "meta": {
+          "status": "running",
+          "goal": "plan the next steps to fix working-state panel hydration",
+          "current_step": "Inspect the current state and constraints",
+          "result": "",
+          "error": "",
+          "steps": [
+            {
+              "id": "step_1",
+              "text": "Inspect the current state and constraints",
+              "status": "running",
+              "notes": "",
+              "started_at": "2026-04-17T18:03:49.790349+00:00",
+              "completed_at": "",
+              "meta": {}
+            },
+            {
+              "id": "step_2",
+              "text": "Choose the safest implementation path",
+              "status": "pending",
+              "notes": "",
+              "started_at": "",
+              "completed_at": "",
+              "meta": {}
+            },
+            {
+              "id": "step_3",
+              "text": "Apply the required change",
+              "status": "pending",
+              "notes": "",
+              "started_at": "",
+              "completed_at": "",
+              "meta": {}
+            },
+            {
+              "id": "step_4",
+              "text": "Verify the result",
+              "status": "pending",
+              "notes": "",
+              "started_at": "",
+              "completed_at": "",
+              "meta": {}
+            },
+            {
+              "id": "step_5",
+              "text": "Summarize outcome and next move",
+              "status": "pending",
+              "notes": "",
+              "started_at": "",
+              "completed_at": "",
+              "meta": {}
+            }
+          ],
+          "created_at": "2026-04-17T18:03:49.790349+00:00",
+          "updated_at": "2026-04-17T18:03:49.790349+00:00"
+        }
+      },
+      "meta": {
+        "execution_id": "exec_d684b939f5b2",
+        "status": "running",
+        "goal": "plan the next steps to fix working-state panel hydration",
+        "current_step": "Inspect the current state and constraints",
+        "steps": [
+          {
+            "id": "step_1",
+            "text": "Inspect the current state and constraints",
+            "status": "running",
+            "notes": "",
+            "started_at": "2026-04-17T18:03:49.790349+00:00",
+            "completed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_2",
+            "text": "Choose the safest implementation path",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_3",
+            "text": "Apply the required change",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_4",
+            "text": "Verify the result",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_5",
+            "text": "Summarize outcome and next move",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "meta": {}
+          }
+        ],
+        "result": "",
+        "error": ""
+      },
+      "id": "artifact_549edb712d6f4e7ab116090025318a57",
+      "updated_at": "2026-04-17T18:03:49.791818+00:00",
+      "created_at": "2026-04-17T18:03:49.791818+00:00"
+    },
+    {
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "kind": "execution_run",
+      "title": "Execution Plan",
+      "body": "Goal: plan the next steps to fix working-state panel hydration\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nCurrent step: Inspect the current state and constraints",
+      "viewer": {
+        "kind": "execution_run",
+        "title": "Execution Plan",
+        "body": "Goal: plan the next steps to fix working-state panel hydration\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nCurrent step: Inspect the current state and constraints",
+        "meta": {
+          "status": "running",
+          "goal": "plan the next steps to fix working-state panel hydration",
+          "current_step": "Inspect the current state and constraints",
+          "result": "",
+          "error": "",
+          "steps": [
+            {
+              "id": "step_1",
+              "text": "Inspect the current state and constraints",
+              "status": "running",
+              "notes": "",
+              "started_at": "2026-04-17T18:07:30.759547+00:00",
+              "completed_at": "",
+              "meta": {}
+            },
+            {
+              "id": "step_2",
+              "text": "Choose the safest implementation path",
+              "status": "pending",
+              "notes": "",
+              "started_at": "",
+              "completed_at": "",
+              "meta": {}
+            },
+            {
+              "id": "step_3",
+              "text": "Apply the required change",
+              "status": "pending",
+              "notes": "",
+              "started_at": "",
+              "completed_at": "",
+              "meta": {}
+            },
+            {
+              "id": "step_4",
+              "text": "Verify the result",
+              "status": "pending",
+              "notes": "",
+              "started_at": "",
+              "completed_at": "",
+              "meta": {}
+            },
+            {
+              "id": "step_5",
+              "text": "Summarize outcome and next move",
+              "status": "pending",
+              "notes": "",
+              "started_at": "",
+              "completed_at": "",
+              "meta": {}
+            }
+          ],
+          "created_at": "2026-04-17T18:07:30.759547+00:00",
+          "updated_at": "2026-04-17T18:07:30.759547+00:00"
+        }
+      },
+      "meta": {
+        "execution_id": "exec_f0b5a0ad0a82",
+        "status": "running",
+        "goal": "plan the next steps to fix working-state panel hydration",
+        "current_step": "Inspect the current state and constraints",
+        "steps": [
+          {
+            "id": "step_1",
+            "text": "Inspect the current state and constraints",
+            "status": "running",
+            "notes": "",
+            "started_at": "2026-04-17T18:07:30.759547+00:00",
+            "completed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_2",
+            "text": "Choose the safest implementation path",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_3",
+            "text": "Apply the required change",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_4",
+            "text": "Verify the result",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_5",
+            "text": "Summarize outcome and next move",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "meta": {}
+          }
+        ],
+        "result": "",
+        "error": ""
+      },
+      "id": "artifact_d531bae00348454b9f54d039f6a5f254",
+      "updated_at": "2026-04-17T18:07:30.760571+00:00",
+      "created_at": "2026-04-17T18:07:30.760571+00:00"
+    },
+    {
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: plan the next steps to fix working-state panel hydration\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nCurrent step: Inspect the current state and constraints",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: plan the next steps to fix working-state panel hydration\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nCurrent step: Inspect the current state and constraints",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "meta": {
+        "execution_id": "exec_0e8ac448a552",
+        "status": "running",
+        "goal": "plan the next steps to fix working-state panel hydration",
+        "current_step": "Inspect the current state and constraints",
+        "steps": [
+          {
+            "id": "step_1",
+            "text": "Inspect the current state and constraints",
+            "status": "running",
+            "notes": "",
+            "started_at": "2026-04-17T18:13:14.807772+00:00",
+            "completed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_2",
+            "text": "Choose the safest implementation path",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_3",
+            "text": "Apply the required change",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_4",
+            "text": "Verify the result",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_5",
+            "text": "Summarize outcome and next move",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "meta": {}
+          }
+        ],
+        "result": "",
+        "error": ""
+      },
+      "id": "artifact_37ec371cc84e49f3a3220c481bed3a66",
+      "updated_at": "2026-04-17T18:13:14.962813+00:00",
+      "created_at": "2026-04-17T18:13:14.808827+00:00",
+      "group": "Other",
+      "preview": "Goal: plan the next steps to fix working-state panel hydration\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest i",
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: plan the next steps to fix working-state panel hydration\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\n\nCurrent step: Inspect the current state and constraints",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: plan the next steps to fix working-state panel hydration\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\n\nCurrent step: Inspect the current state and constraints",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "meta": {
+        "execution_id": "exec_ec5015dcfb09",
+        "status": "running",
+        "goal": "plan the next steps to fix working-state panel hydration",
+        "current_step": "Inspect the current state and constraints",
+        "steps": [
+          {
+            "id": "step_1",
+            "text": "Inspect the current state and constraints",
+            "status": "running",
+            "notes": "",
+            "started_at": "2026-04-17T18:28:24.607189+00:00",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_2",
+            "text": "Choose the safest implementation path",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_3",
+            "text": "Apply the required change",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_4",
+            "text": "Verify the result",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_5",
+            "text": "Summarize outcome and next move",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          }
+        ],
+        "result": "",
+        "error": ""
+      },
+      "id": "artifact_f55aa0b38b584bffb44fe8e5c7835d5f",
+      "updated_at": "2026-04-17T18:28:24.740538+00:00",
+      "created_at": "2026-04-17T18:28:24.608731+00:00",
+      "group": "Other",
+      "preview": "Goal: plan the next steps to fix working-state panel hydration\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest i",
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: advance execution\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\n\nCurrent step: Inspect the current state and constraints",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: advance execution\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\n\nCurrent step: Inspect the current state and constraints",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "meta": {
+        "execution_id": "exec_138ded7ebc0d",
+        "status": "running",
+        "goal": "advance execution",
+        "current_step": "Inspect the current state and constraints",
+        "steps": [
+          {
+            "id": "step_1",
+            "text": "Inspect the current state and constraints",
+            "status": "running",
+            "notes": "",
+            "started_at": "2026-04-17T18:28:30.237362+00:00",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_2",
+            "text": "Choose the safest implementation path",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_3",
+            "text": "Apply the required change",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_4",
+            "text": "Verify the result",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_5",
+            "text": "Summarize outcome and next move",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          }
+        ],
+        "result": "",
+        "error": ""
+      },
+      "id": "artifact_8e3893b4f81e4a79b47a3554bb95467c",
+      "updated_at": "2026-04-17T18:28:30.383826+00:00",
+      "created_at": "2026-04-17T18:28:30.238135+00:00",
+      "group": "Other",
+      "preview": "Goal: advance execution\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the requir",
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: advance execution\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\n\nCurrent step: Inspect the current state and constraints",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: advance execution\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\n\nCurrent step: Inspect the current state and constraints",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "meta": {
+        "execution_id": "exec_a31c9d29b748",
+        "status": "running",
+        "goal": "advance execution",
+        "current_step": "Inspect the current state and constraints",
+        "steps": [
+          {
+            "id": "step_1",
+            "text": "Inspect the current state and constraints",
+            "status": "running",
+            "notes": "",
+            "started_at": "2026-04-17T18:30:39.218334+00:00",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_2",
+            "text": "Choose the safest implementation path",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_3",
+            "text": "Apply the required change",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_4",
+            "text": "Verify the result",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_5",
+            "text": "Summarize outcome and next move",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          }
+        ],
+        "result": "",
+        "error": ""
+      },
+      "id": "artifact_86c8a079a793486bbd5e84b2efb7daaf",
+      "updated_at": "2026-04-17T18:30:39.355709+00:00",
+      "created_at": "2026-04-17T18:30:39.219111+00:00",
+      "group": "Other",
+      "preview": "Goal: advance execution\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the requir",
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the required change\n[>] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 3/5 complete\n\nCurrent step:",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "meta": {
+        "execution_id": "exec_a31c9d29b748",
+        "status": "running",
+        "goal": "advance execution",
+        "current_step": "Inspect the current state and constraints",
+        "steps": [
+          {
+            "id": "step_1",
+            "text": "Inspect the current state and constraints",
+            "status": "running",
+            "notes": "",
+            "started_at": "2026-04-17T18:30:39.218334+00:00",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_2",
+            "text": "Choose the safest implementation path",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_3",
+            "text": "Apply the required change",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_4",
+            "text": "Verify the result",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_5",
+            "text": "Summarize outcome and next move",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          }
+        ],
+        "result": "",
+        "error": "",
+        "auto_executed": true,
+        "done": 3,
+        "total": 5
+      },
+      "id": "artifact_7023a04bb5ad462b98801bd6349bd5ed",
+      "updated_at": "2026-04-18T08:20:32.913312+00:00",
+      "created_at": "2026-04-18T08:20:32.763308+00:00",
+      "group": "Other",
+      "preview": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the requir",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the required change\n[>] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 3/5 complete\n\nCurrent step:",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the required change\n[x] Verify the result\n[x] Summarize outcome and next move\n\nProgress: 5/5 complete\n\nCurrent step:",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "meta": {
+        "execution_id": "exec_a31c9d29b748",
+        "status": "running",
+        "goal": "advance execution",
+        "current_step": "Inspect the current state and constraints",
+        "steps": [
+          {
+            "id": "step_1",
+            "text": "Inspect the current state and constraints",
+            "status": "running",
+            "notes": "",
+            "started_at": "2026-04-17T18:30:39.218334+00:00",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_2",
+            "text": "Choose the safest implementation path",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_3",
+            "text": "Apply the required change",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_4",
+            "text": "Verify the result",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_5",
+            "text": "Summarize outcome and next move",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          }
+        ],
+        "result": "",
+        "error": "",
+        "auto_executed": true,
+        "done": 5,
+        "total": 5
+      },
+      "id": "artifact_a633dda6ae79429c8b8bcf777c55a909",
+      "updated_at": "2026-04-18T08:21:26.761455+00:00",
+      "created_at": "2026-04-18T08:21:26.548030+00:00",
+      "group": "Other",
+      "preview": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the requir",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the required change\n[x] Verify the result\n[x] Summarize outcome and next move\n\nProgress: 5/5 complete\n\nCurrent step:",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the required change\n[x] Verify the result\n[x] Summarize outcome and next move\n\nProgress: 5/5 complete\n\nCurrent step:",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "meta": {
+        "execution_id": "exec_a31c9d29b748",
+        "status": "running",
+        "goal": "advance execution",
+        "current_step": "Inspect the current state and constraints",
+        "steps": [
+          {
+            "id": "step_1",
+            "text": "Inspect the current state and constraints",
+            "status": "running",
+            "notes": "",
+            "started_at": "2026-04-17T18:30:39.218334+00:00",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_2",
+            "text": "Choose the safest implementation path",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_3",
+            "text": "Apply the required change",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_4",
+            "text": "Verify the result",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_5",
+            "text": "Summarize outcome and next move",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          }
+        ],
+        "result": "",
+        "error": "",
+        "auto_executed": true,
+        "done": 5,
+        "total": 5
+      },
+      "id": "artifact_4f68287931fe45618bff754dc6bb8dd3",
+      "updated_at": "2026-04-18T08:24:44.346083+00:00",
+      "created_at": "2026-04-18T08:24:44.200074+00:00",
+      "group": "Other",
+      "preview": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the requir",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the required change\n[x] Verify the result\n[x] Summarize outcome and next move\n\nProgress: 5/5 complete\n\nCurrent step:",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the required change\n[x] Verify the result\n[x] Summarize outcome and next move\n\nProgress: 5/5 complete\n\nCurrent step:",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "meta": {
+        "execution_id": "exec_a31c9d29b748",
+        "status": "running",
+        "goal": "advance execution",
+        "current_step": "Inspect the current state and constraints",
+        "steps": [
+          {
+            "id": "step_1",
+            "text": "Inspect the current state and constraints",
+            "status": "running",
+            "notes": "",
+            "started_at": "2026-04-17T18:30:39.218334+00:00",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_2",
+            "text": "Choose the safest implementation path",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_3",
+            "text": "Apply the required change",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_4",
+            "text": "Verify the result",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_5",
+            "text": "Summarize outcome and next move",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          }
+        ],
+        "result": "",
+        "error": "",
+        "auto_executed": true,
+        "done": 5,
+        "total": 5,
+        "executed_steps": [],
+        "paused": false,
+        "complete": true
+      },
+      "id": "artifact_ee93458fda8f4fcc9aab0af7edaeb136",
+      "updated_at": "2026-04-18T08:28:31.632937+00:00",
+      "created_at": "2026-04-18T08:28:31.487730+00:00",
+      "group": "Other",
+      "preview": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the requir",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the required change\n[x] Verify the result\n[x] Summarize outcome and next move\n\nProgress: 5/5 complete\n\nCurrent step:",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the required change\n[x] Verify the result\n[x] Summarize outcome and next move\n\nProgress: 5/5 complete\n\nCurrent step: (complete)",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "meta": {
+        "execution_id": "exec_a31c9d29b748",
+        "status": "running",
+        "goal": "advance execution",
+        "current_step": "Inspect the current state and constraints",
+        "steps": [
+          {
+            "id": "step_1",
+            "text": "Inspect the current state and constraints",
+            "status": "running",
+            "notes": "",
+            "started_at": "2026-04-17T18:30:39.218334+00:00",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_2",
+            "text": "Choose the safest implementation path",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_3",
+            "text": "Apply the required change",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_4",
+            "text": "Verify the result",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_5",
+            "text": "Summarize outcome and next move",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          }
+        ],
+        "result": "",
+        "error": "",
+        "auto_executed": true,
+        "done": 5,
+        "total": 5,
+        "executed_steps": [],
+        "paused": false,
+        "complete": true
+      },
+      "id": "artifact_5fed055340a144deadfd4eef65244e3c",
+      "updated_at": "2026-04-18T08:30:57.675520+00:00",
+      "created_at": "2026-04-18T08:30:57.528650+00:00",
+      "group": "Other",
+      "preview": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the requir",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the required change\n[x] Verify the result\n[x] Summarize outcome and next move\n\nProgress: 5/5 complete\n\nCurrent step: (complete)",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the required change\n[x] Verify the result\n[x] Summarize outcome and next move\n\nProgress: 5/5 complete\n\nCurrent step: (complete)",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "meta": {
+        "execution_id": "exec_a31c9d29b748",
+        "status": "running",
+        "goal": "advance execution",
+        "current_step": "Inspect the current state and constraints",
+        "steps": [
+          {
+            "id": "step_1",
+            "text": "Inspect the current state and constraints",
+            "status": "running",
+            "notes": "",
+            "started_at": "2026-04-17T18:30:39.218334+00:00",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_2",
+            "text": "Choose the safest implementation path",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_3",
+            "text": "Apply the required change",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_4",
+            "text": "Verify the result",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          },
+          {
+            "id": "step_5",
+            "text": "Summarize outcome and next move",
+            "status": "pending",
+            "notes": "",
+            "started_at": "",
+            "completed_at": "",
+            "blocked_at": "",
+            "failed_at": "",
+            "meta": {}
+          }
+        ],
+        "result": "",
+        "error": "",
+        "auto_executed": true,
+        "done": 5,
+        "total": 5,
+        "executed_steps": [],
+        "paused": false,
+        "complete": true
+      },
+      "id": "artifact_e2db24c77fc64f198d340ec4f1d63604",
+      "updated_at": "2026-04-18T08:35:43.043693+00:00",
+      "created_at": "2026-04-18T08:35:42.901059+00:00",
+      "group": "Other",
+      "preview": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the requir",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: advance execution\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the required change\n[x] Verify the result\n[x] Summarize outcome and next move\n\nProgress: 5/5 complete\n\nCurrent step: (complete)",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "execution",
+      "title": "Execution Plan",
+      "body": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: (idle)",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "meta": {
+        "auto_generated": true,
+        "done": 0,
+        "total": 5
+      },
+      "id": "artifact_7a1de678ea164f6581f20bbff8e8d0c1",
+      "updated_at": "2026-04-18T08:48:32.564764+00:00",
+      "created_at": "2026-04-18T08:48:32.564764+00:00"
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: debug a bug in my code\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the required change\n[x] Verify the result\n[x] Summarize outcome and next move\n\nProgress: 5/5 complete\nCurrent step: (complete)",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "meta": {
+        "auto_generated": true,
+        "done": 5,
+        "total": 5,
+        "auto_executed": true,
+        "executed_steps": [
+          "Inspect the current state and constraints",
+          "Choose the safest implementation path",
+          "Apply the required change",
+          "Verify the result",
+          "Summarize outcome and next move"
+        ],
+        "paused": false,
+        "complete": true
+      },
+      "id": "artifact_ef5863734309406dbaf40985630c0e3f",
+      "updated_at": "2026-04-18T08:48:32.728350+00:00",
+      "created_at": "2026-04-18T08:48:32.575981+00:00",
+      "group": "Other",
+      "preview": "Goal: debug a bug in my code\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the r",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: debug a bug in my code\n\nSteps:\n[x] Inspect the current state and constraints\n[x] Choose the safest implementation path\n[x] Apply the required change\n[x] Verify the result\n[x] Summarize outcome and next move\n\nProgress: 5/5 complete\nCurrent step: (complete)",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+      "summary": "Execution plan for: debug a bug in my code",
+      "preview": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the r",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "source": "execution",
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 0,
+        "total": 5,
+        "paused": false
+      },
+      "id": "artifact_117d3e6fd23b4c83a120aecc421ffe55",
+      "updated_at": "2026-04-18T12:50:49.013900+00:00",
+      "created_at": "2026-04-18T12:50:48.852070+00:00",
+      "group": "Other",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: \n\nSteps:\n\nProgress: 0/0 complete\nCurrent step: complete",
+      "summary": "Execution plan for: debug a bug in my code",
+      "preview": "Goal: \n\nSteps:\n\nProgress: 0/0 complete\nCurrent step: complete",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "source": "execution",
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 0,
+        "total": 5,
+        "paused": false
+      },
+      "id": "artifact_71ca7a1ac2014c88a1f57ed0aa5f93b2",
+      "updated_at": "2026-04-18T13:46:05.731013+00:00",
+      "created_at": "2026-04-18T12:54:31.795259+00:00",
+      "group": "Other",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: \n\nSteps:\n\nProgress: 0/0 complete\nCurrent step: complete",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false,
+      "execution": {
+        "goal": "",
+        "steps": [],
+        "current_step_index": 0,
+        "status": "complete",
+        "progress": 0,
+        "current_step": "complete"
+      }
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+      "summary": "Execution plan for: debug a bug in my code",
+      "preview": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the r",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "source": "execution",
+      "execution": {
+        "goal": "debug a bug in my code",
+        "steps": [
+          {
+            "title": "Inspect the current state and constraints",
+            "status": "current"
+          },
+          {
+            "title": "Choose the safest implementation path",
+            "status": "pending"
+          },
+          {
+            "title": "Apply the required change",
+            "status": "pending"
+          },
+          {
+            "title": "Verify the result",
+            "status": "pending"
+          },
+          {
+            "title": "Summarize outcome and next move",
+            "status": "pending"
+          }
+        ],
+        "current_step_index": 0,
+        "progress": 0,
+        "current_step": "Inspect the current state and constraints",
+        "status": "running"
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 0,
+        "total": 5,
+        "paused": false
+      },
+      "id": "artifact_e2da2d6786dc41729a04265c4289caad",
+      "updated_at": "2026-04-18T14:06:32.601792+00:00",
+      "created_at": "2026-04-18T14:06:32.345906+00:00",
+      "group": "Other",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+      "summary": "Execution plan for: debug a bug in my code",
+      "preview": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the r",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "source": "execution",
+      "execution": {
+        "goal": "debug a bug in my code",
+        "steps": [
+          {
+            "title": "Inspect the current state and constraints",
+            "status": "current"
+          },
+          {
+            "title": "Choose the safest implementation path",
+            "status": "pending"
+          },
+          {
+            "title": "Apply the required change",
+            "status": "pending"
+          },
+          {
+            "title": "Verify the result",
+            "status": "pending"
+          },
+          {
+            "title": "Summarize outcome and next move",
+            "status": "pending"
+          }
+        ],
+        "current_step_index": 0,
+        "progress": 0,
+        "current_step": "Inspect the current state and constraints",
+        "status": "running"
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 0,
+        "total": 5,
+        "paused": false
+      },
+      "id": "artifact_3f5ea7c93b264a3a840c03d8370452f3",
+      "updated_at": "2026-04-18T14:08:29.115710+00:00",
+      "created_at": "2026-04-18T14:08:28.873328+00:00",
+      "group": "Other",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: debug a bug in my code\nrun it\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+      "summary": "Execution plan for: debug a bug in my code\nrun it",
+      "preview": "Goal: debug a bug in my code\nrun it\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Appl",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "source": "execution",
+      "execution": {
+        "goal": "debug a bug in my code\nrun it",
+        "steps": [
+          {
+            "title": "Inspect the current state and constraints",
+            "status": "current"
+          },
+          {
+            "title": "Choose the safest implementation path",
+            "status": "pending"
+          },
+          {
+            "title": "Apply the required change",
+            "status": "pending"
+          },
+          {
+            "title": "Verify the result",
+            "status": "pending"
+          },
+          {
+            "title": "Summarize outcome and next move",
+            "status": "pending"
+          }
+        ],
+        "current_step_index": 0,
+        "progress": 0,
+        "current_step": "Inspect the current state and constraints",
+        "status": "running"
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 0,
+        "total": 5,
+        "paused": false
+      },
+      "id": "artifact_99fab0f35e3b44708e22924d400760a1",
+      "updated_at": "2026-04-18T14:09:05.202633+00:00",
+      "created_at": "2026-04-18T14:09:04.953994+00:00",
+      "group": "Other",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: debug a bug in my code\nrun it\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+      "summary": "Execution plan for: debug a bug in my code",
+      "preview": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the r",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "source": "execution",
+      "execution": {
+        "goal": "debug a bug in my code",
+        "steps": [
+          {
+            "title": "Inspect the current state and constraints",
+            "status": "current"
+          },
+          {
+            "title": "Choose the safest implementation path",
+            "status": "pending"
+          },
+          {
+            "title": "Apply the required change",
+            "status": "pending"
+          },
+          {
+            "title": "Verify the result",
+            "status": "pending"
+          },
+          {
+            "title": "Summarize outcome and next move",
+            "status": "pending"
+          }
+        ],
+        "current_step_index": 0,
+        "progress": 0,
+        "current_step": "Inspect the current state and constraints",
+        "status": "running"
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 0,
+        "total": 5,
+        "paused": false
+      },
+      "id": "artifact_eac97cfc56b947e5917c631e4e87fb75",
+      "updated_at": "2026-04-18T14:13:40.890935+00:00",
+      "created_at": "2026-04-18T14:13:40.733588+00:00",
+      "group": "Other",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: debug a bug in my code\n\nSteps:\n[✓] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 1/5 complete\nCurrent step: Choose the safest implementation path",
+      "summary": "Execution plan for: debug a bug in my code",
+      "preview": "Goal: debug a bug in my code\n\nSteps:\n[✓] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the r",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "source": "execution",
+      "execution": {
+        "goal": "debug a bug in my code",
+        "steps": [
+          {
+            "title": "Inspect the current state and constraints",
+            "status": "done"
+          },
+          {
+            "title": "Choose the safest implementation path",
+            "status": "pending"
+          },
+          {
+            "title": "Apply the required change",
+            "status": "pending"
+          },
+          {
+            "title": "Verify the result",
+            "status": "pending"
+          },
+          {
+            "title": "Summarize outcome and next move",
+            "status": "pending"
+          }
+        ],
+        "current_step_index": 1,
+        "progress": 1,
+        "current_step": "Choose the safest implementation path",
+        "status": "running"
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 0,
+        "total": 5,
+        "paused": false
+      },
+      "id": "artifact_5d1a9fc86a14427cbcd716f803786a73",
+      "updated_at": "2026-04-18T14:44:44.830265+00:00",
+      "created_at": "2026-04-18T14:44:43.520836+00:00",
+      "group": "Other",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: debug a bug in my code\n\nSteps:\n[✓] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 1/5 complete\nCurrent step: Choose the safest implementation path",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: debug a bug in my code and run all\n\nSteps:\n[✓] Inspect the current state and constraints\n[✓] Choose the safest implementation path\n[✓] Apply the required change\n[✓] Verify the result\n[✓] Summarize outcome and next move\n\nProgress: 5/5 complete\nCurrent step: complete",
+      "summary": "Execution plan for: debug a bug in my code and run all",
+      "preview": "Goal: debug a bug in my code and run all\n\nSteps:\n[✓] Inspect the current state and constraints\n[✓] Choose the safest implementation path\n[✓]",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "source": "execution",
+      "execution": {
+        "goal": "debug a bug in my code and run all",
+        "steps": [
+          {
+            "title": "Inspect the current state and constraints",
+            "status": "done"
+          },
+          {
+            "title": "Choose the safest implementation path",
+            "status": "done"
+          },
+          {
+            "title": "Apply the required change",
+            "status": "done"
+          },
+          {
+            "title": "Verify the result",
+            "status": "done"
+          },
+          {
+            "title": "Summarize outcome and next move",
+            "status": "done"
+          }
+        ],
+        "current_step_index": 5,
+        "progress": 5,
+        "current_step": "complete",
+        "status": "complete"
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 0,
+        "total": 5,
+        "paused": false
+      },
+      "id": "artifact_e18cb5047fcc4f6a9be8efc4d3c6985f",
+      "updated_at": "2026-04-18T14:50:37.668349+00:00",
+      "created_at": "2026-04-18T14:49:43.213965+00:00",
+      "group": "Other",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: debug a bug in my code and run all\n\nSteps:\n[✓] Inspect the current state and constraints\n[✓] Choose the safest implementation path\n[✓] Apply the required change\n[✓] Verify the result\n[✓] Summarize outcome and next move\n\nProgress: 5/5 complete\nCurrent step: complete",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: debug a bug in my code\n\nSteps:\n[✓] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 1/5 complete\nCurrent step: Choose the safest implementation path\n\nLast step output:\n1. What I did\n- Inspected the stated task state, active file, and bug focus.\n- Identified the likely debugging boundary: backend session `working_state` in `services/chat_service.py` must contain row data in the shape the frontend panel expects.\n- Noted constraints from context:\n  - Continuity replies already work, so general chat/session flow is likely intact.\n  - The backend/frontend bridge is considered stable, so the issue is likely row hydration payload shape, persistence, or mapping rather than transport.\n  - Immediate next move is to verify whether rows render from session `working_state`.\n\n2. Result\n- Current debugging target is narrowed to “panel row hydration” specifically at the point where `working_state` is read, serialized, or transformed for the frontend.\n- Most probable failure points:\n  - Rows are not being saved into `working_state`.\n  - Rows exist in `working_state` but under the wrong key/path.\n  - Rows are present but in a schema the frontend renderer does not recognize.\n  - Hydration code in `chat_service.py` is not including panel rows when building the response.\n\n3. Next implication\n- Safest next step: inspect `chat_service.py` for:\n  - where `session.working_state` is written,\n  - where response payloads are built,\n  - and whether panel rows are copied from session state into the outgoing response.\n- Then verify with a concrete session dump/log:\n  - `working_state` contains expected rows,\n  - response JSON includes them,\n  - and key names/types match frontend expectations.",
+      "summary": "Execution plan for: debug a bug in my code",
+      "preview": "Goal: debug a bug in my code\n\nSteps:\n[✓] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the r",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "source": "execution",
+      "execution": {
+        "goal": "debug a bug in my code",
+        "steps": [
+          {
+            "title": "Inspect the current state and constraints",
+            "status": "done"
+          },
+          {
+            "title": "Choose the safest implementation path",
+            "status": "pending"
+          },
+          {
+            "title": "Apply the required change",
+            "status": "pending"
+          },
+          {
+            "title": "Verify the result",
+            "status": "pending"
+          },
+          {
+            "title": "Summarize outcome and next move",
+            "status": "pending"
+          }
+        ],
+        "current_step_index": 1,
+        "progress": 1,
+        "current_step": "Choose the safest implementation path",
+        "status": "running",
+        "step_results": [
+          {
+            "index": 0,
+            "title": "Inspect the current state and constraints",
+            "output": "1. What I did\n- Inspected the stated task state, active file, and bug focus.\n- Identified the likely debugging boundary: backend session `working_state` in `services/chat_service.py` must contain row data in the shape the frontend panel expects.\n- Noted constraints from context:\n  - Continuity replies already work, so general chat/session flow is likely intact.\n  - The backend/frontend bridge is considered stable, so the issue is likely row hydration payload shape, persistence, or mapping rather than transport.\n  - Immediate next move is to verify whether rows render from session `working_state`.\n\n2. Result\n- Current debugging target is narrowed to “panel row hydration” specifically at the point where `working_state` is read, serialized, or transformed for the frontend.\n- Most probable failure points:\n  - Rows are not being saved into `working_state`.\n  - Rows exist in `working_state` but under the wrong key/path.\n  - Rows are present but in a schema the frontend renderer does not recognize.\n  - Hydration code in `chat_service.py` is not including panel rows when building the response.\n\n3. Next implication\n- Safest next step: inspect `chat_service.py` for:\n  - where `session.working_state` is written,\n  - where response payloads are built,\n  - and whether panel rows are copied from session state into the outgoing response.\n- Then verify with a concrete session dump/log:\n  - `working_state` contains expected rows,\n  - response JSON includes them,\n  - and key names/types match frontend expectations.",
+            "created_at": "2026-04-18T14:57:25.536487+00:00"
+          }
+        ]
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 0,
+        "total": 5,
+        "paused": false
+      },
+      "id": "artifact_c6803af6f1c6438785430d8dea1e0695",
+      "updated_at": "2026-04-18T14:57:25.709951+00:00",
+      "created_at": "2026-04-18T14:57:15.319636+00:00",
+      "group": "Other",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: debug a bug in my code\n\nSteps:\n[✓] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 1/5 complete\nCurrent step: Choose the safest implementation path\n\nLast step output:\n1. What I did\n- Inspected the stated task state, active file, and bug focus.\n- Identified the likely debugging boundary: backend session `working_state` in `services/chat_service.py` must contain row data in the shape the frontend panel expects.\n- Noted constraints from context:\n  - Continuity replies already work, so general chat/session flow is likely intact.\n  - The backend/frontend bridge is considered stable, so the issue is likely row hydration payload shape, persistence, or mapping rather than transport.\n  - Immediate next move is to verify whether rows render from session `working_state`.\n\n2. Result\n- Current debugging target is narrowed to “panel row hydration” specifically at the point where `working_state` is read, serialized, or transformed for the frontend.\n- Most probable failure points:\n  - Rows are not being saved into `working_state`.\n  - Rows exist in `working_state` but under the wrong key/path.\n  - Rows are present but in a schema the frontend renderer does not recognize.\n  - Hydration code in `chat_service.py` is not including panel rows when building the response.\n\n3. Next implication\n- Safest next step: inspect `chat_service.py` for:\n  - where `session.working_state` is written,\n  - where response payloads are built,\n  - and whether panel rows are copied from session state into the outgoing response.\n- Then verify with a concrete session dump/log:\n  - `working_state` contains expected rows,\n  - response JSON includes them,\n  - and key names/types match frontend expectations.",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "execution_step",
+      "group": "Execution",
+      "title": "Execution Step 1: Inspect the current state and constraints",
+      "summary": "1. What I did\n- Inspected the stated task state, active file, and bug focus.\n- Identified the likely debugging boundary: backend session `working_state` in `services/chat_service.py` must contain row ",
+      "preview": "1. What I did\n- Inspected the stated task state, active file, and bug focus.\n- Identified the likely debugging boundary: backend session `wo",
+      "body": "1. What I did\n- Inspected the stated task state, active file, and bug focus.\n- Identified the likely debugging boundary: backend session `working_state` in `services/chat_service.py` must contain row data in the shape the frontend panel expects.\n- Noted constraints from context:\n  - Continuity replies already work, so general chat/session flow is likely intact.\n  - The backend/frontend bridge is considered stable, so the issue is likely row hydration payload shape, persistence, or mapping rather than transport.\n  - Immediate next move is to verify whether rows render from session `working_state`.\n\n2. Result\n- Current debugging target is narrowed to “panel row hydration” specifically at the point where `working_state` is read, serialized, or transformed for the frontend.\n- Most probable failure points:\n  - Rows are not being saved into `working_state`.\n  - Rows exist in `working_state` but under the wrong key/path.\n  - Rows are present but in a schema the frontend renderer does not recognize.\n  - Hydration code in `chat_service.py` is not including panel rows when building the response.\n\n3. Next implication\n- Safest next step: inspect `chat_service.py` for:\n  - where `session.working_state` is written,\n  - where response payloads are built,\n  - and whether panel rows are copied from session state into the outgoing response.\n- Then verify with a concrete session dump/log:\n  - `working_state` contains expected rows,\n  - response JSON includes them,\n  - and key names/types match frontend expectations.",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "source": "execution_step",
+      "meta": {
+        "goal": "debug a bug in my code",
+        "step_index": 0,
+        "step_title": "Inspect the current state and constraints",
+        "execution_id": ""
+      },
+      "id": "artifact_f2f3b470115948c8ad6c30c8ac6dc0d3",
+      "updated_at": "2026-04-18T14:57:25.537718+00:00",
+      "created_at": "2026-04-18T14:57:25.537718+00:00"
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: debug a bug in my code\n\nSteps:\n[✓] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 1/5 complete\nCurrent step: Choose the safest implementation path\n\nLast step output:\n1. What I did\n- Inspected the current task state, file focus, and bug target from the provided context.\n- Identified the likely debugging boundary: backend `chat_service.py` must supply/normalize `session working_state` in a shape the frontend panel row hydrator expects.\n- Noted constraints:\n  - Active bug is specifically “panel row hydration”.\n  - Last known good behavior is “continuity reply works”, so core chat flow is likely intact.\n  - Checkpoint says backend/frontend bridge is stable, so the issue is more likely data shape/content than transport.\n  - Next intended move is already defined: verify rows render from `session working_state`.\n\n2. Result\n- Current state is consistent with a hydration bug caused by mismatch between:\n  - what `chat_service.py` stores/returns in session `working_state`, and\n  - what the frontend expects to render as panel rows.\n- Safest inspection focus:\n  - where `working_state` is written in `services/chat_service.py`\n  - whether panel rows exist there under the expected key\n  - whether rows are serialized as the expected type/fields\n  - whether continuity logic preserves reply text but drops or mutates panel row data\n- No code change made yet; this step clarifies that the highest-probability failure is row structure persistence, not chat continuity or bridge transport.\n\n3. Next implication\n- Next, inspect `C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py` for:\n  - all reads/writes of `working_state`\n  - any construction of panel/row payloads\n  - any filtering, merging, or serialization that could strip row fields\n- Then compare that backend payload shape against the frontend renderer’s expected row schema to confirm the exact hydration mismatch.",
+      "summary": "Execution plan for: debug a bug in my code",
+      "preview": "Goal: debug a bug in my code\n\nSteps:\n[✓] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the r",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "source": "execution",
+      "execution": {
+        "goal": "debug a bug in my code",
+        "steps": [
+          {
+            "title": "Inspect the current state and constraints",
+            "status": "done"
+          },
+          {
+            "title": "Choose the safest implementation path",
+            "status": "pending"
+          },
+          {
+            "title": "Apply the required change",
+            "status": "pending"
+          },
+          {
+            "title": "Verify the result",
+            "status": "pending"
+          },
+          {
+            "title": "Summarize outcome and next move",
+            "status": "pending"
+          }
+        ],
+        "current_step_index": 1,
+        "progress": 1,
+        "current_step": "Choose the safest implementation path",
+        "status": "running",
+        "step_results": [
+          {
+            "index": 0,
+            "title": "Inspect the current state and constraints",
+            "output": "1. What I did\n- Inspected the current task state, file focus, and bug target from the provided context.\n- Identified the likely debugging boundary: backend `chat_service.py` must supply/normalize `session working_state` in a shape the frontend panel row hydrator expects.\n- Noted constraints:\n  - Active bug is specifically “panel row hydration”.\n  - Last known good behavior is “continuity reply works”, so core chat flow is likely intact.\n  - Checkpoint says backend/frontend bridge is stable, so the issue is more likely data shape/content than transport.\n  - Next intended move is already defined: verify rows render from `session working_state`.\n\n2. Result\n- Current state is consistent with a hydration bug caused by mismatch between:\n  - what `chat_service.py` stores/returns in session `working_state`, and\n  - what the frontend expects to render as panel rows.\n- Safest inspection focus:\n  - where `working_state` is written in `services/chat_service.py`\n  - whether panel rows exist there under the expected key\n  - whether rows are serialized as the expected type/fields\n  - whether continuity logic preserves reply text but drops or mutates panel row data\n- No code change made yet; this step clarifies that the highest-probability failure is row structure persistence, not chat continuity or bridge transport.\n\n3. Next implication\n- Next, inspect `C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py` for:\n  - all reads/writes of `working_state`\n  - any construction of panel/row payloads\n  - any filtering, merging, or serialization that could strip row fields\n- Then compare that backend payload shape against the frontend renderer’s expected row schema to confirm the exact hydration mismatch.",
+            "created_at": "2026-04-18T14:58:22.040426+00:00"
+          }
+        ]
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 0,
+        "total": 5,
+        "paused": false
+      },
+      "id": "artifact_57564cedbc4747d185031783a7bb3292",
+      "updated_at": "2026-04-18T14:58:22.283709+00:00",
+      "created_at": "2026-04-18T14:58:07.326359+00:00",
+      "group": "Other",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: debug a bug in my code\n\nSteps:\n[✓] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 1/5 complete\nCurrent step: Choose the safest implementation path\n\nLast step output:\n1. What I did\n- Inspected the current task state, file focus, and bug target from the provided context.\n- Identified the likely debugging boundary: backend `chat_service.py` must supply/normalize `session working_state` in a shape the frontend panel row hydrator expects.\n- Noted constraints:\n  - Active bug is specifically “panel row hydration”.\n  - Last known good behavior is “continuity reply works”, so core chat flow is likely intact.\n  - Checkpoint says backend/frontend bridge is stable, so the issue is more likely data shape/content than transport.\n  - Next intended move is already defined: verify rows render from `session working_state`.\n\n2. Result\n- Current state is consistent with a hydration bug caused by mismatch between:\n  - what `chat_service.py` stores/returns in session `working_state`, and\n  - what the frontend expects to render as panel rows.\n- Safest inspection focus:\n  - where `working_state` is written in `services/chat_service.py`\n  - whether panel rows exist there under the expected key\n  - whether rows are serialized as the expected type/fields\n  - whether continuity logic preserves reply text but drops or mutates panel row data\n- No code change made yet; this step clarifies that the highest-probability failure is row structure persistence, not chat continuity or bridge transport.\n\n3. Next implication\n- Next, inspect `C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py` for:\n  - all reads/writes of `working_state`\n  - any construction of panel/row payloads\n  - any filtering, merging, or serialization that could strip row fields\n- Then compare that backend payload shape against the frontend renderer’s expected row schema to confirm the exact hydration mismatch.",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
+    },
+    {
+      "kind": "execution_step",
+      "group": "Execution",
+      "title": "Execution Step 1: Inspect the current state and constraints",
+      "summary": "1. What I did\n- Inspected the current task state, file focus, and bug target from the provided context.\n- Identified the likely debugging boundary: backend `chat_service.py` must supply/normalize `ses",
+      "preview": "1. What I did\n- Inspected the current task state, file focus, and bug target from the provided context.\n- Identified the likely debugging bo",
+      "body": "1. What I did\n- Inspected the current task state, file focus, and bug target from the provided context.\n- Identified the likely debugging boundary: backend `chat_service.py` must supply/normalize `session working_state` in a shape the frontend panel row hydrator expects.\n- Noted constraints:\n  - Active bug is specifically “panel row hydration”.\n  - Last known good behavior is “continuity reply works”, so core chat flow is likely intact.\n  - Checkpoint says backend/frontend bridge is stable, so the issue is more likely data shape/content than transport.\n  - Next intended move is already defined: verify rows render from `session working_state`.\n\n2. Result\n- Current state is consistent with a hydration bug caused by mismatch between:\n  - what `chat_service.py` stores/returns in session `working_state`, and\n  - what the frontend expects to render as panel rows.\n- Safest inspection focus:\n  - where `working_state` is written in `services/chat_service.py`\n  - whether panel rows exist there under the expected key\n  - whether rows are serialized as the expected type/fields\n  - whether continuity logic preserves reply text but drops or mutates panel row data\n- No code change made yet; this step clarifies that the highest-probability failure is row structure persistence, not chat continuity or bridge transport.\n\n3. Next implication\n- Next, inspect `C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py` for:\n  - all reads/writes of `working_state`\n  - any construction of panel/row payloads\n  - any filtering, merging, or serialization that could strip row fields\n- Then compare that backend payload shape against the frontend renderer’s expected row schema to confirm the exact hydration mismatch.",
+      "session_id": "session_86c2227fa2b64a5d805a87e496172490",
+      "source": "execution_step",
+      "meta": {
+        "goal": "debug a bug in my code",
+        "step_index": 0,
+        "step_title": "Inspect the current state and constraints",
+        "execution_id": ""
+      },
+      "id": "artifact_1a87241d8243474d94f4bbc0a1a4fe3a",
+      "updated_at": "2026-04-18T14:58:22.042601+00:00",
+      "created_at": "2026-04-18T14:58:22.042601+00:00"
     }
   ]
 }

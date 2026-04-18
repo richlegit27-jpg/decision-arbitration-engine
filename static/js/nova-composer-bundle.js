@@ -914,14 +914,22 @@ function applyStatePayload(payload) {
       })
     : emptyWorkingContext();
 
-  if (data.working_context) {
-    const liveWorkingContext = normalizeWorkingContext(data.working_context);
-    state.workingContext = liveWorkingContext.show
-      ? Object.assign({}, liveWorkingContext, {
-          collapsed: previousWorkingContext.collapsed,
-        })
-      : emptyWorkingContext();
-  }
+const backendWorkingContext =
+  (data.working_context_payload && data.working_context_payload.show
+    ? data.working_context_payload
+    : null) ||
+  (data.working_context && typeof data.working_context === "object"
+    ? data.working_context
+    : null);
+
+if (backendWorkingContext) {
+  const liveWorkingContext = normalizeWorkingContext(backendWorkingContext);
+  state.workingContext = liveWorkingContext.show
+    ? Object.assign({}, liveWorkingContext, {
+        collapsed: previousWorkingContext.collapsed,
+      })
+    : emptyWorkingContext();
+}
 
   if (data.assistant_message) {
     const assistantMsg = normalizeMessage(data.assistant_message);
@@ -1664,6 +1672,7 @@ function renderChat() {
     })
   );
 
+  console.log("workingContextHtml =", workingContextHtml);
   els.chatThread.innerHTML = workingContextHtml + messagesHtml;
   wireWorkingContextPanel();
   updateTopbarFromState();
@@ -1671,63 +1680,7 @@ function renderChat() {
 }
 
 function renderSessionList() {
-  if (!els.sessionList) return;
-
-  const sessions = state.sessions.slice().sort(function (a, b) {
-    const ap = a.pinned ? 1 : 0;
-    const bp = b.pinned ? 1 : 0;
-    if (ap !== bp) return bp - ap;
-
-    const at = Date.parse(a.updated_at || a.created_at || 0) || 0;
-    const bt = Date.parse(b.updated_at || b.created_at || 0) || 0;
-    return bt - at;
-  });
-
-  els.sessionList.innerHTML = sessions
-    .map(function (session) {
-      const active = String(session.id) === String(state.activeSessionId);
-
-      return (
-        '<div class="nova-session-card' +
-        (active ? " is-active" : "") +
-        '">' +
-        '<button type="button" class="nova-session-card-main" data-open-session="' +
-        escapeHtml(session.id) +
-        '">' +
-        '<div class="nova-session-card-top">' +
-        '<div class="nova-session-card-title">' +
-        escapeHtml(session.title || "Untitled chat") +
-        "</div>" +
-        (session.pinned ? '<div class="nova-session-card-pin">ðŸ“Œ</div>' : "") +
-        "</div>" +
-        '<div class="nova-session-card-preview">' +
-        escapeHtml(session.last_message_preview || "No messages yet") +
-        "</div>" +
-        '<div class="nova-session-card-meta">' +
-        escapeHtml(
-          String(
-            Number(session.message_count || safeArray(session.messages).length || 0)
-          ) + " messages"
-        ) +
-        "</div>" +
-        "</button>" +
-        '<div class="nova-session-card-actions">' +
-        '<button type="button" class="nova-session-card-action" data-pin-session="' +
-        escapeHtml(session.id) +
-        '">' +
-        (session.pinned ? "Unpin" : "Pin") +
-        "</button>" +
-        '<button type="button" class="nova-session-card-action" data-rename-session="' +
-        escapeHtml(session.id) +
-        '">Rename</button>' +
-        '<button type="button" class="nova-session-card-action" data-delete-session="' +
-        escapeHtml(session.id) +
-        '">Delete</button>' +
-        "</div>" +
-        "</div>"
-      );
-    })
-    .join("");
+  return;
 }
 
 function renderArtifacts() {
@@ -2501,7 +2454,11 @@ function finalizeStreamMessage(payload) {
   if (hydratedAssistantMessage && hydratedAssistantMessage.id) {
     upsertMessage(hydratedAssistantMessage);
 
-    const workingContext = normalizeWorkingContext(data.working_context);
+const workingContext = normalizeWorkingContext(
+  (data && data.working_context_payload) ||
+    (data && data.working_context) ||
+    emptyWorkingContext()
+);
     if (workingContext.show) {
       upsertWorkingContextMessage(workingContext, hydratedAssistantMessage.id);
     }
@@ -3087,7 +3044,9 @@ async function consumeChatJson(payload) {
       upsertMessage(assistantMessage);
 
       const workingContext = normalizeWorkingContext(
-        data && data.working_context
+        (data && data.working_context_payload) ||
+          (data && data.working_context) ||
+          emptyWorkingContext()
       );
 
       if (workingContext.show) {
@@ -4419,15 +4378,11 @@ function renderWorkingContextPanel() {
     );
   }
 
-  if (!items.length && wc.text) {
-    items.push(
-      `<pre class="nova-working-context-pre">${escapeHtml(wc.text)}</pre>`
-    );
-  }
-
   const collapsedClass = wc.collapsed ? " is-collapsed" : "";
   const buttonLabel = wc.collapsed ? "Expand working context" : "Collapse working context";
   const chevron = wc.collapsed ? "▸" : "▾";
+
+  console.log("renderWorkingContextPanel HTML", wc, items);
 
   return `
     <section class="nova-working-context-panel${collapsedClass}" data-working-context-panel>
@@ -4435,16 +4390,13 @@ function renderWorkingContextPanel() {
         type="button"
         class="nova-working-context-toggle"
         data-working-context-toggle
+        aria-label="${escapeHtml(buttonLabel)}"
         aria-expanded="${wc.collapsed ? "false" : "true"}"
-        aria-label="${buttonLabel}"
-        title="${buttonLabel}"
       >
-        <div class="nova-working-context-header">
-          <span class="nova-working-context-kicker">Working context</span>
-          <span class="nova-working-context-chevron" aria-hidden="true">${chevron}</span>
-        </div>
+        <span class="nova-working-context-toggle-icon">${chevron}</span>
+        <span class="nova-working-context-title">Working context</span>
       </button>
-      <div class="nova-working-context-body"${wc.collapsed ? ' hidden' : ""}>
+      <div class="nova-working-context-body">
         ${items.join("")}
       </div>
     </section>
