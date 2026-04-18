@@ -5148,6 +5148,80 @@
       "image_missing": false,
       "video_missing": false,
       "audio_missing": false
+    },
+    {
+      "kind": "other",
+      "title": "Execution Plan",
+      "body": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+      "summary": "Execution plan for: debug a bug in my code",
+      "preview": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the r",
+      "session_id": "session_bfbc54b60b3840639391de53f386c17a",
+      "source": "execution",
+      "execution": {
+        "goal": "debug a bug in my code",
+        "steps": [
+          {
+            "title": "Inspect the current state and constraints",
+            "status": "current"
+          },
+          {
+            "title": "Choose the safest implementation path",
+            "status": "pending"
+          },
+          {
+            "title": "Apply the required change",
+            "status": "pending"
+          },
+          {
+            "title": "Verify the result",
+            "status": "pending"
+          },
+          {
+            "title": "Summarize outcome and next move",
+            "status": "pending"
+          }
+        ],
+        "current_step_index": 0,
+        "progress": 0,
+        "current_step": "Inspect the current state and constraints",
+        "status": "running"
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 0,
+        "total": 5,
+        "paused": false
+      },
+      "id": "artifact_bf35da56485848aa985e0b8ffd8d038f",
+      "updated_at": "2026-04-18T22:55:15.233219+00:00",
+      "created_at": "2026-04-18T22:55:14.824365+00:00",
+      "group": "Other",
+      "viewer": {
+        "kind": "other",
+        "title": "Execution Plan",
+        "body": "Goal: debug a bug in my code\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+        "image_url": null,
+        "video_url": null,
+        "audio_url": null,
+        "source_url": "",
+        "filename": "",
+        "media_missing": false,
+        "image_missing": false,
+        "video_missing": false,
+        "audio_missing": false,
+        "image_path": null,
+        "video_path": null,
+        "audio_path": null
+      },
+      "image_url": null,
+      "video_url": null,
+      "audio_url": null,
+      "media_missing": false,
+      "image_missing": false,
+      "video_missing": false,
+      "audio_missing": false
     }
   ]
 }

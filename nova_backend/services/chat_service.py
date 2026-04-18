@@ -900,8 +900,38 @@ class ChatService:
 
     def _can_advance_execution_step(self, execution, user_text, step_title, step_output, attachments=None):
         if not self._has_real_debug_context(user_text, execution, attachments):
-            return False, "Missing real debugging data (code, error, reproduction)."
+            missing_parts = []
 
+            lowered_user_text = self._safe_str(user_text).lower()
+
+            if not self._safe_str(user_text) or len(self._safe_str(user_text).strip()) < 10:
+                missing_parts.append("clear problem description")
+
+            if "traceback" not in lowered_user_text and "error" not in lowered_user_text:
+                missing_parts.append("exact error or traceback")
+
+            if "def " not in user_text and ".py" not in user_text:
+                missing_parts.append("relevant code snippet or file path")
+
+            instruction_lines = [
+                "Step blocked.",
+                "",
+                "To continue, send:",
+            ]
+
+            for i, part in enumerate(missing_parts, start=1):
+                instruction_lines.append(f"{i}. {part}")
+
+            if not missing_parts:
+                instruction_lines.append("1. more detailed context")
+
+            instruction_lines.append("")
+            instruction_lines.append("Example:")
+            instruction_lines.append("Error: ...")
+            instruction_lines.append("Code: ...")
+            instruction_lines.append("Expected: ...")
+
+            return False, "\n".join(instruction_lines)
         if self._step_requires_real_change(step_title):
             if not self._step_output_indicates_real_change(step_output):
                 return False, "No real code change detected."
@@ -1943,6 +1973,14 @@ class ChatService:
             except Exception as e:
                 print("BUILD EXECUTION PLAN FAILED (keyword artifact):", e)
                 saved_artifact = None
+
+        try:
+            self._persist_execution_artifact(
+                session_id=session_id,
+                execution=execution,
+            )
+        except Exception as e:
+            print("BUILD EXECUTION PLAN PERSIST EXECUTION FAILED:", e)
 
         print("BUILD EXECUTION PLAN SAVED =", bool(saved_artifact))
         print("BUILD EXECUTION PLAN SESSION =", session_id)
