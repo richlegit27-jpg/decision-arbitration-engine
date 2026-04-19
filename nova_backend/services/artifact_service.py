@@ -12,6 +12,8 @@ from nova_backend.utils.time_utils import iso_now
 class ArtifactService:
     def __init__(self, artifacts_file: str):
         self.artifacts_file = Path(artifacts_file)
+        print("ARTIFACT FILE PATH =", self.artifacts_file)
+
         self.media = ArtifactMediaService(UPLOADS_DIR)
         self._ensure_store()
 
@@ -30,6 +32,26 @@ class ArtifactService:
 
     def _write_store(self, data: Dict[str, Any]) -> None:
         save_json_file(self.artifacts_file, data)
+
+    def list_by_session(self, session_id: str):
+        session_id = str(session_id or "").strip()
+        artifacts = self.list_all() if hasattr(self, "list_all") else []
+        if not session_id:
+            return artifacts
+        return [
+            artifact
+            for artifact in (artifacts or [])
+            if str((artifact or {}).get("session_id") or "").strip() == session_id
+        ]
+
+    def list_all(self):
+        try:
+            data = self._read_store()
+            artifacts = data.get("artifacts") or []
+            return artifacts if isinstance(artifacts, list) else []
+        except Exception as e:
+            print("ARTIFACT SERVICE LIST_ALL FAILED =", e)
+            return []
 
     # =========================
     # 🔥 NORMALIZATION CORE
@@ -141,40 +163,40 @@ class ArtifactService:
                 return self._normalize_artifact(item)
         return None
 
-def save_artifact(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
-    data = self._read_store()
-    items = data.get("artifacts", [])
+    def save_artifact(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
+        data = self._read_store()
+        items = data.get("artifacts", [])
 
-    artifact = dict(artifact or {})
+        artifact = dict(artifact or {})
 
-    now = iso_now()
+        now = iso_now()
 
-    if not artifact.get("id"):
-        import uuid
-        artifact["id"] = f"artifact_{uuid.uuid4().hex}"
+        if not artifact.get("id"):
+            import uuid
+            artifact["id"] = f"artifact_{uuid.uuid4().hex}"
 
-    artifact["updated_at"] = now
-    if not artifact.get("created_at"):
-        artifact["created_at"] = now
+        artifact["updated_at"] = now
+        if not artifact.get("created_at"):
+            artifact["created_at"] = now
 
-    replaced = False
-    for i, existing in enumerate(items):
-        if existing.get("id") == artifact["id"]:
-            items[i] = artifact
-            replaced = True
-            break
+        replaced = False
+        for i, existing in enumerate(items):
+            if existing.get("id") == artifact["id"]:
+                items[i] = artifact
+                replaced = True
+                break
 
-    if not replaced:
-        items.append(artifact)
+        if not replaced:
+            items.append(artifact)
 
-    # 🔥 STORAGE CONTROL (TRIM HERE)
-    MAX_ARTIFACTS = 100
-    items = items[-MAX_ARTIFACTS:]
+        # 🔥 STORAGE CONTROL
+        MAX_ARTIFACTS = 100
+        items = items[-MAX_ARTIFACTS:]
 
-    data["artifacts"] = items
-    self._write_store(data)
+        data["artifacts"] = items
+        self._write_store(data)
 
-    return self._normalize_artifact(artifact) 
+        return self._normalize_artifact(artifact)
 
     def create(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
         return self.save_artifact(artifact)

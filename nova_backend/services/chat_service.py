@@ -37,6 +37,12 @@ class ChatService:
         web_service: WebService,
         recon_service: ReconService,
     ):
+        self.session_service = session_service
+        self.memory_service = memory_service
+        self.artifact_service = artifact_service
+        self.web_service = web_service
+        self.recon_service = recon_service
+
         self.sessions = session_service
         self.memory = memory_service
         self.artifacts = artifact_service
@@ -46,6 +52,8 @@ class ChatService:
         self.image_model = os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1")
         self.image_size = os.getenv("NOVA_IMAGE_SIZE", "1024x1024")
         self.chat_model = os.getenv("OPENAI_MODEL", "gpt-5.4")
+        self.model = self.chat_model
+        print("MODEL CHECK:", hasattr(self, "model"), self.model)
         self.memory_limit = int(os.getenv("NOVA_MEMORY_LIMIT", "3"))
 
         self.uploads_dir = Path(
@@ -1756,119 +1764,49 @@ class ChatService:
         except Exception as e:
             print("PERSIST EXECUTION SAVE SESSIONS FAILED:", e)
 
-    def _find_latest_execution_artifact(self, session_id: str):
+    def _find_latest_execution_artifact(self, session_id: str = ""):
         session_id = self._safe_str(session_id)
 
-        persisted_execution = None
-
         try:
-            persisted_execution = self._get_persisted_execution_artifact(session_id=session_id)
-        except Exception as e:
-            print("FIND EXECUTION PERSISTED LOOKUP FAILED:", e)
-            persisted_execution = None
-
-        if isinstance(persisted_execution, dict):
-            persisted_steps = (
-                (persisted_execution.get("execution") or {}).get("steps")
-                if isinstance(persisted_execution.get("execution"), dict)
-                else persisted_execution.get("steps")
-            ) or []
-
-            if persisted_steps:
-                execution_payload = persisted_execution.get("execution")
-                if not isinstance(execution_payload, dict):
-                    execution_payload = persisted_execution
-
-                execution_payload = self._normalize_execution_state(dict(execution_payload or {}))
-
-                artifact_id = self._safe_str(
-                    persisted_execution.get("artifact_id")
-                    or execution_payload.get("artifact_id")
-                )
-
-                body = self._render_execution(execution_payload)
-
-                return {
-                    "id": artifact_id,
-                    "kind": "execution",
-                    "type": "execution",
-                    "title": "Execution Plan",
-                    "body": body,
-                    "session_id": session_id,
-                    "execution": execution_payload,
-                    "meta": {
-                        "active_execution": True,
-                        "source": "persisted_execution",
-                    },
-                }
-
-        try:
-            artifacts = self._call_first(
-                self.artifacts,
-                ["get_artifacts", "list", "all", "get_all"],
-            ) or []
-        except Exception:
             artifacts = []
 
-        if isinstance(artifacts, dict):
-            if isinstance(artifacts.get("artifacts"), list):
-                artifacts = artifacts.get("artifacts") or []
-            elif isinstance(artifacts.get("items"), list):
-                artifacts = artifacts.get("items") or []
-            else:
-                artifacts = []
+            if hasattr(self, "artifact_service") and hasattr(self.artifact_service, "list_all"):
+                artifacts = self.artifact_service.list_all()
+            elif hasattr(self, "artifacts") and hasattr(self.artifacts, "list_all"):
+                artifacts = self.artifacts.list_all()
 
-        if not isinstance(artifacts, list):
-            return None
+            artifacts = artifacts or []
 
-        matches = []
+            print("ALL ARTIFACTS =", artifacts)
 
-        for a in artifacts:
-            if not isinstance(a, dict):
-                continue
+            matches = []
 
-            a_session_id = self._safe_str(a.get("session_id"))
-            a_kind = self._safe_str(a.get("kind")).lower()
-            a_type = self._safe_str(a.get("type")).lower()
-            body = self._safe_str(a.get("body")).lower()
+            for a in artifacts:
+                a = a or {}
 
-            execution = a.get("execution")
-            meta = a.get("meta") or {}
-            meta_execution = meta.get("execution") if isinstance(meta, dict) else None
+                if session_id and self._safe_str(a.get("session_id")) != session_id:
+                    continue
 
-            has_structured_execution = (
-                isinstance(execution, dict) and bool(execution.get("steps"))
-            ) or (
-                isinstance(meta_execution, dict) and bool(meta_execution.get("steps"))
+                execution = a.get("execution") or ((a.get("meta") or {}).get("execution")) or {}
+
+                if execution:
+                    print("MATCHED EXECUTION ARTIFACT =", a)
+                    matches.append(a)
+
+            matches.sort(
+                key=lambda x: self._safe_str(x.get("created_at")),
+                reverse=True,
             )
 
-            is_execution = (
-                a_kind in {"execution", "execution_run"}
-                or a_type in {"execution", "execution_run"}
-                or has_structured_execution
-                or (
-                    "progress:" in body
-                    and "current step:" in body
-                    and "steps:" in body
-                )
-            )
+            latest = matches[0] if matches else None
 
-            if not is_execution:
-                continue
+            print("FINAL LATEST =", latest)
 
-            if session_id and a_session_id != session_id:
-                continue
+            return latest
 
-            matches.append(a)
-
-        if not matches:
+        except Exception as e:
+            print("FIND EXECUTION FAILED =", e)
             return None
-
-        matches.sort(
-            key=lambda x: self._safe_str(x.get("updated_at")) or self._safe_str(x.get("created_at")),
-            reverse=True,
-        )
-        return matches[0]
 
     def _attach_execution(self, payload, user_text, assistant_msg, decision, session_id=""):
         execution = self._build_execution(
@@ -2053,11 +1991,31 @@ class ChatService:
 
         return self._normalize_execution_state(execution)
 
+    def _extract_text_response(self, response) -> str:
+        try:
+            if hasattr(response, "output_text") and response.output_text:
+                return response.output_text
+
+            if hasattr(response, "output") and response.output:
+                parts = []
+                for item in response.output:
+                    if hasattr(item, "content"):
+                        for c in item.content:
+                            if hasattr(c, "text"):
+                                parts.append(c.text)
+                return "\n".join(parts)
+
+            return str(response)
+        except Exception as e:
+            return f"[extract_error] {e}"
+
     def _advance_execution_request(self, user_text: str, session_id: str = "", attachments=None):
         attachments = attachments or []
         session_id = self._safe_str(session_id)
         user_text = self._safe_str(user_text)
         assistant_text = ""
+
+        print("ADVANCE SESSION_ID =", session_id)
 
         latest = self._find_latest_execution_artifact(session_id=session_id)
         print("ADVANCE LATEST =", latest)
@@ -4562,7 +4520,7 @@ class ChatService:
 
         try:
             response = self.client.responses.create(
-                model=self.model,
+                model=self.chat_model,
                 input=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
@@ -4771,8 +4729,10 @@ class ChatService:
         try:
             user_text = self._safe_str(user_text)
             session_id = self._ensure_session_id(session_id)
-            user_msg = self._build_user_message(user_text, attachments=attachments)
 
+            print("HANDLE SESSION_ID =", session_id)
+
+            user_msg = self._build_user_message(user_text, attachments=attachments)
             auto_exec_match = self._looks_like_auto_execution_request(user_text)
             progress_exec_match = self._looks_like_execution_progression(user_text)
 
