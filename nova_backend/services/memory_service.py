@@ -38,6 +38,12 @@ class MemoryService:
         items.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
         return items
 
+    def build_list_payload(self) -> List[Dict[str, Any]]:
+        return self.all()
+
+    def build_view_payload(self, memory_id: str) -> Optional[Dict[str, Any]]:
+        return self.get(memory_id)
+
     def get(self, memory_id: str) -> Optional[Dict[str, Any]]:
         target = str(memory_id or "").strip()
         if not target:
@@ -65,7 +71,6 @@ class MemoryService:
 
         memory.append(item)
 
-        # 🔥 STORAGE CONTROL
         MAX_MEMORY_ITEMS = 100
         memory = memory[-MAX_MEMORY_ITEMS:]
 
@@ -99,7 +104,6 @@ class MemoryService:
         if not replaced:
             memory.append(item)
 
-        # 🔥 STORAGE CONTROL
         MAX_MEMORY_ITEMS = 100
         memory = memory[-MAX_MEMORY_ITEMS:]
 

@@ -1664,7 +1664,7 @@ class ChatService:
             return None
 
         try:
-            sessions = self._load_sessions()
+            sessions = self.session_service.list_sessions()
         except Exception as e:
             print("GET PERSISTED EXECUTION LOAD SESSIONS FAILED:", e)
             return None
@@ -1716,7 +1716,7 @@ class ChatService:
         execution["active"] = True
 
         try:
-            sessions = self._load_sessions()
+            sessions = self.session_service.list_sessions()
         except Exception as e:
             print("PERSIST EXECUTION LOAD SESSIONS FAILED:", e)
             return
