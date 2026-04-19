@@ -2054,84 +2054,85 @@ class ChatService:
         return self._normalize_execution_state(execution)
 
     def _advance_execution_request(self, user_text: str, session_id: str = "", attachments=None):
-       attachments = attachments or []
-       session_id = self._safe_str(session_id)
-       user_text = self._safe_str(user_text)
-       assistant_text = ""
+        attachments = attachments or []
+        session_id = self._safe_str(session_id)
+        user_text = self._safe_str(user_text)
+        assistant_text = ""
 
-       latest = self._find_latest_execution_artifact(session_id=session_id)
-       print("ADVANCE LATEST =", latest)
+        latest = self._find_latest_execution_artifact(session_id=session_id)
+        print("ADVANCE LATEST =", latest)
 
-       user_msg = self._build_user_message(
-          user_text,
-          attachments=attachments,
-       )
+        user_msg = self._build_user_message(
+            user_text,
+            attachments=attachments,
+        )
 
-       if not latest:
-          assistant_msg = self._build_assistant_message(
-             text="No execution found. Start with a plan first.",
-             attachments=[],
-          )
-          return self._finalize_response(
-             session_id=session_id,
-             user_text=user_text,
-             user_msg=user_msg,
-             assistant_msg=assistant_msg,
-             decision={
+        if not latest:
+            assistant_msg = self._build_assistant_message(
+                text="No execution found. Start with a plan first.",
+                attachments=[],
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision={
+                    "route": "execution",
+                    "mode": "execution_progress",
+                    "save_artifact": False,
+                    "save_memory": False,
+                    "use_memory": True,
+                },
+                saved_artifact=None,
+            )
+
+        execution = latest.get("execution") or {}
+
+        result = self._execute_current_step(
+            execution=execution,
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
+
+        updated_execution = self._normalize_execution_state(
+            result.get("execution") or execution
+        )
+        step_output = self._safe_str(result.get("step_output"))
+        saved_artifact = result.get("saved_artifact")
+
+        plan_body = self._render_execution(updated_execution)
+
+        if step_output:
+            assistant_text = step_output
+            if plan_body:
+                assistant_text += "\n\n" + plan_body
+        else:
+            assistant_text = "Step processed."
+            if plan_body:
+                assistant_text += "\n\n" + plan_body
+
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            attachments=[],
+        )
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision={
                 "route": "execution",
                 "mode": "execution_progress",
-                "save_artifact": False,
+                "save_artifact": bool(saved_artifact),
                 "save_memory": False,
                 "use_memory": True,
-             },
-             saved_artifact=None,
-          )
+            },
+            saved_artifact=saved_artifact,
+        )
 
-       execution = latest.get("execution") or {}
-
-       result = self._execute_current_step(
-          execution=execution,
-          user_text=user_text,
-          session_id=session_id,
-          attachments=attachments,
-       )
-
-       updated_execution = self._normalize_execution_state(
-          result.get("execution") or execution
-       )
-       step_output = self._safe_str(result.get("step_output"))
-       saved_artifact = result.get("saved_artifact")
-
-       plan_body = self._render_execution(updated_execution)
-
-       if step_output:
-          assistant_text = step_output
-          if plan_body:
-             assistant_text += "\n\n" + plan_body
-       else:
-          assistant_text = "Step processed."
-          if plan_body:
-             assistant_text += "\n\n" + plan_body
-
-       assistant_msg = self._build_assistant_message(
-          text=assistant_text,
-          attachments=[],
-       )
-
-       return self._finalize_response(
-          session_id=session_id,
-          user_text=user_text,
-          user_msg=user_msg,
-          assistant_msg=assistant_msg,
-          decision={
-             "route": "execution",
-             "mode": "execution_progress",
-             "save_artifact": bool(saved_artifact),
-             "save_memory": False,
-             "use_memory": True,
-          },
-          saved_artifact=saved_artifact,
-       )
     # =========================
     # AUTO EXECUTION LOOP (PHASE 6)
     # =========================
@@ -4433,132 +4434,132 @@ class ChatService:
             "working_state": {},
         }
 
-def _execute_current_step(self, execution: dict, user_text: str, session_id: str = "", attachments=None) -> dict:
-    attachments = attachments or []
-    execution = self._normalize_execution_state(dict(execution or {}))
+    def _execute_current_step(self, execution: dict, user_text: str, session_id: str = "", attachments=None) -> dict:
+        attachments = attachments or []
+        execution = self._normalize_execution_state(dict(execution or {}))
 
-    steps = execution.get("steps") or []
-    current_index = self._execution_current_index(execution)
+        steps = execution.get("steps") or []
+        current_index = self._execution_current_index(execution)
 
-    if not steps or current_index >= len(steps):
-        execution["status"] = "complete"
-        execution["current_step"] = "complete"
-        execution["progress"] = len(steps)
-        execution.setdefault("step_results", [])
-        return {
-            "execution": execution,
-            "step_output": "No remaining execution step.",
-            "saved_artifact": {
-                "kind": "execution",
-                "title": self._safe_str(execution.get("goal")) or "Execution",
-                "body": self._format_execution_plan(execution),
+        if not steps or current_index >= len(steps):
+            execution["status"] = "complete"
+            execution["current_step"] = "complete"
+            execution["progress"] = len(steps)
+            execution.setdefault("step_results", [])
+            return {
                 "execution": execution,
-                "meta": {
+                "step_output": "No remaining execution step.",
+                "saved_artifact": {
+                    "kind": "execution",
+                    "title": self._safe_str(execution.get("goal")) or "Execution",
+                    "body": self._format_execution_plan(execution),
                     "execution": execution,
-                    "execution_id": self._safe_str(execution.get("id")),
-                    "status": self._safe_str(execution.get("status")) or "complete",
-                    "progress": execution.get("progress", len(steps)),
-                    "current_step": self._safe_str(execution.get("current_step")) or "complete",
-                    "goal": self._safe_str(execution.get("goal")),
+                    "meta": {
+                        "execution": execution,
+                        "execution_id": self._safe_str(execution.get("id")),
+                        "status": self._safe_str(execution.get("status")) or "complete",
+                        "progress": execution.get("progress", len(steps)),
+                        "current_step": self._safe_str(execution.get("current_step")) or "complete",
+                        "goal": self._safe_str(execution.get("goal")),
+                    },
                 },
+            }
+
+        current_step = steps[current_index] or {}
+        step_title = self._safe_str(current_step.get("title")) or f"Step {current_index + 1}"
+        goal = self._safe_str(execution.get("goal"))
+        execution.setdefault("step_results", [])
+
+        system_prompt = (
+            "You are executing one step in Nova's task engine. "
+            "Be concrete, operational, and brief. "
+            "Return useful progress for the current step only."
+        )
+
+        user_prompt_parts = [
+            f"Goal: {goal}",
+            f"Current step ({current_index + 1}/{len(steps)}): {step_title}",
+        ]
+
+        if user_text.strip():
+            user_prompt_parts.append(f"Latest user input: {user_text}")
+
+        if attachments:
+            attachment_lines = []
+            for item in attachments:
+                if not isinstance(item, dict):
+                    continue
+                name = self._safe_str(item.get("filename") or item.get("name") or item.get("stored_name"))
+                url = self._safe_str(item.get("url"))
+                mime_type = self._safe_str(item.get("mime_type") or item.get("mime"))
+                bits = [bit for bit in [name, mime_type, url] if bit]
+                if bits:
+                    attachment_lines.append(" - " + " | ".join(bits))
+            if attachment_lines:
+                user_prompt_parts.append("Attachments:\n" + "\n".join(attachment_lines))
+
+        user_prompt = "\n\n".join(part for part in user_prompt_parts if part)
+
+        step_output = ""
+        tool_bundle = {}
+
+        try:
+            response = self.client.responses.create(
+                model=self.model,
+                input=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+            step_output = self._extract_text_response(response).strip()
+        except Exception as exc:
+            step_output = f"Step execution failed: {exc}"
+
+        if not step_output:
+            step_output = f"Completed step: {step_title}"
+
+        step_result = {
+            "step_index": current_index,
+            "step_title": step_title,
+            "output": step_output,
+            "completed_at": self._iso_now(),
+        }
+        execution["step_results"].append(step_result)
+
+        next_index = current_index + 1
+        execution["progress"] = next_index
+
+        if next_index >= len(steps):
+            execution["status"] = "complete"
+            execution["current_step"] = "complete"
+        else:
+            execution["status"] = "in_progress"
+            next_step = steps[next_index] or {}
+            execution["current_step"] = self._safe_str(next_step.get("title")) or f"Step {next_index + 1}"
+
+        artifact_payload = {
+            "kind": "execution",
+            "title": goal or "Execution",
+            "body": self._format_execution_plan(execution),
+            "execution": execution,
+            "meta": {
+                "execution": execution,
+                "goal": goal,
+                "step_index": current_index,
+                "step_title": step_title,
+                "execution_id": self._safe_str(execution.get("id")),
+                "tool_bundle": tool_bundle or {},
+                "status": self._safe_str(execution.get("status")),
+                "progress": execution.get("progress", 0),
+                "current_step": self._safe_str(execution.get("current_step")),
             },
         }
 
-    current_step = steps[current_index] or {}
-    step_title = self._safe_str(current_step.get("title")) or f"Step {current_index + 1}"
-    goal = self._safe_str(execution.get("goal"))
-    execution.setdefault("step_results", [])
-
-    system_prompt = (
-        "You are executing one step in Nova's task engine. "
-        "Be concrete, operational, and brief. "
-        "Return useful progress for the current step only."
-    )
-
-    user_prompt_parts = [
-        f"Goal: {goal}",
-        f"Current step ({current_index + 1}/{len(steps)}): {step_title}",
-    ]
-
-    if user_text.strip():
-        user_prompt_parts.append(f"Latest user input: {user_text}")
-
-    if attachments:
-        attachment_lines = []
-        for item in attachments:
-            if not isinstance(item, dict):
-                continue
-            name = self._safe_str(item.get("filename") or item.get("name") or item.get("stored_name"))
-            url = self._safe_str(item.get("url"))
-            mime_type = self._safe_str(item.get("mime_type") or item.get("mime"))
-            bits = [bit for bit in [name, mime_type, url] if bit]
-            if bits:
-                attachment_lines.append(" - " + " | ".join(bits))
-        if attachment_lines:
-            user_prompt_parts.append("Attachments:\n" + "\n".join(attachment_lines))
-
-    user_prompt = "\n\n".join(part for part in user_prompt_parts if part)
-
-    step_output = ""
-    tool_bundle = {}
-
-    try:
-        response = self.client.responses.create(
-            model=self.model,
-            input=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        )
-        step_output = self._extract_text_response(response).strip()
-    except Exception as exc:
-        step_output = f"Step execution failed: {exc}"
-
-    if not step_output:
-        step_output = f"Completed step: {step_title}"
-
-    step_result = {
-        "step_index": current_index,
-        "step_title": step_title,
-        "output": step_output,
-        "completed_at": self._iso_now(),
-    }
-    execution["step_results"].append(step_result)
-
-    next_index = current_index + 1
-    execution["progress"] = next_index
-
-    if next_index >= len(steps):
-        execution["status"] = "complete"
-        execution["current_step"] = "complete"
-    else:
-        execution["status"] = "in_progress"
-        next_step = steps[next_index] or {}
-        execution["current_step"] = self._safe_str(next_step.get("title")) or f"Step {next_index + 1}"
-
-    artifact_payload = {
-        "kind": "execution",
-        "title": goal or "Execution",
-        "body": self._format_execution_plan(execution),
-        "execution": execution,
-        "meta": {
+        return {
             "execution": execution,
-            "goal": goal,
-            "step_index": current_index,
-            "step_title": step_title,
-            "execution_id": self._safe_str(execution.get("id")),
-            "tool_bundle": tool_bundle or {},
-            "status": self._safe_str(execution.get("status")),
-            "progress": execution.get("progress", 0),
-            "current_step": self._safe_str(execution.get("current_step")),
-        },
-    }
-
-    return {
-        "execution": execution,
-        "step_output": step_output,
-        "saved_artifact": artifact_payload,
-    }
+            "step_output": step_output,
+            "saved_artifact": artifact_payload,
+        }
 
     def _maybe_execute_tool(self, step_title: str, user_text: str, execution: dict | None = None) -> dict:
         tool_decision = self._decide_tool_for_step(
