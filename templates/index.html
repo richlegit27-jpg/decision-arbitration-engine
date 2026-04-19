@@ -63,7 +63,17 @@
         </div>
       </header>
 
-      <div id="execution-panel" class="execution-panel" hidden></div>
+      <div id="execution-panel" class="execution-panel" data-execution-panel hidden>
+  <div data-execution-empty>No execution yet</div>
+  <div data-execution-content hidden></div>
+
+  <div class="execution-controls">
+    <button data-exec-run-step>Run Step</button>
+    <button data-exec-run-all>Run All</button>
+    <button data-exec-stop>Stop</button>
+    <button data-exec-show-plan>Show Plan</button>
+  </div>
+</div>
 
       <section class="nova-chat-thread" data-chat-thread>
         <div class="nova-empty-state" data-chat-empty hidden>

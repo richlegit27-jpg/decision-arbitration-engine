@@ -2381,6 +2381,7 @@ class ChatService:
     def _auto_execute_request(self, user_text: str, session_id: str = "", attachments=None):
         attachments = attachments or []
         session_id = self._safe_str(session_id)
+        user_text = self._safe_str(user_text)
 
         latest = self._find_latest_execution_artifact(session_id=session_id)
         user_msg = self._build_user_message(user_text, attachments=attachments)
@@ -2405,60 +2406,116 @@ class ChatService:
                 saved_artifact=None,
             )
 
-        execution = latest.get("execution") or {}
-        execution = self._normalize_execution_state(execution)
+        execution = self._normalize_execution_state(latest.get("execution") or {})
+        if not execution:
+            assistant_msg = self._build_assistant_message(
+                text="Execution state is missing. Start with a new plan first.",
+                attachments=[],
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision={
+                    "route": "execution_auto",
+                    "mode": "execution_auto",
+                    "save_artifact": False,
+                    "save_memory": False,
+                    "use_memory": True,
+                },
+                saved_artifact=None,
+            )
 
+        max_steps = 20
         safety = 0
         last_step_output = ""
+        saved_artifact = None
+        blocked = False
+        error_text = ""
 
-        while execution.get("status") != "complete" and safety < 20:
-            result = self._execute_current_step(
-                execution=execution,
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
+        while safety < max_steps:
+            status = self._safe_str(execution.get("status")).lower()
+            if status == "complete":
+                break
+
+            try:
+                result = self._execute_current_step(
+                    execution=execution,
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                )
+            except Exception as exc:
+                error_text = f"Auto execution failed on step {safety + 1}: {self._safe_str(exc)}"
+                blocked = True
+                break
+
+            execution = self._normalize_execution_state(
+                result.get("execution") or execution
             )
-            execution = result.get("execution") or execution
             last_step_output = self._safe_str(result.get("step_output"))
+            saved_artifact = result.get("saved_artifact") or saved_artifact
+
+            if last_step_output and last_step_output.lower().startswith("step blocked"):
+                blocked = True
+                break
+
+            status = self._safe_str(execution.get("status")).lower()
+            if status in {"blocked", "error"}:
+                blocked = True
+                break
+
             safety += 1
 
-        steps = execution.get("steps") or []
-        goal = self._safe_str(execution.get("goal"))
+        if safety >= max_steps and self._safe_str(execution.get("status")).lower() != "complete":
+            blocked = True
+            if not last_step_output:
+                last_step_output = f"Stopped after reaching the safety cap of {max_steps} auto-executed steps."
 
-        lines = [f"Goal: {goal}", "", "Steps:"]
-        for step in steps:
-            status = self._safe_str(step.get("status")).lower()
-            if status == "done":
-                marker = "[✓]"
-            elif status == "current":
-                marker = "[>]"
-            else:
-                marker = "[ ]"
-            lines.append(f"{marker} {self._safe_str(step.get('title'))}")
+        final_body = self._render_execution(execution)
 
-        lines.append("")
-        lines.append(f"Progress: {execution.get('progress', 0)}/{len(steps)} complete")
-        lines.append(f"Current step: {self._safe_str(execution.get('current_step')) or 'complete'}")
-
-        if last_step_output:
-            lines.append("")
-            lines.append("Last step output:")
-            lines.append(last_step_output)
-
-        updated_body = "\n".join(lines)
-
-        artifact_payload = dict(latest)
-        artifact_payload["body"] = updated_body
-        artifact_payload["preview"] = updated_body[:140]
-        artifact_payload["execution"] = execution
+        canonical_artifact = {
+            "kind": "execution",
+            "title": self._safe_str(execution.get("goal")) or "Execution",
+            "body": final_body,
+            "execution": execution,
+            "meta": {
+                "execution": execution,
+                "execution_id": self._safe_str(execution.get("id")),
+                "status": self._safe_str(execution.get("status")),
+                "progress": execution.get("progress", 0),
+                "current_step": self._safe_str(execution.get("current_step")),
+                "goal": self._safe_str(execution.get("goal")),
+                "auto_executed": True,
+                "safety_count": safety,
+            },
+        }
 
         saved_artifact = self._call_first(
             self.artifacts,
             ["save_artifact", "create", "save", "create_artifact", "add_artifact"],
-            artifact_payload,
+            canonical_artifact,
         )
 
-        assistant_text = f"Execution complete.\n\n{updated_body}"
+        status = self._safe_str(execution.get("status")).lower()
+        if error_text:
+            assistant_text = "Execution stopped with an error."
+        elif blocked or status in {"blocked", "error"}:
+            assistant_text = "Execution stopped before completion."
+        elif status == "complete":
+            assistant_text = "Execution complete."
+        else:
+            assistant_text = "Execution paused."
+
+        if last_step_output:
+            assistant_text += "\n\nLast step output:\n" + last_step_output
+
+        if error_text:
+            assistant_text += "\n\n" + error_text
+
+        if final_body:
+            assistant_text += "\n\n" + final_body
 
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
@@ -4452,7 +4509,7 @@ class ChatService:
                 "saved_artifact": {
                     "kind": "execution",
                     "title": self._safe_str(execution.get("goal")) or "Execution",
-                    "body": self._format_execution_plan(execution),
+                    "body": self._render_execution(execution),
                     "execution": execution,
                     "meta": {
                         "execution": execution,
@@ -4527,11 +4584,14 @@ class ChatService:
         execution["step_results"].append(step_result)
 
         next_index = current_index + 1
+        execution["current_step_index"] = next_index
         execution["progress"] = next_index
 
         if next_index >= len(steps):
             execution["status"] = "complete"
             execution["current_step"] = "complete"
+            execution["current_step_index"] = len(steps)
+            execution["progress"] = len(steps)
         else:
             execution["status"] = "in_progress"
             next_step = steps[next_index] or {}
@@ -4540,7 +4600,7 @@ class ChatService:
         artifact_payload = {
             "kind": "execution",
             "title": goal or "Execution",
-            "body": self._format_execution_plan(execution),
+            "body": self._render_execution(execution),
             "execution": execution,
             "meta": {
                 "execution": execution,

@@ -377,6 +377,13 @@ function attachmentSummary(attachment) {
     railPanels: qsa("[data-rail-panel]"),
     voiceButton: qs('[data-action="voice"]'),
     ttsToggleButton: document.querySelector('[data-action="tts-toggle"]'),
+    executionPanel: document.querySelector('[data-execution-panel]'),
+    executionEmpty: document.querySelector('[data-execution-empty]'),
+    executionContent: document.querySelector('[data-execution-content]'),
+    execRunStepButton: document.querySelector('[data-exec-run-step]'),
+    execRunAllButton: document.querySelector('[data-exec-run-all]'),
+    execStopButton: document.querySelector('[data-exec-stop]'),
+    execShowPlanButton: document.querySelector('[data-exec-show-plan]'),
   };
 
 const state = {
@@ -415,8 +422,15 @@ workingContext: {
 },
 
 execution: {
-  active: false,
+  artifactId: "",
+  goal: "",
+  status: "",
+  progress: 0,
+  currentStep: "",
+  currentStepIndex: 0,
   steps: [],
+  stepResults: [],
+  raw: null,
 },
 
   tokenRender: {
@@ -1774,6 +1788,139 @@ function renderSessionList() {
   return;
 }
 
+async function sendExecutionCommand(commandText) {
+  const payload = {
+    user_text: commandText,
+    session_id: state.activeSessionId || "",
+    attachments: [],
+  };
+
+  return consumeChatStreamStable(payload);
+}
+
+function extractExecutionFromArtifact(artifact) {
+
+  if (!artifact || typeof artifact !== "object") return null;
+
+  const direct = artifact.execution && typeof artifact.execution === "object"
+    ? artifact.execution
+    : null;
+
+  const metaExecution = artifact.meta &&
+    typeof artifact.meta === "object" &&
+    artifact.meta.execution &&
+    typeof artifact.meta.execution === "object"
+      ? artifact.meta.execution
+      : null;
+
+  const execution = direct || metaExecution;
+  if (!execution) return null;
+
+  const steps = Array.isArray(execution.steps) ? execution.steps : [];
+  const stepResults = Array.isArray(execution.step_results)
+    ? execution.step_results
+    : (Array.isArray(execution.stepResults) ? execution.stepResults : []);
+
+  return {
+    artifactId: artifact.id || "",
+    goal: execution.goal || artifact.title || "Execution",
+    status: execution.status || "",
+    progress: Number(execution.progress || 0),
+    currentStep: execution.current_step || "",
+    currentStepIndex: Number(execution.current_step_index || 0),
+    steps,
+    stepResults,
+    raw: execution,
+  };
+}
+
+function syncExecutionFromArtifacts() {
+  const artifacts = Array.isArray(state.artifacts) ? state.artifacts : [];
+  let latest = null;
+
+  for (const artifact of artifacts) {
+    const extracted = extractExecutionFromArtifact(artifact);
+    if (!extracted) continue;
+    latest = extracted;
+  }
+
+  if (!latest) {
+    state.execution = {
+      artifactId: "",
+      goal: "",
+      status: "",
+      progress: 0,
+      currentStep: "",
+      currentStepIndex: 0,
+      steps: [],
+      stepResults: [],
+      raw: null,
+    };
+    return;
+  }
+
+  state.execution = latest;
+}
+
+function renderExecutionPanel() {
+  if (!els.executionPanel || !els.executionContent || !els.executionEmpty) return;
+
+  syncExecutionFromArtifacts();
+
+  const execution = state.execution || {};
+  const steps = Array.isArray(execution.steps) ? execution.steps : [];
+  const total = steps.length;
+  const progress = Number(execution.progress || 0);
+  const percent = total > 0 ? Math.max(0, Math.min(100, (progress / total) * 100)) : 0;
+  const status = String(execution.status || "").toLowerCase();
+
+  if (!execution.raw) {
+    els.executionPanel.hidden = true;
+    els.executionEmpty.hidden = true;
+    els.executionContent.hidden = true;
+    els.executionContent.innerHTML = "";
+    return;
+  }
+
+  const stepsHtml = steps.map(function (step, index) {
+    const title = escapeHtml((step && step.title) || `Step ${index + 1}`);
+    const isDone = index < progress || String((step && step.status) || "").toLowerCase() === "done";
+    const isCurrent = index === Number(execution.currentStepIndex || 0) && status !== "complete";
+    const isBlocked = status === "blocked" && isCurrent;
+
+    const classes = [
+      "execution-step",
+      isDone ? "is-done" : "",
+      isCurrent ? "is-current" : "",
+      isBlocked ? "is-blocked" : "",
+    ].filter(Boolean).join(" ");
+
+    return `
+      <div class="${classes}">
+        <div>${isDone ? "✓" : isCurrent ? ">" : "•"} ${title}</div>
+      </div>
+    `;
+  }).join("");
+
+  els.executionPanel.hidden = false;
+  els.executionEmpty.hidden = true;
+  els.executionContent.hidden = false;
+  els.executionContent.innerHTML = `
+    <div class="execution-card">
+      <div class="execution-goal">${escapeHtml(execution.goal || "Execution")}</div>
+      <div class="execution-meta">
+        Status: ${escapeHtml(execution.status || "unknown")} ·
+        Progress: ${progress}/${total} ·
+        Current: ${escapeHtml(execution.currentStep || "complete")}
+      </div>
+      <div class="execution-progress">
+        <div class="execution-progress-bar" style="width:${percent}%"></div>
+      </div>
+      <div class="execution-steps">${stepsHtml}</div>
+    </div>
+  `;
+}
+
 function renderArtifacts() {
   if (!els.artifactList) {
     els.artifactList = document.querySelector("[data-artifact-list]");
@@ -1798,6 +1945,7 @@ function renderArtifacts() {
   if (!sessionArtifacts.length && allArtifacts.length) {
     sessionArtifacts = allArtifacts.slice();
   }
+
 
   function getKindBadge(kind) {
     const kindLabel = String(kind || "artifact").toLowerCase();
@@ -3984,6 +4132,34 @@ if (els.attachButton) {
     });
   }
 
+if (els.execRunStepButton) {
+  els.execRunStepButton.addEventListener("click", function (event) {
+    event.preventDefault();
+    sendExecutionCommand("run it");
+  });
+}
+
+if (els.execRunAllButton) {
+  els.execRunAllButton.addEventListener("click", function (event) {
+    event.preventDefault();
+    sendExecutionCommand("run all");
+  });
+}
+
+if (els.execStopButton) {
+  els.execStopButton.addEventListener("click", function (event) {
+    event.preventDefault();
+    sendExecutionCommand("stop");
+  });
+}
+
+if (els.execShowPlanButton) {
+  els.execShowPlanButton.addEventListener("click", function (event) {
+    event.preventDefault();
+    sendExecutionCommand("show plan");
+  });
+}
+
   if (els.newChatButton) {
     els.newChatButton.addEventListener("click", function (event) {
       event.preventDefault();
@@ -4110,6 +4286,7 @@ async function boot() {
     renderChat();
     renderSessionList();
     renderArtifacts();
+    renderExecutionPanel();
     renderMemory();
   }
 
@@ -4958,6 +5135,8 @@ scrollChatToBottom(true);
     }
   }
 }
+
+
 function consumeChatStream(payload) {
   return consumeChatStreamStable(payload);
 }
