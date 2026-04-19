@@ -141,36 +141,40 @@ class ArtifactService:
                 return self._normalize_artifact(item)
         return None
 
-    def save_artifact(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
-        data = self._read_store()
-        items = data.get("artifacts", [])
+def save_artifact(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
+    data = self._read_store()
+    items = data.get("artifacts", [])
 
-        artifact = dict(artifact or {})
+    artifact = dict(artifact or {})
 
-        now = iso_now()
+    now = iso_now()
 
-        if not artifact.get("id"):
-            import uuid
-            artifact["id"] = f"artifact_{uuid.uuid4().hex}"
+    if not artifact.get("id"):
+        import uuid
+        artifact["id"] = f"artifact_{uuid.uuid4().hex}"
 
-        artifact["updated_at"] = now
-        if not artifact.get("created_at"):
-            artifact["created_at"] = now
+    artifact["updated_at"] = now
+    if not artifact.get("created_at"):
+        artifact["created_at"] = now
 
-        replaced = False
-        for i, existing in enumerate(items):
-            if existing.get("id") == artifact["id"]:
-                items[i] = artifact
-                replaced = True
-                break
+    replaced = False
+    for i, existing in enumerate(items):
+        if existing.get("id") == artifact["id"]:
+            items[i] = artifact
+            replaced = True
+            break
 
-        if not replaced:
-            items.append(artifact)
+    if not replaced:
+        items.append(artifact)
 
-        data["artifacts"] = items
-        self._write_store(data)
+    # 🔥 STORAGE CONTROL (TRIM HERE)
+    MAX_ARTIFACTS = 100
+    items = items[-MAX_ARTIFACTS:]
 
-        return self._normalize_artifact(artifact)
+    data["artifacts"] = items
+    self._write_store(data)
+
+    return self._normalize_artifact(artifact) 
 
     def create(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
         return self.save_artifact(artifact)

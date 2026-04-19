@@ -1777,11 +1777,12 @@ function renderChat() {
 
   console.log("workingContextHtml =", workingContextHtml);
 
-  els.chatThread.innerHTML = workingContextHtml + messagesHtml;
+els.chatThread.innerHTML = workingContextHtml + messagesHtml;
 
-  wireWorkingContextPanel();
-  updateTopbarFromState();
-  scrollChatToBottom(true);
+wireWorkingContextPanel();
+updateTopbarFromState();
+scrollChatToBottom(true);
+renderExecutionPanel();
 }
 
 function renderSessionList() {
@@ -4078,16 +4079,27 @@ async function playVoiceReplyFromText(text) {
 }
 
 function bindEvents() {
+  // 🔥 FIXED composer submit (with debug + safety)
   if (els.composerForm) {
-    els.composerForm.addEventListener("submit", handleComposerSubmit);
+    els.composerForm.addEventListener("submit", function (event) {
+      console.log("COMPOSER SUBMIT FIRED");
+
+      event.preventDefault();
+
+      if (typeof handleComposerSubmit === "function") {
+        return handleComposerSubmit(event);
+      }
+
+      console.warn("handleComposerSubmit is missing or not a function");
+    });
   }
 
-if (els.ttsToggleButton) {
-  els.ttsToggleButton.addEventListener("click", function (event) {
-    event.preventDefault();
-    toggleTtsMute();
-  });
-}
+  if (els.ttsToggleButton) {
+    els.ttsToggleButton.addEventListener("click", function (event) {
+      event.preventDefault();
+      toggleTtsMute();
+    });
+  }
 
   if (els.voiceButton) {
     els.voiceButton.addEventListener("click", function (event) {
@@ -4103,13 +4115,12 @@ if (els.ttsToggleButton) {
     });
   }
 
-
-if (els.attachButton) {
-  els.attachButton.addEventListener("click", function (event) {
-    event.preventDefault();
-    openAttachPicker();
-  });
-}
+  if (els.attachButton) {
+    els.attachButton.addEventListener("click", function (event) {
+      event.preventDefault();
+      openAttachPicker();
+    });
+  }
 
   if (els.attachInput) {
     els.attachInput.addEventListener("change", function (event) {
@@ -4132,33 +4143,34 @@ if (els.attachButton) {
     });
   }
 
-if (els.execRunStepButton) {
-  els.execRunStepButton.addEventListener("click", function (event) {
-    event.preventDefault();
-    sendExecutionCommand("run it");
-  });
-}
+  // 🔥 execution buttons
+  if (els.execRunStepButton) {
+    els.execRunStepButton.addEventListener("click", function (event) {
+      event.preventDefault();
+      sendExecutionCommand("run it");
+    });
+  }
 
-if (els.execRunAllButton) {
-  els.execRunAllButton.addEventListener("click", function (event) {
-    event.preventDefault();
-    sendExecutionCommand("run all");
-  });
-}
+  if (els.execRunAllButton) {
+    els.execRunAllButton.addEventListener("click", function (event) {
+      event.preventDefault();
+      sendExecutionCommand("run all");
+    });
+  }
 
-if (els.execStopButton) {
-  els.execStopButton.addEventListener("click", function (event) {
-    event.preventDefault();
-    sendExecutionCommand("stop");
-  });
-}
+  if (els.execStopButton) {
+    els.execStopButton.addEventListener("click", function (event) {
+      event.preventDefault();
+      sendExecutionCommand("stop");
+    });
+  }
 
-if (els.execShowPlanButton) {
-  els.execShowPlanButton.addEventListener("click", function (event) {
-    event.preventDefault();
-    sendExecutionCommand("show plan");
-  });
-}
+  if (els.execShowPlanButton) {
+    els.execShowPlanButton.addEventListener("click", function (event) {
+      event.preventDefault();
+      sendExecutionCommand("show plan");
+    });
+  }
 
   if (els.newChatButton) {
     els.newChatButton.addEventListener("click", function (event) {

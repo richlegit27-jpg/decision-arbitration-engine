@@ -167,20 +167,28 @@ class SessionService:
         sessions.sort(key=_session_sort_key)
         return sessions
 
-    def _save_sessions(self, sessions, active_session_id=None):
-        sessions = [_normalize_session(s) for s in sessions]
-        sessions.sort(key=_session_sort_key)
+    def _save_sessions(self, sessions, active):
+        MAX_SESSIONS = 25
+        MAX_MESSAGES_PER_SESSION = 50
 
-        active = str(active_session_id or "").strip()
-        if not active and sessions:
-            active = str(sessions[0].get("id") or "").strip()
+        safe_sessions = []
 
-        self._write_store(
-            {
-                "active_session_id": active,
-                "sessions": sessions,
-            }
-        )
+        for s in sessions[-MAX_SESSIONS:]:
+            msgs = s.get("messages") or []
+
+            s["messages"] = msgs[-MAX_MESSAGES_PER_SESSION:]
+
+            if s.get("last_message_preview"):
+                s["last_message_preview"] = str(s["last_message_preview"])[:200]
+
+            safe_sessions.append(s)
+
+        payload = {
+            "sessions": safe_sessions,
+            "active_session_id": active,
+        }
+
+        self._write_store(payload)
 
     def _find(self, sessions, session_id):
         target = str(session_id or "").strip()

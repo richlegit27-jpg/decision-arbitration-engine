@@ -1,16 +1,1 @@
-[
-  {
-    "id": "memory_20260419052909136623",
-    "text": "The bug is in C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py Error: When I send \"run it\" after creating a plan, Nova sometimes throws a UI send error or a backend 500. Expected: After plan creation, \"run it\" should advance one step or return \"Step blocked.\" if data is missing. Actual: Sometimes the UI shows \"Something went wrong sending the message.\"",
-    "kind": "project",
-    "source": "router_auto",
-    "session_id": "session_6fcc10b634394837b3e924cdde9bbaab",
-    "weight": 1.0,
-    "tags": [],
-    "preview": "The bug is in C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py Error: When I send \"run it\" after creating a plan, Nova sometimes th",
-    "quality_score": 5.75,
-    "normalized_text": "The bug is in C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py Error: When I send \"run it\" after creating a plan, Nova sometimes throws a UI send error or a backend 500. Expected: After plan creation, \"run it\" should advance one step or return \"Step blocked.\" if data is missing. Actual: Sometimes the UI shows \"Something went wrong sending the message.\"",
-    "created_at": "2026-04-19T05:29:09.136614+00:00",
-    "updated_at": "2026-04-19T05:29:09.136614+00:00"
-  }
-]
+[]
