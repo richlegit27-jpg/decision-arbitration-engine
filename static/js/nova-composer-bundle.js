@@ -247,11 +247,13 @@ function resolveUploadUrl(url) {
   }
 
 function normalizeMessage(raw) {
-  const item = raw && typeof raw === "object" ? raw : {};
-  const meta = item.meta && typeof item.meta === "object" ? item.meta : {};
-  const artifact = item.artifact && typeof item.artifact === "object" ? item.artifact : {};
-  const viewer = item.viewer && typeof item.viewer === "object" ? item.viewer : {};
+  if (!raw || typeof raw !== "object") return null;
 
+  if (raw.ok === true && raw.assistant_message) {
+    raw = raw.assistant_message;
+  }
+
+  const item = raw;
   const role = String(item.role || "assistant");
   const kind = String(item.kind || "");
   const text = normalizeText(
@@ -261,51 +263,39 @@ function normalizeMessage(raw) {
     item.body ||
     item.message ||
     ""
-  );
+  ).trim();
 
-  const workingContext =
-    item.working_context && typeof item.working_context === "object"
-      ? normalizeWorkingContext(item.working_context)
-      : null;
-
-  const hasWorkingContext =
-    kind === "working_context" ||
-    (workingContext && workingContext.show) ||
-    (workingContext && workingContext.text);
-
-  if (role === "assistant" && !String(text || "").trim() && !hasWorkingContext) {
+  if (role === "assistant" && !text && kind !== "working_context") {
     return null;
   }
 
-  const imageUrl = resolveUploadUrl(
-    item.image_url ||
-    artifact.image_url ||
-    viewer.image_url ||
-    meta.image_url ||
-    ""
-  );
+  if (
+    typeof text === "string" &&
+    (
+      text.includes("'ok': True") ||
+      text.includes('"ok": true') ||
+      text.includes("'assistant_message':") ||
+      text.includes('"assistant_message":')
+    )
+  ) {
+    return null;
+  }
 
   return {
-    id: String(item.id || makeId("msg")),
+    id: item.id || makeId("msg"),
     role: role,
     kind: kind,
     text: text,
-    working_context: workingContext,
-    parent_message_id: String(item.parent_message_id || ""),
-    created_at: String(item.created_at || new Date().toISOString()),
+    attachments: Array.isArray(item.attachments) ? item.attachments : [],
+    meta: item.meta || {},
+    created_at: item.created_at || new Date().toISOString(),
     pending: Boolean(item.pending),
     streaming: Boolean(item.streaming),
-    stopped: Boolean(item.stopped),
     error: Boolean(item.error),
-    source: String(item.source || ""),
-    ui: item.ui && typeof item.ui === "object" ? item.ui : {},
-    meta: meta,
-    artifact: artifact,
-    viewer: viewer,
-    image_url: imageUrl,
-    attachments: safeArray(item.attachments).map(normalizeAttachment),
+    stopped: Boolean(item.stopped),
   };
 }
+
 
 function buildWorkingContextFromWorkingState(rawState) {
   const state = rawState && typeof rawState === "object" ? rawState : {};
@@ -786,10 +776,40 @@ if (els.chatInput) {
   }
 
 function upsertMessage(rawMessage) {
-  const message = normalizeMessage(rawMessage);
+  if (!rawMessage || typeof rawMessage !== "object") return null;
+
+  let safeRaw = rawMessage;
+
+  if (safeRaw.ok === true && safeRaw.assistant_message) {
+    safeRaw = safeRaw.assistant_message;
+  }
+
+  if (
+    typeof safeRaw.text === "string" &&
+    (
+      safeRaw.text.includes("'ok': True") ||
+      safeRaw.text.includes('"ok": true') ||
+      safeRaw.text.includes("'assistant_message':") ||
+      safeRaw.text.includes('"assistant_message":')
+    )
+  ) {
+    return null;
+  }
+
+  const message = normalizeMessage(safeRaw);
   if (!message) return null;
 
-  const existingIndex = state.messages.findIndex((item) => item && item.id === message.id);
+  const existingIndex = state.messages.findIndex(function (item) {
+    if (!item) return false;
+
+    if (message.id && item.id === message.id) return true;
+
+    return (
+      String(item.role || "") === String(message.role || "") &&
+      String(item.text || "").trim() === String(message.text || "").trim() &&
+      String(item.created_at || "") === String(message.created_at || "")
+    );
+  });
 
   if (existingIndex >= 0) {
     state.messages[existingIndex] = message;
@@ -869,15 +889,61 @@ function applyStatePayload(payload) {
     setSessions(data.sessions);
   }
 
-  if (data.active_session && Array.isArray(data.active_session.messages)) {
-    state.messages = data.active_session.messages.map(normalizeMessage);
-  } else if (data.session && Array.isArray(data.session.messages)) {
-    state.messages = data.session.messages.map(normalizeMessage);
-  } else if (Array.isArray(data.messages)) {
-    state.messages = data.messages.map(normalizeMessage);
-  } else {
-    state.messages = state.messages || [];
-  }
+  state.messages = (function () {
+    const incoming =
+      (data.active_session && Array.isArray(data.active_session.messages)
+        ? data.active_session.messages
+        : data.session && Array.isArray(data.session.messages)
+        ? data.session.messages
+        : Array.isArray(data.messages)
+        ? data.messages
+        : []) || [];
+
+    return incoming
+      .map(function (msg) {
+        if (!msg || typeof msg !== "object") return null;
+
+        if (msg.ok === true && msg.assistant_message) {
+          msg = msg.assistant_message;
+        }
+
+        if (
+          typeof msg.text === "string" &&
+          (
+            msg.text.includes("'ok': True") ||
+            msg.text.includes('"ok": true') ||
+            msg.text.includes("'assistant_message':") ||
+            msg.text.includes('"assistant_message":')
+          )
+        ) {
+          return null;
+        }
+
+        return normalizeMessage(msg);
+      })
+      .filter(Boolean);
+  })();
+
+  state.messages = state.messages.filter(function (msg, index, arr) {
+    if (!msg) return false;
+
+    if (msg.kind === "working_context") return false;
+
+    const role = String(msg.role || "");
+    const text = String(msg.text || "").trim();
+    const created = String(msg.created_at || "");
+
+    const firstMatchIndex = arr.findIndex(function (other) {
+      return (
+        other &&
+        String(other.role || "") === role &&
+        String(other.text || "").trim() === text &&
+        String(other.created_at || "") === created
+      );
+    });
+
+    return firstMatchIndex === index;
+  });
 
   state.messages = state.messages.filter(function (msg) {
     return msg && msg.kind !== "working_context";
@@ -973,6 +1039,12 @@ if (backendWorkingContext) {
 
   if (typeof renderWeb === "function") {
     renderWeb();
+  }
+
+  if (state.stream) {
+    state.stream.placeholderId = "";
+    state.stream.messageId = "";
+    state.stream.targetMessageId = "";
   }
 
   updateTopbarFromState();
@@ -1651,12 +1723,29 @@ function wireWorkingContextPanel() {
   };
 }
 
-
 function renderChat() {
   if (!els.chatThread) return;
 
+  // remove working_context artifacts
   state.messages = (state.messages || []).filter(function (msg) {
     return !(msg && msg.kind === "working_context");
+  });
+
+  // 🔥 stable chronological sort + role tie-break
+  state.messages = (state.messages || []).slice().sort(function (a, b) {
+    const at = Date.parse(a && a.created_at ? a.created_at : "") || 0;
+    const bt = Date.parse(b && b.created_at ? b.created_at : "") || 0;
+
+    if (at !== bt) return at - bt;
+
+    const aRole = String((a && a.role) || "");
+    const bRole = String((b && b.role) || "");
+
+    if (aRole === bRole) return 0;
+    if (aRole === "user" && bRole === "assistant") return -1;
+    if (aRole === "assistant" && bRole === "user") return 1;
+
+    return 0;
   });
 
   setChatEmptyVisible(state.messages.length === 0);
@@ -1673,7 +1762,9 @@ function renderChat() {
   );
 
   console.log("workingContextHtml =", workingContextHtml);
+
   els.chatThread.innerHTML = workingContextHtml + messagesHtml;
+
   wireWorkingContextPanel();
   updateTopbarFromState();
   scrollChatToBottom(true);
@@ -2951,17 +3042,55 @@ if (!(error instanceof TypeError)) {
   };
 }
 
-
 function appendUserMessageLocal(text, attachments) {
-  const message = normalizeMessage({
-    id: makeId("user"),
+  const messageId = makeId("user");
+
+  const normalizedAttachments = Array.isArray(attachments)
+    ? attachments.map(function (item) {
+        return {
+          id: String(item && item.id ? item.id : ""),
+          filename: String(
+            (item && (item.filename || item.name)) || ""
+          ),
+          name: String(
+            (item && (item.name || item.filename)) || ""
+          ),
+          stored_name: String(item && item.stored_name ? item.stored_name : ""),
+          file_url: String(item && item.file_url ? item.file_url : ""),
+          url: String(
+            (item && (item.url || item.file_url)) || ""
+          ),
+          mime_type: String(
+            (item && item.mime_type) || "application/octet-stream"
+          ),
+          size: Number((item && item.size) || 0),
+          status: "uploaded",
+          upload_error: "",
+        };
+      })
+    : [];
+
+  const userMessage = {
+    id: messageId,
     role: "user",
-    text: text,
-    attachments: safeArray(attachments).map(normalizeAttachment),
+    kind: "message",
+    text: String(text || ""),
     created_at: new Date().toISOString(),
-  });
-  upsertMessage(message);
-  return message;
+    pending: false,
+    streaming: false,
+    error: false,
+    stopped: false,
+    attachments: normalizedAttachments,
+    meta: {},
+  };
+
+  if (!Array.isArray(state.messages)) {
+    state.messages = [];
+  }
+
+  state.messages.push(userMessage);
+  renderChat();
+  return userMessage;
 }
 
 async function consumeChatJson(payload) {
@@ -3118,7 +3247,11 @@ async function consumeChatJson(payload) {
 }
 
 async function sendMessage() {
-  const inputEl = els.chatInput || document.querySelector("[data-chat-input]") || document.querySelector("textarea");
+  const inputEl =
+    els.chatInput ||
+    document.querySelector("[data-chat-input]") ||
+    document.querySelector("textarea");
+
   const text = String((inputEl && inputEl.value) || "").trim();
 
   console.log("sendMessage ENTERED", {
@@ -3144,7 +3277,7 @@ async function sendMessage() {
     state.imageGenPlaceholderId = tempId;
   }
 
-  const attachments = state.pendingUploads
+  const attachments = (state.pendingUploads || [])
     .filter(function (item) {
       return (
         item &&
@@ -3229,7 +3362,7 @@ async function sendMessage() {
         id: pendingAssistantId,
         role: "assistant",
         text: "",
-        created_at: new Date().toISOString(),
+        created_at: new Date(Date.now() + 1).toISOString(),
         pending: true,
         streaming: true,
         error: false,
@@ -4686,42 +4819,18 @@ async function consumeChatStreamStable(payload) {
         return {};
       });
 
-      if (data.session_id) {
-        state.activeSessionId = String(data.session_id || "");
-      } else if (data.session && data.session.id) {
-        state.activeSessionId = String(data.session.id || "");
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || ("Request failed: " + response.status));
       }
 
-      if (Array.isArray(data.sessions)) {
-        setSessions(data.sessions);
-      }
+      applyStatePayload(data);
 
-      if (data.session && Array.isArray(data.session.messages)) {
-        state.messages = data.session.messages.map(normalizeMessage);
-      } else if (Array.isArray(data.messages)) {
-        state.messages = data.messages.map(normalizeMessage);
-      } else if (data.assistant_message) {
-        upsertMessage(data.assistant_message);
-      }
+      finishStreamUi({
+        statusState: "idle",
+        statusText: "Ready",
+      });
 
-      if (Array.isArray(data.artifacts)) {
-        state.artifacts = data.artifacts;
-        renderArtifacts();
-      }
-
-      if (Array.isArray(data.memory)) {
-        state.memory = data.memory;
-        renderMemory();
-      }
-
-      flushTokensNow();
-      clearTokenRenderState();
-      finishStreamUi({ statusState: "idle", statusText: "Ready" });
-      renderSessionList();
-      renderChat();
-      updateTopbarFromState();
-      scrollChatToBottom(true);
-      return;
+      return data;
     }
 
     if (!response.body || typeof response.body.getReader !== "function") {
