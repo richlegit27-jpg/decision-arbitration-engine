@@ -319,17 +319,16 @@ class WebService:
 
     def _summarize_search_results(self, query: str, results: List[dict]) -> str:
         if not results:
-            return f'No recent web results found for "{query}".'
+            return f'I searched for "{query}" but didn’t find strong results. Try opening a specific site or refining the query.'
 
         lines: List[str] = []
+
         for item in results[:3]:
             title = str(item.get("title") or "").strip()
             snippet = str(item.get("snippet") or "").strip()
             domain = str(item.get("domain") or "").strip()
 
-            if title and snippet and domain:
-                lines.append(f"{title} ({domain}): {snippet}")
-            elif title and snippet:
+            if title and snippet:
                 lines.append(f"{title}: {snippet}")
             elif title:
                 lines.append(title)

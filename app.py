@@ -603,6 +603,44 @@ def api_chat():
         attachments=attachments,
     )
 
+    lowered = user_text.lower()
+
+    has_url = (
+        "http://" in lowered
+        or "https://" in lowered
+        or bool(re.search(r"\bwww\.[^\s]+\.[^\s]+\b", lowered))
+    )
+
+    looks_like_web_search = (
+        lowered.startswith("search ")
+        or lowered.startswith("look up ")
+        or lowered.startswith("lookup ")
+        or lowered.startswith("find ")
+        or lowered.startswith("latest ")
+        or lowered.startswith("news ")
+        or lowered.startswith("current ")
+        or lowered.startswith("today ")
+        or " latest " in lowered
+        or " news " in lowered
+        or " current " in lowered
+        or " today " in lowered
+    )
+
+    if has_url:
+        if "url" not in decision or not str(decision.get("url") or "").strip():
+            m = re.search(r"(https?://[^\s]+)", user_text, re.IGNORECASE)
+            if m:
+                decision["url"] = m.group(1).strip()
+            else:
+                m = re.search(r"\b(www\.[^\s]+\.[^\s]+)\b", user_text, re.IGNORECASE)
+                if m:
+                    decision["url"] = "https://" + m.group(1).strip()
+
+        decision["route"] = "web"
+
+    elif looks_like_web_search:
+        decision["route"] = "web_search"
+
     try:
         # identity recall
         if any(p.search(user_text) for p in IDENTITY_QUESTION_PATTERNS):
@@ -627,13 +665,62 @@ def api_chat():
             return json_ok(**payload)
 
         # web route
+        # web search route
+        if decision.get("route") == "web_search":
+            query = user_text.strip()
+            result = web_service.search(query)
+
+            artifact_payload = web_service.build_search_artifact_payload(result)
+
+            payload = build_common_state_payload(session_id=session_id)
+            payload.update(
+                {
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": result.get("summary")
+                        or f'Web search completed for "{query}".',
+                    },
+                    "saved_artifact": artifact_payload,
+                    "web_result": result,
+                    "debug": {
+                        "decision": decision,
+                        "route_taken": "web_search",
+                    },
+                }
+            )
+            return json_ok(**payload)
+
+        # web route
         if decision.get("route") == "web":
             url = str(decision.get("url") or "").strip()
             if not url:
                 return json_error("URL could not be determined", 400)
 
             result = web_service.fetch(url)
+
             if not result.get("ok"):
+                search_result = web_service.search(url)
+                if search_result.get("ok"):
+                    artifact_payload = web_service.build_search_artifact_payload(search_result)
+
+                    payload = build_common_state_payload(session_id=session_id)
+                    payload.update(
+                        {
+                            "assistant_message": {
+                                "role": "assistant",
+                                "text": search_result.get("summary")
+                                or f'Web search completed for "{url}".',
+                            },
+                            "saved_artifact": artifact_payload,
+                            "web_result": search_result,
+                            "debug": {
+                                "decision": decision,
+                                "route_taken": "web_search_fallback",
+                            },
+                        }
+                    )
+                    return json_ok(**payload)
+
                 return json_error(result.get("error") or "Fetch failed", 500)
 
             artifact_payload = web_service.build_artifact_payload(result)
@@ -656,7 +743,6 @@ def api_chat():
                 }
             )
             return json_ok(**payload)
-
         # recon route
         if decision.get("route") == "recon":
             url = str(decision.get("url") or "").strip()
