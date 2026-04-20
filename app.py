@@ -28,10 +28,9 @@ from nova_backend.services.artifact_service import ArtifactService
 from nova_backend.services.memory_service import MemoryService
 from nova_backend.services.web_service import WebService
 from nova_backend.services.recon_service import ReconService
-from nova_backend.services.chat_service import ChatService
 from nova_backend.services.intent_router_service import IntentRouterService
 from nova_backend.utils.file_utils import ensure_dir
-
+from nova_backend.services.chat_service import ChatService
 
 # -----------------------
 # APP SETUP

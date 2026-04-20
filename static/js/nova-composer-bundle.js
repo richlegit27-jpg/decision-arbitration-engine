@@ -1587,17 +1587,31 @@ function renderWorkingContextPanel() {
     );
   }
 
+  const collapsedClass = wc.collapsed ? " is-collapsed" : "";
+  const buttonLabel = wc.collapsed ? "Expand working context" : "Collapse working context";
+  const chevron = wc.collapsed ? "▸" : "▾";
+
+  console.log("renderWorkingContextPanel HTML", wc, items);
+
   return `
-    <section class="nova-working-context-panel" data-working-context-panel>
-      <div class="nova-working-context-header">
-        <span class="nova-working-context-kicker">Working context</span>
-      </div>
-      <div class="nova-working-context-body">
+    <section class="nova-working-context-panel${collapsedClass}" data-working-context-panel>
+      <button
+        type="button"
+        class="nova-working-context-toggle"
+        data-working-context-toggle
+        aria-label="${escapeHtml(buttonLabel)}"
+        aria-expanded="${wc.collapsed ? "false" : "true"}"
+      >
+        <span class="nova-working-context-toggle-icon">${chevron}</span>
+        <span class="nova-working-context-title">Working context</span>
+      </button>
+      <div class="nova-working-context-body"${wc.collapsed ? ' hidden' : ""}>
         ${items.join("")}
       </div>
     </section>
   `;
 }
+
 function normalizeWorkingContext(raw) {
   const input = raw && typeof raw === "object" ? raw : {};
   const rawState =
@@ -1722,11 +1736,14 @@ function renderWorkingContextPanel() {
 
 function wireWorkingContextPanel() {
   if (!els.chatThread) return;
+  if (els.chatThread.__workingContextWired) return;
 
-  const toggle = els.chatThread.querySelector("[data-working-context-toggle]");
-  if (!toggle) return;
+  els.chatThread.__workingContextWired = true;
 
-  toggle.onclick = function () {
+  els.chatThread.addEventListener("click", function (event) {
+    const toggle = event.target.closest("[data-working-context-toggle]");
+    if (!toggle) return;
+
     const current = normalizeWorkingContext(state.workingContext || emptyWorkingContext());
 
     state.workingContext = Object.assign({}, current, {
@@ -1734,18 +1751,16 @@ function wireWorkingContextPanel() {
     });
 
     renderChat();
-  };
+  });
 }
 
 function renderChat() {
   if (!els.chatThread) return;
 
-  // remove working_context artifacts
   state.messages = (state.messages || []).filter(function (msg) {
     return !(msg && msg.kind === "working_context");
   });
 
-  // 🔥 stable chronological sort + role tie-break
   state.messages = (state.messages || []).slice().sort(function (a, b) {
     const at = Date.parse(a && a.created_at ? a.created_at : "") || 0;
     const bt = Date.parse(b && b.created_at ? b.created_at : "") || 0;
@@ -1766,23 +1781,17 @@ function renderChat() {
 
   const workingContextHtml = renderWorkingContextPanel();
   const messagesHtml = state.messages.map(renderMessageCard).join("");
+  const nextHtml = workingContextHtml + messagesHtml;
 
-  log("renderChat workingContext", state.workingContext);
-  log(
-    "renderChat working_context rows",
-    state.messages.filter(function (msg) {
-      return msg && msg.kind === "working_context";
-    })
-  );
+  if (els.chatThread.__lastRenderHtml !== nextHtml) {
+    els.chatThread.innerHTML = nextHtml;
+    els.chatThread.__lastRenderHtml = nextHtml;
+  }
 
-  console.log("workingContextHtml =", workingContextHtml);
-
-els.chatThread.innerHTML = workingContextHtml + messagesHtml;
-
-wireWorkingContextPanel();
-updateTopbarFromState();
-scrollChatToBottom(true);
-renderExecutionPanel();
+  wireWorkingContextPanel();
+  updateTopbarFromState();
+  scrollChatToBottom(true);
+  renderExecutionPanel();
 }
 
 function renderSessionList() {

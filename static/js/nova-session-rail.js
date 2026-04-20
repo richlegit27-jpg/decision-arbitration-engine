@@ -59,14 +59,15 @@ const state = {
     );
   }
 
-  function getNewBtnEl() {
-    return (
-      q("#newSessionBtn") ||
-      q("#sessionNewBtn") ||
-      q("[data-session-new]") ||
-      q(".nova-session-new")
-    );
-  }
+function getNewBtnEl() {
+  return (
+    q("#newSessionBtn") ||
+    q("#sessionNewBtn") ||
+    q("[data-new-chat]") ||
+    q("[data-session-new]") ||
+    q(".nova-session-new")
+  );
+}
 
   function getStatusEl() {
     return (
@@ -388,7 +389,6 @@ function render() {
 
       return `
         <div class="nova-session-item ${isActive ? "is-active" : ""}" data-session-id="${sessionId}">
-          
           <button
             type="button"
             class="nova-session-main"
@@ -433,19 +433,24 @@ function render() {
               title="Delete"
             >🗑</button>
           </div>
-
         </div>
       `;
     })
     .join("");
 
-  // 🔥 FORCE CLICK BIND AFTER RENDER
   els.list.querySelectorAll(".nova-session-main").forEach(function (btn) {
-    btn.onclick = function () {
+    btn.onclick = async function () {
       const id = btn.getAttribute("data-session-id");
-      console.log("SESSION CLICK DIRECT:", id);
-      if (window.NovaSessionRail?.selectSession) {
-        window.NovaSessionRail.selectSession(id);
+      if (!id || id === state.activeSessionId) return;
+
+      btn.disabled = true;
+      try {
+        await selectSession(id);
+      } catch (err) {
+        console.error("NovaSessionRail direct select failed:", err);
+        setStatus(err?.payload?.message || err?.message || "Select failed");
+      } finally {
+        btn.disabled = false;
       }
     };
   });
@@ -532,41 +537,41 @@ function wireList() {
 }
 
 function wireEvents() {
-    document.addEventListener(
-      "nova:request-session-reload",
-      async function (event) {
-        try {
-          await reloadFromBackend(
-            event?.detail?.sessionId || state.activeSessionId || ""
-          );
-        } catch (err) {
-          console.error("NovaSessionRail reload failed:", err);
-          setStatus(err?.payload?.message || err?.message || "Reload failed");
-        }
-      }
-    );
-
-    document.addEventListener("nova:select-session", async function (event) {
-      const sessionId = event?.detail?.sessionId || "";
-      if (!sessionId) return;
-
+  document.addEventListener(
+    "nova:request-session-reload",
+    async function (event) {
       try {
-        await selectSession(sessionId);
+        await reloadFromBackend(
+          event?.detail?.sessionId || state.activeSessionId || ""
+        );
       } catch (err) {
-        console.error("NovaSessionRail select event failed:", err);
-        setStatus(err?.payload?.message || err?.message || "Select failed");
+        console.error("NovaSessionRail reload failed:", err);
+        setStatus(err?.payload?.message || err?.message || "Reload failed");
       }
-    });
+    }
+  );
 
-    document.addEventListener("nova:create-session", async function () {
-      try {
-        await createSession();
-      } catch (err) {
-        console.error("NovaSessionRail create event failed:", err);
-        setStatus(err?.payload?.message || err?.message || "Create failed");
-      }
-    });
-  }
+  document.addEventListener("nova:select-session", async function (event) {
+    const sessionId = event?.detail?.sessionId || "";
+    if (!sessionId) return;
+
+    try {
+      await selectSession(sessionId);
+    } catch (err) {
+      console.error("NovaSessionRail select event failed:", err);
+      setStatus(err?.payload?.message || err?.message || "Select failed");
+    }
+  });
+
+  document.addEventListener("nova:create-session", async function () {
+    try {
+      await createSession();
+    } catch (err) {
+      console.error("NovaSessionRail create event failed:", err);
+      setStatus(err?.payload?.message || err?.message || "Create failed");
+    }
+  });
+}
 
 async function boot() {
   bindEls();

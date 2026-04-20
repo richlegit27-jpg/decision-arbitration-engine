@@ -9003,3 +9003,308 @@ button.nova-button {
   gap: 8px;
   margin-top: 8px;
 }
+
+.nova-execution-viewer {
+  position: static !important;
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.nova-execution-viewer *,
+.nova-execution-viewer *::before,
+.nova-execution-viewer *::after {
+  box-sizing: border-box;
+}
+
+.nova-execution-viewer__header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.nova-execution-viewer__section {
+  margin-top: 16px;
+}
+
+.nova-execution-viewer__summary {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.nova-viewer[data-rail-viewer] {
+  position: relative !important;
+  overflow: auto !important;
+}
+
+.nova-viewer[data-rail-viewer] .nova-viewer-shell {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+/* === KILL OLD EXECUTION PANEL === */
+[data-execution-panel],
+[data-execution-empty],
+[data-execution-content],
+[data-exec-run-step],
+[data-exec-run-all],
+[data-exec-stop],
+[data-exec-show-plan] {
+  display: none !important;
+}
+
+/* execution step base */
+.nova-execution-step {
+  padding: 8px 10px;
+  border-radius: 10px;
+  margin-bottom: 6px;
+  opacity: 0.6;
+  transition: all 0.25s ease;
+}
+
+/* layout */
+.nova-execution-step__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nova-execution-step__marker {
+  width: 14px;
+  text-align: center;
+  font-weight: bold;
+}
+
+/* CURRENT STEP */
+.nova-execution-step--current {
+  opacity: 1;
+  background: rgba(0, 150, 255, 0.08);
+}
+
+.nova-execution-step--current .nova-execution-step__marker {
+  color: #00aaff;
+  text-shadow: 0 0 6px #00aaff;
+}
+
+/* COMPLETED */
+.nova-execution-step--done {
+  opacity: 0.9;
+}
+
+.nova-execution-step--done .nova-execution-step__marker {
+  color: #00cc66;
+}
+
+/* TODO */
+.nova-execution-step--todo {
+  opacity: 0.4;
+}
+
+/* result block */
+.nova-execution-step__result {
+  margin-top: 6px;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+/* pulse animation */
+.nova-execution-step--current {
+  animation: novaPulse 0.4s ease;
+}
+
+@keyframes novaPulse {
+  0% { transform: scale(0.98); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+.nova-session-item
+.nova-session-item.is-active
+.nova-session-main
+.nova-session-title-row
+.nova-session-title
+.nova-session-meta-row
+.nova-session-preview
+.nova-session-actions
+.nova-session-action
+.nova-session-action.danger
+.nova-session-pin-badge
+.nova-session-empty
+
+/* =========================
+   NOVA SESSION RAIL POLISH
+   ========================= */
+
+.nova-session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 6px;
+  border-radius: 10px;
+  margin-bottom: 4px;
+  transition: background 0.15s ease, transform 0.08s ease;
+}
+
+.nova-session-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.nova-session-item.is-active {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.nova-session-main {
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nova-session-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nova-session-title {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nova-session-meta-row {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.nova-session-preview {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nova-session-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.nova-session-item:hover .nova-session-actions,
+.nova-session-item.is-active .nova-session-actions {
+  opacity: 1;
+}
+
+.nova-session-action {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, transform 0.08s ease;
+}
+
+.nova-session-action:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.nova-session-action.danger:hover {
+  color: #ff5c5c;
+}
+
+.nova-session-pin-badge {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.nova-session-empty {
+  padding: 12px;
+  text-align: center;
+  opacity: 0.6;
+}
+
+/* =========================
+   LEFT RAIL FINAL TIGHTEN
+   ========================= */
+
+.nova-session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nova-session-item {
+  min-height: 54px;
+  border: 1px solid transparent;
+}
+
+.nova-session-item:hover {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.nova-session-item.is-active {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.nova-session-main {
+  min-width: 0;
+}
+
+.nova-session-title-row,
+.nova-session-meta-row {
+  min-width: 0;
+}
+
+.nova-session-title,
+.nova-session-preview {
+  display: block;
+  min-width: 0;
+}
+
+.nova-session-actions {
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.nova-session-action {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.nova-session-action:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nova-session-action.danger:hover {
+  background: rgba(255, 92, 92, 0.12);
+}
+
+.nova-session-empty-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nova-session-empty-subtitle {
+  font-size: 12px;
+  margin-top: 4px;
+  opacity: 0.7;
+}
