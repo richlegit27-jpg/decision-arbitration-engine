@@ -1,29 +1,5 @@
-﻿(function () {
+(function () {
   "use strict";
-
-  function findArtifactById(artifactId) {
-    try {
-      const targetId = String(artifactId || "").trim();
-      if (!targetId) return null;
-
-      const list = Array.isArray(state && state.artifacts) ? state.artifacts : [];
-
-      for (let i = 0; i < list.length; i++) {
-        const item = list[i];
-        if (!item) continue;
-
-        const id = String(item.id || item.artifact_id || item._id || "").trim();
-        if (id === targetId) {
-          return item;
-        }
-      }
-
-      return null;
-    } catch (e) {
-      console.warn("[findArtifactById] failed", e);
-      return null;
-    }
-  }
 
   if (window.NovaComposerBundle) return;
 
@@ -33,54 +9,106 @@
     } catch (_) {}
   }
 
-async function jumpToSessionAndSync(sessionId, options) {
-  const opts = options || {};
-  const targetSessionId = String(sessionId || "").trim();
-  if (!targetSessionId) return false;
+  function applyBackendSessionState(payload, explicitSessionId) {
+    const data = payload && typeof payload === "object" ? payload : {};
 
-  try {
-    const response = await fetch("/api/sessions/switch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: targetSessionId }),
-      credentials: "same-origin",
-    });
+    if (explicitSessionId && typeof data === "object" && data) {
+      data.active_session_id = data.active_session_id || explicitSessionId;
+    }
 
-    if (!response.ok) throw new Error("switch failed");
+    if (typeof hydrateFromState === "function") {
+      hydrateFromState(data || {});
+      return;
+    }
 
-    const stateRes = await fetch("/api/state");
-    const data = await stateRes.json();
+    const resolvedSession =
+      data.session && typeof data.session === "object"
+        ? data.session
+        : data.active_session && typeof data.active_session === "object"
+          ? data.active_session
+          : null;
 
-if (typeof hydrateFromState === "function") {
-  hydrateFromState(data || {});
-}
+    const resolvedSessionId = String(
+      explicitSessionId ||
+      data.active_session_id ||
+      (resolvedSession && resolvedSession.id) ||
+      data.session_id ||
+      state.activeSessionId ||
+      ""
+    ).trim();
 
-// HARD RESET RAIL (CRITICAL)
-state.rail.selectedId = "";
-state.rail.selectedKind = "";
-if (els.railViewer) {
-  els.railViewer.innerHTML = "";
-  els.railViewer.hidden = true;
-}
+    if (resolvedSessionId) {
+      state.activeSessionId = resolvedSessionId;
+    }
 
-if (state.pendingArtifactOpenId) {
-  const id = state.pendingArtifactOpenId;
-  state.pendingArtifactOpenId = "";
+    if (resolvedSession && Array.isArray(resolvedSession.messages)) {
+      state.messages = resolvedSession.messages.map(normalizeMessage);
+    } else if (Array.isArray(data.messages)) {
+      state.messages = data.messages.map(normalizeMessage);
+    }
 
-  if (id) {
-    openArtifactFromStateOrBackend(id);
+    if (Array.isArray(data.artifacts)) {
+      state.artifacts = data.artifacts.map(normalizeArtifact);
+    }
+
+    if (Array.isArray(data.memory)) {
+      state.memory = data.memory.map(normalizeMemoryItem);
+    }
+
+    renderChat();
+    renderArtifacts();
+    renderMemory();
+    updateTopbarFromState();
+    scrollChatToBottom(true);
   }
-}
 
-    showToast("Session synced", "success");
-    return true;
+  async function jumpToSessionAndSync(sessionId, options) {
+    const opts = options || {};
+    const targetSessionId = String(sessionId || "").trim();
+    if (!targetSessionId) return false;
 
-  } catch (e) {
-    warn("jumpToSessionAndSync failed", e);
-    showToast("Session sync failed", "error");
-    return false;
+    try {
+      const response = await fetch("/api/sessions/switch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: targetSessionId }),
+        credentials: "same-origin",
+      });
+
+      if (!response.ok) throw new Error("switch failed");
+
+      const stateRes = await fetch("/api/state", {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      const data = await stateRes.json();
+
+      applyBackendSessionState(data || {}, targetSessionId);
+
+      state.rail.selectedId = "";
+      state.rail.selectedKind = "";
+      if (els.railViewer) {
+        els.railViewer.innerHTML = "";
+        els.railViewer.hidden = true;
+      }
+
+      if (state.pendingArtifactOpenId) {
+        const id = state.pendingArtifactOpenId;
+        state.pendingArtifactOpenId = "";
+
+        if (id) {
+          openArtifactFromStateOrBackend(id);
+        }
+      }
+
+      showToast("Session synced", "success");
+      return true;
+    } catch (e) {
+      console.warn("jumpToSessionAndSync failed", e);
+      showToast("Session sync failed", "error");
+      return false;
+    }
   }
-}
 
 function resolveUploadUrl(url) {
   const raw = String(url || "").trim();
@@ -890,14 +918,27 @@ function removeMessage(messageId) {
 function applyStatePayload(payload) {
   const data = payload && typeof payload === "object" ? payload : {};
 
-  state.activeSessionId = String(
+// 🔥 LOCK: respect rail first, fallback to backend
+let nextSessionId = "";
+
+if (window.NovaSessionRail?.getActiveSessionId) {
+  const railId = window.NovaSessionRail.getActiveSessionId();
+  if (railId) {
+    nextSessionId = railId;
+  }
+}
+
+if (!nextSessionId) {
+  nextSessionId = String(
     data.active_session_id ||
     data.session_id ||
     (data.session && data.session.id) ||
     (data.active_session && data.active_session.id) ||
-    state.activeSessionId ||
     ""
   ).trim();
+}
+
+state.activeSessionId = nextSessionId;
 
   if (Array.isArray(data.sessions)) {
     setSessions(data.sessions);
@@ -1078,27 +1119,20 @@ if (backendWorkingContext) {
 }
 
 // ==============================
-// 🔥 SESSION RESTORE (GLOBAL)
+// 🔥 UNIFIED SESSION SWITCH (LOCKED)
 // ==============================
 window.openSessionFromBackend = async function (sessionId) {
   const id = String(sessionId || "").trim();
-  if (!id) return;
+  if (!id) return false;
 
-  const res = await fetch(`/api/sessions/${id}`, {
-    method: "GET",
-    credentials: "same-origin",
-  });
-
-  if (!res.ok) {
-    throw new Error("Failed to load session");
+  if (typeof jumpToSessionAndSync === "function") {
+    return await jumpToSessionAndSync(id);
   }
 
-  const payload = await res.json();
-
-  if (typeof applyStatePayload === "function") {
-    applyStatePayload(payload);
-  }
+  console.warn("jumpToSessionAndSync missing");
+  return false;
 };
+
 
 // ==============================
 // 🔥 ARTIFACT → CHAT BRIDGE
@@ -1410,7 +1444,7 @@ function renderAttachmentBlock(attachment) {
     '<a href="' +
     escapeHtml(href || "#") +
     '" target="_blank" rel="noopener noreferrer" class="message-attachment__file-link">' +
-    '<div class="message-attachment__icon">ðŸ“Ž</div>' +
+    '<div class="message-attachment__icon">📎</div>' +
     '<div class="message-attachment__footer">' +
     '<div class="message-attachment__name">' +
     escapeHtml(name) +
@@ -5098,14 +5132,14 @@ async function consumeChatStreamStable(payload) {
 
 flushTokensNow();
 
-if (state.stream && state.stream.targetMessageId) {
-  try {
-    const latestState = await apiGet("/api/state");
-    applyStatePayload(latestState || {});
-  } catch (error) {
-    console.warn("final state refresh failed", error);
-  }
+try {
+  const latestState = await apiGet("/api/state");
+  applyStatePayload(latestState || {});
+} catch (error) {
+  console.warn("final state refresh failed", error);
+}
 
+if (state.stream && state.stream.targetMessageId) {
   finalizeStreamMessage({
     message_id: state.stream.targetMessageId,
     text: (
@@ -5294,5 +5328,10 @@ if (btn) {
     openRail();
   };
 }
+
+window.NovaComposerBundle = {
+  applyBackendSessionState,
+  jumpToSessionAndSync,
+};
 
 })();

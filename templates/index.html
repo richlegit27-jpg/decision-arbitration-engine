@@ -104,7 +104,7 @@
                 aria-label="Attach"
                 title="Attach"
               >
-                ï¼‹
+                +
               </button>
 
               <button
@@ -114,7 +114,7 @@
                 aria-label="Voice"
                 title="Voice"
               >
-                ðŸŽ¤
+                Mic
               </button>
             </div>
 
@@ -256,17 +256,18 @@
 
   <div class="nova-sidebar-backdrop" data-sidebar-backdrop hidden></div>
 
-  <div id="rail-reopen-root">
-    <button
-      id="rail-reopen-btn"
-      type="button"
-      aria-label="Open right panel"
-      onclick="(function(){document.body.classList.add('is-rail-open');var rail=document.querySelector('.nova-rail');if(rail){rail.classList.add('is-open');}})()"
-    >â˜°</button>
-  </div>
+<div id="rail-reopen-root">
+  <button
+    id="rail-reopen-btn"
+    type="button"
+    aria-label="Open right panel"
+    onclick="(function(){document.body.classList.add('is-rail-open');var rail=document.querySelector('.nova-rail');if(rail){rail.classList.add('is-open');}})()"
+  >&#9776;</button>
+</div>
 
-  <script src="/static/js/nova-composer-bundle.js?v=stream-memory-lock-2026-04-16-004"></script>
-  <script src="/static/js/nova-session-rail.js?v=session-split-2026-04-12-001"></script>
-  <script src="/static/js/nova-memory.js?v=memory-panel-2026-04-15-002"></script>
+<!-- <script src="/static/js/nova-execution-viewer.js"></script> -->
+<script src="/static/js/nova-composer-bundle.js?v=left-panel-lock-2026-04-20-001"></script>
+<script src="/static/js/nova-session-rail.js?v=session-rail-fix-2026-04-20-001"></script>
+<script src="/static/js/nova-memory.js?v=memory-panel-2026-04-15-002"></script>
 </body>
 </html>
