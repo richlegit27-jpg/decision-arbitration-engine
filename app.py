@@ -32,6 +32,7 @@ from nova_backend.services.intent_router_service import IntentRouterService
 from nova_backend.utils.file_utils import ensure_dir
 from nova_backend.services.chat_service import ChatService
 
+
 # -----------------------
 # APP SETUP
 # -----------------------
@@ -737,20 +738,33 @@ def api_chat():
                 result["debug"]["artifact_persist_error"] = str(e)
 
         existing_debug = result.get("debug") if isinstance(result.get("debug"), dict) else {}
-
-        assistant_message = result.get("assistant_message")
         saved_artifact = result.get("saved_artifact")
 
-        # FORCE TEXT INTO CHAT MESSAGE
-        if isinstance(assistant_message, dict):
-            text = (
-                assistant_message.get("text")
-                or (saved_artifact or {}).get("body")
-                or (saved_artifact or {}).get("text")
-                or ((saved_artifact or {}).get("viewer") or {}).get("body")
-                or "Generated"
-            )
-            assistant_message["text"] = text
+        session_payload = result.get("session")
+        if not isinstance(session_payload, dict):
+            session_payload = session_service.get_session(session_id) or {}
+
+        session_messages = session_payload.get("messages") if isinstance(session_payload.get("messages"), list) else []
+
+        final_text = ""
+        for msg in reversed(session_messages):
+            if not isinstance(msg, dict):
+                continue
+            if str(msg.get("role") or "").strip().lower() != "assistant":
+                continue
+
+            candidate = str(msg.get("text") or "").strip()
+            if candidate and candidate.lower() != "none":
+                final_text = candidate
+                break
+
+        if not final_text:
+            final_text = "I'm here. Tell me what you need."
+
+        assistant_message = {
+            "role": "assistant",
+            "text": final_text,
+        }
 
         # ATTACH IMAGE TO CHAT MESSAGE
         if isinstance(assistant_message, dict) and isinstance(saved_artifact, dict):
@@ -813,6 +827,7 @@ def api_session_by_id(session_id: str):
 
     return json_ok(
         session=session,
+        sessions=session_service.get_all(),
         active_session_id=session_service.active_session_id,
     )
 
@@ -822,55 +837,34 @@ def api_sessions_new():
     data = request_json()
     title = str(data.get("title") or "New Chat").strip() or "New Chat"
 
-    session = session_service.create(title)
+    session = session_service.create_session(title)
+    if not session:
+        return json_error("Failed to create session", 500)
+
     return json_ok(
-        session=session,
+        session=session_service.get_session(session["id"]),
         sessions=session_service.get_all(),
         active_session_id=session_service.active_session_id,
-        artifacts=artifact_service.build_list_payload(),
-        memory=memory_service.build_list_payload(),
     )
 
 
 @app.post("/api/sessions/switch")
 def api_sessions_switch():
-    data = request.get_json(force=True) or {}
-    session_id = data.get("session_id")
+    data = request_json()
+    session_id = str(data.get("session_id") or "").strip()
 
     if not session_id:
-        return jsonify({"ok": False, "error": "Missing session_id"}), 400
+        return json_error("Missing session_id", 400)
 
     session = session_service.set_active(session_id)
     if not session:
-        return jsonify({"ok": False, "error": "Session not found"}), 404
+        return json_error("Session not found", 404)
 
-    # 🔥 FULL STATE BUILD (this was missing)
-    messages = session.get("messages", [])
-
-    # safe fallbacks (so frontend never keeps stale data)
-    artifacts = []
-    memory = []
-
-    try:
-        if hasattr(chat_service, "artifacts"):
-            artifacts = chat_service.artifacts.list_for_session(session_id)
-    except Exception:
-        artifacts = []
-
-    try:
-        if hasattr(chat_service, "memory"):
-            memory = chat_service.memory.get_recent(session_id)
-    except Exception:
-        memory = []
-
-    return jsonify({
-        "ok": True,
-        "active_session_id": session_id,
-        "session": session,
-        "messages": messages,
-        "artifacts": artifacts,
-        "memory": memory,
-    })
+    return json_ok(
+        session=session_service.get_session(session_id),
+        sessions=session_service.get_all(),
+        active_session_id=session_service.active_session_id,
+    )
 
 
 @app.post("/api/sessions/rename")
@@ -882,11 +876,32 @@ def api_sessions_rename():
     if not session_id:
         return json_error("Missing session_id", 400)
 
-    if not session_service.rename(session_id, title or "New Chat"):
+    session = session_service.rename(session_id, title or "New Chat")
+    if not session:
         return json_error("Session not found", 404)
 
     return json_ok(
-        session=session_session_service.get_session(session_id),
+        session=session_service.get_session(session_id),
+        sessions=session_service.get_all(),
+        active_session_id=session_service.active_session_id,
+    )
+
+
+@app.post("/api/sessions/pin")
+def api_sessions_pin():
+    data = request_json()
+    session_id = str(data.get("session_id") or "").strip()
+    pinned = bool(data.get("pinned"))
+
+    if not session_id:
+        return json_error("Missing session_id", 400)
+
+    session = session_service.pin(session_id, pinned)
+    if not session:
+        return json_error("Session not found", 404)
+
+    return json_ok(
+        session=session_service.get_session(session_id),
         sessions=session_service.get_all(),
         active_session_id=session_service.active_session_id,
     )
@@ -903,32 +918,14 @@ def api_sessions_delete():
     if not session_service.delete(session_id):
         return json_error("Session not found", 404)
 
-    return json_ok(
-        sessions=session_service.get_all(),
-        active_session_id=session_service.active_session_id,
-        session=session_service.get_active(),
-        artifacts=artifact_service.build_list_payload(),
-        memory=memory_service.build_list_payload(),
-    )
-
-
-@app.post("/api/sessions/pin")
-def api_sessions_pin():
-    data = request_json()
-    session_id = str(data.get("session_id") or "").strip()
-
-    if not session_id:
-        return json_error("Missing session_id", 400)
-
-    if not session_service.pin(session_id):
-        return json_error("Session not found", 404)
+    active_id = session_service.active_session_id
+    active_session = session_service.get_active()
 
     return json_ok(
+        session=active_session,
         sessions=session_service.get_all(),
-        active_session_id=session_service.active_session_id,
-        session=session_service.get_active(),
+        active_session_id=active_id,
     )
-
 
 # -----------------------
 # ARTIFACTS

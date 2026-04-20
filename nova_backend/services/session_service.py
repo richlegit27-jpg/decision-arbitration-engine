@@ -238,6 +238,35 @@ class SessionService:
 
         return True
 
+    def rename(self, session_id: str, title: str):
+        data = self._read_store()
+        sessions = data.get("sessions", [])
+
+        clean_title = str(title or "").strip() or "New Chat"
+
+        for session in sessions:
+            if str(session.get("id") or "") == str(session_id or ""):
+                session["title"] = clean_title
+                session["updated_at"] = iso_now()
+                self._write_store(data)
+                return session
+
+        return None
+
+
+    def pin(self, session_id: str, pinned: bool):
+        data = self._read_store()
+        sessions = data.get("sessions", [])
+
+        for session in sessions:
+            if str(session.get("id") or "") == str(session_id or ""):
+                session["pinned"] = bool(pinned)
+                session["updated_at"] = iso_now()
+                self._write_store(data)
+                return session
+
+        return None
+
     # -----------------------
     # WORKING STATE
     # -----------------------

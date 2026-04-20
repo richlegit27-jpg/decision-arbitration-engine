@@ -3357,22 +3357,36 @@ async function consumeChatJson(payload) {
 
     applyStatePayload(data || {});
 
+    const hasSessionMessages =
+      (data &&
+        data.session &&
+        Array.isArray(data.session.messages) &&
+        data.session.messages.length > 0) ||
+      (data &&
+        data.active_session &&
+        Array.isArray(data.active_session.messages) &&
+        data.active_session.messages.length > 0) ||
+      (data && Array.isArray(data.messages) && data.messages.length > 0);
+
     const assistantMessage = normalizeMessage(
       (data && (data.assistant_message || data.message)) || {}
     );
 
-    if (assistantMessage && assistantMessage.id) {
+    if (!hasSessionMessages && assistantMessage && assistantMessage.id) {
       upsertMessage(assistantMessage);
+    }
 
-      const workingContext = normalizeWorkingContext(
-        (data && data.working_context_payload) ||
-          (data && data.working_context) ||
-          emptyWorkingContext()
+    const workingContext = normalizeWorkingContext(
+      (data && data.working_context_payload) ||
+        (data && data.working_context) ||
+        emptyWorkingContext()
+    );
+
+    if (workingContext.show) {
+      upsertWorkingContextMessage(
+        workingContext,
+        assistantMessage && assistantMessage.id ? assistantMessage.id : ""
       );
-
-      if (workingContext.show) {
-        upsertWorkingContextMessage(workingContext, assistantMessage.id);
-      }
     }
 
     if (data && data.session && data.session.id) {
@@ -5333,5 +5347,13 @@ window.NovaComposerBundle = {
   applyBackendSessionState,
   jumpToSessionAndSync,
 };
+
+setTimeout(() => {
+  const voiceBtn = document.querySelector('[data-action="voice"]');
+  if (voiceBtn) voiceBtn.textContent = 'Mic';
+
+  const attachBtn = document.querySelector('[data-attach-button]');
+  if (attachBtn) attachBtn.textContent = '+';
+}, 500);
 
 })();

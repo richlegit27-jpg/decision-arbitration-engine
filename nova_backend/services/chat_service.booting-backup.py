@@ -53,12 +53,14 @@ class ChatService:
         self.image_size = os.getenv("NOVA_IMAGE_SIZE", "1024x1024")
         self.chat_model = os.getenv("OPENAI_MODEL", "gpt-5.4")
         self.model = self.chat_model
+        print("MODEL CHECK:", hasattr(self, "model"), self.model)
         self.memory_limit = int(os.getenv("NOVA_MEMORY_LIMIT", "3"))
 
         self.uploads_dir = Path(
             os.getenv("UPLOADS_DIR", r"C:\Users\Owner\nova\uploads")
         )
         self.uploads_dir.mkdir(parents=True, exist_ok=True)
+        print("CHATSERVICE INIT uploads_dir =", self.uploads_dir)
 
         self.client = OpenAI()
         self.agent = AgentService()
@@ -840,7 +842,7 @@ class ChatService:
                 session_id=session_id,
             )
         except Exception as e:
-            pass
+            print("MEMORY WRITE FAILED:", e)
 
     # =========================
     # EXECUTION GUARD HELPERS (STEP TRUTH ENFORCEMENT)
@@ -990,6 +992,8 @@ class ChatService:
         goal = str(execution.get("goal") or "").strip()
         steps = execution.get("steps") or []
 
+        print("RENDER EXECUTION =", execution)
+        print("RENDER STEPS =", steps)
 
         total = len(steps)
         done = sum(1 for s in steps if (s or {}).get("status") == "done")
@@ -1670,6 +1674,7 @@ class ChatService:
         try:
             sessions = self.session_service.list_sessions()
         except Exception as e:
+            print("GET PERSISTED EXECUTION LOAD SESSIONS FAILED:", e)
             return None
 
         if isinstance(sessions, dict):
@@ -1721,6 +1726,7 @@ class ChatService:
         try:
             sessions = self.session_service.list_sessions()
         except Exception as e:
+            print("PERSIST EXECUTION LOAD SESSIONS FAILED:", e)
             return
 
         if isinstance(sessions, dict):
@@ -1755,9 +1761,8 @@ class ChatService:
                 self._save_sessions(sessions)
             else:
                 self._save_sessions(items)
-
         except Exception as e:
-            pass
+            print("PERSIST EXECUTION SAVE SESSIONS FAILED:", e)
 
     def _find_latest_execution_artifact(self, session_id: str = ""):
         session_id = self._safe_str(session_id)
@@ -1772,6 +1777,8 @@ class ChatService:
 
             artifacts = artifacts or []
 
+            print("ALL ARTIFACTS =", artifacts)
+
             matches = []
 
             for a in artifacts:
@@ -1783,6 +1790,7 @@ class ChatService:
                 execution = a.get("execution") or ((a.get("meta") or {}).get("execution")) or {}
 
                 if execution:
+                    print("MATCHED EXECUTION ARTIFACT =", a)
                     matches.append(a)
 
             matches.sort(
@@ -1792,9 +1800,12 @@ class ChatService:
 
             latest = matches[0] if matches else None
 
+            print("FINAL LATEST =", latest)
+
             return latest
 
         except Exception as e:
+            print("FIND EXECUTION FAILED =", e)
             return None
 
     def _attach_execution(self, payload, user_text, assistant_msg, decision, session_id=""):
@@ -1826,12 +1837,9 @@ class ChatService:
         payload["assistant_message"]["meta"]["execution"] = execution
 
         try:
-            self._persist_execution_artifact(
-                session_id=session_id,
-                execution=execution,
-            )
+            self._persist_execution_artifact(session_id=session_id, execution=execution)
         except Exception as e:
-            pass
+            payload["debug"]["execution_persist_error"] = str(e)
 
         return payload
 
@@ -1845,6 +1853,7 @@ class ChatService:
             return False
 
         normalized = " ".join(text.split())
+        print("PROGRESS_MATCH_NORMALIZED =", repr(normalized))
 
         triggers = {
             "run it",
@@ -1984,22 +1993,19 @@ class ChatService:
 
     def _extract_text_response(self, response) -> str:
         try:
-            if not response:
-                return ""
-
             if hasattr(response, "output_text") and response.output_text:
-                return str(response.output_text).strip()
+                return response.output_text
 
             if hasattr(response, "output") and response.output:
                 parts = []
                 for item in response.output:
                     if hasattr(item, "content"):
                         for c in item.content:
-                            if hasattr(c, "text") and c.text:
-                                parts.append(str(c.text))
-                return "\n".join(parts).strip()
+                            if hasattr(c, "text"):
+                                parts.append(c.text)
+                return "\n".join(parts)
 
-            return ""
+            return str(response)
         except Exception as e:
             return f"[extract_error] {e}"
 
@@ -2009,7 +2015,10 @@ class ChatService:
         user_text = self._safe_str(user_text)
         assistant_text = ""
 
+        print("ADVANCE SESSION_ID =", session_id)
+
         latest = self._find_latest_execution_artifact(session_id=session_id)
+        print("ADVANCE LATEST =", latest)
 
         user_msg = self._build_user_message(
             user_text,
@@ -2236,6 +2245,7 @@ class ChatService:
                 artifact_payload,
             )
         except Exception as e:
+            print("BUILD EXECUTION PLAN FAILED (positional):", e)
             saved_artifact = None
 
         if not saved_artifact:
@@ -2246,6 +2256,7 @@ class ChatService:
                     artifact=artifact_payload,
                 )
             except Exception as e:
+                print("BUILD EXECUTION PLAN FAILED (keyword artifact):", e)
                 saved_artifact = None
 
         artifact_id = ""
@@ -2259,7 +2270,12 @@ class ChatService:
         try:
             self._persist_execution_artifact(session_id=session_id, execution=execution)
         except Exception as e:
-            pass
+            print("BUILD EXECUTION PLAN PERSIST EXECUTION FAILED:", e)
+
+        print("BUILD EXECUTION PLAN SAVED =", bool(saved_artifact))
+        print("BUILD EXECUTION PLAN SESSION =", session_id)
+        print("BUILD EXECUTION PLAN ARTIFACT =", saved_artifact)
+        print("BUILD EXECUTION PLAN ACTIVE EXECUTION =", execution)
 
         return saved_artifact
 
@@ -2519,7 +2535,7 @@ class ChatService:
             self._persist_message_fallback(session_id, user_msg)
             self._persist_message_fallback(session_id, assistant_msg)
         except Exception as e:
-            pass
+            print("TURN PERSIST FAILED:", e)
 
     def _get_session_payload(self, session_id: str, fallback_messages=None) -> dict:
         fallback_messages = fallback_messages or []
@@ -3081,6 +3097,7 @@ class ChatService:
 
         merged["updated_at"] = self._iso_now()
 
+        print("WORKING_STATE_MERGED =", merged)
 
         # primary path
         try:
@@ -3089,10 +3106,12 @@ class ChatService:
                 {"working_state": merged},
             ) or {}
             persisted = updated.get("working_state")
+            print("WORKING_STATE_UPDATED_SESSION =", persisted)
             if isinstance(persisted, dict):
+                print("FINAL_WORKING_STATE_BEFORE_RETURN =", persisted)
                 return dict(persisted)
         except Exception as e:
-            pass
+            print("WORKING_STATE_UPDATE_SESSION_FAILED =", e)
 
         # fallback: force write into session store
         try:
@@ -3118,16 +3137,20 @@ class ChatService:
 
                 refreshed = self.sessions.get_session(session_id) or {}
                 persisted = refreshed.get("working_state")
+                print("WORKING_STATE_FALLBACK_PERSISTED =", persisted)
 
                 if isinstance(persisted, dict) and any(
                     (str(v).strip() if v is not None else "") for v in persisted.values()
                 ):
+                    print("FINAL_WORKING_STATE_BEFORE_RETURN =", persisted)
                     return dict(persisted)
 
         except Exception as e:
-            pass
+            print("WORKING_STATE_FALLBACK_FAILED =", e)
 
+        print("FINAL_WORKING_STATE_BEFORE_RETURN =", merged)
         return dict(merged)
+
     # ==============================
     # MEMORY HELPERS
     # ==============================
@@ -3272,40 +3295,29 @@ class ChatService:
                     session_id=session_id,
                 )
             except Exception as e:
-                pass
+                print("MEMORY WRITE FAILED:", e)
+
 
     def _memory_text_tokens(self, value: str) -> set[str]:
-        text = self._safe_str(value).lower()
-        if not text:
-            return set()
+            text = self._safe_str(value).lower()
+            if not text:
+                return set()
 
-        stop_words = {
-            "the",
-            "and",
-            "for",
-            "that",
-            "with",
-            "have",
-            "this",
-            "from",
-            "your",
-            "about",
-            "just",
-            "into",
-            "they",
-            "them",
-            "then",
-            "than",
-            "were",
-            "been",
-            "being",
-            "want",
-            "plan",
-            "goal",
-        }
+            stop_words = {
+                "the", "a", "an", "and", "or", "but", "if", "then", "than",
+                "to", "of", "for", "in", "on", "at", "by", "with", "from",
+                "is", "are", "was", "were", "be", "been", "being",
+                "it", "this", "that", "these", "those",
+                "i", "me", "my", "you", "your", "we", "our",
+                "do", "does", "did", "have", "has", "had",
+                "what", "when", "where", "why", "how",
+                "can", "could", "should", "would", "will",
+                "about", "into", "over", "under", "again", "right", "now",
+            }
 
-        tokens = set(re.findall(r"[a-z0-9_]{2,}", text))
-        return {t for t in tokens if t not in stop_words}
+            tokens = set(re.findall(r"[a-z0-9_]{2,}", text))
+            return {token for token in tokens if token not in stop_words}
+
 
     def _memory_kind_weight(self, kind: str) -> float:
             k = self._safe_str(kind).lower()
@@ -3578,6 +3590,7 @@ class ChatService:
             try:
                 return self.artifacts.save_artifact(artifact)
             except Exception as e:
+                print("ARTIFACT SAVE FAILED:", e)
                 return None
 
     def _persist_image_generation_artifact(
@@ -3605,74 +3618,71 @@ class ChatService:
             return self._save_artifact_fallback(artifact)
 
     def _handle_image_generation(
-        self,
-        prompt: str,
-        session_id: str = "",
-        parent_artifact_id: str = "",
-        source_type: str = "generated",
-    ) -> dict:
-        try:
-            result = self.client.images.generate(
-                model=self.image_model,
-                prompt=prompt,
-                size=self.image_size,
-            )
-
-            first = result.data[0] if getattr(result, "data", None) else None
-            image_b64 = getattr(first, "b64_json", None) if first else None
-            revised_prompt = getattr(first, "revised_prompt", "") if first else ""
-            if not image_b64:
-                raise ValueError("Image API returned no b64_json")
-
-            image_bytes = base64.b64decode(image_b64)
-            filename = f"generated_{uuid.uuid4().hex}.png"
-            filepath = self.uploads_dir / filename
-
-            with open(filepath, "wb") as f:
-                f.write(image_bytes)
-
-            image_url = f"/api/uploads/{filename}"
-
-            saved_artifact = None
+            self,
+            prompt: str,
+            session_id: str = "",
+            parent_artifact_id: str = "",
+            source_type: str = "generated",
+        ) -> dict:
             try:
-                artifact = self._build_image_generation_artifact(
-                    session_id=session_id,
+                result = self.client.images.generate(
+                    model=self.image_model,
                     prompt=prompt,
-                    image_url=image_url,
-                    revised_prompt=revised_prompt,
-                    parent_artifact_id=parent_artifact_id,
-                    source_type=source_type,
-                    generation_mode="text_to_image",
+                    size=self.image_size,
                 )
-                saved_artifact = self._save_artifact(artifact)
-            except Exception:
+
+                first = result.data[0] if getattr(result, "data", None) else None
+                image_b64 = getattr(first, "b64_json", None) if first else None
+                if not image_b64:
+                    raise ValueError("Image API returned no b64_json")
+
+                image_bytes = base64.b64decode(image_b64)
+                filename = f"generated_{uuid.uuid4().hex}.png"
+                filepath = self.uploads_dir / filename
+
+                with open(filepath, "wb") as f:
+                    f.write(image_bytes)
+
+                image_url = f"/api/uploads/{filename}"
+
                 saved_artifact = None
+                try:
+                    saved_artifact = self._persist_image_generation_artifact(
+                        session_id=session_id,
+                        prompt=prompt,
+                        image_url=image_url,
+                        revised_prompt="",
+                        parent_artifact_id=parent_artifact_id,
+                        source_type=source_type,
+                        generation_mode="text_to_image",
+                    )
+                except Exception as e:
+                    print("IMAGE ARTIFACT SAVE FAILED:", e)
 
-            return {
-                "ok": True,
-                "text": f"Generated image for: {prompt}",
-                "image_url": image_url,
-                "prompt": prompt,
-                "revised_prompt": revised_prompt,
-                "parent_artifact_id": parent_artifact_id,
-                "source_type": source_type,
-                "generation_mode": "text_to_image",
-                "saved_artifact": saved_artifact,
-            }
-        except Exception as e:
-            return {
-                "ok": False,
-                "text": f"Image generation failed: {e}",
-                "error": str(e),
-                "image_url": "",
-                "prompt": prompt,
-                "revised_prompt": "",
-                "parent_artifact_id": parent_artifact_id,
-                "source_type": source_type,
-                "generation_mode": "text_to_image",
-                "saved_artifact": None,
-            }
-
+                return {
+                    "ok": True,
+                    "text": f"Generated image for: {prompt}",
+                    "image_url": image_url,
+                    "prompt": prompt,
+                    "revised_prompt": "",
+                    "parent_artifact_id": parent_artifact_id,
+                    "source_type": source_type,
+                    "generation_mode": "text_to_image",
+                    "saved_artifact": saved_artifact,
+                }
+            except Exception as e:
+                return {
+                    "ok": False,
+                    "text": f"Image generation failed: {e}",
+                    "error": str(e),
+                    "image_url": "",
+                    "prompt": prompt,
+                    "revised_prompt": "",
+                    "parent_artifact_id": parent_artifact_id,
+                    "source_type": source_type,
+                    "generation_mode": "text_to_image",
+                    "saved_artifact": None,
+                }
         # ==============================
         # WEB / ATTACHMENT HELPERS
         # ==============================
@@ -3905,6 +3915,9 @@ class ChatService:
                 session_id=session_id,
             )
 
+            print("=== NOVA PROMPT START ===")
+            print(prompt[:4000])
+            print("=== NOVA PROMPT END ===")
 
             try:
                 response = self.client.responses.create(
@@ -3932,15 +3945,9 @@ class ChatService:
     def _build_assistant_message(self, text: str, attachments=None, meta=None) -> dict:
         attachments = attachments or []
         meta = meta or {}
-
-        clean_text = self._safe_str(text).strip()
-
-        if not clean_text or clean_text.lower() == "none":
-            clean_text = "I'm here. Tell me what you need."
-
         return {
             "role": "assistant",
-            "text": clean_text,
+            "text": self._safe_str(text),
             "attachments": attachments,
             "meta": meta,
         }
@@ -3956,6 +3963,7 @@ class ChatService:
     ) -> dict:
         self._maybe_write_memory(decision, user_text, session_id)
 
+        print("FINALIZE_ASSISTANT_TEXT =", repr(assistant_msg.get("text")))
 
         should_inject_working_context = self._should_inject_working_context(
             decision=decision,
@@ -3965,12 +3973,18 @@ class ChatService:
 
         working_context_payload = self._build_working_context_payload(session_id)
 
+        print("WORKING_CONTEXT_SHOULD_INJECT =", should_inject_working_context)
+        print("WORKING_CONTEXT_PAYLOAD =", working_context_payload)
 
         self._persist_turn(session_id, user_msg, assistant_msg)
 
         fresh_session = self._get_session_payload(
             session_id,
             fallback_messages=[user_msg, assistant_msg],
+        )
+        print(
+            "FINALIZE_FRESH_SESSION_WORKING_STATE =",
+            (fresh_session or {}).get("working_state"),
         )
 
         payload = {
@@ -4006,6 +4020,8 @@ class ChatService:
             decision,
             session_id=session_id,
         )
+
+        return payload
 
     def _execute_memory_recall(
             self,
@@ -4111,114 +4127,153 @@ class ChatService:
                 saved_artifact=web_result.get("artifact"),
             )
 
-    def _execute_general_chat(
-        self,
-        decision: dict,
-        user_text: str,
-        session_id: str,
-        attachments=None,
-        working_state=None,
-        working_context_block="",
-    ) -> str:
-        attachments = attachments or []
-        user_msg = self._build_user_message(user_text, attachments=attachments)
+    def _execute_attachment_analysis(
+            self,
+            decision: dict,
+            user_text: str,
+            session_id: str,
+            attachments=None,
+        ) -> dict:
+            attachments = attachments or []
+            user_msg = self._build_user_message(user_text, attachments=attachments)
+            result = self._handle_attachment_analysis(user_text, attachments)
 
-        lowered = self._safe_str(user_text).lower().strip()
-
-        continuity_triggers = {
-            "where are we",
-            "where are we now",
-            "what are we doing",
-            "what are we doing now",
-            "now what",
-            "what's next",
-            "whats next",
-            "what is next",
-            "what file are we in",
-            "what broke",
-            "what did we fix",
-        }
-
-        wants_where_are_we = lowered in continuity_triggers
-
-        if wants_where_are_we:
-            assistant_text = self._safe_str(
-                self._handle_where_are_we(session_id, user_text)
+            assistant_msg = self._build_assistant_message(
+                text=self._safe_str(result.get("text")) or "Attachment analysis completed.",
+                meta={"attachment_analysis": True},
+                attachments=[],
             )
-        else:
-            memory_context = self._build_memory_context_for_chat(
+
+            return self._finalize_response(
+                session_id=session_id,
                 user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
                 decision=decision,
-            )
-            session = self.sessions.get_session(session_id) or {}
-            working_state_prompt = self._build_working_state_prompt_block(session_id)
-
-            prompt_parts = []
-
-            if working_state_prompt:
-                prompt_parts.append(working_state_prompt)
-
-            if working_context_block:
-                prompt_parts.append(working_context_block)
-
-            if memory_context:
-                prompt_parts.append(memory_context)
-
-            prompt_parts.append(f"User request:\n{user_text}")
-
-            enriched_user_text = "\n\n".join([p for p in prompt_parts if p]).strip()
-
-            messages = self._compose_model_messages(
-                user_text=enriched_user_text,
-                session=session,
-                decision=decision,
-                memory_context="",
+                saved_artifact=result.get("saved_artifact"),
             )
 
-            assistant_text = ""
+    def _execute_general_chat(
+            self,
+            decision: dict,
+            user_text: str,
+            session_id: str,
+            attachments=None,
+            working_state=None,
+            working_context_block="",
+        ) -> dict:
+            attachments = attachments or []
+            user_msg = self._build_user_message(user_text, attachments=attachments)
 
-            try:
-                response = self.client.responses.create(
-                    model=self.chat_model,
-                    input=messages,
+            lowered = self._safe_str(user_text).lower().strip()
+
+            continuity_triggers = {
+                "where are we",
+                "where are we now",
+                "what are we doing",
+                "what are we doing now",
+                "now what",
+                "what's next",
+                "whats next",
+                "what is next",
+                "what file are we in",
+                "what broke",
+                "what did we fix",
+            }
+
+            wants_where_are_we = lowered in continuity_triggers
+
+            if wants_where_are_we:
+                assistant_text = self._safe_str(self._handle_where_are_we(session_id, user_text))
+            else:
+                memory_context = self._build_memory_context_for_chat(
+                    user_text=user_text,
+                    decision=decision,
+                )
+                session = self.sessions.get_session(session_id) or {}
+                working_state_prompt = self._build_working_state_prompt_block(session_id)
+
+                prompt_parts = []
+
+                if working_state_prompt:
+                    prompt_parts.append(working_state_prompt)
+
+                if working_context_block:
+                    prompt_parts.append(working_context_block)
+
+                if memory_context:
+                    prompt_parts.append(memory_context)
+
+                prompt_parts.append(f"User request:\n{user_text}")
+
+                enriched_user_text = "\n\n".join([p for p in prompt_parts if p]).strip()
+
+                messages = self._compose_model_messages(
+                    user_text=enriched_user_text,
+                    session=session,
+                    decision=decision,
+                    memory_context="",
                 )
 
-                if hasattr(response, "output_text") and response.output_text:
-                    assistant_text = self._safe_str(response.output_text).strip()
-                elif hasattr(response, "output") and response.output:
-                    parts = []
-                    for item in response.output:
-                        if hasattr(item, "content") and item.content:
-                            for c in item.content:
-                                text_value = getattr(c, "text", "")
-                                text_value = self._safe_str(text_value).strip()
-                                if text_value:
-                                    parts.append(text_value)
+                assistant_text = ""
 
-                    assistant_text = " ".join(parts).strip()
+                try:
+                    response = self.client.responses.create(
+                        model=self.chat_model,
+                        input=messages,
+                    )
 
-            except Exception as e:
-                assistant_text = f"Chat failed: {e}"
+                    if hasattr(response, "output_text") and response.output_text:
+                        assistant_text = self._safe_str(response.output_text).strip()
+                    elif hasattr(response, "output") and response.output:
+                        parts = []
+                        for item in response.output:
+                            if hasattr(item, "content") and item.content:
+                                for c in item.content:
+                                    text_value = getattr(c, "text", "")
+                                    text_value = self._safe_str(text_value).strip()
+                                    if text_value:
+                                        parts.append(text_value)
 
-            if not assistant_text or not assistant_text.strip():
-                assistant_text = "No response generated."
+                        assistant_text = " ".join(parts).strip()
 
-        updates = self._extract_working_state_updates(
-            user_text=user_text,
-            current_state=self._get_working_state(session_id),
-        )
+                except Exception as e:
+                    assistant_text = f"Chat failed: {e}"
 
-        if updates:
-            self._update_working_state(session_id, updates)
+                if not assistant_text or not assistant_text.strip():
+                    assistant_text = "No response generated."
 
-        assistant_meta = {}
-        if working_state:
-            assistant_meta["working_state"] = working_state
-        if working_context_block:
-            assistant_meta["working_context_block"] = working_context_block
+            updates = self._extract_working_state_updates(
+                user_text=user_text,
+                current_state=self._get_working_state(session_id),
+            )
 
-        return self._safe_str(assistant_text)   
-     
+            print("WORKING_STATE_UPDATES =", updates)
+
+            if updates:
+                self._update_working_state(session_id, updates)
+
+            assistant_meta = {}
+            if working_state:
+                assistant_meta["working_state"] = working_state
+            if working_context_block:
+                assistant_meta["working_context_block"] = working_context_block
+
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                meta=assistant_meta,
+                attachments=[],
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+                saved_artifact=None,
+            )
+
     def _execute_web_operator(self, user_text: str, session_id: str) -> dict:
         try:
             url_match = re.search(r"(https?://[^\s]+)", user_text or "")
@@ -4675,61 +4730,18 @@ class ChatService:
             user_text = self._safe_str(user_text)
             session_id = self._ensure_session_id(session_id)
 
-            # ==============================
-            # SAFE WEB TRIGGER (Tavily)
-            # ==============================
-            if "search " in user_text.lower():
-                from services_web import search_web_for_query, get_tavily_api_key
-
-                tavily_key = get_tavily_api_key()
-                if tavily_key:
-                    results, provider, meta = search_web_for_query(
-                        user_text,
-                        tavily_api_key=tavily_key,
-                        max_results=5,
-                        search_depth="basic",
-                        include_answer=True,
-                        include_raw_content=False,
-                        topic="general",
-                    )
-
-                    answer = str(meta.get("answer") or "").strip()
-                    fallback = ""
-                    if results and isinstance(results[0], dict):
-                        fallback = str(results[0].get("content") or "").strip()
-
-                    text = answer or fallback or f'No live web results found for "{user_text}".'
-
-                    assistant_msg = self._build_assistant_message(
-                        text=text,
-                        attachments=[],
-                    )
-
-                    return self._finalize_response(
-                        session_id=session_id,
-                        user_text=user_text,
-                        user_msg=self._build_user_message(user_text, attachments=attachments or []),
-                        assistant_msg=assistant_msg,
-                        decision={
-                            "route": "web",
-                            "mode": "search",
-                            "save_artifact": False,
-                            "save_memory": False,
-                            "use_memory": True,
-                        },
-                        saved_artifact=None,
-                    )
-
-            # ==============================
-            # NORMAL FLOW
-            # ==============================
+            print("HANDLE SESSION_ID =", session_id)
 
             user_msg = self._build_user_message(user_text, attachments=attachments)
-
             auto_exec_match = self._looks_like_auto_execution_request(user_text)
             progress_exec_match = self._looks_like_execution_progression(user_text)
 
+            print("HANDLE USER_TEXT =", repr(user_text))
+            print("HANDLE AUTO_EXEC_MATCH =", auto_exec_match)
+            print("HANDLE PROGRESS_EXEC_MATCH =", progress_exec_match)
+
             if auto_exec_match:
+                print("HANDLE ROUTE = auto_execute")
                 return self._auto_execute_request(
                     user_text=user_text,
                     session_id=session_id,
@@ -4737,11 +4749,14 @@ class ChatService:
                 )
 
             if progress_exec_match:
+                print("HANDLE ROUTE = advance_execution")
                 return self._advance_execution_request(
                     user_text=user_text,
                     session_id=session_id,
                     attachments=attachments,
                 )
+
+            print("HANDLE ROUTE = normal_chat")
 
             auto_run_after_plan = any(
                 x in self._safe_str(user_text).lower()
@@ -4757,9 +4772,11 @@ class ChatService:
             latest_execution = self._find_latest_execution_artifact(session_id=session_id)
 
             if self._looks_like_plan_request(user_text) and not latest_execution:
+                print("AUTO PLAN: generating execution plan")
                 saved_artifact = self._build_execution_plan(user_text, session_id)
 
                 if auto_run_after_plan:
+                    print("AUTO PLAN: immediately auto-executing")
                     return self._auto_execute_request(
                         user_text="auto execute",
                         session_id=session_id,
@@ -4798,6 +4815,9 @@ class ChatService:
                 attachments=attachments,
             )
 
+            assistant_text = ""
+            saved_artifact = None
+
             if decision.get("route") == "image":
                 return self._handle_image_request(
                     user_text=user_text,
@@ -4825,13 +4845,8 @@ class ChatService:
                 working_context_block=working_context_block,
             )
 
-            assistant_text = self._safe_str(assistant_text).strip()
-
-            if not assistant_text or assistant_text.lower() == "none":
-                assistant_text = "I'm here. Tell me what you need."
-
             assistant_msg = self._build_assistant_message(
-                text=assistant_text,
+                text=self._safe_str(assistant_text),
                 attachments=[],
             )
 
@@ -4843,13 +4858,15 @@ class ChatService:
                 user_msg=user_msg,
                 assistant_msg=assistant_msg,
                 decision=decision,
-                saved_artifact=None,
+                saved_artifact=saved_artifact,
             )
 
         except Exception as e:
             import traceback
 
             tb = traceback.format_exc()
+            print("HANDLE FAILED:", e)
+            print(tb)
 
             safe_session_id = session_id
             try:
@@ -4861,7 +4878,7 @@ class ChatService:
             try:
                 safe_user_text = self._safe_str(user_text)
             except Exception:
-                pass
+                safe_user_text = ""
 
             try:
                 safe_user_msg = self._build_user_message(
