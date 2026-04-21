@@ -3644,7 +3644,7 @@ class ChatService:
                     source_type=source_type,
                     generation_mode="text_to_image",
                 )
-                saved_artifact = self._save_artifact(artifact)
+                saved_artifact = self._save_artifact_fallback(artifact)
             except Exception:
                 saved_artifact = None
 
@@ -3673,188 +3673,683 @@ class ChatService:
                 "saved_artifact": None,
             }
 
+    def _rewrite_query_with_location(self, user_text: str, location=None) -> str:
+        text = self._safe_str(user_text)
+        location = location or {}
+
+        if "near me" not in text.lower():
+            return text
+
+        lat = location.get("lat")
+        lng = location.get("lng")
+
+        if lat is not None and lng is not None:
+            return re.sub(
+                r"\bnear me\b",
+                f"near {lat},{lng}",
+                text,
+                flags=re.IGNORECASE,
+            )
+
+        return text
+
+    def _should_use_web(self, user_text: str) -> bool:
+        text = self._safe_str(user_text).lower().strip()
+        if not text:
+            return False
+
+        if text.startswith("/web "):
+            return True
+
+        if self._looks_like_url(text) or self._extract_first_url(text):
+            return True
+
+        freshness_terms = [
+            "latest",
+            "latest on",
+            "news",
+            "today",
+            "current",
+            "right now",
+            "recent",
+            "update",
+            "updates",
+        ]
+
+        local_terms = [
+            "near me",
+            "nearby",
+            "closest",
+            "nearest",
+            "open now",
+            "hours",
+            "store hours",
+            "location",
+            "address",
+            "phone",
+            "phone number",
+            "directions",
+            "website",
+        ]
+
+        finance_terms = [
+            "price of",
+            "stock price",
+            "market cap",
+            "btc",
+            "bitcoin",
+            "ethereum",
+            "eth",
+            "nasdaq",
+            "dow",
+            "s&p",
+        ]
+
+        sports_terms = [
+            "record",
+            "score",
+            "scores",
+            "standing",
+            "standings",
+            "stats",
+            "schedule",
+            "rank",
+            "ranking",
+            "wins",
+            "losses",
+            "nba",
+            "nfl",
+            "mlb",
+            "nhl",
+            "ncaa",
+            "lakers",
+            "warriors",
+            "yankees",
+            "canucks",
+        ]
+
+        weather_terms = [
+            "weather",
+            "forecast",
+            "temperature",
+            "rain",
+            "snow",
+            "wind",
+        ]
+
+        if any(term in text for term in freshness_terms):
+            return True
+
+        if any(term in text for term in local_terms):
+            return True
+
+        if any(term in text for term in finance_terms):
+            return True
+
+        if any(term in text for term in sports_terms):
+            return True
+
+        if any(term in text for term in weather_terms):
+            return True
+
+        if self._looks_like_business_query(text):
+            return True
+
+        return False
+
+    def _infer_web_intent(self, user_text: str) -> str:
+        text = self._safe_str(user_text).lower().strip()
+        if not text:
+            return "general"
+
+        if any(term in text for term in ["weather", "forecast", "temperature", "rain", "snow", "wind"]):
+            return "weather"
+
+        if any(term in text for term in [
+            "record", "score", "scores", "standing", "standings", "stats",
+            "schedule", "wins", "losses", "nba", "nfl", "mlb", "nhl",
+            "lakers", "warriors", "yankees", "canucks"
+        ]):
+            return "sports"
+
+        if any(term in text for term in [
+            "price of", "stock price", "market cap", "btc", "bitcoin",
+            "ethereum", "eth", "nasdaq", "dow", "s&p"
+        ]):
+            return "finance"
+
+        if self._looks_like_business_query(text) or any(term in text for term in [
+            "near me", "nearby", "closest", "nearest", "open now", "hours",
+            "address", "location", "phone", "directions"
+        ]):
+            return "local"
+
+        if any(term in text for term in ["latest", "latest on", "news", "recent", "today", "update", "updates"]):
+            return "news"
+
+        return "general"
+
+    def _rewrite_web_query(self, user_text: str, location=None) -> str:
+        query = self._rewrite_query_with_location(user_text, location)
+        text = self._safe_str(query).strip()
+        lowered = text.lower()
+        intent = self._infer_web_intent(text)
+
+        if intent == "sports":
+            if "record" in lowered and "season" not in lowered:
+                return f"{text} current season"
+            if "standings" not in lowered and "standing" in lowered:
+                return f"{text} current standings"
+            return text
+
+        if intent == "finance":
+            if "price of" in lowered and "today" not in lowered:
+                return f"{text} today"
+            return text
+
+        if intent == "weather":
+            if "today" not in lowered and "forecast" not in lowered:
+                return f"{text} today"
+            return text
+
+        if intent == "news":
+            if "latest" not in lowered and "today" not in lowered:
+                return f"latest {text}"
+            return text
+
+        if intent == "local":
+            return text
+
+        return text
+
+    def _looks_like_business_query(self, text: str) -> bool:
+        t = self._safe_str(text).lower().strip()
+        if not t:
+            return False
+
+        business_terms = [
+            "tim hortons",
+            "starbucks",
+            "mcdonalds",
+            "walmart",
+            "costco",
+            "restaurant",
+            "cafe",
+            "coffee",
+            "pharmacy",
+            "store",
+            "bank",
+            "gas",
+            "gas station",
+            "mall",
+            "clinic",
+            "hospital",
+            "gym",
+        ]
+
+        business_intents = [
+            "hours",
+            "open",
+            "open now",
+            "closing",
+            "close",
+            "location",
+            "address",
+            "near me",
+            "nearest",
+            "closest",
+            "phone",
+        ]
+
+        has_business = any(term in t for term in business_terms)
+        has_intent = any(term in t for term in business_intents)
+
+        return has_business or has_intent
+
+
+    def _extract_grounded_business_result(self, payload) -> dict:
+        payload = payload or {}
+
+        results = payload.get("results") or payload.get("items") or []
+        if not isinstance(results, list):
+            results = []
+
+        best = {}
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+
+            title = self._safe_str(item.get("title") or item.get("name")).strip()
+            snippet = self._safe_str(
+                item.get("snippet") or item.get("content") or item.get("body")
+            ).strip()
+            url = self._safe_str(item.get("url") or item.get("source_url")).strip()
+            address = self._safe_str(
+                item.get("address")
+                or item.get("location")
+                or item.get("formatted_address")
+            ).strip()
+            hours = self._safe_str(
+                item.get("hours")
+                or item.get("opening_hours")
+                or item.get("open_hours")
+            ).strip()
+
+            score = 0
+            if title:
+                score += 2
+            if address:
+                score += 2
+            if hours:
+                score += 4
+            if url:
+                score += 1
+            if snippet:
+                score += 1
+
+            if not best or score > best.get("_score", 0):
+                best = {
+                    "title": title,
+                    "address": address,
+                    "hours": hours,
+                    "snippet": snippet,
+                    "url": url,
+                    "_score": score,
+                }
+
+        if not best:
+            return {
+                "ok": False,
+                "reason": "no_result",
+                "title": "",
+                "address": "",
+                "hours": "",
+                "snippet": "",
+                "url": "",
+            }
+
+        best["ok"] = bool(best.get("title") or best.get("address") or best.get("hours"))
+        best["reason"] = "ok" if best["ok"] else "weak_result"
+        return best
+
+
+    def _build_grounded_business_answer(self, query: str, grounded: dict) -> str:
+        grounded = grounded or {}
+
+        title = self._safe_str(grounded.get("title")).strip()
+        address = self._safe_str(grounded.get("address")).strip()
+        hours = self._safe_str(grounded.get("hours")).strip()
+        url = self._safe_str(grounded.get("url")).strip()
+
+        if not grounded.get("ok"):
+            return (
+                f'I found possible business results for "{self._safe_str(query)}", '
+                "but I could not verify the exact location or live hours confidently."
+            )
+
+        if not hours:
+            parts = []
+            if title:
+                parts.append(title)
+            if address:
+                parts.append(address)
+
+            base = "\n".join(parts).strip()
+            if not base:
+                base = f'I found possible results for "{self._safe_str(query)}".'
+
+            return (
+                f"{base}\n\n"
+                "I could not verify live hours confidently from the returned source data."
+            )
+
+        lines = []
+        if title:
+            lines.append(title)
+        if address:
+            lines.append(address)
+        lines.append(f"Hours: {hours}")
+        if url:
+            lines.append(f"Source: {url}")
+
+        return "\n".join(lines).strip()
+
+    def _summarize_search_results(self, query: str, results: list) -> str:
+        query = self._safe_str(query)
+        results = results if isinstance(results, list) else []
+
+        cleaned = []
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+
+            title = self._safe_str(item.get("title") or item.get("name")).strip()
+            snippet = self._safe_str(
+                item.get("snippet") or item.get("content") or item.get("body")
+            ).strip()
+            url = self._safe_str(item.get("url") or item.get("source_url")).strip()
+
+            if not (title or snippet or url):
+                continue
+
+            cleaned.append({
+                "title": title,
+                "snippet": snippet,
+                "url": url,
+            })
+
+        if not cleaned:
+            return f'I searched for "{query}" but could not find strong live results.'
+
+        lines = []
+        for item in cleaned[:5]:
+            block = []
+            if item["title"]:
+                block.append(item["title"])
+            if item["snippet"]:
+                block.append(item["snippet"])
+            if item["url"]:
+                block.append(item["url"])
+            lines.append("\n".join(block).strip())
+
+        return "\n\n".join(lines).strip() 
+
         # ==============================
         # WEB / ATTACHMENT HELPERS
         # ==============================
 
-    def _handle_web_fetch(self, url: str, session_id: str = "") -> dict:
-            raw_url = self._safe_str(url)
-            normalized_url = raw_url
-            if normalized_url and not re.match(r"^https?://", normalized_url, re.IGNORECASE):
-                normalized_url = "https://" + normalized_url
+    def _handle_web_request(
+        self,
+        user_text: str,
+        session_id: str,
+        attachments=None,
+        user_msg=None,
+        decision=None,
+    ) -> dict:
 
-            fetched_at = datetime.now(timezone.utc).isoformat()
+        business_query = self._looks_like_business_query(user_text)
 
+        clean_text = self._safe_str(user_text).strip()
+
+        # --- detect URL ---
+        url_match = re.search(r"(https?://[^\s]+)", clean_text, re.IGNORECASE)
+        if not url_match:
+            www_match = re.search(r"\b(www\.[^\s]+\.[^\s]+)\b", clean_text, re.IGNORECASE)
+            if www_match:
+                clean_text = "https://" + www_match.group(1)
+                url_match = True
+
+        # --- URL → FETCH ---
+        if url_match:
+            return self._execute_web_fetch(
+                decision={"url": clean_text, "route": self.ROUTE_WEB_FETCH},
+                user_text=clean_text,
+                session_id=session_id,
+                attachments=attachments,
+            )
+
+        # --- TEXT → SEARCH ---
+        try:
+            result = self.web_service.search(clean_text)
+        except Exception as e:
+            return {
+                "ok": False,
+                "text": f"Web search failed: {e}",
+                "error": str(e),
+            }
+
+        artifact_payload = {}
+        try:
+            if hasattr(self.web_service, "build_search_artifact_payload"):
+                artifact_payload = self.web_service.build_search_artifact_payload(result) or {}
+        except Exception:
+            artifact_payload = {}
+
+        summary = self._safe_str(result.get("summary"))
+
+        if business_query:
+            grounded = self._extract_grounded_business_result(result)
+            summary = self._build_grounded_business_answer(clean_text, grounded)
+
+        assistant_text = summary or f'Web search completed for "{clean_text}".'
+
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            meta={
+                "web_search": True,
+                "query": clean_text,
+            },
+            attachments=[],
+        )
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg or self._build_user_message(user_text, attachments=[]),
+            assistant_msg=assistant_msg,
+            decision=decision or {"route": "web_search"},
+            saved_artifact=artifact_payload,
+        )
+
+    def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
+        attachments = attachments or []
+
+        image_url = ""
+        image_name = ""
+
+        for item in attachments:
+            if not isinstance(item, dict):
+                continue
+
+            att_type = self._safe_str(item.get("type")).lower()
+            mime_type = self._safe_str(item.get("mime_type")).lower()
+            url = self._safe_str(item.get("url"))
+            name = self._safe_str(item.get("name") or item.get("filename") or "image")
+
+            if url and (att_type == "image" or mime_type.startswith("image/")):
+                image_url = url
+                image_name = name
+                break
+
+        if image_url:
             try:
-                result = self.web.fetch(normalized_url)
+                prompt = self._safe_str(user_text) or "what is in this image"
+
+                response = self.client.responses.create(
+                    model=self.chat_model,
+                    input=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "input_text", "text": prompt},
+                                {"type": "input_image", "image_url": image_url},
+                            ],
+                        }
+                    ],
+                )
+
+                text = self._extract_response_text(response)
+
+                return {
+                    "ok": True,
+                    "text": text or f"I analyzed the image: {image_name}",
+                    "saved_artifact": None,
+                }
+
             except Exception as e:
                 return {
                     "ok": False,
-                    "error": f"Web fetch failed: {e}",
-                    "url": normalized_url,
-                    "debug": {
-                        "route_taken": "web_fetch",
-                        "error": str(e),
-                    },
+                    "text": f"Image analysis failed: {e}",
+                    "error": str(e),
+                    "saved_artifact": None,
                 }
 
-            if not isinstance(result, dict):
-                result = {}
+        names = []
+        for item in attachments:
+            if isinstance(item, dict):
+                name = self._safe_str(item.get("name") or item.get("filename"))
+                if name:
+                    names.append(name)
 
-            artifact = {}
-            try:
-                if hasattr(self.web, "build_artifact_payload") and callable(self.web.build_artifact_payload):
-                    artifact = self.web.build_artifact_payload(result) or {}
-            except Exception as e:
-                artifact = {
-                    "kind": "web_result",
-                    "title": self._safe_str(result.get("title")) or normalized_url,
-                    "summary": self._safe_str(result.get("summary")),
-                    "body": self._safe_str(result.get("content")),
-                    "preview": self._safe_str(result.get("preview")),
-                    "source_url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                    "meta": {
-                        "description": self._safe_str(result.get("description")),
-                        "site_name": self._safe_str(result.get("site_name")),
-                        "domain": self._safe_str(result.get("domain")),
-                        "content": self._safe_str(result.get("content")),
-                        "url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                        "status_code": result.get("status_code"),
-                        "ssl_verified": result.get("ssl_verified"),
-                        "artifact_build_error": str(e),
-                    },
-                    "viewer": {
-                        "kind": "web_result",
-                        "title": self._safe_str(result.get("title")) or normalized_url,
-                        "body": self._safe_str(result.get("content")),
-                        "analysis_text": self._safe_str(result.get("summary")),
-                        "bullets": self._safe_list(result.get("bullets")),
-                        "links": self._safe_list(result.get("links")),
-                        "images": self._safe_list(result.get("images")),
-                        "source_url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                    },
-                }
+        summary = (
+            f"I analyzed the uploaded attachment(s): {', '.join(names)}."
+            if names
+            else "I analyzed the uploaded attachment(s)."
+        )
 
-            if isinstance(artifact, dict):
-                artifact["session_id"] = session_id or artifact.get("session_id", "")
-                artifact.setdefault("created_at", fetched_at)
-                artifact["updated_at"] = fetched_at
+        if user_text:
+            summary += f" Request: {user_text}"
 
-            artifact = self._upgrade_web_artifact_payload(
-                artifact=artifact,
-                result=result,
-                url=normalized_url,
-            )
+        return {
+            "ok": True,
+            "text": summary,
+            "saved_artifact": None,
+        }
 
-            saved_artifact = self._save_artifact_fallback(artifact) if artifact else None
-            final_artifact = self._upgrade_web_artifact_payload(
-                artifact=saved_artifact or artifact,
-                result=result,
-                url=normalized_url,
-            )
+    def _decide_route_unified(self, user_text: str, attachments=None) -> dict:
+        text = self._safe_str(user_text).strip()
+        lowered = text.lower()
+        attachments = attachments or []
 
-            summary = self._safe_str(final_artifact.get("summary")) if isinstance(final_artifact, dict) else ""
-            body = self._safe_str(final_artifact.get("body")) if isinstance(final_artifact, dict) else ""
-            title = self._safe_str(final_artifact.get("title")) if isinstance(final_artifact, dict) else normalized_url
-            viewer = self._safe_dict(final_artifact.get("viewer")) if isinstance(final_artifact, dict) else {}
-            meta = self._safe_dict(final_artifact.get("meta")) if isinstance(final_artifact, dict) else {}
+        # =========================
+        # URL -> web fetch
+        # =========================
+        if re.search(r"(https?://[^\s]+)", lowered) or re.search(r"\bwww\.", lowered):
+            return {"route": self.ROUTE_WEB_FETCH, "url": text}
 
-            return {
-                "ok": bool(result.get("ok", True)),
-                "text": summary or f"Fetched {title}",
-                "artifact": final_artifact,
-                "viewer": viewer,
-                "url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                "source_url": self._safe_str(meta.get("source_url")) or self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                "title": title,
-                "summary": summary,
-                "body": body,
-                "meta": meta,
-                "debug": {
-                    "route_taken": "web_fetch",
-                    "status_code": result.get("status_code"),
-                    "artifact_kind": self._safe_str(final_artifact.get("kind")) if isinstance(final_artifact, dict) else "web_result",
-                },
-            }
+        # =========================
+        # explicit command
+        # =========================
+        if lowered.startswith("/web "):
+            return {"route": self.ROUTE_WEB_FETCH, "query": text[5:].strip()}
 
-    def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
-            attachments = attachments or []
+        # =========================
+        # HIGH CONFIDENCE WEB
+        # =========================
+        strong_phrases = [
+            "price of",
+            "how much is",
+            "latest",
+            "news",
+            "update",
+            "current",
+            "today",
+            "stock",
+            "market",
+        ]
 
-            image_url = ""
-            image_name = ""
+        for phrase in strong_phrases:
+            if phrase in lowered:
+                return {"route": "web_search", "query": text}
 
+        # =========================
+        # QUESTION PATTERNS
+        # =========================
+        if lowered.startswith((
+            "who is",
+            "what is",
+            "where is",
+            "when did",
+            "how much",
+            "how many",
+            "why is",
+        )):
+            return {"route": "web_search", "query": text}
+
+        # =========================
+        # ATTACHMENTS
+        # =========================
+        if attachments:
             for item in attachments:
                 if not isinstance(item, dict):
                     continue
-
-                att_type = self._safe_str(item.get("type")).lower()
                 mime_type = self._safe_str(item.get("mime_type")).lower()
-                url = self._safe_str(item.get("url"))
-                name = self._safe_str(item.get("name") or item.get("filename") or "image")
+                att_type = self._safe_str(item.get("type")).lower()
+                if att_type == "image" or mime_type.startswith("image/"):
+                    return {"route": self.ROUTE_ATTACHMENT_ANALYSIS}
 
-                if url and (att_type == "image" or mime_type.startswith("image/")):
-                    image_url = url
-                    image_name = name
-                    break
+        # =========================
+        # FALLBACK HEURISTIC
+        # =========================
+        # short factual query -> web
+        if len(lowered.split()) <= 5:
+            return {"route": "web_search", "query": text}
 
-            if image_url:
-                try:
-                    prompt = self._safe_str(user_text) or "what is in this image"
+        return {"route": self.ROUTE_GENERAL_CHAT}
 
-                    response = self.client.responses.create(
-                        model=self.chat_model,
-                        input=[
-                            {
-                                "role": "user",
-                                "content": [
-                                    {"type": "input_text", "text": prompt},
-                                    {"type": "input_image", "image_url": image_url},
-                                ],
-                            }
-                        ],
-                    )
+    def _decide_route_unified(self, user_text: str, attachments=None) -> dict:
+        text = self._safe_str(user_text).strip()
+        lowered = text.lower()
+        attachments = attachments or []
 
-                    text = self._extract_response_text(response)
+        has_url = (
+            "http://" in lowered
+            or "https://" in lowered
+            or bool(re.search(r"\bwww\.[^\s]+\.[^\s]+\b", lowered))
+        )
 
-                    return {
-                        "ok": True,
-                        "text": text or f"I analyzed the image: {image_name}",
-                        "saved_artifact": None,
-                    }
-
-                except Exception as e:
-                    return {
-                        "ok": False,
-                        "text": f"Image analysis failed: {e}",
-                        "error": str(e),
-                        "saved_artifact": None,
-                    }
-
-            names = []
-            for item in attachments:
-                if isinstance(item, dict):
-                    name = self._safe_str(item.get("name") or item.get("filename"))
-                    if name:
-                        names.append(name)
-
-            summary = (
-                f"I analyzed the uploaded attachment(s): {', '.join(names)}."
-                if names
-                else "I analyzed the uploaded attachment(s)."
-            )
-
-            if user_text:
-                summary += f" Request: {user_text}"
-
+        if lowered.startswith("/web "):
             return {
-                "ok": True,
-                "text": summary,
-                "saved_artifact": None,
+                "route": self.ROUTE_WEB_FETCH,
+                "query": text[5:].strip(),
+                "forced": True,
             }
 
-        # ==============================
-        # MODEL HELPERS
-        # ==============================
+        if lowered.startswith("/image "):
+            return {
+                "route": self.ROUTE_IMAGE_GENERATION,
+                "prompt": text[7:].strip(),
+                "forced": True,
+            }
+
+        if has_url:
+            m = re.search(r"(https?://[^\s]+)", text, re.IGNORECASE)
+            if m:
+                return {
+                    "route": self.ROUTE_WEB_FETCH,
+                    "url": m.group(1).strip(),
+                }
+
+            m = re.search(r"\b(www\.[^\s]+\.[^\s]+)\b", text, re.IGNORECASE)
+            if m:
+                return {
+                    "route": self.ROUTE_WEB_FETCH,
+                    "url": "https://" + m.group(1).strip(),
+                }
+
+        current_info_patterns = [
+            r"^search\s+",
+            r"^look up\s+",
+            r"^lookup\s+",
+            r"^find\s+",
+            r"^latest\s+",
+            r"^news\s+",
+            r"^current\s+",
+            r"^today\s+",
+            r"^who is\s+",
+            r"^what is\s+",
+            r"^price of\s+",
+            r"^how much is\s+",
+            r"\b(latest|news|current|today|recent)\b",
+            r"\b(price|stock price|btc price|eth price)\b",
+        ]
+
+        if any(re.search(pattern, lowered) for pattern in current_info_patterns):
+            return {
+                "route": "web_search",
+                "query": text,
+            }
+
+        if attachments:
+            for item in attachments:
+                if not isinstance(item, dict):
+                    continue
+                mime_type = self._safe_str(item.get("mime_type")).lower()
+                att_type = self._safe_str(item.get("type")).lower()
+                if att_type == "image" or mime_type.startswith("image/"):
+                    return {"route": self.ROUTE_ATTACHMENT_ANALYSIS}
+
+        return {"route": self.ROUTE_GENERAL_CHAT}
 
     def _build_chat_input(
             self,
@@ -4668,19 +5163,36 @@ class ChatService:
     # PUBLIC ENTRY
     # ==============================
 
-    def handle(self, user_text: str, session_id: str = "", attachments=None):
+    def handle(self, user_text: str, session_id: str = "", attachments=None, location=None):
         attachments = attachments or []
 
         try:
             user_text = self._safe_str(user_text)
             session_id = self._ensure_session_id(session_id)
+            location = location or {}
+
+            # ==============================
+            # AUTO WEB ROUTING + LOCATION REWRITE
+            # ==============================
+            rewritten = self._rewrite_web_query(user_text, location)
+            web_intent = self._infer_web_intent(user_text)
+
+            if self._should_use_web(user_text):
+                return self._handle_web_request(
+                    user_text=rewritten,
+                    session_id=session_id,
+                    attachments=attachments,
+                    user_msg=self._build_user_message(user_text, attachments=attachments),
+                    decision={
+                        "route": "web_search",
+                        "web_intent": web_intent,
+                    },
+                )
 
             # ==============================
             # SAFE WEB TRIGGER (Tavily)
             # ==============================
             if "search " in user_text.lower():
-                from services_web import search_web_for_query, get_tavily_api_key
-
                 tavily_key = get_tavily_api_key()
                 if tavily_key:
                     results, provider, meta = search_web_for_query(
@@ -4698,7 +5210,9 @@ class ChatService:
                     if results and isinstance(results[0], dict):
                         fallback = str(results[0].get("content") or "").strip()
 
-                    text = answer or fallback or f'No live web results found for "{user_text}".'
+                    text = answer or fallback
+                    if not text:
+                        text = self._summarize_search_results(user_text, results)
 
                     assistant_msg = self._build_assistant_message(
                         text=text,
@@ -4721,7 +5235,7 @@ class ChatService:
                     )
 
             # ==============================
-            # NORMAL FLOW
+            # UNIFIED ROUTING (SINGLE SOURCE)
             # ==============================
 
             user_msg = self._build_user_message(user_text, attachments=attachments)
@@ -4793,27 +5307,52 @@ class ChatService:
             working_state = self._maybe_update_working_state(session_id, user_text)
             working_context_block = self._build_working_context_block(session_id)
 
-            decision = self._decide_route(
+            decision = self._decide_route_unified(
                 user_text=user_text,
                 attachments=attachments,
             )
 
-            if decision.get("route") == "image":
-                return self._handle_image_request(
-                    user_text=user_text,
+            if decision.get("route") == "web":
+                web_input = self._safe_str(
+                    decision.get("query")
+                    or decision.get("url")
+                    or user_text
+                )
+                web_input = self._rewrite_query_with_location(web_input, location)
+
+                return self._handle_web_request(
+                    user_text=web_input,
                     session_id=session_id,
                     attachments=attachments,
                     user_msg=user_msg,
                     decision=decision,
                 )
 
-            if decision.get("route") == "web":
+            if decision.get("route") == "web_search":
+                web_input = self._safe_str(decision.get("query") or user_text)
+                web_input = self._rewrite_query_with_location(web_input, location)
+
                 return self._handle_web_request(
-                    user_text=user_text,
+                    user_text=web_input,
                     session_id=session_id,
                     attachments=attachments,
                     user_msg=user_msg,
                     decision=decision,
+                )
+
+            if decision.get("route") == "image":
+                return self._handle_image_request(
+                    user_text=self._safe_str(decision.get("prompt") or user_text),
+                    session_id=session_id,
+                    attachments=attachments,
+                    user_msg=user_msg,
+                    decision=decision,
+                )
+
+            if decision.get("route") == "image_analysis":
+                return self._handle_attachment_analysis(
+                    user_text=user_text,
+                    attachments=attachments,
                 )
 
             assistant_text = self._execute_general_chat(

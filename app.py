@@ -267,7 +267,6 @@ def extract_name_from_memory_text(text: str) -> str:
 
     return ""
 
-
 def find_best_name_memory(session_id: str) -> dict | None:
     target_session = str(session_id or "").strip()
     all_memory = memory_service.all() or []
@@ -332,40 +331,6 @@ def find_best_name_memory(session_id: str) -> dict | None:
         reverse=True,
     )
     return candidates[0]
-
-
-    match = find_best_name_memory(session_id=session_id)
-
-    payload = build_common_state_payload(session_id=session_id)
-
-    if match:
-        name = match["name"]
-        item = match["item"]
-
-        payload.update(
-            {
-                "assistant_message": {
-                    "role": "assistant",
-                },
-                "debug": {
-                    "decision": decision,
-                },
-            }
-        )
-        return json_ok(**payload)
-
-    payload.update(
-        {
-            "assistant_message": {
-                "role": "assistant",
-                "text": "I don’t know your name yet. Tell me with “my name is …” and I’ll remember it.",
-            },
-            "debug": {
-                "decision": decision,
-            },
-        },
-    )
-    return json_ok(**payload)
 
 # ==============================
 # ==============================
@@ -482,32 +447,38 @@ def score_name_memory(item: dict, session_id: str) -> float:
 
     return score
 
+def build_name_lookup_response(session_id: str, decision: dict) -> Any:
+    match = find_best_name_memory(session_id=session_id)
+    payload = build_common_state_payload(session_id=session_id)
 
-def find_best_name_memory(session_id: str) -> dict | None:
-    items = get_memory_items()
-    candidates = []
+    if match:
+        name = match["name"]
 
-    for item in items:
-        score = score_name_memory(item, session_id)
-        if score <= -9999.0:
-            continue
+        payload.update(
+            {
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": f"Your name is {name}.",
+                },
+                "debug": {
+                    "decision": decision,
+                },
+            }
+        )
+        return json_ok(**payload)
 
-        candidates.append({
-            "item": item,
-            "score": score,
-            "updated_at": str(item.get("updated_at") or item.get("created_at") or ""),
-            "name": extract_name_from_memory_text(item.get("text", "")),
-        })
-
-    if not candidates:
-        return None
-
-    candidates.sort(
-        key=lambda x: (x["score"], x["updated_at"]),
-        reverse=True,
+    payload.update(
+        {
+            "assistant_message": {
+                "role": "assistant",
+                "text": 'I don\'t know your name yet. Tell me with "my name is ..." and I\'ll remember it.',
+            },
+            "debug": {
+                "decision": decision,
+            },
+        }
     )
-    return candidates[0]
-
+    return json_ok(**payload)
 
 def cleanup_competing_name_memories(session_id: str, winning_text: str):
     target_session = str(session_id or "").strip()
@@ -621,10 +592,23 @@ def api_chat():
         or lowered.startswith("news ")
         or lowered.startswith("current ")
         or lowered.startswith("today ")
+        or lowered.startswith("price ")
+        or lowered.startswith("who is ")
+        or lowered.startswith("what is ")
+        or lowered.startswith("show me ")
+        or lowered.startswith("tell me about ")
+        or lowered.endswith(" news")
+        or lowered.endswith(" price")
         or " latest " in lowered
         or " news " in lowered
         or " current " in lowered
         or " today " in lowered
+        or " price " in lowered
+        or " stock " in lowered
+        or " weather " in lowered
+        or " update " in lowered
+        or " president of " in lowered
+        or " ceo of " in lowered
     )
 
     if has_url:
@@ -641,6 +625,7 @@ def api_chat():
 
     elif looks_like_web_search:
         decision["route"] = "web_search"
+        decision["force_web"] = True
 
     try:
         # identity recall
@@ -656,7 +641,7 @@ def api_chat():
             else:
                 payload["assistant_message"] = {
                     "role": "assistant",
-                    "text": "I don’t know your name yet.",
+                    "text": "I don't know your name yet.",
                 }
 
             payload["debug"] = {
@@ -670,6 +655,86 @@ def api_chat():
         if decision.get("route") == "web_search":
             query = user_text.strip()
             result = web_service.search(query)
+
+            if not isinstance(result, dict):
+                return json_error("Web search returned an invalid result", 500)
+
+            if not result.get("ok"):
+                return json_error(result.get("error") or "Web search failed", 500)
+
+            summary = str(result.get("summary") or "").strip()
+            results = result.get("results") if isinstance(result.get("results"), list) else []
+
+            if not summary and results:
+                summary = "\n\n".join(
+                    filter(
+                        None,
+                        [
+                            "\n".join(
+                                filter(
+                                    None,
+                                    [
+                                        str(item.get("title") or "").strip(),
+                                        str(
+                                            item.get("snippet")
+                                            or item.get("content")
+                                            or item.get("body")
+                                            or ""
+                                        ).strip(),
+                                        str(item.get("url") or item.get("source_url") or "").strip(),
+                                    ],
+                                )
+                            ).strip()
+                            for item in results[:5]
+                            if isinstance(item, dict)
+                        ],
+                    )
+                ).strip()
+
+            if not summary:
+                summary = ""
+
+            artifact_payload = web_service.build_search_artifact_payload(result)
+
+            payload = build_common_state_payload(session_id=session_id)
+            payload.update(
+                {
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": summary or f'Web search completed for "{query}".',
+                    },
+                    "saved_artifact": artifact_payload,
+                    "web_result": result,
+                    "debug": {
+                        "decision": decision,
+                        "route_taken": "web_search",
+                    },
+                }
+            )
+            return json_ok(**payload)
+            if not result.get("ok"):
+                return json_error(result.get("error") or "Web search failed", 500)
+
+            artifact_payload = web_service.build_search_artifact_payload(result)
+
+            payload = build_common_state_payload(session_id=session_id)
+            payload.update(
+                {
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": result.get("summary")
+                        or f'Web search completed for "{query}".',
+                    },
+                    "saved_artifact": artifact_payload,
+                    "web_result": result,
+                    "debug": {
+                        "decision": decision,
+                        "route_taken": "web_search",
+                        "forced_web": True,
+                    },
+                }
+            )
+            return json_ok(**payload)
 
             artifact_payload = web_service.build_search_artifact_payload(result)
 
@@ -1274,10 +1339,7 @@ def api_voice_reply():
             },
         }
 
-        try:
-            save_artifact_from_assistant(assistant_message, "voice_reply")
-        except Exception:
-            pass
+# artifact save skipped (not wired for voice yet)
 
         return jsonify({
             "ok": True,
@@ -1452,3 +1514,4 @@ def voice_transcribe():
 # -----------------------
 if __name__ == "__main__":
     app.run(debug=False, port=5001)
+

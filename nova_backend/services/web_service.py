@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import re
 import hashlib
+import re
 from typing import Any, Dict, List
-from urllib.parse import urlparse, urljoin, quote_plus
+from urllib.parse import quote_plus, unquote, urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -11,30 +11,22 @@ from bs4 import BeautifulSoup
 
 class WebService:
     def __init__(self, timeout: int = 12):
-        self.timeout = timeout
+        self.timeout = int(timeout or 12)
         self.cache: Dict[str, dict] = {}
 
     # -----------------------
-    # CORE HELPERS
+    # BASIC HELPERS
     # -----------------------
 
-    def normalize_url(self, url: str) -> str:
-        url = str(url or "").strip()
-        if not url:
-            return ""
-        if not url.startswith(("http://", "https://")):
-            url = "https://" + url
-        return url
-
     def _hash(self, value: str) -> str:
-        return hashlib.md5(str(value or "").encode()).hexdigest()
+        return hashlib.sha256(str(value or "").encode("utf-8")).hexdigest()
 
     def _headers(self) -> dict:
         return {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/135.0.0.0 Safari/537.36"
+                "Chrome/124.0.0.0 Safari/537.36"
             ),
             "Accept": "*/*",
         }
@@ -44,9 +36,8 @@ class WebService:
         headers["Accept-Language"] = "en-US,en;q=0.9"
         return headers
 
-    # -----------------------
-    # EXTRACTION
-    # -----------------------
+    def _clean_text(self, text: str) -> str:
+        return re.sub(r"\s+", " ", str(text or "")).strip()
 
     def _strip_html(self, html: str) -> str:
         soup = BeautifulSoup(html or "", "html.parser")
@@ -60,148 +51,304 @@ class WebService:
         if main is None:
             main = soup.body if soup.body else soup
 
-        text = main.get_text(separator=" ", strip=True)
-        text = re.sub(r"\s+", " ", text).strip()
-
-        return text[:5000]
-
-    def _extract_links(self, html: str, base_url: str) -> List[str]:
-        links = re.findall(r'href=["\'](.*?)["\']', html, re.I)
-        results: List[str] = []
-
-        for link in links:
-            if link.startswith("#") or "javascript:" in link.lower():
-                continue
-            full = urljoin(base_url, link)
-            if full.startswith("http"):
-                results.append(full)
-
-        return list(dict.fromkeys(results))[:20]
-
-    def _extract_images(self, html: str, base_url: str) -> List[str]:
-        imgs = re.findall(r'<img[^>]+src=["\'](.*?)["\']', html, re.I)
-        results: List[str] = []
-
-        for img in imgs:
-            full = urljoin(base_url, img)
-            if full.startswith("http"):
-                results.append(full)
-
-        return list(dict.fromkeys(results))[:10]
+        text = main.get_text("\n", strip=True) if main else ""
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        text = re.sub(r"[ \t]+", " ", text)
+        return text.strip()
 
     def _extract_title(self, html: str) -> str:
-        m = re.search(r"<title>(.*?)</title>", html, re.I | re.S)
-        if not m:
-            return ""
-        title = re.sub(r"\s+", " ", m.group(1)).strip()
-        return title
+        soup = BeautifulSoup(html or "", "html.parser")
+        title = soup.title.get_text(" ", strip=True) if soup.title else ""
+        return self._clean_text(title)[:300]
 
-    # -----------------------
-    # INTELLIGENCE
-    # -----------------------
-
-    def _summarize(self, text: str) -> str:
-        text = str(text or "").strip()
+    def _summarize(self, text: str, max_len: int = 500) -> str:
+        text = self._clean_text(text)
         if not text:
             return ""
+        if len(text) <= max_len:
+            return text
+        cut = text[:max_len].rsplit(" ", 1)[0].strip()
+        return cut or text[:max_len]
 
-        parts = re.split(r"\. |\n", text)
-        cleaned: List[str] = []
-
-        for p in parts:
-            p = p.strip()
-            if len(p) < 40:
-                continue
-
-            lowered = p.lower()
-            if "advertisement" in lowered:
-                continue
-            if "skip to" in lowered:
-                continue
-            if "search the web" in lowered:
-                continue
-            if "all rights reserved" in lowered:
-                continue
-            if "privacy" in lowered:
-                continue
-            if "terms" in lowered:
-                continue
-
-            cleaned.append(p)
-
-            if len(cleaned) >= 5:
-                break
-
-        return ". ".join(cleaned).strip()
-
-    def _bullets(self, text: str) -> List[str]:
+    def _bullets(self, text: str, limit: int = 5) -> List[str]:
         text = str(text or "").strip()
         if not text:
             return []
 
-        parts = re.split(r"\. |\n", text)
+        parts = re.split(r"(?<=[.!?])\s+", text)
         bullets: List[str] = []
 
-        for p in parts:
-            p = p.strip()
-            if not p:
+        for part in parts:
+            cleaned = self._clean_text(part)
+            if not cleaned:
                 continue
-
-            lowered = p.lower()
-
-            if len(p) < 40 or len(p) > 200:
-                continue
-            if "advertisement" in lowered:
-                continue
-            if "skip to" in lowered:
-                continue
-            if "search the web" in lowered:
-                continue
-            if "all rights reserved" in lowered:
-                continue
-            if "privacy" in lowered:
-                continue
-            if "terms" in lowered:
-                continue
-
-            bullets.append(p)
-
-            if len(bullets) >= 5:
+            bullets.append(cleaned[:220])
+            if len(bullets) >= limit:
                 break
 
         return bullets
 
+    def _extract_links(self, html: str, base_url: str) -> List[dict]:
+        soup = BeautifulSoup(html or "", "html.parser")
+        seen = set()
+        items: List[dict] = []
+
+        for a in soup.find_all("a", href=True):
+            href = str(a.get("href") or "").strip()
+            text = self._clean_text(a.get_text(" ", strip=True))
+            if not href:
+                continue
+
+            full = urljoin(base_url, href)
+            if full in seen:
+                continue
+            seen.add(full)
+
+            items.append(
+                {
+                    "text": text[:200],
+                    "url": full,
+                }
+            )
+
+            if len(items) >= 30:
+                break
+
+        return items
+
+    def _extract_images(self, html: str, base_url: str) -> List[dict]:
+        soup = BeautifulSoup(html or "", "html.parser")
+        seen = set()
+        items: List[dict] = []
+
+        for img in soup.find_all("img"):
+            src = str(img.get("src") or "").strip()
+            alt = self._clean_text(img.get("alt") or "")
+            if not src:
+                continue
+
+            full = urljoin(base_url, src)
+            if full in seen:
+                continue
+            seen.add(full)
+
+            items.append(
+                {
+                    "url": full,
+                    "alt": alt[:200],
+                }
+            )
+
+            if len(items) >= 30:
+                break
+
+        return items
+
     def _detect_type(self, text: str, url: str) -> str:
-        lowered = text.lower()
-        if "login" in lowered or "sign in" in lowered:
-            return "auth"
-        if len(text) > 2000:
-            return "article"
-        return "general"
+        lowered = str(text or "").lower()
+        parsed = urlparse(str(url or ""))
+
+        if "news" in parsed.netloc or "/news" in parsed.path:
+            return "news"
+        if "product" in lowered or "add to cart" in lowered:
+            return "product"
+        if "contact" in lowered or "hours" in lowered or "location" in lowered:
+            return "business"
+        return "web_page"
+
+    def normalize_url(self, url: str) -> str:
+        url = str(url or "").strip()
+        if not url:
+            return ""
+        if not re.match(r"^https?://", url, flags=re.I):
+            url = "https://" + url
+        return url
 
     # -----------------------
-    # SEARCH
+    # INTENT ROUTING
     # -----------------------
-
-    def _clean_search_snippet(self, text: str) -> str:
-        text = re.sub(r"\s+", " ", str(text or "")).strip()
-        return text[:300]
 
     def _search_cache_key(self, query: str) -> str:
         return "search:" + self._hash(query.lower().strip())
 
+    def classify_web_query(self, query: str) -> str:
+        q = str(query or "").strip().lower()
+        if not q:
+            return "search"
+
+        price_words = (
+            "price",
+            "quote",
+            "trading",
+            "market cap",
+            "chart",
+            "value",
+            "worth",
+        )
+        crypto_words = (
+            "bitcoin",
+            "btc",
+            "ethereum",
+            "eth",
+            "solana",
+            "sol",
+            "dogecoin",
+            "doge",
+            "xrp",
+            "ripple",
+            "cardano",
+            "ada",
+            "litecoin",
+            "ltc",
+            "bnb",
+            "binance coin",
+        )
+        weather_words = (
+            "weather",
+            "forecast",
+            "temperature",
+            "rain",
+            "snow",
+            "wind",
+            "humidity",
+            "hot",
+            "cold",
+        )
+        business_words = (
+            "hours",
+            "open now",
+            "closing time",
+            "address",
+            "phone number",
+            "location",
+            "directions",
+            "near me",
+        )
+
+        if any(word in q for word in crypto_words) and any(word in q for word in price_words):
+            return "crypto_price"
+
+        if any(word in q for word in weather_words):
+            return "weather"
+
+        if any(word in q for word in business_words):
+            return "business_lookup"
+
+        return "search"
+
+    # -----------------------
+    # SEARCH ROUTER
+    # -----------------------
+
     def search(self, query: str, max_results: int = 5) -> dict:
         query = str(query or "").strip()
         if not query:
-            return {"ok": False, "error": "empty query", "query": "", "results": []}
+            return {
+                "ok": False,
+                "error": "empty query",
+                "query": "",
+                "results": [],
+                "summary": "",
+                "source_type": "search",
+            }
 
         cache_key = self._search_cache_key(query)
         if cache_key in self.cache:
             return self.cache[cache_key]
 
+        intent = self.classify_web_query(query)
+
+        if intent == "crypto_price":
+            payload = self.lookup_crypto_price(query)
+            self.cache[cache_key] = payload
+            return payload
+
+        if intent == "weather":
+            payload = self.lookup_weather(query)
+            self.cache[cache_key] = payload
+            return payload
+
+        if intent == "business_lookup":
+            payload = self.lookup_business(query, max_results=max_results)
+            self.cache[cache_key] = payload
+            return payload
+
+        payload = self.search_web_html(query, max_results=max_results)
+        self.cache[cache_key] = payload
+        return payload
+
+    # -----------------------
+    # SPECIALIST LANES
+    # -----------------------
+
+    def _extract_crypto_id(self, query: str) -> str:
+        q = str(query or "").lower()
+
+        mapping = {
+            "bitcoin": "bitcoin",
+            "btc": "bitcoin",
+            "ethereum": "ethereum",
+            "eth": "ethereum",
+            "solana": "solana",
+            "sol": "solana",
+            "dogecoin": "dogecoin",
+            "doge": "dogecoin",
+            "xrp": "ripple",
+            "ripple": "ripple",
+            "cardano": "cardano",
+            "ada": "cardano",
+            "litecoin": "litecoin",
+            "ltc": "litecoin",
+            "bnb": "binancecoin",
+            "binance coin": "binancecoin",
+        }
+
+        for key, value in mapping.items():
+            if re.search(rf"\b{re.escape(key)}\b", q):
+                return value
+
+        return ""
+
+    def lookup_crypto_price(self, query: str) -> dict:
+        coin_id = self._extract_crypto_id(query)
+
+        return {
+            "ok": True,
+            "query": query,
+            "results": [
+                {
+                    "title": "CRYPTO LANE HIT",
+                    "url": "",
+                    "snippet": f"coin_id={coin_id}",
+                    "domain": "",
+                }
+            ],
+            "summary": f"CRYPTO LANE HIT | coin_id={coin_id}",
+            "source_type": "crypto_price",
+            "coin_id": coin_id,
+        }
+
+    def lookup_weather(self, query: str) -> dict:
+        # Safe starter: keep this routed through generic search until you add a weather API.
+        result = self.search_web_html(query, max_results=5)
+        result["source_type"] = "weather_search"
+        return result
+
+    def lookup_business(self, query: str, max_results: int = 5) -> dict:
+        # Safe starter: keep this routed through generic search until you add a maps/business API.
+        result = self.search_web_html(query, max_results=max_results)
+        result["source_type"] = "business_search"
+        return result
+
+    # -----------------------
+    # GENERIC HTML SEARCH
+    # -----------------------
+
+    def search_web_html(self, query: str, max_results: int = 5) -> dict:
+        query = str(query or "").strip()
+
         try:
             url = "https://html.duckduckgo.com/html/?q=" + quote_plus(query)
-
             response = requests.get(
                 url,
                 timeout=self.timeout,
@@ -210,12 +357,7 @@ class WebService:
             )
             response.raise_for_status()
 
-            print("WEB SEARCH URL =", url)
-            print("WEB SEARCH STATUS =", response.status_code)
-            print("WEB SEARCH HTML PREVIEW =", response.text[:800])
-
             soup = BeautifulSoup(response.text or "", "html.parser")
-
             results: List[dict] = []
 
             candidates = (
@@ -276,17 +418,13 @@ class WebService:
                 if len(results) >= max_results:
                     break
 
-            print("WEB SEARCH RESULT COUNT =", len(results))
-
-            payload = {
+            return {
                 "ok": True,
                 "query": query,
                 "results": results,
                 "summary": self._summarize_search_results(query, results),
+                "source_type": "search_html",
             }
-
-            self.cache[cache_key] = payload
-            return payload
 
         except Exception as e:
             return {
@@ -295,45 +433,73 @@ class WebService:
                 "query": query,
                 "results": [],
                 "summary": "",
+                "source_type": "search_html",
             }
+
+    def _clean_search_snippet(self, text: str) -> str:
+        text = re.sub(r"\s+", " ", str(text or "")).strip()
+        return text[:300]
 
     def _extract_ddg_target(self, href: str) -> str:
         href = str(href or "").strip()
         if not href:
             return ""
 
-        # direct absolute url
         if href.startswith("http://") or href.startswith("https://"):
             return href
 
-        # ddg redirect form /l/?uddg=...
-        m = re.search(r"[?&]uddg=([^&]+)", href)
-        if m:
+        match = re.search(r"[?&]uddg=([^&]+)", href)
+        if match:
             try:
-                from urllib.parse import unquote
-                return unquote(m.group(1))
+                return unquote(match.group(1))
             except Exception:
                 return ""
 
         return ""
 
     def _summarize_search_results(self, query: str, results: List[dict]) -> str:
-        if not results:
-            return f'I searched for "{query}" but didn’t find strong results. Try opening a specific site or refining the query.'
+        query = str(query or "").strip()
+        results = results if isinstance(results, list) else []
+
+        cleaned: List[dict] = []
+
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+
+            title = str(item.get("title") or item.get("name") or "").strip()
+            snippet = str(
+                item.get("snippet") or item.get("content") or item.get("body") or ""
+            ).strip()
+            url = str(item.get("url") or item.get("source_url") or "").strip()
+
+            if not (title or snippet or url):
+                continue
+
+            cleaned.append(
+                {
+                    "title": title,
+                    "snippet": snippet,
+                    "url": url,
+                }
+            )
+
+        if not cleaned:
+            return f'I searched for "{query}" but could not find strong live results.'
 
         lines: List[str] = []
 
-        for item in results[:3]:
-            title = str(item.get("title") or "").strip()
-            snippet = str(item.get("snippet") or "").strip()
-            domain = str(item.get("domain") or "").strip()
+        for item in cleaned[:5]:
+            block: List[str] = []
+            if item["title"]:
+                block.append(item["title"])
+            if item["snippet"]:
+                block.append(item["snippet"])
+            if item["url"]:
+                block.append(item["url"])
+            lines.append("\n".join(block).strip())
 
-            if title and snippet:
-                lines.append(f"{title}: {snippet}")
-            elif title:
-                lines.append(title)
-
-        return " | ".join(lines)[:1200]
+        return "\n\n".join(lines).strip()[:2000]
 
     # -----------------------
     # FETCH
@@ -345,20 +511,19 @@ class WebService:
             return {"ok": False, "error": "bad url"}
 
         key = "fetch:" + self._hash(url)
-
         if key in self.cache:
             return self.cache[key]
 
         try:
-            r = requests.get(
+            response = requests.get(
                 url,
                 timeout=self.timeout,
                 headers=self._headers(),
                 allow_redirects=True,
             )
-            r.raise_for_status()
+            response.raise_for_status()
 
-            html = r.text
+            html = response.text
             text = self._strip_html(html)
 
             result = {
@@ -378,90 +543,101 @@ class WebService:
             return result
 
         except Exception as e:
-            return {"ok": False, "error": str(e)}
+            return {
+                "ok": False,
+                "url": url,
+                "error": str(e),
+                "summary": "",
+                "content": "",
+                "bullets": [],
+                "links": [],
+                "images": [],
+                "page_type": "web_page",
+            }
 
     # -----------------------
-    # ARTIFACTS
+    # ARTIFACT PAYLOADS
     # -----------------------
 
-    def build_artifact_payload(self, r: Dict[str, Any]) -> dict:
-        title = r.get("title") or "Web page"
-        summary = r.get("summary") or ""
-        content = r.get("content") or ""
-        url = r.get("url") or ""
-
-        body_parts = []
-        if summary:
-            body_parts.append(summary)
-        if content:
-            body_parts.append(content[:2000])
-
-        body = "\n\n".join(body_parts).strip()
-
-        return {
-            "kind": "web_result",
-            "title": title,
-            "summary": summary,
-            "body": body,
-            "source_url": url,
-            "meta": {
-                "domain": r.get("domain"),
-                "page_type": r.get("page_type"),
-                "links": r.get("links"),
-                "images": r.get("images"),
-            },
-            "viewer": {
-                "title": title,
-                "analysis_text": summary,
-                "body": content[:2000],
-                "bullets": r.get("bullets"),
-                "links": r.get("links"),
-                "images": r.get("images"),
-                "source_url": url,
-            },
-        }
-
-    def build_search_artifact_payload(self, r: Dict[str, Any]) -> dict:
-        query = str(r.get("query") or "").strip()
-        summary = str(r.get("summary") or "").strip()
-        results = r.get("results") or []
+    def build_search_artifact_payload(self, result: Dict[str, Any]) -> dict:
+        query = str(result.get("query") or "").strip()
+        summary = str(result.get("summary") or "").strip()
+        results = result.get("results") or []
+        source_type = str(result.get("source_type") or "search").strip()
 
         lines: List[str] = []
         for idx, item in enumerate(results[:5], start=1):
+            if not isinstance(item, dict):
+                continue
+
             title = str(item.get("title") or "").strip()
             url = str(item.get("url") or "").strip()
             snippet = str(item.get("snippet") or "").strip()
 
-            block = f"{idx}. {title}"
+            block = f"{idx}. {title}" if title else f"{idx}."
             if snippet:
                 block += f"\n   {snippet}"
             if url:
                 block += f"\n   {url}"
             lines.append(block)
 
-        body_parts = []
+        body_parts: List[str] = []
         if summary:
             body_parts.append(summary)
         if lines:
             body_parts.append("\n\n".join(lines))
 
-        body = "\n\n".join(body_parts).strip()
+        body = "\n\n".join(part for part in body_parts if part).strip()
 
         return {
             "kind": "web_search",
-            "title": f'Web search: {query}' if query else "Web search",
+            "title": f"Web search: {query}" if query else "Web search",
             "summary": summary,
             "body": body,
-            "source_url": "",
+            "source_type": source_type,
             "meta": {
                 "query": query,
-                "result_count": len(results),
+                "source_type": source_type,
+                "results_count": len(results),
             },
             "viewer": {
-                "title": f'Web search: {query}' if query else "Web search",
-                "analysis_text": summary,
+                "kind": "web_search",
+                "title": f"Web search: {query}" if query else "Web search",
                 "body": body,
-                "results": results,
-                "source_url": "",
+            },
+        }
+
+    def build_fetch_artifact_payload(self, result: Dict[str, Any]) -> dict:
+        title = str(result.get("title") or result.get("url") or "Web page").strip()
+        summary = str(result.get("summary") or "").strip()
+        url = str(result.get("url") or "").strip()
+        content = str(result.get("content") or "").strip()
+
+        body_parts: List[str] = []
+        if summary:
+            body_parts.append(summary)
+        if url:
+            body_parts.append(url)
+        if content:
+            body_parts.append(content[:4000])
+
+        body = "\n\n".join(part for part in body_parts if part).strip()
+
+        return {
+            "kind": "web_fetch",
+            "title": title,
+            "summary": summary,
+            "body": body,
+            "source_url": url,
+            "meta": {
+                "url": url,
+                "domain": str(result.get("domain") or "").strip(),
+                "page_type": str(result.get("page_type") or "web_page").strip(),
+            },
+            "viewer": {
+                "kind": "web_fetch",
+                "title": title,
+                "body": body,
+                "source_url": url,
             },
         }
