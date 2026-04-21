@@ -425,41 +425,41 @@ const state = {
   pendingArtifactOpenId: "",
   uploadInFlightCount: 0,
 
-workingContext: {
-  show: false,
-  collapsed: false,
-  text: "",
-  state: {
-    active_task: "",
-    current_file: "",
-    current_bug: "",
-    last_success: "",
-    next_move: "",
-    checkpoint: "",
-    updated_at: "",
+  workingContext: {
+    show: false,
+    collapsed: false,
+    text: "",
+    state: {
+      active_task: "",
+      current_file: "",
+      current_bug: "",
+      last_success: "",
+      next_move: "",
+      checkpoint: "",
+      updated_at: "",
+    },
   },
-},
 
   stream: {
-  controller: null,
-  running: false,
-  messageId: "",
-  mode: "",
-  placeholderId: "",
-  buffer: "",
-},
+    controller: null,
+    running: false,
+    messageId: "",
+    mode: "",
+    placeholderId: "",
+    buffer: "",
+  },
 
-execution: {
-  artifactId: "",
-  goal: "",
-  status: "",
-  progress: 0,
-  currentStep: "",
-  currentStepIndex: 0,
-  steps: [],
-  stepResults: [],
-  raw: null,
-},
+  execution: {
+    artifactId: "",
+    goal: "",
+    status: "",
+    progress: 0,
+    currentStep: "",
+    currentStepIndex: 0,
+    steps: [],
+    stepResults: [],
+    raw: null,
+  },
 
   tokenRender: {
     queue: "",
@@ -478,11 +478,12 @@ execution: {
     busy: false,
   },
 
-  tts: {
-    enabled: false,
-    playing: false,
-    audio: null,
-  },
+tts: {
+  enabled: true,
+  playing: false,
+  audio: null,
+  lastAutoMessageId: "",
+},
 
   rail: {
     tab: "artifacts",
@@ -492,6 +493,33 @@ execution: {
     artifactFilter: "all",
   },
 };
+
+if (els.ttsToggleButton) {
+  els.ttsToggleButton.onclick = async function () {
+    try {
+      const lastMsg = (state.messages || [])
+        .slice()
+        .reverse()
+        .find(function (m) {
+          return m && m.role === "assistant" && String(m.text || "").trim();
+        });
+
+      if (!lastMsg || !lastMsg.text) {
+        console.warn("No assistant message to speak");
+        return;
+      }
+
+      const result = await requestVoiceReply(lastMsg.text);
+
+      if (result && result.url) {
+        const audio = new Audio(result.url);
+        await audio.play();
+      }
+    } catch (err) {
+      console.error("TTS failed:", err);
+    }
+  };
+}
 
 function renderExecution() {
   const container =
@@ -3376,6 +3404,10 @@ async function consumeChatJson(payload) {
       upsertMessage(assistantMessage);
     }
 
+    if (assistantMessage) {
+      autoPlayTtsForAssistantMessage(assistantMessage);
+    }
+
     const workingContext = normalizeWorkingContext(
       (data && data.working_context_payload) ||
         (data && data.working_context) ||
@@ -3893,10 +3925,13 @@ async function transcribeVoice(blob) {
     els.chatInput.value = text;
     autoResizeTextarea();
     els.chatInput.focus();
+    els.chatInput.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
   showToast("Voice ready. Sending...", "success");
   await sendMessage();
+
+  return text;
 }
 
 let activeVoiceRecordingPromise = null;
@@ -4080,9 +4115,10 @@ async function playVoiceReplyFromText(text) {
 
   if (!state.tts) {
     state.tts = {
-      enabled: false,
+      enabled: true,
       playing: false,
       audio: null,
+      lastAutoMessageId: "",
     };
   }
 
@@ -4091,7 +4127,17 @@ async function playVoiceReplyFromText(text) {
   stopCurrentTtsPlayback();
 
   const payload = await requestVoiceReply(cleanText);
-  const url = String((payload && payload.url) || "").trim();
+
+  const url = String(
+    (payload &&
+      payload.assistant_message &&
+      payload.assistant_message.meta &&
+      payload.assistant_message.meta.audio_url) ||
+    (payload && payload.audio_url) ||
+    (payload && payload.url) ||
+    ""
+  ).trim();
+
   if (!url) {
     throw new Error("Voice reply URL missing.");
   }
@@ -4105,7 +4151,6 @@ async function playVoiceReplyFromText(text) {
   const audio = new Audio();
   audio.preload = "auto";
   audio.src = absoluteUrl;
-  audio.load();
 
   state.tts.audio = audio;
   state.tts.playing = true;
@@ -4132,7 +4177,59 @@ async function playVoiceReplyFromText(text) {
     }
   });
 
-  await audio.play();
+  try {
+    await audio.play();
+  } catch (err) {
+    state.tts.playing = false;
+    state.tts.audio = null;
+    updateTtsToggleUi();
+    throw err;
+  }
+}
+
+function shouldAutoPlayTtsForMessage(message) {
+  if (!message || typeof message !== "object") return false;
+
+  const role = String(message.role || "").trim().toLowerCase();
+  if (role !== "assistant") return false;
+
+  const text = normalizeText(message.text || "").trim();
+  if (!text) return false;
+
+  if (!state.tts) {
+    state.tts = {
+      enabled: true,
+      playing: false,
+      audio: null,
+      lastAutoMessageId: "",
+    };
+  }
+
+  if (state.tts.enabled === false) return false;
+
+  const meta = message.meta && typeof message.meta === "object" ? message.meta : {};
+  if (meta.skip_tts === true) return false;
+
+  const messageId = String(message.id || "").trim();
+  if (messageId && state.tts.lastAutoMessageId === messageId) return false;
+
+  return true;
+}
+
+async function autoPlayTtsForAssistantMessage(message) {
+  if (!shouldAutoPlayTtsForMessage(message)) return;
+
+  const text = normalizeText(message.text || "").trim();
+  const messageId = String(message.id || "").trim();
+
+  try {
+    if (messageId) {
+      state.tts.lastAutoMessageId = messageId;
+    }
+    await playVoiceReplyFromText(text);
+  } catch (err) {
+    console.error("[NovaComposerBundle] auto TTS failed:", err);
+  }
 }
 
 function bindEvents() {

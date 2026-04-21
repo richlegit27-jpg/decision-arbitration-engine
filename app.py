@@ -2,8 +2,9 @@
 
 import os
 import re
+import mimetypes
 from pathlib import Path
-
+from openai import OpenAI
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from flask_cors import CORS
 
@@ -1203,46 +1204,88 @@ def api_recon_analyze():
         artifact=recon_service.build_artifact_payload(result),
     )
 
-@app.post("/api/upload")
-def api_upload():
+@app.post("/api/voice/reply")
+def api_voice_reply():
+    data = request.get_json(silent=True) or {}
+
+    text = str(data.get("text") or "").strip()
+    voice = str(data.get("voice") or "alloy").strip() or "alloy"
+    audio_format = str(data.get("format") or "mp3").strip().lower() or "mp3"
+
+    if not text:
+        return jsonify({"ok": False, "error": "Missing text."}), 400
+
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        return jsonify({"ok": False, "error": "OPENAI_API_KEY is missing."}), 500
+
+    client = OpenAI(api_key=api_key)
+
+    allowed_formats = {"mp3", "wav", "opus", "aac", "flac", "pcm"}
+    if audio_format not in allowed_formats:
+        audio_format = "mp3"
+
+    ext_map = {
+        "mp3": ".mp3",
+        "wav": ".wav",
+        "opus": ".opus",
+        "aac": ".aac",
+        "flac": ".flac",
+        "pcm": ".pcm",
+    }
+
+    temp_name = f"tts_{uuid.uuid4().hex}{ext_map.get(audio_format, '.mp3')}"
+    temp_path = UPLOADS_DIR / temp_name
+
     try:
-        if "file" not in request.files:
-            return jsonify({
-                "ok": False,
-                "error": "No file provided.",
-            }), 400
+        response = client.audio.speech.create(
+            model="gpt-4o-mini-tts",
+            voice=voice,
+            input=text,
+            response_format=audio_format,
+        )
 
-        file = request.files["file"]
-        if not file or not getattr(file, "filename", ""):
-            return jsonify({
-                "ok": False,
-                "error": "Empty file.",
-            }), 400
+        audio_bytes = None
 
-        original_name = os.path.basename(str(file.filename or "upload"))
-        safe_name = secure_filename(original_name) or "upload.bin"
+        if hasattr(response, "read"):
+            audio_bytes = response.read()
+        elif hasattr(response, "content"):
+            audio_bytes = response.content
+        elif isinstance(response, (bytes, bytearray)):
+            audio_bytes = bytes(response)
 
-        base, ext = os.path.splitext(safe_name)
-        ext = ext or ""
-        final_name = f"{base}_{uuid.uuid4().hex}{ext}"
+        if not audio_bytes:
+            return jsonify({"ok": False, "error": "TTS returned empty audio."}), 500
 
-        save_path = UPLOADS_DIR / final_name
-        file.save(str(save_path))
+        temp_path.write_bytes(audio_bytes)
 
-        mime_type = getattr(file, "mimetype", None) or "application/octet-stream"
-        size = save_path.stat().st_size if save_path.exists() else 0
+        audio_url = f"/api/uploads/{temp_name}"
+        mime_type = mimetypes.guess_type(temp_name)[0] or "audio/mpeg"
+
+        assistant_message = {
+            "id": f"assistant_{uuid.uuid4().hex}",
+            "role": "assistant",
+            "text": text,
+            "attachments": [],
+            "meta": {
+                "source": "voice_reply",
+                "audio_url": audio_url,
+                "mime_type": mime_type,
+            },
+        }
+
+        try:
+            save_artifact_from_assistant(assistant_message, "voice_reply")
+        except Exception:
+            pass
 
         return jsonify({
             "ok": True,
-            "filename": final_name,
-            "original_filename": original_name,
-            "file_url": f"/api/uploads/{final_name}",
-            "url": f"/api/uploads/{final_name}",
-            "mime_type": mime_type,
-            "size": size,
+            "assistant_message": assistant_message,
+            "session_id": "voice_reply",
         })
+
     except Exception as e:
-        app.logger.exception("api_upload failed")
         return jsonify({
             "ok": False,
             "error": str(e),
@@ -1334,6 +1377,76 @@ def api_uploads(filename: str):
             "error": str(e),
             "filename": str(filename or ""),
         }), 500
+
+@app.route("/api/voice/transcribe", methods=["POST"])
+def voice_transcribe():
+    temp_path = None
+
+    try:
+        uploaded = request.files.get("file")
+        if not uploaded:
+            return jsonify({"ok": False, "error": "No audio file provided."}), 400
+
+        original_name = str(uploaded.filename or "voice.webm").strip() or "voice.webm"
+        ext = os.path.splitext(original_name)[1].lower().strip()
+
+        allowed_exts = {".webm", ".wav", ".mp3", ".m4a", ".mp4", ".mpeg", ".mpga", ".ogg"}
+        if ext not in allowed_exts:
+            ext = ".webm"
+
+        temp_name = f"voice_in_{uuid.uuid4().hex}{ext}"
+        temp_path = os.path.join(str(UPLOADS_DIR), temp_name)
+
+        uploaded.save(temp_path)
+
+        if not os.path.exists(temp_path):
+            return jsonify({"ok": False, "error": "Saved audio file is missing."}), 500
+
+        file_size = os.path.getsize(temp_path)
+        if file_size <= 0:
+            return jsonify({"ok": False, "error": "Recorded audio file is empty."}), 400
+
+        from openai import OpenAI
+        client = OpenAI()
+
+        mime_type = str(getattr(uploaded, "mimetype", "") or "").lower()
+
+        with open(temp_path, "rb") as audio_file:
+            transcript = client.audio.transcriptions.create(
+                model="gpt-4o-mini-transcribe",
+                file=audio_file,
+            )
+
+        text = ""
+        if hasattr(transcript, "text"):
+            text = str(transcript.text or "").strip()
+        elif isinstance(transcript, dict):
+            text = str(transcript.get("text") or "").strip()
+        else:
+            text = str(transcript or "").strip()
+
+        return jsonify({
+            "ok": True,
+            "text": text,
+            "debug": {
+                "filename": original_name,
+                "saved_path": temp_path,
+                "size": file_size,
+                "mime_type": mime_type,
+            },
+        })
+
+    except Exception as e:
+        print("VOICE TRANSCRIBE ERROR:", str(e))
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    finally:
+        try:
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
+        except Exception:
+            pass
+
 # -----------------------
 # MAIN
 # -----------------------
