@@ -562,6 +562,108 @@ function renderExecution() {
     .join("");
 }
 
+function getSessionArtifactsForRail() {
+  const activeSessionId = String(state.activeSessionId || "").trim();
+  const allArtifacts = safeArray(state.artifacts);
+
+  let sessionArtifacts = allArtifacts.filter(function (item) {
+    if (!activeSessionId) return true;
+    return String(item && item.session_id ? item.session_id : "").trim() === activeSessionId;
+  });
+
+  if (!sessionArtifacts.length && allArtifacts.length) {
+    sessionArtifacts = allArtifacts.slice();
+  }
+
+  return sessionArtifacts;
+}
+
+function railHasRealMemory() {
+  return safeArray(state.memory).length > 0;
+}
+
+function syncRailTruth() {
+  const hasArtifacts = getSessionArtifactsForRail().length > 0;
+  const hasMemory = railHasRealMemory();
+
+  if (state.rail.tab === "web") {
+    state.rail.tab = hasArtifacts ? "artifacts" : (hasMemory ? "memory" : "artifacts");
+  }
+
+  if (state.rail.tab === "memory" && !hasMemory) {
+    state.rail.tab = hasArtifacts ? "artifacts" : "artifacts";
+  }
+
+  if (!state.rail.tab) {
+    state.rail.tab = hasArtifacts ? "artifacts" : (hasMemory ? "memory" : "artifacts");
+  }
+
+  qsa("[data-rail-tab]").forEach(function (tabEl) {
+    const tabName = String(tabEl.getAttribute("data-rail-tab") || "").trim().toLowerCase();
+
+    if (tabName === "web") {
+      tabEl.hidden = true;
+      tabEl.setAttribute("aria-hidden", "true");
+      tabEl.classList.remove("is-active");
+      return;
+    }
+
+    if (tabName === "memory") {
+      const visible = hasMemory;
+      tabEl.hidden = !visible;
+      tabEl.setAttribute("aria-hidden", visible ? "false" : "true");
+      if (!visible) {
+        tabEl.classList.remove("is-active");
+      }
+      return;
+    }
+
+    tabEl.hidden = false;
+    tabEl.setAttribute("aria-hidden", "false");
+  });
+}
+
+function setRailTab(tabName) {
+  const requested = String(tabName || "artifacts").trim().toLowerCase();
+  const nextTab =
+    requested === "memory" && railHasRealMemory()
+      ? "memory"
+      : "artifacts";
+
+  state.rail.tab = nextTab;
+
+  qsa("[data-rail-tab]").forEach(function (tabEl) {
+    const tab = String(tabEl.getAttribute("data-rail-tab") || "").trim().toLowerCase();
+    tabEl.classList.toggle("is-active", tab === nextTab);
+    tabEl.setAttribute("aria-selected", tab === nextTab ? "true" : "false");
+  });
+
+  qsa("[data-rail-panel]").forEach(function (panelEl) {
+    const panel = String(panelEl.getAttribute("data-rail-panel") || "").trim().toLowerCase();
+    const isActive = panel === nextTab;
+    panelEl.hidden = !isActive;
+    panelEl.classList.toggle("is-active", isActive);
+  });
+
+  if (els.railTitle) {
+    els.railTitle.textContent = nextTab === "memory" ? "Memory" : "Artifacts";
+  }
+
+  if (els.railSubtitle) {
+    if (nextTab === "memory") {
+      els.railSubtitle.textContent = "Saved memory";
+    } else {
+      els.railSubtitle.textContent = "Session artifacts";
+    }
+  }
+
+  if (nextTab === "memory") {
+    if (typeof renderMemory === "function") renderMemory();
+  } else {
+    if (typeof renderArtifacts === "function") renderArtifacts();
+  }
+}
+
 function syncRailReopenVisibility() {
   const el = document.querySelector("[data-rail-reopen-wrap]");
   if (!el) return;
@@ -579,6 +681,8 @@ function openRail() {
   els.rail.classList.add("is-open");
   document.body.classList.add("is-rail-open");
 
+  syncRailTruth();
+
   if (els.railTabs && els.railTabs.length) {
     const activeTab =
       state.rail && state.rail.tab ? state.rail.tab : "artifacts";
@@ -592,96 +696,8 @@ function openRail() {
 
   if (typeof renderArtifacts === "function") renderArtifacts();
   if (typeof renderMemory === "function") renderMemory();
-  if (typeof renderWeb === "function") renderWeb();
 
   syncRailReopenVisibility();
-}
-
-async function openArtifactFromStateOrBackend(artifactId) {
-  const id = String(artifactId || "").trim();
-  if (!id) return;
-
-  let artifact =
-    typeof findArtifactById === "function" ? findArtifactById(id) : null;
-
-  if (!artifact) {
-    try {
-      const payload = await apiGet("/api/state");
-      applyStatePayload(payload);
-      artifact =
-        typeof findArtifactById === "function" ? findArtifactById(id) : null;
-    } catch (error) {
-      warn("artifact refresh failed", error);
-    }
-  }
-
-  if (!artifact) {
-    state.rail.selectedId = "";
-    state.rail.selectedKind = "";
-
-    openRail();
-    setRailTab("artifacts");
-
-    if (els.railViewer) {
-      els.railViewer.hidden = false;
-      els.railViewer.innerHTML =
-        '<div class="nova-viewer-shell">' +
-        '<div class="nova-viewer-empty">' +
-        '<div class="nova-viewer-empty-title">Artifact not found</div>' +
-        '<div class="nova-viewer-empty-copy">This artifact is not available in the current session.</div>' +
-        "</div>" +
-        "</div>";
-    }
-
-    showToast("Artifact not found.", "error");
-    return;
-  }
-
-  const artifactSessionId = String(
-    artifact.session_id ||
-      (artifact.viewer && artifact.viewer.session_id) ||
-      ""
-  ).trim();
-
-  if (
-    artifactSessionId &&
-    artifactSessionId !== String(state.activeSessionId || "").trim()
-  ) {
-    try {
-      await openSessionFromBackend(artifactSessionId);
-      artifact =
-        typeof findArtifactById === "function" ? findArtifactById(id) || artifact : artifact;
-    } catch (error) {
-      warn("artifact session open failed", error);
-      showToast("Session switch failed.", "error");
-      return;
-    }
-  }
-
-  openRail();
-  setRailTab("artifacts");
-  setRailSelectedItem("artifact", id);
-
-  if (els.railViewer) {
-    els.railViewer.hidden = false;
-    els.railViewer.innerHTML = artifactViewerHtml(artifact);
-  }
-
-  if (els.railTitle) {
-    els.railTitle.textContent = "Artifacts";
-  }
-
-  if (els.railSubtitle) {
-    const viewer =
-      artifact.viewer && typeof artifact.viewer === "object" ? artifact.viewer : {};
-    els.railSubtitle.textContent = String(
-      viewer.title || artifact.title || artifact.name || "Artifact"
-    );
-  }
-
-  if (typeof renderArtifacts === "function") {
-    renderArtifacts();
-  }
 }
 
   function closeRail() {
@@ -972,7 +988,11 @@ state.activeSessionId = nextSessionId;
     setSessions(data.sessions);
   }
 
-  state.messages = (function () {
+if (Array.isArray(data.artifacts)) {
+  state.artifacts = data.artifacts;
+}
+
+  const incomingMessages = (function () {
     const incoming =
       (data.active_session && Array.isArray(data.active_session.messages)
         ? data.active_session.messages
@@ -1007,26 +1027,76 @@ state.activeSessionId = nextSessionId;
       .filter(Boolean);
   })();
 
-  state.messages = state.messages.filter(function (msg, index, arr) {
-    if (!msg) return false;
+  const currentMessages = Array.isArray(state.messages)
+    ? state.messages
+        .filter(function (msg) {
+          return msg && msg.kind !== "working_context";
+        })
+        .map(normalizeMessage)
+    : [];
 
-    if (msg.kind === "working_context") return false;
+  const dedupeMessages = function (messages) {
+    return (messages || []).filter(function (msg, index, arr) {
+      if (!msg) return false;
+      if (msg.kind === "working_context") return false;
 
-    const role = String(msg.role || "");
-    const text = String(msg.text || "").trim();
-    const created = String(msg.created_at || "");
+      const role = String(msg.role || "");
+      const text = String(msg.text || "").trim();
+      const created = String(msg.created_at || "");
+      const id = String(msg.id || "");
 
-    const firstMatchIndex = arr.findIndex(function (other) {
-      return (
-        other &&
-        String(other.role || "") === role &&
-        String(other.text || "").trim() === text &&
-        String(other.created_at || "") === created
-      );
+      const firstMatchIndex = arr.findIndex(function (other) {
+        return (
+          other &&
+          (
+            (id && String(other.id || "") === id) ||
+            (
+              String(other.role || "") === role &&
+              String(other.text || "").trim() === text &&
+              String(other.created_at || "") === created
+            )
+          )
+        );
+      });
+
+      return firstMatchIndex === index;
     });
+  };
 
-    return firstMatchIndex === index;
+  const incomingIds = new Set(
+    incomingMessages
+      .map(function (msg) {
+        return String((msg && msg.id) || "").trim();
+      })
+      .filter(Boolean)
+  );
+
+  const mergedMessages = incomingMessages.slice();
+
+  currentMessages.forEach(function (msg) {
+    const id = String((msg && msg.id) || "").trim();
+    if (id && !incomingIds.has(id)) {
+      mergedMessages.push(msg);
+    }
   });
+
+  const finalMessages = dedupeMessages(mergedMessages);
+  const currentAssistantCount = currentMessages.filter(function (msg) {
+    return msg && String(msg.role || "") === "assistant";
+  }).length;
+  const finalAssistantCount = finalMessages.filter(function (msg) {
+    return msg && String(msg.role || "") === "assistant";
+  }).length;
+
+  if (
+    currentMessages.length > finalMessages.length &&
+    currentAssistantCount > finalAssistantCount
+  ) {
+    console.warn("⚠️ Prevented message overwrite from stale state payload");
+    state.messages = dedupeMessages(currentMessages);
+  } else {
+    state.messages = finalMessages;
+  }
 
   state.messages = state.messages.filter(function (msg) {
     return msg && msg.kind !== "working_context";
@@ -1107,9 +1177,9 @@ if (backendWorkingContext) {
     }
   }
 
-  state.artifacts = safeArray(data.artifacts);
-  state.memory = safeArray(data.memory);
-  state.web = safeArray(data.web);
+state.artifacts = safeArray(data.artifacts).map(normalizeArtifact);
+state.memory = safeArray(data.memory).map(normalizeMemoryItem);
+state.web = safeArray(data.web);
 
   if (window.NovaArtifacts && typeof window.NovaArtifacts.reload === "function") {
     window.NovaArtifacts.reload();
@@ -1119,6 +1189,7 @@ if (backendWorkingContext) {
   renderChat();
   renderArtifacts();
   renderMemory();
+  syncRailTruth();
 
   if (typeof renderWeb === "function") {
     renderWeb();
@@ -1851,13 +1922,30 @@ function renderChat() {
   }
 
   wireWorkingContextPanel();
+  wireRailTabs();
   updateTopbarFromState();
   scrollChatToBottom(true);
   renderExecutionPanel();
+
 }
 
 function renderSessionList() {
   return;
+}
+
+function wireRailTabs() {
+  if (!els.railTabs || !els.railTabs.length) return;
+  if (els.rail.__tabsWired) return;
+
+  els.rail.__tabsWired = true;
+
+  els.railTabs.forEach(function (tabEl) {
+    tabEl.addEventListener("click", function () {
+      const tabName = String(tabEl.getAttribute("data-rail-tab") || "").trim().toLowerCase();
+      syncRailTruth();
+      setRailTab(tabName);
+    });
+  });
 }
 
 async function sendExecutionCommand(commandText) {
@@ -1993,6 +2081,80 @@ function renderExecutionPanel() {
   `;
 }
 
+function getSessionArtifactsForRail() {
+  const activeSessionId = String(state.activeSessionId || "").trim();
+  const allArtifacts = safeArray(state.artifacts);
+
+  let sessionArtifacts = allArtifacts.filter(function (item) {
+    if (!activeSessionId) return true;
+    return String(item && item.session_id ? item.session_id : "").trim() === activeSessionId;
+  });
+
+  if (!sessionArtifacts.length && allArtifacts.length) {
+    sessionArtifacts = allArtifacts.slice();
+  }
+
+  return sessionArtifacts;
+}
+
+function getArtifactKindBadge(kind) {
+  const value = String(kind || "").trim().toLowerCase();
+
+  if (!value) return "artifact";
+  if (value.includes("image")) return "image";
+  if (value.includes("web")) return "web";
+  if (value.includes("chat")) return "chat";
+  if (value.includes("analysis")) return "analysis";
+  return "artifact";
+}
+
+function getAvailableArtifactFilters(items) {
+  const filters = new Set(["all"]);
+
+  safeArray(items).forEach(function (item) {
+    const viewer = item && typeof item.viewer === "object" ? item.viewer : {};
+    const badge = getArtifactKindBadge(viewer.kind || item.kind || "artifact");
+    filters.add(badge);
+  });
+
+  const preferredOrder = ["all", "image", "web", "chat", "analysis", "artifact"];
+  return preferredOrder.filter(function (key) {
+    return filters.has(key);
+  });
+}
+
+function syncRailTruth() {
+  const hasArtifacts = getSessionArtifactsForRail().length > 0;
+  const hasMemory = safeArray(state.memory).length > 0;
+
+  if (!hasArtifacts && state.rail.tab === "artifacts" && hasMemory) {
+    state.rail.tab = "memory";
+  } else if (hasArtifacts) {
+    state.rail.tab = "artifacts";
+  } else if (!hasMemory) {
+    state.rail.tab = "artifacts";
+  }
+
+  qsa("[data-rail-tab]").forEach(function (tabEl) {
+    const tab = String(tabEl.getAttribute("data-rail-tab") || "").trim().toLowerCase();
+
+    if (tab === "web") {
+      tabEl.hidden = true;
+      tabEl.setAttribute("aria-hidden", "true");
+      return;
+    }
+
+    if (tab === "memory") {
+      tabEl.hidden = !hasMemory;
+      tabEl.setAttribute("aria-hidden", hasMemory ? "false" : "true");
+      return;
+    }
+
+    tabEl.hidden = false;
+    tabEl.setAttribute("aria-hidden", "false");
+  });
+}
+
 function renderArtifacts() {
   if (!els.artifactList) {
     els.artifactList = document.querySelector("[data-artifact-list]");
@@ -2003,7 +2165,8 @@ function renderArtifacts() {
   const searchQuery = String(
     (state.rail && state.rail.artifactSearch) || ""
   ).trim().toLowerCase();
-  const activeFilter = String(
+
+  let activeFilter = String(
     (state.rail && state.rail.artifactFilter) || "all"
   ).trim().toLowerCase();
 
@@ -2018,14 +2181,13 @@ function renderArtifacts() {
     sessionArtifacts = allArtifacts.slice();
   }
 
-
   function getKindBadge(kind) {
-    const kindLabel = String(kind || "artifact").toLowerCase();
+    const value = String(kind || "").toLowerCase();
 
-    if (kindLabel.includes("image")) return "image";
-    if (kindLabel.includes("web")) return "web";
-    if (kindLabel.includes("chat")) return "chat";
-    if (kindLabel.includes("analysis")) return "analysis";
+    if (value.includes("image")) return "image";
+    if (value.includes("web")) return "web";
+    if (value.includes("chat")) return "chat";
+    if (value.includes("analysis")) return "analysis";
     return "artifact";
   }
 
@@ -2043,6 +2205,27 @@ function renderArtifacts() {
     if (kindBadge === "chat") return "Chat";
     if (kindBadge === "analysis") return "Analysis";
     return "Other";
+  }
+
+  // 🔥 NEW: dynamic filter detection
+  const filterSet = new Set(["all"]);
+
+  sessionArtifacts.forEach(function (item) {
+    const viewer = item && typeof item.viewer === "object" ? item.viewer : {};
+    const kind = String(viewer.kind || item.kind || "artifact");
+    const badge = getKindBadge(kind);
+    filterSet.add(badge);
+  });
+
+  const filterOrder = ["all", "image", "web", "chat", "analysis", "artifact"];
+  const availableFilters = filterOrder.filter(function (f) {
+    return filterSet.has(f);
+  });
+
+  // 🔥 normalize active filter
+  if (!availableFilters.includes(activeFilter)) {
+    activeFilter = "all";
+    state.rail.artifactFilter = "all";
   }
 
   const normalized = sessionArtifacts
@@ -2124,12 +2307,22 @@ function renderArtifacts() {
     .filter(function (entry) {
       if (!entry.id) return false;
 
-      const matchesSearch = !searchQuery || entry.haystack.indexOf(searchQuery) >= 0;
+      const matchesSearch = !searchQuery || entry.haystack.includes(searchQuery);
       const matchesFilter =
         activeFilter === "all" || entry.kindBadge === activeFilter;
 
       return matchesSearch && matchesFilter;
     });
+
+  // 🔥 NEW: dynamic filters UI
+  const filterLabels = {
+    all: "All",
+    image: "Image",
+    web: "Web",
+    chat: "Chat",
+    analysis: "Analysis",
+    artifact: "Other",
+  };
 
   const controlsHtml =
     '<div class="rail-artifact-tools">' +
@@ -2137,21 +2330,17 @@ function renderArtifacts() {
         escapeHtml((state.rail && state.rail.artifactSearch) || "") +
       '">' +
       '<div class="rail-artifact-filters">' +
-        '<button type="button" class="rail-filter-pill' +
-          (activeFilter === "all" ? " is-active" : "") +
-          '" data-artifact-filter="all">All</button>' +
-        '<button type="button" class="rail-filter-pill' +
-          (activeFilter === "image" ? " is-active" : "") +
-          '" data-artifact-filter="image">Image</button>' +
-        '<button type="button" class="rail-filter-pill' +
-          (activeFilter === "web" ? " is-active" : "") +
-          '" data-artifact-filter="web">Web</button>' +
-        '<button type="button" class="rail-filter-pill' +
-          (activeFilter === "chat" ? " is-active" : "") +
-          '" data-artifact-filter="chat">Chat</button>' +
-        '<button type="button" class="rail-filter-pill' +
-          (activeFilter === "analysis" ? " is-active" : "") +
-          '" data-artifact-filter="analysis">Analysis</button>' +
+        availableFilters.map(function (f) {
+          return (
+            '<button type="button" class="rail-filter-pill' +
+              (activeFilter === f ? " is-active" : "") +
+              '" data-artifact-filter="' +
+              escapeHtml(f) +
+              '">' +
+              escapeHtml(filterLabels[f] || f) +
+            "</button>"
+          );
+        }).join("") +
       "</div>" +
     "</div>";
 
@@ -2160,23 +2349,8 @@ function renderArtifacts() {
       controlsHtml +
       '<div class="nova-artifact-empty">' +
       '<div class="nova-artifact-empty-title">No artifacts for this session</div>' +
-      '<div class="nova-artifact-empty-copy">Create an image, web result, analysis, or chat artifact in this session to see it here.</div>' +
+      '<div class="nova-artifact-empty-copy">Create something to see it here.</div>' +
       "</div>";
-
-    if (
-      state.rail &&
-      state.rail.selectedKind === "artifact" &&
-      els.railViewer
-    ) {
-      els.railViewer.hidden = false;
-      els.railViewer.innerHTML =
-        '<div class="nova-viewer-shell">' +
-        '<div class="nova-viewer-empty">' +
-        '<div class="nova-viewer-empty-title">No artifact selected</div>' +
-        '<div class="nova-viewer-empty-copy">This session does not have any artifacts yet.</div>' +
-        "</div>" +
-        "</div>";
-    }
     return;
   }
 
@@ -2185,23 +2359,8 @@ function renderArtifacts() {
       controlsHtml +
       '<div class="nova-artifact-empty">' +
       '<div class="nova-artifact-empty-title">No matching artifacts</div>' +
-      '<div class="nova-artifact-empty-copy">Try a different search or filter.</div>' +
+      '<div class="nova-artifact-empty-copy">Try a different filter.</div>' +
       "</div>";
-
-    if (
-      state.rail &&
-      state.rail.selectedKind === "artifact" &&
-      els.railViewer
-    ) {
-      els.railViewer.hidden = false;
-      els.railViewer.innerHTML =
-        '<div class="nova-viewer-shell">' +
-        '<div class="nova-viewer-empty">' +
-        '<div class="nova-viewer-empty-title">Nothing matches this filter</div>' +
-        '<div class="nova-viewer-empty-copy">Change the search text or filter pills to show more artifacts.</div>' +
-        "</div>" +
-        "</div>";
-    }
     return;
   }
 
@@ -2221,92 +2380,37 @@ function renderArtifacts() {
     grouped[key].push(entry);
   });
 
-  const orderedGroups = Object.keys(grouped)
+  const html = Object.keys(grouped)
     .sort(function (a, b) {
       return getGroupOrder(a) - getGroupOrder(b);
     })
     .map(function (groupKey) {
-      const cardsHtml = grouped[groupKey]
-        .map(function (entry) {
-          const isActive =
-            state.rail &&
-            state.rail.selectedKind === "artifact" &&
-            String(state.rail.selectedId || "").trim() === entry.id;
-
-          return (
-            '<div class="nova-artifact-card' +
-            (isActive ? " is-active" : "") +
-            '" data-artifact-open="' +
-            escapeHtml(entry.id) +
-            '">' +
-              '<div class="nova-artifact-card-top">' +
-                '<span class="nova-artifact-card-kind">' +
-                  escapeHtml(entry.kindBadge) +
-                "</span>" +
-                (entry.timeLabel
-                  ? '<span class="nova-artifact-card-time">' +
-                    escapeHtml(entry.timeLabel) +
-                    "</span>"
-                  : "") +
-              "</div>" +
-              '<div class="nova-artifact-card-title">' +
-                escapeHtml(entry.title) +
-              "</div>" +
-              (entry.preview
-                ? '<div class="nova-artifact-card-preview">' +
-                  escapeHtml(entry.preview.slice(0, 200)) +
-                  "</div>"
-                : "") +
-              (entry.thumbUrl
-                ? '<img class="nova-artifact-card-thumb" src="' +
-                  escapeHtml(entry.thumbUrl) +
-                  '" alt="' +
-                  escapeHtml(entry.title) +
-                  '" loading="lazy" />'
-                : "") +
-            "</div>"
-          );
-        })
-        .join("");
+      const cards = grouped[groupKey].map(function (entry) {
+        return (
+          '<div class="nova-artifact-card" data-artifact-open="' +
+          escapeHtml(entry.id) +
+          '">' +
+          '<div class="nova-artifact-card-title">' +
+          escapeHtml(entry.title) +
+          "</div>" +
+          "</div>"
+        );
+      }).join("");
 
       return (
         '<section class="nova-artifact-group">' +
-          '<div class="nova-artifact-group-title">' +
-            escapeHtml(getGroupTitle(groupKey)) +
-          "</div>" +
-          '<div class="nova-artifact-list">' +
-            cardsHtml +
-          "</div>" +
+        '<div class="nova-artifact-group-title">' +
+        escapeHtml(getGroupTitle(groupKey)) +
+        "</div>" +
+        '<div class="nova-artifact-list">' +
+        cards +
+        "</div>" +
         "</section>"
       );
     })
     .join("");
 
-  els.artifactList.innerHTML = controlsHtml + orderedGroups;
-
-  if (
-    state.rail &&
-    state.rail.selectedKind === "artifact" &&
-    state.rail.selectedId
-  ) {
-    const selectedStillVisible = normalized.some(function (entry) {
-      return entry.id === String(state.rail.selectedId || "").trim();
-    });
-
-    if (!selectedStillVisible) {
-      state.rail.selectedId = "";
-      if (els.railViewer) {
-        els.railViewer.hidden = false;
-        els.railViewer.innerHTML =
-          '<div class="nova-viewer-shell">' +
-          '<div class="nova-viewer-empty">' +
-          '<div class="nova-viewer-empty-title">Selected artifact hidden</div>' +
-          '<div class="nova-viewer-empty-copy">Your current search, filter, or session no longer includes the previously selected artifact.</div>' +
-          "</div>" +
-          "</div>";
-      }
-    }
-  }
+  els.artifactList.innerHTML = controlsHtml + html;
 }
 
   async function apiGet(url) {
@@ -2691,16 +2795,20 @@ function finalizeStreamMessage(payload) {
     ("assistant_" + Date.now())
   ).trim();
 
-  const existingIndex = state.messages.findIndex(function (msg) {
-    return msg && msg.id === targetId;
-  });
+  const existingIndex = Array.isArray(state.messages)
+    ? state.messages.findIndex(function (msg) {
+        return msg && msg.id === targetId;
+      })
+    : -1;
 
   const existing = existingIndex >= 0 ? state.messages[existingIndex] : null;
 
   const finalText = String(
     data.text ||
-    data.message ||
     data.content ||
+    (data.assistant_message && typeof data.assistant_message === "object"
+      ? data.assistant_message.text
+      : "") ||
     (existing && existing.text) ||
     ""
   );
@@ -2726,14 +2834,11 @@ function finalizeStreamMessage(payload) {
   });
 
   if (finalMessage && finalMessage.id) {
-    if (existingIndex >= 0) {
-      state.messages[existingIndex] = finalMessage;
-    } else {
-      state.messages.push(finalMessage);
-    }
+    upsertMessage(finalMessage);
   }
 
   if (data.execution && Array.isArray(data.execution.steps)) {
+    state.execution = state.execution || { active: false, steps: [] };
     state.execution.active = true;
     state.execution.steps = data.execution.steps.map(function (step, index) {
       return {
@@ -2758,21 +2863,32 @@ function finalizeStreamMessage(payload) {
 
   applyStatePayload(data);
 
-  const hydratedAssistantMessage = normalizeMessage(
-    (data && (data.assistant_message || data.message)) || finalMessage || {}
-  );
+  const assistantSource =
+    data && data.assistant_message && typeof data.assistant_message === "object"
+      ? data.assistant_message
+      : finalMessage;
+
+  const hydratedAssistantMessage = normalizeMessage(assistantSource || {});
 
   if (hydratedAssistantMessage && hydratedAssistantMessage.id) {
     upsertMessage(hydratedAssistantMessage);
+  }
 
-const workingContext = normalizeWorkingContext(
-  (data && data.working_context_payload) ||
-    (data && data.working_context) ||
-    emptyWorkingContext()
-);
-    if (workingContext.show) {
-      upsertWorkingContextMessage(workingContext, hydratedAssistantMessage.id);
-    }
+  if (finalMessage && finalMessage.id) {
+    upsertMessage(finalMessage);
+  }
+
+  const workingContext = normalizeWorkingContext(
+    (data && data.working_context_payload) ||
+      (data && data.working_context) ||
+      emptyWorkingContext()
+  );
+
+  if (workingContext.show) {
+    upsertWorkingContextMessage(
+      workingContext,
+      (hydratedAssistantMessage && hydratedAssistantMessage.id) || finalMessage.id || ""
+    );
   }
 
   if (state.stream) {
@@ -2819,114 +2935,169 @@ async function openSession(sessionId) {
 }
 
 function artifactViewerHtml(artifact) {
-  if (!artifact || typeof artifact !== "object") {
-    return '<div class="artifact-empty">No artifact selected.</div>';
+  if (!artifact) return "<div class='empty'>No artifact</div>";
+
+  const kind = String(artifact.kind || "");
+
+  if (kind === "web_search") {
+    const payload = artifact.payload || {};
+    const results = Array.isArray(payload.results) ? payload.results : [];
+    const query = String(payload.query || "");
+
+    if (!results.length) {
+      return `
+        <div class="artifact-viewer">
+          <div class="artifact-title">Web results</div>
+          <div class="artifact-empty">No results for "${escapeHtml(query)}"</div>
+        </div>
+      `;
+    }
+
+    const items = results.map(function (item) {
+      const title = escapeHtml(item.title || "Untitled");
+      const snippet = escapeHtml(item.snippet || "");
+      const url = escapeHtml(item.url || "#");
+
+      return `
+        <div class="web-card">
+          <a href="${url}" target="_blank" class="web-title">${title}</a>
+          <div class="web-snippet">${snippet}</div>
+          <div class="web-url">${url}</div>
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <div class="artifact-viewer">
+        <div class="artifact-title">Results for "${escapeHtml(query)}"</div>
+        <div class="web-results">
+          ${items}
+        </div>
+      </div>
+    `;
   }
 
-  const viewer = artifact.viewer || {};
-  const meta = artifact.meta || {};
+  return `
+    <div class="artifact-viewer">
+      <pre>${escapeHtml(JSON.stringify(artifact, null, 2))}</pre>
+    </div>
+  `;
+}
 
-  const kind = String(viewer.kind || artifact.kind || "artifact").trim();
-  const title = String(viewer.title || artifact.title || "Artifact").trim();
+function artifactViewerHtml(artifact) {
+  if (!artifact) {
+    return '<div class="nova-viewer-shell"><div class="nova-viewer-empty"><div class="nova-viewer-empty-title">No artifact</div></div></div>';
+  }
 
-  const summary = String(
-    viewer.analysis_text ||
-    artifact.summary ||
-    artifact.preview ||
-    ""
-  ).trim();
+  const item = artifact && typeof artifact === "object" ? artifact : {};
+  const viewer = item.viewer && typeof item.viewer === "object" ? item.viewer : {};
+  const meta = item.meta && typeof item.meta === "object" ? item.meta : {};
 
+  const kind = String(viewer.kind || item.kind || "artifact").trim().toLowerCase();
+  const title = String(viewer.title || item.title || item.name || "Artifact").trim();
   const body = String(
     viewer.body ||
-    artifact.body ||
-    meta.content ||
+    item.body ||
+    item.preview ||
+    item.summary ||
+    item.content ||
     ""
   ).trim();
 
   const sourceUrl = String(
     viewer.source_url ||
-    artifact.source_url ||
+    item.source_url ||
+    meta.source_url ||
     meta.url ||
     ""
   ).trim();
 
-  const bullets = Array.isArray(viewer.bullets) ? viewer.bullets : [];
-  const links = Array.isArray(viewer.links) ? viewer.links : [];
-  const images = Array.isArray(viewer.images) ? viewer.images : [];
+  const imageUrl = String(
+    viewer.image_url ||
+    item.image_url ||
+    meta.image_url ||
+    ""
+  ).trim();
 
-  const escapeHtml = (v) =>
-    String(v || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+  const webResults =
+    Array.isArray(item.results) ? item.results :
+    Array.isArray(meta.results) ? meta.results :
+    Array.isArray(viewer.results) ? viewer.results :
+    [];
 
-  const bulletsHtml = bullets.length
-    ? `<section class="artifact-view-section">
-        <div class="artifact-view-section__title">Highlights</div>
-        <ul class="artifact-bullets">
-          ${bullets.map(b => `<li>${escapeHtml(b)}</li>`).join("")}
-        </ul>
-      </section>`
-    : "";
+  if (kind === "web" || kind === "web_search") {
+    const cardsHtml = webResults.length
+      ? webResults.map(function (result) {
+          const resultTitle = String(result && result.title ? result.title : "Untitled");
+          const resultSnippet = String(result && result.snippet ? result.snippet : "");
+          const resultUrl = String(result && (result.url || result.link) ? (result.url || result.link) : "").trim();
 
-  const linksHtml = links.length
-    ? `<section class="artifact-view-section">
-        <div class="artifact-view-section__title">Links</div>
-        <div class="artifact-link-list">
-          ${links.map(l => `
-            <a class="artifact-link-item" href="${escapeHtml(l)}" target="_blank">
-              ${escapeHtml(l)}
-            </a>
-          `).join("")}
-        </div>
-      </section>`
-    : "";
+          return (
+            '<article class="web-card">' +
+              '<div class="web-card__title">' +
+                (resultUrl
+                  ? '<a href="' + escapeHtml(resultUrl) + '" target="_blank" rel="noopener noreferrer" class="web-title">' +
+                      escapeHtml(resultTitle) +
+                    '</a>'
+                  : escapeHtml(resultTitle)) +
+              '</div>' +
+              (resultSnippet
+                ? '<div class="web-snippet">' + escapeHtml(resultSnippet) + '</div>'
+                : '') +
+              (resultUrl
+                ? '<div class="web-url">' + escapeHtml(resultUrl) + '</div>'
+                : '') +
+            '</article>'
+          );
+        }).join("")
+      : "";
 
-  const imagesHtml = images.length
-    ? `<section class="artifact-view-section">
-        <div class="artifact-view-section__title">Images</div>
-        <div class="artifact-image-grid">
-          ${images.map(src => `
-            <a href="${escapeHtml(src)}" target="_blank">
-              <img src="${escapeHtml(src)}" />
-            </a>
-          `).join("")}
-        </div>
-      </section>`
-    : "";
+    return (
+      '<div class="nova-viewer-shell">' +
+        '<div class="nova-viewer-header">' +
+          '<div class="nova-viewer-title">' + escapeHtml(title || "Web results") + '</div>' +
+          (sourceUrl
+            ? '<a href="' + escapeHtml(sourceUrl) + '" target="_blank" rel="noopener noreferrer" class="nova-viewer-link">Source</a>'
+            : '') +
+        '</div>' +
+        (body
+          ? '<div class="nova-viewer-body"><pre class="nova-artifact-meta-pre">' + escapeHtml(body) + '</pre></div>'
+          : '') +
+        (cardsHtml
+          ? '<div class="web-results">' + cardsHtml + '</div>'
+          : '') +
+      '</div>'
+    );
+  }
 
-  const bodyHtml = body
-    ? `<section class="artifact-view-section">
-        <div class="artifact-view-section__title">Content</div>
-        <div class="artifact-body">
-          ${body.split(/\n\n/).map(p => `<p>${escapeHtml(p)}</p>`).join("")}
-        </div>
-      </section>`
-    : "";
+  if (imageUrl) {
+    return (
+      '<div class="nova-viewer-shell">' +
+        '<div class="nova-viewer-header">' +
+          '<div class="nova-viewer-title">' + escapeHtml(title) + '</div>' +
+        '</div>' +
+        '<div class="nova-viewer-body">' +
+          '<a href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noopener noreferrer">' +
+            '<img src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(title) + '" class="message-attachment__image">' +
+          '</a>' +
+        '</div>' +
+        (body
+          ? '<pre class="nova-artifact-meta-pre">' + escapeHtml(body) + '</pre>'
+          : '') +
+      '</div>'
+    );
+  }
 
-  return `
-    <div class="artifact-view">
-      <div class="artifact-view-header">
-        <div class="artifact-view-header__kind">${escapeHtml(kind)}</div>
-        <div class="artifact-view-header__title">${escapeHtml(title)}</div>
-        ${summary ? `<div class="artifact-view-header__summary">${escapeHtml(summary)}</div>` : ""}
-      </div>
-
-      ${bulletsHtml}
-      ${linksHtml}
-      ${imagesHtml}
-      ${bodyHtml}
-
-      ${sourceUrl ? `
-        <section class="artifact-view-section">
-          <div class="artifact-view-section__title">Source</div>
-          <a class="artifact-meta-link" href="${escapeHtml(sourceUrl)}" target="_blank">
-            ${escapeHtml(sourceUrl)}
-          </a>
-        </section>
-      ` : ""}
-    </div>
-  `;
+  return (
+    '<div class="nova-viewer-shell">' +
+      '<div class="nova-viewer-header">' +
+        '<div class="nova-viewer-title">' + escapeHtml(title) + '</div>' +
+      '</div>' +
+      '<div class="nova-viewer-body">' +
+        '<pre class="nova-artifact-meta-pre">' + escapeHtml(body || JSON.stringify(item, null, 2)) + '</pre>' +
+      '</div>' +
+    '</div>'
+  );
 }
 
  function setRailTab(tab) {
@@ -3013,6 +3184,15 @@ function setRailSelectedItem(kind, id) {
   } catch (error) {
     target.scrollIntoView();
   }
+}
+
+function findArtifactById(id) {
+  const target = String(id || "").trim();
+  if (!target) return null;
+
+  return safeArray(state.artifacts).find(function (artifact) {
+    return String((artifact && artifact.id) || "").trim() === target;
+  }) || null;
 }
 
 async function openArtifactFromStateOrBackend(artifactId) {
@@ -3400,7 +3580,7 @@ async function consumeChatJson(payload) {
       (data && (data.assistant_message || data.message)) || {}
     );
 
-    if (!hasSessionMessages && assistantMessage && assistantMessage.id) {
+    if (assistantMessage && assistantMessage.id) {
       upsertMessage(assistantMessage);
     }
 
@@ -3482,6 +3662,23 @@ async function consumeChatJson(payload) {
     });
     throw error;
   }
+}
+
+async function getBrowserLocation() {
+  if (!navigator.geolocation) return null;
+
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolve({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      },
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+    );
+  });
 }
 
 async function sendMessage() {
@@ -3583,11 +3780,13 @@ async function sendMessage() {
 
   try {
     const isImageCommand = String(text || "").trim().toLowerCase().startsWith("/image");
+    const location = await getBrowserLocation();
 
     const payload = {
       user_text: text,
       session_id: String(state.activeSessionId || ""),
       attachments: attachments,
+      location: location,
     };
 
     if (isImageCommand) {
@@ -4917,28 +5116,50 @@ function selectRelevantMemory(userText, limit) {
 }
 
 function renderMemory() {
-  const list = document.querySelector("[data-memory-list]");
-  const empty = document.querySelector("[data-memory-empty]");
-  if (!list || !empty) return;
+  if (!els.memoryList) {
+    els.memoryList = document.querySelector("[data-memory-list]");
+  }
+  if (!els.memoryList) return;
 
-  const items = (Array.isArray(state.memory) ? state.memory : []).map(normalizeMemoryItem);
-  state.memory = items;
-
-  if (!items.length) {
-    empty.hidden = false;
-    list.innerHTML = "";
+  if (!state.rail || state.rail.tab !== "memory") {
     return;
   }
 
-  empty.hidden = true;
-  list.innerHTML = items.map(function (m) {
+  const items = safeArray(state.memory);
+
+  if (!items.length) {
+    els.memoryList.innerHTML =
+      '<div class="nova-memory-empty">' +
+      '<div class="nova-memory-empty-title">No saved memory yet</div>' +
+      '<div class="nova-memory-empty-copy">Memory will appear here when this lane is actively used.</div>' +
+      '</div>';
+    return;
+  }
+
+  const html = items.map(function (item) {
+    const title = String(item.title || item.name || item.key || "Memory").trim();
+    const preview = String(
+      item.preview ||
+      item.value ||
+      item.text ||
+      item.content ||
+      item.summary ||
+      ""
+    ).trim();
+
+    const id = String(item.id || "").trim();
+
     return (
-      '<button class="nova-rail-card" type="button" data-memory-open="' + escapeHtml(m.id) + '">' +
-      '<div class="nova-rail-card-title">' + escapeHtml(summarizeMemoryText(m.preview || m.text, 120) || "Memory item") + "</div>" +
-      '<div class="nova-rail-card-meta">' + escapeHtml(m.kind || "note") + "</div>" +
-      "</button>"
+      '<div class="nova-memory-card" data-memory-open="' + escapeHtml(id) + '">' +
+        '<div class="nova-memory-card-title">' + escapeHtml(title) + '</div>' +
+        (preview
+          ? '<div class="nova-memory-card-preview">' + escapeHtml(preview.slice(0, 200)) + '</div>'
+          : "") +
+      '</div>'
     );
   }).join("");
+
+  els.memoryList.innerHTML = html;
 }
 
 function renderMemoryViewer(item) {
