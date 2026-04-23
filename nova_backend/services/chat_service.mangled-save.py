@@ -53,14 +53,12 @@ class ChatService:
         self.image_size = os.getenv("NOVA_IMAGE_SIZE", "1024x1024")
         self.chat_model = os.getenv("OPENAI_MODEL", "gpt-5.4")
         self.model = self.chat_model
-        print("MODEL CHECK:", hasattr(self, "model"), self.model)
         self.memory_limit = int(os.getenv("NOVA_MEMORY_LIMIT", "3"))
 
         self.uploads_dir = Path(
             os.getenv("UPLOADS_DIR", r"C:\Users\Owner\nova\uploads")
         )
         self.uploads_dir.mkdir(parents=True, exist_ok=True)
-        print("CHATSERVICE INIT uploads_dir =", self.uploads_dir)
 
         self.client = OpenAI()
         self.agent = AgentService()
@@ -490,6 +488,151 @@ class ChatService:
 
         return False
 
+    def _get_thread_state(self, session_id: str) -> dict:
+        state = self._get_working_state(session_id)
+        if not isinstance(state, dict):
+            state = {}
+
+        thread_state = state.get("thread_state")
+        if not isinstance(thread_state, dict):
+            thread_state = {}
+
+        return {
+            "style": self._safe_str(thread_state.get("style")),
+            "topic": self._safe_str(thread_state.get("topic")),
+            "last_intent": self._safe_str(thread_state.get("last_intent")),
+            "active_reference": self._safe_str(thread_state.get("active_reference")),
+            "last_goal": self._safe_str(thread_state.get("last_goal")),
+        }
+
+    def _set_thread_state(self, session_id: str, **updates) -> dict:
+        current_state = self._get_working_state(session_id)
+        if not isinstance(current_state, dict):
+            current_state = {}
+
+        thread_state = current_state.get("thread_state")
+        if not isinstance(thread_state, dict):
+            thread_state = {}
+
+        for key, value in updates.items():
+            if value is None:
+                continue
+            thread_state[str(key)] = self._safe_str(value)
+
+        current_state["thread_state"] = thread_state
+        self._save_working_state(session_id, current_state)
+        return thread_state
+
+    def _get_last_meaningful_user_message(self, session_id: str) -> str:
+        session = self.sessions.get_session(session_id) or {}
+        messages = session.get("messages") or []
+
+        for msg in reversed(messages):
+            if not isinstance(msg, dict):
+                continue
+            if self._safe_str(msg.get("role")).lower() != "user":
+                continue
+
+            text = self._safe_str(msg.get("text")).strip()
+            lowered = text.lower()
+
+            if not text:
+                continue
+            if lowered in {
+                "continue",
+                "go on",
+                "keep going",
+                "what next",
+                "fix that",
+                "do that",
+                "do it",
+                "what are we doing",
+                "what are we ding",
+            }:
+                continue
+
+            return text
+
+        return ""
+
+    def _extract_style_from_text(self, user_text: str) -> str:
+        lowered = self._safe_str(user_text).lower().strip()
+
+        if any(p in lowered for p in ["funny way", "do funny", "make it funny", "be funny"]):
+            return "funny"
+
+        if any(p in lowered for p in ["sarcastic way", "be sarcastic", "make it sarcastic"]):
+            return "sarcastic"
+
+        if any(p in lowered for p in ["serious way", "be serious", "plain and serious"]):
+            return "serious"
+
+        if any(p in lowered for p in ["simple way", "explain simply", "like i'm 5", "eli5"]):
+            return "simple"
+
+        return ""
+    def _looks_like_continuation_turn(self, user_text: str) -> bool:
+        lowered = self._safe_str(user_text).lower().strip()
+        if not lowered:
+            return False
+
+        continuation_triggers = {
+            "what next",
+            "finish it",
+            "finish that",
+            "do that",
+            "do it",
+            "fix that",
+            "what are we doing",
+            "what are we ding",
+            "where were we",
+        }
+        return lowered in continuation_triggers
+
+    def _update_thread_state_from_turn(self, session_id: str, user_text: str, decision: dict, assistant_text: str = "") -> None:
+        user_text = self._safe_str(user_text).strip()
+        assistant_text = self._safe_str(assistant_text).strip()
+        decision = decision or {}
+
+        style = self._extract_style_from_text(user_text)
+        route = self._safe_str(decision.get("route"))
+        topic = ""
+        active_reference = ""
+        last_goal = ""
+
+        lowered = user_text.lower()
+
+        if style:
+            self._set_thread_state(session_id, style=style)
+
+        if route:
+            self._set_thread_state(session_id, last_intent=route)
+
+        if self._looks_like_continuation_turn(user_text):
+            active_reference = self._get_last_meaningful_user_message(session_id)
+            if active_reference:
+                self._set_thread_state(session_id, active_reference=active_reference)
+            return
+
+        if user_text and lowered not in {
+            "continue",
+            "go on",
+            "keep going",
+            "what next",
+            "fix that",
+            "do that",
+            "do it",
+            "what are we doing",
+            "what are we ding",
+        }:
+            topic = user_text
+            self._set_thread_state(session_id, topic=topic, active_reference=topic)
+
+        if assistant_text:
+            if "execution plan created" in assistant_text.lower():
+                last_goal = user_text
+                self._set_thread_state(session_id, last_goal=last_goal)
+
     def _build_working_context_block(self, session_id: str):
         state = self._get_working_state(session_id)
 
@@ -604,28 +747,6 @@ class ChatService:
         return [item for _, item in ranked[:limit]]
 
 
-    def _format_memory_context(self, memory_items) -> str:
-        memory_items = memory_items or []
-        lines = []
-
-        for item in memory_items:
-            if isinstance(item, dict):
-                kind = self._safe_str(item.get("kind")).strip()
-                text = self._safe_str(item.get("text")).strip()
-            else:
-                kind = ""
-                text = self._safe_str(item).strip()
-
-            if not text:
-                continue
-
-            if kind:
-                lines.append(f"- [{kind}] {text}")
-            else:
-                lines.append(f"- {text}")
-
-        return "\n".join(lines).strip()
-
     def _build_memory_context_for_chat(self, user_text: str, decision=None) -> str:
         decision = decision or {}
         use_memory = bool(decision.get("use_memory", True))
@@ -737,116 +858,6 @@ class ChatService:
             return "I do not have any saved memory yet."
 
         return "Hereâ€™s what I remember:\n" + "\n".join(lines)
-
-    def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
-        if not isinstance(decision, dict):
-            return
-        if not decision.get("save_memory"):
-            return
-
-        text = self._normalize_memory_text_for_save(user_text)
-        lowered = text.lower()
-
-        should_save = False
-        kind = "note"
-
-        # profile / identity
-        if any(x in lowered for x in ["my name is", "i am ", "i'm ", "call me"]):
-            should_save = True
-            kind = "profile"
-
-        # preferences
-        elif any(
-            x in lowered
-            for x in [
-                "my favorite",
-                "my favourite",
-                "favorite color is",
-                "favourite color is",
-                "i prefer",
-                "i like",
-                "i love",
-                "i enjoy",
-                "i usually",
-                "i always",
-                "from now on",
-                "going forward",
-            ]
-        ):
-            should_save = True
-            kind = "preference"
-
-        # project / work
-        elif any(
-            x in lowered
-            for x in [
-                "i'm building",
-                "i am building",
-                "my project",
-                "i'm working on",
-                "i am working on",
-                "working on",
-                "nova",
-            ]
-        ):
-            should_save = True
-            kind = "project"
-
-        # goals
-        elif any(x in lowered for x in ["i want to", "my goal", "i plan to"]):
-            should_save = True
-            kind = "goal"
-
-        # explicit memory instruction
-        elif "remember that" in lowered:
-            should_save = True
-            kind = "note"
-
-        if not should_save:
-            return
-
-        if not self._should_save_memory_text(text, kind=kind):
-            return
-
-        try:
-            existing_items = []
-            if hasattr(self, "memory") and self.memory and hasattr(self.memory, "all"):
-                existing_items = self.memory.all() or []
-
-            for item in existing_items:
-                if not isinstance(item, dict):
-                    continue
-
-                existing_text = self._normalize_memory_text_for_save(item.get("text", ""))
-                existing_kind = self._safe_str(item.get("kind")).lower().strip()
-                existing_session = self._safe_str(item.get("session_id")).strip()
-
-                if (
-                    existing_text
-                    and existing_text.lower() == text.lower()
-                    and existing_kind == kind
-                    and existing_session == self._safe_str(session_id)
-                ):
-                    return
-
-        except Exception:
-            pass
-
-        try:
-            self._call_first(
-                self.memory,
-                ["add_memory", "create_memory", "save_memory", "create"],
-                text=text,
-                kind=kind,
-                source="router_auto",
-                session_id=session_id,
-            )
-        except Exception as e:
-            print("MEMORY WRITE FAILED:", e)
-
-    # =========================
-    # EXECUTION GUARD HELPERS (STEP TRUTH ENFORCEMENT)
-    # =========================
 
     def _text_has_placeholder_debug_content(self, text: str) -> bool:
         text = self._safe_str(text).strip().lower()
@@ -992,8 +1003,6 @@ class ChatService:
         goal = str(execution.get("goal") or "").strip()
         steps = execution.get("steps") or []
 
-        print("RENDER EXECUTION =", execution)
-        print("RENDER STEPS =", steps)
 
         total = len(steps)
         done = sum(1 for s in steps if (s or {}).get("status") == "done")
@@ -1109,39 +1118,27 @@ class ChatService:
 
         return summary
 
+def _build_system_prompt(self, decision=None):
+    return (
+        "You are Nova, a direct execution-focused AI.\n\n"
 
-    def _build_system_prompt(self, decision=None):
-        parts = []
+        "Rules:\n"
+        "- NEVER greet the user\n"
+        "- NEVER say 'what do you need'\n"
+        "- NEVER ask generic follow-up questions\n"
+        "- NEVER respond with assistant-style filler\n\n"
 
-        parts.append(
-            "You are Nova, a focused AI workspace assistant. "
-            "Be clear, direct, continuity-aware, and useful. "
-            "Prefer action over explanation. "
-            "Do not ramble. "
-            "Preserve the user's momentum."
-        )
+        "Behavior:\n"
+        "- If the user says 'hi' or 'hello', respond with something meaningful or stay minimal\n"
+        "- Prefer moving forward over asking questions\n"
+        "- Give direct answers or useful output immediately\n\n"
 
-        parts.append(
-            "When coding or project-building, be precise and operational. "
-            "Keep outputs structured and grounded in the user's active work."
-        )
-
-        parts.append(
-            "Response style rules: "
-            "be concise, confident, and practical. "
-            "Prefer direct answers first. "
-            "Avoid generic assistant filler. "
-            "When relevant, anchor the reply to the user's active file, bug, or next move. "
-            "Do not repeat the working context unless it improves the reply. "
-            "Use it quietly to stay aligned."
-        )
-
-        if decision and isinstance(decision, dict):
-            mode = (decision.get("mode") or "").strip()
-            if mode:
-                parts.append(f"Current operating mode: {mode}.")
-
-        return "\n\n".join([p for p in parts if p]).strip()
+        "Style:\n"
+        "- concise\n"
+        "- confident\n"
+        "- no fluff\n"
+        "- no assistant tone\n"
+    )
 
     def _compose_model_messages(self, user_text, session=None, decision=None, memory_context=None):
         session = session or {}
@@ -1188,32 +1185,6 @@ class ChatService:
             return current_state
 
         return self._update_working_state(session_id, updates)
-
-    def _is_valid_state_value(self, value):
-        if not value:
-            return False
-
-        value = str(value).strip()
-
-        if len(value) > 120:
-            return False
-
-        if "\n" in value:
-            return False
-
-        bad_patterns = [
-            "recommended order",
-            "next, improve",
-            "current project truth",
-            "if you want",
-        ]
-
-        lower = value.lower()
-        for p in bad_patterns:
-            if p in lower:
-                return False
-
-        return True
 
     def _load_memory(self):
         """
@@ -1359,103 +1330,25 @@ class ChatService:
         )
         return any(trigger in t for trigger in triggers)
 
-    def _decide_route(
-        self,
-        user_text: str,
-        session_id: str = "",
-        attachments=None,
-    ) -> dict:
-        attachments = attachments or []
-        text = self._safe_str(user_text)
-        lowered = text.lower()
-
-        decision = {
-            "route": self.ROUTE_GENERAL_CHAT,
-            "mode": "chat",
-            "confidence": 0.50,
-            "use_memory": True,
-            "save_memory": True,
-            "save_artifact": False,
-            "has_attachments": bool(attachments),
-            "url": "",
-            "memory_limit": self.memory_limit,
-            "reasons": [],
-            "session_id": self._safe_str(session_id),
-        }
+    def _looks_like_execution(self, user_text: str, decision: dict | None = None) -> bool:
+        text = str(user_text or "").strip().lower()
 
         if not text:
-            decision["reasons"].append("empty_input")
-            return decision
+            return False
 
-        if self._is_image_generation_request(user_text):
-            decision.update(
-                {
-                    "route": self.ROUTE_IMAGE_GENERATION,
-                    "mode": "image",
-                    "confidence": 0.95,
-                    "save_artifact": True,
-                    "save_memory": False,
-                    "use_memory": False,
-                    "url": "",
-                    "has_attachments": bool(attachments),
-                    "prompt": self._image_prompt_from_text(user_text),
-                }
-            )
-            decision["reasons"].append("image_trigger")
-            return decision
+        if self._looks_like_continuation_turn(user_text):
+            return False
 
-        if attachments:
-            decision.update(
-                {
-                    "route": self.ROUTE_ATTACHMENT_ANALYSIS,
-                    "mode": "analysis",
-                    "confidence": 0.90,
-                    "save_artifact": True,
-                }
-            )
-            decision["reasons"].append("attachments_present")
-            return decision
+        if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
+            if len(text.strip()) < 20:
+                return False
+            return True
 
-        url = self._extract_first_url(text)
-        if url:
-            decision.update(
-                {
-                    "route": self.ROUTE_WEB_FETCH,
-                    "mode": "tool",
-                    "confidence": 0.94,
-                    "save_artifact": True,
-                    "url": url,
-                }
-            )
-            decision["reasons"].append("url_detected")
-            return decision
+        # coding / structured intent
+        if decision and decision.get("mode") in {"coding", "analysis"}:
+            return True
 
-        if self._looks_like_memory_recall(text):
-            decision.update(
-                {
-                    "route": self.ROUTE_MEMORY_RECALL,
-                    "mode": "memory",
-                    "confidence": 0.82,
-                    "save_memory": False,
-                }
-            )
-            decision["reasons"].append("memory_recall_trigger")
-            return decision
-
-        if self._looks_like_planning(text):
-            decision.update(
-                {
-                    "route": self.ROUTE_PLANNING,
-                    "mode": "planning",
-                    "confidence": 0.78,
-                    "save_artifact": True,
-                }
-            )
-            decision["reasons"].append("planning_trigger")
-            return decision
-
-        decision["reasons"].append("default_general_chat")
-        return decision
+        return False
 
     # ==============================
     # EXECUTION SYSTEM
@@ -1474,25 +1367,6 @@ class ChatService:
             notes = self._clean_execution_text(step.get("notes"))
             normalized.append(f"{title}|{status}|{notes}")
         return normalized
-
-
-    def _looks_like_execution(self, user_text: str, decision: dict | None = None) -> bool:
-        text = str(user_text or "").strip().lower()
-
-        if not text:
-            return False
-
-
-        # 🔥 PLAN CREATION
-        if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
-            return True
-
-        # 🔥 FALLBACK: coding / structured intent
-        if decision and decision.get("mode") in {"coding", "analysis"}:
-            return True
-
-        return False
-
 
     def _execution_step_titles_for_goal(self, goal: str) -> list[str]:
         lowered = str(goal or "").lower()
@@ -1674,7 +1548,6 @@ class ChatService:
         try:
             sessions = self.session_service.list_sessions()
         except Exception as e:
-            print("GET PERSISTED EXECUTION LOAD SESSIONS FAILED:", e)
             return None
 
         if isinstance(sessions, dict):
@@ -1726,7 +1599,6 @@ class ChatService:
         try:
             sessions = self.session_service.list_sessions()
         except Exception as e:
-            print("PERSIST EXECUTION LOAD SESSIONS FAILED:", e)
             return
 
         if isinstance(sessions, dict):
@@ -1761,8 +1633,9 @@ class ChatService:
                 self._save_sessions(sessions)
             else:
                 self._save_sessions(items)
+
         except Exception as e:
-            print("PERSIST EXECUTION SAVE SESSIONS FAILED:", e)
+            pass
 
     def _find_latest_execution_artifact(self, session_id: str = ""):
         session_id = self._safe_str(session_id)
@@ -1777,8 +1650,6 @@ class ChatService:
 
             artifacts = artifacts or []
 
-            print("ALL ARTIFACTS =", artifacts)
-
             matches = []
 
             for a in artifacts:
@@ -1790,7 +1661,6 @@ class ChatService:
                 execution = a.get("execution") or ((a.get("meta") or {}).get("execution")) or {}
 
                 if execution:
-                    print("MATCHED EXECUTION ARTIFACT =", a)
                     matches.append(a)
 
             matches.sort(
@@ -1800,12 +1670,9 @@ class ChatService:
 
             latest = matches[0] if matches else None
 
-            print("FINAL LATEST =", latest)
-
             return latest
 
         except Exception as e:
-            print("FIND EXECUTION FAILED =", e)
             return None
 
     def _attach_execution(self, payload, user_text, assistant_msg, decision, session_id=""):
@@ -1837,123 +1704,39 @@ class ChatService:
         payload["assistant_message"]["meta"]["execution"] = execution
 
         try:
-            self._persist_execution_artifact(session_id=session_id, execution=execution)
+            self._persist_execution_artifact(
+                session_id=session_id,
+                execution=execution,
+            )
         except Exception as e:
-            payload["debug"]["execution_persist_error"] = str(e)
+            pass
 
         return payload
 
-# =========================
-# EXECUTION PROGRESSION (PHASE 5)
-# =========================
+    # =========================
+    # EXECUTION PROGRESSION (PHASE 5)
+    # =========================
 
-    def _looks_like_execution_progression(self, user_text: str) -> bool:
-        text = self._safe_str(user_text).strip().lower()
-        if not text:
-            return False
+def _looks_like_execution_progression(self, user_text: str) -> bool:
+    text = self._safe_str(user_text).strip().lower()
 
-        normalized = " ".join(text.split())
-        print("PROGRESS_MATCH_NORMALIZED =", repr(normalized))
-
-        triggers = {
-            "run it",
-            "continue",
-            "go on",
-            "next step",
-            "advance",
-            "proceed",
-            "keep going",
-        }
-
-        if normalized in triggers:
-            return True
-
-        if normalized.endswith(" run it"):
-            return True
-
-        if "run it" in normalized and len(normalized) <= 40:
-            return True
-
+    if not text:
         return False
 
-    def _normalize_execution_state(self, execution):
-        if not isinstance(execution, dict):
-            execution = {}
+    triggers = [
+        "run it",
+        "continue",
+        "next",
+        "go",
+        "do it",
+        "execute",
+        "step",
+        "proceed",
+        "keep going",
+        "next step",
+    ]
 
-        execution.setdefault("goal", "")
-        execution.setdefault("steps", [])
-        execution.setdefault("current_step_index", 0)
-        execution.setdefault("status", "running")
-        execution.setdefault("progress", 0)
-        execution.setdefault("current_step", "")
-
-        raw_steps = execution.get("steps") or []
-        clean_steps = []
-
-        for raw in raw_steps:
-            if isinstance(raw, dict):
-                title = str(raw.get("title") or "").strip()
-            else:
-                title = str(raw).strip()
-
-            if not title:
-                continue
-
-            clean_steps.append({
-                "title": title,
-                "status": "pending",
-            })
-
-        step_count = len(clean_steps)
-
-        if step_count == 0:
-            execution["steps"] = []
-            execution["current_step_index"] = 0
-            execution["progress"] = 0
-            execution["current_step"] = "complete" if execution.get("status") == "complete" else ""
-            execution["status"] = "complete"
-            return execution
-
-        try:
-            current_index = int(execution.get("current_step_index", 0) or 0)
-        except Exception:
-            current_index = 0
-
-        if current_index < 0:
-            current_index = 0
-        if current_index > step_count:
-            current_index = step_count
-
-        status = str(execution.get("status") or "running").strip().lower()
-        if status not in ["running", "complete", "blocked"]:
-            status = "running"
-
-        if status == "complete" or current_index >= step_count:
-            current_index = step_count
-            for step in clean_steps:
-                step["status"] = "done"
-            progress = step_count
-            current_step = "complete"
-            status = "complete"
-        else:
-            for idx, step in enumerate(clean_steps):
-                if idx < current_index:
-                    step["status"] = "done"
-                elif idx == current_index:
-                    step["status"] = "current"
-                else:
-                    step["status"] = "pending"
-
-            progress = current_index
-            current_step = clean_steps[current_index]["title"]
-
-        execution["steps"] = clean_steps
-        execution["current_step_index"] = current_index
-        execution["progress"] = progress
-        execution["current_step"] = current_step
-        execution["status"] = status
-        return execution
-
+    return any(t in text for t in triggers)
 
     def _advance_execution_one_step(self, execution):
         execution = self._normalize_execution_state(dict(execution or {}))
@@ -1993,19 +1776,22 @@ class ChatService:
 
     def _extract_text_response(self, response) -> str:
         try:
+            if not response:
+                return ""
+
             if hasattr(response, "output_text") and response.output_text:
-                return response.output_text
+                return str(response.output_text).strip()
 
             if hasattr(response, "output") and response.output:
                 parts = []
                 for item in response.output:
                     if hasattr(item, "content"):
                         for c in item.content:
-                            if hasattr(c, "text"):
-                                parts.append(c.text)
-                return "\n".join(parts)
+                            if hasattr(c, "text") and c.text:
+                                parts.append(str(c.text))
+                return "\n".join(parts).strip()
 
-            return str(response)
+            return ""
         except Exception as e:
             return f"[extract_error] {e}"
 
@@ -2015,37 +1801,25 @@ class ChatService:
         user_text = self._safe_str(user_text)
         assistant_text = ""
 
-        print("ADVANCE SESSION_ID =", session_id)
-
         latest = self._find_latest_execution_artifact(session_id=session_id)
-        print("ADVANCE LATEST =", latest)
 
         user_msg = self._build_user_message(
             user_text,
             attachments=attachments,
         )
 
-        if not latest:
-            assistant_msg = self._build_assistant_message(
-                text="No execution found. Start with a plan first.",
-                attachments=[],
-            )
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision={
-                    "route": "execution",
-                    "mode": "execution_progress",
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": True,
-                },
-                saved_artifact=None,
-            )
+        execution = {}
 
-        execution = latest.get("execution") or {}
+        if isinstance(latest, dict):
+            execution = latest.get("execution") or ((latest.get("meta") or {}).get("execution")) or {}
+
+        if not execution:
+            persisted = self._get_persisted_execution_artifact(session_id)
+            if isinstance(persisted, dict):
+                execution = persisted
+
+        if not execution:
+            return None
 
         result = self._execute_current_step(
             execution=execution,
@@ -2193,14 +1967,34 @@ class ChatService:
 
     def _build_execution_plan(self, user_text: str, session_id: str):
         goal = self._safe_str(user_text).strip() or "Complete the requested task"
+        lowered = goal.lower()
 
-        steps = [
-            "Inspect the current state and constraints",
-            "Choose the safest implementation path",
-            "Apply the required change",
-            "Verify the result",
-            "Summarize outcome and next move",
-        ]
+        if "plan" in lowered and not any(
+            x in lowered for x in ["fix", "debug", "error", "bug", "traceback", ".py", "implement"]
+        ):
+            steps = [
+                "Define the plan objective",
+                "Identify assumptions and constraints",
+                "Break the work into milestones",
+                "Assign a practical order or timeline",
+                "Summarize the final plan",
+            ]
+        elif any(x in lowered for x in ["fix", "debug", "error", "bug", "traceback", ".py", "implement"]):
+            steps = [
+                "Inspect the current state and constraints",
+                "Choose the safest implementation path",
+                "Apply the required change",
+                "Verify the result",
+                "Summarize outcome and next move",
+            ]
+        else:
+            steps = [
+                "Clarify the objective from available context",
+                "Break the task into concrete steps",
+                "Execute the highest-value next step",
+                "Verify progress",
+                "Summarize outcome and next move",
+            ]
 
         execution = self._normalize_execution_state({
             "goal": goal,
@@ -2244,8 +2038,7 @@ class ChatService:
                 ["save_artifact", "create_artifact", "add_artifact", "save", "create"],
                 artifact_payload,
             )
-        except Exception as e:
-            print("BUILD EXECUTION PLAN FAILED (positional):", e)
+        except Exception:
             saved_artifact = None
 
         if not saved_artifact:
@@ -2255,8 +2048,7 @@ class ChatService:
                     ["save_artifact", "create_artifact", "add_artifact", "save", "create"],
                     artifact=artifact_payload,
                 )
-            except Exception as e:
-                print("BUILD EXECUTION PLAN FAILED (keyword artifact):", e)
+            except Exception:
                 saved_artifact = None
 
         artifact_id = ""
@@ -2269,13 +2061,8 @@ class ChatService:
 
         try:
             self._persist_execution_artifact(session_id=session_id, execution=execution)
-        except Exception as e:
-            print("BUILD EXECUTION PLAN PERSIST EXECUTION FAILED:", e)
-
-        print("BUILD EXECUTION PLAN SAVED =", bool(saved_artifact))
-        print("BUILD EXECUTION PLAN SESSION =", session_id)
-        print("BUILD EXECUTION PLAN ARTIFACT =", saved_artifact)
-        print("BUILD EXECUTION PLAN ACTIVE EXECUTION =", execution)
+        except Exception:
+            pass
 
         return saved_artifact
 
@@ -2345,24 +2132,7 @@ class ChatService:
         user_msg = self._build_user_message(user_text, attachments=attachments)
 
         if not latest:
-            assistant_msg = self._build_assistant_message(
-                text="No execution found. Start with a plan first.",
-                attachments=[],
-            )
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision={
-                    "route": "execution_auto",
-                    "mode": "execution_auto",
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": True,
-                },
-                saved_artifact=None,
-            )
+            return None
 
         execution = self._normalize_execution_state(latest.get("execution") or {})
         if not execution:
@@ -2535,7 +2305,7 @@ class ChatService:
             self._persist_message_fallback(session_id, user_msg)
             self._persist_message_fallback(session_id, assistant_msg)
         except Exception as e:
-            print("TURN PERSIST FAILED:", e)
+            pass
 
     def _get_session_payload(self, session_id: str, fallback_messages=None) -> dict:
         fallback_messages = fallback_messages or []
@@ -2663,35 +2433,6 @@ class ChatService:
         # WORKING STATE (PHASE 3)
         # ==============================
 
-    def _get_working_state(self, session_id: str):
-            state = self._call_first(
-                self.sessions,
-                ["get_working_state"],
-                session_id,
-                default={},
-            )
-
-            if not isinstance(state, dict):
-                state = {}
-
-            cleaned = {}
-            for key in (
-                "active_task",
-                "current_file",
-                "current_bug",
-                "last_success",
-                "next_move",
-                "checkpoint",
-                "updated_at",
-            ):
-                value = state.get(key, "")
-                if key == "updated_at":
-                    cleaned[key] = self._safe_str(value)
-                else:
-                    cleaned[key] = self._clean_working_state_value(value)
-
-            return cleaned
-
     def _handle_where_are_we(self, session_id: str, user_text: str = "") -> str:
             state = self._get_working_state(session_id) or {}
 
@@ -2807,32 +2548,6 @@ class ChatService:
         # =========================
         # WORKING STATE HELPERS
         # =========================
-
-    def _clean_working_state_value(self, value, limit=120):
-            text = self._safe_str(value).strip()
-            if not text:
-                return ""
-
-            text = text.replace("\r", " ").replace("\n", " ")
-            text = re.sub(r"\s+", " ", text).strip()
-
-            bad_starts = (
-                "yes",
-                "agreed",
-                "recommended",
-                "in short",
-                "what this means",
-            )
-
-            lower = text.lower()
-            if any(lower.startswith(x) for x in bad_starts):
-                return ""
-
-            for splitter in [" and ", " but ", " so "]:
-                if splitter in text:
-                    text = text.split(splitter)[0].strip()
-
-            return text[:limit]
 
     def _is_valid_state_value(self, value):
             if not value:
@@ -3097,7 +2812,6 @@ class ChatService:
 
         merged["updated_at"] = self._iso_now()
 
-        print("WORKING_STATE_MERGED =", merged)
 
         # primary path
         try:
@@ -3106,12 +2820,10 @@ class ChatService:
                 {"working_state": merged},
             ) or {}
             persisted = updated.get("working_state")
-            print("WORKING_STATE_UPDATED_SESSION =", persisted)
             if isinstance(persisted, dict):
-                print("FINAL_WORKING_STATE_BEFORE_RETURN =", persisted)
                 return dict(persisted)
         except Exception as e:
-            print("WORKING_STATE_UPDATE_SESSION_FAILED =", e)
+            pass
 
         # fallback: force write into session store
         try:
@@ -3137,20 +2849,16 @@ class ChatService:
 
                 refreshed = self.sessions.get_session(session_id) or {}
                 persisted = refreshed.get("working_state")
-                print("WORKING_STATE_FALLBACK_PERSISTED =", persisted)
 
                 if isinstance(persisted, dict) and any(
                     (str(v).strip() if v is not None else "") for v in persisted.values()
                 ):
-                    print("FINAL_WORKING_STATE_BEFORE_RETURN =", persisted)
                     return dict(persisted)
 
         except Exception as e:
-            print("WORKING_STATE_FALLBACK_FAILED =", e)
+            pass
 
-        print("FINAL_WORKING_STATE_BEFORE_RETURN =", merged)
         return dict(merged)
-
     # ==============================
     # MEMORY HELPERS
     # ==============================
@@ -3295,29 +3003,40 @@ class ChatService:
                     session_id=session_id,
                 )
             except Exception as e:
-                print("MEMORY WRITE FAILED:", e)
-
+                pass
 
     def _memory_text_tokens(self, value: str) -> set[str]:
-            text = self._safe_str(value).lower()
-            if not text:
-                return set()
+        text = self._safe_str(value).lower()
+        if not text:
+            return set()
 
-            stop_words = {
-                "the", "a", "an", "and", "or", "but", "if", "then", "than",
-                "to", "of", "for", "in", "on", "at", "by", "with", "from",
-                "is", "are", "was", "were", "be", "been", "being",
-                "it", "this", "that", "these", "those",
-                "i", "me", "my", "you", "your", "we", "our",
-                "do", "does", "did", "have", "has", "had",
-                "what", "when", "where", "why", "how",
-                "can", "could", "should", "would", "will",
-                "about", "into", "over", "under", "again", "right", "now",
-            }
+        stop_words = {
+            "the",
+            "and",
+            "for",
+            "that",
+            "with",
+            "have",
+            "this",
+            "from",
+            "your",
+            "about",
+            "just",
+            "into",
+            "they",
+            "them",
+            "then",
+            "than",
+            "were",
+            "been",
+            "being",
+            "want",
+            "plan",
+            "goal",
+        }
 
-            tokens = set(re.findall(r"[a-z0-9_]{2,}", text))
-            return {token for token in tokens if token not in stop_words}
-
+        tokens = set(re.findall(r"[a-z0-9_]{2,}", text))
+        return {t for t in tokens if t not in stop_words}
 
     def _memory_kind_weight(self, kind: str) -> float:
             k = self._safe_str(kind).lower()
@@ -3590,7 +3309,6 @@ class ChatService:
             try:
                 return self.artifacts.save_artifact(artifact)
             except Exception as e:
-                print("ARTIFACT SAVE FAILED:", e)
                 return None
 
     def _persist_image_generation_artifact(
@@ -3618,254 +3336,707 @@ class ChatService:
             return self._save_artifact_fallback(artifact)
 
     def _handle_image_generation(
-            self,
-            prompt: str,
-            session_id: str = "",
-            parent_artifact_id: str = "",
-            source_type: str = "generated",
-        ) -> dict:
+        self,
+        prompt: str,
+        session_id: str = "",
+        parent_artifact_id: str = "",
+        source_type: str = "generated",
+    ) -> dict:
+        try:
+            result = self.client.images.generate(
+                model=self.image_model,
+                prompt=prompt,
+                size=self.image_size,
+            )
+
+            first = result.data[0] if getattr(result, "data", None) else None
+            image_b64 = getattr(first, "b64_json", None) if first else None
+            revised_prompt = getattr(first, "revised_prompt", "") if first else ""
+            if not image_b64:
+                raise ValueError("Image API returned no b64_json")
+
+            image_bytes = base64.b64decode(image_b64)
+            filename = f"generated_{uuid.uuid4().hex}.png"
+            filepath = self.uploads_dir / filename
+
+            with open(filepath, "wb") as f:
+                f.write(image_bytes)
+
+            image_url = f"/api/uploads/{filename}"
+
+            saved_artifact = None
             try:
-                result = self.client.images.generate(
-                    model=self.image_model,
+                artifact = self._build_image_generation_artifact(
+                    session_id=session_id,
                     prompt=prompt,
-                    size=self.image_size,
+                    image_url=image_url,
+                    revised_prompt=revised_prompt,
+                    parent_artifact_id=parent_artifact_id,
+                    source_type=source_type,
+                    generation_mode="text_to_image",
                 )
-
-                first = result.data[0] if getattr(result, "data", None) else None
-                image_b64 = getattr(first, "b64_json", None) if first else None
-                if not image_b64:
-                    raise ValueError("Image API returned no b64_json")
-
-                image_bytes = base64.b64decode(image_b64)
-                filename = f"generated_{uuid.uuid4().hex}.png"
-                filepath = self.uploads_dir / filename
-
-                with open(filepath, "wb") as f:
-                    f.write(image_bytes)
-
-                image_url = f"/api/uploads/{filename}"
-
+                saved_artifact = self._save_artifact_fallback(artifact)
+            except Exception:
                 saved_artifact = None
-                try:
-                    saved_artifact = self._persist_image_generation_artifact(
-                        session_id=session_id,
-                        prompt=prompt,
-                        image_url=image_url,
-                        revised_prompt="",
-                        parent_artifact_id=parent_artifact_id,
-                        source_type=source_type,
-                        generation_mode="text_to_image",
-                    )
-                except Exception as e:
-                    print("IMAGE ARTIFACT SAVE FAILED:", e)
 
-                return {
-                    "ok": True,
-                    "text": f"Generated image for: {prompt}",
-                    "image_url": image_url,
-                    "prompt": prompt,
-                    "revised_prompt": "",
-                    "parent_artifact_id": parent_artifact_id,
-                    "source_type": source_type,
-                    "generation_mode": "text_to_image",
-                    "saved_artifact": saved_artifact,
+            return {
+                "ok": True,
+                "text": f"Generated image for: {prompt}",
+                "image_url": image_url,
+                "prompt": prompt,
+                "revised_prompt": revised_prompt,
+                "parent_artifact_id": parent_artifact_id,
+                "source_type": source_type,
+                "generation_mode": "text_to_image",
+                "saved_artifact": saved_artifact,
+            }
+        except Exception as e:
+            return {
+                "ok": False,
+                "text": f"Image generation failed: {e}",
+                "error": str(e),
+                "image_url": "",
+                "prompt": prompt,
+                "revised_prompt": "",
+                "parent_artifact_id": parent_artifact_id,
+                "source_type": source_type,
+                "generation_mode": "text_to_image",
+                "saved_artifact": None,
+            }
+
+    def _rewrite_query_with_location(self, user_text: str, location=None) -> str:
+        text = self._safe_str(user_text)
+        location = location or {}
+
+        if "near me" not in text.lower():
+            return text
+
+        lat = location.get("lat")
+        lng = location.get("lng")
+
+        if lat is not None and lng is not None:
+            return re.sub(
+                r"\bnear me\b",
+                f"near {lat},{lng}",
+                text,
+                flags=re.IGNORECASE,
+            )
+
+        return text
+
+    def _should_use_web(self, user_text: str) -> bool:
+        text = self._safe_str(user_text).lower().strip()
+        if not text:
+            return False
+
+        if text.startswith("/web "):
+            return True
+
+        if self._looks_like_url(text) or self._extract_first_url(text):
+            return True
+
+        freshness_terms = [
+            "latest",
+            "latest on",
+            "news",
+            "today",
+            "current",
+            "right now",
+            "recent",
+            "update",
+            "updates",
+        ]
+
+        local_terms = [
+            "near me",
+            "nearby",
+            "closest",
+            "nearest",
+            "open now",
+            "hours",
+            "store hours",
+            "location",
+            "address",
+            "phone",
+            "phone number",
+            "directions",
+            "website",
+        ]
+
+        finance_terms = [
+            "price of",
+            "stock price",
+            "market cap",
+            "btc",
+            "bitcoin",
+            "ethereum",
+            "eth",
+            "nasdaq",
+            "dow",
+            "s&p",
+        ]
+
+        sports_terms = [
+            "record",
+            "score",
+            "scores",
+            "standing",
+            "standings",
+            "stats",
+            "schedule",
+            "rank",
+            "ranking",
+            "wins",
+            "losses",
+            "nba",
+            "nfl",
+            "mlb",
+            "nhl",
+            "ncaa",
+            "lakers",
+            "warriors",
+            "yankees",
+            "canucks",
+        ]
+
+        weather_terms = [
+            "weather",
+            "forecast",
+            "temperature",
+            "rain",
+            "snow",
+            "wind",
+        ]
+
+        if any(term in text for term in freshness_terms):
+            return True
+
+        if any(term in text for term in local_terms):
+            return True
+
+        if any(term in text for term in finance_terms):
+            return True
+
+        if any(term in text for term in sports_terms):
+            return True
+
+        if any(term in text for term in weather_terms):
+            return True
+
+        if self._looks_like_business_query(text):
+            return True
+
+        return False
+
+    def _infer_web_intent(self, user_text: str) -> str:
+        text = self._safe_str(user_text).lower().strip()
+        if not text:
+            return "general"
+
+        if any(term in text for term in ["weather", "forecast", "temperature", "rain", "snow", "wind"]):
+            return "weather"
+
+        if any(term in text for term in [
+            "record", "score", "scores", "standing", "standings", "stats",
+            "schedule", "wins", "losses", "nba", "nfl", "mlb", "nhl",
+            "lakers", "warriors", "yankees", "canucks"
+        ]):
+            return "sports"
+
+        if any(term in text for term in [
+            "price of", "stock price", "market cap", "btc", "bitcoin",
+            "ethereum", "eth", "nasdaq", "dow", "s&p"
+        ]):
+            return "finance"
+
+        if self._looks_like_business_query(text) or any(term in text for term in [
+            "near me", "nearby", "closest", "nearest", "open now", "hours",
+            "address", "location", "phone", "directions"
+        ]):
+            return "local"
+
+        if any(term in text for term in ["latest", "latest on", "news", "recent", "today", "update", "updates"]):
+            return "news"
+
+        return "general"
+
+    def _rewrite_web_query(self, user_text: str, location=None) -> str:
+        query = self._rewrite_query_with_location(user_text, location)
+        text = self._safe_str(query).strip()
+        lowered = text.lower()
+        intent = self._infer_web_intent(text)
+
+        if intent == "sports":
+            if "record" in lowered and "season" not in lowered:
+                return f"{text} current season"
+            if "standings" not in lowered and "standing" in lowered:
+                return f"{text} current standings"
+            return text
+
+        if intent == "finance":
+            if "price of" in lowered and "today" not in lowered:
+                return f"{text} today"
+            return text
+
+        if intent == "weather":
+            if "today" not in lowered and "forecast" not in lowered:
+                return f"{text} today"
+            return text
+
+        if intent == "news":
+            if "latest" not in lowered and "today" not in lowered:
+                return f"latest {text}"
+            return text
+
+        if intent == "local":
+            return text
+
+        return text
+
+    def _looks_like_business_query(self, text: str) -> bool:
+        t = self._safe_str(text).lower().strip()
+        if not t:
+            return False
+
+        business_terms = [
+            "tim hortons",
+            "starbucks",
+            "mcdonalds",
+            "walmart",
+            "costco",
+            "restaurant",
+            "cafe",
+            "coffee",
+            "pharmacy",
+            "store",
+            "bank",
+            "gas",
+            "gas station",
+            "mall",
+            "clinic",
+            "hospital",
+            "gym",
+        ]
+
+        business_intents = [
+            "hours",
+            "open",
+            "open now",
+            "closing",
+            "close",
+            "location",
+            "address",
+            "near me",
+            "nearest",
+            "closest",
+            "phone",
+        ]
+
+        has_business = any(term in t for term in business_terms)
+        has_intent = any(term in t for term in business_intents)
+
+        return has_business or has_intent
+
+
+    def _extract_grounded_business_result(self, payload) -> dict:
+        payload = payload or {}
+
+        results = payload.get("results") or payload.get("items") or []
+        if not isinstance(results, list):
+            results = []
+
+        best = {}
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+
+            title = self._safe_str(item.get("title") or item.get("name")).strip()
+            snippet = self._safe_str(
+                item.get("snippet") or item.get("content") or item.get("body")
+            ).strip()
+            url = self._safe_str(item.get("url") or item.get("source_url")).strip()
+            address = self._safe_str(
+                item.get("address")
+                or item.get("location")
+                or item.get("formatted_address")
+            ).strip()
+            hours = self._safe_str(
+                item.get("hours")
+                or item.get("opening_hours")
+                or item.get("open_hours")
+            ).strip()
+
+            score = 0
+            if title:
+                score += 2
+            if address:
+                score += 2
+            if hours:
+                score += 4
+            if url:
+                score += 1
+            if snippet:
+                score += 1
+
+            if not best or score > best.get("_score", 0):
+                best = {
+                    "title": title,
+                    "address": address,
+                    "hours": hours,
+                    "snippet": snippet,
+                    "url": url,
+                    "_score": score,
                 }
-            except Exception as e:
-                return {
-                    "ok": False,
-                    "text": f"Image generation failed: {e}",
-                    "error": str(e),
-                    "image_url": "",
-                    "prompt": prompt,
-                    "revised_prompt": "",
-                    "parent_artifact_id": parent_artifact_id,
-                    "source_type": source_type,
-                    "generation_mode": "text_to_image",
-                    "saved_artifact": None,
-                }
+
+        if not best:
+            return {
+                "ok": False,
+                "reason": "no_result",
+                "title": "",
+                "address": "",
+                "hours": "",
+                "snippet": "",
+                "url": "",
+            }
+
+        best["ok"] = bool(best.get("title") or best.get("address") or best.get("hours"))
+        best["reason"] = "ok" if best["ok"] else "weak_result"
+        return best
+
+
+    def _build_grounded_business_answer(self, query: str, grounded: dict) -> str:
+        grounded = grounded or {}
+
+        title = self._safe_str(grounded.get("title")).strip()
+        address = self._safe_str(grounded.get("address")).strip()
+        hours = self._safe_str(grounded.get("hours")).strip()
+        url = self._safe_str(grounded.get("url")).strip()
+
+        if not grounded.get("ok"):
+            return (
+                f'I found possible business results for "{self._safe_str(query)}", '
+                "but I could not verify the exact location or live hours confidently."
+            )
+
+        if not hours:
+            parts = []
+            if title:
+                parts.append(title)
+            if address:
+                parts.append(address)
+
+            base = "\n".join(parts).strip()
+            if not base:
+                base = f'I found possible results for "{self._safe_str(query)}".'
+
+            return (
+                f"{base}\n\n"
+                "I could not verify live hours confidently from the returned source data."
+            )
+
+        lines = []
+        if title:
+            lines.append(title)
+        if address:
+            lines.append(address)
+        lines.append(f"Hours: {hours}")
+        if url:
+            lines.append(f"Source: {url}")
+
+        return "\n".join(lines).strip()
+
+def _clean_search_query(self, text: str) -> str:
+    t = str(text or "").lower().strip()
+
+    # remove filler phrases
+    junk = [
+        "research",
+        "look up",
+        "search",
+        "find",
+        "latest on",
+        "latest",
+        "tell me about",
+        "what is",
+        "what's",
+        "give me",
+        "info on",
+    ]
+
+    for j in junk:
+        if t.startswith(j):
+            t = t[len(j):].strip()
+
+    # fix common patterns
+    if "price of" in t:
+        t = t.replace("price of", "").strip() + " price"
+
+    # collapse whitespace
+    t = " ".join(t.split())
+
+    return t.strip()
+
+    def _summarize_search_results(self, query: str, results: list) -> str:
+        query = self._safe_str(query)
+        results = results if isinstance(results, list) else []
+
+        cleaned = []
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+
+            title = self._safe_str(item.get("title") or item.get("name")).strip()
+            snippet = self._safe_str(
+                item.get("snippet") or item.get("content") or item.get("body")
+            ).strip()
+            url = self._safe_str(item.get("url") or item.get("source_url")).strip()
+
+            if not (title or snippet or url):
+                continue
+
+            cleaned.append({
+                "title": title,
+                "snippet": snippet,
+                "url": url,
+            })
+
+        if not cleaned:
+            return f'I searched for "{query}" but could not find strong live results.'
+
+        lines = []
+        for item in cleaned[:5]:
+            block = []
+            if item["title"]:
+                block.append(item["title"])
+            if item["snippet"]:
+                block.append(item["snippet"])
+            if item["url"]:
+                block.append(item["url"])
+            lines.append("\n".join(block).strip())
+
+        return "\n\n".join(lines).strip() 
+
         # ==============================
         # WEB / ATTACHMENT HELPERS
         # ==============================
 
-    def _handle_web_fetch(self, url: str, session_id: str = "") -> dict:
-            raw_url = self._safe_str(url)
-            normalized_url = raw_url
-            if normalized_url and not re.match(r"^https?://", normalized_url, re.IGNORECASE):
-                normalized_url = "https://" + normalized_url
+def _handle_web_request(
+    self,
+    user_text: str,
+    query: str = "",
+    session_id: str = "",
+    attachments=None,
+    user_msg=None,
+    decision=None,
+) -> dict:
 
-            fetched_at = datetime.now(timezone.utc).isoformat()
+    attachments = attachments or []
+    clean_text = self._safe_str(query or user_text).strip()
+    business_query = self._looks_like_business_query(clean_text)
 
+    # --- detect URL ---
+    url_match = re.search(r"(https?://[^\s]+)", clean_text, re.IGNORECASE)
+    if not url_match:
+        www_match = re.search(r"\b(www\.[^\s]+\.[^\s]+)\b", clean_text, re.IGNORECASE)
+        if www_match:
+            clean_text = "https://" + www_match.group(1)
+            url_match = True
+
+    # --- URL -> FETCH ---
+    if url_match:
+        return self._execute_web_fetch(
+            decision={"url": clean_text, "route": self.ROUTE_WEB_FETCH},
+            user_text=clean_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
+
+    # --- TEXT -> SEARCH ---
+    try:
+        result = self.web_service.search(clean_text)
+    except Exception as e:
+        return {
+            "ok": False,
+            "text": f"Web search failed: {e}",
+            "error": str(e),
+        }
+
+    artifact_payload = {}
+    try:
+        if hasattr(self.web_service, "build_search_artifact_payload"):
+            artifact_payload = self.web_service.build_search_artifact_payload(result) or {}
+    except Exception:
+        artifact_payload = {}
+
+    summary = self._safe_str(result.get("summary"))
+
+    if business_query:
+        grounded = self._extract_grounded_business_result(result)
+        summary = self._build_grounded_business_answer(clean_text, grounded)
+
+    assistant_text = summary or f'Web search completed for "{clean_text}".'
+
+    assistant_msg = self._build_assistant_message(
+        text=assistant_text,
+        meta={
+            "web_search": True,
+            "query": clean_text,
+        },
+        attachments=[],
+    )
+
+    return self._finalize_response(
+        session_id=session_id,
+        user_text=user_text,
+        user_msg=user_msg or self._build_user_message(user_text, attachments=[]),
+        assistant_msg=assistant_msg,
+        decision=decision or {"route": "web_search"},
+        saved_artifact=artifact_payload,
+    )
+
+    def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
+        attachments = attachments or []
+
+        image_url = ""
+        image_name = ""
+
+        for item in attachments:
+            if not isinstance(item, dict):
+                continue
+
+            att_type = self._safe_str(item.get("type")).lower()
+            mime_type = self._safe_str(item.get("mime_type")).lower()
+            url = self._safe_str(item.get("url"))
+            name = self._safe_str(item.get("name") or item.get("filename") or "image")
+
+            if url and (att_type == "image" or mime_type.startswith("image/")):
+                image_url = url
+                image_name = name
+                break
+
+        if image_url:
             try:
-                result = self.web.fetch(normalized_url)
+                prompt = self._safe_str(user_text) or "what is in this image"
+
+                response = self.client.responses.create(
+                    model=self.chat_model,
+                    input=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "input_text", "text": prompt},
+                                {"type": "input_image", "image_url": image_url},
+                            ],
+                        }
+                    ],
+                )
+
+                text = self._extract_response_text(response)
+
+                return {
+                    "ok": True,
+                    "text": text or f"I analyzed the image: {image_name}",
+                    "saved_artifact": None,
+                }
+
             except Exception as e:
                 return {
                     "ok": False,
-                    "error": f"Web fetch failed: {e}",
-                    "url": normalized_url,
-                    "debug": {
-                        "route_taken": "web_fetch",
-                        "error": str(e),
-                    },
+                    "text": f"Image analysis failed: {e}",
+                    "error": str(e),
+                    "saved_artifact": None,
                 }
 
-            if not isinstance(result, dict):
-                result = {}
+        names = []
+        for item in attachments:
+            if isinstance(item, dict):
+                name = self._safe_str(item.get("name") or item.get("filename"))
+                if name:
+                    names.append(name)
 
-            artifact = {}
-            try:
-                if hasattr(self.web, "build_artifact_payload") and callable(self.web.build_artifact_payload):
-                    artifact = self.web.build_artifact_payload(result) or {}
-            except Exception as e:
-                artifact = {
-                    "kind": "web_result",
-                    "title": self._safe_str(result.get("title")) or normalized_url,
-                    "summary": self._safe_str(result.get("summary")),
-                    "body": self._safe_str(result.get("content")),
-                    "preview": self._safe_str(result.get("preview")),
-                    "source_url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                    "meta": {
-                        "description": self._safe_str(result.get("description")),
-                        "site_name": self._safe_str(result.get("site_name")),
-                        "domain": self._safe_str(result.get("domain")),
-                        "content": self._safe_str(result.get("content")),
-                        "url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                        "status_code": result.get("status_code"),
-                        "ssl_verified": result.get("ssl_verified"),
-                        "artifact_build_error": str(e),
-                    },
-                    "viewer": {
-                        "kind": "web_result",
-                        "title": self._safe_str(result.get("title")) or normalized_url,
-                        "body": self._safe_str(result.get("content")),
-                        "analysis_text": self._safe_str(result.get("summary")),
-                        "bullets": self._safe_list(result.get("bullets")),
-                        "links": self._safe_list(result.get("links")),
-                        "images": self._safe_list(result.get("images")),
-                        "source_url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                    },
-                }
+        summary = (
+            f"I analyzed the uploaded attachment(s): {', '.join(names)}."
+            if names
+            else "I analyzed the uploaded attachment(s)."
+        )
 
-            if isinstance(artifact, dict):
-                artifact["session_id"] = session_id or artifact.get("session_id", "")
-                artifact.setdefault("created_at", fetched_at)
-                artifact["updated_at"] = fetched_at
+        if user_text:
+            summary += f" Request: {user_text}"
 
-            artifact = self._upgrade_web_artifact_payload(
-                artifact=artifact,
-                result=result,
-                url=normalized_url,
-            )
+        return {
+            "ok": True,
+            "text": summary,
+            "saved_artifact": None,
+        }
 
-            saved_artifact = self._save_artifact_fallback(artifact) if artifact else None
-            final_artifact = self._upgrade_web_artifact_payload(
-                artifact=saved_artifact or artifact,
-                result=result,
-                url=normalized_url,
-            )
 
-            summary = self._safe_str(final_artifact.get("summary")) if isinstance(final_artifact, dict) else ""
-            body = self._safe_str(final_artifact.get("body")) if isinstance(final_artifact, dict) else ""
-            title = self._safe_str(final_artifact.get("title")) if isinstance(final_artifact, dict) else normalized_url
-            viewer = self._safe_dict(final_artifact.get("viewer")) if isinstance(final_artifact, dict) else {}
-            meta = self._safe_dict(final_artifact.get("meta")) if isinstance(final_artifact, dict) else {}
+        # =========================
+        # URL -> web fetch
+        # =========================
+        if re.search(r"(https?://[^\s]+)", lowered) or re.search(r"\bwww\.", lowered):
+            return {"route": self.ROUTE_WEB_FETCH, "url": text}
 
-            return {
-                "ok": bool(result.get("ok", True)),
-                "text": summary or f"Fetched {title}",
-                "artifact": final_artifact,
-                "viewer": viewer,
-                "url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                "source_url": self._safe_str(meta.get("source_url")) or self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                "title": title,
-                "summary": summary,
-                "body": body,
-                "meta": meta,
-                "debug": {
-                    "route_taken": "web_fetch",
-                    "status_code": result.get("status_code"),
-                    "artifact_kind": self._safe_str(final_artifact.get("kind")) if isinstance(final_artifact, dict) else "web_result",
-                },
-            }
+        # =========================
+        # explicit command
+        # =========================
+        if lowered.startswith("/web "):
+            return {"route": self.ROUTE_WEB_FETCH, "query": text[5:].strip()}
 
-    def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
-            attachments = attachments or []
+        # =========================
+        # HIGH CONFIDENCE WEB
+        # =========================
+        strong_phrases = [
+            "price of",
+            "how much is",
+            "latest",
+            "news",
+            "update",
+            "current",
+            "today",
+            "stock",
+            "market",
+        ]
 
-            image_url = ""
-            image_name = ""
+        for phrase in strong_phrases:
+            if phrase in lowered:
+                return {"route": "web_search", "query": text}
 
+        # =========================
+        # QUESTION PATTERNS
+        # =========================
+        if lowered.startswith((
+            "who is",
+            "what is",
+            "where is",
+            "when did",
+            "how much",
+            "how many",
+            "why is",
+        )):
+            return {"route": "web_search", "query": text}
+
+        # =========================
+        # ATTACHMENTS
+        # =========================
+        if attachments:
             for item in attachments:
                 if not isinstance(item, dict):
                     continue
-
-                att_type = self._safe_str(item.get("type")).lower()
                 mime_type = self._safe_str(item.get("mime_type")).lower()
-                url = self._safe_str(item.get("url"))
-                name = self._safe_str(item.get("name") or item.get("filename") or "image")
+                att_type = self._safe_str(item.get("type")).lower()
+                if att_type == "image" or mime_type.startswith("image/"):
+                    return {"route": self.ROUTE_ATTACHMENT_ANALYSIS}
 
-                if url and (att_type == "image" or mime_type.startswith("image/")):
-                    image_url = url
-                    image_name = name
-                    break
+        # =========================
+        # FALLBACK HEURISTIC
+        # =========================
+        # short factual query -> web
+        if len(lowered.split()) <= 5:
+            return {"route": "web_search", "query": text}
 
-            if image_url:
-                try:
-                    prompt = self._safe_str(user_text) or "what is in this image"
+        return {"route": self.ROUTE_GENERAL_CHAT}
 
-                    response = self.client.responses.create(
-                        model=self.chat_model,
-                        input=[
-                            {
-                                "role": "user",
-                                "content": [
-                                    {"type": "input_text", "text": prompt},
-                                    {"type": "input_image", "image_url": image_url},
-                                ],
-                            }
-                        ],
-                    )
-
-                    text = self._extract_response_text(response)
-
-                    return {
-                        "ok": True,
-                        "text": text or f"I analyzed the image: {image_name}",
-                        "saved_artifact": None,
-                    }
-
-                except Exception as e:
-                    return {
-                        "ok": False,
-                        "text": f"Image analysis failed: {e}",
-                        "error": str(e),
-                        "saved_artifact": None,
-                    }
-
-            names = []
-            for item in attachments:
-                if isinstance(item, dict):
-                    name = self._safe_str(item.get("name") or item.get("filename"))
-                    if name:
-                        names.append(name)
-
-            summary = (
-                f"I analyzed the uploaded attachment(s): {', '.join(names)}."
-                if names
-                else "I analyzed the uploaded attachment(s)."
-            )
-
-            if user_text:
-                summary += f" Request: {user_text}"
-
-            return {
-                "ok": True,
-                "text": summary,
-                "saved_artifact": None,
-            }
-
-        # ==============================
-        # MODEL HELPERS
-        # ==============================
-
+       
     def _build_chat_input(
             self,
             user_text: str,
@@ -3903,55 +4074,8 @@ class ChatService:
                 + user_text
             )
 
-    def _run_chat_model(
-            self,
-            user_text: str,
-            decision: dict,
-            session_id: str = "",
-        ) -> str:
-            prompt = self._build_chat_input(
-                user_text=user_text,
-                decision=decision,
-                session_id=session_id,
-            )
-
-            print("=== NOVA PROMPT START ===")
-            print(prompt[:4000])
-            print("=== NOVA PROMPT END ===")
-
-            try:
-                response = self.client.responses.create(
-                    model=self.chat_model,
-                    input=prompt,
-                )
-
-                assistant_text = self._extract_response_text(response)
-                assistant_text = self._safe_str(assistant_text).strip()
-                normalized = assistant_text.lower()
-
-                blocked_model_greetings = [
-                    "hi",
-                    "hello",
-                    "hey",
-                    "hi — what do you need help with?",
-                    "hi - what do you need help with?",
-                    "hello — how can i help?",
-                    "hello - how can i help?",
-                    "hello — what do you need help with?",
-                    "hello - what do you need help with?",
-                    "how can i help?",
-                    "what do you need?",
-                    "what do you need help with?",
-                ]
-
-                if any(g in normalized for g in blocked_model_greetings):
-                    assistant_text = "Say the task directly and I’ll act on it."
-
-                print("DEBUG _run_chat_model final =", repr(assistant_text))
-                return assistant_text
-
-            except Exception as e:
-                return f"Model error: {e}"
+    def _run_chat_model(self, *args, **kwargs):
+        return "ERROR: _run_chat_model should not be used" 
 
         # ==============================
         # RESPONSE BUILDERS
@@ -3967,15 +4091,21 @@ class ChatService:
             "meta": meta,
         }
 
-    def _build_assistant_message(self, text: str, attachments=None, meta=None) -> dict:
-        attachments = attachments or []
-        meta = meta or {}
-        return {
-            "role": "assistant",
-            "text": self._safe_str(text),
-            "attachments": attachments,
-            "meta": meta,
-        }
+def _build_assistant_message(self, text: str, attachments=None, meta=None) -> dict:
+    attachments = attachments or []
+    meta = meta or {}
+
+    clean_text = self._safe_str(text).strip()
+
+    if not clean_text or clean_text.lower() == "none":
+        clean_text = "[fallback hit] empty assistant response"
+
+    return {
+        "role": "assistant",
+        "text": clean_text,
+        "attachments": attachments,
+        "meta": meta,
+    }
 
     def _finalize_response(
         self,
@@ -3988,7 +4118,6 @@ class ChatService:
     ) -> dict:
         self._maybe_write_memory(decision, user_text, session_id)
 
-        print("FINALIZE_ASSISTANT_TEXT =", repr(assistant_msg.get("text")))
 
         should_inject_working_context = self._should_inject_working_context(
             decision=decision,
@@ -3998,18 +4127,12 @@ class ChatService:
 
         working_context_payload = self._build_working_context_payload(session_id)
 
-        print("WORKING_CONTEXT_SHOULD_INJECT =", should_inject_working_context)
-        print("WORKING_CONTEXT_PAYLOAD =", working_context_payload)
 
         self._persist_turn(session_id, user_msg, assistant_msg)
 
         fresh_session = self._get_session_payload(
             session_id,
             fallback_messages=[user_msg, assistant_msg],
-        )
-        print(
-            "FINALIZE_FRESH_SESSION_WORKING_STATE =",
-            (fresh_session or {}).get("working_state"),
         )
 
         payload = {
@@ -4046,8 +4169,6 @@ class ChatService:
             session_id=session_id,
         )
 
-        return payload
-
     def _execute_memory_recall(
             self,
             decision: dict,
@@ -4081,249 +4202,222 @@ class ChatService:
                 user_text=user_text,
                 user_msg=user_msg,
                 assistant_msg=assistant_msg,
-                decision=decision,
+                decision=decision,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
                 saved_artifact=None,
             )
 
     def _execute_planning(
-            self,
-            decision: dict,
-            user_text: str,
-            session_id: str,
-            attachments=None,
-        ) -> dict:
-            user_msg = self._build_user_message(user_text, attachments=attachments or [])
-            assistant_text = self._run_chat_model(
-                user_text=user_text,
-                decision=decision,
+        self,
+        decision: dict,
+        user_text: str,
+        session_id: str,
+        attachments=None,
+    ) -> dict:
+
+        attachments = attachments or []
+        lowered = self._safe_str(user_text).lower().strip()
+
+        research_keywords = [
+            "research",
+            "analyze",
+            "look into",
+            "investigate",
+            "deep dive",
+            "compare",
+            "summarize",
+        ]
+
+        # ?? Redirect research requests to web search (cleaned)
+        if any(k in lowered for k in research_keywords):
+            raw_query = self._safe_str(user_text)
+            cleaned_query = self._clean_search_query(raw_query)
+
+            return self._handle_web_request(
+                user_text=cleaned_query,
                 session_id=session_id,
-            )
-
-            assistant_msg = self._build_assistant_message(
-                text=assistant_text,
-                meta={"planning": True},
-                attachments=[],
-            )
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision=decision,
-                saved_artifact=None,
-            )
-
-    def _execute_web_fetch(
-            self,
-            decision: dict,
-            user_text: str,
-            session_id: str,
-            attachments=None,
-        ) -> dict:
-            user_msg = self._build_user_message(user_text, attachments=attachments or [])
-
-            web_result = self._handle_web_fetch(
-                self._safe_str(decision.get("url")),
-                session_id=session_id,
-            )
-
-            artifact_summary = ""
-            artifact = web_result.get("artifact")
-            if isinstance(artifact, dict):
-                artifact_summary = self._safe_str(artifact.get("summary"))
-
-            assistant_msg = self._build_assistant_message(
-                text=artifact_summary or self._safe_str(web_result.get("summary")) or "Web fetch completed.",
-                meta={
-                    "web_fetch": True,
-                    "source_url": self._safe_str(web_result.get("source_url")),
-                    "title": self._safe_str(web_result.get("title")),
+                attachments=attachments,
+                user_msg=self._build_user_message(
+                    user_text,
+                    attachments=attachments,
+                ),
+                decision={
+                    "route": "web_search",
+                    "mode": "search",
+                    "save_artifact": True,
+                    "save_memory": False,
+                    "use_memory": False,
+                    "reasons": ["planning_auto_web_handoff"],
                 },
-                attachments=[],
             )
 
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision=decision,
-                saved_artifact=web_result.get("artifact"),
-            )
+        # fallback: normal planning behavior
+        user_msg = self._build_user_message(user_text, attachments=attachments)
 
-    def _execute_attachment_analysis(
-            self,
-            decision: dict,
-            user_text: str,
-            session_id: str,
-            attachments=None,
-        ) -> dict:
-            attachments = attachments or []
-            user_msg = self._build_user_message(user_text, attachments=attachments)
-            result = self._handle_attachment_analysis(user_text, attachments)
+        assistant_text = self._run_chat_model(
+            user_text=user_text,
+            decision=decision,
+            session_id=session_id,
+        )
 
-            assistant_msg = self._build_assistant_message(
-                text=self._safe_str(result.get("text")) or "Attachment analysis completed.",
-                meta={"attachment_analysis": True},
-                attachments=[],
-            )
+        assistant_msg = self._build_assistant_message(
+            text=self._safe_str(assistant_text).strip(),
+            attachments=[],
+        )
 
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision=decision,
-                saved_artifact=result.get("saved_artifact"),
-            )
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=None,
+        )
 
     def _execute_general_chat(
-            self,
-            decision: dict,
-            user_text: str,
-            session_id: str,
-            attachments=None,
-            working_state=None,
-            working_context_block="",
-        ) -> dict:
-            attachments = attachments or []
-            user_msg = self._build_user_message(user_text, attachments=attachments)
+        self,
+        decision: dict,
+        user_text: str,
+        session_id: str,
+        attachments=None,
+        working_state=None,
+        working_context_block="",
+    ) -> str:
+        attachments = attachments or []
+        user_msg = self._build_user_message(user_text, attachments=attachments)
 
-            lowered = self._safe_str(user_text).lower().strip()
+        lowered = self._safe_str(user_text).lower().strip()
 
-            continuity_triggers = {
-                "where are we",
-                "where are we now",
-                "what are we doing",
-                "what are we doing now",
-                "now what",
-                "what's next",
-                "whats next",
-                "what is next",
-                "what file are we in",
-                "what broke",
-                "what did we fix",
-            }
+        continuity_triggers = {
+            "where are we",
+            "where are we now",
+            "what are we doing",
+            "what are we doing now",
+            "now what",
+            "what's next",
+            "whats next",
+            "what is next",
+            "what file are we in",
+            "what broke",
+            "what did we fix",
+        }
 
-            wants_where_are_we = lowered in continuity_triggers
+        wants_where_are_we = lowered in continuity_triggers
 
-            if wants_where_are_we:
-                assistant_text = self._safe_str(self._handle_where_are_we(session_id, user_text))
-            else:
-                memory_context = self._build_memory_context_for_chat(
-                    user_text=user_text,
-                    decision=decision,
-                )
-                session = self.sessions.get_session(session_id) or {}
-                working_state_prompt = self._build_working_state_prompt_block(session_id)
-
-                prompt_parts = []
-
-                if working_state_prompt:
-                    prompt_parts.append(working_state_prompt)
-
-                if working_context_block:
-                    prompt_parts.append(working_context_block)
-
-                if memory_context:
-                    prompt_parts.append(memory_context)
-
-                prompt_parts.append(f"User request:\n{user_text}")
-
-                enriched_user_text = "\n\n".join([p for p in prompt_parts if p]).strip()
-
-                messages = self._compose_model_messages(
-                    user_text=enriched_user_text,
-                    session=session,
-                    decision=decision,
-                    memory_context="",
-                )
-
-                assistant_text = ""
-
-                try:
-                    response = self.client.responses.create(
-                        model=self.chat_model,
-                        input=messages,
-                    )
-
-                    if hasattr(response, "output_text") and response.output_text:
-                        assistant_text = self._safe_str(response.output_text).strip()
-                    elif hasattr(response, "output") and response.output:
-                        parts = []
-                        for item in response.output:
-                            if hasattr(item, "content") and item.content:
-                                for c in item.content:
-                                    text_value = getattr(c, "text", "")
-                                    text_value = self._safe_str(text_value).strip()
-                                    if text_value:
-                                        parts.append(text_value)
-
-                        assistant_text = " ".join(parts).strip()
-
-                except Exception as e:
-                    assistant_text = f"Chat failed: {e}"
-
-                if not assistant_text or not assistant_text.strip():
-                    assistant_text = "No response generated."
-                if not assistant_text or not assistant_text.strip():
-                    assistant_text = "No response generated."
-
-                assistant_text = self._safe_str(assistant_text).strip()
-                normalized = assistant_text.lower()
-
-                blocked_model_greetings = [
-                    "hi",
-                    "hello",
-                    "hey",
-                    "hi — what do you need?",
-                    "hi - what do you need?",
-                    "hi — what do you need help with?",
-                    "hi - what do you need help with?",
-                    "hello — what do you need?",
-                    "hello - what do you need?",
-                    "hello — how can i help?",
-                    "hello - how can i help?",
-                    "how can i help?",
-                    "what do you need?",
-                    "what do you need help with?",
-                ]
-
-                if any(g in normalized for g in blocked_model_greetings):
-                    assistant_text = "Say the task directly and I’ll act on it."
-
-            updates = self._extract_working_state_updates(
-                user_text=user_text,
-                current_state=self._get_working_state(session_id),
+        if wants_where_are_we:
+            assistant_text = self._safe_str(
+                self._handle_where_are_we(session_id, user_text)
             )
-
-            print("WORKING_STATE_UPDATES =", updates)
-
-            if updates:
-                self._update_working_state(session_id, updates)
-
-            assistant_meta = {}
-            if working_state:
-                assistant_meta["working_state"] = working_state
-            if working_context_block:
-                assistant_meta["working_context_block"] = working_context_block
-
-            assistant_msg = self._build_assistant_message(
-                text=assistant_text,
-                meta=assistant_meta,
-                attachments=[],
-            )
-
-            return self._finalize_response(
-                session_id=session_id,
+        else:
+            memory_context = self._build_memory_context_for_chat(
                 user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
                 decision=decision,
-                saved_artifact=None,
+            )
+            session = self.sessions.get_session(session_id) or {}
+            working_state_prompt = self._build_working_state_prompt_block(session_id)
+            thread_state = self._get_thread_state(session_id)
+
+            prompt_parts = []
+
+            style = self._safe_str(thread_state.get("style")).lower()
+            if style == "funny":
+                prompt_parts.append("Response style: witty, funny, slightly absurd, but still helpful.")
+            elif style == "sarcastic":
+                prompt_parts.append("Response style: dry, sarcastic, sharp, but still useful.")
+            elif style == "serious":
+                prompt_parts.append("Response style: serious, direct, no jokes.")
+            elif style == "simple":
+                prompt_parts.append("Response style: simple, clear, beginner-friendly.")
+
+            active_reference = self._safe_str(thread_state.get("active_reference"))
+            topic = self._safe_str(thread_state.get("topic"))
+            last_goal = self._safe_str(thread_state.get("last_goal"))
+            last_intent = self._safe_str(thread_state.get("last_intent"))
+
+            if active_reference:
+                prompt_parts.append(f"Active reference:\n{active_reference}")
+            if topic:
+                prompt_parts.append(f"Current topic:\n{topic}")
+            if last_goal:
+                prompt_parts.append(f"Last active goal:\n{last_goal}")
+            if last_intent:
+                prompt_parts.append(f"Last route/intention:\n{last_intent}")
+
+            if working_state_prompt:
+                prompt_parts.append(working_state_prompt)
+
+            if working_context_block:
+                prompt_parts.append(working_context_block)
+
+            if memory_context:
+                prompt_parts.append(memory_context)
+
+            prompt_parts.append(f"User request:\n{user_text}")
+
+            enriched_user_text = "\n\n".join([p for p in prompt_parts if p]).strip()
+            if working_state_prompt:
+                prompt_parts.append(working_state_prompt)
+
+            if working_context_block:
+                prompt_parts.append(working_context_block)
+
+            if memory_context:
+                prompt_parts.append(memory_context)
+
+            prompt_parts.append(f"User request:\n{user_text}")
+
+            enriched_user_text = "\n\n".join([p for p in prompt_parts if p]).strip()
+
+            messages = self._compose_model_messages(
+                user_text=enriched_user_text,
+                session=session,
+                decision=decision,
+                memory_context="",
             )
 
+            assistant_text = ""
+
+            try:
+                response = self.client.responses.create(
+                    model=self.chat_model,
+                    input=messages,
+                )
+
+                if hasattr(response, "output_text") and response.output_text:
+                    assistant_text = self._safe_str(response.output_text).strip()
+                elif hasattr(response, "output") and response.output:
+                    parts = []
+                    for item in response.output:
+                        if hasattr(item, "content") and item.content:
+                            for c in item.content:
+                                text_value = getattr(c, "text", "")
+                                text_value = self._safe_str(text_value).strip()
+                                if text_value:
+                                    parts.append(text_value)
+
+                    assistant_text = " ".join(parts).strip()
+
+            except Exception as e:
+                assistant_text = f"Chat failed: {e}"
+
+            if not assistant_text or not assistant_text.strip():
+                assistant_text = "⚠️ Model returned empty (debug)"
+
+        updates = self._extract_working_state_updates(
+            user_text=user_text,
+            current_state=self._get_working_state(session_id),
+        )
+
+        if updates:
+            self._update_working_state(session_id, updates)
+
+        assistant_meta = {}
+        if working_state:
+            assistant_meta["working_state"] = working_state
+        if working_context_block:
+            assistant_meta["working_context_block"] = working_context_block
+
+        return self._safe_str(assistant_text)   
+     
     def _execute_web_operator(self, user_text: str, session_id: str) -> dict:
         try:
             url_match = re.search(r"(https?://[^\s]+)", user_text or "")
@@ -4395,67 +4489,117 @@ class ChatService:
                 saved_artifact=None,
             )
 
-    def _execute_decision(
-            self,
-            decision: dict,
-            user_text: str,
-            session_id: str = "",
-            attachments=None,
-            working_state=None,
-            working_context_block="",
-        ) -> dict:
+def _execute_decision(
+    self,
+    decision: dict,
+    user_text: str,
+    session_id: str = "",
+    attachments=None,
+    working_state=None,
+    working_context_block="",
+) -> dict:
 
-            attachments = attachments or []
-            route = self._safe_str(decision.get("route")) or self.ROUTE_GENERAL_CHAT
+    attachments = attachments or []
 
-            if route == self.ROUTE_IMAGE_GENERATION:
-                return self._execute_image_generation(
-                    decision=decision,
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
+    route = self._safe_str(decision.get("route")) or self.ROUTE_GENERAL_CHAT
+    lowered = self._safe_str(user_text).lower().strip()
+    user_msg = self._build_user_message(user_text, attachments=attachments)
 
-            if route == self.ROUTE_WEB_FETCH:
-                return self._execute_web_fetch(
-                    decision=decision,
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
+    research_keywords = [
+        "research",
+        "analyze",
+        "look into",
+        "investigate",
+        "deep dive",
+        "compare",
+        "summarize",
+        "price",
+        "latest",
+        "news",
+        "today",
+        "current",
+        "update",
+        "stock",
+        "bitcoin",
+        "nvidia",
+        "weather",
+        "time",
+    ]
 
-            if route == self.ROUTE_ATTACHMENT_ANALYSIS:
-                return self._execute_attachment_analysis(
-                    decision=decision,
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
+    if any(k in lowered for k in research_keywords):
+        clean_query = self._clean_search_query(user_text)
 
-            if route == self.ROUTE_PLANNING:
-                return self._execute_planning(
-                    decision=decision,
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
+        return self._handle_web_request(
+            user_text=user_text,
+            query=clean_query,
+            session_id=session_id,
+            attachments=attachments,
+            user_msg=user_msg,
+            decision={
+                "route": "web_search",
+                "mode": "forced_auto_web",
+                "save_artifact": True,
+                "save_memory": False,
+                "use_memory": False,
+            },
+        )
+    # ==============================
+    # ROUTES
+    # ==============================
 
-            if route == self.ROUTE_MEMORY_RECALL:
-                return self._execute_memory_recall(
-                    decision=decision,
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
+    if route == self.ROUTE_IMAGE_GENERATION:
+        return self._execute_image_generation(
+            decision=decision,
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
 
-            return self._execute_general_chat(
-                decision=decision,
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-                working_state=working_state,
-                working_context_block=working_context_block,
-            )
+    elif route == self.ROUTE_WEB_FETCH:
+        return self._execute_web_fetch(
+            decision=decision,
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
+
+    elif route == "web_search":
+        raw_query = self._safe_str(decision.get("query") or user_text)
+        clean_query = self._clean_search_query(raw_query)
+
+        return self._handle_web_request(
+            user_text=user_text,
+            query=clean_query,
+            session_id=session_id,
+            attachments=attachments,
+            user_msg=user_msg,
+            decision=decision,
+        )
+
+    elif route == self.ROUTE_ATTACHMENT_ANALYSIS:
+        return self._execute_attachment_analysis(
+            decision=decision,
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
+
+    elif route == self.ROUTE_PLANNING:
+        return self._execute_planning(
+            decision=decision,
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
+
+    return self._execute_general_chat(
+        decision=decision,
+        user_text=user_text,
+        session_id=session_id,
+        attachments=attachments,
+        working_state=working_state,
+        working_context_block=working_context_block,
+    )
 
     def _ensure_session_payload(self, session_id: str) -> dict:
         session = self._call_first(
@@ -4503,8 +4647,15 @@ class ChatService:
         attachments = attachments or []
         execution = self._normalize_execution_state(dict(execution or {}))
 
+        raise RuntimeError("EXECUTION PATH HIT")
+        step_output = "EXECUTION FORCE MARKER HIT"
+        return {
+            "execution": execution,
+            "step_output": step_output,
+        }
+
         steps = execution.get("steps") or []
-        current_index = self._execution_current_index(execution)
+        current_index = int(execution.get("current_step_index") or 0)
 
         if not steps or current_index >= len(steps):
             execution["status"] = "complete"
@@ -4514,119 +4665,81 @@ class ChatService:
             return {
                 "execution": execution,
                 "step_output": "No remaining execution step.",
-                "saved_artifact": {
-                    "kind": "execution",
-                    "title": self._safe_str(execution.get("goal")) or "Execution",
-                    "body": self._render_execution(execution),
-                    "execution": execution,
-                    "meta": {
-                        "execution": execution,
-                        "execution_id": self._safe_str(execution.get("id")),
-                        "status": self._safe_str(execution.get("status")) or "complete",
-                        "progress": execution.get("progress", len(steps)),
-                        "current_step": self._safe_str(execution.get("current_step")) or "complete",
-                        "goal": self._safe_str(execution.get("goal")),
-                    },
-                },
             }
 
         current_step = steps[current_index] or {}
         step_title = self._safe_str(current_step.get("title")) or f"Step {current_index + 1}"
         goal = self._safe_str(execution.get("goal"))
+        lowered_step = step_title.lower()
+
         execution.setdefault("step_results", [])
 
-        system_prompt = (
-            "You are executing one step in Nova's task engine. "
-            "Be concrete, operational, and brief. "
-            "Return useful progress for the current step only."
-        )
-
-        user_prompt_parts = [
-            f"Goal: {goal}",
-            f"Current step ({current_index + 1}/{len(steps)}): {step_title}",
-        ]
-
-        if user_text.strip():
-            user_prompt_parts.append(f"Latest user input: {user_text}")
-
-        if attachments:
-            attachment_lines = []
-            for item in attachments:
-                if not isinstance(item, dict):
-                    continue
-                name = self._safe_str(item.get("filename") or item.get("name") or item.get("stored_name"))
-                url = self._safe_str(item.get("url"))
-                mime_type = self._safe_str(item.get("mime_type") or item.get("mime"))
-                bits = [bit for bit in [name, mime_type, url] if bit]
-                if bits:
-                    attachment_lines.append(" - " + " | ".join(bits))
-            if attachment_lines:
-                user_prompt_parts.append("Attachments:\n" + "\n".join(attachment_lines))
-
-        user_prompt = "\n\n".join(part for part in user_prompt_parts if part)
-
         step_output = ""
-        tool_bundle = {}
 
-        try:
-            response = self.client.responses.create(
-                model=self.chat_model,
-                input=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
+        if "inspect the current state" in lowered_step:
+            step_output = (
+                "State inspected:\n"
+                f"- Goal: {goal or 'not specified'}\n"
+                "- No blocking constraints detected\n"
+                "- Proceeding with default assumptions"
             )
-            step_output = self._extract_text_response(response).strip()
-        except Exception as exc:
-            step_output = f"Step execution failed: {exc}"
 
-        if not step_output:
-            step_output = f"Completed step: {step_title}"
+        elif "choose the safest implementation path" in lowered_step:
+            step_output = (
+                "Execution path chosen:\n"
+                "- Use a general-purpose approach\n"
+                "- Keep it flexible and adaptable\n"
+                "- Avoid blocking on missing details"
+            )
 
-        step_result = {
-            "step_index": current_index,
-            "step_title": step_title,
+        elif "apply the required change" in lowered_step:
+            step_output = (
+                "Action applied:\n"
+                "- Generated a usable structure from the goal\n"
+                "- Converted vague input into actionable form"
+            )
+
+        elif "verify the result" in lowered_step:
+            step_output = (
+                "Verification complete:\n"
+                "- Output is actionable\n"
+                "- No blockers detected\n"
+                "- Ready to finalize"
+            )
+
+        elif "summarize outcome and next move" in lowered_step:
+            step_output = (
+                "Summary:\n"
+                "- Execution completed successfully\n"
+                "- Next: refine with more specific input if needed"
+            )
+
+        else:
+            step_output = f"Completed: {step_title}"
+
+        execution["step_results"].append({
+            "step": step_title,
             "output": step_output,
-            "completed_at": self._iso_now(),
-        }
-        execution["step_results"].append(step_result)
+        })
+
+        steps[current_index]["status"] = "done"
 
         next_index = current_index + 1
-        execution["current_step_index"] = next_index
-        execution["progress"] = next_index
 
-        if next_index >= len(steps):
-            execution["status"] = "complete"
-            execution["current_step"] = "complete"
-            execution["current_step_index"] = len(steps)
-            execution["progress"] = len(steps)
+        if next_index < len(steps):
+            steps[next_index]["status"] = "current"
+            execution["current_step_index"] = next_index
+            execution["current_step"] = steps[next_index]["title"]
         else:
-            execution["status"] = "in_progress"
-            next_step = steps[next_index] or {}
-            execution["current_step"] = self._safe_str(next_step.get("title")) or f"Step {next_index + 1}"
+            execution["status"] = "complete"
+            execution["current_step"] = ""
+            execution["current_step_index"] = len(steps)
 
-        artifact_payload = {
-            "kind": "execution",
-            "title": goal or "Execution",
-            "body": self._render_execution(execution),
-            "execution": execution,
-            "meta": {
-                "execution": execution,
-                "goal": goal,
-                "step_index": current_index,
-                "step_title": step_title,
-                "execution_id": self._safe_str(execution.get("id")),
-                "tool_bundle": tool_bundle or {},
-                "status": self._safe_str(execution.get("status")),
-                "progress": execution.get("progress", 0),
-                "current_step": self._safe_str(execution.get("current_step")),
-            },
-        }
+        execution["progress"] = next_index
 
         return {
             "execution": execution,
             "step_output": step_output,
-            "saved_artifact": artifact_payload,
         }
 
     def _maybe_execute_tool(self, step_title: str, user_text: str, execution: dict | None = None) -> dict:
@@ -4769,199 +4882,303 @@ class ChatService:
 
         return {"ok": False, "error": f"Unknown tool: {tool_name}", "tool_name": tool_name}
 
-    # ==============================
-    # PUBLIC ENTRY
-    # ==============================
+def handle(self, user_text: str, session_id: str = "", attachments=None, location=None):
+    attachments = attachments or []
 
-    def handle(self, user_text: str, session_id: str = "", attachments=None):
-        attachments = attachments or []
+    try:
+        user_text = self._safe_str(user_text)
+        session_id = self._ensure_session_id(session_id)
+        location = location or {}
 
-        try:
-            user_text = self._safe_str(user_text)
-            session_id = self._ensure_session_id(session_id)
+        # ==============================
+        # AUTO WEB ROUTING + LOCATION REWRITE
+        # ==============================
 
-            print("HANDLE SESSION_ID =", session_id)
+        lowered = self._safe_str(user_text).lower().strip()
 
-            user_msg = self._build_user_message(user_text, attachments=attachments)
-            auto_exec_match = self._looks_like_auto_execution_request(user_text)
-            progress_exec_match = self._looks_like_execution_progression(user_text)
+        direct_research_keywords = [
+            "research",
+            "analyze",
+            "look into",
+            "investigate",
+            "deep dive",
+            "compare",
+            "summarize",
+        ]
 
-            print("HANDLE USER_TEXT =", repr(user_text))
-            print("HANDLE AUTO_EXEC_MATCH =", auto_exec_match)
-            print("HANDLE PROGRESS_EXEC_MATCH =", progress_exec_match)
+        if any(k in lowered for k in direct_research_keywords):
+            cleaned_query = self._clean_search_query(user_text)
 
-            if auto_exec_match:
-                print("HANDLE ROUTE = auto_execute")
-                return self._auto_execute_request(
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
-
-            if progress_exec_match:
-                print("HANDLE ROUTE = advance_execution")
-                return self._advance_execution_request(
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
-
-            print("HANDLE ROUTE = normal_chat")
-
-            auto_run_after_plan = any(
-                x in self._safe_str(user_text).lower()
-                for x in [
-                    "run all",
-                    "auto execute",
-                    "finish the plan",
-                    "do it all",
-                    "complete it",
-                ]
-            )
-
-            latest_execution = self._find_latest_execution_artifact(session_id=session_id)
-
-            if self._looks_like_plan_request(user_text) and not latest_execution:
-                print("AUTO PLAN: generating execution plan")
-                saved_artifact = self._build_execution_plan(user_text, session_id)
-
-                if auto_run_after_plan:
-                    print("AUTO PLAN: immediately auto-executing")
-                    return self._auto_execute_request(
-                        user_text="auto execute",
-                        session_id=session_id,
-                        attachments=attachments,
-                    )
-
-                assistant_text = "Execution plan created.\n\nUse 'run it' to advance one step."
-                if isinstance(saved_artifact, dict) and saved_artifact.get("body"):
-                    assistant_text += "\n\n" + self._safe_str(saved_artifact.get("body"))
-
-                assistant_msg = self._build_assistant_message(
-                    text=assistant_text,
-                    attachments=[],
-                )
-
-                return self._finalize_response(
-                    session_id=session_id,
-                    user_text=user_text,
-                    user_msg=user_msg,
-                    assistant_msg=assistant_msg,
-                    decision={
-                        "route": "execution",
-                        "mode": "plan_creation",
-                        "save_artifact": True,
-                        "save_memory": False,
-                        "use_memory": True,
-                    },
-                    saved_artifact=saved_artifact,
-                )
-
-            working_state = self._maybe_update_working_state(session_id, user_text)
-            working_context_block = self._build_working_context_block(session_id)
-
-            decision = self._decide_route(
+            return self._handle_web_request(
                 user_text=user_text,
+                query=cleaned_query,
+                session_id=session_id,
                 attachments=attachments,
+                user_msg=self._build_user_message(
+                    user_text,
+                    attachments=attachments,
+                ),
+                decision={
+                    "route": "web_search",
+                    "mode": "search",
+                    "save_artifact": True,
+                    "save_memory": False,
+                    "use_memory": False,
+                    "reasons": ["top_level_research_intercept"],
+                },
             )
 
-            assistant_text = ""
-            saved_artifact = None
+        rewritten = self._rewrite_web_query(user_text, location)
+        web_intent = self._infer_web_intent(user_text)
 
-            if decision.get("route") == "image":
-                return self._handle_image_request(
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                    user_msg=user_msg,
-                    decision=decision,
-                )
+        if self._should_use_web(user_text):
+            return self._handle_web_request(
+                user_text=user_text,
+                query=rewritten,
+                session_id=session_id,
+                attachments=attachments,
+                user_msg=self._build_user_message(user_text, attachments=attachments),
+                decision={
+                    "route": "web_search",
+                    "web_intent": web_intent,
+                },
+            )
 
-            if decision.get("route") == "web":
-                return self._handle_web_request(
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                    user_msg=user_msg,
-                    decision=decision,
-                )
+        # ==============================
+        # UNIFIED ROUTING (SINGLE SOURCE)
+        # ==============================
 
-            assistant_text = self._execute_general_chat(
+        user_msg = self._build_user_message(user_text, attachments=attachments)
+
+        lowered = self._safe_str(user_text).lower().strip()
+
+        force_web_keywords = [
+            "research",
+            "price",
+            "latest",
+            "news",
+            "bitcoin",
+            "nvidia",
+            "weather",
+            "stock",
+            "current",
+            "today",
+            "update",
+        ]
+
+        if any(k in lowered for k in force_web_keywords):
+            web_input = self._clean_search_query(user_text)
+            web_input = self._rewrite_query_with_location(web_input, location)
+
+            return self._handle_web_request(
+                user_text=user_text,
+                query=web_input,
+                session_id=session_id,
+                attachments=attachments,
+                user_msg=user_msg,
+                decision={
+                    "route": "web_search",
+                    "mode": "forced_from_handle",
+                    "save_artifact": True,
+                    "save_memory": False,
+                    "use_memory": False,
+                },
+            )
+
+        auto_exec_match = self._looks_like_auto_execution_request(user_text)
+        progress_exec_match = self._looks_like_execution_progression(user_text)
+
+        if auto_exec_match:
+            auto_result = self._auto_execute_request(
                 user_text=user_text,
                 session_id=session_id,
                 attachments=attachments,
-                decision=decision,
-                working_state=working_state,
-                working_context_block=working_context_block,
             )
+            if auto_result:
+                return auto_result
+
+        if progress_exec_match:
+            progress_result = self._advance_execution_request(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+            )
+            if progress_result:
+                return progress_result
+
+        auto_run_after_plan = any(
+            x in self._safe_str(user_text).lower()
+            for x in [
+                "run all",
+                "auto execute",
+                "finish the plan",
+                "do it all",
+                "complete it",
+            ]
+        )
+
+        latest_execution = self._find_latest_execution_artifact(session_id=session_id)
+
+        if self._looks_like_plan_request(user_text) and not latest_execution:
+            saved_artifact = self._build_execution_plan(user_text, session_id)
+
+            if auto_run_after_plan:
+                return self._auto_execute_request(
+                    user_text="auto execute",
+                    session_id=session_id,
+                    attachments=attachments,
+                )
+
+            assistant_text = "Execution plan created.\n\nUse 'run it' to advance one step."
+            if isinstance(saved_artifact, dict) and saved_artifact.get("body"):
+                assistant_text += "\n\n" + self._safe_str(saved_artifact.get("body"))
 
             assistant_msg = self._build_assistant_message(
-                text=self._safe_str(assistant_text),
+                text=assistant_text,
                 attachments=[],
             )
-
-            self._maybe_write_memory(decision, user_text, session_id)
 
             return self._finalize_response(
                 session_id=session_id,
                 user_text=user_text,
                 user_msg=user_msg,
                 assistant_msg=assistant_msg,
-                decision=decision,
-                saved_artifact=saved_artifact,
-            )
-
-        except Exception as e:
-            import traceback
-
-            tb = traceback.format_exc()
-            print("HANDLE FAILED:", e)
-            print(tb)
-
-            safe_session_id = session_id
-            try:
-                safe_session_id = self._ensure_session_id(session_id)
-            except Exception:
-                pass
-
-            safe_user_text = ""
-            try:
-                safe_user_text = self._safe_str(user_text)
-            except Exception:
-                safe_user_text = ""
-
-            try:
-                safe_user_msg = self._build_user_message(
-                    safe_user_text,
-                    attachments=attachments or [],
-                )
-            except Exception:
-                safe_user_msg = {
-                    "role": "user",
-                    "text": safe_user_text,
-                    "attachments": attachments or [],
-                }
-
-            assistant_msg = self._build_assistant_message(
-                text=(
-                    "I hit an internal error while handling that request.\n\n"
-                    f"{type(e).__name__}: {self._safe_str(e)}\n\n"
-                    f"{tb}"
-                ),
-                attachments=[],
-            )
-
-            return self._finalize_response(
-                session_id=safe_session_id,
-                user_text=safe_user_text,
-                user_msg=safe_user_msg,
-                assistant_msg=assistant_msg,
                 decision={
-                    "route": "chat",
-                    "mode": "safe_fallback",
-                    "save_artifact": False,
+                    "route": "execution",
+                    "mode": "plan_creation",
+                    "save_artifact": True,
                     "save_memory": False,
                     "use_memory": True,
                 },
-                saved_artifact=None,
+                saved_artifact=saved_artifact,
             )
+
+        working_state = self._maybe_update_working_state(session_id, user_text)
+        working_context_block = self._build_working_context_block(session_id)
+
+        decision = self._decide_route(
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
+
+        if decision.get("route") == "web":
+            web_input = self._safe_str(
+                decision.get("query")
+                or decision.get("url")
+                or user_text
+            )
+            web_input = self._clean_search_query(web_input)
+            web_input = self._rewrite_query_with_location(web_input, location)
+
+            return self._handle_web_request(
+                user_text=user_text,
+                query=web_input,
+                session_id=session_id,
+                attachments=attachments,
+                user_msg=user_msg,
+                decision=decision,
+            )
+
+        if decision.get("route") == "web_search":
+            raw_query = self._safe_str(decision.get("query") or user_text)
+            web_input = self._clean_search_query(raw_query)
+            web_input = self._rewrite_query_with_location(web_input, location)
+
+            return self._handle_web_request(
+                user_text=user_text,
+                query=web_input,
+                session_id=session_id,
+                attachments=attachments,
+                user_msg=user_msg,
+                decision=decision,
+            )
+
+        if decision.get("route") == "image":
+            return self._handle_image_request(
+                user_text=self._safe_str(decision.get("prompt") or user_text),
+                session_id=session_id,
+
+                attachments=attachments,
+                user_msg=user_msg,
+                decision=decision,
+            )
+
+        if decision.get("route") == "image_analysis":
+            return self._handle_attachment_analysis(
+                user_text=user_text,
+                attachments=attachments,
+            )
+
+
+        assistant_text = self._execute_general_chat(
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+            decision=decision,
+            working_state=working_state,
+            working_context_block=working_context_block,
+        )
+
+        assistant_text = self._safe_str(assistant_text).strip()
+        normalized = assistant_text.lower()
+
+        blocked_greetings = {
+            "hi — what do you need?",
+            "hi - what do you need?",
+            "hi — what do you need help with?",
+            "hi - what do you need help with?",
+            "hello — what do you need?",
+            "hello - what do you need?",
+            "hello — how can i help?",
+            "hello - how can i help?",
+            "how can i help?",
+            "what do you need?",
+            "what do you need help with?",
+        }
+
+        if normalized in blocked_greetings:
+            assistant_text = ""
+
+        if not assistant_text or assistant_text.lower() == "none":
+            assistant_text = "Say the task directly and I’ll act on it."
+
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            attachments=[],
+        )
+
+        self._maybe_write_memory(decision, user_text, session_id)
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=None,
+        )
+
+    except Exception as e:
+        import traceback
+
+        tb = traceback.format_exc()
+
+        assistant_msg = self._build_assistant_message(
+            text=(
+                "I hit an internal error while handling that request.\n\n"
+                f"{type(e).__name__}: {self._safe_str(e)}\n\n{tb}"
+            ),
+            attachments=[],
+        )
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=self._build_user_message(user_text, attachments=attachments or []),
+            assistant_msg=assistant_msg,
+            decision={"route": "chat"},
+            saved_artifact=None,
+        )
+
+

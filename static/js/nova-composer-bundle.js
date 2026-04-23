@@ -48,7 +48,7 @@
     }
 
     if (Array.isArray(data.artifacts)) {
-      state.artifacts = data.artifacts.map(normalizeArtifact);
+      state.artifacts = safeArray(data.artifacts);
     }
 
     if (Array.isArray(data.memory)) {
@@ -293,9 +293,9 @@ function normalizeMessage(raw) {
     ""
   ).trim();
 
-  if (role === "assistant" && !text && kind !== "working_context") {
-    return null;
-  }
+if (role === "assistant" && !text && kind !== "working_context") {
+  // keep empty assistant messages — do not drop
+}
 
   if (
     typeof text === "string" &&
@@ -494,9 +494,139 @@ tts: {
   },
 };
 
+function updateTtsToggleUi() {
+  if (!els.ttsToggleButton) return;
+
+  if (!state.tts) {
+    state.tts = {
+      enabled: true,
+      playing: false,
+      audio: null,
+      lastAutoMessageId: "",
+    };
+  }
+
+  const enabled = state.tts.enabled !== false;
+  const playing = !!state.tts.playing;
+
+  els.ttsToggleButton.classList.toggle("is-muted", !enabled);
+  els.ttsToggleButton.classList.toggle("is-playing", playing);
+
+  if (playing) {
+    els.ttsToggleButton.textContent = "⏹";
+    els.ttsToggleButton.setAttribute("aria-label", "Stop voice reply");
+    els.ttsToggleButton.setAttribute("title", "Stop voice reply");
+    return;
+  }
+
+  els.ttsToggleButton.textContent = enabled ? "🔊" : "🔇";
+  els.ttsToggleButton.setAttribute(
+    "aria-label",
+    enabled ? "Voice replies on" : "Voice replies muted"
+  );
+  els.ttsToggleButton.setAttribute(
+    "title",
+    enabled ? "Voice replies on" : "Voice replies muted"
+  );
+}
+
+function stopCurrentTtsPlayback() {
+  if (!state.tts) return;
+
+  try {
+    if (state.tts.audio) {
+      state.tts.audio.pause();
+      state.tts.audio.currentTime = 0;
+    }
+  } catch (_) {}
+
+  state.tts.playing = false;
+  state.tts.audio = null;
+  updateTtsToggleUi();
+}
+
+async function playVoiceReplyFromText(text) {
+  const content = String(text || "").trim();
+  if (!content) return;
+  if (!state.tts || state.tts.enabled === false) return;
+
+  try {
+    stopCurrentTtsPlayback();
+
+    const result = await requestVoiceReply(content);
+    if (!result || !result.url) return;
+
+    const audio = new Audio(result.url);
+    state.tts.audio = audio;
+    state.tts.playing = true;
+    updateTtsToggleUi();
+
+    audio.addEventListener("ended", function () {
+      if (state.tts && state.tts.audio === audio) {
+        state.tts.playing = false;
+        state.tts.audio = null;
+        updateTtsToggleUi();
+      }
+    });
+
+    audio.addEventListener("pause", function () {
+      if (state.tts && state.tts.audio === audio && !audio.ended) {
+        state.tts.playing = false;
+        state.tts.audio = null;
+        updateTtsToggleUi();
+      }
+    });
+
+    await audio.play();
+  } catch (err) {
+    console.error("TTS failed:", err);
+    if (state.tts) {
+      state.tts.playing = false;
+      state.tts.audio = null;
+    }
+    updateTtsToggleUi();
+  }
+}
+
+async function autoPlayTtsForAssistantMessage(message) {
+  const text = String(
+    (message && (message.text || message.content || message.body)) || ""
+  ).trim();
+  const messageId = String((message && message.id) || "").trim();
+
+  if (!text) return;
+  if (!state.tts || state.tts.enabled === false) return;
+  if (messageId && state.tts.lastAutoMessageId === messageId) return;
+
+  if (messageId) {
+    state.tts.lastAutoMessageId = messageId;
+  }
+
+  await playVoiceReplyFromText(text);
+}
+
 if (els.ttsToggleButton) {
-  els.ttsToggleButton.onclick = async function () {
-    try {
+  els.ttsToggleButton.addEventListener("click", async function (event) {
+    event.preventDefault();
+
+    if (!state.tts) {
+      state.tts = {
+        enabled: true,
+        playing: false,
+        audio: null,
+        lastAutoMessageId: "",
+      };
+    }
+
+    if (state.tts.playing && state.tts.audio) {
+      stopCurrentTtsPlayback();
+      return;
+    }
+
+    state.tts.enabled = !state.tts.enabled;
+    updateTtsToggleUi();
+
+    if (state.tts.enabled) {
       const lastMsg = (state.messages || [])
         .slice()
         .reverse()
@@ -504,21 +634,11 @@ if (els.ttsToggleButton) {
           return m && m.role === "assistant" && String(m.text || "").trim();
         });
 
-      if (!lastMsg || !lastMsg.text) {
-        console.warn("No assistant message to speak");
-        return;
+      if (lastMsg && lastMsg.text) {
+        await playVoiceReplyFromText(lastMsg.text);
       }
-
-      const result = await requestVoiceReply(lastMsg.text);
-
-      if (result && result.url) {
-        const audio = new Audio(result.url);
-        await audio.play();
-      }
-    } catch (err) {
-      console.error("TTS failed:", err);
     }
-  };
+  });
 }
 
 function renderExecution() {
@@ -1088,15 +1208,8 @@ if (Array.isArray(data.artifacts)) {
     return msg && String(msg.role || "") === "assistant";
   }).length;
 
-  if (
-    currentMessages.length > finalMessages.length &&
-    currentAssistantCount > finalAssistantCount
-  ) {
-    console.warn("⚠️ Prevented message overwrite from stale state payload");
-    state.messages = dedupeMessages(currentMessages);
-  } else {
-    state.messages = finalMessages;
-  }
+// 🔥 FINAL: always trust backend state
+state.messages = finalMessages;
 
   state.messages = state.messages.filter(function (msg) {
     return msg && msg.kind !== "working_context";
@@ -1177,7 +1290,7 @@ if (backendWorkingContext) {
     }
   }
 
-state.artifacts = safeArray(data.artifacts).map(normalizeArtifact);
+state.artifacts = safeArray(data.artifacts);
 state.memory = safeArray(data.memory).map(normalizeMemoryItem);
 state.web = safeArray(data.web);
 
@@ -1251,12 +1364,6 @@ window.NovaArtifactChatAction = function (text) {
   composer.value = value;
   composer.dispatchEvent(new Event("input", { bubbles: true }));
   composer.focus();
-};
-
-window.NovaSendMessage = async function () {
-  if (typeof sendMessage === "function") {
-    return await sendMessage();
-  }
 };
 
 window.NovaSendMessage = async function () {
@@ -1669,82 +1776,6 @@ function renderMessageCard(message) {
   );
 }
 
-function renderWorkingContextPanel() {
-  const wc = normalizeWorkingContext(state.workingContext || emptyWorkingContext());
-
-  if (!wc.show) {
-    return "";
-  }
-
-  const items = [];
-
-  if (wc.state.active_task) {
-    items.push(
-      `<div class="nova-working-context-row"><span class="nova-working-context-label">Active task</span><span class="nova-working-context-value">${escapeHtml(wc.state.active_task)}</span></div>`
-    );
-  }
-
-  if (wc.state.current_file) {
-    items.push(
-      `<div class="nova-working-context-row"><span class="nova-working-context-label">Current file</span><span class="nova-working-context-value">${escapeHtml(wc.state.current_file)}</span></div>`
-    );
-  }
-
-  if (wc.state.current_bug) {
-    items.push(
-      `<div class="nova-working-context-row"><span class="nova-working-context-label">Current bug</span><span class="nova-working-context-value">${escapeHtml(wc.state.current_bug)}</span></div>`
-    );
-  }
-
-  if (wc.state.last_success) {
-    items.push(
-      `<div class="nova-working-context-row"><span class="nova-working-context-label">Last success</span><span class="nova-working-context-value">${escapeHtml(wc.state.last_success)}</span></div>`
-    );
-  }
-
-  if (wc.state.next_move) {
-    items.push(
-      `<div class="nova-working-context-row"><span class="nova-working-context-label">Next move</span><span class="nova-working-context-value">${escapeHtml(wc.state.next_move)}</span></div>`
-    );
-  }
-
-  if (wc.state.checkpoint) {
-    items.push(
-      `<div class="nova-working-context-row"><span class="nova-working-context-label">Checkpoint</span><span class="nova-working-context-value">${escapeHtml(wc.state.checkpoint)}</span></div>`
-    );
-  }
-
-  if (!items.length && wc.text) {
-    items.push(
-      `<pre class="nova-working-context-pre">${escapeHtml(wc.text)}</pre>`
-    );
-  }
-
-  const collapsedClass = wc.collapsed ? " is-collapsed" : "";
-  const buttonLabel = wc.collapsed ? "Expand working context" : "Collapse working context";
-  const chevron = wc.collapsed ? "▸" : "▾";
-
-  console.log("renderWorkingContextPanel HTML", wc, items);
-
-  return `
-    <section class="nova-working-context-panel${collapsedClass}" data-working-context-panel>
-      <button
-        type="button"
-        class="nova-working-context-toggle"
-        data-working-context-toggle
-        aria-label="${escapeHtml(buttonLabel)}"
-        aria-expanded="${wc.collapsed ? "false" : "true"}"
-      >
-        <span class="nova-working-context-toggle-icon">${chevron}</span>
-        <span class="nova-working-context-title">Working context</span>
-      </button>
-      <div class="nova-working-context-body"${wc.collapsed ? ' hidden' : ""}>
-        ${items.join("")}
-      </div>
-    </section>
-  `;
-}
-
 function normalizeWorkingContext(raw) {
   const input = raw && typeof raw === "object" ? raw : {};
   const rawState =
@@ -1771,100 +1802,6 @@ function normalizeWorkingContext(raw) {
         typeof rawState.updated_at === "string" ? rawState.updated_at : "",
     },
   };
-}
-
-function emptyWorkingContext() {
-  return {
-    show: false,
-    collapsed: false,
-    text: "",
-    state: {
-      active_task: "",
-      current_file: "",
-      current_bug: "",
-      last_success: "",
-      next_move: "",
-      checkpoint: "",
-      updated_at: "",
-    },
-  };
-}
-
-function renderWorkingContextPanel() {
-  const wc = normalizeWorkingContext(state.workingContext || emptyWorkingContext());
-
-  if (!wc.show) {
-    return "";
-  }
-
-  const items = [];
-
-  if (wc.state.active_task) {
-    items.push(
-      `<div class="nova-working-context-row"><span class="nova-working-context-label">Active task</span><span class="nova-working-context-value">${escapeHtml(wc.state.active_task)}</span></div>`
-    );
-  }
-
-  if (wc.state.current_file) {
-    items.push(
-      `<div class="nova-working-context-row"><span class="nova-working-context-label">Current file</span><span class="nova-working-context-value">${escapeHtml(wc.state.current_file)}</span></div>`
-    );
-  }
-
-  if (wc.state.current_bug) {
-    items.push(
-      `<div class="nova-working-context-row"><span class="nova-working-context-label">Current bug</span><span class="nova-working-context-value">${escapeHtml(wc.state.current_bug)}</span></div>`
-    );
-  }
-
-  if (wc.state.last_success) {
-    items.push(
-      `<div class="nova-working-context-row"><span class="nova-working-context-label">Last success</span><span class="nova-working-context-value">${escapeHtml(wc.state.last_success)}</span></div>`
-    );
-  }
-
-  if (wc.state.next_move) {
-    items.push(
-      `<div class="nova-working-context-row"><span class="nova-working-context-label">Next move</span><span class="nova-working-context-value">${escapeHtml(wc.state.next_move)}</span></div>`
-    );
-  }
-
-  if (wc.state.checkpoint) {
-    items.push(
-      `<div class="nova-working-context-row"><span class="nova-working-context-label">Checkpoint</span><span class="nova-working-context-value">${escapeHtml(wc.state.checkpoint)}</span></div>`
-    );
-  }
-
-  if (!items.length && wc.text) {
-    items.push(
-      `<pre class="nova-working-context-pre">${escapeHtml(wc.text)}</pre>`
-    );
-  }
-
-  const collapsedClass = wc.collapsed ? " is-collapsed" : "";
-  const buttonLabel = wc.collapsed ? "Expand working context" : "Collapse working context";
-  const chevron = wc.collapsed ? "▸" : "▾";
-
-  return `
-    <section class="nova-working-context-panel${collapsedClass}" data-working-context-panel>
-      <button
-        type="button"
-        class="nova-working-context-toggle"
-        data-working-context-toggle
-        aria-expanded="${wc.collapsed ? "false" : "true"}"
-        aria-label="${buttonLabel}"
-        title="${buttonLabel}"
-      >
-        <div class="nova-working-context-header">
-          <span class="nova-working-context-kicker">Working context</span>
-          <span class="nova-working-context-chevron" aria-hidden="true">${chevron}</span>
-        </div>
-      </button>
-      <div class="nova-working-context-body"${wc.collapsed ? ' hidden' : ""}>
-        ${items.join("")}
-      </div>
-    </section>
-  `;
 }
 
 function wireWorkingContextPanel() {
@@ -1931,21 +1868,6 @@ function renderChat() {
 
 function renderSessionList() {
   return;
-}
-
-function wireRailTabs() {
-  if (!els.railTabs || !els.railTabs.length) return;
-  if (els.rail.__tabsWired) return;
-
-  els.rail.__tabsWired = true;
-
-  els.railTabs.forEach(function (tabEl) {
-    tabEl.addEventListener("click", function () {
-      const tabName = String(tabEl.getAttribute("data-rail-tab") || "").trim().toLowerCase();
-      syncRailTruth();
-      setRailTab(tabName);
-    });
-  });
 }
 
 async function sendExecutionCommand(commandText) {
@@ -2475,21 +2397,21 @@ function renderArtifacts() {
         controller.abort();
       } catch (_) {}
     }
+const id = state.stream.messageId || state.stream.placeholderId;
 
-    const id = state.stream.messageId || state.stream.placeholderId;
-    if (id) {
-      const msg = findMessageById(id);
-      if (msg) {
-        upsertMessage({
-          ...msg,
-          pending: false,
-          streaming: false,
-          stopped: true,
-          error: false,
-        });
-      }
-    }
+if (id) {
+  const msg = findMessageById(id);
 
+  if (msg) {
+    upsertMessage({
+      ...msg,
+      pending: false,
+      streaming: false,
+      stopped: true,
+      error: false,
+    });
+  }
+}
     finishStreamUi({
       statusState: opts.statusState,
       statusText: opts.statusText,
@@ -2526,21 +2448,6 @@ function queueTokenFlush(messageId) {
     flushTokensNow();
   });
 }
- 
-function clearTokenRenderState() {
-  tokenTextBuffer = "";
-  tokenMessageId = "";
-  tokenFlushQueued = false;
-  tokenLastFlushAt = 0;
-
-  if (tokenRafId) {
-    try {
-      cancelAnimationFrame(tokenRafId);
-    } catch (_) {}
-  }
-
-  tokenRafId = 0;
-}
 
 function flushTokensNow() {
   return;
@@ -2559,21 +2466,6 @@ function ensureTokenRenderState() {
   return state.tokenRender;
 }
 
-function clearTokenRenderState() {
-  const tr = ensureTokenRenderState();
-
-  if (tr.rafId) {
-    try {
-      cancelAnimationFrame(tr.rafId);
-    } catch (_) {}
-  }
-
-  tr.buffer = "";
-  tr.targetMessageId = "";
-  tr.scheduled = false;
-  tr.lastFlushAt = 0;
-  tr.rafId = 0;
-}
 
 function appendTextToMessage(messageId, chunk) {
   if (!messageId || !chunk) return;
@@ -2595,26 +2487,7 @@ function appendTextToMessage(messageId, chunk) {
     error: false,
   });
 }
-
-function flushTokensNow() {
-  const tr = ensureTokenRenderState();
-  if (!tr.targetMessageId || !tr.buffer) {
-    tr.scheduled = false;
-    tr.rafId = 0;
-    return;
-  }
-
-  const chunk = tr.buffer;
-  tr.buffer = "";
-  tr.scheduled = false;
-  tr.rafId = 0;
-  tr.lastFlushAt = Date.now();
-
-  appendTextToMessage(tr.targetMessageId, chunk);
-  renderChat();
-  scrollChatToBottom(true);
-}
-
+  
 function scheduleTokenFlush() {
   const tr = ensureTokenRenderState();
   if (tr.scheduled) return;
@@ -2935,56 +2808,6 @@ async function openSession(sessionId) {
 }
 
 function artifactViewerHtml(artifact) {
-  if (!artifact) return "<div class='empty'>No artifact</div>";
-
-  const kind = String(artifact.kind || "");
-
-  if (kind === "web_search") {
-    const payload = artifact.payload || {};
-    const results = Array.isArray(payload.results) ? payload.results : [];
-    const query = String(payload.query || "");
-
-    if (!results.length) {
-      return `
-        <div class="artifact-viewer">
-          <div class="artifact-title">Web results</div>
-          <div class="artifact-empty">No results for "${escapeHtml(query)}"</div>
-        </div>
-      `;
-    }
-
-    const items = results.map(function (item) {
-      const title = escapeHtml(item.title || "Untitled");
-      const snippet = escapeHtml(item.snippet || "");
-      const url = escapeHtml(item.url || "#");
-
-      return `
-        <div class="web-card">
-          <a href="${url}" target="_blank" class="web-title">${title}</a>
-          <div class="web-snippet">${snippet}</div>
-          <div class="web-url">${url}</div>
-        </div>
-      `;
-    }).join("");
-
-    return `
-      <div class="artifact-viewer">
-        <div class="artifact-title">Results for "${escapeHtml(query)}"</div>
-        <div class="web-results">
-          ${items}
-        </div>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="artifact-viewer">
-      <pre>${escapeHtml(JSON.stringify(artifact, null, 2))}</pre>
-    </div>
-  `;
-}
-
-function artifactViewerHtml(artifact) {
   if (!artifact) {
     return '<div class="nova-viewer-shell"><div class="nova-viewer-empty"><div class="nova-viewer-empty-title">No artifact</div></div></div>';
   }
@@ -3019,125 +2842,95 @@ function artifactViewerHtml(artifact) {
     ""
   ).trim();
 
-  const webResults =
-    Array.isArray(item.results) ? item.results :
-    Array.isArray(meta.results) ? meta.results :
-    Array.isArray(viewer.results) ? viewer.results :
-    [];
+  // ==============================
+  // WEB VIEWER
+  // ==============================
+  if (kind === "web_result" || kind === "web_search") {
+    const results =
+      Array.isArray(viewer.results) ? viewer.results :
+      Array.isArray(item.results) ? item.results :
+      Array.isArray(meta.results) ? meta.results :
+      Array.isArray(viewer.links) ? viewer.links :
+      [];
 
-  if (kind === "web" || kind === "web_search") {
-    const cardsHtml = webResults.length
-      ? webResults.map(function (result) {
-          const resultTitle = String(result && result.title ? result.title : "Untitled");
-          const resultSnippet = String(result && result.snippet ? result.snippet : "");
-          const resultUrl = String(result && (result.url || result.link) ? (result.url || result.link) : "").trim();
+    const query = String(
+      viewer.query ||
+      item.query ||
+      meta.query ||
+      title ||
+      "Web results"
+    ).trim();
 
-          return (
-            '<article class="web-card">' +
-              '<div class="web-card__title">' +
-                (resultUrl
-                  ? '<a href="' + escapeHtml(resultUrl) + '" target="_blank" rel="noopener noreferrer" class="web-title">' +
-                      escapeHtml(resultTitle) +
-                    '</a>'
-                  : escapeHtml(resultTitle)) +
-              '</div>' +
-              (resultSnippet
-                ? '<div class="web-snippet">' + escapeHtml(resultSnippet) + '</div>'
-                : '') +
-              (resultUrl
-                ? '<div class="web-url">' + escapeHtml(resultUrl) + '</div>'
-                : '') +
-            '</article>'
-          );
-        }).join("")
-      : "";
-
-    return (
-      '<div class="nova-viewer-shell">' +
-        '<div class="nova-viewer-header">' +
-          '<div class="nova-viewer-title">' + escapeHtml(title || "Web results") + '</div>' +
-          (sourceUrl
-            ? '<a href="' + escapeHtml(sourceUrl) + '" target="_blank" rel="noopener noreferrer" class="nova-viewer-link">Source</a>'
-            : '') +
-        '</div>' +
-        (body
-          ? '<div class="nova-viewer-body"><pre class="nova-artifact-meta-pre">' + escapeHtml(body) + '</pre></div>'
-          : '') +
-        (cardsHtml
-          ? '<div class="web-results">' + cardsHtml + '</div>'
-          : '') +
-      '</div>'
-    );
-  }
-
-  if (imageUrl) {
-    return (
-      '<div class="nova-viewer-shell">' +
-        '<div class="nova-viewer-header">' +
-          '<div class="nova-viewer-title">' + escapeHtml(title) + '</div>' +
-        '</div>' +
-        '<div class="nova-viewer-body">' +
-          '<a href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noopener noreferrer">' +
-            '<img src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(title) + '" class="message-attachment__image">' +
-          '</a>' +
-        '</div>' +
-        (body
-          ? '<pre class="nova-artifact-meta-pre">' + escapeHtml(body) + '</pre>'
-          : '') +
-      '</div>'
-    );
-  }
-
-  return (
-    '<div class="nova-viewer-shell">' +
-      '<div class="nova-viewer-header">' +
-        '<div class="nova-viewer-title">' + escapeHtml(title) + '</div>' +
-      '</div>' +
-      '<div class="nova-viewer-body">' +
-        '<pre class="nova-artifact-meta-pre">' + escapeHtml(body || JSON.stringify(item, null, 2)) + '</pre>' +
-      '</div>' +
-    '</div>'
-  );
-}
-
- function setRailTab(tab) {
-  const t = String(tab || "").trim();
-  if (!t) return;
-
-  if (!state.rail) state.rail = {};
-  state.rail.tab = t;
-
-  /* highlight tabs */
-  document.querySelectorAll("[data-rail-tab]").forEach(function (btn) {
-    const btnTab = String(btn.getAttribute("data-rail-tab") || "").trim();
-    if (btnTab === t) {
-      btn.classList.add("is-active");
-    } else {
-      btn.classList.remove("is-active");
+    if (!results.length) {
+      return `
+        <div class="nova-viewer-shell">
+          <div class="nova-viewer-card">
+            <div class="nova-viewer-kicker">Web</div>
+            <div class="nova-viewer-title">${escapeHtml(query)}</div>
+            <div class="nova-viewer-body">${renderSafeText(body || "No results found.")}</div>
+            ${sourceUrl ? `<a class="nova-web-viewer-open" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noreferrer">Open source</a>` : ""}
+          </div>
+        </div>
+      `;
     }
-  });
 
-  /* toggle panels */
-  const artifactsPanel = document.querySelector("[data-rail-artifacts]");
-  const memoryPanel = document.querySelector("[data-rail-memory]");
-  const webPanel = document.querySelector("[data-rail-web]");
+    const items = results.slice(0, 8).map(function (r) {
+      const t = escapeHtml(r.title || r.label || r.text || "Untitled");
+      const s = escapeHtml(r.snippet || r.body || "");
+      const u = escapeHtml(r.url || r.href || "#");
 
-  if (artifactsPanel) artifactsPanel.hidden = t !== "artifacts";
-  if (memoryPanel) memoryPanel.hidden = t !== "memory";
-  if (webPanel) webPanel.hidden = t !== "web";
+      return `
+        <div class="web-card">
+          <a href="${u}" target="_blank" rel="noreferrer" class="web-title">${t}</a>
+          <div class="web-snippet">${s}</div>
+          <div class="web-url">${u}</div>
+        </div>
+      `;
+    }).join("");
 
-  /* render */
-  if (t === "artifacts" && typeof renderArtifacts === "function") {
-    renderArtifacts();
+    return `
+      <div class="nova-viewer-shell">
+        <div class="nova-viewer-card nova-web-viewer-card">
+          <div class="nova-viewer-kicker">Web</div>
+          <div class="nova-viewer-title">${escapeHtml(query)}</div>
+          ${sourceUrl ? `<div class="nova-web-viewer-url">${escapeHtml(sourceUrl)}</div>` : ""}
+          ${body ? `<div class="nova-viewer-body">${renderSafeText(body)}</div>` : ""}
+          <div class="web-results">${items}</div>
+          ${sourceUrl ? `<a class="nova-web-viewer-open" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noreferrer">Open source</a>` : ""}
+        </div>
+      </div>
+    `;
   }
 
-  if (t === "memory" && typeof renderMemory === "function") {
-    renderMemory();
+  // ==============================
+  // IMAGE VIEWER
+  // ==============================
+  if (imageUrl) {
+    return `
+      <div class="nova-viewer-shell">
+        <div class="nova-viewer-card">
+          <div class="nova-viewer-kicker">Image</div>
+          <div class="nova-viewer-title">${escapeHtml(title)}</div>
+          <img src="${escapeHtml(imageUrl)}" class="nova-viewer-image" />
+          ${body ? `<div class="nova-viewer-body">${renderSafeText(body)}</div>` : ""}
+        </div>
+      </div>
+    `;
   }
 
-  if (t === "web" && typeof renderWeb === "function") {
-    renderWeb();
-  }
+  // ==============================
+  // DEFAULT VIEWER
+  // ==============================
+  return `
+    <div class="nova-viewer-shell">
+      <div class="nova-viewer-card">
+        <div class="nova-viewer-kicker">${escapeHtml(kind)}</div>
+        <div class="nova-viewer-title">${escapeHtml(title)}</div>
+        ${sourceUrl ? `<div class="nova-viewer-url">${escapeHtml(sourceUrl)}</div>` : ""}
+        <div class="nova-viewer-body">${renderSafeText(body)}</div>
+      </div>
+    </div>
+  `;
 }
 
 function cssEscape(value) {
@@ -3514,9 +3307,9 @@ async function consumeChatJson(payload) {
     throw new Error("A generation is already running.");
   }
 
-  setBusyUi(true);
-  state.stream.running = false;
-  updateTopbarFromState();
+setBusyUi(true);
+state.stream.running = true;
+updateTopbarFromState();
 
   try {
     const response = await fetch("/api/chat", {
@@ -3553,7 +3346,6 @@ async function consumeChatJson(payload) {
       throw new Error(message);
     }
 
-    // FIX: attach generated image to assistant message
     if (data && data.saved_artifact && data.saved_artifact.image_url) {
       if (!data.assistant_message) {
         data.assistant_message = {};
@@ -3564,77 +3356,23 @@ async function consumeChatJson(payload) {
     }
 
     applyStatePayload(data || {});
+if (state.stream && state.stream.targetMessageId) {
+  removeMessage(state.stream.targetMessageId);
+}
 
-    const hasSessionMessages =
-      (data &&
-        data.session &&
-        Array.isArray(data.session.messages) &&
-        data.session.messages.length > 0) ||
-      (data &&
-        data.active_session &&
-        Array.isArray(data.active_session.messages) &&
-        data.active_session.messages.length > 0) ||
-      (data && Array.isArray(data.messages) && data.messages.length > 0);
+state.messages = (state.messages || []).map(function (msg) {
+  if (!msg || String(msg.role || "") !== "assistant") return msg;
 
-    const assistantMessage = normalizeMessage(
-      (data && (data.assistant_message || data.message)) || {}
-    );
+  return {
+    ...msg,
+    pending: false,
+    streaming: false,
+    stopped: false,
+    error: false,
+  };
+});
 
-    if (assistantMessage && assistantMessage.id) {
-      upsertMessage(assistantMessage);
-    }
-
-    if (assistantMessage) {
-      autoPlayTtsForAssistantMessage(assistantMessage);
-    }
-
-    const workingContext = normalizeWorkingContext(
-      (data && data.working_context_payload) ||
-        (data && data.working_context) ||
-        emptyWorkingContext()
-    );
-
-    if (workingContext.show) {
-      upsertWorkingContextMessage(
-        workingContext,
-        assistantMessage && assistantMessage.id ? assistantMessage.id : ""
-      );
-    }
-
-    if (data && data.session && data.session.id) {
-      state.activeSessionId = String(data.session.id || "");
-    } else if (data && data.session_id) {
-      state.activeSessionId = String(data.session_id || "");
-    }
-
-    state.execution = state.execution || {
-      active: false,
-      steps: [],
-    };
-
-    if (data.execution && Array.isArray(data.execution.steps)) {
-      state.execution.active = true;
-      state.execution.steps = data.execution.steps.map(function (step, index) {
-        return {
-          id: String(step.id || ("step_" + index)),
-          title: String(step.title || step.text || ""),
-          status: String(step.status || "planned"),
-          notes: String(step.notes || ""),
-        };
-      });
-      renderExecution();
-    } else {
-      state.execution.active = false;
-      state.execution.steps = [];
-      renderExecution();
-    }
-
-    renderSessionList();
-    renderChat();
-    renderArtifacts();
-    renderMemory();
-    updateTopbarFromState();
-    scrollChatToBottom(true);
+renderChat();
 
     flushTokensNow();
     clearTokenRenderState();
@@ -4113,8 +3851,8 @@ async function transcribeVoice(blob) {
     throw new Error(data.error || "Voice transcription failed.");
   }
 
-  const text = normalizeText(data.text || "").trim();
-
+const text = normalizeText(data && data.text ? data.text : "");
+const safeText = typeof text === "string" ? text : "";
   if (!text) {
     showToast("No speech detected.", "info");
     return;
@@ -4724,45 +4462,62 @@ function wireSidebar() {
 }
 
 function renderWeb() {
+  if (!els.webList) {
+    els.webList = document.querySelector("[data-web-list]");
+  }
   if (!els.webList) return;
 
-  const items = safeArray(state.webResults);
-
-  if (els.webEmpty) {
-    els.webEmpty.hidden = items.length > 0;
+  if (!state.rail || state.rail.tab !== "web") {
+    return;
   }
 
-  els.webList.innerHTML = items.length
-    ? items
-        .map(function (item) {
-          const id = escapeHtml(String(item.id || ""));
-          const title = escapeHtml(String(item.title || "Web result"));
-          const subtitle = escapeHtml(
-            String(item.domain || item.url || item.source_url || "")
-          );
-          const preview = renderSafeText(
-            summarizeText(
-              item.preview ||
-                item.summary ||
-                item.description ||
-                item.body ||
-                item.content ||
-                "",
-              180
-            )
-          );
+  const items = safeArray(state.web).length
+    ? safeArray(state.web)
+    : safeArray(state.artifacts).filter(function (item) {
+        const kind = String((item && item.kind) || "").toLowerCase();
+        const source = String((item && item.source) || "").toLowerCase();
+        return kind === "web_result" || source === "web_fetch";
+      });
 
-          return [
-            '<button class="nova-rail-item" type="button" data-web-open="' + id + '">',
-            '<div class="nova-rail-item-kicker">Web</div>',
-            '<div class="nova-rail-item-title">' + title + '</div>',
-            '<div class="nova-rail-item-meta">' + subtitle + '</div>',
-            '<div class="nova-rail-item-preview">' + preview + '</div>',
-            "</button>",
-          ].join("");
-        })
-        .join("")
-    : "";
+  if (!items.length) {
+    els.webList.innerHTML =
+      '<div class="nova-memory-empty">' +
+      '<div class="nova-memory-empty-title">No web results yet</div>' +
+      '<div class="nova-memory-empty-copy">Run a web query to populate this panel.</div>' +
+      '</div>';
+    return;
+  }
+
+  const html = items.map(function (item) {
+    const viewer = item.viewer || {};
+    const meta = item.meta || {};
+
+    const title = escapeHtml(viewer.title || item.title || "Web result");
+    const summary = escapeHtml(
+      viewer.analysis_text ||
+      item.summary ||
+      item.preview ||
+      ""
+    );
+    const url = escapeHtml(
+      viewer.source_url ||
+      item.source_url ||
+      meta.url ||
+      ""
+    );
+
+    const id = escapeHtml(String(item.id || ""));
+
+    return (
+      '<div class="nova-web-card" data-artifact-open="' + id + '">' +
+        '<div class="nova-web-card-title">' + title + '</div>' +
+        (summary ? '<div class="nova-web-card-summary">' + summary + '</div>' : "") +
+        (url ? '<div class="nova-web-card-url">' + url + '</div>' : "") +
+      '</div>'
+    );
+  }).join("");
+
+  els.webList.innerHTML = html;
 }
 
 function renderWorkingContextCard(workingContext) {

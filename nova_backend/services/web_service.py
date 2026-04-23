@@ -240,42 +240,44 @@ class WebService:
     # SEARCH ROUTER
     # -----------------------
 
-    def search(self, query: str, max_results: int = 5) -> dict:
-        query = str(query or "").strip()
-        if not query:
-            return {
-                "ok": False,
-                "error": "empty query",
-                "query": "",
-                "results": [],
-                "summary": "",
-                "source_type": "search",
-            }
+def search(self, query: str, max_results: int = 5) -> dict:
+    query = str(query or "").strip()
 
-        cache_key = self._search_cache_key(query)
-        if cache_key in self.cache:
-            return self.cache[cache_key]
+    if not query:
+        return {
+            "ok": False,
+            "query": query,
+            "results": [],
+            "summary": "Empty query.",
+            "source_type": "search",
+        }
 
-        intent = self.classify_web_query(query)
+    route = self.classify_web_query(query)
 
-        if intent == "crypto_price":
-            payload = self.lookup_crypto_price(query)
-            self.cache[cache_key] = payload
-            return payload
+    try:
+        # --- CRYPTO ---
+        if route == "crypto_price":
+            return self.lookup_crypto_price(query)
 
-        if intent == "weather":
-            payload = self.lookup_weather(query)
-            self.cache[cache_key] = payload
-            return payload
+        # --- WEATHER ---
+        if route == "weather":
+            return self.lookup_weather(query)
 
-        if intent == "business_lookup":
-            payload = self.lookup_business(query, max_results=max_results)
-            self.cache[cache_key] = payload
-            return payload
+        # --- BUSINESS ---
+        if route == "business_lookup":
+            return self.lookup_business(query, max_results=max_results)
 
-        payload = self.search_web_html(query, max_results=max_results)
-        self.cache[cache_key] = payload
-        return payload
+        # --- DEFAULT SEARCH ---
+        return self.search_web_html(query, max_results=max_results)
+
+    except Exception as e:
+        return {
+            "ok": False,
+            "query": query,
+            "results": [],
+            "summary": f"Search failed: {e}",
+            "source_type": "search_error",
+        }
 
     # -----------------------
     # SPECIALIST LANES
@@ -312,21 +314,101 @@ class WebService:
     def lookup_crypto_price(self, query: str) -> dict:
         coin_id = self._extract_crypto_id(query)
 
-        return {
-            "ok": True,
-            "query": query,
-            "results": [
-                {
-                    "title": "CRYPTO LANE HIT",
-                    "url": "",
-                    "snippet": f"coin_id={coin_id}",
-                    "domain": "",
+        if not coin_id:
+            return {
+                "ok": False,
+                "query": query,
+                "results": [],
+                "summary": f'Crypto symbol not recognized for "{query}".',
+                "source_type": "crypto_price",
+                "coin_id": "",
+            }
+
+        try:
+            url = "https://api.coingecko.com/api/v3/simple/price"
+            params = {
+                "ids": coin_id,
+                "vs_currencies": "usd",
+                "include_24hr_change": "true",
+                "include_market_cap": "true",
+            }
+
+            response = requests.get(
+                url,
+                params=params,
+                timeout=self.timeout,
+                headers=self._headers(),
+                allow_redirects=True,
+            )
+            response.raise_for_status()
+
+            data = response.json() or {}
+            coin_data = data.get(coin_id) or {}
+
+            usd = coin_data.get("usd")
+            change_24h = coin_data.get("usd_24h_change")
+            market_cap = coin_data.get("usd_market_cap")
+
+            if usd is None:
+                return {
+                    "ok": False,
+                    "query": query,
+                    "results": [],
+                    "summary": f'CoinGecko returned no USD price for "{coin_id}".',
+                    "source_type": "crypto_price",
+                    "coin_id": coin_id,
                 }
-            ],
-            "summary": f"CRYPTO LANE HIT | coin_id={coin_id}",
-            "source_type": "crypto_price",
-            "coin_id": coin_id,
-        }
+
+            pretty_name = (
+                coin_id.replace("binancecoin", "Binance Coin")
+                .replace("-", " ")
+                .title()
+            )
+
+            summary_parts = [f"{pretty_name} price: ${usd:,.2f} USD"]
+
+            if isinstance(change_24h, (int, float)):
+                summary_parts.append(f"24h change: {change_24h:+.2f}%")
+
+            if isinstance(market_cap, (int, float)):
+                summary_parts.append(f"Market cap: ${market_cap:,.0f}")
+
+            summary = " | ".join(summary_parts)
+
+            return {
+                "ok": True,
+                "query": query,
+                "results": [
+                    {
+                        "title": f"{pretty_name} price",
+                        "url": f"https://www.coingecko.com/en/coins/{coin_id}",
+                        "snippet": summary,
+                        "domain": "www.coingecko.com",
+                    }
+                ],
+                "summary": summary,
+                "source_type": "crypto_price",
+                "coin_id": coin_id,
+            }
+
+        except requests.RequestException as e:
+            return {
+                "ok": False,
+                "query": query,
+                "results": [],
+                "summary": f"CoinGecko request failed: {e}",
+                "source_type": "crypto_price",
+                "coin_id": coin_id,
+            }
+        except Exception as e:
+            return {
+                "ok": False,
+                "query": query,
+                "results": [],
+                "summary": f"Crypto price lookup failed: {e}",
+                "source_type": "crypto_price",
+                "coin_id": coin_id,
+            }
 
     def lookup_weather(self, query: str) -> dict:
         # Safe starter: keep this routed through generic search until you add a weather API.
@@ -360,11 +442,16 @@ class WebService:
             soup = BeautifulSoup(response.text or "", "html.parser")
             results: List[dict] = []
 
-            candidates = (
-                soup.select(".result")
-                or soup.select(".result__body")
-                or soup.select("div")
-            )
+            candidates = soup.select(".result")
+
+            if not candidates:
+                candidates = soup.select(".result__body")
+
+            if not candidates:
+                candidates = soup.select(".web-result")
+
+            if not candidates:
+                candidates = soup.select("a[href]")
 
             for result in candidates:
                 title_el = (
@@ -395,8 +482,11 @@ class WebService:
                 if not href or not title:
                     continue
 
-                final_url = self._extract_ddg_target(href) or href
+                if "duckduckgo.com" in href:
+                    continue
 
+                final_url = self._extract_ddg_target(href) or href
+                print("PARSED:", title, final_url)
                 domain = ""
                 try:
                     domain = urlparse(final_url).netloc

@@ -1,3 +1,1235 @@
 {
-  "artifacts": []
+  "artifacts": [
+    {
+      "kind": "web_search",
+      "title": "Web search: Tim Hortons near me",
+      "summary": "I searched for \"Tim Hortons near me\" but didn’t find strong results. Try opening a specific site or refining the query.",
+      "body": "I searched for \"Tim Hortons near me\" but didn’t find strong results. Try opening a specific site or refining the query.",
+      "source_url": "",
+      "meta": {
+        "query": "Tim Hortons near me",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: Tim Hortons near me",
+        "analysis_text": "I searched for \"Tim Hortons near me\" but didn’t find strong results. Try opening a specific site or refining the query.",
+        "body": "I searched for \"Tim Hortons near me\" but didn’t find strong results. Try opening a specific site or refining the query.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"Tim Hortons near me\" but didn’t find strong results. Try opening a specific site or refining the query.",
+      "session_id": "session_5e74fccb818446aa8ee6ed44e659d20a",
+      "id": "artifact_4d5682160fc44513a8828f17f46a5178",
+      "updated_at": "2026-04-21T15:17:26.287818+00:00",
+      "created_at": "2026-04-21T15:17:26.287818+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: Walmart hours",
+      "summary": "I searched for \"Walmart hours\" but didn’t find strong results. Try opening a specific site or refining the query.",
+      "body": "I searched for \"Walmart hours\" but didn’t find strong results. Try opening a specific site or refining the query.",
+      "source_url": "",
+      "meta": {
+        "query": "Walmart hours",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: Walmart hours",
+        "analysis_text": "I searched for \"Walmart hours\" but didn’t find strong results. Try opening a specific site or refining the query.",
+        "body": "I searched for \"Walmart hours\" but didn’t find strong results. Try opening a specific site or refining the query.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"Walmart hours\" but didn’t find strong results. Try opening a specific site or refining the query.",
+      "session_id": "session_5e74fccb818446aa8ee6ed44e659d20a",
+      "id": "artifact_d2ab0f0c902c46a183cd1ef5b9b26364",
+      "updated_at": "2026-04-21T15:17:39.229790+00:00",
+      "created_at": "2026-04-21T15:17:39.229790+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: weather in Vancouver",
+      "summary": "I searched for \"weather in Vancouver\" but didn’t find strong results. Try opening a specific site or refining the query.",
+      "body": "I searched for \"weather in Vancouver\" but didn’t find strong results. Try opening a specific site or refining the query.",
+      "source_url": "",
+      "meta": {
+        "query": "weather in Vancouver",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: weather in Vancouver",
+        "analysis_text": "I searched for \"weather in Vancouver\" but didn’t find strong results. Try opening a specific site or refining the query.",
+        "body": "I searched for \"weather in Vancouver\" but didn’t find strong results. Try opening a specific site or refining the query.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"weather in Vancouver\" but didn’t find strong results. Try opening a specific site or refining the query.",
+      "session_id": "session_5e74fccb818446aa8ee6ed44e659d20a",
+      "id": "artifact_0a7a6b236bf5443fb0438975fc729ae7",
+      "updated_at": "2026-04-21T15:17:52.763483+00:00",
+      "created_at": "2026-04-21T15:17:52.763483+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: what are the lakers record current season",
+      "summary": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+      "body": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "what are the lakers record current season",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: what are the lakers record current season",
+        "analysis_text": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+        "body": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+      "session_id": "session_290fbf6a314d4b888079d36acd694ed5",
+      "id": "artifact_fe8a15e74b754918b60d0b6fd8c1734f",
+      "updated_at": "2026-04-21T17:31:56.977093+00:00",
+      "created_at": "2026-04-21T17:31:56.977093+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: what are the lakers record current season",
+      "summary": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+      "body": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "what are the lakers record current season",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: what are the lakers record current season",
+        "analysis_text": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+        "body": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+      "session_id": "session_290fbf6a314d4b888079d36acd694ed5",
+      "id": "artifact_e6dd9a5c82294c33a577afec770d3fc0",
+      "updated_at": "2026-04-21T17:32:14.902144+00:00",
+      "created_at": "2026-04-21T17:32:14.902144+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: what are the lakers record current season",
+      "summary": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+      "body": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "what are the lakers record current season",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: what are the lakers record current season",
+        "analysis_text": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+        "body": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"what are the lakers record current season\" but could not find strong live results.",
+      "session_id": "test-session",
+      "id": "artifact_148b5660d3fe429da779e7826ea12e1e",
+      "updated_at": "2026-04-21T17:33:28.426245+00:00",
+      "created_at": "2026-04-21T17:33:28.426245+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: weather in vancouver today",
+      "summary": "I searched for \"weather in vancouver today\" but could not find strong live results.",
+      "body": "I searched for \"weather in vancouver today\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "weather in vancouver today",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: weather in vancouver today",
+        "analysis_text": "I searched for \"weather in vancouver today\" but could not find strong live results.",
+        "body": "I searched for \"weather in vancouver today\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"weather in vancouver today\" but could not find strong live results.",
+      "session_id": "session_290fbf6a314d4b888079d36acd694ed5",
+      "id": "artifact_d65f8f4cec7d40cfbafa2667f8eb5f77",
+      "updated_at": "2026-04-21T17:55:58.211384+00:00",
+      "created_at": "2026-04-21T17:55:58.211384+00:00"
+    },
+    {
+      "kind": "execution",
+      "title": "Execution Plan",
+      "body": "Goal: fix that\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+      "summary": "Execution plan for: fix that",
+      "preview": "Goal: fix that\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change",
+      "session_id": "session_290fbf6a314d4b888079d36acd694ed5",
+      "source": "execution",
+      "execution": {
+        "goal": "fix that",
+        "steps": [
+          {
+            "title": "Inspect the current state and constraints",
+            "status": "current"
+          },
+          {
+            "title": "Choose the safest implementation path",
+            "status": "pending"
+          },
+          {
+            "title": "Apply the required change",
+            "status": "pending"
+          },
+          {
+            "title": "Verify the result",
+            "status": "pending"
+          },
+          {
+            "title": "Summarize outcome and next move",
+            "status": "pending"
+          }
+        ],
+        "current_step_index": 0,
+        "progress": 0,
+        "current_step": "Inspect the current state and constraints",
+        "status": "running"
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 0,
+        "total": 5,
+        "paused": false,
+        "active_execution": true
+      },
+      "id": "artifact_f8217b7b036144a68a5ed0d5b735964d",
+      "updated_at": "2026-04-21T18:57:22.589931+00:00",
+      "created_at": "2026-04-21T18:57:22.589931+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: tell me a funny joke about bitcoin",
+      "summary": "I searched for \"tell me a funny joke about bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"tell me a funny joke about bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "tell me a funny joke about bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: tell me a funny joke about bitcoin",
+        "analysis_text": "I searched for \"tell me a funny joke about bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"tell me a funny joke about bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"tell me a funny joke about bitcoin\" but could not find strong live results.",
+      "session_id": "session_290fbf6a314d4b888079d36acd694ed5",
+      "id": "artifact_2f8dfc2b4c4b4a22ba636f7a559e44db",
+      "updated_at": "2026-04-21T19:43:43.541571+00:00",
+      "created_at": "2026-04-21T19:43:43.541571+00:00"
+    },
+    {
+      "kind": "execution",
+      "title": "Execution Plan",
+      "body": "Goal: make a plan\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+      "summary": "Execution plan for: make a plan",
+      "preview": "Goal: make a plan\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required cha",
+      "session_id": "session_f0c54c5b4b2e46f2b23b7f6a48a718c2",
+      "source": "execution",
+      "execution": {
+        "goal": "make a plan",
+        "steps": [
+          {
+            "title": "Inspect the current state and constraints",
+            "status": "current"
+          },
+          {
+            "title": "Choose the safest implementation path",
+            "status": "pending"
+          },
+          {
+            "title": "Apply the required change",
+            "status": "pending"
+          },
+          {
+            "title": "Verify the result",
+            "status": "pending"
+          },
+          {
+            "title": "Summarize outcome and next move",
+            "status": "pending"
+          }
+        ],
+        "current_step_index": 0,
+        "progress": 0,
+        "current_step": "Inspect the current state and constraints",
+        "status": "running"
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 0,
+        "total": 5,
+        "paused": false,
+        "active_execution": true
+      },
+      "id": "artifact_69a6788680e04a0d86528b4109525df8",
+      "updated_at": "2026-04-22T11:09:14.447487+00:00",
+      "created_at": "2026-04-22T11:09:14.447487+00:00"
+    },
+    {
+      "kind": "execution",
+      "title": "Execution Plan",
+      "body": "Goal: make a plan\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required change\n[ ] Verify the result\n[ ] Summarize outcome and next move\n\nProgress: 0/5 complete\nCurrent step: Inspect the current state and constraints",
+      "summary": "Execution plan for: make a plan",
+      "preview": "Goal: make a plan\n\nSteps:\n[>] Inspect the current state and constraints\n[ ] Choose the safest implementation path\n[ ] Apply the required cha",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "source": "execution",
+      "execution": {
+        "goal": "make a plan",
+        "steps": [
+          {
+            "title": "Inspect the current state and constraints",
+            "status": "current"
+          },
+          {
+            "title": "Choose the safest implementation path",
+            "status": "pending"
+          },
+          {
+            "title": "Apply the required change",
+            "status": "pending"
+          },
+          {
+            "title": "Verify the result",
+            "status": "pending"
+          },
+          {
+            "title": "Summarize outcome and next move",
+            "status": "pending"
+          }
+        ],
+        "current_step_index": 0,
+        "progress": 0,
+        "current_step": "Inspect the current state and constraints",
+        "status": "running"
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 0,
+        "total": 5,
+        "paused": false,
+        "active_execution": true
+      },
+      "id": "artifact_f4d4f29f955f4ad0b68744fb0e917347",
+      "updated_at": "2026-04-22T12:53:11.512627+00:00",
+      "created_at": "2026-04-22T12:53:11.512627+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: /web bitcoin",
+      "summary": "I searched for \"/web bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"/web bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "/web bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: /web bitcoin",
+        "analysis_text": "I searched for \"/web bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"/web bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"/web bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_56bbde92c2cf4b91843d02c4e312edae",
+      "updated_at": "2026-04-22T20:31:38.429901+00:00",
+      "created_at": "2026-04-22T20:31:38.429901+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: /web bitcoin",
+      "summary": "I searched for \"/web bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"/web bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "/web bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: /web bitcoin",
+        "analysis_text": "I searched for \"/web bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"/web bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"/web bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_07d572be65f946ed95336e233c69858b",
+      "updated_at": "2026-04-22T20:43:23.166229+00:00",
+      "created_at": "2026-04-22T20:43:23.166229+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: whats the lakers record current season",
+      "summary": "I searched for \"whats the lakers record current season\" but could not find strong live results.",
+      "body": "I searched for \"whats the lakers record current season\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "whats the lakers record current season",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: whats the lakers record current season",
+        "analysis_text": "I searched for \"whats the lakers record current season\" but could not find strong live results.",
+        "body": "I searched for \"whats the lakers record current season\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"whats the lakers record current season\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_608105b85cad4384801565a73025b598",
+      "updated_at": "2026-04-22T21:04:03.687853+00:00",
+      "created_at": "2026-04-22T21:04:03.687853+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_222a7776f9184b79b40c4e3e3ac58e70",
+      "updated_at": "2026-04-22T22:02:43.937884+00:00",
+      "created_at": "2026-04-22T22:02:43.937884+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_abbd0253864b412f90770692672f1fad",
+      "updated_at": "2026-04-22T22:02:59.742742+00:00",
+      "created_at": "2026-04-22T22:02:59.742742+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: shut up i 'm not congresswoman lauren i\\'m asking you about bitcoin",
+      "summary": "I searched for \"shut up i 'm not congresswoman lauren i\\'m asking you about bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"shut up i 'm not congresswoman lauren i\\'m asking you about bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "shut up i 'm not congresswoman lauren i\\'m asking you about bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: shut up i 'm not congresswoman lauren i\\'m asking you about bitcoin",
+        "analysis_text": "I searched for \"shut up i 'm not congresswoman lauren i\\'m asking you about bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"shut up i 'm not congresswoman lauren i\\'m asking you about bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"shut up i 'm not congresswoman lauren i\\'m asking you about bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_a16a919be24c4ba4bac64c318b1769ac",
+      "updated_at": "2026-04-22T22:03:25.685859+00:00",
+      "created_at": "2026-04-22T22:03:25.685859+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_9daf0797856b4d20af9606a31145938c",
+      "updated_at": "2026-04-22T22:05:04.754843+00:00",
+      "created_at": "2026-04-22T22:05:04.754843+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_30efc7736c2149bdac5aea2849d5c1d7",
+      "updated_at": "2026-04-22T22:12:22.364661+00:00",
+      "created_at": "2026-04-22T22:12:22.364661+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_417600534d1240dba6b88fe8b75153c3",
+      "updated_at": "2026-04-22T22:25:16.354587+00:00",
+      "created_at": "2026-04-22T22:25:16.354587+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_930e9112f6de4c54b7b640bfb090ab57",
+      "updated_at": "2026-04-22T22:26:09.845862+00:00",
+      "created_at": "2026-04-22T22:26:09.845862+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_8d9136d0388844d5bea21417e23b47c4",
+      "updated_at": "2026-04-22T22:30:04.196971+00:00",
+      "created_at": "2026-04-22T22:30:04.196971+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_b2b391084da44ac9a95363670927dd48",
+      "updated_at": "2026-04-22T23:14:35.268355+00:00",
+      "created_at": "2026-04-22T23:14:35.268355+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_af87f4331b904c81bcb6dabbc481c155",
+      "updated_at": "2026-04-22T23:20:54.094680+00:00",
+      "created_at": "2026-04-22T23:20:54.094680+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_0ab89a7f5f0b4efeb5f80a550d63724d",
+      "updated_at": "2026-04-22T23:23:44.936788+00:00",
+      "created_at": "2026-04-22T23:23:44.936788+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_b4a665d33c044380b4850efd2deddda0",
+      "updated_at": "2026-04-22T23:31:34.880348+00:00",
+      "created_at": "2026-04-22T23:31:34.880348+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_8df1b192472642b396b03abd234e8167",
+      "updated_at": "2026-04-22T23:31:58.368962+00:00",
+      "created_at": "2026-04-22T23:31:58.368962+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_e8003b4ec9224c4ca43b399655435078",
+      "updated_at": "2026-04-23T01:13:17.110029+00:00",
+      "created_at": "2026-04-23T01:13:17.110029+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_ab74443cc70648309db076ea1f6b5fca",
+      "updated_at": "2026-04-23T01:16:16.482428+00:00",
+      "created_at": "2026-04-23T01:16:16.482428+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_eecc7bf992ae40bb901e062ee79de8d1",
+      "updated_at": "2026-04-23T01:19:45.597867+00:00",
+      "created_at": "2026-04-23T01:19:45.597867+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_b453769a93d145c0abcfba46d3364af7",
+      "id": "artifact_d980342721d14edca2c82679753e4d49",
+      "updated_at": "2026-04-23T01:22:12.203564+00:00",
+      "created_at": "2026-04-23T01:22:12.203564+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_3e3f2d907ad44f37929a8d63bba0ec8a",
+      "id": "artifact_dab1853524474f6e863ed8790ec83d2d",
+      "updated_at": "2026-04-23T01:25:23.051270+00:00",
+      "created_at": "2026-04-23T01:25:23.051270+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_3e3f2d907ad44f37929a8d63bba0ec8a",
+      "id": "artifact_a2bfa5936f614945936910fcf8ad8437",
+      "updated_at": "2026-04-23T01:25:29.034868+00:00",
+      "created_at": "2026-04-23T01:25:29.034868+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: reearch bitcoin",
+      "summary": "I searched for \"reearch bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"reearch bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "reearch bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: reearch bitcoin",
+        "analysis_text": "I searched for \"reearch bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"reearch bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"reearch bitcoin\" but could not find strong live results.",
+      "session_id": "session_3e3f2d907ad44f37929a8d63bba0ec8a",
+      "id": "artifact_94382c6054ea4305b51fa1d2d9547983",
+      "updated_at": "2026-04-23T01:28:23.249127+00:00",
+      "created_at": "2026-04-23T01:28:23.249127+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_3e3f2d907ad44f37929a8d63bba0ec8a",
+      "id": "artifact_487cbc919cf3424587702c3d018a48b8",
+      "updated_at": "2026-04-23T01:31:18.962722+00:00",
+      "created_at": "2026-04-23T01:31:18.962722+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_3e3f2d907ad44f37929a8d63bba0ec8a",
+      "id": "artifact_790f9d5fb96848d690b75bea3a3218e8",
+      "updated_at": "2026-04-23T01:41:24.078663+00:00",
+      "created_at": "2026-04-23T01:41:24.078663+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_3e3f2d907ad44f37929a8d63bba0ec8a",
+      "id": "artifact_0a31b186e06a4df29a89fac13ec1289f",
+      "updated_at": "2026-04-23T01:51:34.721298+00:00",
+      "created_at": "2026-04-23T01:51:34.721298+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_3e3f2d907ad44f37929a8d63bba0ec8a",
+      "id": "artifact_c592a8a8b9dc43a2bb7a58fed32c170b",
+      "updated_at": "2026-04-23T01:51:49.828102+00:00",
+      "created_at": "2026-04-23T01:51:49.828102+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_3e3f2d907ad44f37929a8d63bba0ec8a",
+      "id": "artifact_68c407af33bb41fdaa19f00793193777",
+      "updated_at": "2026-04-23T01:55:11.232915+00:00",
+      "created_at": "2026-04-23T01:55:11.232915+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: whats going on in the nba playoff",
+      "summary": "I searched for \"whats going on in the nba playoff\" but could not find strong live results.",
+      "body": "I searched for \"whats going on in the nba playoff\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "whats going on in the nba playoff",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: whats going on in the nba playoff",
+        "analysis_text": "I searched for \"whats going on in the nba playoff\" but could not find strong live results.",
+        "body": "I searched for \"whats going on in the nba playoff\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"whats going on in the nba playoff\" but could not find strong live results.",
+      "session_id": "session_63d0b354ae374830a6b6c71ffca4c8bb",
+      "id": "artifact_83575b915753463e905f81ad5f244283",
+      "updated_at": "2026-04-23T01:57:15.151925+00:00",
+      "created_at": "2026-04-23T01:57:15.151925+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_ebed879eeac04e34bb7cdc3250224927",
+      "id": "artifact_42c11316f9254598b1ac7191845aa238",
+      "updated_at": "2026-04-23T02:05:00.181163+00:00",
+      "created_at": "2026-04-23T02:05:00.181163+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_ebed879eeac04e34bb7cdc3250224927",
+      "id": "artifact_5e7d6c0ec04b438d9a43f1700e273b61",
+      "updated_at": "2026-04-23T02:09:54.269285+00:00",
+      "created_at": "2026-04-23T02:09:54.269285+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_ebed879eeac04e34bb7cdc3250224927",
+      "id": "artifact_636c05c2278b4bc894d86c2fc3193659",
+      "updated_at": "2026-04-23T04:40:19.779316+00:00",
+      "created_at": "2026-04-23T04:40:19.779316+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_ebed879eeac04e34bb7cdc3250224927",
+      "id": "artifact_0eb1d78d028944a1a7a904ca1b6042f6",
+      "updated_at": "2026-04-23T04:47:35.242122+00:00",
+      "created_at": "2026-04-23T04:47:35.242122+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: research bitcoin",
+      "summary": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "research bitcoin",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: research bitcoin",
+        "analysis_text": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "body": "I searched for \"research bitcoin\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"research bitcoin\" but could not find strong live results.",
+      "session_id": "session_55c82edb74524c6194f3e1ed3ba458ab",
+      "id": "artifact_6e73f17230d2490fb296bbb6dffe2e06",
+      "updated_at": "2026-04-23T04:51:29.241949+00:00",
+      "created_at": "2026-04-23T04:51:29.241949+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: explain bitcoin mining difficulty",
+      "summary": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "body": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "explain bitcoin mining difficulty",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: explain bitcoin mining difficulty",
+        "analysis_text": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+        "body": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "session_id": "session_82207dfd02d64579af248a8dafbb9b95",
+      "id": "artifact_cabdb6eeaffb4a6aa1d403bef5ffc8e3",
+      "updated_at": "2026-04-23T05:37:25.280652+00:00",
+      "created_at": "2026-04-23T05:37:25.280652+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: explain bitcoin mining difficulty",
+      "summary": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "body": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "explain bitcoin mining difficulty",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: explain bitcoin mining difficulty",
+        "analysis_text": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+        "body": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "session_id": "session_82207dfd02d64579af248a8dafbb9b95",
+      "id": "artifact_586508359b5c4d979c605137c56894bf",
+      "updated_at": "2026-04-23T05:50:07.562839+00:00",
+      "created_at": "2026-04-23T05:50:07.562839+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: explain bitcoin mining difficulty",
+      "summary": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "body": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "explain bitcoin mining difficulty",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: explain bitcoin mining difficulty",
+        "analysis_text": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+        "body": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "session_id": "session_82207dfd02d64579af248a8dafbb9b95",
+      "id": "artifact_1c7b532726f242faae6d22b541186d48",
+      "updated_at": "2026-04-23T06:07:24.528780+00:00",
+      "created_at": "2026-04-23T06:07:24.528780+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: explain bitcoin mining difficulty",
+      "summary": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "body": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "explain bitcoin mining difficulty",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: explain bitcoin mining difficulty",
+        "analysis_text": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+        "body": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "session_id": "session_82207dfd02d64579af248a8dafbb9b95",
+      "id": "artifact_3f33734567c343819d3286c905812983",
+      "updated_at": "2026-04-23T06:09:05.847825+00:00",
+      "created_at": "2026-04-23T06:09:05.847825+00:00"
+    },
+    {
+      "kind": "web_search",
+      "title": "Web search: explain bitcoin mining difficulty",
+      "summary": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "body": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "source_url": "",
+      "meta": {
+        "query": "explain bitcoin mining difficulty",
+        "result_count": 0
+      },
+      "viewer": {
+        "title": "Web search: explain bitcoin mining difficulty",
+        "analysis_text": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+        "body": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+        "results": [],
+        "source_url": ""
+      },
+      "preview": "I searched for \"explain bitcoin mining difficulty\" but could not find strong live results.",
+      "session_id": "session_64557284a4174b1187163d616ebd7bb9",
+      "id": "artifact_db4f7622e9524c5ab86feda21ec46e4e",
+      "updated_at": "2026-04-23T06:15:24.916678+00:00",
+      "created_at": "2026-04-23T06:15:24.916678+00:00"
+    }
+  ]
 }

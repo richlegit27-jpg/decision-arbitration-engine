@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 import re
@@ -250,22 +250,6 @@ def memory_exists_for_session(session_id: str, fact_text: str) -> bool:
     if not text:
         return False
     return any(pattern.search(text) for pattern in IDENTITY_QUESTION_PATTERNS)
-
-
-def extract_name_from_memory_text(text: str) -> str:
-    raw = str(text or "").strip()
-    if not raw:
-        return ""
-
-    for pattern in NAME_MEMORY_PATTERNS:
-        match = pattern.search(raw)
-        if match:
-            name = str(match.group(1) or "").strip()
-            name = re.sub(r"[^\w\s'\-]", "", name).strip()
-            if name:
-                return _clean_fact_value(name)
-
-    return ""
 
 def find_best_name_memory(session_id: str) -> dict | None:
     target_session = str(session_id or "").strip()
@@ -715,131 +699,6 @@ def api_chat():
             if not result.get("ok"):
                 return json_error(result.get("error") or "Web search failed", 500)
 
-            artifact_payload = web_service.build_search_artifact_payload(result)
-
-            payload = build_common_state_payload(session_id=session_id)
-            payload.update(
-                {
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": result.get("summary")
-                        or f'Web search completed for "{query}".',
-                    },
-                    "saved_artifact": artifact_payload,
-                    "web_result": result,
-                    "debug": {
-                        "decision": decision,
-                        "route_taken": "web_search",
-                        "forced_web": True,
-                    },
-                }
-            )
-            return json_ok(**payload)
-
-            artifact_payload = web_service.build_search_artifact_payload(result)
-
-            payload = build_common_state_payload(session_id=session_id)
-            payload.update(
-                {
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": result.get("summary")
-                        or f'Web search completed for "{query}".',
-                    },
-                    "saved_artifact": artifact_payload,
-                    "web_result": result,
-                    "debug": {
-                        "decision": decision,
-                        "route_taken": "web_search",
-                    },
-                }
-            )
-            return json_ok(**payload)
-
-        # web route
-        if decision.get("route") == "web":
-            url = str(decision.get("url") or "").strip()
-            if not url:
-                return json_error("URL could not be determined", 400)
-
-            result = web_service.fetch(url)
-
-            if not result.get("ok"):
-                search_result = web_service.search(url)
-                if search_result.get("ok"):
-                    artifact_payload = web_service.build_search_artifact_payload(search_result)
-
-                    payload = build_common_state_payload(session_id=session_id)
-                    payload.update(
-                        {
-                            "assistant_message": {
-                                "role": "assistant",
-                                "text": search_result.get("summary")
-                                or f'Web search completed for "{url}".',
-                            },
-                            "saved_artifact": artifact_payload,
-                            "web_result": search_result,
-                            "debug": {
-                                "decision": decision,
-                                "route_taken": "web_search_fallback",
-                            },
-                        }
-                    )
-                    return json_ok(**payload)
-
-                return json_error(result.get("error") or "Fetch failed", 500)
-
-            artifact_payload = web_service.build_artifact_payload(result)
-
-            payload = build_common_state_payload(session_id=session_id)
-            payload.update(
-                {
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": result.get("summary")
-                        or result.get("preview")
-                        or f"Fetched {url}",
-                    },
-                    "saved_artifact": artifact_payload,
-                    "web_result": result,
-                    "debug": {
-                        "decision": decision,
-                        "route_taken": "web",
-                    },
-                }
-            )
-            return json_ok(**payload)
-        # recon route
-        if decision.get("route") == "recon":
-            url = str(decision.get("url") or "").strip()
-            if not url:
-                return json_error("Recon route selected but no URL was found", 400)
-
-            result = recon_service.analyze_target(url)
-            if not result.get("ok"):
-                return json_error(result.get("error") or "Recon failed", 500)
-
-            artifact_payload = recon_service.build_artifact_payload(result)
-
-            payload = build_common_state_payload(session_id=session_id)
-            payload.update(
-                {
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": result.get("summary")
-                        or result.get("preview")
-                        or f"Recon complete for {url}",
-                    },
-                    "saved_artifact": artifact_payload,
-                    "recon_result": result,
-                    "debug": {
-                        "decision": decision,
-                        "route_taken": "recon",
-                    },
-                }
-            )
-            return json_ok(**payload)
-
         # default chat
         result = chat_service.handle(
             user_text=user_text,
@@ -855,8 +714,22 @@ def api_chat():
                 }
             }
 
-        # persist artifact with readable text for UI
+        existing_debug = result.get("debug") if isinstance(result.get("debug"), dict) else {}
         saved_artifact = result.get("saved_artifact")
+
+        raw_assistant = result.get("assistant_message")
+        if not isinstance(raw_assistant, dict):
+            raw_assistant = {}
+
+        final_text = str(raw_assistant.get("text") or "").strip()
+        if not final_text:
+            final_text = "⚠️ BLANK_REPLY_FROM_BACKEND"
+
+        assistant_message = dict(raw_assistant)
+        assistant_message["role"] = "assistant"
+        assistant_message["text"] = final_text
+
+        # persist artifact with readable text for UI
         if isinstance(saved_artifact, dict):
             try:
                 artifact_payload = dict(saved_artifact)
@@ -866,7 +739,7 @@ def api_chat():
                     or artifact_payload.get("body")
                     or artifact_payload.get("analysis_text")
                     or ((artifact_payload.get("viewer") or {}).get("body"))
-                    or ((result.get("assistant_message") or {}).get("text"))
+                    or final_text
                     or "Generated artifact"
                 )
 
@@ -889,36 +762,7 @@ def api_chat():
                 result.setdefault("debug", {})
                 result["debug"]["artifact_persist_error"] = str(e)
 
-        existing_debug = result.get("debug") if isinstance(result.get("debug"), dict) else {}
-        saved_artifact = result.get("saved_artifact")
-
-        session_payload = result.get("session")
-        if not isinstance(session_payload, dict):
-            session_payload = session_service.get_session(session_id) or {}
-
-        session_messages = session_payload.get("messages") if isinstance(session_payload.get("messages"), list) else []
-
-        final_text = ""
-        for msg in reversed(session_messages):
-            if not isinstance(msg, dict):
-                continue
-            if str(msg.get("role") or "").strip().lower() != "assistant":
-                continue
-
-            candidate = str(msg.get("text") or "").strip()
-            if candidate and candidate.lower() != "none":
-                final_text = candidate
-                break
-
-        if not final_text:
-            final_text = "I'm here. Tell me what you need."
-
-        assistant_message = {
-            "role": "assistant",
-            "text": final_text,
-        }
-
-        # ATTACH IMAGE TO CHAT MESSAGE
+        # attach image to chat message
         if isinstance(assistant_message, dict) and isinstance(saved_artifact, dict):
             image_url = (
                 saved_artifact.get("image_url")
@@ -949,6 +793,7 @@ def api_chat():
                 **existing_debug,
                 "decision": decision,
                 "route_taken": "chat",
+                "forced_final_text": final_text,
             },
         }
 
@@ -1514,4 +1359,6 @@ def voice_transcribe():
 # -----------------------
 if __name__ == "__main__":
     app.run(debug=False, port=5001)
+
+
 
