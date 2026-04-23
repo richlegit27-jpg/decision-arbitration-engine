@@ -1,18 +1,70 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from typing import Any, Dict, List
-from urllib.parse import quote_plus, unquote, urljoin, urlparse
+from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
 
 class WebService:
-    def __init__(self, timeout: int = 12):
+    def __init__(self, timeout: int = 6):
         self.timeout = int(timeout or 12)
         self.cache: Dict[str, dict] = {}
+
+        self.brave_api_key = str(os.getenv("BRAVE_SEARCH_API_KEY") or "").strip()
+        self.brave_web_endpoint = "https://api.search.brave.com/res/v1/web/search"
+        self.brave_news_endpoint = "https://api.search.brave.com/res/v1/news/search"
+
+        self.trusted_domains = {
+            "reuters.com",
+            "apnews.com",
+            "bloomberg.com",
+            "cnbc.com",
+            "wsj.com",
+            "ft.com",
+            "theverge.com",
+            "techcrunch.com",
+            "arstechnica.com",
+            "coindesk.com",
+            "cointelegraph.com",
+            "sec.gov",
+            "whitehouse.gov",
+            "canada.ca",
+            "weather.gc.ca",
+            "openai.com",
+            "nvidia.com",
+            "microsoft.com",
+            "google.com",
+            "alphabet.com",
+            "meta.com",
+            "tesla.com",
+            "apple.com",
+            "amazon.com",
+            "coingecko.com",
+        }
+
+        self.low_quality_domains = {
+            "pinterest.com",
+            "facebook.com",
+            "instagram.com",
+            "tiktok.com",
+        }
+
+        self.news_domains = {
+            "reuters.com",
+            "apnews.com",
+            "bloomberg.com",
+            "cnbc.com",
+            "wsj.com",
+            "ft.com",
+            "theverge.com",
+            "techcrunch.com",
+            "arstechnica.com",
+        }
 
     # -----------------------
     # BASIC HELPERS
@@ -31,9 +83,18 @@ class WebService:
             "Accept": "*/*",
         }
 
-    def _search_headers(self) -> dict:
-        headers = self._headers()
-        headers["Accept-Language"] = "en-US,en;q=0.9"
+    def _brave_headers(self) -> dict:
+        headers = {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+        }
+        if self.brave_api_key:
+            headers["X-Subscription-Token"] = self.brave_api_key
         return headers
 
     def _clean_text(self, text: str) -> str:
@@ -164,6 +225,61 @@ class WebService:
             url = "https://" + url
         return url
 
+    def _domain_root(self, domain: str) -> str:
+        domain = str(domain or "").strip().lower()
+        if domain.startswith("www."):
+            domain = domain[4:]
+        return domain
+
+    def _extract_domain(self, url: str) -> str:
+        try:
+            return self._domain_root(urlparse(str(url or "")).netloc)
+        except Exception:
+            return ""
+
+    def _query_tokens(self, query: str) -> List[str]:
+        raw = re.findall(r"[a-zA-Z0-9][a-zA-Z0-9\-\._]+", str(query or "").lower())
+        stop = {
+            "the", "a", "an", "on", "in", "for", "of", "to", "and", "or",
+            "is", "are", "what", "who", "where", "when", "latest", "news",
+            "today", "current", "update", "price", "stock",
+        }
+        return [token for token in raw if token not in stop and len(token) > 1]
+
+    def _wants_freshness(self, query: str) -> bool:
+        q = str(query or "").lower()
+        freshness_words = (
+            "latest",
+            "news",
+            "today",
+            "current",
+            "update",
+            "updates",
+            "recent",
+            "right now",
+            "this week",
+            "breaking",
+        )
+        return any(word in q for word in freshness_words)
+
+    def _looks_like_news_query(self, query: str) -> bool:
+        q = str(query or "").lower()
+        news_words = (
+            "latest",
+            "news",
+            "current",
+            "today",
+            "update",
+            "updates",
+            "recent",
+            "breaking",
+        )
+        return any(word in q for word in news_words)
+
+    def _looks_like_url(self, query: str) -> bool:
+        q = str(query or "").strip().lower()
+        return q.startswith("http://") or q.startswith("https://") or q.startswith("www.")
+
     # -----------------------
     # INTENT ROUTING
     # -----------------------
@@ -175,6 +291,9 @@ class WebService:
         q = str(query or "").strip().lower()
         if not q:
             return "search"
+
+        if self._looks_like_url(q):
+            return "url_fetch"
 
         price_words = (
             "price",
@@ -234,50 +353,80 @@ class WebService:
         if any(word in q for word in business_words):
             return "business_lookup"
 
+        if self._looks_like_news_query(q):
+            return "news_search"
+
         return "search"
 
     # -----------------------
     # SEARCH ROUTER
     # -----------------------
 
-def search(self, query: str, max_results: int = 5) -> dict:
-    query = str(query or "").strip()
+    def search(self, query: str, max_results: int = 5) -> dict:
+        query = str(query or "").strip()
 
-    if not query:
-        return {
-            "ok": False,
-            "query": query,
-            "results": [],
-            "summary": "Empty query.",
-            "source_type": "search",
-        }
+        if not query:
+            return {
+                "ok": False,
+                "query": query,
+                "results": [],
+                "summary": "Empty query.",
+                "source_type": "search",
+            }
 
-    route = self.classify_web_query(query)
+        route = self.classify_web_query(query)
 
-    try:
-        # --- CRYPTO ---
-        if route == "crypto_price":
-            return self.lookup_crypto_price(query)
+        try:
+            if route == "url_fetch":
+                fetched = self.fetch(query)
+                if fetched.get("ok"):
+                    return {
+                        "ok": True,
+                        "query": query,
+                        "results": [
+                            {
+                                "title": str(fetched.get("title") or query).strip(),
+                                "url": str(fetched.get("url") or query).strip(),
+                                "snippet": str(fetched.get("summary") or "").strip(),
+                                "domain": self._extract_domain(fetched.get("url") or query),
+                            }
+                        ],
+                        "summary": str(fetched.get("summary") or "").strip(),
+                        "source_type": "url_fetch",
+                    }
+                return {
+                    "ok": False,
+                    "query": query,
+                    "results": [],
+                    "summary": str(fetched.get("error") or "Fetch failed."),
+                    "source_type": "url_fetch",
+                }
 
-        # --- WEATHER ---
-        if route == "weather":
-            return self.lookup_weather(query)
+            if route == "crypto_price":
+                return self.lookup_crypto_price(query)
 
-        # --- BUSINESS ---
-        if route == "business_lookup":
-            return self.lookup_business(query, max_results=max_results)
+            if route == "weather":
+                return self.lookup_weather(query)
 
-        # --- DEFAULT SEARCH ---
-        return self.search_web_html(query, max_results=max_results)
+            if route == "business_lookup":
+                return self.lookup_business(query, max_results=max_results)
 
-    except Exception as e:
-        return {
-            "ok": False,
-            "query": query,
-            "results": [],
-            "summary": f"Search failed: {e}",
-            "source_type": "search_error",
-        }
+            if route == "news_search":
+                normalized_news_query = query
+                if "news" not in query.lower():
+                    normalized_news_query = f"{query} news"
+                return self.search_news_api(normalized_news_query, max_results=max_results)
+
+            return self.search_web_api(query, max_results=max_results, preferred_mode="general")
+
+        except Exception as e:
+            return {
+                "ok": False,
+                "query": query,
+                "results": [],
+                "summary": f"Search failed: {e}",
+                "source_type": "search_error",
+            }
 
     # -----------------------
     # SPECIALIST LANES
@@ -383,7 +532,8 @@ def search(self, query: str, max_results: int = 5) -> dict:
                         "title": f"{pretty_name} price",
                         "url": f"https://www.coingecko.com/en/coins/{coin_id}",
                         "snippet": summary,
-                        "domain": "www.coingecko.com",
+                        "domain": "coingecko.com",
+                        "score": 100.0,
                     }
                 ],
                 "summary": summary,
@@ -411,141 +561,345 @@ def search(self, query: str, max_results: int = 5) -> dict:
             }
 
     def lookup_weather(self, query: str) -> dict:
-        # Safe starter: keep this routed through generic search until you add a weather API.
-        result = self.search_web_html(query, max_results=5)
-        result["source_type"] = "weather_search"
-        return result
+        return self.search_web_api(query, max_results=5, preferred_mode="weather")
 
     def lookup_business(self, query: str, max_results: int = 5) -> dict:
-        # Safe starter: keep this routed through generic search until you add a maps/business API.
-        result = self.search_web_html(query, max_results=max_results)
-        result["source_type"] = "business_search"
-        return result
+        return self.search_web_api(query, max_results=max_results, preferred_mode="business")
 
     # -----------------------
-    # GENERIC HTML SEARCH
+    # RANKING
     # -----------------------
 
-    def search_web_html(self, query: str, max_results: int = 5) -> dict:
-        query = str(query or "").strip()
+    def _score_search_result(self, query: str, item: dict, preferred_mode: str = "general") -> float:
+        if not isinstance(item, dict):
+            return -9999.0
+
+        title = str(item.get("title") or "").strip().lower()
+        snippet = str(item.get("snippet") or "").strip().lower()
+        url = str(item.get("url") or "").strip().lower()
+        domain = self._domain_root(item.get("domain") or self._extract_domain(url))
+        query_lower = str(query or "").strip().lower()
+        query_tokens = self._query_tokens(query_lower)
+
+        score = 0.0
+
+        if title:
+            score += 5.0
+        if url:
+            score += 3.0
+        if snippet:
+            score += 2.0
+
+        if query_lower and query_lower in title:
+            score += 45.0
+        if query_lower and query_lower in snippet:
+            score += 20.0
+
+        token_hits_title = 0
+        token_hits_snippet = 0
+        for token in query_tokens:
+            if token in title:
+                token_hits_title += 1
+            if token in snippet:
+                token_hits_snippet += 1
+
+        score += token_hits_title * 10.0
+        score += token_hits_snippet * 4.0
+
+        if domain in self.trusted_domains:
+            score += 20.0
+
+        if domain in self.low_quality_domains:
+            score -= 20.0
+
+        if preferred_mode == "news":
+            if domain in self.news_domains:
+                score += 25.0
+            if "/news" in url:
+                score += 15.0
+            if self._wants_freshness(query):
+                score += 10.0
+
+        if preferred_mode == "weather":
+            if domain.endswith("weather.gc.ca"):
+                score += 35.0
+            if "weather" in domain or "forecast" in title:
+                score += 10.0
+
+        if preferred_mode == "business":
+            if "maps" in url or "location" in url or "hours" in title:
+                score += 15.0
+
+        if domain:
+            parts = domain.split(".")
+            if len(parts) >= 2:
+                base = ".".join(parts[-2:])
+                for token in query_tokens:
+                    if token and token in base:
+                        score += 18.0
+
+        if title and query_lower and title.startswith(query_lower):
+            score += 12.0
+
+        if len(title) > 180:
+            score -= 3.0
+
+        return score
+
+    def _rank_search_results(self, query: str, results: List[dict], preferred_mode: str = "general") -> List[dict]:
+        ranked: List[dict] = []
+
+        for item in results if isinstance(results, list) else []:
+            if not isinstance(item, dict):
+                continue
+
+            normalized = dict(item)
+            normalized["domain"] = self._domain_root(
+                normalized.get("domain") or self._extract_domain(normalized.get("url") or "")
+            )
+            normalized["score"] = float(self._score_search_result(query, normalized, preferred_mode))
+            ranked.append(normalized)
+
+        ranked.sort(
+            key=lambda x: (
+                float(x.get("score") or 0.0),
+                len(str(x.get("snippet") or "")),
+                len(str(x.get("title") or "")),
+            ),
+            reverse=True,
+        )
+        return ranked
+
+    # -----------------------
+    # BRAVE API SEARCH
+    # -----------------------
+
+    def _check_api_key(self) -> str:
+        if self.brave_api_key:
+            return ""
+        return "BRAVE_SEARCH_API_KEY is missing."
+
+    def _normalize_brave_web_results(self, payload: dict) -> List[dict]:
+        web_block = payload.get("web") if isinstance(payload, dict) else {}
+        raw_results = web_block.get("results") if isinstance(web_block, dict) else []
+        raw_results = raw_results if isinstance(raw_results, list) else []
+
+        results: List[dict] = []
+
+        for item in raw_results:
+            if not isinstance(item, dict):
+                continue
+
+            title = self._clean_text(item.get("title") or "")
+            url = str(item.get("url") or "").strip()
+            description = self._clean_text(item.get("description") or "")
+            age = self._clean_text(item.get("age") or item.get("page_age") or "")
+
+            meta_url = item.get("meta_url") if isinstance(item.get("meta_url"), dict) else {}
+            display_url = str(meta_url.get("display_url") or url).strip()
+
+            domain = self._extract_domain(url)
+
+            if not (title or url):
+                continue
+
+            snippet = description
+            if age and age not in snippet:
+                snippet = f"{age} | {snippet}" if snippet else age
+
+            results.append(
+                {
+                    "title": title[:200],
+                    "url": url,
+                    "snippet": snippet[:400],
+                    "domain": domain,
+                    "display_url": display_url,
+                    "age": age,
+                }
+            )
+
+        return results
+
+    def _normalize_brave_news_results(self, payload: dict) -> List[dict]:
+        results_block = payload.get("results") if isinstance(payload, dict) else []
+        results_block = results_block if isinstance(results_block, list) else []
+
+        results: List[dict] = []
+
+        for item in results_block:
+            if not isinstance(item, dict):
+                continue
+
+            title = self._clean_text(item.get("title") or "")
+            url = str(item.get("url") or "").strip()
+            description = self._clean_text(
+                item.get("description") or item.get("snippet") or ""
+            )
+            age = self._clean_text(item.get("age") or "")
+            meta_url = item.get("meta_url") if isinstance(item.get("meta_url"), dict) else {}
+            display_url = str(meta_url.get("display_url") or url).strip()
+            domain = self._extract_domain(url)
+
+            if not (title or url):
+                continue
+
+            snippet = description
+            if age and age not in snippet:
+                snippet = f"{age} | {snippet}" if snippet else age
+
+            results.append(
+                {
+                    "title": title[:200],
+                    "url": url,
+                    "snippet": snippet[:400],
+                    "domain": domain,
+                    "display_url": display_url,
+                    "age": age,
+                }
+            )
+
+        return results
+
+    def search_web_api(self, query: str, max_results: int = 5, preferred_mode: str = "general") -> dict:
+        key_error = self._check_api_key()
+        if key_error:
+            return {
+                "ok": False,
+                "query": query,
+                "results": [],
+                "summary": key_error,
+                "source_type": "brave_web",
+            }
 
         try:
-            url = "https://html.duckduckgo.com/html/?q=" + quote_plus(query)
             response = requests.get(
-                url,
+                self.brave_web_endpoint,
+                headers=self._brave_headers(),
+                params={
+                    "q": query,
+                    "count": min(max(max_results * 3, 5), 20),
+                    "country": "US",
+                    "search_lang": "en",
+                    "ui_lang": "en-US",
+                    "safesearch": "moderate",
+                },
                 timeout=self.timeout,
-                headers=self._search_headers(),
                 allow_redirects=True,
             )
             response.raise_for_status()
+            payload = response.json() or {}
 
-            soup = BeautifulSoup(response.text or "", "html.parser")
-            results: List[dict] = []
-
-            candidates = soup.select(".result")
-
-            if not candidates:
-                candidates = soup.select(".result__body")
-
-            if not candidates:
-                candidates = soup.select(".web-result")
-
-            if not candidates:
-                candidates = soup.select("a[href]")
-
-            for result in candidates:
-                title_el = (
-                    result.select_one("a.result__a")
-                    or result.select_one(".result__title a")
-                    or result.select_one("h2 a")
-                    or result.find("a")
-                )
-
-                snippet_el = (
-                    result.select_one(".result__snippet")
-                    or result.select_one(".result__content")
-                    or result.find("span")
-                )
-
-                if title_el is None:
-                    continue
-
-                title = re.sub(r"\s+", " ", title_el.get_text(" ", strip=True)).strip()
-                href = str(title_el.get("href") or "").strip()
-
-                snippet = ""
-                if snippet_el is not None:
-                    snippet = self._clean_search_snippet(
-                        snippet_el.get_text(" ", strip=True)
-                    )
-
-                if not href or not title:
-                    continue
-
-                if "duckduckgo.com" in href:
-                    continue
-
-                final_url = self._extract_ddg_target(href) or href
-                print("PARSED:", title, final_url)
-                domain = ""
-                try:
-                    domain = urlparse(final_url).netloc
-                except Exception:
-                    domain = ""
-
-                if not domain and not final_url.startswith("http"):
-                    continue
-
-                results.append(
-                    {
-                        "title": title,
-                        "url": final_url,
-                        "snippet": snippet,
-                        "domain": domain,
-                    }
-                )
-
-                if len(results) >= max_results:
-                    break
+            raw_results = self._normalize_brave_web_results(payload)
+            ranked_results = self._rank_search_results(query, raw_results, preferred_mode=preferred_mode)
+            final_results = ranked_results[:max_results]
 
             return {
                 "ok": True,
                 "query": query,
-                "results": results,
-                "summary": self._summarize_search_results(query, results),
-                "source_type": "search_html",
+                "results": final_results,
+                "summary": self._summarize_search_results(query, final_results),
+                "source_type": "brave_web",
+                "debug": {
+                    "preferred_mode": preferred_mode,
+                    "raw_results_count": len(raw_results),
+                    "ranked_results_count": len(final_results),
+                },
             }
 
+        except requests.RequestException as e:
+            return {
+                "ok": False,
+                "query": query,
+                "results": [],
+                "summary": f"Brave web request failed: {e}",
+                "source_type": "brave_web",
+            }
         except Exception as e:
             return {
                 "ok": False,
-                "error": str(e),
                 "query": query,
                 "results": [],
-                "summary": "",
-                "source_type": "search_html",
+                "summary": f"Brave web parsing failed: {e}",
+                "source_type": "brave_web",
             }
 
-    def _clean_search_snippet(self, text: str) -> str:
-        text = re.sub(r"\s+", " ", str(text or "")).strip()
-        return text[:300]
+    def search_news_api(self, query: str, max_results: int = 5) -> dict:
+        key_error = self._check_api_key()
+        if key_error:
+            return {
+                "ok": False,
+                "query": query,
+                "results": [],
+                "summary": key_error,
+                "source_type": "brave_news",
+            }
 
-    def _extract_ddg_target(self, href: str) -> str:
-        href = str(href or "").strip()
-        if not href:
-            return ""
+        try:
+            response = requests.post(
+                self.brave_news_endpoint,
+                headers=self._brave_headers(),
+                json={
+                    "q": query,
+                    "count": min(max(max_results * 3, 5), 50),
+                    "search_lang": "en",
+                    "country": "US",
+                    "safesearch": "moderate",
+                },
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            payload = response.json() or {}
 
-        if href.startswith("http://") or href.startswith("https://"):
-            return href
+            raw_results = self._normalize_brave_news_results(payload)
+            ranked_results = self._rank_search_results(
+                query,
+                raw_results,
+                preferred_mode="news",
+            )
+            final_results = ranked_results[:max_results]
 
-        match = re.search(r"[?&]uddg=([^&]+)", href)
-        if match:
-            try:
-                return unquote(match.group(1))
-            except Exception:
-                return ""
+            if final_results:
+                return {
+                    "ok": True,
+                    "query": query,
+                    "results": final_results,
+                    "summary": self._summarize_search_results(query, final_results),
+                    "source_type": "brave_news",
+                    "debug": {
+                        "preferred_mode": "news",
+                        "raw_results_count": len(raw_results),
+                        "ranked_results_count": len(final_results),
+                    },
+                }
 
-        return ""
+            fallback = self.search_web_api(query, max_results=max_results, preferred_mode="news")
+            if isinstance(fallback, dict):
+                fallback["debug"] = {
+                    **(fallback.get("debug") or {}),
+                    "news_fallback_used": True,
+                    "news_fallback_reason": "empty_news_results",
+                }
+            return fallback
+
+        except requests.RequestException as e:
+            fallback = self.search_web_api(query, max_results=max_results, preferred_mode="news")
+            if isinstance(fallback, dict):
+                fallback["debug"] = {
+                    **(fallback.get("debug") or {}),
+                    "news_fallback_used": True,
+                    "news_fallback_reason": str(e),
+                }
+            return fallback
+
+        except Exception as e:
+            fallback = self.search_web_api(query, max_results=max_results, preferred_mode="news")
+            if isinstance(fallback, dict):
+                fallback["debug"] = {
+                    **(fallback.get("debug") or {}),
+                    "news_fallback_used": True,
+                    "news_fallback_reason": f"unexpected: {e}",
+                }
+            return fallback
 
     def _summarize_search_results(self, query: str, results: List[dict]) -> str:
         query = str(query or "").strip()
@@ -562,6 +916,8 @@ def search(self, query: str, max_results: int = 5) -> dict:
                 item.get("snippet") or item.get("content") or item.get("body") or ""
             ).strip()
             url = str(item.get("url") or item.get("source_url") or "").strip()
+            domain = str(item.get("domain") or "").strip()
+            score = item.get("score")
 
             if not (title or snippet or url):
                 continue
@@ -571,20 +927,24 @@ def search(self, query: str, max_results: int = 5) -> dict:
                     "title": title,
                     "snippet": snippet,
                     "url": url,
+                    "domain": domain,
+                    "score": score,
                 }
             )
 
         if not cleaned:
-            return f'I searched for "{query}" but could not find strong live results.'
+            return f"No live results found for '{query}'."
 
         lines: List[str] = []
 
-        for item in cleaned[:5]:
+        for item in cleaned[:3]:
             block: List[str] = []
             if item["title"]:
                 block.append(item["title"])
             if item["snippet"]:
                 block.append(item["snippet"])
+            if item["domain"]:
+                block.append(f"Source: {item['domain']}")
             if item["url"]:
                 block.append(item["url"])
             lines.append("\n".join(block).strip())
@@ -663,12 +1023,21 @@ def search(self, query: str, max_results: int = 5) -> dict:
             title = str(item.get("title") or "").strip()
             url = str(item.get("url") or "").strip()
             snippet = str(item.get("snippet") or "").strip()
+            domain = str(item.get("domain") or "").strip()
+            score = item.get("score")
 
             block = f"{idx}. {title}" if title else f"{idx}."
             if snippet:
                 block += f"\n   {snippet}"
+            if domain:
+                block += f"\n   Source: {domain}"
             if url:
                 block += f"\n   {url}"
+            if score is not None:
+                try:
+                    block += f"\n   Score: {float(score):.1f}"
+                except Exception:
+                    pass
             lines.append(block)
 
         body_parts: List[str] = []

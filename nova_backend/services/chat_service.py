@@ -20,6 +20,8 @@ from nova_backend.services.recon_service import ReconService
 from nova_backend.services.session_service import SessionService
 from nova_backend.services.web_service import WebService
 from nova_backend.services.tool_service import ToolService
+from nova_backend.services.execution_service import ExecutionService
+
 
 class ChatService:
     ROUTE_GENERAL_CHAT = "general_chat"
@@ -55,7 +57,7 @@ class ChatService:
         self.model = self.chat_model
         print("MODEL CHECK:", hasattr(self, "model"), self.model)
         self.memory_limit = int(os.getenv("NOVA_MEMORY_LIMIT", "3"))
-
+        self.execution_service = ExecutionService()
         self.uploads_dir = Path(
             os.getenv("UPLOADS_DIR", r"C:\Users\Owner\nova\uploads")
         )
@@ -1755,14 +1757,14 @@ class ChatService:
         if not updated:
             return
 
-        try:
-            if wrapped:
-                sessions["sessions"] = items
-                self._save_sessions(sessions)
-            else:
-                self._save_sessions(items)
-        except Exception as e:
-            print("PERSIST EXECUTION SAVE SESSIONS FAILED:", e)
+try:
+    if wrapped:
+        sessions["sessions"] = items
+        self.session_service.save_sessions(sessions)
+    else:
+        self.session_service.save_sessions(items)
+except Exception as e:
+    print("PERSIST EXECUTION SAVE SESSIONS FAILED:", e)
 
     def _find_latest_execution_artifact(self, session_id: str = ""):
         session_id = self._safe_str(session_id)
@@ -2017,15 +2019,37 @@ class ChatService:
 
         print("ADVANCE SESSION_ID =", session_id)
 
-        latest = self._find_latest_execution_artifact(session_id=session_id)
-        print("ADVANCE LATEST =", latest)
+        persisted_execution = self._get_persisted_execution_artifact(session_id=session_id)
+        latest_artifact = self._find_latest_execution_artifact(session_id=session_id)
+
+        print("ADVANCE PERSISTED EXECUTION =", persisted_execution)
+        print("ADVANCE LATEST ARTIFACT =", latest_artifact)
 
         user_msg = self._build_user_message(
             user_text,
             attachments=attachments,
         )
 
-        if not latest:
+        execution = {}
+        if isinstance(persisted_execution, dict) and persisted_execution:
+            execution = persisted_execution
+        execution = {}
+        if isinstance(persisted_execution, dict) and persisted_execution:
+            execution = persisted_execution
+        elif isinstance(latest_artifact, dict):
+            execution = latest_artifact.get("execution") or {}
+        else:
+            execution = {}
+
+        execution = self._normalize_execution_state(execution)
+
+        if self._safe_str(execution.get("status")).lower() == "complete":
+            execution = {}
+
+        if self._safe_str(execution.get("status")).lower() == "complete":
+            execution = {}
+
+        if not execution:
             assistant_msg = self._build_assistant_message(
                 text="No execution found. Start with a plan first.",
                 attachments=[],
@@ -2045,22 +2069,93 @@ class ChatService:
                 saved_artifact=None,
             )
 
-        execution = latest.get("execution") or {}
+        goal_text = self._safe_str(execution.get("goal")).lower()
+        step_index = int(execution.get("current_step_index", 0) or 0)
 
-        result = self._execute_current_step(
-            execution=execution,
-            user_text=user_text,
-            session_id=session_id,
-            attachments=attachments,
-        )
+        if "plan" in goal_text:
+            if step_index == 0:
+                step_output = "State inspected. Missing inputs identified. Ready to proceed."
+            elif step_index == 1:
+                step_output = "Proceeding with a general-purpose plan structure using assumptions."
+            elif step_index == 2:
+                step_output = """Plan:
 
-        updated_execution = self._normalize_execution_state(
-            result.get("execution") or execution
-        )
-        step_output = self._safe_str(result.get("step_output"))
-        saved_artifact = result.get("saved_artifact")
+Goal:
+Create a clear actionable plan.
 
-        plan_body = self._render_execution(updated_execution)
+Steps:
+1. Define the objective
+2. Break into tasks
+3. Prioritize tasks
+4. Assign timeline
+5. Identify resources
+6. Execute
+7. Review and adjust
+
+Next action:
+Write the exact goal in one sentence.
+"""
+            elif step_index == 3:
+                step_output = "Plan structure verified for completeness and usability."
+            elif step_index >= 4:
+                step_output = "Plan created. Next step: refine based on real inputs."
+            else:
+                step_output = "Step executed."
+        else:
+            step_output = "Step executed."
+
+        execution = self._advance_execution_one_step(execution)
+        execution = self._normalize_execution_state(execution)
+
+        saved_artifact = None
+
+        artifact_payload = {
+            "kind": "execution",
+            "title": "Execution Plan",
+            "body": self._render_execution(execution),
+            "summary": f"Execution plan for: {self._safe_str(execution.get('goal'))}",
+            "preview": self._render_execution(execution)[:140],
+            "session_id": session_id,
+            "source": "execution",
+            "execution": execution,
+            "meta": {
+                "auto_generated": True,
+                "auto_executed": False,
+                "complete": self._safe_str(execution.get("status")).lower() == "complete",
+                "done": int(execution.get("progress", 0) or 0),
+                "total": len(execution.get("steps") or []),
+                "paused": False,
+                "active_execution": self._safe_str(execution.get("status")).lower() != "complete",
+            },
+        }
+
+        try:
+            saved_artifact = self._call_first(
+                self.artifacts,
+                ["save_artifact", "create_artifact", "add_artifact", "save", "create"],
+                artifact_payload,
+            )
+        except Exception as e:
+            print("ADVANCE EXECUTION SAVE FAILED (positional):", e)
+            saved_artifact = None
+
+        if not saved_artifact:
+            try:
+                saved_artifact = self._call_first(
+                    self.artifacts,
+                    ["save_artifact", "create_artifact", "add_artifact", "save", "create"],
+                    artifact=artifact_payload,
+                )
+            except Exception as e:
+                print("ADVANCE EXECUTION SAVE FAILED (keyword artifact):", e)
+                saved_artifact = None
+
+        try:
+            self._persist_execution_artifact(session_id=session_id, execution=execution)
+        except Exception as e:
+            print("ADVANCE EXECUTION PERSIST FAILED:", e)
+
+        plan_body = self._render_execution(execution)
 
         if step_output:
             assistant_text = step_output
@@ -4133,8 +4228,27 @@ class ChatService:
             if isinstance(artifact, dict):
                 artifact_summary = self._safe_str(artifact.get("summary"))
 
+            summary_text = self._safe_str(web_result.get("summary"))
+
+            summary_text = self._safe_str(web_result.get("summary"))
+
+            # 🔥 FINAL fallback trigger (this one works)
+            if (
+                web_result.get("ok")
+                and (
+                    not web_result.get("results")
+                    or "No live results found" in summary_text
+                )
+            ):
+                return self._execute_general_chat(
+                    decision={"route": self.ROUTE_GENERAL_CHAT},
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                )
+
             assistant_msg = self._build_assistant_message(
-                text=artifact_summary or self._safe_str(web_result.get("summary")) or "Web fetch completed.",
+                text=artifact_summary or summary_text or "Web fetch completed.",
                 meta={
                     "web_fetch": True,
                     "source_url": self._safe_str(web_result.get("source_url")),

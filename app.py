@@ -70,11 +70,6 @@ chat_service = ChatService(
     recon_service=recon_service,
 )
 
-print("CHAT SERVICE OBJ =", chat_service)
-print("CHAT SERVICE TYPE =", type(chat_service))
-print("CHAT SERVICE MODULE =", type(chat_service).__module__)
-print("CHAT SERVICE HAS HANDLE =", hasattr(chat_service, "handle"))
-print("CHAT SERVICE DIR HAS HANDLE =", "handle" in dir(chat_service))
 
 # -----------------------
 # HELPERS
@@ -608,8 +603,8 @@ def api_chat():
         decision["route"] = "web"
 
     elif looks_like_web_search:
-        decision["route"] = "web_search"
-        decision["force_web"] = True
+        decision["route"] = "chat"
+        decision["force_web"] = False
 
     try:
         # identity recall
@@ -644,7 +639,11 @@ def api_chat():
                 return json_error("Web search returned an invalid result", 500)
 
             if not result.get("ok"):
-                return json_error(result.get("error") or "Web search failed", 500)
+                return json_error(
+                    result.get("error") or "Web search failed",
+                    500,
+                    web_result=result,
+                )
 
             summary = str(result.get("summary") or "").strip()
             results = result.get("results") if isinstance(result.get("results"), list) else []
@@ -697,7 +696,11 @@ def api_chat():
             )
             return json_ok(**payload)
             if not result.get("ok"):
-                return json_error(result.get("error") or "Web search failed", 500)
+                return json_error(
+                    result.get("error") or "Web search failed",
+                    500,
+                    web_result=result,
+                )
 
         # default chat
         result = chat_service.handle(
@@ -1116,88 +1119,25 @@ def api_recon_analyze():
 
 @app.post("/api/voice/reply")
 def api_voice_reply():
-    data = request.get_json(silent=True) or {}
+    return jsonify({
+        "ok": False,
+        "error": "TTS disabled",
+    }), 503
 
-    text = str(data.get("text") or "").strip()
-    voice = str(data.get("voice") or "alloy").strip() or "alloy"
-    audio_format = str(data.get("format") or "mp3").strip().lower() or "mp3"
+def cleanup_uploads(upload_dir, max_files=50):
+    import os
+    files = [
+        os.path.join(upload_dir, f)
+        for f in os.listdir(upload_dir)
+        if os.path.isfile(os.path.join(upload_dir, f))
+    ]
+    files.sort(key=os.path.getmtime, reverse=True)
 
-    if not text:
-        return jsonify({"ok": False, "error": "Missing text."}), 400
-
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not api_key:
-        return jsonify({"ok": False, "error": "OPENAI_API_KEY is missing."}), 500
-
-    client = OpenAI(api_key=api_key)
-
-    allowed_formats = {"mp3", "wav", "opus", "aac", "flac", "pcm"}
-    if audio_format not in allowed_formats:
-        audio_format = "mp3"
-
-    ext_map = {
-        "mp3": ".mp3",
-        "wav": ".wav",
-        "opus": ".opus",
-        "aac": ".aac",
-        "flac": ".flac",
-        "pcm": ".pcm",
-    }
-
-    temp_name = f"tts_{uuid.uuid4().hex}{ext_map.get(audio_format, '.mp3')}"
-    temp_path = UPLOADS_DIR / temp_name
-
-    try:
-        response = client.audio.speech.create(
-            model="gpt-4o-mini-tts",
-            voice=voice,
-            input=text,
-            response_format=audio_format,
-        )
-
-        audio_bytes = None
-
-        if hasattr(response, "read"):
-            audio_bytes = response.read()
-        elif hasattr(response, "content"):
-            audio_bytes = response.content
-        elif isinstance(response, (bytes, bytearray)):
-            audio_bytes = bytes(response)
-
-        if not audio_bytes:
-            return jsonify({"ok": False, "error": "TTS returned empty audio."}), 500
-
-        temp_path.write_bytes(audio_bytes)
-
-        audio_url = f"/api/uploads/{temp_name}"
-        mime_type = mimetypes.guess_type(temp_name)[0] or "audio/mpeg"
-
-        assistant_message = {
-            "id": f"assistant_{uuid.uuid4().hex}",
-            "role": "assistant",
-            "text": text,
-            "attachments": [],
-            "meta": {
-                "source": "voice_reply",
-                "audio_url": audio_url,
-                "mime_type": mime_type,
-            },
-        }
-
-# artifact save skipped (not wired for voice yet)
-
-        return jsonify({
-            "ok": True,
-            "assistant_message": assistant_message,
-            "session_id": "voice_reply",
-        })
-
-    except Exception as e:
-        return jsonify({
-            "ok": False,
-            "error": str(e),
-        }), 500
-
+    for f in files[max_files:]:
+        try:
+            os.remove(f)
+        except:
+            pass
 # -----------------------
 # UPLOADS
 # -----------------------
