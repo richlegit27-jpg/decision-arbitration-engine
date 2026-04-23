@@ -353,9 +353,6 @@ class WebService:
         if any(word in q for word in business_words):
             return "business_lookup"
 
-        if self._looks_like_news_query(q):
-            return "news_search"
-
         return "search"
 
     # -----------------------
@@ -410,12 +407,6 @@ class WebService:
 
             if route == "business_lookup":
                 return self.lookup_business(query, max_results=max_results)
-
-            if route == "news_search":
-                normalized_news_query = query
-                if "news" not in query.lower():
-                    normalized_news_query = f"{query} news"
-                return self.search_news_api(normalized_news_query, max_results=max_results)
 
             return self.search_web_api(query, max_results=max_results, preferred_mode="general")
 
@@ -578,22 +569,24 @@ class WebService:
         snippet = str(item.get("snippet") or "").strip().lower()
         url = str(item.get("url") or "").strip().lower()
         domain = self._domain_root(item.get("domain") or self._extract_domain(url))
+        age = str(item.get("age") or "").strip().lower()
+
         query_lower = str(query or "").strip().lower()
         query_tokens = self._query_tokens(query_lower)
 
         score = 0.0
 
         if title:
-            score += 5.0
+            score += 8.0
         if url:
-            score += 3.0
+            score += 4.0
         if snippet:
-            score += 2.0
+            score += 4.0
 
         if query_lower and query_lower in title:
-            score += 45.0
+            score += 55.0
         if query_lower and query_lower in snippet:
-            score += 20.0
+            score += 24.0
 
         token_hits_title = 0
         token_hits_snippet = 0
@@ -603,21 +596,54 @@ class WebService:
             if token in snippet:
                 token_hits_snippet += 1
 
-        score += token_hits_title * 10.0
-        score += token_hits_snippet * 4.0
+        score += token_hits_title * 12.0
+        score += token_hits_snippet * 5.0
+
+        if query_tokens:
+            coverage = (token_hits_title + token_hits_snippet) / max(len(query_tokens), 1)
+            score += min(coverage * 10.0, 20.0)
 
         if domain in self.trusted_domains:
-            score += 20.0
+            score += 24.0
 
         if domain in self.low_quality_domains:
-            score -= 20.0
+            score -= 30.0
 
-        if preferred_mode == "news":
+        if domain:
+            parts = domain.split(".")
+            if len(parts) >= 2:
+                base = ".".join(parts[-2:])
+                for token in query_tokens:
+                    if token and token in base:
+                        score += 20.0
+
+        if self._wants_freshness(query):
+            freshness_markers = (
+                "hour ago",
+                "hours ago",
+                "minute ago",
+                "minutes ago",
+                "today",
+                "yesterday",
+                "2026",
+                "2025",
+            )
+            if any(marker in age for marker in freshness_markers):
+                score += 18.0
+            if age:
+                score += 6.0
+
+        finance_words = ("price", "stock", "shares", "market cap", "earnings", "crypto", "bitcoin", "btc")
+        if any(word in query_lower for word in finance_words):
+            if domain in {"coingecko.com", "coindesk.com", "cointelegraph.com", "cnbc.com", "bloomberg.com", "reuters.com"}:
+                score += 18.0
+            if any(word in title for word in ("price", "stock", "market", "btc", "bitcoin", "crypto")):
+                score += 12.0
+
+        if preferred_mode == "news" or self._wants_freshness(query):
             if domain in self.news_domains:
-                score += 25.0
+                score += 20.0
             if "/news" in url:
-                score += 15.0
-            if self._wants_freshness(query):
                 score += 10.0
 
         if preferred_mode == "weather":
@@ -628,20 +654,30 @@ class WebService:
 
         if preferred_mode == "business":
             if "maps" in url or "location" in url or "hours" in title:
-                score += 15.0
+                score += 18.0
+            if any(word in snippet for word in ("open", "closed", "hours", "address", "phone")):
+                score += 10.0
 
-        if domain:
-            parts = domain.split(".")
-            if len(parts) >= 2:
-                base = ".".join(parts[-2:])
-                for token in query_tokens:
-                    if token and token in base:
-                        score += 18.0
+        if any(token in domain for token in query_tokens):
+            if domain in {
+                "nvidia.com",
+                "microsoft.com",
+                "google.com",
+                "alphabet.com",
+                "meta.com",
+                "tesla.com",
+                "apple.com",
+                "amazon.com",
+                "openai.com",
+            }:
+                score += 16.0
 
         if title and query_lower and title.startswith(query_lower):
             score += 12.0
 
         if len(title) > 180:
+            score -= 4.0
+        if not snippet:
             score -= 3.0
 
         return score
@@ -732,9 +768,7 @@ class WebService:
 
             title = self._clean_text(item.get("title") or "")
             url = str(item.get("url") or "").strip()
-            description = self._clean_text(
-                item.get("description") or item.get("snippet") or ""
-            )
+            description = self._clean_text(item.get("description") or item.get("snippet") or "")
             age = self._clean_text(item.get("age") or "")
             meta_url = item.get("meta_url") if isinstance(item.get("meta_url"), dict) else {}
             display_url = str(meta_url.get("display_url") or url).strip()
@@ -760,37 +794,123 @@ class WebService:
 
         return results
 
+    def _duckduckgo_search(self, query: str, max_results: int = 5) -> List[dict]:
+        try:
+            url = "https://html.duckduckgo.com/html/"
+            response = requests.post(
+                url,
+                data={"q": query},
+                headers=self._headers(),
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.text, "html.parser")
+            results = []
+
+            # 🔥 updated selectors (more reliable)
+            for result in soup.find_all("div", class_="result__body"):
+                title_tag = result.find("a", class_="result__a")
+                snippet_tag = result.find("a", class_="result__snippet")
+
+                if not title_tag:
+                    continue
+
+                title = self._clean_text(title_tag.get_text())
+                link = title_tag.get("href")
+                snippet = self._clean_text(snippet_tag.get_text() if snippet_tag else "")
+
+                if not link:
+                    continue
+
+                results.append({
+                    "title": title[:200],
+                    "url": link,
+                    "snippet": snippet[:400],
+                    "domain": self._extract_domain(link),
+                })
+
+                if len(results) >= max_results * 3:
+                    break
+
+            return results
+
+        except Exception as e:
+            print("DDG ERROR:", e)  # 🔥 debug visibility
+            return []
+
     def search_web_api(self, query: str, max_results: int = 5, preferred_mode: str = "general") -> dict:
-        key_error = self._check_api_key()
-        if key_error:
+        query = str(query or "").strip()
+        if not query:
             return {
                 "ok": False,
                 "query": query,
                 "results": [],
-                "summary": key_error,
+                "summary": "Empty query.",
                 "source_type": "brave_web",
             }
 
-        try:
-            response = requests.get(
-                self.brave_web_endpoint,
-                headers=self._brave_headers(),
-                params={
-                    "q": query,
-                    "count": min(max(max_results * 3, 5), 20),
-                    "country": "US",
-                    "search_lang": "en",
-                    "ui_lang": "en-US",
-                    "safesearch": "moderate",
-                },
-                timeout=self.timeout,
-                allow_redirects=True,
-            )
-            response.raise_for_status()
-            payload = response.json() or {}
+        key_error = self._check_api_key()
+        brave_error = ""
 
-            raw_results = self._normalize_brave_web_results(payload)
-            ranked_results = self._rank_search_results(query, raw_results, preferred_mode=preferred_mode)
+        if not key_error:
+            try:
+                response = requests.get(
+                    self.brave_web_endpoint,
+                    headers=self._brave_headers(),
+                    params={
+                        "q": query,
+                        "count": min(max(max_results * 3, 5), 20),
+                    },
+                    timeout=self.timeout,
+                    allow_redirects=True,
+                )
+                response.raise_for_status()
+                payload = response.json() or {}
+
+                raw_results = self._normalize_brave_web_results(payload)
+                ranked_results = self._rank_search_results(query, raw_results, preferred_mode=preferred_mode)
+                final_results = ranked_results[:max_results]
+
+                if final_results:
+                    return {
+                        "ok": True,
+                        "query": query,
+                        "results": final_results,
+                        "summary": self._summarize_search_results(query, final_results),
+                        "source_type": "brave_web",
+                        "debug": {
+                            "preferred_mode": preferred_mode,
+                            "raw_results_count": len(raw_results),
+                            "ranked_results_count": len(final_results),
+                        },
+                    }
+
+                brave_error = "Brave returned no ranked results."
+
+            except requests.RequestException as e:
+                brave_error = f"Brave web request failed: {e}"
+            except Exception as e:
+                brave_error = f"Brave web parsing failed: {e}"
+        else:
+            brave_error = key_error
+
+        # -----------------------
+        # FALLBACK CHAIN
+        # -----------------------
+
+        fallback_results: List[dict] = []
+
+        # 1️⃣ DuckDuckGo fallback
+        ddg_results = self._duckduckgo_search(query, max_results=max_results)
+        print("DDG RESULTS COUNT:", len(ddg_results))
+
+        if ddg_results:
+            ranked_results = self._rank_search_results(
+                query,
+                ddg_results,
+                preferred_mode=preferred_mode
+            )
             final_results = ranked_results[:max_results]
 
             return {
@@ -798,31 +918,139 @@ class WebService:
                 "query": query,
                 "results": final_results,
                 "summary": self._summarize_search_results(query, final_results),
-                "source_type": "brave_web",
+                "source_type": "duckduckgo",
                 "debug": {
                     "preferred_mode": preferred_mode,
-                    "raw_results_count": len(raw_results),
+                    "brave_error": brave_error,
+                    "fallback_used": "duckduckgo",
                     "ranked_results_count": len(final_results),
                 },
             }
 
-        except requests.RequestException as e:
+        # 2️⃣ Bing fallback
+        bing_results = self._bing_search(query, max_results=max_results)
+
+        if bing_results:
+            ranked_results = self._rank_search_results(
+                query,
+                bing_results,
+                preferred_mode=preferred_mode
+            )
+            final_results = ranked_results[:max_results]
+
             return {
-                "ok": False,
+                "ok": True,
                 "query": query,
-                "results": [],
-                "summary": f"Brave web request failed: {e}",
-                "source_type": "brave_web",
-            }
-        except Exception as e:
-            return {
-                "ok": False,
-                "query": query,
-                "results": [],
-                "summary": f"Brave web parsing failed: {e}",
-                "source_type": "brave_web",
+                "results": final_results,
+                "summary": self._summarize_search_results(query, final_results),
+                "source_type": "bing",
+                "debug": {
+                    "preferred_mode": preferred_mode,
+                    "brave_error": brave_error,
+                    "fallback_used": "bing",
+                    "ranked_results_count": len(final_results),
+                },
             }
 
+
+        # 3️⃣ RSS news fallback
+        rss_results = self._news_rss_search(query, max_results=max_results)
+
+        if rss_results:
+            ranked_results = self._rank_search_results(
+                query,
+                rss_results,
+                preferred_mode=preferred_mode
+            )
+            final_results = ranked_results[:max_results]
+
+            return {
+                "ok": True,
+                "query": query,
+                "results": final_results,
+                "summary": self._summarize_search_results(query, final_results),
+                "source_type": "rss_news",
+                "debug": {
+                    "fallback_used": "rss_news",
+                },
+            }
+
+        # 3️⃣ Final fallback (Google link)
+        fallback_results.append({
+            "title": query.strip().title(),
+            "url": f"https://www.google.com/search?q={requests.utils.quote(query)}",
+            "snippet": "Live results available via search.",
+            "domain": "google.com",
+            "score": 50.0,
+        })
+
+        ranked_results = self._rank_search_results(
+            query,
+            fallback_results,
+            preferred_mode=preferred_mode
+        )
+        final_results = ranked_results[:max_results]
+
+        return {
+            "ok": True,
+            "query": query,
+            "results": final_results,
+            "summary": self._summarize_search_results(query, final_results),
+            "source_type": "fallback_web",
+            "debug": {
+                "preferred_mode": preferred_mode,
+                "brave_error": brave_error,
+                "fallback_used": "google_link",
+                "ranked_results_count": len(final_results),
+            },
+        }
+
+    def _bing_search(self, query: str, max_results: int = 5) -> List[dict]:
+        try:
+            url = "https://www.bing.com/search"
+            response = requests.get(
+                url,
+                params={"q": query},
+                headers=self._headers(),
+                timeout=self.timeout,
+                allow_redirects=True,
+            )
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.text, "html.parser")
+            results: List[dict] = []
+
+            for item in soup.select("li.b_algo"):
+                title_tag = item.find("h2")
+                link_tag = title_tag.find("a") if title_tag else None
+                snippet_tag = item.find("p")
+
+                if not link_tag:
+                    continue
+
+                title = self._clean_text(link_tag.get_text(" ", strip=True))
+                link = str(link_tag.get("href") or "").strip()
+                snippet = self._clean_text(snippet_tag.get_text(" ", strip=True) if snippet_tag else "")
+
+                if not title or not link:
+                    continue
+
+                results.append({
+                    "title": title[:200],
+                    "url": link,
+                    "snippet": snippet[:400],
+                    "domain": self._extract_domain(link),
+                })
+
+                if len(results) >= max_results * 3:
+                    break
+
+            return results
+
+        except Exception as e:
+            print("BING ERROR:", e)
+            return []
+   
     def search_news_api(self, query: str, max_results: int = 5) -> dict:
         key_error = self._check_api_key()
         if key_error:
@@ -835,27 +1063,21 @@ class WebService:
             }
 
         try:
-            response = requests.post(
+            response = requests.get(
                 self.brave_news_endpoint,
                 headers=self._brave_headers(),
-                json={
+                params={
                     "q": query,
                     "count": min(max(max_results * 3, 5), 50),
-                    "search_lang": "en",
-                    "country": "US",
-                    "safesearch": "moderate",
                 },
                 timeout=self.timeout,
+                allow_redirects=True,
             )
             response.raise_for_status()
             payload = response.json() or {}
 
             raw_results = self._normalize_brave_news_results(payload)
-            ranked_results = self._rank_search_results(
-                query,
-                raw_results,
-                preferred_mode="news",
-            )
+            ranked_results = self._rank_search_results(query, raw_results, preferred_mode="news")
             final_results = ranked_results[:max_results]
 
             if final_results:
@@ -912,12 +1134,9 @@ class WebService:
                 continue
 
             title = str(item.get("title") or item.get("name") or "").strip()
-            snippet = str(
-                item.get("snippet") or item.get("content") or item.get("body") or ""
-            ).strip()
+            snippet = str(item.get("snippet") or item.get("content") or item.get("body") or "").strip()
             url = str(item.get("url") or item.get("source_url") or "").strip()
             domain = str(item.get("domain") or "").strip()
-            score = item.get("score")
 
             if not (title or snippet or url):
                 continue
@@ -928,28 +1147,55 @@ class WebService:
                     "snippet": snippet,
                     "url": url,
                     "domain": domain,
-                    "score": score,
                 }
             )
 
         if not cleaned:
-            return f"No live results found for '{query}'."
+            return f"I couldn’t find strong live results for \"{query}\"."
 
-        lines: List[str] = []
+        top = cleaned[0]
+        title = top.get("title", "").strip()
+        snippet = top.get("snippet", "").strip()
+        url = top.get("url", "").strip()
+        domain = top.get("domain", "").strip()
 
-        for item in cleaned[:3]:
-            block: List[str] = []
-            if item["title"]:
-                block.append(item["title"])
-            if item["snippet"]:
-                block.append(item["snippet"])
-            if item["domain"]:
-                block.append(f"Source: {item['domain']}")
-            if item["url"]:
-                block.append(item["url"])
-            lines.append("\n".join(block).strip())
+        q_lower = query.lower()
 
-        return "\n\n".join(lines).strip()[:2000]
+        if any(word in q_lower for word in ("weather", "forecast", "temperature", "rain", "snow", "wind", "humidity")):
+            location_label = query
+            lowered_query = location_label.lower()
+
+            for prefix in ("weather in ", "weather for ", "forecast in ", "forecast for "):
+                if lowered_query.startswith(prefix):
+                    location_label = location_label[len(prefix):].strip()
+                    break
+
+            if not location_label:
+                location_label = "your area"
+
+            return f"Here’s the weather lookup for {location_label.title()}."
+
+        if any(word in q_lower for word in ("hours", "open now", "closing time", "address", "phone number", "location", "directions", "near me")):
+            return "Here’s a live business lookup with locations, hours, and contact details."
+
+        if any(word in q_lower for word in ("latest", "news", "current", "update", "updates", "recent", "breaking")):
+            if title and snippet:
+                return f"{title}\n{snippet}"
+            if title:
+                return title
+            if snippet:
+                return snippet
+
+        if title and snippet:
+            return f"{title}\n{snippet}"
+        if snippet:
+            return snippet
+        if title:
+            return title
+        if url:
+            return url
+
+        return f"Here’s what I found for \"{query}\"."
 
     # -----------------------
     # FETCH
@@ -1100,3 +1346,45 @@ class WebService:
                 "source_url": url,
             },
         }
+
+    def _news_rss_search(self, query: str, max_results: int = 5) -> List[dict]:
+        try:
+            url = "https://news.google.com/rss/search"
+            response = requests.get(
+                url,
+                params={"q": query, "hl": "en-US", "gl": "US", "ceid": "US:en"},
+                headers=self._headers(),
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.text, "xml")
+            items = soup.find_all("item")
+
+            results = []
+
+            for item in items:
+                title = self._clean_text(item.title.text if item.title else "")
+                link = self._clean_text(item.link.text if item.link else "")
+                snippet_html = item.description.text if item.description else ""
+                snippet = self._clean_text(
+                    BeautifulSoup(snippet_html, "html.parser").get_text(" ", strip=True)
+                )
+                if not title or not link:
+                    continue
+
+                results.append({
+                    "title": title[:200],
+                    "url": link,
+                    "snippet": snippet[:400],
+                    "domain": self._extract_domain(link),
+                })
+
+                if len(results) >= max_results * 3:
+                    break
+
+            return results
+
+        except Exception as e:
+            print("RSS ERROR:", e)
+            return []

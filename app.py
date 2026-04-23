@@ -1,13 +1,12 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import re
-import mimetypes
 from pathlib import Path
-from openai import OpenAI
+
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from flask_cors import CORS
-
+from bs4 import BeautifulSoup
 import uuid
 from werkzeug.utils import secure_filename
 from nova_backend.routes.memory_panel_routes import register_memory_panel_routes
@@ -24,6 +23,7 @@ from nova_backend.config import (
     WEB_TIMEOUT,
     RECON_TIMEOUT,
 )
+
 from nova_backend.services.session_service import SessionService
 from nova_backend.services.artifact_service import ArtifactService
 from nova_backend.services.memory_service import MemoryService
@@ -70,6 +70,11 @@ chat_service = ChatService(
     recon_service=recon_service,
 )
 
+print("CHAT SERVICE OBJ =", chat_service)
+print("CHAT SERVICE TYPE =", type(chat_service))
+print("CHAT SERVICE MODULE =", type(chat_service).__module__)
+print("CHAT SERVICE HAS HANDLE =", hasattr(chat_service, "handle"))
+print("CHAT SERVICE DIR HAS HANDLE =", "handle" in dir(chat_service))
 
 # -----------------------
 # HELPERS
@@ -246,6 +251,23 @@ def memory_exists_for_session(session_id: str, fact_text: str) -> bool:
         return False
     return any(pattern.search(text) for pattern in IDENTITY_QUESTION_PATTERNS)
 
+
+def extract_name_from_memory_text(text: str) -> str:
+    raw = str(text or "").strip()
+    if not raw:
+        return ""
+
+    for pattern in NAME_MEMORY_PATTERNS:
+        match = pattern.search(raw)
+        if match:
+            name = str(match.group(1) or "").strip()
+            name = re.sub(r"[^\w\s'\-]", "", name).strip()
+            if name:
+                return _clean_fact_value(name)
+
+    return ""
+
+
 def find_best_name_memory(session_id: str) -> dict | None:
     target_session = str(session_id or "").strip()
     all_memory = memory_service.all() or []
@@ -310,6 +332,40 @@ def find_best_name_memory(session_id: str) -> dict | None:
         reverse=True,
     )
     return candidates[0]
+
+
+    match = find_best_name_memory(session_id=session_id)
+
+    payload = build_common_state_payload(session_id=session_id)
+
+    if match:
+        name = match["name"]
+        item = match["item"]
+
+        payload.update(
+            {
+                "assistant_message": {
+                    "role": "assistant",
+                },
+                "debug": {
+                    "decision": decision,
+                },
+            }
+        )
+        return json_ok(**payload)
+
+    payload.update(
+        {
+            "assistant_message": {
+                "role": "assistant",
+                "text": "I don’t know your name yet. Tell me with “my name is …” and I’ll remember it.",
+            },
+            "debug": {
+                "decision": decision,
+            },
+        },
+    )
+    return json_ok(**payload)
 
 # ==============================
 # ==============================
@@ -426,38 +482,32 @@ def score_name_memory(item: dict, session_id: str) -> float:
 
     return score
 
-def build_name_lookup_response(session_id: str, decision: dict) -> Any:
-    match = find_best_name_memory(session_id=session_id)
-    payload = build_common_state_payload(session_id=session_id)
 
-    if match:
-        name = match["name"]
+def find_best_name_memory(session_id: str) -> dict | None:
+    items = get_memory_items()
+    candidates = []
 
-        payload.update(
-            {
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": f"Your name is {name}.",
-                },
-                "debug": {
-                    "decision": decision,
-                },
-            }
-        )
-        return json_ok(**payload)
+    for item in items:
+        score = score_name_memory(item, session_id)
+        if score <= -9999.0:
+            continue
 
-    payload.update(
-        {
-            "assistant_message": {
-                "role": "assistant",
-                "text": 'I don\'t know your name yet. Tell me with "my name is ..." and I\'ll remember it.',
-            },
-            "debug": {
-                "decision": decision,
-            },
-        }
+        candidates.append({
+            "item": item,
+            "score": score,
+            "updated_at": str(item.get("updated_at") or item.get("created_at") or ""),
+            "name": extract_name_from_memory_text(item.get("text", "")),
+        })
+
+    if not candidates:
+        return None
+
+    candidates.sort(
+        key=lambda x: (x["score"], x["updated_at"]),
+        reverse=True,
     )
-    return json_ok(**payload)
+    return candidates[0]
+
 
 def cleanup_competing_name_memories(session_id: str, winning_text: str):
     target_session = str(session_id or "").strip()
@@ -556,6 +606,56 @@ def api_chat():
 
     lowered = user_text.lower()
 
+    # 🔒 HARD ROUTE LOCK (stability first)
+    if any(x in lowered for x in [
+        "weather", "forecast", "temperature", "rain", "snow", "wind", "humidity"
+    ]):
+        decision["route"] = "web_search"
+
+    elif any(x in lowered for x in [
+        "hours", "open now", "closing time", "address",
+        "phone number", "location", "directions", "near me"
+    ]):
+        decision["route"] = "web_search"
+
+    elif any(x in lowered for x in [
+        "price", "btc", "bitcoin", "crypto", "market cap"
+    ]):
+        decision["route"] = "web_search"
+
+    elif any(x in lowered for x in [
+        "latest", "news", "current", "update", "who is", "what is", "tell me about"
+    ]):
+        decision["route"] = "web_search"
+
+    # FORCE WEB SEARCH FOR COMMON QUERIES
+    if any(x in lowered for x in [
+        "news",
+        "latest",
+        "price",
+        "who is",
+        "what is",
+        "tell me about",
+        "current",
+        "update",
+        "weather",
+        "forecast",
+        "temperature",
+        "rain",
+        "snow",
+        "wind",
+        "humidity",
+        "hours",
+        "open now",
+        "closing time",
+        "address",
+        "phone number",
+        "location",
+        "directions",
+        "near me",
+    ]):
+        decision["route"] = "web_search"
+
     has_url = (
         "http://" in lowered
         or "https://" in lowered
@@ -571,23 +671,10 @@ def api_chat():
         or lowered.startswith("news ")
         or lowered.startswith("current ")
         or lowered.startswith("today ")
-        or lowered.startswith("price ")
-        or lowered.startswith("who is ")
-        or lowered.startswith("what is ")
-        or lowered.startswith("show me ")
-        or lowered.startswith("tell me about ")
-        or lowered.endswith(" news")
-        or lowered.endswith(" price")
         or " latest " in lowered
         or " news " in lowered
         or " current " in lowered
         or " today " in lowered
-        or " price " in lowered
-        or " stock " in lowered
-        or " weather " in lowered
-        or " update " in lowered
-        or " president of " in lowered
-        or " ceo of " in lowered
     )
 
     if has_url:
@@ -603,8 +690,7 @@ def api_chat():
         decision["route"] = "web"
 
     elif looks_like_web_search:
-        decision["route"] = "chat"
-        decision["force_web"] = False
+        decision["route"] = "web_search"
 
     try:
         # identity recall
@@ -620,7 +706,7 @@ def api_chat():
             else:
                 payload["assistant_message"] = {
                     "role": "assistant",
-                    "text": "I don't know your name yet.",
+                    "text": "I don’t know your name yet.",
                 }
 
             payload["debug"] = {
@@ -636,47 +722,26 @@ def api_chat():
             result = web_service.search(query)
 
             if not isinstance(result, dict):
-                return json_error("Web search returned an invalid result", 500)
-
+                return json_error("Invalid web result", 500)
             if not result.get("ok"):
-                return json_error(
-                    result.get("error") or "Web search failed",
-                    500,
-                    web_result=result,
+                payload = build_common_state_payload(session_id=session_id)
+                payload.update(
+                    {
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": str(
+                                result.get("summary")
+                                or f'Web search failed for "{query}".'
+                            ),
+                        },
+                        "web_result": result,
+                        "debug": {
+                            "decision": decision,
+                            "route_taken": "web_search_soft_fail",
+                        },
+                    }
                 )
-
-            summary = str(result.get("summary") or "").strip()
-            results = result.get("results") if isinstance(result.get("results"), list) else []
-
-            if not summary and results:
-                summary = "\n\n".join(
-                    filter(
-                        None,
-                        [
-                            "\n".join(
-                                filter(
-                                    None,
-                                    [
-                                        str(item.get("title") or "").strip(),
-                                        str(
-                                            item.get("snippet")
-                                            or item.get("content")
-                                            or item.get("body")
-                                            or ""
-                                        ).strip(),
-                                        str(item.get("url") or item.get("source_url") or "").strip(),
-                                    ],
-                                )
-                            ).strip()
-                            for item in results[:5]
-                            if isinstance(item, dict)
-                        ],
-                    )
-                ).strip()
-
-            if not summary:
-                summary = ""
-
+                return json_ok(**payload)
             artifact_payload = web_service.build_search_artifact_payload(result)
 
             payload = build_common_state_payload(session_id=session_id)
@@ -684,7 +749,30 @@ def api_chat():
                 {
                     "assistant_message": {
                         "role": "assistant",
-                        "text": summary or f'Web search completed for "{query}".',
+                        "text": (
+                            str(
+                                result.get("summary")
+                                or f'Web search completed for "{query}".'
+                            ).strip()
+                            + (
+                                "\n\nTop sources:\n"
+                                + "\n\n".join(
+                                    [
+                                        (
+                                            f"{i + 1}. {str(r.get('title') or '').strip()}\n"
+                                            f"{str(r.get('snippet') or '').strip()}\n"
+                                            f"{str(r.get('url') or '').strip()}"
+                                        ).strip()
+                                        for i, r in enumerate(
+                                            (result.get("results") or [])[:3]
+                                        )
+                                        if isinstance(r, dict)
+                                    ]
+                                )
+                                if result.get("results")
+                                else ""
+                            )
+                        ),
                     },
                     "saved_artifact": artifact_payload,
                     "web_result": result,
@@ -695,12 +783,47 @@ def api_chat():
                 }
             )
             return json_ok(**payload)
+        # web route
+        if decision.get("route") == "web":
+            url = str(decision.get("url") or "").strip()
+            if not url:
+                return json_error("URL could not be determined", 400)
+
+            result = web_service.fetch(url)
+
+        # recon route
+        if decision.get("route") == "recon":
+            url = str(decision.get("url") or "").strip()
+            if not url:
+                return json_error("Recon route selected but no URL was found", 400)
+
+            result = recon_service.analyze_target(url)
+
             if not result.get("ok"):
-                return json_error(
-                    result.get("error") or "Web search failed",
-                    500,
-                    web_result=result,
-                )
+                return json_error(result.get("error") or "Recon failed", 500)
+
+            artifact_payload = recon_service.build_artifact_payload(result)
+
+            payload = build_common_state_payload(session_id=session_id)
+            payload.update(
+                {
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            result.get("summary")
+                            or result.get("preview")
+                            or f"Recon complete for {url}"
+                        ),
+                    },
+                    "saved_artifact": artifact_payload,
+                    "recon_result": result,
+                    "debug": {
+                        "decision": decision,
+                        "route_taken": "recon",
+                    },
+                }
+            )
+            return json_ok(**payload)
 
         # default chat
         result = chat_service.handle(
@@ -717,22 +840,8 @@ def api_chat():
                 }
             }
 
-        existing_debug = result.get("debug") if isinstance(result.get("debug"), dict) else {}
-        saved_artifact = result.get("saved_artifact")
-
-        raw_assistant = result.get("assistant_message")
-        if not isinstance(raw_assistant, dict):
-            raw_assistant = {}
-
-        final_text = str(raw_assistant.get("text") or "").strip()
-        if not final_text:
-            final_text = "⚠️ BLANK_REPLY_FROM_BACKEND"
-
-        assistant_message = dict(raw_assistant)
-        assistant_message["role"] = "assistant"
-        assistant_message["text"] = final_text
-
         # persist artifact with readable text for UI
+        saved_artifact = result.get("saved_artifact")
         if isinstance(saved_artifact, dict):
             try:
                 artifact_payload = dict(saved_artifact)
@@ -742,7 +851,7 @@ def api_chat():
                     or artifact_payload.get("body")
                     or artifact_payload.get("analysis_text")
                     or ((artifact_payload.get("viewer") or {}).get("body"))
-                    or final_text
+                    or ((result.get("assistant_message") or {}).get("text"))
                     or "Generated artifact"
                 )
 
@@ -765,7 +874,36 @@ def api_chat():
                 result.setdefault("debug", {})
                 result["debug"]["artifact_persist_error"] = str(e)
 
-        # attach image to chat message
+        existing_debug = result.get("debug") if isinstance(result.get("debug"), dict) else {}
+        saved_artifact = result.get("saved_artifact")
+
+        session_payload = result.get("session")
+        if not isinstance(session_payload, dict):
+            session_payload = session_service.get_session(session_id) or {}
+
+        session_messages = session_payload.get("messages") if isinstance(session_payload.get("messages"), list) else []
+
+        final_text = ""
+        for msg in reversed(session_messages):
+            if not isinstance(msg, dict):
+                continue
+            if str(msg.get("role") or "").strip().lower() != "assistant":
+                continue
+
+            candidate = str(msg.get("text") or "").strip()
+            if candidate and candidate.lower() != "none":
+                final_text = candidate
+                break
+
+        if not final_text:
+            final_text = "I'm here. Tell me what you need."
+
+        assistant_message = {
+            "role": "assistant",
+            "text": final_text,
+        }
+
+        # ATTACH IMAGE TO CHAT MESSAGE
         if isinstance(assistant_message, dict) and isinstance(saved_artifact, dict):
             image_url = (
                 saved_artifact.get("image_url")
@@ -796,7 +934,6 @@ def api_chat():
                 **existing_debug,
                 "decision": decision,
                 "route_taken": "chat",
-                "forced_final_text": final_text,
             },
         }
 
@@ -1117,27 +1254,51 @@ def api_recon_analyze():
         artifact=recon_service.build_artifact_payload(result),
     )
 
-@app.post("/api/voice/reply")
-def api_voice_reply():
-    return jsonify({
-        "ok": False,
-        "error": "TTS disabled",
-    }), 503
+@app.post("/api/upload")
+def api_upload():
+    try:
+        if "file" not in request.files:
+            return jsonify({
+                "ok": False,
+                "error": "No file provided.",
+            }), 400
 
-def cleanup_uploads(upload_dir, max_files=50):
-    import os
-    files = [
-        os.path.join(upload_dir, f)
-        for f in os.listdir(upload_dir)
-        if os.path.isfile(os.path.join(upload_dir, f))
-    ]
-    files.sort(key=os.path.getmtime, reverse=True)
+        file = request.files["file"]
+        if not file or not getattr(file, "filename", ""):
+            return jsonify({
+                "ok": False,
+                "error": "Empty file.",
+            }), 400
 
-    for f in files[max_files:]:
-        try:
-            os.remove(f)
-        except:
-            pass
+        original_name = os.path.basename(str(file.filename or "upload"))
+        safe_name = secure_filename(original_name) or "upload.bin"
+
+        base, ext = os.path.splitext(safe_name)
+        ext = ext or ""
+        final_name = f"{base}_{uuid.uuid4().hex}{ext}"
+
+        save_path = UPLOADS_DIR / final_name
+        file.save(str(save_path))
+
+        mime_type = getattr(file, "mimetype", None) or "application/octet-stream"
+        size = save_path.stat().st_size if save_path.exists() else 0
+
+        return jsonify({
+            "ok": True,
+            "filename": final_name,
+            "original_filename": original_name,
+            "file_url": f"/api/uploads/{final_name}",
+            "url": f"/api/uploads/{final_name}",
+            "mime_type": mime_type,
+            "size": size,
+        })
+    except Exception as e:
+        app.logger.exception("api_upload failed")
+        return jsonify({
+            "ok": False,
+            "error": str(e),
+        }), 500
+
 # -----------------------
 # UPLOADS
 # -----------------------
@@ -1224,81 +1385,8 @@ def api_uploads(filename: str):
             "error": str(e),
             "filename": str(filename or ""),
         }), 500
-
-@app.route("/api/voice/transcribe", methods=["POST"])
-def voice_transcribe():
-    temp_path = None
-
-    try:
-        uploaded = request.files.get("file")
-        if not uploaded:
-            return jsonify({"ok": False, "error": "No audio file provided."}), 400
-
-        original_name = str(uploaded.filename or "voice.webm").strip() or "voice.webm"
-        ext = os.path.splitext(original_name)[1].lower().strip()
-
-        allowed_exts = {".webm", ".wav", ".mp3", ".m4a", ".mp4", ".mpeg", ".mpga", ".ogg"}
-        if ext not in allowed_exts:
-            ext = ".webm"
-
-        temp_name = f"voice_in_{uuid.uuid4().hex}{ext}"
-        temp_path = os.path.join(str(UPLOADS_DIR), temp_name)
-
-        uploaded.save(temp_path)
-
-        if not os.path.exists(temp_path):
-            return jsonify({"ok": False, "error": "Saved audio file is missing."}), 500
-
-        file_size = os.path.getsize(temp_path)
-        if file_size <= 0:
-            return jsonify({"ok": False, "error": "Recorded audio file is empty."}), 400
-
-        from openai import OpenAI
-        client = OpenAI()
-
-        mime_type = str(getattr(uploaded, "mimetype", "") or "").lower()
-
-        with open(temp_path, "rb") as audio_file:
-            transcript = client.audio.transcriptions.create(
-                model="gpt-4o-mini-transcribe",
-                file=audio_file,
-            )
-
-        text = ""
-        if hasattr(transcript, "text"):
-            text = str(transcript.text or "").strip()
-        elif isinstance(transcript, dict):
-            text = str(transcript.get("text") or "").strip()
-        else:
-            text = str(transcript or "").strip()
-
-        return jsonify({
-            "ok": True,
-            "text": text,
-            "debug": {
-                "filename": original_name,
-                "saved_path": temp_path,
-                "size": file_size,
-                "mime_type": mime_type,
-            },
-        })
-
-    except Exception as e:
-        print("VOICE TRANSCRIBE ERROR:", str(e))
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-    finally:
-        try:
-            if temp_path and os.path.exists(temp_path):
-                os.remove(temp_path)
-        except Exception:
-            pass
-
 # -----------------------
 # MAIN
 # -----------------------
 if __name__ == "__main__":
     app.run(debug=False, port=5001)
-
-
-
