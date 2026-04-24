@@ -1956,16 +1956,30 @@ const imageHtml = imageUrl
   ? '<img src="' + escapeHtml(imageUrl) + '" class="nova-source-preview-image" alt="Article image">'
   : "";
 
-const summary = escapeHtml(
-  (data.result && data.result.summary) || "No summary available"
-);
+const rawSummary =
+  (data.result && data.result.summary) || "No summary available";
+
+const summaryParts = String(rawSummary)
+  .split(/(?<=[.!?])\s+|\n+|•|- /)
+  .filter(function (line) {
+    return line && line.trim().length > 20;
+  })
+  .slice(0, 3);
+
+const summaryHtml = summaryParts.length
+  ? '<ul class="nova-source-summary-list">' +
+      summaryParts.map(function (line) {
+        return '<li>' + escapeHtml(line) + '</li>';
+      }).join("") +
+    '</ul>'
+  : '<p>No summary available</p>';
 
         els.railViewer.innerHTML =
           '<div class="nova-viewer-shell">' +
             '<div class="nova-viewer-title">' + safeTitle + '</div>' +
             '<div class="nova-viewer-body">' +
               imageHtml +
-		'<p>' + summary + '</p>' +
+	      summaryHtml +
               '<br>' +
               '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">' +
                 'Open full article' +
