@@ -743,36 +743,15 @@ def api_chat():
                 )
                 return json_ok(**payload)
             artifact_payload = web_service.build_search_artifact_payload(result)
-
             payload = build_common_state_payload(session_id=session_id)
             payload.update(
                 {
                     "assistant_message": {
                         "role": "assistant",
-                        "text": (
-                            str(
-                                result.get("summary")
-                                or f'Web search completed for "{query}".'
-                            ).strip()
-                            + (
-                                "\n\nTop sources:\n"
-                                + "\n\n".join(
-                                    [
-                                        (
-                                            f"{i + 1}. {str(r.get('title') or '').strip()}\n"
-                                            f"{str(r.get('snippet') or '').strip()}\n"
-                                            f"{str(r.get('url') or '').strip()}"
-                                        ).strip()
-                                        for i, r in enumerate(
-                                            (result.get("results") or [])[:3]
-                                        )
-                                        if isinstance(r, dict)
-                                    ]
-                                )
-                                if result.get("results")
-                                else ""
-                            )
-                        ),
+                        "text": str(
+                            result.get("summary")
+                            or f'Web search completed for "{query}".'
+                        ).strip(),
                     },
                     "saved_artifact": artifact_payload,
                     "web_result": result,

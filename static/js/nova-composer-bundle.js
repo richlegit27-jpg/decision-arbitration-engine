@@ -1919,7 +1919,7 @@ function renderSessionList() {
 document.querySelectorAll(".source-row").forEach(function (el) {
   el.addEventListener("click", async function () {
     const url = el.getAttribute("data-url");
-    const title = el.getAttribute("data-title") || "Source";
+    const title = el.getAttribute("data-title") || el.getAttribute("data-preview") || "Source";
 
     if (!url) return;
 
@@ -1937,7 +1937,7 @@ document.querySelectorAll(".source-row").forEach(function (el) {
         '</div>';
 
       try {
-        const res = await fetch("/api/fetch", {
+       const res = await fetch("/api/web/fetch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url })
@@ -1945,13 +1945,27 @@ document.querySelectorAll(".source-row").forEach(function (el) {
 
         const data = await res.json();
 
-        const summary = escapeHtml(data.summary || "No summary available");
+const imageUrl =
+  data.result &&
+  Array.isArray(data.result.images) &&
+  data.result.images.length
+    ? data.result.images[0].url
+    : "";
+
+const imageHtml = imageUrl
+  ? '<img src="' + escapeHtml(imageUrl) + '" class="nova-source-preview-image" alt="Article image">'
+  : "";
+
+const summary = escapeHtml(
+  (data.result && data.result.summary) || "No summary available"
+);
 
         els.railViewer.innerHTML =
           '<div class="nova-viewer-shell">' +
             '<div class="nova-viewer-title">' + safeTitle + '</div>' +
             '<div class="nova-viewer-body">' +
-              '<p>' + summary + '</p>' +
+              imageHtml +
+		'<p>' + summary + '</p>' +
               '<br>' +
               '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">' +
                 'Open full article' +

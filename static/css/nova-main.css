@@ -9351,3 +9351,42 @@ button.nova-button {
   margin-top: 6px;
   word-break: break-all;
 }
+
+.source-row {
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.source-row:hover img {
+  opacity: 1;
+}
+
+.source-row:hover .source-name {
+  text-decoration: underline;
+}
+
+.source-row {
+  position: relative;
+}
+
+.source-row::after {
+  content: attr(data-preview);
+  display: none;
+  position: absolute;
+  left: 24px;
+  top: 24px;
+  z-index: 9999;
+  max-width: 360px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 15, 20, 0.96);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.35;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  white-space: normal;
+}
+
+.source-row:hover::after {
+  display: block;
+}

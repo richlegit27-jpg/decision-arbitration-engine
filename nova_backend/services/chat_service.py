@@ -846,6 +846,94 @@ class ChatService:
         except Exception as e:
             print("MEMORY WRITE FAILED:", e)
 
+    def answer_from_web_results(self, query: str, results: list[dict] | None = None) -> str:
+        query = str(query or "").strip()
+        items = results if isinstance(results, list) else []
+
+        cleaned: list[dict] = []
+        for item in items[:5]:
+            if not isinstance(item, dict):
+                continue
+
+            title = str(item.get("title") or "").strip()
+            snippet = str(item.get("snippet") or "").strip()
+            url = str(item.get("url") or "").strip()
+            domain = str(item.get("domain") or "").strip()
+
+            if not (title or snippet or url):
+                continue
+
+            cleaned.append(
+                {
+                    "title": title,
+                    "snippet": snippet,
+                    "url": url,
+                    "domain": domain,
+                }
+            )
+
+        if not cleaned:
+            return f'I couldn’t find strong live results for "{query}".'
+
+        context_blocks: list[str] = []
+        for idx, item in enumerate(cleaned, start=1):
+            parts: list[str] = []
+            if item["title"]:
+                parts.append(f"Title: {item['title']}")
+            if item["snippet"]:
+                parts.append(f"Snippet: {item['snippet']}")
+            if item["domain"]:
+                parts.append(f"Source: {item['domain']}")
+            if item["url"]:
+                parts.append(f"URL: {item['url']}")
+            context_blocks.append(f"[Result {idx}]\n" + "\n".join(parts))
+
+        web_context = "\n\n".join(context_blocks)
+
+        system_prompt = (
+            "You are answering a user's web question using retrieved live results. "
+            "Write a direct, useful answer in plain language. "
+            "Do not say 'based on the search results' or 'I found'. "
+            "If the results are weak, be honest but still give the best concise answer possible. "
+            "Do not invent facts beyond the provided results. "
+            "Keep it short and natural."
+        )
+
+        user_prompt = (
+            f"User question:\n{query}\n\n"
+            f"Live web results:\n{web_context}\n\n"
+            "Write the answer now."
+        )
+
+        try:
+            response = self.client.responses.create(
+                model=self.model,
+                input=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+
+            text = ""
+            if hasattr(response, "output_text") and response.output_text:
+                text = str(response.output_text).strip()
+            else:
+                text = str(response).strip()
+
+            if text:
+                return text
+
+        except Exception:
+            pass
+
+        top = cleaned[0]
+        fallback_parts = []
+        if top.get("title"):
+            fallback_parts.append(str(top["title"]))
+        if top.get("snippet"):
+            fallback_parts.append(str(top["snippet"]))
+        return "\n".join(fallback_parts).strip() or f'Here’s what I found for "{query}".'
+
     # =========================
     # EXECUTION GUARD HELPERS (STEP TRUTH ENFORCEMENT)
     # =========================
@@ -1389,6 +1477,31 @@ class ChatService:
             decision["reasons"].append("empty_input")
             return decision
 
+        # HARD LOCK: planning requests always win first
+        planning_phrases = (
+            "make a plan",
+            "create a plan",
+            "build a plan",
+            "plan this",
+            "plan it",
+            "give me a plan",
+            "step by step plan",
+            "next steps",
+        )
+        if lowered in planning_phrases or self._looks_like_planning(text):
+            decision.update(
+                {
+                    "route": self.ROUTE_PLANNING,
+                    "mode": "planning",
+                    "confidence": 0.99,
+                    "save_artifact": True,
+                    "save_memory": False,
+                    "use_memory": True,
+                }
+            )
+            decision["reasons"].append("planning_hard_lock")
+            return decision
+
         if self._is_image_generation_request(user_text):
             decision.update(
                 {
@@ -1442,18 +1555,6 @@ class ChatService:
                 }
             )
             decision["reasons"].append("memory_recall_trigger")
-            return decision
-
-        if self._looks_like_planning(text):
-            decision.update(
-                {
-                    "route": self.ROUTE_PLANNING,
-                    "mode": "planning",
-                    "confidence": 0.78,
-                    "save_artifact": True,
-                }
-            )
-            decision["reasons"].append("planning_trigger")
             return decision
 
         decision["reasons"].append("default_general_chat")
@@ -1735,6 +1836,7 @@ class ChatService:
             items = sessions.get("sessions")
             if not isinstance(items, list):
                 return
+            sessions["sessions"] = items
             wrapped = True
         elif isinstance(sessions, list):
             items = sessions
@@ -1757,14 +1859,13 @@ class ChatService:
         if not updated:
             return
 
-try:
-    if wrapped:
-        sessions["sessions"] = items
-        self.session_service.save_sessions(sessions)
-    else:
-        self.session_service.save_sessions(items)
-except Exception as e:
-    print("PERSIST EXECUTION SAVE SESSIONS FAILED:", e)
+        try:
+            if wrapped:
+                self.session_service.save_sessions(sessions)
+            else:
+                self.session_service.save_sessions(items)
+        except Exception as e:
+            print("PERSIST EXECUTION SAVE SESSIONS FAILED:", e)
 
     def _find_latest_execution_artifact(self, session_id: str = ""):
         session_id = self._safe_str(session_id)
@@ -4040,7 +4141,7 @@ Write the exact goal in one sentence.
                 ]
 
                 if any(g in normalized for g in blocked_model_greetings):
-                    assistant_text = "Say the task directly and I’ll act on it."
+                    assistant_text = "I'm here. Tell me what you need."
 
                 print("DEBUG _run_chat_model final =", repr(assistant_text))
                 return assistant_text
