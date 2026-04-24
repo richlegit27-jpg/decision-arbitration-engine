@@ -408,7 +408,11 @@ class WebService:
             if route == "business_lookup":
                 return self.lookup_business(query, max_results=max_results)
 
-            return self.search_web_api(query, max_results=max_results, preferred_mode="general")
+            return self.search_web_api(
+                query,
+                max_results=max_results,
+                preferred_mode="news" if self._looks_like_news_query(query) else "general",
+            )
 
         except Exception as e:
             return {
@@ -895,6 +899,180 @@ class WebService:
         else:
             brave_error = key_error
 
+        ddg_results = self._duckduckgo_search(query, max_results=max_results)
+
+        if ddg_results:
+            ranked_results = self._rank_search_results(query, ddg_results, preferred_mode=preferred_mode)
+            final_results = ranked_results[:max_results]
+
+            return {
+                "ok": True,
+                "query": query,
+                "results": final_results,
+                "summary": self._summarize_search_results(query, final_results),
+                "source_type": "duckduckgo",
+                "debug": {
+                    "preferred_mode": preferred_mode,
+                    "brave_error": brave_error,
+                    "fallback_used": "duckduckgo",
+                    "ranked_results_count": len(final_results),
+                },
+            }
+
+        bing_results = self._bing_search(query, max_results=max_results)
+
+        if bing_results:
+            ranked_results = self._rank_search_results(query, bing_results, preferred_mode=preferred_mode)
+            final_results = ranked_results[:max_results]
+
+            return {
+                "ok": True,
+                "query": query,
+                "results": final_results,
+                "summary": self._summarize_search_results(query, final_results),
+                "source_type": "bing",
+                "debug": {
+                    "preferred_mode": preferred_mode,
+                    "brave_error": brave_error,
+                    "fallback_used": "bing",
+                    "ranked_results_count": len(final_results),
+                },
+            }
+
+        rss_results = []
+        if preferred_mode == "news" and self._looks_like_news_query(query):
+            rss_results = self._news_rss_search(query, max_results=max_results)
+
+        if rss_results:
+            ranked_results = self._rank_search_results(query, rss_results, preferred_mode=preferred_mode)
+            final_results = ranked_results[:max_results]
+
+            return {
+                "ok": True,
+                "query": query,
+                "results": final_results,
+                "summary": self._summarize_search_results(query, final_results),
+                "source_type": "rss_news",
+                "debug": {
+                    "preferred_mode": preferred_mode,
+                    "brave_error": brave_error,
+                    "fallback_used": "rss_news",
+                    "ranked_results_count": len(final_results),
+                },
+            }
+
+        fallback_results: List[dict] = []
+
+        if preferred_mode == "weather":
+            fallback_results.append({
+                "title": query.strip().title(),
+                "url": f"https://www.google.com/search?q={requests.utils.quote(query)}",
+                "snippet": "Current weather and forecast lookup.",
+                "domain": "google.com",
+                "score": 70.0,
+            })
+        elif preferred_mode == "business":
+            fallback_results.append({
+                "title": query.strip().title(),
+                "url": f"https://www.google.com/maps/search/{requests.utils.quote(query)}",
+                "snippet": "Nearby locations, hours, directions, and contact details.",
+                "domain": "google.com",
+                "score": 70.0,
+            })
+        else:
+            fallback_results.append({
+                "title": query.strip().title(),
+                "url": f"https://www.google.com/search?q={requests.utils.quote(query)}",
+                "snippet": "Live results available via search.",
+                "domain": "google.com",
+                "score": 50.0,
+            })
+
+        ranked_results = self._rank_search_results(query, fallback_results, preferred_mode=preferred_mode)
+        final_results = ranked_results[:max_results]
+
+        return {
+            "ok": True,
+            "query": query,
+            "results": final_results,
+            "summary": self._summarize_search_results(query, final_results),
+            "source_type": "fallback_web",
+            "debug": {
+                "preferred_mode": preferred_mode,
+                "brave_error": brave_error,
+                "fallback_used": "google_link",
+                "ranked_results_count": len(final_results),
+            },
+        }
+
+    def _clean_source_name(self, item: dict) -> str:
+        source = (
+            item.get("source")
+            or item.get("publisher")
+            or item.get("site")
+            or item.get("domain")
+            or ""
+        )
+
+        source = str(source).strip()
+
+        if not source:
+            title = str(item.get("title") or "").strip()
+            if " - " in title:
+                source = title.rsplit(" - ", 1)[-1].strip()
+
+        if source.lower() in {"news.google.com", "google news", "google"}:
+            title = str(item.get("title") or "").strip()
+            if " - " in title:
+                source = title.rsplit(" - ", 1)[-1].strip()
+
+        if source:
+            source = source.strip()
+
+            # normalize casing
+            source = source.replace(".com", "")
+            source = " ".join(word.capitalize() for word in source.split())
+
+        return source or "Source"
+
+    def _clean_result_title(self, item: dict) -> str:
+        title = str(item.get("title") or "").strip()
+
+        if " - " in title:
+            title = title.rsplit(" - ", 1)[0].strip()
+
+        return title
+
+    def _clean_result_snippet(self, item: dict, clean_title: str) -> str:
+        snippet = str(
+            item.get("snippet")
+            or item.get("description")
+            or item.get("summary")
+            or ""
+        ).strip()
+
+        if not snippet:
+            return ""
+
+        snippet_clean = snippet.lower().strip()
+        title_clean = clean_title.lower().strip()
+
+        # exact duplicate
+        if snippet_clean == title_clean:
+            return ""
+
+        # snippet starts with title (common RSS duplication)
+        if snippet_clean.startswith(title_clean):
+            extra = snippet[len(clean_title):].strip()
+            # if only small leftover (like source name), drop it
+            if len(extra) <= 50:
+                return ""
+
+        return snippet
+    def _is_google_news_redirect(self, url: str) -> bool:
+        url = str(url or "").strip().lower()
+        return "news.google.com/rss/articles/" in url or "news.google.com/articles/" in url
+
         # -----------------------
         # FALLBACK CHAIN
         # -----------------------
@@ -952,9 +1130,10 @@ class WebService:
                 },
             }
 
-
-        # 3️⃣ RSS news fallback
-        rss_results = self._news_rss_search(query, max_results=max_results)
+        # 3️⃣ RSS news fallback — only for real news/latest queries
+        rss_results = []
+        if preferred_mode == "news" and self._looks_like_news_query(query):
+            rss_results = self._news_rss_search(query, max_results=max_results)
 
         if rss_results:
             ranked_results = self._rank_search_results(
@@ -975,14 +1154,33 @@ class WebService:
                 },
             }
 
-        # 3️⃣ Final fallback (Google link)
-        fallback_results.append({
-            "title": query.strip().title(),
-            "url": f"https://www.google.com/search?q={requests.utils.quote(query)}",
-            "snippet": "Live results available via search.",
-            "domain": "google.com",
-            "score": 50.0,
-        })
+        # 4️⃣ Final fallback
+        if preferred_mode == "weather":
+            fallback_results.append({
+                "title": query.strip().title(),
+                "url": f"https://www.google.com/search?q={requests.utils.quote(query)}",
+                "snippet": "Current weather and forecast lookup.",
+                "domain": "google.com",
+                "score": 70.0,
+            })
+
+        elif preferred_mode == "business":
+            fallback_results.append({
+                "title": query.strip().title(),
+                "url": f"https://www.google.com/maps/search/{requests.utils.quote(query)}",
+                "snippet": "Nearby locations, hours, directions, and contact details.",
+                "domain": "google.com",
+                "score": 70.0,
+            })
+
+        else:
+            fallback_results.append({
+                "title": query.strip().title(),
+                "url": f"https://www.google.com/search?q={requests.utils.quote(query)}",
+                "snippet": "Live results available via search.",
+                "domain": "google.com",
+                "score": 50.0,
+            })
 
         ranked_results = self._rank_search_results(
             query,
@@ -1154,11 +1352,30 @@ class WebService:
             return f"I couldn’t find strong live results for \"{query}\"."
 
         top = cleaned[0]
-        title = top.get("title", "").strip()
-        snippet = top.get("snippet", "").strip()
-        url = top.get("url", "").strip()
-        domain = top.get("domain", "").strip()
 
+        title = self._clean_result_title(top)
+        source = self._clean_source_name(top)
+        snippet = self._clean_result_snippet(top, title)
+
+        lines = []
+
+        lines.append(title)
+
+        if snippet:
+            lines.append(snippet)
+
+        lines.append(f"Source: {source}")
+        lines.append("")
+        lines.append("— Top sources —")
+
+        for idx, item in enumerate(cleaned[:5], start=1):
+            item_title = self._clean_result_title(item)
+            item_source = self._clean_source_name(item)
+            item_url = str(item.get("url") or "").strip()
+
+            lines.append(f"{idx}. {item_source} — {item_title}")
+
+        return "\n".join(lines).strip()
         q_lower = query.lower()
 
         if any(word in q_lower for word in ("weather", "forecast", "temperature", "rain", "snow", "wind", "humidity")):
@@ -1347,40 +1564,81 @@ class WebService:
             },
         }
 
-    def _news_rss_search(self, query: str, max_results: int = 5) -> List[dict]:
+    def _resolve_google_news_url(self, url: str) -> str:
+        url = str(url or "").strip()
+
+        if not url:
+            return ""
+
+        if "news.google.com/rss/articles/" not in url and "news.google.com/articles/" not in url:
+            return url
+
+        try:
+            response = requests.get(
+                url,
+                headers=self._headers(),
+                timeout=self.timeout,
+                allow_redirects=True,
+            )
+
+            final_url = str(response.url or "").strip()
+
+            if final_url and "news.google.com" not in final_url:
+                return final_url
+
+            return url
+
+        except Exception:
+            return url
+
+    def _news_rss_search(self, query: str, max_results: int = 5) -> list:
         try:
             url = "https://news.google.com/rss/search"
             response = requests.get(
                 url,
-                params={"q": query, "hl": "en-US", "gl": "US", "ceid": "US:en"},
+                params={
+                    "q": query,
+                    "hl": "en-US",
+                    "gl": "US",
+                    "ceid": "US:en",
+                },
                 headers=self._headers(),
                 timeout=self.timeout,
             )
             response.raise_for_status()
 
             soup = BeautifulSoup(response.text, "xml")
-            items = soup.find_all("item")
-
             results = []
 
-            for item in items:
+            for item in soup.find_all("item"):
                 title = self._clean_text(item.title.text if item.title else "")
                 link = self._clean_text(item.link.text if item.link else "")
                 snippet_html = item.description.text if item.description else ""
                 snippet = self._clean_text(
                     BeautifulSoup(snippet_html, "html.parser").get_text(" ", strip=True)
                 )
+
                 if not title or not link:
                     continue
 
+                clean_title = title
+                source = ""
+
+                if " - " in title:
+                    parts = title.rsplit(" - ", 1)
+                    clean_title = parts[0].strip()
+                    source = parts[1].strip()
+
+                resolved_link = self._resolve_google_news_url(link)
+
                 results.append({
-                    "title": title[:200],
-                    "url": link,
+                    "title": clean_title[:200],
+                    "url": resolved_link or link,
                     "snippet": snippet[:400],
-                    "domain": self._extract_domain(link),
+                    "domain": source or self._extract_domain(resolved_link or link),
                 })
 
-                if len(results) >= max_results * 3:
+                if len(results) >= max_results:
                     break
 
             return results

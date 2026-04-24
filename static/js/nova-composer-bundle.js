@@ -200,6 +200,15 @@ function resolveUploadUrl(url) {
       .replace(/'/g, "&#39;");
   }
 
+function linkifyText(text) {
+  const safe = escapeHtml(String(text || ""));
+
+  return safe.replace(
+    /(https?:\/\/[^\s<]+)/g,
+    '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+  );
+}
+
   function renderSafeText(value) {
     return escapeHtml(String(value == null ? "" : value)).replace(/\n/g, "<br>");
   }
@@ -1263,32 +1272,23 @@ if (backendWorkingContext) {
     : emptyWorkingContext();
 }
 
-  if (data.assistant_message) {
-    const assistantMsg = normalizeMessage(data.assistant_message);
-    const hasSessionMessages =
-      (data.active_session &&
-        Array.isArray(data.active_session.messages) &&
-        data.active_session.messages.length > 0) ||
-      (data.session &&
-        Array.isArray(data.session.messages) &&
-        data.session.messages.length > 0) ||
-      (Array.isArray(data.messages) && data.messages.length > 0);
+if (data.assistant_message) {
+  const assistantMsg = normalizeMessage(data.assistant_message);
 
-    if (assistantMsg && !hasSessionMessages) {
-      const existingAssistant = state.messages.some(function (msg) {
-        return (
-          msg &&
-          msg.role === "assistant" &&
-          msg.kind !== "working_context" &&
-          String(msg.text || "").trim() === String(assistantMsg.text || "").trim()
-        );
-      });
+  if (assistantMsg) {
+    const exists = state.messages.some(function (msg) {
+      return (
+        msg &&
+        msg.role === "assistant" &&
+        String(msg.text || "").trim() === String(assistantMsg.text || "").trim()
+      );
+    });
 
-      if (!existingAssistant) {
-        upsertMessage(assistantMsg);
-      }
+    if (!exists) {
+      upsertMessage(assistantMsg);
     }
   }
+}
 
 state.artifacts = safeArray(data.artifacts);
 state.memory = safeArray(data.memory).map(normalizeMemoryItem);
@@ -1804,6 +1804,50 @@ function normalizeWorkingContext(raw) {
   };
 }
 
+function linkifySourceLines(text) {
+  if (!text) return text;
+
+  const lines = text.split("\n");
+  const output = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const next = lines[i + 1] || "";
+
+    const match = line.match(/^(\d+)\.\s(.+?)\s—\s(.+)$/);
+
+    if (match && next.startsWith("http")) {
+      const index = match[1];
+      const source = match[2];
+      const title = match[3];
+      const url = next.trim();
+
+      let domain = "";
+      try {
+        domain = new URL(url).hostname;
+      } catch (e) {
+        domain = "";
+      }
+
+output.push(
+  `<div class="source-row" data-url="${url}" data-preview="${title} — ${next.replace(/"/g, '&quot;')}">` +
+    `${index}. ` +
+    `<img src="https://www.google.com/s2/favicons?domain=${domain}&sz=16" ` +
+    `style="width:14px;height:14px;margin-right:6px;border-radius:3px;opacity:0.6;transition:opacity 0.2s ease;" /> ` +
+    `<span class="source-name">${source}</span> — ${title}` +
+  `</div>`
+);
+
+      i++; // skip URL line
+      continue;
+    }
+
+    output.push(line);
+  }
+
+  return output.join("\n");
+}
+
 function wireWorkingContextPanel() {
   if (!els.chatThread) return;
   if (els.chatThread.__workingContextWired) return;
@@ -1851,7 +1895,9 @@ function renderChat() {
 
   const workingContextHtml = renderWorkingContextPanel();
   const messagesHtml = state.messages.map(renderMessageCard).join("");
-  const nextHtml = workingContextHtml + messagesHtml;
+  let nextHtml = workingContextHtml + messagesHtml;
+
+  nextHtml = linkifySourceLines(nextHtml).replace(/\n/g, "<br>");
 
   if (els.chatThread.__lastRenderHtml !== nextHtml) {
     els.chatThread.innerHTML = nextHtml;
@@ -1869,6 +1915,65 @@ function renderChat() {
 function renderSessionList() {
   return;
 }
+
+document.querySelectorAll(".source-row").forEach(function (el) {
+  el.addEventListener("click", async function () {
+    const url = el.getAttribute("data-url");
+    const title = el.getAttribute("data-title") || "Source";
+
+    if (!url) return;
+
+    if (els.railViewer) {
+      els.railViewer.hidden = false;
+
+      const safeTitle = escapeHtml(title || "Source");
+      const safeUrl = escapeHtml(url || "");
+
+      // 🔥 loading state
+      els.railViewer.innerHTML =
+        '<div class="nova-viewer-shell">' +
+          '<div class="nova-viewer-title">' + safeTitle + '</div>' +
+          '<div class="nova-viewer-body">Loading preview...</div>' +
+        '</div>';
+
+      try {
+        const res = await fetch("/api/fetch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
+
+        const data = await res.json();
+
+        const summary = escapeHtml(data.summary || "No summary available");
+
+        els.railViewer.innerHTML =
+          '<div class="nova-viewer-shell">' +
+            '<div class="nova-viewer-title">' + safeTitle + '</div>' +
+            '<div class="nova-viewer-body">' +
+              '<p>' + summary + '</p>' +
+              '<br>' +
+              '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">' +
+                'Open full article' +
+              '</a>' +
+            '</div>' +
+          '</div>';
+
+      } catch (err) {
+        els.railViewer.innerHTML =
+          '<div class="nova-viewer-shell">' +
+            '<div class="nova-viewer-title">' + safeTitle + '</div>' +
+            '<div class="nova-viewer-body">' +
+              'Failed to load preview<br><br>' +
+              '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">' +
+                'Open full article' +
+              '</a>' +
+            '</div>' +
+          '</div>';
+      }
+    }
+  });
+});
 
 async function sendExecutionCommand(commandText) {
   const payload = {
