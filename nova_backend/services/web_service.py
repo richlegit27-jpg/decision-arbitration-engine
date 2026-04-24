@@ -83,6 +83,24 @@ class WebService:
             "Accept": "*/*",
         }
 
+    def _clean_url(self, url: str) -> str:
+        url = str(url or "").strip()
+
+        # 🔥 Fix Google News redirect URLs
+        if "news.google.com/rss/articles" in url:
+            try:
+                import urllib.parse as up
+                parsed = up.urlparse(url)
+                qs = up.parse_qs(parsed.query)
+
+                for key in ["url", "u"]:
+                    if key in qs and qs[key]:
+                        return qs[key][0]
+            except:
+                pass
+
+        return url
+
     def _brave_headers(self) -> dict:
         headers = {
             "Accept": "application/json",
@@ -122,14 +140,30 @@ class WebService:
         title = soup.title.get_text(" ", strip=True) if soup.title else ""
         return self._clean_text(title)[:300]
 
-    def _summarize(self, text: str, max_len: int = 500) -> str:
+    def _summarize(self, text: str, max_len: int = 700) -> str:
         text = self._clean_text(text)
         if not text:
             return ""
+
+        sentences = re.split(r"(?<=[.!?])\s+", text)
+        bullets = []
+
+        for sentence in sentences:
+            sentence = self._clean_text(sentence)
+            if len(sentence) < 40:
+                continue
+            bullets.append(sentence[:220])
+            if len(bullets) >= 3:
+                break
+
+        if bullets:
+            return "\n".join(f"• {bullet}" for bullet in bullets)
+
         if len(text) <= max_len:
-            return text
+            return "• " + text
+
         cut = text[:max_len].rsplit(" ", 1)[0].strip()
-        return cut or text[:max_len]
+        return "• " + (cut or text[:max_len])
 
     def _bullets(self, text: str, limit: int = 5) -> List[str]:
         text = str(text or "").strip()
@@ -216,6 +250,39 @@ class WebService:
         if "contact" in lowered or "hours" in lowered or "location" in lowered:
             return "business"
         return "web_page"
+
+    def _clean_source_url(self, url: str) -> str:
+        url = str(url or "").strip()
+        if not url:
+            return ""
+
+        if "news.google.com/rss/articles" in url:
+            try:
+                import base64
+                import re
+                import urllib.parse as up
+
+                parsed = up.urlparse(url)
+                qs = up.parse_qs(parsed.query)
+
+                for key in ["url", "u"]:
+                    if key in qs and qs[key]:
+                        return qs[key][0]
+
+                # Google RSS URLs often hide the real URL in an encoded path.
+                # If we cannot safely decode it, keep original instead of crashing.
+                path_part = parsed.path.split("/articles/")[-1].split("?")[0]
+                path_part = path_part.replace("-", "+").replace("_", "/")
+                path_part += "=" * (-len(path_part) % 4)
+
+                decoded = base64.urlsafe_b64decode(path_part).decode("utf-8", errors="ignore")
+                match = re.search(r"https?://[^\s\x00-\x1f\"']+", decoded)
+                if match:
+                    return match.group(0)
+            except Exception:
+                return url
+
+        return url
 
     def normalize_url(self, url: str) -> str:
         url = str(url or "").strip()
@@ -1333,25 +1400,27 @@ class WebService:
 
             title = str(item.get("title") or item.get("name") or "").strip()
             snippet = str(item.get("snippet") or item.get("content") or item.get("body") or "").strip()
-            url = str(item.get("url") or item.get("source_url") or "").strip()
+            url = self._clean_source_url(
+ 	        str(item.get("url") or item.get("source_url") or "").strip()
+	    )
             domain = str(item.get("domain") or "").strip()
 
             if not (title or snippet or url):
                 continue
 
-            cleaned.append(
-                {
-                    "title": title,
-                    "snippet": snippet,
-                    "url": url,
-                    "domain": domain,
-                }
-            )
+            cleaned.append({
+                "title": title,
+                "snippet": snippet,
+                "url": url,
+                "domain": domain,
+            })
 
         if not cleaned:
-            return f"I couldn’t find strong live results for \"{query}\"."
+            return f'I couldn’t find strong live results for "{query}".'      
 
-        top = cleaned[0]
+        cleaned = self._rank_search_results(query, cleaned)
+
+	top = cleaned[0]
 
         title = self._clean_result_title(top)
         source = self._clean_source_name(top)
@@ -1359,12 +1428,15 @@ class WebService:
 
         lines = []
 
-        lines.append(title)
+        if title:
+            lines.append(title)
 
         if snippet:
             lines.append(snippet)
 
-        lines.append(f"Source: {source}")
+        if source:
+            lines.append(f"Source: {source}")
+
         lines.append("")
         lines.append("— Top sources —")
 
@@ -1375,44 +1447,10 @@ class WebService:
 
             lines.append(f"{idx}. {item_source} — {item_title}")
 
+            if item_url:
+                lines.append(item_url)
+
         return "\n".join(lines).strip()
-        q_lower = query.lower()
-
-        if any(word in q_lower for word in ("weather", "forecast", "temperature", "rain", "snow", "wind", "humidity")):
-            location_label = query
-            lowered_query = location_label.lower()
-
-            for prefix in ("weather in ", "weather for ", "forecast in ", "forecast for "):
-                if lowered_query.startswith(prefix):
-                    location_label = location_label[len(prefix):].strip()
-                    break
-
-            if not location_label:
-                location_label = "your area"
-
-            return f"Here’s the weather lookup for {location_label.title()}."
-
-        if any(word in q_lower for word in ("hours", "open now", "closing time", "address", "phone number", "location", "directions", "near me")):
-            return "Here’s a live business lookup with locations, hours, and contact details."
-
-        if any(word in q_lower for word in ("latest", "news", "current", "update", "updates", "recent", "breaking")):
-            if title and snippet:
-                return f"{title}\n{snippet}"
-            if title:
-                return title
-            if snippet:
-                return snippet
-
-        if title and snippet:
-            return f"{title}\n{snippet}"
-        if snippet:
-            return snippet
-        if title:
-            return title
-        if url:
-            return url
-
-        return f"Here’s what I found for \"{query}\"."
 
     # -----------------------
     # FETCH
@@ -1631,11 +1669,13 @@ class WebService:
 
                 resolved_link = self._resolve_google_news_url(link)
 
+                clean_url = self._resolve_google_news_url(resolved_link or link)
+
                 results.append({
                     "title": clean_title[:200],
-                    "url": resolved_link or link,
+                    "url": clean_url,
                     "snippet": snippet[:400],
-                    "domain": source or self._extract_domain(resolved_link or link),
+                    "domain": source or self._extract_domain(clean_url),
                 })
 
                 if len(results) >= max_results:

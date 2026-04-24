@@ -579,6 +579,23 @@ def api_state():
 # -----------------------
 # CHAT
 # -----------------------
+
+@app.post("/api/fetch")
+def api_fetch():
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url") or "").strip()
+
+    if not url:
+        return jsonify({
+            "ok": False,
+            "error": "Missing url",
+            "summary": "",
+        }), 400
+
+    result = web_service.fetch(url)
+
+    return jsonify(result)
+
 @app.post("/api/chat")
 def api_chat():
     data = request_json()
@@ -1196,21 +1213,56 @@ def api_memory_cleanup_promote():
 
 @app.post("/api/web/fetch")
 def api_web_fetch():
-    data = request_json()
-    url = str(data.get("url") or "").strip()
+    print("HIT API_WEB_FETCH ROUTE", flush=True)
+    try:
+        data = request.get_json(silent=True) or {}
+        url = str(data.get("url") or "").strip()
 
-    if not url:
-        return json_error("Missing url", 400)
+        if not url:
+            return jsonify({
+                "ok": False,
+                "error": "Missing url",
+            }), 400
 
-    result = web_service.fetch(url)
-    if not result.get("ok"):
-        return json_error(result.get("error") or "Fetch failed", 500, result=result)
+        try:
+            result = web_service.fetch(url)
+        except Exception as exc:
+            result = {
+                "ok": False,
+                "url": url,
+                "summary": "Preview unavailable. Open the full article instead.",
+                "images": [],
+                "error": str(exc),
+            }
 
-    return json_ok(
-        result=result,
-        artifact=web_service.build_artifact_payload(result),
-    )
+        if not isinstance(result, dict):
+            result = {
+                "ok": False,
+                "url": url,
+                "summary": "Preview unavailable. Open the full article instead.",
+                "images": [],
+                "error": "web_service.fetch returned non-dict result",
+            }
 
+        artifact = None
+        if result.get("ok"):
+            try:
+                artifact = web_service.build_artifact_payload(result)
+            except Exception as exc:
+                result["artifact_error"] = str(exc)
+
+        return jsonify({
+            "ok": True,
+            "result": result,
+            "artifact": artifact,
+        })
+
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": str(exc),
+            "route": "/api/web/fetch",
+        }), 200
 
 # -----------------------
 # RECON

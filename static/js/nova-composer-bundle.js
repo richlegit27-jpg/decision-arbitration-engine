@@ -1734,11 +1734,13 @@ function renderMessageCard(message) {
     ? '<div class="message-attachments">' + attachments.map(renderAttachmentBlock).join("") + "</div>"
     : "";
 
-  const textHtml = String(message.text || "").trim()
-    ? '<div class="message-text-inline" style="display:block !important; white-space:pre-wrap !important; color:#ffffff !important; background:rgba(255,255,255,0.04) !important; padding:10px 12px !important; border-radius:10px !important; margin:8px 0 10px 0 !important; line-height:1.45 !important;">' +
-        renderSafeText(message.text) +
-      "</div>"
-    : "";
+const rawText = String(message.text || "").trim();
+
+const textHtml = rawText
+  ? '<div class="message-text-inline" style="display:block !important; white-space:pre-wrap !important; color:#ffffff !important; background:rgba(255,255,255,0.04) !important; padding:10px 12px !important; border-radius:10px !important; margin:8px 0 10px 0 !important; line-height:1.45 !important;">' +
+      linkifySourceLines(rawText) +
+    "</div>"
+  : "";
 
   const bodyHtml = textHtml
     ? textHtml
@@ -1805,47 +1807,44 @@ function normalizeWorkingContext(raw) {
 }
 
 function linkifySourceLines(text) {
-  if (!text) return text;
+  const raw = String(text || "");
+  if (!raw) return "";
 
-  const lines = text.split("\n");
+  const lines = raw.split(/\r?\n/);
   const output = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const next = lines[i + 1] || "";
 
-    const match = line.match(/^(\d+)\.\s(.+?)\s—\s(.+)$/);
+    const match = line.match(/^\s*(\d+)\.\s*(.+?)\s*[—-]\s*(.+?)\s*$/);
 
-    if (match && next.startsWith("http")) {
+    if (match) {
       const index = match[1];
-      const source = match[2];
-      const title = match[3];
-      const url = next.trim();
+      const source = match[2].trim();
+      const title = match[3].trim();
 
-      let domain = "";
-      try {
-        domain = new URL(url).hostname;
-      } catch (e) {
-        domain = "";
+      let url = "";
+
+      const nextLine = (lines[i + 1] || "").trim();
+      if (nextLine.startsWith("http://") || nextLine.startsWith("https://")) {
+        url = nextLine;
+        i++;
       }
 
-output.push(
-  `<div class="source-row" data-url="${url}" data-preview="${title} — ${next.replace(/"/g, '&quot;')}">` +
-    `${index}. ` +
-    `<img src="https://www.google.com/s2/favicons?domain=${domain}&sz=16" ` +
-    `style="width:14px;height:14px;margin-right:6px;border-radius:3px;opacity:0.6;transition:opacity 0.2s ease;" /> ` +
-    `<span class="source-name">${source}</span> — ${title}` +
-  `</div>`
-);
+      output.push(
+        '<div class="source-row" data-url="' + escapeHtml(url) + '" data-title="' + escapeHtml(title) + '" data-preview="' + escapeHtml(source + " — " + title) + '">' +
+          escapeHtml(index) + ". " +
+          '<span class="source-name">' + escapeHtml(source) + '</span> — ' +
+          '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(title) + '</a>' +
+        '</div>'
+      );
 
-      i++; // skip URL line
-      continue;
+    } else {
+      output.push(escapeHtml(line));
     }
-
-    output.push(line);
   }
 
-  return output.join("\n");
+  return output.join("<br>");
 }
 
 function wireWorkingContextPanel() {
@@ -1892,12 +1891,11 @@ function renderChat() {
   });
 
   setChatEmptyVisible(state.messages.length === 0);
-
-  const workingContextHtml = renderWorkingContextPanel();
+  const workingContextHtml = "";
   const messagesHtml = state.messages.map(renderMessageCard).join("");
   let nextHtml = workingContextHtml + messagesHtml;
 
-  nextHtml = linkifySourceLines(nextHtml).replace(/\n/g, "<br>");
+  nextHtml = nextHtml.replace(/\n/g, "<br>");
 
   if (els.chatThread.__lastRenderHtml !== nextHtml) {
     els.chatThread.innerHTML = nextHtml;
@@ -1905,103 +1903,141 @@ function renderChat() {
   }
 
   wireWorkingContextPanel();
-  wireRailTabs();
-  updateTopbarFromState();
-  scrollChatToBottom(true);
-  renderExecutionPanel();
 
+els.chatThread.querySelectorAll(".source-row").forEach(function (el) {
+  if (el.__wired) return;   // 🔥 prevents duplicates
+  el.__wired = true;
+
+  el.addEventListener("click", async function (e) {
+  e.stopPropagation();
+
+  if (e.target.tagName === "A") return;
+
+  let url = el.getAttribute("data-url") || "";
+
+// 🔥 FIX GOOGLE RSS LINKS
+if (url.includes("news.google.com/rss/articles")) {
+  try {
+    const parsed = new URL(url);
+    const realUrl =
+      parsed.searchParams.get("url") ||
+      parsed.searchParams.get("u");
+
+    if (realUrl) {
+      url = realUrl;
+      console.log("CLEANED URL =", url);
+    }
+  } catch (e) {
+    console.warn("URL CLEAN FAIL", e);
+  }
 }
+console.log("CLICK SOURCE URL =", url);
 
-function renderSessionList() {
+if (!url || url === "null" || url === "undefined") {
+  console.warn("NO URL FOUND FOR SOURCE ROW");
   return;
 }
+  const title = el.getAttribute("data-title") || el.getAttribute("data-preview") || "Source";
 
-document.querySelectorAll(".source-row").forEach(function (el) {
-  el.addEventListener("click", async function () {
-    const url = el.getAttribute("data-url");
-    const title = el.getAttribute("data-title") || el.getAttribute("data-preview") || "Source";
+      if (!url || !els.railViewer) return;
 
-    if (!url) return;
-
-    if (els.railViewer) {
       els.railViewer.hidden = false;
 
       const safeTitle = escapeHtml(title || "Source");
       const safeUrl = escapeHtml(url || "");
 
-      // 🔥 loading state
       els.railViewer.innerHTML =
         '<div class="nova-viewer-shell">' +
           '<div class="nova-viewer-title">' + safeTitle + '</div>' +
-          '<div class="nova-viewer-body">Loading preview...</div>' +
+          '<div class="nova-viewer-body">' +
+  '<div class="nova-loading-bar"></div>' +
+  '<div class="nova-loading-line"></div>' +
+  '<div class="nova-loading-line short"></div>' +
+'</div>'
         '</div>';
 
       try {
-       const res = await fetch("/api/web/fetch", {
+        const res = await fetch("/api/web/fetch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url })
+          body: JSON.stringify({ url: url })
         });
 
         const data = await res.json();
 
-const imageUrl =
-  data.result &&
-  Array.isArray(data.result.images) &&
-  data.result.images.length
-    ? data.result.images[0].url
-    : "";
+        const rawSummary = (data.result && data.result.summary) || "No summary available";
 
-const imageHtml = imageUrl
-  ? '<img src="' + escapeHtml(imageUrl) + '" class="nova-source-preview-image" alt="Article image">'
-  : "";
+        const summaryParts = String(rawSummary)
+          .split(/(?<=[.!?])\s+|\n+|•|- /)
+          .filter(function (line) {
+            return line && line.trim().length > 20;
+          })
+          .slice(0, 3);
 
-const rawSummary =
-  (data.result && data.result.summary) || "No summary available";
+        const summaryHtml = summaryParts.length
+          ? '<ul class="nova-source-summary-list">' +
+              summaryParts.map(function (line) {
+                return '<li>' + escapeHtml(line) + '</li>';
+              }).join("") +
+            '</ul>'
+          : '<p>No summary available</p>';
 
-const summaryParts = String(rawSummary)
-  .split(/(?<=[.!?])\s+|\n+|•|- /)
-  .filter(function (line) {
-    return line && line.trim().length > 20;
-  })
-  .slice(0, 3);
+        const imageUrl =
+          data.result &&
+          Array.isArray(data.result.images) &&
+          data.result.images.length
+            ? data.result.images[0].url
+            : "";
 
-const summaryHtml = summaryParts.length
-  ? '<ul class="nova-source-summary-list">' +
-      summaryParts.map(function (line) {
-        return '<li>' + escapeHtml(line) + '</li>';
-      }).join("") +
-    '</ul>'
-  : '<p>No summary available</p>';
+        const imageHtml = imageUrl
+          ? '<img src="' + escapeHtml(imageUrl) + '" class="nova-source-preview-image" alt="Article image">'
+          : "";
 
         els.railViewer.innerHTML =
-          '<div class="nova-viewer-shell">' +
-            '<div class="nova-viewer-title">' + safeTitle + '</div>' +
+          '<div class="nova-viewer-shell nova-article-preview">' +
+            imageHtml +
             '<div class="nova-viewer-body">' +
-              imageHtml +
-	      summaryHtml +
-              '<br>' +
-              '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">' +
-                'Open full article' +
-              '</a>' +
+              '<div class="nova-source-kicker">Source Preview</div>' +
+              '<div class="nova-viewer-title nova-article-title">' + safeTitle + '</div>' +
+              '<div class="nova-article-summary">' +
+                summaryHtml +
+              '</div>' +
+              '<div class="nova-article-actions">' +
+                '<a class="nova-source-open-btn" href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">Open full article ↗</a>' +
+              '</div>' +
             '</div>' +
           '</div>';
-
       } catch (err) {
         els.railViewer.innerHTML =
           '<div class="nova-viewer-shell">' +
             '<div class="nova-viewer-title">' + safeTitle + '</div>' +
-            '<div class="nova-viewer-body">' +
-              'Failed to load preview<br><br>' +
-              '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">' +
-                'Open full article' +
-              '</a>' +
+            '<div class="nova-viewer-body">Failed to load preview<br><br>' +
+              '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">Open full article</a>' +
             '</div>' +
           '</div>';
       }
-    }
+    });
   });
-});
+
+  const firstSourceRow = els.chatThread.querySelector(".source-row");
+  const firstSourceKey = firstSourceRow ? firstSourceRow.getAttribute("data-url") : "";
+
+  if (firstSourceRow && firstSourceKey && els.chatThread.__autoOpenedSource !== firstSourceKey) {
+    els.chatThread.__autoOpenedSource = firstSourceKey;
+    setTimeout(function () {
+      firstSourceRow.click();
+    }, 300);
+  }
+
+  wireRailTabs();
+  updateTopbarFromState();
+  scrollChatToBottom(true);
+  renderExecutionPanel();
+}
+
+function renderSessionList() {
+  return;
+}
 
 async function sendExecutionCommand(commandText) {
   const payload = {

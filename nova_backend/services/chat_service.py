@@ -896,7 +896,8 @@ class ChatService:
             "Do not say 'based on the search results' or 'I found'. "
             "If the results are weak, be honest but still give the best concise answer possible. "
             "Do not invent facts beyond the provided results. "
-            "Keep it short and natural."
+            "Keep it short and natural. "
+            "When you include a Top sources list, include each source URL on the line directly after that source."
         )
 
         user_prompt = (
@@ -921,7 +922,27 @@ class ChatService:
                 text = str(response).strip()
 
             if text:
-                return text
+                sources_block = ""
+
+                results = cleaned
+
+                if results:
+                    lines = []
+                    lines.append("\n— Top sources —")
+
+                    for idx, item in enumerate(results[:5], start=1):
+                        title = str(item.get("title") or "").strip()
+                        domain = str(item.get("domain") or "").strip()
+                        url = str(item.get("url") or "").strip()
+
+                        lines.append(f"{idx}. {domain} — {title}")
+
+                        if url:
+                            lines.append(url)
+
+                    sources_block = "\n" + "\n".join(lines)
+
+                return text + sources_block
 
         except Exception:
             pass
@@ -1458,6 +1479,24 @@ class ChatService:
         attachments = attachments or []
         text = self._safe_str(user_text)
         lowered = text.lower()
+
+        # 🔥 FORCE WEB ROUTE FOR LIVE QUERIES
+        if any(word in lowered for word in [
+            "latest", "news", "price", "stock", "weather", "time",
+            "current", "today", "update", "updates"
+        ]):
+            return {
+                "route": self.ROUTE_WEB_FETCH,
+                "mode": "web",
+                "confidence": 1.0,
+                "use_memory": False,
+                "save_memory": False,
+                "save_artifact": True,
+                "has_attachments": False,
+                "url": text,
+                "memory_limit": self.memory_limit,
+                "reasons": ["forced_live_query"],
+            }
 
         decision = {
             "route": self.ROUTE_GENERAL_CHAT,
@@ -2262,15 +2301,16 @@ Write the exact goal in one sentence.
             assistant_text = step_output
             if plan_body:
                 assistant_text += "\n\n" + plan_body
+
         else:
             assistant_text = "Step processed."
             if plan_body:
                 assistant_text += "\n\n" + plan_body
 
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text,
-            attachments=[],
-        )
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                attachments=[],
+            )
 
         return self._finalize_response(
             session_id=session_id,
@@ -4324,12 +4364,12 @@ Write the exact goal in one sentence.
                 session_id=session_id,
             )
 
+            print("DEBUG FULL WEB RESULT =", web_result)
+
             artifact_summary = ""
             artifact = web_result.get("artifact")
             if isinstance(artifact, dict):
                 artifact_summary = self._safe_str(artifact.get("summary"))
-
-            summary_text = self._safe_str(web_result.get("summary"))
 
             summary_text = self._safe_str(web_result.get("summary"))
 
@@ -4348,8 +4388,31 @@ Write the exact goal in one sentence.
                     attachments=attachments,
                 )
 
+            assistant_text = artifact_summary or summary_text or "Web fetch completed."
+
+            results = web_result.get("results") if isinstance(web_result, dict) else []
+
+            if isinstance(results, list) and results:
+                source_lines = ["", "— Top sources —"]
+
+                for idx, item in enumerate(results[:5], start=1):
+                    if not isinstance(item, dict):
+                        continue
+
+                    title = self._safe_str(item.get("title"))
+                    domain = self._safe_str(item.get("domain"))
+                    url = self._safe_str(item.get("url"))
+
+                    source_lines.append(f"{idx}. {domain} — {title}")
+
+                    if url:
+                        source_lines.append(url)
+
+                if "http://" not in assistant_text and "https://" not in assistant_text:
+                    assistant_text += "\n" + "\n".join(source_lines)
+
             assistant_msg = self._build_assistant_message(
-                text=artifact_summary or summary_text or "Web fetch completed.",
+                text=assistant_text,
                 meta={
                     "web_fetch": True,
                     "source_url": self._safe_str(web_result.get("source_url")),
