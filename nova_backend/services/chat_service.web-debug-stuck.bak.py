@@ -2351,6 +2351,7 @@ Write the exact goal in one sentence.
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
             attachments=[],
+            meta={"source_urls": result.get("source_urls") or []} if isinstance(result, dict) else {},
         )
 
         return self._finalize_response(
@@ -2640,26 +2641,6 @@ Write the exact goal in one sentence.
                 },
                 saved_artifact=None,
             )
-
-        assistant_msg = self._build_assistant_message(
-            text="Auto execution started.",
-            attachments=[],
-        )
-
-        return self._finalize_response(
-            session_id=session_id,
-            user_text=user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision={
-                "route": "execution_auto",
-                "mode": "execution_auto",
-                "save_artifact": False,
-                "save_memory": False,
-                "use_memory": True,
-            },
-            saved_artifact=None,
-        )
 
         execution = self._normalize_execution_state(latest.get("execution") or {})
         if not execution:
@@ -4207,91 +4188,55 @@ Write the exact goal in one sentence.
                 + user_text
             )
 
-    def _execute_general_chat(
-        self,
-        decision: dict,
-        user_text: str,
-        session_id: str,
-        attachments=None,
-    ) -> dict:
-
-        user_msg = self._build_user_message(user_text, attachments=attachments or [])
-
-        prompt = self._build_chat_input(
-            user_text=user_text,
-            decision=decision,
-            session_id=session_id,
-        )
-
-        print("=== NOVA PROMPT START ===")
-        print(prompt[:4000])
-        print("=== NOVA PROMPT END ===")
-
-        try:
-            response = self.client.responses.create(
-                model=self.chat_model,
-                input=prompt,
+    def _run_chat_model(
+            self,
+            user_text: str,
+            decision: dict,
+            session_id: str = "",
+        ) -> str:
+            prompt = self._build_chat_input(
+                user_text=user_text,
+                decision=decision,
+                session_id=session_id,
             )
 
-            assistant_text = self._extract_response_text(response)
-            assistant_text = self._safe_str(assistant_text).strip()
+            print("=== NOVA PROMPT START ===")
+            print(prompt[:4000])
+            print("=== NOVA PROMPT END ===")
 
-            if not assistant_text:
-                assistant_text = "No response generated."
+            try:
+                response = self.client.responses.create(
+                    model=self.chat_model,
+                    input=prompt,
+                )
 
-            normalized = assistant_text.lower()
+                assistant_text = self._extract_response_text(response)
+                assistant_text = self._safe_str(assistant_text).strip()
+                normalized = assistant_text.lower()
 
-            # --- SAFE GREETING FILTER ---
-            blocked_model_greetings = [
-                "hi",
-                "hello",
-                "hey",
-                "hi — what do you need?",
-                "hi - what do you need?",
-                "hi — what do you need help with?",
-                "hi - what do you need help with?",
-                "hello — what do you need?",
-                "hello - what do you need?",
-                "hello — how can i help?",
-                "hello - how can i help?",
-                "how can i help?",
-                "what do you need?",
-                "what do you need help with?",
-            ]
+                blocked_model_greetings = [
+                    "hi",
+                    "hello",
+                    "hey",
+                    "hi — what do you need help with?",
+                    "hi - what do you need help with?",
+                    "hello — how can i help?",
+                    "hello - how can i help?",
+                    "hello — what do you need help with?",
+                    "hello - what do you need help with?",
+                    "how can i help?",
+                    "what do you need?",
+                    "what do you need help with?",
+                ]
 
-            if any(g in normalized for g in blocked_model_greetings):
-                if "plan" not in normalized:
-                    assistant_text = (
-                        "I need the previous context to continue that. "
-                        "Try again after a web result or artifact is active."
-                    )
+                if any(g in normalized for g in blocked_model_greetings):
+                    assistant_text = "I'm here. Tell me what you need."
 
-        except Exception as e:
-            print("GENERAL CHAT ERROR:", e)
-            assistant_text = "Something went wrong generating a response."
+                print("DEBUG _run_chat_model final =", repr(assistant_text))
+                return assistant_text
 
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text
-        )
-
-        updates = self._extract_working_state_updates(
-            user_text=user_text,
-            current_state=self._get_working_state(session_id),
-        )
-
-        payload = self._build_common_state_payload(session_id=session_id)
-        payload.update(
-            {
-                "assistant_message": assistant_msg,
-                "updates": updates,
-                "debug": {
-                    "decision": decision,
-                    "route_taken": "general_chat",
-                },
-            }
-        )
-
-        return payload
+            except Exception as e:
+                return f"Model error: {e}"
 
         # ==============================
         # RESPONSE BUILDERS
@@ -4613,40 +4558,100 @@ Write the exact goal in one sentence.
             )
 
     def _execute_general_chat(
-        self,
-        decision: dict,
-        user_text: str,
-        session_id: str,
-        attachments=None,
-    ) -> dict:
+            self,
+            decision: dict,
+            user_text: str,
+            session_id: str,
+            attachments=None,
+            working_state=None,
+            working_context_block="",
+        ) -> dict:
+            attachments = attachments or []
+            user_msg = self._build_user_message(user_text, attachments=attachments)
 
-        user_msg = self._build_user_message(user_text, attachments=attachments or [])
+            lowered = self._safe_str(user_text).lower().strip()
 
-        prompt = self._build_chat_input(
-            user_text=user_text,
-            decision=decision,
-            session_id=session_id,
-        )
+            continuity_triggers = {
+                "where are we",
+                "where are we now",
+                "what are we doing",
+                "what are we doing now",
+                "now what",
+                "what's next",
+                "whats next",
+                "what is next",
+                "what file are we in",
+                "what broke",
+                "what did we fix",
+            }
 
-        print("=== NOVA PROMPT START ===")
-        print(prompt[:4000])
-        print("=== NOVA PROMPT END ===")
+            wants_where_are_we = lowered in continuity_triggers
 
-        try:
-            response = self.client.responses.create(
-                model=self.chat_model,
-                input=prompt,
-            )
+            if wants_where_are_we:
+                assistant_text = self._safe_str(self._handle_where_are_we(session_id, user_text))
+            else:
+                memory_context = self._build_memory_context_for_chat(
+                    user_text=user_text,
+                    decision=decision,
+                )
+                session = self.sessions.get_session(session_id) or {}
+                working_state_prompt = self._build_working_state_prompt_block(session_id)
 
-            assistant_text = self._extract_response_text(response)
-            assistant_text = self._safe_str(assistant_text).strip()
+                prompt_parts = []
 
-            if not assistant_text:
-                assistant_text = "No response generated."
+                if working_state_prompt:
+                    prompt_parts.append(working_state_prompt)
 
-            normalized = assistant_text.lower()
+                if working_context_block:
+                    prompt_parts.append(working_context_block)
 
-            # --- SAFE GREETING FILTER ---
+                if memory_context:
+                    prompt_parts.append(memory_context)
+
+                prompt_parts.append(f"User request:\n{user_text}")
+
+                enriched_user_text = "\n\n".join([p for p in prompt_parts if p]).strip()
+
+                messages = self._compose_model_messages(
+                    user_text=enriched_user_text,
+                    session=session,
+                    decision=decision,
+                    memory_context="",
+                )
+
+                assistant_text = ""
+
+                try:
+                    response = self.client.responses.create(
+                        model=self.chat_model,
+                        input=messages,
+                    )
+
+                    if hasattr(response, "output_text") and response.output_text:
+                        assistant_text = self._safe_str(response.output_text).strip()
+                    elif hasattr(response, "output") and response.output:
+                        parts = []
+                        for item in response.output:
+                            if hasattr(item, "content") and item.content:
+                                for c in item.content:
+                                    text_value = getattr(c, "text", "")
+                                    text_value = self._safe_str(text_value).strip()
+                                    if text_value:
+                                        parts.append(text_value)
+
+                        assistant_text = " ".join(parts).strip()
+
+                except Exception as e:
+                    assistant_text = f"Chat failed: {e}"
+
+                if not assistant_text or not assistant_text.strip():
+                    assistant_text = "No response generated."
+                if not assistant_text or not assistant_text.strip():
+                    assistant_text = "No response generated."
+
+                assistant_text = self._safe_str(assistant_text).strip()
+                normalized = assistant_text.lower()
+
             blocked_model_greetings = [
                 "hi",
                 "hello",
@@ -4665,38 +4670,38 @@ Write the exact goal in one sentence.
             ]
 
             if any(g in normalized for g in blocked_model_greetings):
-                if "plan" not in normalized:
-                    assistant_text = (
-                        "I need the previous context to continue that. "
-                        "Try again after a web result or artifact is active."
-                    )
+                assistant_text = "I need the previous context to continue that. Try again after a web result or artifact is         active."
 
-        except Exception as e:
-            print("GENERAL CHAT ERROR:", e)
-            assistant_text = "Something went wrong generating a response."
+            updates = self._extract_working_state_updates(
+                user_text=user_text,
+                current_state=self._get_working_state(session_id),
+            )
 
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text
-        )
+            print("WORKING_STATE_UPDATES =", updates)
 
-        updates = self._extract_working_state_updates(
-            user_text=user_text,
-            current_state=self._get_working_state(session_id),
-        )
+            if updates:
+                self._update_working_state(session_id, updates)
 
-        payload = self._build_common_state_payload(session_id=session_id)
-        payload.update(
-            {
-                "assistant_message": assistant_msg,
-                "updates": updates,
-                "debug": {
-                    "decision": decision,
-                    "route_taken": "general_chat",
-                },
-            }
-        )
+            assistant_meta = {}
+            if working_state:
+                assistant_meta["working_state"] = working_state
+            if working_context_block:
+                assistant_meta["working_context_block"] = working_context_block
 
-        return payload
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                meta=assistant_meta,
+                attachments=[],
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+                saved_artifact=None,
+            )
 
     def _execute_web_operator(self, user_text: str, session_id: str) -> dict:
         try:
@@ -5197,9 +5202,7 @@ Write the exact goal in one sentence.
 
             latest_execution = self._find_latest_execution_artifact(session_id=session_id)
 
-            latest_execution = self._find_latest_execution_artifact(session_id=session_id)
-
-            if "plan" in self._safe_str(user_text).lower():
+            if self._looks_like_plan_request(user_text) and not latest_execution:
                 print("AUTO PLAN: generating execution plan")
                 saved_artifact = self._build_execution_plan(user_text, session_id)
 
@@ -5212,7 +5215,6 @@ Write the exact goal in one sentence.
                     )
 
                 assistant_text = "Execution plan created.\n\nUse 'run it' to advance one step."
-
                 if isinstance(saved_artifact, dict) and saved_artifact.get("body"):
                     assistant_text += "\n\n" + self._safe_str(saved_artifact.get("body"))
 

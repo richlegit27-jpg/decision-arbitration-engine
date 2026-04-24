@@ -1081,6 +1081,42 @@ def api_artifact_view(artifact_id: str):
         artifact=payload,
     )
 
+@app.delete("/api/artifacts/<artifact_id>")
+def api_delete_artifact(artifact_id: str):
+    try:
+        ok = artifact_service.delete_artifact(artifact_id)
+
+        return json_ok(
+            ok=bool(ok),
+            deleted_artifact_id=artifact_id,
+            artifacts=artifact_service.build_list_payload(),
+        )
+
+    except Exception as e:
+        return json_error(f"Failed to delete artifact: {e}", 500)
+
+def delete_artifact(self, artifact_id: str) -> bool:
+    try:
+        data = self._load()
+
+        artifacts = data.get("artifacts", [])
+
+        new_artifacts = [
+            a for a in artifacts
+            if str(a.get("id")) != str(artifact_id)
+        ]
+
+        if len(new_artifacts) == len(artifacts):
+            return False
+
+        data["artifacts"] = new_artifacts
+        self._save(data)
+
+        return True
+
+    except Exception as e:
+        print("DELETE ARTIFACT ERROR:", e)
+        return False
 
 # -----------------------
 # MEMORY

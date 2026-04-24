@@ -1688,6 +1688,16 @@ function renderAttachmentBlock(attachment) {
     );
   }
 
+function linkifySourceLines(html) {
+  return String(html || "").replace(
+    /(https?:\/\/[^\s<]+)/g,
+    function (url) {
+      const cleanUrl = url.replace(/[.,)]$/, "");
+      return `<div class="source-row" data-url="${cleanUrl}" data-title="Source">${cleanUrl}</div>`;
+    }
+  );
+}
+
 function renderMessageCard(message) {
   if (!message) return "";
 
@@ -1891,55 +1901,91 @@ function renderChat() {
   });
 
   setChatEmptyVisible(state.messages.length === 0);
+
   const workingContextHtml = "";
   const messagesHtml = state.messages.map(renderMessageCard).join("");
   let nextHtml = workingContextHtml + messagesHtml;
 
-  nextHtml = nextHtml.replace(/\n/g, "<br>");
-
   if (els.chatThread.__lastRenderHtml !== nextHtml) {
     els.chatThread.innerHTML = nextHtml;
+
+// 🔥 SOURCE CLICK HANDLER (RIGHT RAIL VIEWER)
+document.querySelectorAll(".source-row").forEach(function (el) {
+  el.addEventListener("click", function () {
+    const url = el.getAttribute("data-url");
+    if (!url) return;
+
+    const rail = document.querySelector("[data-right-rail]");
+    const viewer = document.querySelector("[data-rail-viewer]");
+    if (!rail || !viewer) return;
+
+    rail.classList.add("is-open");
+    document.body.classList.add("is-rail-open");
+    viewer.hidden = false;
+
+    viewer.innerHTML = `
+      <div class="nova-viewer-shell">
+        <div class="nova-viewer-title">Source preview</div>
+        <div class="nova-viewer-body">
+          <a href="${url}" target="_blank" rel="noopener noreferrer">Open full article</a>
+        </div>
+      </div>
+    `;
+  });
+});
+
     els.chatThread.__lastRenderHtml = nextHtml;
   }
 
   wireWorkingContextPanel();
 
-els.chatThread.querySelectorAll(".source-row").forEach(function (el) {
-  if (el.__wired) return;   // 🔥 prevents duplicates
-  el.__wired = true;
+  els.chatThread.querySelectorAll(".source-row").forEach(function (el) {
+    if (el.__wired) return;
+    el.__wired = true;
 
-  el.addEventListener("click", async function (e) {
-  e.stopPropagation();
+    el.addEventListener("click", async function (e) {
+      e.stopPropagation();
 
-  if (e.target.tagName === "A") return;
+      if (e.target.tagName === "A") return;
 
-  let url = el.getAttribute("data-url") || "";
+      let url = el.getAttribute("data-url") || "";
 
-// 🔥 FIX GOOGLE RSS LINKS
-if (url.includes("news.google.com/rss/articles")) {
-  try {
-    const parsed = new URL(url);
-    const realUrl =
-      parsed.searchParams.get("url") ||
-      parsed.searchParams.get("u");
+      if (url.includes("news.google.com/rss/articles")) {
+        try {
+          const parsed = new URL(url);
+          const realUrl =
+            parsed.searchParams.get("url") ||
+            parsed.searchParams.get("u");
 
-    if (realUrl) {
-      url = realUrl;
-      console.log("CLEANED URL =", url);
-    }
-  } catch (e) {
-    console.warn("URL CLEAN FAIL", e);
-  }
-}
-console.log("CLICK SOURCE URL =", url);
+          if (realUrl) {
+            url = realUrl;
+            console.log("CLEANED URL =", url);
+          }
+        } catch (e) {
+          console.warn("URL CLEAN FAIL", e);
+        }
+      }
 
-if (!url || url === "null" || url === "undefined") {
-  console.warn("NO URL FOUND FOR SOURCE ROW");
-  return;
-}
-  const title = el.getAttribute("data-title") || el.getAttribute("data-preview") || "Source";
+      console.log("CLICK SOURCE URL =", url);
 
-      if (!url || !els.railViewer) return;
+      if (!url || url === "null" || url === "undefined") {
+        console.warn("NO URL FOUND FOR SOURCE ROW");
+        return;
+      }
+
+      sendMessage({
+        text: "open this",
+        force_route: "web_fetch",
+        mode: "followup_web_open",
+        url: url
+      });
+
+      const title =
+        el.getAttribute("data-title") ||
+        el.getAttribute("data-preview") ||
+        "Source";
+
+      if (!els.railViewer) return;
 
       els.railViewer.hidden = false;
 
@@ -1950,10 +1996,10 @@ if (!url || url === "null" || url === "undefined") {
         '<div class="nova-viewer-shell">' +
           '<div class="nova-viewer-title">' + safeTitle + '</div>' +
           '<div class="nova-viewer-body">' +
-  '<div class="nova-loading-bar"></div>' +
-  '<div class="nova-loading-line"></div>' +
-  '<div class="nova-loading-line short"></div>' +
-'</div>'
+            '<div class="nova-loading-bar"></div>' +
+            '<div class="nova-loading-line"></div>' +
+            '<div class="nova-loading-line short"></div>' +
+          '</div>' +
         '</div>';
 
       try {
@@ -1965,7 +2011,9 @@ if (!url || url === "null" || url === "undefined") {
 
         const data = await res.json();
 
-        const rawSummary = (data.result && data.result.summary) || "No summary available";
+        const rawSummary =
+          (data.result && data.result.summary) ||
+          "No summary available";
 
         const summaryParts = String(rawSummary)
           .split(/(?<=[.!?])\s+|\n+|•|- /)
@@ -2020,9 +2068,15 @@ if (!url || url === "null" || url === "undefined") {
   });
 
   const firstSourceRow = els.chatThread.querySelector(".source-row");
-  const firstSourceKey = firstSourceRow ? firstSourceRow.getAttribute("data-url") : "";
+  const firstSourceKey = firstSourceRow
+    ? firstSourceRow.getAttribute("data-url")
+    : "";
 
-  if (firstSourceRow && firstSourceKey && els.chatThread.__autoOpenedSource !== firstSourceKey) {
+  if (
+    firstSourceRow &&
+    firstSourceKey &&
+    els.chatThread.__autoOpenedSource !== firstSourceKey
+  ) {
     els.chatThread.__autoOpenedSource = firstSourceKey;
     setTimeout(function () {
       firstSourceRow.click();
@@ -2252,29 +2306,21 @@ function renderArtifacts() {
   }
   if (!els.artifactList) return;
 
-  const activeSessionId = String(state.activeSessionId || "").trim();
-  const searchQuery = String(
-    (state.rail && state.rail.artifactSearch) || ""
-  ).trim().toLowerCase();
+  if (!state.rail) state.rail = {};
 
-  let activeFilter = String(
-    (state.rail && state.rail.artifactFilter) || "all"
-  ).trim().toLowerCase();
+  const activeSessionId = String(state.activeSessionId || "").trim();
+  const searchQuery = String(state.rail.artifactSearch || "").trim().toLowerCase();
+  let activeFilter = String(state.rail.artifactFilter || "all").trim().toLowerCase();
 
   const allArtifacts = safeArray(state.artifacts);
 
-  let sessionArtifacts = allArtifacts.filter(function (item) {
-    if (!activeSessionId) return true;
-    return String(item && item.session_id ? item.session_id : "").trim() === activeSessionId;
+  const sessionArtifacts = allArtifacts.filter(function (item) {
+    const itemSessionId = String((item && item.session_id) || "").trim();
+    return !activeSessionId || !itemSessionId || itemSessionId === activeSessionId;
   });
-
-  if (!sessionArtifacts.length && allArtifacts.length) {
-    sessionArtifacts = allArtifacts.slice();
-  }
 
   function getKindBadge(kind) {
     const value = String(kind || "").toLowerCase();
-
     if (value.includes("image")) return "image";
     if (value.includes("web")) return "web";
     if (value.includes("chat")) return "chat";
@@ -2298,14 +2344,12 @@ function renderArtifacts() {
     return "Other";
   }
 
-  // 🔥 NEW: dynamic filter detection
   const filterSet = new Set(["all"]);
 
   sessionArtifacts.forEach(function (item) {
     const viewer = item && typeof item.viewer === "object" ? item.viewer : {};
     const kind = String(viewer.kind || item.kind || "artifact");
-    const badge = getKindBadge(kind);
-    filterSet.add(badge);
+    filterSet.add(getKindBadge(kind));
   });
 
   const filterOrder = ["all", "image", "web", "chat", "analysis", "artifact"];
@@ -2313,7 +2357,6 @@ function renderArtifacts() {
     return filterSet.has(f);
   });
 
-  // 🔥 normalize active filter
   if (!availableFilters.includes(activeFilter)) {
     activeFilter = "all";
     state.rail.artifactFilter = "all";
@@ -2325,9 +2368,7 @@ function renderArtifacts() {
       const meta = item && typeof item.meta === "object" ? item.meta : {};
 
       const id = String(item.id || "").trim();
-      const title = String(
-        viewer.title || item.title || item.name || "Artifact"
-      ).trim();
+      const title = String(viewer.title || item.title || item.name || "Artifact").trim();
 
       const preview = String(
         viewer.body ||
@@ -2338,10 +2379,7 @@ function renderArtifacts() {
           ""
       ).trim();
 
-      const kind = String(
-        viewer.kind || item.kind || "artifact"
-      ).trim();
-
+      const kind = String(viewer.kind || item.kind || "artifact").trim();
       const kindBadge = getKindBadge(kind);
 
       const thumbUrl = String(
@@ -2351,9 +2389,7 @@ function renderArtifacts() {
           ""
       ).trim();
 
-      const createdAt = String(
-        item.updated_at || item.created_at || ""
-      ).trim();
+      const createdAt = String(item.updated_at || item.created_at || "").trim();
 
       let timeLabel = "";
       if (createdAt) {
@@ -2377,7 +2413,7 @@ function renderArtifacts() {
         preview,
         kind,
         kindBadge,
-        String(item.session_id || "")
+        String(item.session_id || ""),
       ]
         .join("\n")
         .toLowerCase();
@@ -2399,13 +2435,11 @@ function renderArtifacts() {
       if (!entry.id) return false;
 
       const matchesSearch = !searchQuery || entry.haystack.includes(searchQuery);
-      const matchesFilter =
-        activeFilter === "all" || entry.kindBadge === activeFilter;
+      const matchesFilter = activeFilter === "all" || entry.kindBadge === activeFilter;
 
       return matchesSearch && matchesFilter;
     });
 
-  // 🔥 NEW: dynamic filters UI
   const filterLabels = {
     all: "All",
     image: "Image",
@@ -2417,22 +2451,24 @@ function renderArtifacts() {
 
   const controlsHtml =
     '<div class="rail-artifact-tools">' +
-      '<input type="text" class="rail-artifact-search" data-artifact-search placeholder="Search artifacts..." value="' +
-        escapeHtml((state.rail && state.rail.artifactSearch) || "") +
-      '">' +
-      '<div class="rail-artifact-filters">' +
-        availableFilters.map(function (f) {
-          return (
-            '<button type="button" class="rail-filter-pill' +
-              (activeFilter === f ? " is-active" : "") +
-              '" data-artifact-filter="' +
-              escapeHtml(f) +
-              '">' +
-              escapeHtml(filterLabels[f] || f) +
-            "</button>"
-          );
-        }).join("") +
-      "</div>" +
+    '<input type="text" class="rail-artifact-search" data-artifact-search placeholder="Search artifacts..." value="' +
+    escapeHtml(state.rail.artifactSearch || "") +
+    '">' +
+    '<div class="rail-artifact-filters">' +
+    availableFilters
+      .map(function (f) {
+        return (
+          '<button type="button" class="rail-filter-pill' +
+          (activeFilter === f ? " is-active" : "") +
+          '" data-artifact-filter="' +
+          escapeHtml(f) +
+          '">' +
+          escapeHtml(filterLabels[f] || f) +
+          "</button>"
+        );
+      })
+      .join("") +
+    "</div>" +
     "</div>";
 
   if (!sessionArtifacts.length) {
@@ -2476,17 +2512,24 @@ function renderArtifacts() {
       return getGroupOrder(a) - getGroupOrder(b);
     })
     .map(function (groupKey) {
-      const cards = grouped[groupKey].map(function (entry) {
-        return (
-          '<div class="nova-artifact-card" data-artifact-open="' +
-          escapeHtml(entry.id) +
-          '">' +
-          '<div class="nova-artifact-card-title">' +
-          escapeHtml(entry.title) +
-          "</div>" +
-          "</div>"
-        );
-      }).join("");
+      const cards = grouped[groupKey]
+        .map(function (entry) {
+          return (
+            '<div class="nova-artifact-card" data-artifact-open="' +
+            escapeHtml(entry.id) +
+            '" data-artifact-id="' +
+            escapeHtml(entry.id) +
+            '">' +
+            '<div class="nova-artifact-card-title">' +
+            escapeHtml(entry.title) +
+            "</div>" +
+            '<button type="button" class="nova-artifact-delete" data-action="delete-artifact" data-artifact-id="' +
+            escapeHtml(entry.id) +
+            '" title="Delete artifact">Delete</button>' +
+            "</div>"
+          );
+        })
+        .join("");
 
       return (
         '<section class="nova-artifact-group">' +
@@ -3161,80 +3204,33 @@ async function openArtifactFromStateOrBackend(artifactId) {
   const id = String(artifactId || "").trim();
   if (!id) return;
 
-  let artifact =
-    typeof findArtifactById === "function" ? findArtifactById(id) : null;
+  let artifact = typeof findArtifactById === "function" ? findArtifactById(id) : null;
 
   if (!artifact) {
     try {
       const payload = await apiGet("/api/state");
       applyStatePayload(payload);
-      artifact =
-        typeof findArtifactById === "function" ? findArtifactById(id) : null;
+      artifact = typeof findArtifactById === "function" ? findArtifactById(id) : null;
     } catch (error) {
       warn("artifact refresh failed", error);
     }
   }
 
-  if (!artifact) {
-    openRail();
-    setRailTab("artifacts");
-    setRailSelectedItem("artifact", id);
+  openRail();
+  setRailTab("artifacts");
 
+  if (!artifact) {
     if (els.railViewer) {
       els.railViewer.hidden = false;
       els.railViewer.innerHTML =
         '<div class="nova-viewer-shell">' +
-        '<div class="nova-viewer-empty">' +
-        '<div class="nova-viewer-empty-title">Artifact not found</div>' +
-        '<div class="nova-viewer-empty-copy">This artifact is not available in the current state.</div>' +
-        "</div>" +
-        "</div>";
+          '<div class="nova-viewer-empty">' +
+            '<div class="nova-viewer-empty-title">Artifact not found</div>' +
+            '<div class="nova-viewer-empty-copy">This artifact is not available in the current state.</div>' +
+          '</div>' +
+        '</div>';
     }
-
     showToast("Artifact not found.", "error");
-    return;
-  }
-
-  const artifactSessionId = String(
-    artifact.session_id ||
-      (artifact.viewer && artifact.viewer.session_id) ||
-      ""
-  ).trim();
-
-  if (
-    artifactSessionId &&
-    artifactSessionId !== String(state.activeSessionId || "").trim()
-  ) {
-    try {
-      state.pendingArtifactOpenId = id;
-      await openSessionFromBackend(artifactSessionId);
-
-      artifact =
-        typeof findArtifactById === "function" ? findArtifactById(id) || artifact : artifact;
-    } catch (error) {
-      warn("artifact session open failed", error);
-      showToast("Session switch failed.", "error");
-      return;
-    }
-  }
-
-  if (!artifact) {
-    if (state.pendingArtifactOpenId === id) {
-      state.pendingArtifactOpenId = "";
-    }
-
-    if (els.railViewer) {
-      els.railViewer.hidden = false;
-      els.railViewer.innerHTML =
-        '<div class="nova-viewer-shell">' +
-        '<div class="nova-viewer-empty">' +
-        '<div class="nova-viewer-empty-title">Artifact reopen failed</div>' +
-        '<div class="nova-viewer-empty-copy">The owning session opened, but this artifact could not be resolved afterward.</div>' +
-        "</div>" +
-        "</div>";
-    }
-
-    showToast("Artifact could not be reopened after session switch.", "error");
     return;
   }
 
@@ -3244,15 +3240,17 @@ async function openArtifactFromStateOrBackend(artifactId) {
   state.rail.selectedKind = "artifact";
   state.rail.selectedId = id;
 
-  openRail();
-  setRailTab("artifacts");
-  setRailSelectedItem("artifact", id);
+  if (typeof setRailSelectedItem === "function") {
+    setRailSelectedItem("artifact", id);
+  }
+
+  if (els.railViewer) {
+    els.railViewer.hidden = false;
+    els.railViewer.innerHTML = artifactViewerHtml(artifact);
+  }
 
   if (window.NovaArtifacts && typeof window.NovaArtifacts.setActiveArtifactById === "function") {
     window.NovaArtifacts.setActiveArtifactById(id);
-  } else if (els.railViewer) {
-    els.railViewer.hidden = false;
-    els.railViewer.innerHTML = artifactViewerHtml(artifact);
   }
 
   if (els.railTitle) {
@@ -3260,8 +3258,7 @@ async function openArtifactFromStateOrBackend(artifactId) {
   }
 
   if (els.railSubtitle) {
-    const viewer =
-      artifact.viewer && typeof artifact.viewer === "object" ? artifact.viewer : {};
+    const viewer = artifact.viewer && typeof artifact.viewer === "object" ? artifact.viewer : {};
     els.railSubtitle.textContent = String(
       viewer.title || artifact.title || artifact.name || "Artifact"
     );
@@ -3524,7 +3521,17 @@ updateTopbarFromState();
       data.assistant_message.artifact = data.saved_artifact;
     }
 
-    applyStatePayload(data || {});
+     applyStatePayload(data || {});
+
+    // 🔥 AUTO-OPEN LATEST ARTIFACT
+    if (data && data.saved_artifact && data.saved_artifact.id) {
+      openArtifactFromStateOrBackend(data.saved_artifact.id);
+    }
+
+    if (state.stream && state.stream.targetMessageId) {
+      removeMessage(state.stream.targetMessageId);
+    }
+
 if (state.stream && state.stream.targetMessageId) {
   removeMessage(state.stream.targetMessageId);
 }
@@ -3937,7 +3944,7 @@ async function recordVoiceOnce() {
   });
 
   recorder.start();
-  showToast("Recording... click voice again to stop.", "info");
+  showToast("🎤 Recording... click again to send", "info");
 
   return new Promise(function (resolve, reject) {
     recorder.addEventListener("stop", function () {
@@ -4035,6 +4042,7 @@ const safeText = typeof text === "string" ? text : "";
   }
 
   showToast("Voice ready. Sending...", "success");
+  console.log("VOICE TRANSCRIPT =", text);
   await sendMessage();
 
   return text;
@@ -5457,6 +5465,57 @@ function wireArtifactClicks() {
   els.artifactList.dataset.bound = "1";
 
   els.artifactList.addEventListener("click", async function (event) {
+    const deleteBtn = event.target.closest('[data-action="delete-artifact"]');
+    if (deleteBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const id = deleteBtn.getAttribute("data-artifact-id");
+      if (!id) return;
+
+      const artifact = (state.artifacts || []).find(function (item) {
+        return String(item && item.id) === String(id);
+      });
+
+      if (!artifact) return;
+
+      state.artifacts = (state.artifacts || []).filter(function (item) {
+        return String(item && item.id) !== String(id);
+      });
+
+      renderArtifacts();
+
+      const undo = window.confirm("Artifact hidden. Undo delete?");
+      if (undo) {
+        state.artifacts.unshift(artifact);
+        renderArtifacts();
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/artifacts/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+          headers: { "Accept": "application/json" }
+        });
+
+        const data = await res.json();
+
+        if (!data || data.ok === false) {
+          alert("Permanent delete failed. Restoring artifact.");
+          state.artifacts.unshift(artifact);
+          renderArtifacts();
+        }
+      } catch (err) {
+        console.error("Delete error:", err);
+        alert("Permanent delete failed. Restoring artifact.");
+        state.artifacts.unshift(artifact);
+        renderArtifacts();
+      }
+
+      return;
+    }
+
+
     const card = event.target.closest("[data-artifact-open]");
     if (!card) return;
 

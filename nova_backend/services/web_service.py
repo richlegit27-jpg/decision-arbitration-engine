@@ -1401,8 +1401,8 @@ class WebService:
             title = str(item.get("title") or item.get("name") or "").strip()
             snippet = str(item.get("snippet") or item.get("content") or item.get("body") or "").strip()
             url = self._clean_source_url(
- 	        str(item.get("url") or item.get("source_url") or "").strip()
-	    )
+             str(item.get("url") or item.get("source_url") or "").strip()
+        )
             domain = str(item.get("domain") or "").strip()
 
             if not (title or snippet or url):
@@ -1416,11 +1416,11 @@ class WebService:
             })
 
         if not cleaned:
-            return f'I couldn’t find strong live results for "{query}".'      
+            return f'I couldn’t find strong live results for "{query}".'
 
         cleaned = self._rank_search_results(query, cleaned)
 
-	top = cleaned[0]
+        top = cleaned[0]
 
         title = self._clean_result_title(top)
         source = self._clean_source_name(top)
