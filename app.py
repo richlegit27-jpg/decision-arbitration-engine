@@ -623,6 +623,24 @@ def api_chat():
 
     lowered = user_text.lower()
 
+    lowered = user_text.lower()
+
+    # 🔥 PROTECT PERSONAL MEMORY QUERIES FROM WEB HIJACK
+    personal_memory_queries = (
+        "what is my",
+        "what's my",
+        "my favorite",
+        "my favourite",
+        "what do you know about me",
+        "about me",
+        "who am i",
+        "my name",
+        "what am i working on",
+    )
+
+    if any(q in lowered for q in personal_memory_queries):
+        decision["route"] = "general_chat"
+
     # 🔒 HARD ROUTE LOCK (stability first)
     if any(x in lowered for x in [
         "weather", "forecast", "temperature", "rain", "snow", "wind", "humidity"
@@ -641,7 +659,7 @@ def api_chat():
         decision["route"] = "web_search"
 
     elif any(x in lowered for x in [
-        "latest", "news", "current", "update", "who is", "what is", "tell me about"
+        "latest", "news", "current", "update", "who is", "tell me about"
     ]):
         decision["route"] = "web_search"
 
@@ -651,7 +669,6 @@ def api_chat():
         "latest",
         "price",
         "who is",
-        "what is",
         "tell me about",
         "current",
         "update",

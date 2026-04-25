@@ -1,15 +1,6 @@
 {
   "memory": [
     {
-      "text": "remember my favorite color is red",
-      "kind": "note",
-      "source": "manual",
-      "session_id": "",
-      "id": "memory_30647f17556540b3928bc5d405d80d69",
-      "updated_at": "2026-04-25T13:07:47.892453+00:00",
-      "created_at": "2026-04-25T13:07:47.892453+00:00"
-    },
-    {
       "text": "watch joe rogan",
       "kind": "note",
       "source": "manual",
@@ -44,15 +35,6 @@
       "id": "memory_daad3100ca89475086663436610bae09",
       "updated_at": "2026-04-25T12:58:11.685959+00:00",
       "created_at": "2026-04-25T12:58:11.685959+00:00"
-    },
-    {
-      "text": "facorate color is blue",
-      "kind": "note",
-      "source": "manual",
-      "session_id": "",
-      "id": "memory_9f63b413257c44c8a949e1a9fc31939f",
-      "updated_at": "2026-04-25T12:58:00.315768+00:00",
-      "created_at": "2026-04-25T12:58:00.315768+00:00"
     },
     {
       "text": "God is always good",

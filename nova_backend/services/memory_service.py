@@ -61,11 +61,33 @@ class MemoryService:
         item = dict(item or {})
         now = iso_now()
 
+        new_text = str(item.get("text") or "").strip().lower()
+        new_kind = str(item.get("kind") or "note").strip().lower()
+
+        # dedup / overwrite same kind + same text
+        for i, existing in enumerate(memory):
+            existing_text = str((existing or {}).get("text") or "").strip().lower()
+            existing_kind = str((existing or {}).get("kind") or "note").strip().lower()
+
+            if existing_text == new_text and existing_kind == new_kind:
+                existing = dict(existing or {})
+                existing.update(item)
+                existing["updated_at"] = now
+                if not existing.get("created_at"):
+                    existing["created_at"] = now
+
+                memory[i] = existing
+                data["memory"] = memory
+                self._write_store(data)
+                return existing
+
         if not item.get("id"):
             import uuid
             item["id"] = f"memory_{uuid.uuid4().hex}"
 
+        item["kind"] = new_kind
         item["updated_at"] = now
+
         if not item.get("created_at"):
             item["created_at"] = now
 

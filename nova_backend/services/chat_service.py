@@ -759,6 +759,22 @@ class ChatService:
             should_save = True
             kind = "profile"
 
+        # style / communication
+        elif any(
+            x in lowered
+            for x in [
+                "answer me",
+                "talk to me",
+                "respond with",
+                "be direct",
+                "no fluff",
+                "tldr",
+                "smff",
+            ]
+        ):
+            should_save = True
+            kind = "style"
+
         # preferences
         elif any(
             x in lowered
@@ -1436,7 +1452,7 @@ class ChatService:
         if any(pattern in lowered for pattern in junk_patterns):
             return False
 
-        if kind in {"profile", "project", "preference", "goal", "note"}:
+        if kind in {"profile", "project", "preference", "goal", "note", "style"}:
             return True
 
         strong_signals = (
@@ -1588,6 +1604,33 @@ class ChatService:
         attachments = attachments or []
         text = self._safe_str(user_text)
         lowered = text.lower()
+
+        # 🔥 FORCE MEMORY FOR PERSONAL QUERIES (HIGHEST PRIORITY)
+        personal_memory_queries = (
+            "what is my",
+            "what's my",
+            "who am i",
+            "what do you know about me",
+            "about me",
+            "my favorite",
+            "my favourite",
+            "my name",
+            "what am i working on",
+        )
+
+        if any(q in lowered for q in personal_memory_queries):
+            return {
+                "route": self.ROUTE_GENERAL_CHAT,
+                "mode": "memory",
+                "confidence": 0.99,
+                "use_memory": True,
+                "save_memory": False,
+                "save_artifact": False,
+                "has_attachments": False,
+                "url": "",
+                "memory_limit": self.memory_limit,
+                "reasons": ["forced_memory_priority"],
+            }
 
         # 🔥 FORCE WEB ROUTE FOR LIVE QUERIES
         if any(word in lowered for word in [
@@ -3729,22 +3772,24 @@ Write the exact goal in one sentence.
         k = self._safe_str(kind).lower()
 
         if k in {"profile", "identity"}:
-            return 8.0
+            return 9.0
+
+        if k in {"style"}:
+            return 8.0   # 🔥 NEW — how you want responses
 
         if k in {"preference"}:
-            return 6.0
+            return 7.0
 
         if k in {"project", "goal"}:
-            return 5.0
+            return 6.0
 
         if k in {"instruction", "workflow"}:
-            return 4.0
+            return 5.0
 
         if k in {"note"}:
             return 2.0
 
         return 1.0
-
 
     def _memory_time_bonus(self, item: dict) -> float:
             created_at = self._safe_str(item.get("updated_at") or item.get("created_at"))
