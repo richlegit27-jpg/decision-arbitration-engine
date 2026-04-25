@@ -3293,7 +3293,6 @@ Write the exact goal in one sentence.
                     "save_memory": False,
                     "use_memory": True,
                 },
-                saved_artifact=None,
             )
 
         max_steps = 20
