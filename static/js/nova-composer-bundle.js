@@ -4874,30 +4874,6 @@ function wireWebLinks() {
 }
 
 function wireMemoryControls() {
-  // ADD
-  document.querySelectorAll(".nova-memory-add-btn").forEach(function (btn) {
-    if (btn.__wired) return;
-    btn.__wired = true;
-
-    btn.addEventListener("click", async function () {
-      const text = prompt("Enter memory:");
-      if (!text) return;
-
-      const res = await fetch("/api/memory/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-
-      const data = await res.json();
-      if (data?.data?.memory) {
-  state.memory = data.data.memory;
-        renderMemory();
-      }
-    });
-  });
-
-  // DELETE
   document.querySelectorAll("[data-memory-delete]").forEach(function (btn) {
     if (btn.__wired) return;
     btn.__wired = true;
@@ -4908,16 +4884,24 @@ function wireMemoryControls() {
       const id = btn.getAttribute("data-memory-delete");
       if (!id) return;
 
-      const res = await fetch("/api/memory/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
+      try {
+        const res = await fetch("/api/memory/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: id }),
+        });
 
-      const data = await res.json();
-      if (data?.data?.memory) {
-        state.memory = data.data.memory;
-        renderMemory();
+        const data = await res.json();
+
+        if (data && data.ok) {
+          state.memory = safeArray(state.memory).filter(function (m) {
+            return String(m.id) !== String(id);
+          });
+
+          renderMemory();
+        }
+      } catch (err) {
+        console.error("Memory delete failed", err);
       }
     });
   });
