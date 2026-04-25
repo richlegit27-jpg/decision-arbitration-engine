@@ -84,12 +84,19 @@ class ChatService:
 
         session_id = self._ensure_session_id(session_id)
         user_text = self._safe_str(user_text)
-
-        decision = self._decide_route(
-            user_text=user_text,
-            attachments=attachments,
-        )
-
+ 
+        decision = {
+            "route": self.ROUTE_GENERAL_CHAT,
+            "mode": "chat",
+            "confidence": 0.55,
+            "use_memory": True,
+            "save_memory": True,
+            "save_artifact": False,
+            "has_attachments": bool(attachments),
+            "url": "",
+            "memory_limit": self.memory_limit,
+            "reasons": ["recovery_bypass_decide_route"],
+        }
         working_state = self._maybe_update_working_state(session_id, user_text)
         working_context_block = self._build_working_context_block(session_id)
 
