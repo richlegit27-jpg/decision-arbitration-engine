@@ -64,6 +64,32 @@ class MemoryService:
         new_text = str(item.get("text") or "").strip().lower()
         new_kind = str(item.get("kind") or "note").strip().lower()
 
+        preference_keys = (
+            "favorite color",
+            "favourite color",
+            "communication style",
+            "name is",
+            "prefers to be called",
+        )
+
+        for key in preference_keys:
+            if key in new_text:
+                for i, existing in enumerate(memory):
+                    existing_text = str((existing or {}).get("text") or "").strip().lower()
+                    existing_kind = str((existing or {}).get("kind") or "note").strip().lower()
+
+                    if key in existing_text and existing_kind == new_kind:
+                        existing = dict(existing or {})
+                        existing.update(item)
+                        existing["updated_at"] = now
+                        if not existing.get("created_at"):
+                            existing["created_at"] = now
+
+                        memory[i] = existing
+                        data["memory"] = memory
+                        self._write_store(data)
+                        return existing
+
         # dedup / overwrite same kind + same text
         for i, existing in enumerate(memory):
             existing_text = str((existing or {}).get("text") or "").strip().lower()
