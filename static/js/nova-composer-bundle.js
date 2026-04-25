@@ -5039,25 +5039,61 @@ function renderMemory() {
       '<button class="nova-memory-refresh-btn">Refresh</button>' +
     '</div>';
 
-  html += items.map(function (item) {
-    const id = escapeHtml(item.id);
-    const text = escapeHtml(summarizeMemoryText(item.text, 120));
-    const kind = escapeHtml(item.kind || "note");
-    const source = escapeHtml(item.source || "memory");
-    const session = escapeHtml(item.session_id || "");
+  const groups = {
+    profile: [],
+    identity: [],
+    style: [],
+    preference: [],
+    project: [],
+    goal: [],
+    note: [],
+  };
+
+  items.forEach(function (item) {
+    const kind = String(item.kind || "note").toLowerCase();
+    if (groups[kind]) {
+      groups[kind].push(item);
+    } else {
+      groups.note.push(item);
+    }
+  });
+
+  function renderMemorySection(title, list) {
+    if (!list.length) return "";
 
     return (
-      '<div class="nova-memory-card" data-memory-id="' + id + '">' +
-        '<div class="nova-memory-card-title">' + kind + '</div>' +
-        '<div class="nova-memory-card-preview">' + text + '</div>' +
-        '<div class="nova-memory-meta">' +
-          (session ? '<span>' + session + '</span>' : '') +
-          '<span>' + source + '</span>' +
-        '</div>' +
-        '<button class="nova-memory-delete" data-memory-delete="' + id + '">Remove</button>' +
+      '<div class="nova-memory-section">' +
+        '<div class="nova-memory-section-title">' + escapeHtml(title) + '</div>' +
+        list.map(function (item) {
+          const id = escapeHtml(item.id);
+          const text = escapeHtml(summarizeMemoryText(item.text, 120));
+          const kind = escapeHtml(item.kind || "note");
+          const source = escapeHtml(item.source || "memory");
+          const session = escapeHtml(item.session_id || "");
+
+          return (
+            '<div class="nova-memory-card" data-memory-id="' + id + '">' +
+              '<div class="nova-memory-card-title">' + kind + '</div>' +
+              '<div class="nova-memory-card-preview">' + text + '</div>' +
+              '<div class="nova-memory-meta">' +
+                (session ? '<span>' + session + '</span>' : '') +
+                '<span>' + source + '</span>' +
+              '</div>' +
+              '<button class="nova-memory-delete" data-memory-delete="' + id + '">Remove</button>' +
+            '</div>'
+          );
+        }).join("") +
       '</div>'
     );
-  }).join("");
+  }
+
+  html +=
+    renderMemorySection("Identity", groups.profile.concat(groups.identity)) +
+    renderMemorySection("Style", groups.style) +
+    renderMemorySection("Preferences", groups.preference) +
+    renderMemorySection("Project", groups.project) +
+    renderMemorySection("Goals", groups.goal) +
+    renderMemorySection("Notes", groups.note);
 
   els.memoryList.innerHTML = html;
 
