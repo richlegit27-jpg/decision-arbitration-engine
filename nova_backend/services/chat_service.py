@@ -192,40 +192,59 @@ class ChatService:
         decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
 
-        # build prompt
         prompt = self._safe_str(decision.get("prompt"))
         if not prompt:
             prompt = self._image_prompt_from_text(user_text)
 
-        # build user message
         user_msg = self._build_user_message(
             user_text,
             attachments=attachments,
         )
 
         try:
-            # 🔥 USE THE WORKING IMAGE PIPELINE
-            result = self._handle_image_generation(
+            result = self.client.images.generate(
+                model=self.image_model,
                 prompt=prompt,
-                session_id=session_id,
+                size=self.image_size,
             )
 
-            image_url = self._safe_str(result.get("image_url")) if isinstance(result, dict) else ""
-            saved_artifact = result.get("saved_artifact") if isinstance(result, dict) else None
+            first = result.data[0] if getattr(result, "data", None) else None
+            image_b64 = getattr(first, "b64_json", None) if first else None
+            if not image_b64:
+                raise ValueError("Image API returned no b64_json")
 
-            assistant_text = self._safe_str(result.get("text")) if isinstance(result, dict) else ""
-            if not assistant_text:
-                assistant_text = f"Generated image for: {prompt}"
+            image_bytes = base64.b64decode(image_b64)
+            filename = f"generated_{uuid.uuid4().hex}.png"
+            filepath = self.uploads_dir / filename
+
+            with open(filepath, "wb") as f:
+                f.write(image_bytes)
+
+            image_url = f"/api/uploads/{filename}"
+
+            saved_artifact = None
+            try:
+                saved_artifact = self._persist_image_generation_artifact(
+                    session_id=session_id,
+                    prompt=prompt,
+                    image_url=image_url,
+                    revised_prompt="",
+                    parent_artifact_id="",
+                    source_type="generated",
+                    generation_mode="text_to_image",
+                )
+            except Exception as e:
+                print("IMAGE ARTIFACT SAVE FAILED:", e)
 
             assistant_msg = self._build_assistant_message(
-                text=assistant_text,
+                text=f"Generated image for: {prompt}",
                 attachments=[
                     {
                         "type": "image",
                         "url": image_url,
                         "name": "Generated Image",
                     }
-                ] if image_url else [],
+                ],
                 meta={
                     "type": "image_generation",
                     "image_url": image_url,
@@ -436,16 +455,19 @@ class ChatService:
         session_id = self._ensure_session_id(session_id)
         user_text = self._safe_str(user_text)
 
+        print("🔥 CHAT_SERVICE_HANDLE_HIT:", user_text)
+
         decision = self._decide_route(
             user_text=user_text,
             session_id=session_id,
             attachments=attachments,
         )
 
-        route = self._safe_str(decision.get("route"))
+        if "image" in user_text.lower():
+            decision["route"] = self.ROUTE_IMAGE_GENERATION
+            decision["mode"] = "image_generation"
+            decision["prompt"] = user_text
 
-        # 🔥 1. IMAGE GENERATION (FIRST)
-        if route == self.ROUTE_IMAGE_GENERATION:
             return self._execute_image_generation(
                 user_text=user_text,
                 session_id=session_id,
@@ -453,7 +475,8 @@ class ChatService:
                 decision=decision,
             )
 
-        # 🌐 2. WEB FETCH
+        route = self._safe_str(decision.get("route"))
+
         if route == self.ROUTE_WEB_FETCH:
             return self._execute_web_fetch(
                 decision=decision,
@@ -462,7 +485,6 @@ class ChatService:
                 attachments=attachments,
             )
 
-        # 💬 3. GENERAL CHAT (DEFAULT)
         result = self._execute_general_chat(
             user_text=user_text,
             session_id=session_id,
@@ -470,11 +492,9 @@ class ChatService:
             decision=decision,
         )
 
-        # 🧠 4. MEMORY (AFTER RESPONSE)
         self._maybe_write_memory(decision, user_text, session_id)
 
         return result
-
 
     def _clean_artifact_text(self, value: str, limit: int = 300) -> str:
         text = re.sub(r"\s+", " ", self._safe_str(value)).strip()
@@ -2045,98 +2065,94 @@ class ChatService:
         )
         return any(trigger in t for trigger in triggers)
 
-def _decide_route(
-    self,
-    user_text: str,
-    attachments=None,
-    session_id: str = "",
-) -> dict:
+    def _decide_route(
+        self,
+        user_text: str,
+        attachments=None,
+        session_id: str = "",
+    ) -> dict:
 
-    user_text = self._safe_str(user_text)
-    lower_text = user_text.lower()
+        user_text = self._safe_str(user_text)
+        lower_text = user_text.lower()
 
-    attachments = attachments or []
+        attachments = attachments or []
 
-    # =========================
-    # IMAGE GENERATION (PRIORITY)
-    # =========================
-    image_triggers = (
-        "generate an image",
-        "make an image",
-        "create an image",
-        "draw ",
-        "picture of",
-        "image of",
-        "render ",
-    )
+        # =========================
+        # IMAGE GENERATION (PRIORITY)
+        # =========================
+        image_triggers = (
+            "generate an image",
+            "make an image",
+            "create an image",
+            "draw ",
+            "picture of",
+            "image of",
+            "render ",
+        )
 
-    if any(trigger in lower_text for trigger in image_triggers):
+        if any(trigger in lower_text for trigger in image_triggers):
+            return {
+                "route": self.ROUTE_IMAGE_GENERATION,   # 🔥 use constant
+                "mode": "image_generation",
+                "confidence": 0.95,
+                "reasons": ["image_generation_intent"],
+                "save_artifact": True,
+                "save_memory": False,
+                "use_memory": False,
+                "prompt": user_text,
+            }
+
+        # =========================
+        # IMAGE ANALYSIS (attachments)
+        # =========================
+        if attachments:
+            return {
+                "route": self.ROUTE_ATTACHMENT_ANALYSIS,
+                "mode": "image_analysis",
+                "confidence": 0.9,
+                "reasons": ["attachment_present"],
+                "save_artifact": True,
+                "save_memory": False,
+                "use_memory": False,
+            }
+
+        # =========================
+        # WEB SEARCH
+        # =========================
+        web_triggers = (
+            "latest",
+            "news",
+            "today",
+            "current",
+            "price",
+            "stock",
+            "bitcoin",
+            "nvidia",
+        )
+
+        if any(trigger in lower_text for trigger in web_triggers):
+            return {
+                "route": self.ROUTE_WEB_FETCH,   # 🔥 use constant
+                "mode": "web_fetch",
+                "confidence": 0.85,
+                "reasons": ["web_intent"],
+                "save_artifact": True,
+                "save_memory": False,
+                "use_memory": False,
+            }
+
+        # =========================
+        # DEFAULT CHAT
+        # =========================
         return {
-            "route": "image_generation",
-            "mode": "image_generation",
-            "confidence": 0.95,
-            "reasons": ["image_generation_intent"],
-            "save_artifact": True,
-            "save_memory": False,
-            "use_memory": False,
-            "prompt": user_text,
+            "route": self.ROUTE_GENERAL_CHAT,
+            "mode": "chat",
+            "confidence": 0.6,
+            "reasons": ["default_chat"],
+            "save_artifact": False,
+            "save_memory": True,
+            "use_memory": True,
         }
-
-    # =========================
-    # IMAGE ANALYSIS (attachments)
-    # =========================
-    if attachments:
-        return {
-            "route": "image_analysis",
-            "mode": "image_analysis",
-            "confidence": 0.9,
-            "reasons": ["attachment_present"],
-            "save_artifact": True,
-            "save_memory": False,
-            "use_memory": False,
-        }
-
-    # =========================
-    # WEB SEARCH
-    # =========================
-    web_triggers = (
-        "latest",
-        "news",
-        "today",
-        "current",
-        "price",
-        "stock",
-        "bitcoin",
-        "nvidia",
-    )
-
-    if any(trigger in lower_text for trigger in web_triggers):
-        return {
-            "route": "web",
-            "mode": "web_fetch",
-            "confidence": 0.85,
-            "reasons": ["web_intent"],
-            "save_artifact": True,
-            "save_memory": False,
-            "use_memory": False,
-        }
-
-    # =========================
-    # DEFAULT CHAT
-    # =========================
-    return {
-        "route": "chat",
-        "mode": "chat",
-        "confidence": 0.6,
-        "reasons": ["default_chat"],
-        "save_artifact": False,
-        "save_memory": True,
-        "use_memory": True,
-    }
-
-    # ==============================
-    # EXECUTION SYSTEM
-    # ==============================
 
     def _normalize_steps_signature(self, steps) -> List[str]:
         if not isinstance(steps, list):
@@ -4430,7 +4446,7 @@ def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -
                 "source": "image_generation",
                 "meta": meta,
                 "viewer": {
-                    "kind": "image_generation",
+                    "kind": "image",
                     "title": "Generated image",
                     "body": artifact_text,
                     "summary": artifact_text,
@@ -4476,71 +4492,68 @@ def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -
             return self._save_artifact_fallback(artifact)
 
     def _handle_image_generation(
-            self,
-            prompt: str,
-            session_id: str = "",
-            parent_artifact_id: str = "",
-            source_type: str = "generated",
-        ) -> dict:
+        self,
+        prompt: str,
+        session_id: str = "",
+        parent_artifact_id: str = "",
+        source_type: str = "generated",
+    ) -> dict:
+        try:
+            result = self.client.images.generate(
+                model=self.image_model,
+                prompt=prompt,
+                size=self.image_size,
+            )
+
+            first = result.data[0] if getattr(result, "data", None) else None
+            image_b64 = getattr(first, "b64_json", None) if first else None
+            if not image_b64:
+                raise ValueError("Image API returned no b64_json")
+
+            image_bytes = base64.b64decode(image_b64)
+            filename = f"generated_{uuid.uuid4().hex}.png"
+            filepath = self.uploads_dir / filename
+
+            with open(filepath, "wb") as f:
+                f.write(image_bytes)
+
+            image_url = f"/api/uploads/{filename}"
+
+            saved_artifact = None
             try:
-                result = self.client.images.generate(
-                    model=self.image_model,
+                saved_artifact = self._persist_image_generation_artifact(
+                    session_id=session_id,
                     prompt=prompt,
-                    size=self.image_size,
+                    image_url=image_url,
+                    revised_prompt="",
+                    parent_artifact_id=parent_artifact_id,
+                    source_type=source_type,
+                    generation_mode="text_to_image",
                 )
-
-                first = result.data[0] if getattr(result, "data", None) else None
-                image_b64 = getattr(first, "b64_json", None) if first else None
-                if not image_b64:
-                    raise ValueError("Image API returned no b64_json")
-
-                image_bytes = base64.b64decode(image_b64)
-                filename = f"generated_{uuid.uuid4().hex}.png"
-                filepath = self.uploads_dir / filename
-
-                with open(filepath, "wb") as f:
-                    f.write(image_bytes)
-
-                image_url = f"/api/uploads/{filename}"
-
-                saved_artifact = None
-                try:
-                    saved_artifact = self._persist_image_generation_artifact(
-                        session_id=session_id,
-                        prompt=prompt,
-                        image_url=image_url,
-                        revised_prompt="",
-                        parent_artifact_id=parent_artifact_id,
-                        source_type=source_type,
-                        generation_mode="text_to_image",
-                    )
-                except Exception as e:
-                    print("IMAGE ARTIFACT SAVE FAILED:", e)
-
-                return {
-                    "ok": True,
-                    "text": f"Generated image for: {prompt}",
-                    "image_url": image_url,
-                    "prompt": prompt,
-                    "revised_prompt": "",
-                    "parent_artifact_id": parent_artifact_id,
-                    "source_type": source_type,
-                    "generation_mode": "text_to_image",
-                    "saved_artifact": saved_artifact,
-                }
             except Exception as e:
-                return {
-                    "ok": False,
-                    "text": f"Image generation failed: {e}",
-                    "error": str(e),
-                    "image_url": "",
-                    "prompt": prompt,
-                    "revised_prompt": "",
-                    "parent_artifact_id": parent_artifact_id,
-                    "source_type": source_type,
-                    "generation_mode": "text_to_image",
-                    "saved_artifact": None,
-                }
+                print("IMAGE ARTIFACT SAVE FAILED:", e)
+
+            return {
+                "ok": True,
+                "text": f"Generated image for: {prompt}",
+                "image_url": image_url,
+                "prompt": prompt,
+                "revised_prompt": "",
+                "saved_artifact": saved_artifact,
+            }
+
+        except Exception as e:
+            print("IMAGE GENERATION FAILED:", e)
+            return {
+                "ok": False,
+                "text": f"Image generation failed: {e}",
+                "error": str(e),
+                "image_url": "",
+                "prompt": prompt,
+                "revised_prompt": "",
+                "saved_artifact": None,
+            }
+
         # ==============================
         # WEB / ATTACHMENT HELPERS
         # ==============================
