@@ -4346,7 +4346,7 @@ Write the exact goal in one sentence.
 
         user_msg = self._build_user_message(
             user_text,
-            attachments=attachments
+            attachments=attachments,
         )
 
         prompt = self._build_chat_input(
@@ -4377,7 +4377,8 @@ Write the exact goal in one sentence.
             assistant_text = "Something went wrong generating a response."
 
         assistant_msg = self._build_assistant_message(
-            text=assistant_text
+            text=assistant_text,
+            memory_used=[],
         )
 
         updates = self._extract_working_state_updates(
@@ -4393,7 +4394,6 @@ Write the exact goal in one sentence.
             decision=decision,
             saved_artifact=None,
         )
-
         # ==============================
         # RESPONSE BUILDERS
         # ==============================
@@ -4408,14 +4408,22 @@ Write the exact goal in one sentence.
             "meta": meta,
         }
 
-    def _build_assistant_message(self, text: str, attachments=None, meta=None) -> dict:
+    def _build_assistant_message(
+        self,
+        text: str,
+        attachments=None,
+        meta=None,
+        memory_used=None,
+    ) -> dict:
         attachments = attachments or []
         meta = meta or {}
+
         return {
             "role": "assistant",
             "text": self._safe_str(text),
             "attachments": attachments,
             "meta": meta,
+            "memory_used": memory_used or [],
         }
 
     def _finalize_response(
@@ -4442,12 +4450,15 @@ Write the exact goal in one sentence.
         print("WORKING_CONTEXT_SHOULD_INJECT =", should_inject_working_context)
         print("WORKING_CONTEXT_PAYLOAD =", working_context_payload)
 
+        assistant_msg["memory_used"] = assistant_msg.get("memory_used", [])
+
         self._persist_turn(session_id, user_msg, assistant_msg)
 
         fresh_session = self._get_session_payload(
             session_id,
             fallback_messages=[user_msg, assistant_msg],
         )
+
         print(
             "FINALIZE_FRESH_SESSION_WORKING_STATE =",
             (fresh_session or {}).get("working_state"),
@@ -4488,7 +4499,6 @@ Write the exact goal in one sentence.
         )
 
         return payload
-
     def _execute_memory_recall(
             self,
             decision: dict,
@@ -4621,56 +4631,37 @@ Write the exact goal in one sentence.
         source_urls = []
 
         if isinstance(web_result, dict):
-            assistant_text = self._safe_str(web_result.get("summary")) or "Web fetch completed."
+            assistant_text = self._safe_str(
+                web_result.get("summary")
+            ) or "Web fetch completed."
 
             results = web_result.get("results")
 
             if isinstance(results, list):
                 for r in results:
+                    if not isinstance(r, dict):
+                        continue
                     url = self._safe_str(r.get("url"))
                     if url:
                         source_urls.append(url)
 
         artifact = web_result.get("artifact") if isinstance(web_result, dict) else None
 
-        if isinstance(artifact, dict) and source_urls:
-            meta = artifact.get("meta") or {}
-            viewer = artifact.get("viewer") or {}
+        if isinstance(artifact, dict):
+            meta = artifact.get("meta")
+            if not isinstance(meta, dict):
+                meta = {}
 
-            meta["source_urls"] = source_urls
-            viewer["source_urls"] = source_urls
+            viewer = artifact.get("viewer")
+            if not isinstance(viewer, dict):
+                viewer = {}
+
+            if source_urls:
+                meta["source_urls"] = source_urls
+                viewer["source_urls"] = source_urls
 
             artifact["meta"] = meta
             artifact["viewer"] = viewer
-
-        print("WEB_FETCH DEBUG web_result =", web_result)
-        print("WEB_FETCH DEBUG source_urls =", source_urls)
-
-        source_urls = []
-
-        if isinstance(web_result, dict):
-            results = web_result.get("results")
-
-            if isinstance(results, list):
-                for r in results:
-                    url = self._safe_str(r.get("url"))
-                    if url:
-                        source_urls.append(url)
-
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text,
-            attachments=[],
-            meta={"source_urls": source_urls} if source_urls else {},
-        )
-
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text,
-            attachments=[],
-            meta={"source_urls": source_urls} if source_urls else {},
-        )
-
-        artifact["meta"] = meta
-        artifact["viewer"] = viewer
 
         print("WEB_FETCH DEBUG web_result =", web_result)
         print("WEB_FETCH DEBUG source_urls =", source_urls)

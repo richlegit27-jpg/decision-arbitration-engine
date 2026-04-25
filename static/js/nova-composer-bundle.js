@@ -1774,11 +1774,17 @@ const textHtml = rawText
   if (message.stopped) metaBits.push("Stopped");
   if (message.source) metaBits.push(message.source);
 
-  const metaHtml = metaBits.length
-    ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
-    : "";
+const metaHtml = metaBits.length
+  ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
+  : "";
 
-  return (
+const memoryUsed = Array.isArray(message.memory_used) ? message.memory_used : [];
+
+const memoryUsedHtml = (role !== "user" && memoryUsed.length)
+  ? '<div class="message-card__memory-used">Memory used: ' + memoryUsed.length + '</div>'
+  : "";
+
+return (
     '<article class="message-card ' +
     roleClass +
     '" data-message-id="' +
@@ -1793,6 +1799,7 @@ const textHtml = rawText
     bodyHtml +
     imageHtml +
     attachmentsHtml +
+    memoryUsedHtml +
     renderMessageActions(message) +
     "</article>"
   );
@@ -4732,7 +4739,7 @@ function wireMemoryControls() {
 
       const data = await res.json();
       if (data?.data?.memory) {
-      state.memory = data.data.memory;
+  state.memory = data.data.memory;
         renderMemory();
       }
     });
@@ -4982,56 +4989,74 @@ function renderMemory() {
 
   if (!els.memoryList) return;
 
-  const items = safeArray(state.memory).map(normalizeMemoryItem);
+  const items = safeArray(state.memory)
+    .map(normalizeMemoryItem)
+    .sort(function (a, b) {
+      return Date.parse(b.updated_at || b.created_at || "") - Date.parse(a.updated_at || a.created_at || "");
+    });
 
-  // EMPTY STATE
   if (!items.length) {
     els.memoryList.innerHTML =
       '<div class="nova-memory-empty">' +
-        '<div class="nova-memory-empty-title">No saved memory yet</div>' +
-        '<div class="nova-memory-empty-copy">Add something important to remember.</div>' +
+        '<div class="nova-memory-empty-title">No memory yet</div>' +
+        '<div class="nova-memory-empty-copy">Start teaching Nova about you.</div>' +
         '<button class="nova-memory-add-btn">+ Add Memory</button>' +
       '</div>';
 
-    if (typeof wireMemoryControls === "function") {
-      wireMemoryControls();
-    }
-
+    wireMemoryControls();
     return;
   }
 
-  // TOP BAR
   let html =
     '<div class="nova-memory-toolbar">' +
-      '<button class="nova-memory-add-btn">+ Add Memory</button>' +
+      '<button class="nova-memory-add-btn">+ Add</button>' +
+      '<button class="nova-memory-refresh-btn">Refresh</button>' +
     '</div>';
 
-  // ITEMS
   html += items.map(function (item) {
-    const id = escapeHtml(item.id || item.key || item.title || item.text || "");
-    const title = escapeHtml(item.title || item.key || "Memory");
-    const text = escapeHtml(item.text || item.value || item.content || item.preview || "");
+    const id = escapeHtml(item.id);
+    const text = escapeHtml(summarizeMemoryText(item.text, 120));
+    const kind = escapeHtml(item.kind || "note");
+    const source = escapeHtml(item.source || "memory");
+    const session = escapeHtml(item.session_id || "");
 
     return (
       '<div class="nova-memory-card" data-memory-id="' + id + '">' +
-        '<div class="nova-memory-card-title">' + title + '</div>' +
-        (text ? '<div class="nova-memory-card-preview">' + text.slice(0, 200) + '</div>' : "") +
+        '<div class="nova-memory-card-title">' + kind + '</div>' +
+        '<div class="nova-memory-card-preview">' + text + '</div>' +
+        '<div class="nova-memory-meta">' +
+          (session ? '<span>' + session + '</span>' : '') +
+          '<span>' + source + '</span>' +
+        '</div>' +
         '<button class="nova-memory-delete" data-memory-delete="' + id + '">Remove</button>' +
       '</div>'
     );
   }).join("");
 
-els.memoryList.innerHTML = html;
+  els.memoryList.innerHTML = html;
 
-if (typeof wireMemoryClicks === "function") {
   wireMemoryClicks();
-}
-
-if (typeof wireMemoryControls === "function") {
   wireMemoryControls();
-}
-}
 
+  document.querySelectorAll(".nova-memory-refresh-btn").forEach(function (btn) {
+    if (btn.__wired) return;
+    btn.__wired = true;
+
+    btn.addEventListener("click", async function () {
+      try {
+        const res = await fetch("/api/memory");
+        const data = await res.json();
+
+        if (data && data.data && data.data.memory) {
+          state.memory = data.data.memory;
+          renderMemory();
+        }
+      } catch (e) {
+        console.error("Memory refresh failed", e);
+      }
+    });
+  });
+}
 function renderMemoryViewer(item) {
   const viewer = document.querySelector("[data-rail-viewer]");
   if (!viewer) return;
