@@ -4926,7 +4926,6 @@ function wireMemoryControls() {
 function wireMemoryClicks() {
   if (!els.memoryList) return;
 
-  // 🔥 REMOVE LOCK (this was breaking it)
   els.memoryList.dataset.bound = "";
 
   els.memoryList.onclick = function (e) {
@@ -4950,6 +4949,7 @@ function wireMemoryClicks() {
 
       return;
     }
+
     const btn = e.target.closest("[data-memory-id]");
     if (!btn) return;
 
@@ -4966,17 +4966,7 @@ function wireMemoryClicks() {
     setRailTab("memory");
     setRailSelectedItem("memory", memoryId);
 
-    if (els.railViewer) {
-      els.railViewer.hidden = false;
-      els.railViewer.innerHTML =
-        '<div class="nova-viewer-shell">' +
-        '<div class="nova-viewer-card">' +
-        '<div class="nova-viewer-kicker">Memory</div>' +
-        '<div class="nova-viewer-title">' + escapeHtml(String(item.kind || "note")) + "</div>" +
-        '<div class="nova-viewer-body">' + renderSafeText(String(item.text || item.content || item.body || "")) + "</div>" +
-        "</div>" +
-        "</div>";
-    }
+    renderMemoryViewer(item);
 
     if (els.railTitle) els.railTitle.textContent = "Memory";
     if (els.railSubtitle) els.railSubtitle.textContent = String(item.kind || "note");
