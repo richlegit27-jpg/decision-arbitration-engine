@@ -1912,8 +1912,19 @@ function renderChat() {
 // 🔥 SOURCE CLICK HANDLER (RIGHT RAIL VIEWER)
 document.querySelectorAll(".source-row").forEach(function (el) {
   el.addEventListener("click", function () {
-    const url = el.getAttribute("data-url");
-    if (!url) return;
+    let url = el.getAttribute("data-url") || "";
+
+    if (!url) {
+      const link = el.querySelector("a[href]");
+      if (link) {
+        url = link.getAttribute("href") || "";
+      }
+    }
+
+    if (!url) {
+      console.warn("NO URL FOUND FOR SOURCE ROW");
+      return;
+    }
 
     const rail = document.querySelector("[data-right-rail]");
     const viewer = document.querySelector("[data-rail-viewer]");
@@ -1933,139 +1944,10 @@ document.querySelectorAll(".source-row").forEach(function (el) {
     `;
   });
 });
-
     els.chatThread.__lastRenderHtml = nextHtml;
   }
 
-  wireWorkingContextPanel();
-
-  els.chatThread.querySelectorAll(".source-row").forEach(function (el) {
-    if (el.__wired) return;
-    el.__wired = true;
-
-    el.addEventListener("click", async function (e) {
-      e.stopPropagation();
-
-      if (e.target.tagName === "A") return;
-
-      let url = el.getAttribute("data-url") || "";
-
-      if (url.includes("news.google.com/rss/articles")) {
-        try {
-          const parsed = new URL(url);
-          const realUrl =
-            parsed.searchParams.get("url") ||
-            parsed.searchParams.get("u");
-
-          if (realUrl) {
-            url = realUrl;
-            console.log("CLEANED URL =", url);
-          }
-        } catch (e) {
-          console.warn("URL CLEAN FAIL", e);
-        }
-      }
-
-      console.log("CLICK SOURCE URL =", url);
-
-      if (!url || url === "null" || url === "undefined") {
-        console.warn("NO URL FOUND FOR SOURCE ROW");
-        return;
-      }
-
-      sendMessage({
-        text: "open this",
-        force_route: "web_fetch",
-        mode: "followup_web_open",
-        url: url
-      });
-
-      const title =
-        el.getAttribute("data-title") ||
-        el.getAttribute("data-preview") ||
-        "Source";
-
-      if (!els.railViewer) return;
-
-      els.railViewer.hidden = false;
-
-      const safeTitle = escapeHtml(title || "Source");
-      const safeUrl = escapeHtml(url || "");
-
-      els.railViewer.innerHTML =
-        '<div class="nova-viewer-shell">' +
-          '<div class="nova-viewer-title">' + safeTitle + '</div>' +
-          '<div class="nova-viewer-body">' +
-            '<div class="nova-loading-bar"></div>' +
-            '<div class="nova-loading-line"></div>' +
-            '<div class="nova-loading-line short"></div>' +
-          '</div>' +
-        '</div>';
-
-      try {
-        const res = await fetch("/api/web/fetch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: url })
-        });
-
-        const data = await res.json();
-
-        const rawSummary =
-          (data.result && data.result.summary) ||
-          "No summary available";
-
-        const summaryParts = String(rawSummary)
-          .split(/(?<=[.!?])\s+|\n+|•|- /)
-          .filter(function (line) {
-            return line && line.trim().length > 20;
-          })
-          .slice(0, 3);
-
-        const summaryHtml = summaryParts.length
-          ? '<ul class="nova-source-summary-list">' +
-              summaryParts.map(function (line) {
-                return '<li>' + escapeHtml(line) + '</li>';
-              }).join("") +
-            '</ul>'
-          : '<p>No summary available</p>';
-
-        const imageUrl =
-          data.result &&
-          Array.isArray(data.result.images) &&
-          data.result.images.length
-            ? data.result.images[0].url
-            : "";
-
-        const imageHtml = imageUrl
-          ? '<img src="' + escapeHtml(imageUrl) + '" class="nova-source-preview-image" alt="Article image">'
-          : "";
-
-        els.railViewer.innerHTML =
-          '<div class="nova-viewer-shell nova-article-preview">' +
-            imageHtml +
-            '<div class="nova-viewer-body">' +
-              '<div class="nova-source-kicker">Source Preview</div>' +
-              '<div class="nova-viewer-title nova-article-title">' + safeTitle + '</div>' +
-              '<div class="nova-article-summary">' +
-                summaryHtml +
-              '</div>' +
-              '<div class="nova-article-actions">' +
-                '<a class="nova-source-open-btn" href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">Open full article ↗</a>' +
-              '</div>' +
-            '</div>' +
-          '</div>';
-      } catch (err) {
-        els.railViewer.innerHTML =
-          '<div class="nova-viewer-shell">' +
-            '<div class="nova-viewer-title">' + safeTitle + '</div>' +
-            '<div class="nova-viewer-body">Failed to load preview<br><br>' +
-              '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">Open full article</a>' +
-            '</div>' +
-          '</div>';
-      }
-    });
-  });
+wireWorkingContextPanel();
 
   const firstSourceRow = els.chatThread.querySelector(".source-row");
   const firstSourceKey = firstSourceRow
@@ -5514,7 +5396,6 @@ function wireArtifactClicks() {
 
       return;
     }
-
 
     const card = event.target.closest("[data-artifact-open]");
     if (!card) return;

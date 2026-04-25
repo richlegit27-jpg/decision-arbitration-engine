@@ -4207,15 +4207,38 @@ Write the exact goal in one sentence.
                 + user_text
             )
 
+    def _build_common_state_payload(self, session_id: str = "") -> dict:
+        session = self._get_session_payload(session_id)
+
+        return {
+            "ok": True,
+            "active_session_id": session_id,
+            "session_id": session_id,
+            "session": session if isinstance(session, dict) else {},
+            "active_session": session if isinstance(session, dict) else {},
+            "messages": session.get("messages", []) if isinstance(session, dict) else [],
+            "artifacts": self._list_artifacts_for_session(session_id),
+            "memory": self._list_memory_for_session(session_id),
+        }
+
     def _execute_general_chat(
         self,
-        decision: dict,
-        user_text: str,
-        session_id: str,
+        decision=None,
+        user_text: str = "",
+        session_id: str = "",
         attachments=None,
+        memory_context="",
+        working_context_block="",
+        working_state=None,
     ) -> dict:
 
-        user_msg = self._build_user_message(user_text, attachments=attachments or [])
+        decision = decision if isinstance(decision, dict) else {}
+        attachments = attachments or []
+
+        user_msg = self._build_user_message(
+            user_text,
+            attachments=attachments
+        )
 
         prompt = self._build_chat_input(
             user_text=user_text,
@@ -4239,33 +4262,6 @@ Write the exact goal in one sentence.
             if not assistant_text:
                 assistant_text = "No response generated."
 
-            normalized = assistant_text.lower()
-
-            # --- SAFE GREETING FILTER ---
-            blocked_model_greetings = [
-                "hi",
-                "hello",
-                "hey",
-                "hi — what do you need?",
-                "hi - what do you need?",
-                "hi — what do you need help with?",
-                "hi - what do you need help with?",
-                "hello — what do you need?",
-                "hello - what do you need?",
-                "hello — how can i help?",
-                "hello - how can i help?",
-                "how can i help?",
-                "what do you need?",
-                "what do you need help with?",
-            ]
-
-            if any(g in normalized for g in blocked_model_greetings):
-                if "plan" not in normalized:
-                    assistant_text = (
-                        "I need the previous context to continue that. "
-                        "Try again after a web result or artifact is active."
-                    )
-
         except Exception as e:
             print("GENERAL CHAT ERROR:", e)
             assistant_text = "Something went wrong generating a response."
@@ -4279,19 +4275,14 @@ Write the exact goal in one sentence.
             current_state=self._get_working_state(session_id),
         )
 
-        payload = self._build_common_state_payload(session_id=session_id)
-        payload.update(
-            {
-                "assistant_message": assistant_msg,
-                "updates": updates,
-                "debug": {
-                    "decision": decision,
-                    "route_taken": "general_chat",
-                },
-            }
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=None,
         )
-
-        return payload
 
         # ==============================
         # RESPONSE BUILDERS
@@ -4522,12 +4513,13 @@ Write the exact goal in one sentence.
         if isinstance(web_result, dict):
             assistant_text = self._safe_str(web_result.get("summary")) or "Web fetch completed."
 
-            if isinstance(web_result.get("source_urls"), list):
-                source_urls = [
-                    self._safe_str(u)
-                    for u in web_result.get("source_urls")
-                    if self._safe_str(u)
-                ]
+            results = web_result.get("results")
+
+            if isinstance(results, list):
+                for r in results:
+                    url = self._safe_str(r.get("url"))
+                    if url:
+                        source_urls.append(url)
 
         artifact = web_result.get("artifact") if isinstance(web_result, dict) else None
 
@@ -4540,6 +4532,38 @@ Write the exact goal in one sentence.
 
             artifact["meta"] = meta
             artifact["viewer"] = viewer
+
+        print("WEB_FETCH DEBUG web_result =", web_result)
+        print("WEB_FETCH DEBUG source_urls =", source_urls)
+
+        source_urls = []
+
+        if isinstance(web_result, dict):
+            results = web_result.get("results")
+
+            if isinstance(results, list):
+                for r in results:
+                    url = self._safe_str(r.get("url"))
+                    if url:
+                        source_urls.append(url)
+
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            attachments=[],
+            meta={"source_urls": source_urls} if source_urls else {},
+        )
+
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            attachments=[],
+            meta={"source_urls": source_urls} if source_urls else {},
+        )
+
+        artifact["meta"] = meta
+        artifact["viewer"] = viewer
+
+        print("WEB_FETCH DEBUG web_result =", web_result)
+        print("WEB_FETCH DEBUG source_urls =", source_urls)
 
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
@@ -4612,91 +4636,6 @@ Write the exact goal in one sentence.
                 saved_artifact=result.get("saved_artifact"),
             )
 
-    def _execute_general_chat(
-        self,
-        decision: dict,
-        user_text: str,
-        session_id: str,
-        attachments=None,
-    ) -> dict:
-
-        user_msg = self._build_user_message(user_text, attachments=attachments or [])
-
-        prompt = self._build_chat_input(
-            user_text=user_text,
-            decision=decision,
-            session_id=session_id,
-        )
-
-        print("=== NOVA PROMPT START ===")
-        print(prompt[:4000])
-        print("=== NOVA PROMPT END ===")
-
-        try:
-            response = self.client.responses.create(
-                model=self.chat_model,
-                input=prompt,
-            )
-
-            assistant_text = self._extract_response_text(response)
-            assistant_text = self._safe_str(assistant_text).strip()
-
-            if not assistant_text:
-                assistant_text = "No response generated."
-
-            normalized = assistant_text.lower()
-
-            # --- SAFE GREETING FILTER ---
-            blocked_model_greetings = [
-                "hi",
-                "hello",
-                "hey",
-                "hi — what do you need?",
-                "hi - what do you need?",
-                "hi — what do you need help with?",
-                "hi - what do you need help with?",
-                "hello — what do you need?",
-                "hello - what do you need?",
-                "hello — how can i help?",
-                "hello - how can i help?",
-                "how can i help?",
-                "what do you need?",
-                "what do you need help with?",
-            ]
-
-            if any(g in normalized for g in blocked_model_greetings):
-                if "plan" not in normalized:
-                    assistant_text = (
-                        "I need the previous context to continue that. "
-                        "Try again after a web result or artifact is active."
-                    )
-
-        except Exception as e:
-            print("GENERAL CHAT ERROR:", e)
-            assistant_text = "Something went wrong generating a response."
-
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text
-        )
-
-        updates = self._extract_working_state_updates(
-            user_text=user_text,
-            current_state=self._get_working_state(session_id),
-        )
-
-        payload = self._build_common_state_payload(session_id=session_id)
-        payload.update(
-            {
-                "assistant_message": assistant_msg,
-                "updates": updates,
-                "debug": {
-                    "decision": decision,
-                    "route_taken": "general_chat",
-                },
-            }
-        )
-
-        return payload
 
     def _execute_web_operator(self, user_text: str, session_id: str) -> dict:
         try:
@@ -4769,69 +4708,6 @@ Write the exact goal in one sentence.
                 saved_artifact=None,
             )
 
-    def _execute_decision(
-            self,
-            decision: dict,
-            user_text: str,
-            session_id: str = "",
-            attachments=None,
-            working_state=None,
-            working_context_block="",
-        ) -> dict:
-
-            attachments = attachments or []
-            route = self._safe_str(decision.get("route")) or self.ROUTE_GENERAL_CHAT
-
-            if route == self.ROUTE_IMAGE_GENERATION:
-                return self._execute_image_generation(
-                    decision=decision,
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
-
-            print("ROUTER FINAL ROUTE =", route)
-            print("ROUTER DECISION =", decision)
-            if route == self.ROUTE_WEB_FETCH:
-                return self._execute_web_fetch(
-                    decision=decision,
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
-
-            if route == self.ROUTE_ATTACHMENT_ANALYSIS:
-                return self._execute_attachment_analysis(
-                    decision=decision,
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
-
-            if route == self.ROUTE_PLANNING:
-                return self._execute_planning(
-                    decision=decision,
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
-
-            if route == self.ROUTE_MEMORY_RECALL:
-                return self._execute_memory_recall(
-                    decision=decision,
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
-
-            return self._execute_general_chat(
-                decision=decision,
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-                working_state=working_state,
-                working_context_block=working_context_block,
-            )
 
     def _ensure_session_payload(self, session_id: str) -> dict:
         session = self._call_first(
