@@ -133,3 +133,38 @@ class MemoryService:
 
     def clear(self) -> None:
         self._write_store({"memory": []})
+
+    def cleanup_memories(self):
+        junk_patterns = (
+            "traceback",
+            "attributeerror",
+            "nameerror",
+            "unboundlocalerror",
+            "taberror",
+            "syntaxerror",
+            "indentationerror",
+            "internal error",
+            "chat_service.py",
+            "nova_backend",
+            "copy regenerate",
+        )
+
+        items = self.all()
+        cleaned = []
+        removed = []
+
+        for item in items:
+            text = str(item.get("text") or "").lower()
+
+            if any(pattern in text for pattern in junk_patterns):
+                removed.append(item)
+                continue
+
+            cleaned.append(item)
+
+        self._write_store({"memory": cleaned})
+
+        return {
+            "removed": len(removed),
+            "kept": len(cleaned),
+        }

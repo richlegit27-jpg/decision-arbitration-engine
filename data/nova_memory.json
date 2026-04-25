@@ -1,6 +1,60 @@
 {
   "memory": [
     {
+      "text": "remember my favorite color is red",
+      "kind": "note",
+      "source": "manual",
+      "session_id": "",
+      "id": "memory_30647f17556540b3928bc5d405d80d69",
+      "updated_at": "2026-04-25T13:07:47.892453+00:00",
+      "created_at": "2026-04-25T13:07:47.892453+00:00"
+    },
+    {
+      "text": "watch joe rogan",
+      "kind": "note",
+      "source": "manual",
+      "session_id": "",
+      "id": "memory_f8939468eb854c249ada34321cf735c2",
+      "updated_at": "2026-04-25T12:59:09.522498+00:00",
+      "created_at": "2026-04-25T12:59:09.522498+00:00"
+    },
+    {
+      "text": "appointment at 3",
+      "kind": "note",
+      "source": "manual",
+      "session_id": "",
+      "id": "memory_ca70442bf77b415d89e91dc800788353",
+      "updated_at": "2026-04-25T12:58:29.297245+00:00",
+      "created_at": "2026-04-25T12:58:29.297245+00:00"
+    },
+    {
+      "text": "go to gym",
+      "kind": "note",
+      "source": "manual",
+      "session_id": "",
+      "id": "memory_2461082f67214fd3a5e5262e45c5c689",
+      "updated_at": "2026-04-25T12:58:19.719448+00:00",
+      "created_at": "2026-04-25T12:58:19.719448+00:00"
+    },
+    {
+      "text": "do 1000 pushups",
+      "kind": "note",
+      "source": "manual",
+      "session_id": "",
+      "id": "memory_daad3100ca89475086663436610bae09",
+      "updated_at": "2026-04-25T12:58:11.685959+00:00",
+      "created_at": "2026-04-25T12:58:11.685959+00:00"
+    },
+    {
+      "text": "facorate color is blue",
+      "kind": "note",
+      "source": "manual",
+      "session_id": "",
+      "id": "memory_9f63b413257c44c8a949e1a9fc31939f",
+      "updated_at": "2026-04-25T12:58:00.315768+00:00",
+      "created_at": "2026-04-25T12:58:00.315768+00:00"
+    },
+    {
       "text": "God is always good",
       "kind": "note",
       "source": "manual",

@@ -1780,8 +1780,16 @@ const metaHtml = metaBits.length
 
 const memoryUsed = Array.isArray(message.memory_used) ? message.memory_used : [];
 
-const memoryUsedHtml = (role !== "user" && memoryUsed.length)
-  ? '<div class="message-card__memory-used">Memory used: ' + memoryUsed.length + '</div>'
+const memoryUsedIds = memoryUsed
+  .map(function (item) {
+    return String((item && item.id) || "").trim();
+  })
+  .filter(Boolean);
+
+const memoryUsedHtml = (role !== "user" && memoryUsedIds.length)
+  ? '<button type="button" class="message-card__memory-used" data-memory-used-open="' +
+      escapeHtml(memoryUsedIds.join(",")) +
+    '">Memory used: ' + memoryUsedIds.length + '</button>'
   : "";
 
 return (
@@ -4780,6 +4788,24 @@ function wireMemoryClicks() {
   els.memoryList.onclick = function (e) {
     if (e.target.closest("[data-memory-delete]")) return;
 
+    const usedBtn = e.target.closest("[data-memory-used-open]");
+    if (usedBtn) {
+      const ids = String(usedBtn.getAttribute("data-memory-used-open") || "")
+        .split(",")
+        .map(function (id) { return id.trim(); })
+        .filter(Boolean);
+
+      if (ids.length) {
+        openRail();
+        setRailTab("memory");
+        setRailSelectedItem("memory", ids[0]);
+
+        const item = findMemoryById(ids[0]);
+        renderMemoryViewer(item);
+      }
+
+      return;
+    }
     const btn = e.target.closest("[data-memory-id]");
     if (!btn) return;
 
@@ -5166,7 +5192,7 @@ function mergeAssistantReplyIntoState(payload) {
       created_at: new Date().toISOString(),
       attachments: [],
       artifacts: [],
-      memory_used: payload.memoryUsed || []
+      memory_used: payload.memory_used || []
     };
 
     const normalizedFallback = typeof normalizeMessage === "function"

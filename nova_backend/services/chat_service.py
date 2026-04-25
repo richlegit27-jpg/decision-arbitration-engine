@@ -1292,7 +1292,7 @@ class ChatService:
             messages.append({
                 "role": "system",
                 "content": (
-                    "Relevant memory to use only if it helps with the current request:\n"
+                    "Memory about the user (use this as ground truth when relevant):\n"
                     f"{memory_context}"
                 )
             })
@@ -1418,6 +1418,23 @@ class ChatService:
 
         kind = self._safe_str(kind).lower().strip()
         lowered = cleaned.lower()
+
+        junk_patterns = (
+            "traceback",
+            "attributeerror",
+            "nameerror",
+            "unboundlocalerror",
+            "taberror",
+            "syntaxerror",
+            "indentationerror",
+            "internal error",
+            "chat_service.py",
+            "nova_backend",
+            "copy regenerate",
+        )
+
+        if any(pattern in lowered for pattern in junk_patterns):
+            return False
 
         if kind in {"profile", "project", "preference", "goal", "note"}:
             return True
@@ -3709,17 +3726,24 @@ Write the exact goal in one sentence.
 
 
     def _memory_kind_weight(self, kind: str) -> float:
-            k = self._safe_str(kind).lower()
+        k = self._safe_str(kind).lower()
 
-            if k in {"preference", "profile"}:
-                return 3.0
-            if k in {"project", "goal"}:
-                return 2.5
-            if k in {"identity", "personal"}:
-                return 2.0
-            if k in {"summary", "note"}:
-                return 1.25
-            return 1.0
+        if k in {"profile", "identity"}:
+            return 8.0
+
+        if k in {"preference"}:
+            return 6.0
+
+        if k in {"project", "goal"}:
+            return 5.0
+
+        if k in {"instruction", "workflow"}:
+            return 4.0
+
+        if k in {"note"}:
+            return 2.0
+
+        return 1.0
 
 
     def _memory_time_bonus(self, item: dict) -> float:
@@ -4287,7 +4311,7 @@ Write the exact goal in one sentence.
 
         if memory_block:
             sections.append(
-                "Relevant memory:\n"
+                "Known facts about the user (use these as truth when answering):\n"
                 f"{memory_block}"
             )
 
@@ -4344,6 +4368,20 @@ Write the exact goal in one sentence.
         decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
 
+        memory_used = []
+        try:
+            memory_used = self._rank_memory_context(
+                user_text=user_text,
+                limit=int(decision.get("memory_limit") or 3),
+                session_id=session_id,
+            )
+            if not isinstance(memory_used, list):
+                memory_used = []
+            memory_used = memory_used[:3]
+        except Exception as e:
+            print("MEMORY_USED RANK FAILED:", e)
+            memory_used = []
+
         user_msg = self._build_user_message(
             user_text,
             attachments=attachments,
@@ -4378,7 +4416,7 @@ Write the exact goal in one sentence.
 
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
-            memory_used=[],
+            memory_used=memory_used,
         )
 
         updates = self._extract_working_state_updates(
