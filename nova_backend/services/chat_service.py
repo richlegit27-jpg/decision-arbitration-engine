@@ -79,12 +79,173 @@ class ChatService:
             max_follow_links=5,
         )
 
+    def _build_user_message(self, text: str, attachments=None, meta=None) -> dict:
+        attachments = attachments or []
+        meta = meta or {}
+        return {
+            "role": "user",
+            "text": self._safe_str(text),
+            "attachments": attachments,
+            "meta": meta,
+        }
+
+    def _build_assistant_message(
+        self,
+        text: str,
+        attachments=None,
+        meta=None,
+        memory_used=None,
+    ) -> dict:
+        attachments = attachments or []
+        meta = meta or {}
+
+        return {
+            "role": "assistant",
+            "text": self._safe_str(text),
+            "attachments": attachments,
+            "meta": meta,
+            "memory_used": memory_used or [],
+        }
+
+    def _finalize_response(
+        self,
+        session_id: str,
+        user_text: str,
+        user_msg: dict,
+        assistant_msg: dict,
+        decision: dict,
+        saved_artifact=None,
+    ) -> dict:
+        self._maybe_write_memory(decision, user_text, session_id)
+
+        print("FINALIZE_ASSISTANT_TEXT =", repr(assistant_msg.get("text")))
+
+        should_inject_working_context = self._should_inject_working_context(
+            decision=decision,
+            user_text=user_text,
+            assistant_msg=assistant_msg,
+        )
+
+        working_context_payload = self._build_working_context_payload(session_id)
+
+        print("WORKING_CONTEXT_SHOULD_INJECT =", should_inject_working_context)
+        print("WORKING_CONTEXT_PAYLOAD =", working_context_payload)
+
+        assistant_msg["memory_used"] = assistant_msg.get("memory_used", [])
+
+        self._persist_turn(session_id, user_msg, assistant_msg)
+
+        fresh_session = self._get_session_payload(
+            session_id,
+            fallback_messages=[user_msg, assistant_msg],
+        )
+
+        print(
+            "FINALIZE_FRESH_SESSION_WORKING_STATE =",
+            (fresh_session or {}).get("working_state"),
+        )
+
+        payload = {
+            "ok": True,
+            "active_session_id": session_id,
+            "assistant_message": assistant_msg,
+            "working_context": {
+                "show": bool(
+                    should_inject_working_context and working_context_payload.get("show")
+                ),
+                "text": working_context_payload.get("text", ""),
+                "state": working_context_payload.get("state", {}),
+            },
+            "session": fresh_session,
+            "saved_artifact": saved_artifact,
+            "artifacts": self._get_artifacts_list(),
+            "memory": self._get_memory_list(),
+            "sessions": self._get_sessions_list(),
+            "debug": {
+                "decision": decision,
+                "route": "chat_service.handle",
+                "route_taken": decision.get("route"),
+                "working_context_injected": should_inject_working_context,
+                "working_context_available": working_context_payload.get("show", False),
+                "working_context_payload": working_context_payload,
+            },
+        }
+
+        payload = self._attach_execution(
+            payload,
+            user_text,
+            assistant_msg,
+            decision,
+            session_id=session_id,
+        )
+
+        return payload
+
+    def _execute_general_chat(
+        self,
+        decision=None,
+        user_text: str = "",
+        session_id: str = "",
+        attachments=None,
+        memory_context="",
+        working_context_block="",
+        working_state=None,
+    ) -> dict:
+
+        decision = decision if isinstance(decision, dict) else {}
+        attachments = attachments or []
+
+        user_msg = self._build_user_message(
+            user_text,
+            attachments=attachments,
+        )
+
+        if not memory_context:
+            memory_context = self._build_memory_context_for_chat(user_text, decision)
+
+        model_messages = self._compose_model_messages(
+            user_text=user_text,
+            session=self._get_session_payload(session_id),
+            decision=decision,
+            memory_context=memory_context,
+        )
+
+        try:
+            response = self.client.responses.create(
+                model=self.chat_model,
+                input=model_messages,
+            )
+
+            assistant_text = self._extract_response_text(response)
+            assistant_text = self._safe_str(assistant_text).strip()
+
+            if not assistant_text:
+                assistant_text = "No response generated."
+
+        except Exception as e:
+            print("GENERAL CHAT ERROR:", e)
+            assistant_text = f"Something went wrong generating a response: {type(e).__name__}: {self._safe_str(e)}"
+
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            attachments=[],
+        )
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=None,
+        ) 
+
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         attachments = attachments or []
 
         session_id = self._ensure_session_id(session_id)
         user_text = self._safe_str(user_text)
- 
+
         decision = {
             "route": self.ROUTE_GENERAL_CHAT,
             "mode": "chat",
@@ -97,8 +258,13 @@ class ChatService:
             "memory_limit": self.memory_limit,
             "reasons": ["recovery_bypass_decide_route"],
         }
-        working_state = self._maybe_update_working_state(session_id, user_text)
-        working_context_block = self._build_working_context_block(session_id)
+
+        result = self._execute_general_chat(
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+            decision=decision,
+        )
 
         self._maybe_write_memory(decision, user_text, session_id)
 
@@ -4564,198 +4730,11 @@ def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -
             "memory": self._list_memory_for_session(session_id),
         }
 
-    def _execute_general_chat(
-        self,
-        decision=None,
-        user_text: str = "",
-        session_id: str = "",
-        attachments=None,
-        memory_context="",
-        working_context_block="",
-        working_state=None,
-    ) -> dict:
-
-        decision = decision if isinstance(decision, dict) else {}
-        attachments = attachments or []
-
-        memory_used = []
-        try:
-            memory_used = self._rank_memory_context(
-                user_text=user_text,
-                limit=int(decision.get("memory_limit") or 3),
-                session_id=session_id,
-            )
-
-            if not isinstance(memory_used, list):
-                memory_used = []
-
-            pinned = [m for m in memory_used if isinstance(m, dict) and m.get("pinned")]
-            non_pinned = [m for m in memory_used if isinstance(m, dict) and not m.get("pinned")]
-            memory_used = (pinned + non_pinned)[:3]
-
-            memory_used = memory_used[:3]
-        except Exception as e:
-            print("MEMORY_USED RANK FAILED:", e)
-            memory_used = []
-
-        user_msg = self._build_user_message(
-            user_text,
-            attachments=attachments,
-        )
-
-        memory_context = self._format_memory_context(memory_used)
-
-        prompt = self._build_chat_input(
-            user_text=user_text,
-            decision=decision,
-            session_id=session_id,
-            working_context_block=working_context_block,
-            memory_context=memory_context,
-        )
-
-        print("=== NOVA PROMPT START ===")
-        print(prompt[:4000])
-        print("=== NOVA PROMPT END ===")
-
-        try:
-            response = self.client.responses.create(
-                model=self.chat_model,
-                input=prompt,
-            )
-
-            assistant_text = self._extract_response_text(response)
-            assistant_text = self._safe_str(assistant_text).strip()
-
-            if not assistant_text:
-                assistant_text = "No response generated."
-
-        except Exception as e:
-            print("GENERAL CHAT ERROR:", e)
-            assistant_text = "Something went wrong generating a response."
-
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text,
-            memory_used=memory_used,
-        )
-
-        updates = self._extract_working_state_updates(
-            user_text=user_text,
-            current_state=self._get_working_state(session_id),
-        )
-
-        return self._finalize_response(
-            session_id=session_id,
-            user_text=user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision=decision,
-            saved_artifact=None,
-        )
         # ==============================
         # RESPONSE BUILDERS
         # ==============================
 
-    def _build_user_message(self, text: str, attachments=None, meta=None) -> dict:
-        attachments = attachments or []
-        meta = meta or {}
-        return {
-            "role": "user",
-            "text": self._safe_str(text),
-            "attachments": attachments,
-            "meta": meta,
-        }
 
-    def _build_assistant_message(
-        self,
-        text: str,
-        attachments=None,
-        meta=None,
-        memory_used=None,
-    ) -> dict:
-        attachments = attachments or []
-        meta = meta or {}
-
-        return {
-            "role": "assistant",
-            "text": self._safe_str(text),
-            "attachments": attachments,
-            "meta": meta,
-            "memory_used": memory_used or [],
-        }
-
-    def _finalize_response(
-        self,
-        session_id: str,
-        user_text: str,
-        user_msg: dict,
-        assistant_msg: dict,
-        decision: dict,
-        saved_artifact=None,
-    ) -> dict:
-        self._maybe_write_memory(decision, user_text, session_id)
-
-        print("FINALIZE_ASSISTANT_TEXT =", repr(assistant_msg.get("text")))
-
-        should_inject_working_context = self._should_inject_working_context(
-            decision=decision,
-            user_text=user_text,
-            assistant_msg=assistant_msg,
-        )
-
-        working_context_payload = self._build_working_context_payload(session_id)
-
-        print("WORKING_CONTEXT_SHOULD_INJECT =", should_inject_working_context)
-        print("WORKING_CONTEXT_PAYLOAD =", working_context_payload)
-
-        assistant_msg["memory_used"] = assistant_msg.get("memory_used", [])
-
-        self._persist_turn(session_id, user_msg, assistant_msg)
-
-        fresh_session = self._get_session_payload(
-            session_id,
-            fallback_messages=[user_msg, assistant_msg],
-        )
-
-        print(
-            "FINALIZE_FRESH_SESSION_WORKING_STATE =",
-            (fresh_session or {}).get("working_state"),
-        )
-
-        payload = {
-            "ok": True,
-            "active_session_id": session_id,
-            "assistant_message": assistant_msg,
-            "working_context": {
-                "show": bool(
-                    should_inject_working_context and working_context_payload.get("show")
-                ),
-                "text": working_context_payload.get("text", ""),
-                "state": working_context_payload.get("state", {}),
-            },
-            "session": fresh_session,
-            "saved_artifact": saved_artifact,
-            "artifacts": self._get_artifacts_list(),
-            "memory": self._get_memory_list(),
-            "sessions": self._get_sessions_list(),
-            "debug": {
-                "decision": decision,
-                "route": "chat_service.handle",
-                "route_taken": decision.get("route"),
-                "working_context_injected": should_inject_working_context,
-                "working_context_available": working_context_payload.get("show", False),
-                "working_context_payload": working_context_payload,
-            },
-        }
-
-        payload = self._attach_execution(
-            payload,
-            user_text,
-            assistant_msg,
-            decision,
-            session_id=session_id,
-        )
-
-        return payload
     def _execute_memory_recall(
             self,
             decision: dict,
@@ -5382,38 +5361,3 @@ def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -
     # ==============================
     # PUBLIC ENTRY
     # ==============================
-    def handle(self, user_text: str, session_id: str = "", attachments=None):
-        attachments = attachments or []
-
-        session_id = self._ensure_session_id(session_id)
-        user_text = self._safe_str(user_text)
-
-        decision = {
-            "route": self.ROUTE_GENERAL_CHAT,
-            "mode": "chat",
-            "confidence": 0.55,
-            "use_memory": True,
-            "save_memory": True,
-            "save_artifact": False,
-            "has_attachments": bool(attachments),
-            "url": "",
-            "memory_limit": self.memory_limit,
-            "reasons": ["recovery_bypass_decide_route"],
-        }
-
-        assistant_msg = self._build_assistant_message(
-            text="Nova recovery mode active.",
-            attachments=[],
-        )
-
-        self._maybe_write_memory(decision, user_text, session_id)
-
-        return self._finalize_response(
-            session_id=session_id,
-            user_text=user_text,
-            user_msg=self._build_user_message(user_text, attachments=attachments),
-            assistant_msg=assistant_msg,
-            decision=decision,
-            saved_artifact=None,
-        )
-
