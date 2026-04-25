@@ -743,8 +743,10 @@ class ChatService:
     def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
         if not isinstance(decision, dict):
             return
+        # 🔥 FORCE SAVE FOR IMPORTANT USER STATEMENTS
         if not decision.get("save_memory"):
-            return
+            # allow override for important memory
+            pass
 
         text = self._normalize_memory_text_for_save(user_text)
         lowered = text.lower()
@@ -1365,6 +1367,81 @@ class ChatService:
 
     def _safe_str(self, value: Any) -> str:
         return str(value or "").strip()
+
+    def _normalize_memory_text_for_save(self, text) -> str:
+        raw = self._safe_str(text).strip()
+        if not raw:
+            return ""
+
+        lowered = raw.lower().strip()
+
+        junk_exact = {
+            "hi",
+            "hello",
+            "hey",
+            "ok",
+            "okay",
+            "yes",
+            "no",
+            "run it",
+            "continue",
+            "next",
+            "thanks",
+            "thank you",
+        }
+
+        if lowered in junk_exact:
+            return ""
+
+        blocked_starts = (
+            "what do you remember",
+            "what do u remember",
+            "do you remember",
+            "tell me what you remember",
+        )
+
+        if lowered.startswith(blocked_starts):
+            return ""
+
+
+        return raw
+
+    def _should_save_memory_text(self, text, kind=None) -> bool:
+        cleaned = self._normalize_memory_text_for_save(text)
+        if not cleaned:
+            return False
+
+        kind = self._safe_str(kind).lower().strip()
+        lowered = cleaned.lower()
+
+        if kind in {"profile", "project", "preference", "goal", "note"}:
+            return True
+
+        strong_signals = (
+            "my name is",
+            "user's name is",
+            "user prefers to be called",
+            "i am ",
+            "i'm ",
+            "i work on",
+            "i'm working on",
+            "i am working on",
+            "user is working on",
+            "user is building",
+        )
+
+        if any(s in lowered for s in strong_signals):
+            return True
+
+        weak_signals = (
+            "i prefer",
+            "user preference",
+            "remember",
+            "from now on",
+            "going forward",
+        )
+
+        return any(s in lowered for s in weak_signals)
 
     def _clean_text(self, value: str | None) -> str:
         text = str(value or "")
@@ -3516,84 +3593,104 @@ Write the exact goal in one sentence.
             return "\n".join(lines).strip()
 
     def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
+        text = self._normalize_memory_text_for_save(user_text)
+        lowered = text.lower()
 
-            if not isinstance(decision, dict):
-                return
+        if not text:
+            return
 
-            if not decision.get("save_memory"):
-                return
+        should_save = False
+        kind = "note"
+        clean_memory = text
 
-            text = self._safe_str(user_text)
-            lowered = text.lower()
-
-            should_save = False
-            kind = "note"
-
-            # profile / identity
-            if any(x in lowered for x in ["my name is", "i am ", "i'm ", "call me"]):
+        if "my name is " in lowered:
+            name = text.split("my name is", 1)[-1].strip(" .,!?:;")
+            if name:
                 should_save = True
                 kind = "profile"
+                clean_memory = f"User's name is {name.title()}."
 
-            # preferences
-            elif any(
-                x in lowered
-                for x in [
-                    "my favorite",
-                    "my favourite",
-                    "favorite color is",
-                    "favourite color is",
-                    "i prefer",
-                    "i like",
-                    "i love",
-                    "i enjoy",
-                    "i usually",
-                    "i always",
-                    "from now on",
-                ]
-            ):
+        elif "call me " in lowered:
+            name = text.split("call me", 1)[-1].strip(" .,!?:;")
+            if name:
                 should_save = True
-                kind = "preference"
+                kind = "profile"
+                clean_memory = f"User prefers to be called {name.title()}."
 
-            # project / work
-            elif any(
-                x in lowered
-                for x in [
-                    "i'm building",
-                    "i am building",
-                    "my project",
-                    "i'm working on",
-                    "working on",
-                    "nova",
-                ]
-            ):
+        elif any(x in lowered for x in ["i'm working on ", "i am working on ", "working on "]):
+            clean = text
+            for marker in ["i'm working on ", "i am working on ", "working on "]:
+                if marker in lowered:
+                    clean = text[lowered.find(marker) + len(marker):].strip(" .,!?:;")
+                    break
+
+            if clean:
                 should_save = True
                 kind = "project"
+                clean_memory = f"User is working on {clean}."
 
-            # goals
-            elif any(x in lowered for x in ["i want to", "my goal", "i plan to"]):
+        elif any(x in lowered for x in ["i'm building ", "i am building ", "my project is "]):
+            clean = text
+            for marker in ["i'm building ", "i am building ", "my project is "]:
+                if marker in lowered:
+                    clean = text[lowered.find(marker) + len(marker):].strip(" .,!?:;")
+                    break
+
+            if clean:
                 should_save = True
-                kind = "goal"
+                kind = "project"
+                clean_memory = f"User is building {clean}."
 
-            # explicit memory instruction
-            elif "remember that" in lowered:
+        elif any(x in lowered for x in ["i prefer ", "from now on ", "going forward "]):
+            should_save = True
+            kind = "preference"
+            clean_memory = f"User preference: {text.strip(' .,!?:;')}."
+
+        elif any(x in lowered for x in ["my goal is ", "i want to ", "i plan to "]):
+            should_save = True
+            kind = "goal"
+            clean_memory = f"User goal: {text.strip(' .,!?:;')}."
+
+        elif "remember that" in lowered:
+            clean = text.split("remember that", 1)[-1].strip(" .,!?:;")
+            if clean:
                 should_save = True
                 kind = "note"
+                clean_memory = clean[0].upper() + clean[1:] + "."
 
-            if not should_save:
-                return
+        if not should_save:
+            return
 
-            try:
-                self._call_first(
-                    self.memory,
-                    ["add_memory", "create_memory", "save_memory", "create"],
-                    text=text,
-                    kind=kind,
-                    source="router_auto",
-                    session_id=session_id,
-                )
-            except Exception as e:
-                print("MEMORY WRITE FAILED:", e)
+        if not self._should_save_memory_text(clean_memory, kind=kind):
+            return
 
+        try:
+            existing_items = []
+            if hasattr(self, "memory") and self.memory and hasattr(self.memory, "all"):
+                existing_items = self.memory.all() or []
+
+            for item in existing_items:
+                if not isinstance(item, dict):
+                    continue
+
+                existing_text = self._normalize_memory_text_for_save(item.get("text", ""))
+                existing_kind = self._safe_str(item.get("kind")).lower().strip()
+
+                if existing_text.lower() == clean_memory.lower() and existing_kind == kind:
+                    return
+
+        except Exception:
+            pass
+
+try:
+    self.memory.add_memory({
+        "text": clean_memory,
+        "kind": kind,
+        "source": "router_auto_clean",
+        "session_id": session_id,
+    })
+except Exception as e:
+    print("MEMORY WRITE FAILED:", e)
 
     def _memory_text_tokens(self, value: str) -> set[str]:
             text = self._safe_str(value).lower()
@@ -4171,41 +4268,74 @@ Write the exact goal in one sentence.
         # ==============================
 
     def _build_chat_input(
-            self,
-            user_text: str,
-            decision: dict,
-            session_id: str = "",
-        ) -> str:
-            user_text = self._safe_str(user_text)
+        self,
+        user_text: str,
+        decision: dict,
+        session_id: str = "",
+        working_context_block: str = "",
+    ) -> str:
 
-            memory_items = self._rank_memory_context(
-                user_text=user_text,
-                limit=int(decision.get("memory_limit") or self.memory_limit),
-                session_id=session_id,
+        user_text = self._safe_str(user_text)
+        decision = decision if isinstance(decision, dict) else {}
+
+        memory_items = self._rank_memory_context(
+            user_text=user_text,
+            limit=int(decision.get("memory_limit") or self.memory_limit),
+            session_id=session_id,
+        )
+
+        memory_block = self._format_memory_context(memory_items[:3])
+
+        session = self._get_session_payload(session_id)
+        messages = session.get("messages", []) if isinstance(session, dict) else []
+
+        recent_lines = []
+        for msg in messages[-8:]:
+            if not isinstance(msg, dict):
+                continue
+
+            role = self._safe_str(msg.get("role"))
+            text = self._safe_str(msg.get("text"))
+
+            if not role or not text:
+                continue
+
+            recent_lines.append(f"{role}: {text}")
+
+        recent_block = "\n".join(recent_lines)
+
+        sections = []
+
+        if memory_block:
+            sections.append(
+                "Relevant memory:\n"
+                f"{memory_block}"
             )
 
-            memory_block = self._format_memory_context(memory_items[:3])
-
-            sections = []
-
-            if memory_block:
-                sections.append(
-                    "Relevant memory:\n"
-                    f"{memory_block}"
-                )
-
-            if not sections:
-                return user_text
-
-            return (
-                "\n\n".join(sections)
-                + "\n\nInstructions:\n"
-                + "- Answer clearly and directly.\n"
-                + "- Use relevant memory when it helps.\n"
-                + "- Do not claim missing context if the answer is already available.\n\n"
-                + "User message:\n"
-                + user_text
+        if working_context_block:
+            sections.append(
+                "Current working context:\n"
+                f"{working_context_block}"
             )
+
+        if recent_block:
+            sections.append(
+                "IMPORTANT CONTEXT (use this to understand follow-ups):\n"
+                f"{recent_block}"
+            )
+
+        if not sections:
+            return user_text
+
+        return (
+            "\n\n".join(sections)
+            + "\n\nInstructions:\n"
+            + "- Answer clearly and directly.\n"
+            + "- You MUST use the recent conversation to resolve follow-up questions.\n"
+            + "- If the user asks something like 'what should I do first', use the context above.\n\n"
+            + "User message:\n"
+            + user_text
+        )
 
     def _build_common_state_payload(self, session_id: str = "") -> dict:
         session = self._get_session_payload(session_id)
@@ -4244,6 +4374,7 @@ Write the exact goal in one sentence.
             user_text=user_text,
             decision=decision,
             session_id=session_id,
+            working_context_block=working_context_block,
         )
 
         print("=== NOVA PROMPT START ===")

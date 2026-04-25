@@ -343,12 +343,41 @@
 
         const card = e.target.closest("[data-memory-id]");
         if (card) {
-          state.selectedId = card.getAttribute("data-memory-id") || "";
+          const id = card.getAttribute("data-memory-id") || "";
+          state.selectedId = id;
+
+          const item = state.items.find(function (m) {
+            return String(m.id || "") === id;
+          });
+
           renderList();
+
+          if (!item) return;
+
+          const viewer = document.querySelector("[data-rail-viewer]") || document.querySelector("#rail-viewer");
+
+          if (viewer) {
+            viewer.hidden = false;
+            viewer.innerHTML = `
+              <div class="nova-viewer-shell">
+                <div class="nova-viewer-title">Memory</div>
+                <div class="nova-viewer-body">
+                  <p>${escapeHtml(item.text || "")}</p>
+                  <div style="margin-top:10px; font-size:12px; opacity:0.7;">
+                    ${item.kind ? `<div><strong>Kind:</strong> ${escapeHtml(item.kind)}</div>` : ""}
+                    ${item.source ? `<div><strong>Source:</strong> ${escapeHtml(item.source)}</div>` : ""}
+                  </div>
+                </div>
+              </div>
+            `;
+          }
+
+          return;
         }
       });
     }
   }
+
   async function boot() {
     syncEls();
     if (!els.panel) {
