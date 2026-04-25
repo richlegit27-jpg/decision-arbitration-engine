@@ -765,6 +765,21 @@ class ChatService:
 
         score = 0.0
 
+        project_query_triggers = [
+            "what am i working on",
+            "what project",
+            "my project",
+            "current project",
+            "what are we building",
+            "what am i building",
+        ]
+
+        if any(trigger in user_text for trigger in project_query_triggers):
+            if kind.lower() == "project":
+                score += 100.0
+            if "nova" in haystack:
+                score += 100.0
+
         user_words = [w for w in re.findall(r"[a-zA-Z0-9_:\\.-]+", user_text) if len(w) > 2]
         if not user_words:
             return 0.0
