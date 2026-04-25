@@ -9390,3 +9390,28 @@ button.nova-button {
 .source-row:hover::after {
   display: block;
 }
+
+.message-attachment__actions {
+  position: relative;
+  z-index: 5;
+  pointer-events: auto;
+}
+
+.message-attachment__action {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.message-attachments,
+.message-attachment,
+.message-attachment__footer,
+.message-attachment__actions,
+.message-attachment__action {
+  position: relative;
+  z-index: 20;
+  pointer-events: auto !important;
+}
+
+.message-attachment__action {
+  cursor: pointer;
+}

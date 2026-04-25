@@ -1418,7 +1418,71 @@ window.NovaAnalyzeArtifactImage = async function (imageUrl, artifact) {
 // ==============================
 // 🔥 COPY + REGENERATE FIX (PUT THIS HERE)
 // ==============================
+
 document.addEventListener("click", async function (event) {
+  const imageRegenBtn = event.target.closest("[data-regenerate-image-message]");
+  if (imageRegenBtn) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const messageId = String(imageRegenBtn.getAttribute("data-regenerate-image-message") || "").trim();
+    console.log("IMAGE REGEN MESSAGE ID:", messageId);
+
+    if (!messageId) {
+      console.warn("IMAGE REGEN MISSING MESSAGE ID");
+      return;
+    }
+
+    const userMsg = currentUserMessageForRegenerate(messageId);
+    if (!userMsg) {
+      console.warn("IMAGE REGEN COULD NOT FIND USER MESSAGE");
+      return;
+    }
+
+    const prompt = String(userMsg.text || "").trim();
+    console.log("IMAGE REGEN PROMPT:", prompt);
+
+    if (!prompt) {
+      console.warn("IMAGE REGEN EMPTY PROMPT");
+      return;
+    }
+
+    const payload = {
+      user_text: prompt.startsWith("/image") ? prompt : "/image " + prompt,
+      session_id: String(state.activeSessionId || "").trim(),
+      attachments: [],
+    };
+
+    console.log("IMAGE REGEN PAYLOAD:", payload);
+
+    if (typeof consumeChatStream === "function") {
+      await consumeChatStream(payload);
+    } else if (typeof consumeChatStreamStable === "function") {
+      await consumeChatStreamStable(payload);
+    } else if (typeof consumeChatJson === "function") {
+      await consumeChatJson(payload);
+    } else {
+      console.warn("No chat consumer found");
+    }
+
+    return;
+  }
+  // 🔥 IMAGE REGENERATE (PUT THIS FIRST)
+
+
+  // 👇 your existing handlers stay below this  const imageRegenBtn = event.target.closest("[data-regenerate-image]");
+  if (imageRegenBtn) {
+    event.preventDefault();
+
+    const prompt = String(imageRegenBtn.getAttribute("data-regenerate-image") || "").trim();
+
+    if (prompt) {
+      sendMessage("/image " + prompt);
+    }
+
+    return;
+  }
+
   const copyBtn = event.target.closest("[data-copy-message]");
   if (copyBtn) {
     const messageId = String(copyBtn.getAttribute("data-copy-message") || "").trim();
@@ -1441,9 +1505,9 @@ document.addEventListener("click", async function (event) {
     return;
   }
 
-  const regenBtn = event.target.closest("[data-regenerate-message]");
-  if (regenBtn) {
-    const messageId = String(regenBtn.getAttribute("data-regenerate-message") || "").trim();
+  const messageRegenBtn = event.target.closest("[data-regenerate-message]");
+  if (messageRegenBtn) {
+    const messageId = String(messageRegenBtn.getAttribute("data-regenerate-message") || "").trim();
     if (!messageId) return;
 
     const userMsg = currentUserMessageForRegenerate(messageId);
@@ -1462,6 +1526,8 @@ document.addEventListener("click", async function (event) {
     } else if (typeof consumeChatStreamStable === "function") {
       await consumeChatStreamStable(payload);
     }
+
+    return;
   }
 });
 
@@ -1728,42 +1794,69 @@ function renderMessageCard(message) {
   const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
   const attachments = safeArray(message.attachments);
 
+  const firstImageAttachment = attachments.find(function (att) {
+    if (!att) return false;
+    const type = String(att.type || "").toLowerCase();
+    const url = String(att.url || "").toLowerCase();
+    const filename = String(att.filename || "").toLowerCase();
+    const mime = String(att.mime_type || att.content_type || "").toLowerCase();
+
+    return (
+      type === "image" ||
+      mime.startsWith("image/") ||
+      url.endsWith(".png") ||
+      url.endsWith(".jpg") ||
+      url.endsWith(".jpeg") ||
+      url.endsWith(".webp") ||
+      filename.endsWith(".png") ||
+      filename.endsWith(".jpg") ||
+      filename.endsWith(".jpeg") ||
+      filename.endsWith(".webp")
+    );
+  });
+
   const imageUrl = resolveUploadUrl(
     message.image_url ||
     (message.artifact && message.artifact.image_url) ||
     (message.viewer && message.viewer.image_url) ||
     (message.meta && message.meta.image_url) ||
+    (firstImageAttachment && firstImageAttachment.url) ||
     ""
   );
 
-  const imageHtml = imageUrl
-    ? '<div class="message-attachments">' +
-        '<div class="message-attachment message-attachment--image">' +
-          '<a href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noopener noreferrer">' +
-            '<img src="' + escapeHtml(imageUrl) + '" alt="Generated image" class="message-attachment__image">' +
-          '</a>' +
-          '<div class="message-attachment__footer">' +
-            '<a href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noopener noreferrer" class="message-attachment__name">Generated image</a>' +
-            '<div class="message-attachment__actions">' +
-              '<a href="' + escapeHtml(imageUrl) + '" download class="message-attachment__action">Download</a>' +
-              '<button type="button" class="message-attachment__action" data-copy-url="' + escapeHtml(imageUrl) + '">Copy URL</button>' +
-            '</div>' +
+const imageHtml = imageUrl
+  ? '<div class="message-attachments">' +
+      '<div class="message-attachment message-attachment--image">' +
+        '<a href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noopener noreferrer">' +
+          '<img src="' + escapeHtml(imageUrl) + '" alt="Generated image" class="message-attachment__image">' +
+        '</a>' +
+        '<div class="message-attachment__footer">' +
+          '<a href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noopener noreferrer" class="message-attachment__name">Generated image</a>' +
+          '<div class="message-attachment__actions">' +
+            '<a href="' + escapeHtml(imageUrl) + '" download class="message-attachment__action">Download</a>' +
+            '<button type="button" class="message-attachment__action" data-copy-url="' + escapeHtml(imageUrl) + '">Copy URL</button>' +
+            '<button type="button" class="message-attachment__action" data-regenerate-image-message="' + escapeHtml(message.id || "") + '">Regenerate</button>' +
           '</div>' +
         '</div>' +
-      '</div>'
-    : "";
-
-  const attachmentsHtml = attachments.length
-    ? '<div class="message-attachments">' + attachments.map(renderAttachmentBlock).join("") + "</div>"
-    : "";
-
-const rawText = String(message.text || "").trim();
-
-const textHtml = rawText
-  ? '<div class="message-text-inline" style="display:block !important; white-space:pre-wrap !important; color:#ffffff !important; background:rgba(255,255,255,0.04) !important; padding:10px 12px !important; border-radius:10px !important; margin:8px 0 10px 0 !important; line-height:1.45 !important;">' +
-      linkifySourceLines(rawText) +
-    "</div>"
+      '</div>' +
+    '</div>'
   : "";
+
+  const nonImageAttachments = attachments.filter(function (att) {
+    return att !== firstImageAttachment;
+  });
+
+  const attachmentsHtml = nonImageAttachments.length
+    ? '<div class="message-attachments">' + nonImageAttachments.map(renderAttachmentBlock).join("") + "</div>"
+    : "";
+
+  const rawText = String(message.text || "").trim();
+
+  const textHtml = rawText
+    ? '<div class="message-text-inline" style="display:block !important; white-space:pre-wrap !important; color:#ffffff !important; background:rgba(255,255,255,0.04) !important; padding:10px 12px !important; border-radius:10px !important; margin:8px 0 10px 0 !important; line-height:1.45 !important;">' +
+        linkifySourceLines(rawText) +
+      "</div>"
+    : "";
 
   const bodyHtml = textHtml
     ? textHtml
@@ -1777,25 +1870,25 @@ const textHtml = rawText
   if (message.stopped) metaBits.push("Stopped");
   if (message.source) metaBits.push(message.source);
 
-const metaHtml = metaBits.length
-  ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
-  : "";
+  const metaHtml = metaBits.length
+    ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
+    : "";
 
-const memoryUsed = Array.isArray(message.memory_used) ? message.memory_used : [];
+  const memoryUsed = Array.isArray(message.memory_used) ? message.memory_used : [];
 
-const memoryUsedIds = memoryUsed
-  .map(function (item) {
-    return String((item && item.id) || "").trim();
-  })
-  .filter(Boolean);
+  const memoryUsedIds = memoryUsed
+    .map(function (item) {
+      return String((item && item.id) || "").trim();
+    })
+    .filter(Boolean);
 
-const memoryUsedHtml = (role !== "user" && memoryUsedIds.length)
-  ? '<button type="button" class="message-card__memory-used" data-memory-used-open="' +
-      escapeHtml(memoryUsedIds.join(",")) +
-    '">Memory used: ' + memoryUsedIds.length + '</button>'
-  : "";
+  const memoryUsedHtml = (role !== "user" && memoryUsedIds.length)
+    ? '<button type="button" class="message-card__memory-used" data-memory-used-open="' +
+        escapeHtml(memoryUsedIds.join(",")) +
+      '">Memory used: ' + memoryUsedIds.length + '</button>'
+    : "";
 
-return (
+  return (
     '<article class="message-card ' +
     roleClass +
     '" data-message-id="' +
@@ -1815,7 +1908,6 @@ return (
     "</article>"
   );
 }
-
 function normalizeWorkingContext(raw) {
   const input = raw && typeof raw === "object" ? raw : {};
   const rawState =

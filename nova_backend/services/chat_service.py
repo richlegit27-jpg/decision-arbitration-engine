@@ -181,6 +181,100 @@ class ChatService:
 
         return payload
 
+    def _execute_image_generation(
+        self,
+        user_text: str,
+        session_id: str,
+        attachments=None,
+        decision=None,
+    ) -> dict:
+
+        decision = decision if isinstance(decision, dict) else {}
+        attachments = attachments or []
+
+        user_msg = self._build_user_message(
+            user_text,
+            attachments=attachments,
+        )
+
+        prompt = self._safe_str(decision.get("prompt"))
+        if not prompt:
+            prompt = self._image_prompt_from_text(user_text)
+
+        try:
+            response = self.client.images.generate(
+                model="gpt-image-1",
+                prompt=prompt,
+                size="1024x1024",
+            )
+
+            image_base64 = response.data[0].b64_json
+
+            import base64
+            import os
+            import uuid
+
+            filename = f"img_{uuid.uuid4().hex}.png"
+            filepath = os.path.join(self.uploads_dir, filename)
+
+            with open(filepath, "wb") as f:
+                f.write(base64.b64decode(image_base64))
+
+            image_url = f"/api/uploads/{filename}"
+            assistant_text = "Image generated successfully."
+
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                attachments=[
+                    {
+                        "type": "image",
+                        "url": image_url,
+                        "filename": filename,
+                        "prompt": prompt,
+                        "mime_type": "image/png",
+                        "content_type": "image/png",
+                    }
+                ],
+                meta={
+                    "type": "image_generation",
+                    "image_url": image_url,
+                    "prompt": prompt,
+                },
+            )
+
+            # 🔥 CRITICAL LINE (this fixes your issue)
+            assistant_msg["image_url"] = image_url
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+                saved_artifact=None,
+            )
+
+        except Exception as e:
+            print("IMAGE GENERATION FAILED:", e)
+
+            assistant_msg = self._build_assistant_message(
+                text=f"I hit an error generating the image: {type(e).__name__}: {self._safe_str(e)}",
+                attachments=[],
+                meta={
+                    "type": "image_generation_error",
+                    "error": str(e),
+                },
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+                saved_artifact=None,
+            )
+
     def _execute_general_chat(
         self,
         decision=None,
@@ -238,7 +332,115 @@ class ChatService:
             assistant_msg=assistant_msg,
             decision=decision,
             saved_artifact=None,
-        ) 
+        )
+
+    def _execute_web_fetch(
+        self,
+        decision: dict,
+        user_text: str,
+        session_id: str,
+        attachments=None,
+    ) -> dict:
+        attachments = attachments or []
+
+        print("ENTERED _execute_web_fetch")
+        print("WEB_FETCH decision =", decision)
+
+        mode = self._safe_str(decision.get("mode"))
+        direct_url = self._safe_str(decision.get("url"))
+
+        user_msg = self._build_user_message(
+            user_text,
+            attachments=attachments,
+        )
+
+        if direct_url:
+            print("DIRECT URL FETCH =", direct_url)
+            return self._handle_web_fetch(direct_url, session_id=session_id)
+
+        if mode == "followup_web_open":
+            session = self._get_session_payload(session_id)
+            messages = session.get("messages") if isinstance(session, dict) else []
+            index = int(decision.get("source_index") or 1)
+            urls = []
+
+            for msg in reversed(messages or []):
+                if not isinstance(msg, dict):
+                    continue
+                if self._safe_str(msg.get("role")) != "assistant":
+                    continue
+
+                meta = msg.get("meta") if isinstance(msg.get("meta"), dict) else {}
+                meta_urls = meta.get("source_urls")
+
+                if isinstance(meta_urls, list) and meta_urls:
+                    urls = [self._safe_str(u) for u in meta_urls if self._safe_str(u)]
+                    if urls:
+                        break
+
+            if urls and len(urls) >= index:
+                target_url = urls[index - 1]
+                print("FOLLOWUP OPEN URL =", target_url)
+                return self._handle_web_fetch(target_url, session_id=session_id)
+
+            return {
+                "ok": True,
+                "assistant_message": "I couldn’t find that source to open.",
+            }
+
+        search_query = self._safe_str(user_text)
+        return self._handle_web_fetch(search_query, session_id=session_id) 
+
+
+    def _is_image_generation_request(self, user_text: str) -> bool:
+        text = str(user_text or "").strip().lower()
+
+        if not text:
+            return False
+
+        if text.startswith("/image") or "/image" in text:
+            return True
+
+        keywords = ["generate", "create", "make", "draw", "render", "design"]
+        image_words = ["image", "picture", "photo", "art", "scene", "visual"]
+
+        # 🔥 strong match
+        if any(k in text for k in keywords) and any(i in text for i in image_words):
+            return True
+
+        # 🔥 looser match (for natural language like "cyberpunk city")
+        if any(k in text for k in keywords):
+            return True
+
+        return False
+
+    def _image_prompt_from_text(self, user_text: str) -> str:
+            text = str(user_text or "").strip()
+            lowered = text.lower()
+
+            if lowered.startswith("/image"):
+                prompt = text[6:].strip()
+                return prompt or "Generate an image."
+
+            prefixes = (
+                "generate an image of ",
+                "generate an image ",
+                "generate image of ",
+                "generate image ",
+                "make an image of ",
+                "make an image ",
+                "create an image of ",
+                "create an image ",
+                "draw me ",
+                "draw ",
+            )
+
+            for prefix in prefixes:
+                if lowered.startswith(prefix):
+                    prompt = text[len(prefix):].strip()
+                    return prompt or text
+
+            return text or "Generate an image."
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         attachments = attachments or []
@@ -246,19 +448,33 @@ class ChatService:
         session_id = self._ensure_session_id(session_id)
         user_text = self._safe_str(user_text)
 
-        decision = {
-            "route": self.ROUTE_GENERAL_CHAT,
-            "mode": "chat",
-            "confidence": 0.55,
-            "use_memory": True,
-            "save_memory": True,
-            "save_artifact": False,
-            "has_attachments": bool(attachments),
-            "url": "",
-            "memory_limit": self.memory_limit,
-            "reasons": ["recovery_bypass_decide_route"],
-        }
+        decision = self._decide_route(
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
 
+        route = self._safe_str(decision.get("route"))
+
+        # 🔥 1. IMAGE GENERATION (FIRST)
+        if route == self.ROUTE_IMAGE_GENERATION:
+            return self._execute_image_generation(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+                decision=decision,
+            )
+
+        # 🌐 2. WEB FETCH
+        if route == self.ROUTE_WEB_FETCH:
+            return self._execute_web_fetch(
+                decision=decision,
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+            )
+
+        # 💬 3. GENERAL CHAT (DEFAULT)
         result = self._execute_general_chat(
             user_text=user_text,
             session_id=session_id,
@@ -266,9 +482,11 @@ class ChatService:
             decision=decision,
         )
 
+        # 🧠 4. MEMORY (AFTER RESPONSE)
         self._maybe_write_memory(decision, user_text, session_id)
 
         return result
+
 
     def _clean_artifact_text(self, value: str, limit: int = 300) -> str:
         text = re.sub(r"\s+", " ", self._safe_str(value)).strip()
@@ -1849,7 +2067,78 @@ class ChatService:
         text = self._safe_str(user_text)
         lowered = text.lower()
 
-        # 🔥 FORCE MEMORY FOR PERSONAL QUERIES (HIGHEST PRIORITY)
+        # 🔥 FORCE URL FETCH (HIGHEST PRIORITY)
+        if self._looks_like_url(text):
+            return {
+                "route": self.ROUTE_WEB_FETCH,
+                "mode": "web",
+                "confidence": 1.0,
+                "use_memory": False,
+                "save_memory": False,
+                "save_artifact": True,
+                "has_attachments": False,
+                "url": self._extract_first_url(text),
+                "memory_limit": self.memory_limit,
+                "reasons": ["forced_url_fetch"],
+                "session_id": self._safe_str(session_id),
+            }
+
+        # CONTINUATION: open from previous web results
+        if len(lowered.split()) <= 6:
+            import re
+
+            match = re.search(r"(first|second|third|fourth|fifth|\d+)", lowered)
+
+            if any(word in lowered for word in ["open", "show", "click", "view"]) and match:
+                word = match.group(1)
+                mapping = {
+                    "first": 1,
+                    "second": 2,
+                    "third": 3,
+                    "fourth": 4,
+                    "fifth": 5,
+                }
+
+                index = mapping.get(word)
+                if not index:
+                    try:
+                        index = int(word)
+                    except Exception:
+                        index = 1
+
+                return {
+                    "route": self.ROUTE_WEB_FETCH,
+                    "mode": "followup_web_open",
+                    "confidence": 0.99,
+                    "use_memory": False,
+                    "save_memory": False,
+                    "save_artifact": True,
+                    "has_attachments": False,
+                    "url": "",
+                    "memory_limit": self.memory_limit,
+                    "source_index": index,
+                    "reasons": ["continuation_web_open"],
+                    "session_id": self._safe_str(session_id),
+                }
+
+        # 🔥 IMAGE GENERATION (HIGH PRIORITY)
+        if self._is_image_generation_request(user_text):
+            return {
+                "route": self.ROUTE_IMAGE_GENERATION,
+                "mode": "image",
+                "confidence": 0.99,
+                "use_memory": False,
+                "save_memory": False,
+                "save_artifact": True,
+                "has_attachments": bool(attachments),
+                "url": "",
+                "prompt": self._image_prompt_from_text(user_text),
+                "memory_limit": self.memory_limit,
+                "reasons": ["image_trigger_early"],
+                "session_id": self._safe_str(session_id),
+            }
+
+        # 🔥 FORCE MEMORY FOR PERSONAL QUERIES
         personal_memory_queries = (
             "what is my",
             "what's my",
@@ -1874,6 +2163,7 @@ class ChatService:
                 "url": "",
                 "memory_limit": self.memory_limit,
                 "reasons": ["forced_memory_priority"],
+                "session_id": self._safe_str(session_id),
             }
 
         # 🔥 FORCE WEB ROUTE FOR LIVE QUERIES
@@ -1892,6 +2182,7 @@ class ChatService:
                 "url": text,
                 "memory_limit": self.memory_limit,
                 "reasons": ["forced_live_query"],
+                "session_id": self._safe_str(session_id),
             }
 
         decision = {
@@ -1912,7 +2203,6 @@ class ChatService:
             decision["reasons"].append("empty_input")
             return decision
 
-        # HARD LOCK: planning requests always win first
         planning_phrases = (
             "make a plan",
             "create a plan",
@@ -1923,6 +2213,7 @@ class ChatService:
             "step by step plan",
             "next steps",
         )
+
         if lowered in planning_phrases or self._looks_like_planning(text):
             decision.update(
                 {
@@ -1937,23 +2228,6 @@ class ChatService:
             decision["reasons"].append("planning_hard_lock")
             return decision
 
-        if self._is_image_generation_request(user_text):
-            decision.update(
-                {
-                    "route": self.ROUTE_IMAGE_GENERATION,
-                    "mode": "image",
-                    "confidence": 0.95,
-                    "save_artifact": True,
-                    "save_memory": False,
-                    "use_memory": False,
-                    "url": "",
-                    "has_attachments": bool(attachments),
-                    "prompt": self._image_prompt_from_text(user_text),
-                }
-            )
-            decision["reasons"].append("image_trigger")
-            return decision
-
         if attachments:
             decision.update(
                 {
@@ -1964,20 +2238,6 @@ class ChatService:
                 }
             )
             decision["reasons"].append("attachments_present")
-            return decision
-
-        url = self._extract_first_url(text)
-        if url:
-            decision.update(
-                {
-                    "route": self.ROUTE_WEB_FETCH,
-                    "mode": "tool",
-                    "confidence": 0.94,
-                    "save_artifact": True,
-                    "url": url,
-                }
-            )
-            decision["reasons"].append("url_detected")
             return decision
 
         if self._looks_like_memory_recall(text):
@@ -1991,38 +2251,6 @@ class ChatService:
             )
             decision["reasons"].append("memory_recall_trigger")
             return decision
-
-        # CONTINUATION: short follow-up commands (web results)
-        short_text = lowered.strip()
-
-        if len(short_text.split()) <= 5:
-            import re
-
-            match = re.search(r"(first|second|third|fourth|fifth|\d+)", short_text)
-            if any(word in short_text for word in ["open", "show", "click", "view"]) and match:
-                decision["route"] = self.ROUTE_WEB_FETCH
-                decision["mode"] = "followup_web_open"
-                decision["confidence"] = 0.95
-                decision["reasons"].append("continuation_web_open")
-
-                word = match.group(1)
-                mapping = {
-                    "first": 1,
-                    "second": 2,
-                    "third": 3,
-                    "fourth": 4,
-                    "fifth": 5,
-                }
-
-                index = mapping.get(word)
-                if not index:
-                    try:
-                        index = int(word)
-                    except Exception:
-                        index = 1
-
-                decision["source_index"] = index
-                return decision
 
         decision["reasons"].append("default_general_chat")
         return decision
@@ -4232,74 +4460,35 @@ def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -
 
             return False
 
-    def _is_image_generation_request(self, user_text: str) -> bool:
-        text = self._safe_str(user_text).lower()
-        triggers = [
-            "generate image",
-            "create image",
-            "make image",
-            "draw",
-            "picture of",
-            "image of",
-            "photo of",
-            "make me a picture",
-        ]
-        return any(t in text for t in triggers)
-
         # ==============================
         # IMAGE HELPERS
         # ==============================
 
     def _is_image_generation_request(self, user_text: str) -> bool:
-            text = str(user_text or "").strip().lower()
+        text = str(user_text or "").strip().lower()
 
-            if not text:
-                return False
+        if not text:
+            return False
 
-            if text.startswith("/image"):
-                return True
+        # explicit command
+        if text.startswith("/image") or "/image" in text:
+            return True
 
-            if "/image" in text:
-                return True
+        # strong keyword detection
+        keywords = [
+            "generate", "create", "make", "draw", "render", "design"
+        ]
 
-            triggers = [
-                "generate an image",
-                "generate image",
-                "make an image",
-                "create an image",
-                "draw ",
-                "draw me ",
-            ]
+        image_words = [
+            "image", "picture", "photo", "art", "scene", "visual"
+        ]
 
-            return any(trigger in text for trigger in triggers)
+        # 🔥 detect intent: action + image concept
+        if any(k in text for k in keywords) and any(i in text for i in image_words):
+            return True
 
-    def _image_prompt_from_text(self, user_text: str) -> str:
-            text = str(user_text or "").strip()
-            lowered = text.lower()
+        return False
 
-            if lowered.startswith("/image"):
-                prompt = text[6:].strip()
-                return prompt or "Generate an image."
-
-            prefixes = (
-                "generate an image of ",
-                "generate an image ",
-                "generate image of ",
-                "generate image ",
-                "make an image of ",
-                "make an image ",
-                "create an image of ",
-                "create an image ",
-                "draw me ",
-                "draw ",
-            )
-
-            for prefix in prefixes:
-                if lowered.startswith(prefix):
-                    prompt = text[len(prefix):].strip()
-                    return prompt or text
-
-            return text or "Generate an image."
 
     def _build_image_generation_meta(
             self,
@@ -4787,150 +4976,7 @@ def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -
                 saved_artifact=None,
             )
 
-    def _execute_web_fetch(
-        self,
-        decision: dict,
-        user_text: str,
-        session_id: str,
-        attachments=None,
-    ) -> dict:
-        user_msg = self._build_user_message(user_text, attachments=attachments or [])
 
-        print("ENTERED _execute_web_fetch")
-        print("WEB_FETCH decision =", decision)
-
-        if self._safe_str(decision.get("mode")) == "followup_web_open":
-            direct_url = self._safe_str(decision.get("url"))
-
-            if direct_url:
-                print("DIRECT URL PROVIDED =", direct_url)
-                decision["url"] = direct_url
-
-            else:
-                session = self._get_session_payload(session_id)
-                messages = session.get("messages") if isinstance(session, dict) else []
-                index = int(decision.get("source_index") or 1)
-
-                urls = []
-
-            for msg in reversed(messages or []):
-                if not isinstance(msg, dict):
-                    continue
-                if self._safe_str(msg.get("role")) != "assistant":
-                    continue
-
-                meta = msg.get("meta") if isinstance(msg.get("meta"), dict) else {}
-                meta_urls = meta.get("source_urls")
-
-                if isinstance(meta_urls, list) and meta_urls:
-                    urls = [self._safe_str(u) for u in meta_urls if self._safe_str(u)]
-                    if urls:
-                        break
-
-                # fallback: pull URLs directly from assistant text
-                msg_text = self._safe_str(msg.get("text"))
-                text_urls = re.findall(r"https?://[^\s\]\)<>\"']+", msg_text)
-
-                if text_urls:
-                    urls = [
-                        self._safe_str(u).rstrip(".,)")
-                        for u in text_urls
-                        if self._safe_str(u)
-                    ]
-                    if urls:
-                        break
-
-                    # fallback: pull URLs directly from assistant text
-                    msg_text = self._safe_str(msg.get("text"))
-                    text_urls = re.findall(r"https?://[^\s\]\)<>\"']+", msg_text)
-
-                    if text_urls:
-                        urls = [
-                            self._safe_str(u).rstrip(".,)")
-                            for u in text_urls
-                            if self._safe_str(u)
-                        ]
-                        if urls:
-                            break
-
-                print("FOLLOWUP_WEB_OPEN urls =", urls)
-
-                if 1 <= index <= len(urls):
-                    decision["url"] = urls[index - 1]
-                else:
-                    assistant_msg = self._build_assistant_message(
-                        text="I found the previous source list, but the saved message does not contain source URLs yet. Run a fresh web search after the URL-saving fix, then try again.",
-                        attachments=[],
-                    )
-                    return self._finalize_response(
-                        session_id=session_id,
-                        user_text=user_text,
-                        user_msg=user_msg,
-                        assistant_msg=assistant_msg,
-                        decision=decision,
-                        saved_artifact=None,
-                    )
-
-        web_result = self._handle_web_fetch(
-            self._safe_str(decision.get("url")),
-            session_id=session_id,
-        )
-
-        print("DEBUG FULL WEB RESULT =", web_result)
-
-        assistant_text = "Web fetch completed."
-        source_urls = []
-
-        if isinstance(web_result, dict):
-            assistant_text = self._safe_str(
-                web_result.get("summary")
-            ) or "Web fetch completed."
-
-            results = web_result.get("results")
-
-            if isinstance(results, list):
-                for r in results:
-                    if not isinstance(r, dict):
-                        continue
-                    url = self._safe_str(r.get("url"))
-                    if url:
-                        source_urls.append(url)
-
-        artifact = web_result.get("artifact") if isinstance(web_result, dict) else None
-
-        if isinstance(artifact, dict):
-            meta = artifact.get("meta")
-            if not isinstance(meta, dict):
-                meta = {}
-
-            viewer = artifact.get("viewer")
-            if not isinstance(viewer, dict):
-                viewer = {}
-
-            if source_urls:
-                meta["source_urls"] = source_urls
-                viewer["source_urls"] = source_urls
-
-            artifact["meta"] = meta
-            artifact["viewer"] = viewer
-
-        print("WEB_FETCH DEBUG web_result =", web_result)
-        print("WEB_FETCH DEBUG source_urls =", source_urls)
-
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text,
-            attachments=[],
-            meta={"source_urls": source_urls} if source_urls else {},
-        )
-
-        return self._finalize_response(
-            session_id=session_id,
-            user_text=user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision=decision,
-            saved_artifact=artifact,
-        )
 
     def _execute_planning(
             self,
