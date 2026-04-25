@@ -1,33 +1,6 @@
 {
   "memory": [
     {
-      "text": "User is building Nova, a local AI chat workspace using Flask backend, services layer, memory, artifacts, web fetch, image support, voice, and execution planning.",
-      "kind": "project",
-      "source": "manual",
-      "session_id": "",
-      "id": "memory_nova_project_core",
-      "created_at": "2026-04-25T00:00:00+00:00",
-      "updated_at": "2026-04-25T00:00:00+00:00"
-    },
-    {
-      "text": "go to gym",
-      "kind": "note",
-      "source": "manual",
-      "session_id": "",
-      "id": "memory_2461082f67214fd3a5e5262e45c5c689",
-      "created_at": "2026-04-25T12:58:19.719448+00:00",
-      "updated_at": "2026-04-25T12:58:19.719448+00:00"
-    },
-    {
-      "text": "do 1000 pushups",
-      "kind": "note",
-      "source": "manual",
-      "session_id": "",
-      "id": "memory_daad3100ca89475086663436610bae09",
-      "created_at": "2026-04-25T12:58:11.685959+00:00",
-      "updated_at": "2026-04-25T12:58:11.685959+00:00"
-    },
-    {
       "text": "God is always good",
       "kind": "note",
       "source": "manual",

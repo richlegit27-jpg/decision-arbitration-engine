@@ -4893,13 +4893,11 @@ function wireMemoryControls() {
 
         const data = await res.json();
 
-        if (data && data.ok) {
-          state.memory = safeArray(state.memory).filter(function (m) {
-            return String(m.id) !== String(id);
-          });
-
+        if (data && data.ok && data.data && Array.isArray(data.data.memory)) {
+          state.memory = data.data.memory.map(normalizeMemoryItem);
           renderMemory();
         }
+
       } catch (err) {
         console.error("Memory delete failed", err);
       }
