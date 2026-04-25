@@ -4516,6 +4516,177 @@
       "image_missing": false,
       "video_missing": false,
       "audio_missing": false
+    },
+    {
+      "session_id": "session_503e0c590b0f467faac1b633af1fd52b",
+      "created_at": "2026-04-25T06:25:07.396471+00:00",
+      "updated_at": "2026-04-25T06:25:07.398131+00:00",
+      "kind": "web_result",
+      "group": "Web",
+      "title": "Google",
+      "summary": "• About Store Upload image Upload file AI Mode See more Delete Delete Report inappropriate predictions Google offered in: Français Canada Advertising Business How Search works Privacy Terms Settings Search settings Advance",
+      "preview": "• About Store Upload image Upload file AI Mode See more Delete Delete Report inappropriate predictions Google offered in: Français Canada...",
+      "body": "About\nStore\nUpload image\nUpload file\nAI Mode\nSee more\nDelete\nDelete\nReport inappropriate predictions\nGoogle offered in:\nFrançais\nCanada\nAdvertising\nBusiness\nHow Search works\nPrivacy\nTerms\nSettings\nSearch settings\nAdvanced search\nYour data in Search\nSearch history\nSearch help\nSend feedback\nDark theme: Off\nGoogle apps",
+      "source_url": "https://www.google.com",
+      "source": "web_fetch",
+      "meta": {
+        "source_url": "https://www.google.com",
+        "url": "https://www.google.com",
+        "final_url": "https://www.google.com",
+        "site_name": "",
+        "domain": "www.google.com",
+        "description": "",
+        "status_code": null,
+        "ssl_verified": null,
+        "bullets": [
+          "About Store Upload image Upload file AI Mode See more Delete Delete Report inappropriate predictions Google offered in: Français Canada Advertising Business How Search works Pri...",
+          "• About Store Upload image Upload file AI Mode See more Delete Delete Report inappropriate predictions Google offered in: Français Canada Advertising Business How Search works P..."
+        ],
+        "artifact_description": "• About Store Upload image Upload file AI Mode See more Delete Delete Report inappropriate predictions Google offered in: Français Canada Advertising Business How Search works Privacy Terms Settings Search settings Advance"
+      },
+      "viewer": {
+        "kind": "web_result",
+        "title": "Google",
+        "body": "Title: Google\nDomain: www.google.com\nURL: https://www.google.com\nSummary: • About Store Upload image Upload file AI Mode See more Delete Delete Report inappropriate predictions Google offered in: Français Canada Advertising Business How Search works Privacy Terms Settings Search settings Advance\nKey points:\n- About Store Upload image Upload file AI Mode See more Delete Delete Report inappropriate predictions Google offered in: Français Canada Advertising Business How Search works Pri...\n- • About Store Upload image Upload file AI Mode See more Delete Delete Report inappropriate predictions Google offered in: Français Canada Advertising Business How Search works P...\n\nContent:\nAbout Store Upload image Upload file AI Mode See more Delete Delete Report inappropriate predictions Google offered in: Français Canada Advertising Business How Search works Privacy Terms Settings Search settings Advanced search Your data in Search Search history Search help Send feedback Dark theme: Off Google apps",
+        "analysis_text": "• About Store Upload image Upload file AI Mode See more Delete Delete Report inappropriate predictions Google offered in: Français Canada Advertising Business How Search works Privacy Terms Settings Search settings Advance",
+        "bullets": [
+          "About Store Upload image Upload file AI Mode See more Delete Delete Report inappropriate predictions Google offered in: Français Canada Advertising Business How Search works Pri...",
+          "• About Store Upload image Upload file AI Mode See more Delete Delete Report inappropriate predictions Google offered in: Français Canada Advertising Business How Search works P..."
+        ],
+        "links": [
+          {
+            "text": "About",
+            "url": "https://about.google/?fg=1&utm_source=google-CA&utm_medium=referral&utm_campaign=hp-header"
+          },
+          {
+            "text": "Store",
+            "url": "https://store.google.com/CA?utm_source=hp_header&utm_medium=google_ooo&utm_campaign=GS100042&hl=en-CA"
+          },
+          {
+            "text": "Gmail",
+            "url": "https://mail.google.com/mail/&ogbl"
+          },
+          {
+            "text": "Images",
+            "url": "https://www.google.com/imghp?hl=en&ogbl"
+          },
+          {
+            "text": "",
+            "url": "https://www.google.ca/intl/en/about/products"
+          },
+          {
+            "text": "Sign in",
+            "url": "https://accounts.google.com/ServiceLogin?hl=en&passive=true&continue=https://www.google.com/&ec=futura_exp_og_so_72776762_e"
+          },
+          {
+            "text": "Français",
+            "url": "https://www.google.com/setprefs?sig=0_siB-nzm_9JfmgF07FHpMOaD7BV8%3D&hl=fr&source=homepage&sa=X&ved=0ahUKEwjQ8smKr4iUAxWoDTQIHb40FBUQ2ZgBCCA"
+          },
+          {
+            "text": "Advertising",
+            "url": "https://www.google.com/intl/en_ca/ads/?subid=ww-ww-et-g-awa-a-g_hpafoot1_1!o2&utm_source=google.com&utm_medium=referral&utm_campaign=google_hpafooter&fg=1"
+          },
+          {
+            "text": "Business",
+            "url": "https://www.google.com/services/?subid=ww-ww-et-g-awa-a-g_hpbfoot1_1!o2&utm_source=google.com&utm_medium=referral&utm_campaign=google_hpbfooter&fg=1"
+          },
+          {
+            "text": "How Search works",
+            "url": "https://google.com/search/howsearchworks/?fg=1"
+          }
+        ],
+        "images": [
+          {
+            "url": "data:image/gif;base64,R0lGODlhAQABAID/AMDAwAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==",
+            "alt": "Thumbnail for file attachment"
+          }
+        ],
+        "source_url": "https://www.google.com"
+      },
+      "id": "artifact_ac5f92394e1f4cb08dad09524acd30ed"
+    },
+    {
+      "session_id": "session_503e0c590b0f467faac1b633af1fd52b",
+      "created_at": "2026-04-25T06:25:34.391579+00:00",
+      "updated_at": "2026-04-25T06:25:34.393225+00:00",
+      "kind": "web_result",
+      "group": "Web",
+      "title": "YouTube",
+      "summary": "• About Press Copyright Contact us Creator Advertise Developers Terms Privacy Policy & Safety How YouTube works Test new features Accessibility © 2026 Google LLC",
+      "preview": "• About Press Copyright Contact us Creator Advertise Developers Terms Privacy Policy & Safety How YouTube works Test new features Accessi...",
+      "body": "About\nPress\nCopyright\nContact us\nCreator\nAdvertise\nDevelopers\nTerms\nPrivacy\nPolicy & Safety\nHow YouTube works\nTest new features\nAccessibility\n© 2026 Google LLC",
+      "source_url": "https://www.youtube.com",
+      "source": "web_fetch",
+      "meta": {
+        "source_url": "https://www.youtube.com",
+        "url": "https://www.youtube.com",
+        "final_url": "https://www.youtube.com",
+        "site_name": "",
+        "domain": "www.youtube.com",
+        "description": "",
+        "status_code": null,
+        "ssl_verified": null,
+        "bullets": [
+          "About Press Copyright Contact us Creator Advertise Developers Terms Privacy Policy & Safety How YouTube works Test new features Accessibility © 2026 Google LLC",
+          "• About Press Copyright Contact us Creator Advertise Developers Terms Privacy Policy & Safety How YouTube works Test new features Accessibility © 2026 Google LLC"
+        ],
+        "artifact_description": "• About Press Copyright Contact us Creator Advertise Developers Terms Privacy Policy & Safety How YouTube works Test new features Accessibility © 2026 Google LLC"
+      },
+      "viewer": {
+        "kind": "web_result",
+        "title": "YouTube",
+        "body": "Title: YouTube\nDomain: www.youtube.com\nURL: https://www.youtube.com\nSummary: • About Press Copyright Contact us Creator Advertise Developers Terms Privacy Policy & Safety How YouTube works Test new features Accessibility © 2026 Google LLC\nKey points:\n- About Press Copyright Contact us Creator Advertise Developers Terms Privacy Policy & Safety How YouTube works Test new features Accessibility © 2026 Google LLC\n- • About Press Copyright Contact us Creator Advertise Developers Terms Privacy Policy & Safety How YouTube works Test new features Accessibility © 2026 Google LLC\n\nContent:\nAbout Press Copyright Contact us Creator Advertise Developers Terms Privacy Policy & Safety How YouTube works Test new features Accessibility © 2026 Google LLC",
+        "analysis_text": "• About Press Copyright Contact us Creator Advertise Developers Terms Privacy Policy & Safety How YouTube works Test new features Accessibility © 2026 Google LLC",
+        "bullets": [
+          "About Press Copyright Contact us Creator Advertise Developers Terms Privacy Policy & Safety How YouTube works Test new features Accessibility © 2026 Google LLC",
+          "• About Press Copyright Contact us Creator Advertise Developers Terms Privacy Policy & Safety How YouTube works Test new features Accessibility © 2026 Google LLC"
+        ],
+        "links": [
+          {
+            "text": "",
+            "url": "https://www.youtube.com/"
+          },
+          {
+            "text": "About",
+            "url": "https://www.youtube.com/about/"
+          },
+          {
+            "text": "Press",
+            "url": "https://www.youtube.com/about/press/"
+          },
+          {
+            "text": "Copyright",
+            "url": "https://www.youtube.com/about/copyright/"
+          },
+          {
+            "text": "Contact us",
+            "url": "https://www.youtube.com/t/contact_us/"
+          },
+          {
+            "text": "Creator",
+            "url": "https://www.youtube.com/creators/"
+          },
+          {
+            "text": "Advertise",
+            "url": "https://www.youtube.com/ads/"
+          },
+          {
+            "text": "Developers",
+            "url": "https://developers.google.com/youtube"
+          },
+          {
+            "text": "Terms",
+            "url": "https://www.youtube.com/t/terms"
+          },
+          {
+            "text": "Privacy",
+            "url": "https://www.youtube.com/t/privacy"
+          }
+        ],
+        "images": [],
+        "source_url": "https://www.youtube.com"
+      },
+      "id": "artifact_6146d64a97f74b82b8c24b39890004b6"
     }
   ]
 }

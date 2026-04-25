@@ -836,15 +836,6 @@ class ChatService:
         except Exception:
             pass
 
-        try:
-            self.memory.add_memory({
-                "text": text,
-                "kind": kind,
-                "source": "router_auto",
-                "session_id": session_id,
-            })
-        except Exception as e:
-            print("MEMORY WRITE FAILED:", e)
 
     def answer_from_web_results(self, query: str, results: list[dict] | None = None) -> str:
         query = str(query or "").strip()
@@ -1271,6 +1262,16 @@ class ChatService:
         system_prompt = self._build_system_prompt(decision=decision)
         continuity_context = self._build_continuity_context(session=session)
 
+        execution_text = ""
+        try:
+            latest = self._find_latest_execution_artifact(session_id=session.get("id", ""))
+            if latest:
+                execution = latest.get("execution") or {}
+                if execution:
+                    execution_text = self._render_execution(execution)
+        except Exception:
+            execution_text = ""
+
         messages = [
             {"role": "system", "content": system_prompt}
         ]
@@ -1279,6 +1280,12 @@ class ChatService:
             messages.append({
                 "role": "system",
                 "content": continuity_context
+            })
+
+        if execution_text:
+            messages.append({
+                "role": "system",
+                "content": f"Current execution:\n{execution_text}"
             })
 
         if memory_context:
@@ -1291,7 +1298,7 @@ class ChatService:
             })
 
         messages.append({
-            "role": "user",
+            "role": "user", 
             "content": user_text or ""
         })
 
@@ -3680,16 +3687,6 @@ Write the exact goal in one sentence.
         except Exception:
             pass
 
-try:
-    self.memory.add_memory({
-        "text": clean_memory,
-        "kind": kind,
-        "source": "router_auto_clean",
-        "session_id": session_id,
-    })
-except Exception as e:
-    print("MEMORY WRITE FAILED:", e)
-
     def _memory_text_tokens(self, value: str) -> set[str]:
             text = self._safe_str(value).lower()
             if not text:
@@ -4187,79 +4184,63 @@ except Exception as e:
             } 
 
     def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
-            attachments = attachments or []
+        attachments = attachments or []
 
-            image_url = ""
-            image_name = ""
+        image_url = ""
+        image_name = ""
 
-            for item in attachments:
-                if not isinstance(item, dict):
-                    continue
+        for item in attachments:
+            if not isinstance(item, dict):
+                continue
 
-                att_type = self._safe_str(item.get("type")).lower()
-                mime_type = self._safe_str(item.get("mime_type")).lower()
-                url = self._safe_str(item.get("url"))
-                name = self._safe_str(item.get("name") or item.get("filename") or "image")
+            att_type = self._safe_str(item.get("type")).lower()
+            mime_type = self._safe_str(item.get("mime_type")).lower()
+            url = self._safe_str(item.get("url"))
+            name = self._safe_str(item.get("name") or item.get("filename") or "image")
 
-                if url and (att_type == "image" or mime_type.startswith("image/")):
-                    image_url = url
-                    image_name = name
-                    break
+            if url and (att_type == "image" or mime_type.startswith("image/")):
+                image_url = url
+                image_name = name
+                break
 
-            if image_url:
-                try:
-                    prompt = self._safe_str(user_text) or "what is in this image"
+        if image_url:
+            try:
+                prompt = self._safe_str(user_text) or "what is in this image"
 
-                    response = self.client.responses.create(
-                        model=self.chat_model,
-                        input=[
-                            {
-                                "role": "user",
-                                "content": [
-                                    {"type": "input_text", "text": prompt},
-                                    {"type": "input_image", "image_url": image_url},
-                                ],
-                            }
-                        ],
-                    )
+                response = self.client.responses.create(
+                    model=self.chat_model,
+                    input=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "input_text", "text": prompt},
+                                {"type": "input_image", "image_url": image_url},
+                            ],
+                        }
+                    ],
+                )
 
-                    text = self._extract_response_text(response)
+                assistant_text = self._extract_response_text(response)
 
-                    return {
-                        "ok": True,
-                        "text": text or f"I analyzed the image: {image_name}",
-                        "saved_artifact": None,
-                    }
+            except Exception:
+                assistant_text = "I couldn’t analyze that image."
 
-                except Exception as e:
-                    return {
-                        "ok": False,
-                        "text": f"Image analysis failed: {e}",
-                        "error": str(e),
-                        "saved_artifact": None,
-                    }
+        else:
+            assistant_text = "I couldn’t find an image attachment to analyze."
 
-            names = []
-            for item in attachments:
-                if isinstance(item, dict):
-                    name = self._safe_str(item.get("name") or item.get("filename"))
-                    if name:
-                        names.append(name)
-
-            summary = (
-                f"I analyzed the uploaded attachment(s): {', '.join(names)}."
-                if names
-                else "I analyzed the uploaded attachment(s)."
-            )
-
-            if user_text:
-                summary += f" Request: {user_text}"
-
-            return {
-                "ok": True,
-                "text": summary,
-                "saved_artifact": None,
-            }
+        return {
+            "ok": True,
+            "assistant_text": assistant_text,
+            "assistant_message": {
+                "role": "assistant",
+                "text": assistant_text,
+            },
+            "debug": {
+                "route_taken": "attachment_analysis",
+                "image_name": image_name,
+                "has_image": bool(image_url),
+            },
+        }
 
         # ==============================
         # MODEL HELPERS

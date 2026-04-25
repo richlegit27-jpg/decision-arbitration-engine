@@ -226,12 +226,12 @@ def memory_exists_for_session(session_id: str, fact_text: str) -> bool:
             "fact": fact,
         }
 
-    item = memory_service.add_memory(
-        text=fact_text,
-        kind=fact["kind"],
-        source="router_auto",
-        session_id=session_id,
-    )
+    item = memory_service.add_memory({
+        "text": fact_text,
+        "kind": fact["kind"],
+        "source": "router_auto",
+        "session_id": session_id,
+    })
 
     try:
         if isinstance(item, dict):
@@ -1151,12 +1151,14 @@ def api_memory_add():
             code="missing_text",
         ), 400
 
-    item = memory_service.add_memory(
-        text=text,
-        kind=kind,
-        source=source,
-        session_id=session_id,
-    )
+    item = memory_service.add_memory({
+        "text": text,
+        "kind": kind,
+        "source": source,
+        "session_id": session_id,
+    })
+
+    memory = memory_service.all()
 
     memory = memory_service.all()
 

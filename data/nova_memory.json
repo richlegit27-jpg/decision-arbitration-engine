@@ -1,1 +1,22 @@
-[]
+{
+  "memory": [
+    {
+      "text": "hi",
+      "kind": "note",
+      "source": "manual",
+      "session_id": "",
+      "id": "memory_12c99fe8527440a0a33174d07422c7d7",
+      "updated_at": "2026-04-25T06:24:37.792460+00:00",
+      "created_at": "2026-04-25T06:24:37.792460+00:00"
+    },
+    {
+      "text": "going to the gym later",
+      "kind": "note",
+      "source": "manual",
+      "session_id": "",
+      "id": "memory_5448a71a788d45d3a2d710e982fe104f",
+      "updated_at": "2026-04-25T06:24:53.545141+00:00",
+      "created_at": "2026-04-25T06:24:53.545141+00:00"
+    }
+  ]
+}

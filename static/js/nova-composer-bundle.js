@@ -730,12 +730,11 @@ function syncRailTruth() {
   qsa("[data-rail-tab]").forEach(function (tabEl) {
     const tabName = String(tabEl.getAttribute("data-rail-tab") || "").trim().toLowerCase();
 
-    if (tabName === "web") {
-      tabEl.hidden = true;
-      tabEl.setAttribute("aria-hidden", "true");
-      tabEl.classList.remove("is-active");
-      return;
-    }
+if (tabName === "web") {
+  tabEl.hidden = false;
+  tabEl.setAttribute("aria-hidden", "false");
+  return;
+}
 
     if (tabName === "memory") {
       const visible = hasMemory;
@@ -754,40 +753,51 @@ function syncRailTruth() {
 
 function setRailTab(tabName) {
   const requested = String(tabName || "artifacts").trim().toLowerCase();
+
   const nextTab =
-    requested === "memory" && railHasRealMemory()
-      ? "memory"
+    requested === "memory" || requested === "web" || requested === "artifacts"
+      ? requested
       : "artifacts";
 
+  if (!state.rail) state.rail = {};
   state.rail.tab = nextTab;
 
   qsa("[data-rail-tab]").forEach(function (tabEl) {
     const tab = String(tabEl.getAttribute("data-rail-tab") || "").trim().toLowerCase();
-    tabEl.classList.toggle("is-active", tab === nextTab);
-    tabEl.setAttribute("aria-selected", tab === nextTab ? "true" : "false");
+    const active = tab === nextTab;
+
+    tabEl.hidden = false;
+    tabEl.setAttribute("aria-hidden", "false");
+    tabEl.classList.toggle("is-active", active);
+    tabEl.setAttribute("aria-selected", active ? "true" : "false");
   });
 
   qsa("[data-rail-panel]").forEach(function (panelEl) {
     const panel = String(panelEl.getAttribute("data-rail-panel") || "").trim().toLowerCase();
-    const isActive = panel === nextTab;
-    panelEl.hidden = !isActive;
-    panelEl.classList.toggle("is-active", isActive);
+    const active = panel === nextTab;
+
+    panelEl.hidden = !active;
+    panelEl.classList.toggle("is-active", active);
   });
 
   if (els.railTitle) {
-    els.railTitle.textContent = nextTab === "memory" ? "Memory" : "Artifacts";
+    els.railTitle.textContent =
+      nextTab === "memory" ? "Memory" :
+      nextTab === "web" ? "Web" :
+      "Artifacts";
   }
 
   if (els.railSubtitle) {
-    if (nextTab === "memory") {
-      els.railSubtitle.textContent = "Saved memory";
-    } else {
-      els.railSubtitle.textContent = "Session artifacts";
-    }
+    els.railSubtitle.textContent =
+      nextTab === "memory" ? "Saved memory" :
+      nextTab === "web" ? "Recent web results" :
+      "Session artifacts";
   }
 
   if (nextTab === "memory") {
     if (typeof renderMemory === "function") renderMemory();
+  } else if (nextTab === "web") {
+    if (typeof renderWeb === "function") renderWeb();
   } else {
     if (typeof renderArtifacts === "function") renderArtifacts();
   }
@@ -1877,6 +1887,45 @@ function wireWorkingContextPanel() {
   });
 }
 
+// 🔥 SOURCE CLICK GLOBAL
+if (!window.__sourceClickBound) {
+  window.__sourceClickBound = true;
+
+  document.addEventListener("click", function (e) {
+    const el = e.target.closest(".source-row");
+    if (!el) return;
+
+    let url = el.getAttribute("data-url") || "";
+
+    if (!url) {
+      const link = el.querySelector("a[href]");
+      if (link) url = link.getAttribute("href") || "";
+    }
+
+    if (!url) {
+      console.warn("NO URL FOUND FOR SOURCE ROW");
+      return;
+    }
+
+    const rail = document.querySelector("[data-right-rail]");
+    const viewer = document.querySelector("[data-rail-viewer]");
+    if (!rail || !viewer) return;
+
+    rail.classList.add("is-open");
+    document.body.classList.add("is-rail-open");
+    viewer.hidden = false;
+
+    viewer.innerHTML = `
+      <div class="nova-viewer-shell">
+        <div class="nova-viewer-title">Source preview</div>
+        <div class="nova-viewer-body">
+          <a href="${url}" target="_blank" rel="noopener noreferrer">Open full article</a>
+        </div>
+      </div>
+    `;
+  });
+}
+
 function renderChat() {
   if (!els.chatThread) return;
 
@@ -1947,7 +1996,7 @@ document.querySelectorAll(".source-row").forEach(function (el) {
     els.chatThread.__lastRenderHtml = nextHtml;
   }
 
-wireWorkingContextPanel();
+  wireWorkingContextPanel();
 
   const firstSourceRow = els.chatThread.querySelector(".source-row");
   const firstSourceKey = firstSourceRow
@@ -1965,7 +2014,21 @@ wireWorkingContextPanel();
     }, 300);
   }
 
-  wireRailTabs();
+  if (typeof wireRailTabs === "function") {
+    wireRailTabs();
+  } else {
+    document.querySelectorAll("[data-rail-tab]").forEach(function (btn) {
+      if (btn.__novaRailTabWired) return;
+      btn.__novaRailTabWired = true;
+
+      btn.addEventListener("click", function () {
+        const tab = String(btn.getAttribute("data-rail-tab") || "artifacts").trim();
+        if (typeof setRailTab === "function") setRailTab(tab);
+        if (typeof openRail === "function") openRail();
+      });
+    });
+  }
+
   updateTopbarFromState();
   scrollChatToBottom(true);
   renderExecutionPanel();
@@ -2154,28 +2217,14 @@ function syncRailTruth() {
   const hasArtifacts = getSessionArtifactsForRail().length > 0;
   const hasMemory = safeArray(state.memory).length > 0;
 
-  if (!hasArtifacts && state.rail.tab === "artifacts" && hasMemory) {
-    state.rail.tab = "memory";
-  } else if (hasArtifacts) {
-    state.rail.tab = "artifacts";
-  } else if (!hasMemory) {
+  if (!state.rail) state.rail = {};
+
+  if (!state.rail.tab) {
     state.rail.tab = "artifacts";
   }
 
   qsa("[data-rail-tab]").forEach(function (tabEl) {
     const tab = String(tabEl.getAttribute("data-rail-tab") || "").trim().toLowerCase();
-
-    if (tab === "web") {
-      tabEl.hidden = true;
-      tabEl.setAttribute("aria-hidden", "true");
-      return;
-    }
-
-    if (tab === "memory") {
-      tabEl.hidden = !hasMemory;
-      tabEl.setAttribute("aria-hidden", hasMemory ? "false" : "true");
-      return;
-    }
 
     tabEl.hidden = false;
     tabEl.setAttribute("aria-hidden", "false");
@@ -4524,59 +4573,59 @@ function renderWeb() {
   if (!els.webList) {
     els.webList = document.querySelector("[data-web-list]");
   }
-  if (!els.webList) return;
 
-  if (!state.rail || state.rail.tab !== "web") {
-    return;
-  }
+  if (!els.webList) return;
 
   const items = safeArray(state.web).length
     ? safeArray(state.web)
     : safeArray(state.artifacts).filter(function (item) {
         const kind = String((item && item.kind) || "").toLowerCase();
         const source = String((item && item.source) || "").toLowerCase();
-        return kind === "web_result" || source === "web_fetch";
+        return kind === "web_result" || kind === "web_search" || source === "web_fetch";
       });
 
   if (!items.length) {
     els.webList.innerHTML =
       '<div class="nova-memory-empty">' +
-      '<div class="nova-memory-empty-title">No web results yet</div>' +
-      '<div class="nova-memory-empty-copy">Run a web query to populate this panel.</div>' +
+        '<div class="nova-memory-empty-title">No web results yet</div>' +
+        '<div class="nova-memory-empty-copy">Search something live and the result will appear here.</div>' +
       '</div>';
     return;
   }
 
-  const html = items.map(function (item) {
-    const viewer = item.viewer || {};
-    const meta = item.meta || {};
+els.webList.innerHTML = items.map(function (item) {
+  const viewer = item.viewer || {};
+  const meta = item.meta || {};
 
-    const title = escapeHtml(viewer.title || item.title || "Web result");
-    const summary = escapeHtml(
-      viewer.analysis_text ||
-      item.summary ||
-      item.preview ||
-      ""
-    );
-    const url = escapeHtml(
-      viewer.source_url ||
-      item.source_url ||
-      meta.url ||
-      ""
-    );
+  const id = escapeHtml(item.id || meta.id || viewer.id || "");
+  const title = escapeHtml(viewer.title || item.title || meta.title || "Web result");
+  const summary = escapeHtml(
+    viewer.analysis_text ||
+    item.summary ||
+    item.preview ||
+    meta.summary ||
+    ""
+  );
 
-    const id = escapeHtml(String(item.id || ""));
+  const url = escapeHtml(
+    viewer.source_url ||
+    item.source_url ||
+    meta.source_url ||
+    ""
+  );
 
-    return (
-      '<div class="nova-web-card" data-artifact-open="' + id + '">' +
-        '<div class="nova-web-card-title">' + title + '</div>' +
-        (summary ? '<div class="nova-web-card-summary">' + summary + '</div>' : "") +
-        (url ? '<div class="nova-web-card-url">' + url + '</div>' : "") +
-      '</div>'
-    );
-  }).join("");
+  return (
+    '<button type="button" class="nova-web-card" data-artifact-open="' + id + '">' +
+      '<div class="nova-web-card-title">' + title + '</div>' +
+      (summary ? '<div class="nova-web-card-summary">' + summary.slice(0, 220) + '</div>' : "") +
+      (url ? '<div class="nova-web-card-url">' + url + '</div>' : "") +
+    '</button>'
+  );
+}).join("");
 
-  els.webList.innerHTML = html;
+if (typeof wireWebLinks === "function") {
+  wireWebLinks();
+}
 }
 
 function renderWorkingContextCard(workingContext) {
@@ -4650,87 +4699,84 @@ function wireRailClose() {
 }
 
 function wireWebLinks() {
-  if (!els.webList) return;
+  document.querySelectorAll("[data-artifact-open]").forEach(function (node) {
+    if (node.__novaWebWired) return;
+    node.__novaWebWired = true;
 
-  els.webList.addEventListener("click", function (e) {
-    const btn = e.target.closest("[data-web-open]");
-    if (!btn) return;
+    node.addEventListener("click", function () {
+      const id = String(node.getAttribute("data-artifact-open") || "").trim();
+      if (!id) return;
 
-    const openId = String(btn.getAttribute("data-web-open") || "").trim();
-    if (!openId) return;
-
-    const item = safeArray(state.artifacts).find(function (entry) {
-      const viewer = entry && typeof entry.viewer === "object" ? entry.viewer : {};
-      const id = String(entry.id || "");
-      const sourceUrl = String(
-        viewer.source_url ||
-          entry.source_url ||
-          (entry.meta && entry.meta.source_url) ||
-          ""
-      );
-      return id === openId || sourceUrl === openId;
+      if (typeof openArtifactInRail === "function") {
+        openArtifactInRail(id);
+      }
     });
-
-    openRail();
-    setRailTab("web");
-    setRailSelectedItem("web", openId);
-
-    if (typeof renderWeb === "function") {
-      renderWeb();
-    }
-
-    if (item && els.railViewer) {
-      els.railViewer.hidden = false;
-      els.railViewer.innerHTML = artifactViewerHtml(item);
-    }
   });
 }
 
-function wireRailTabs() {
-  if (!els.railTabs || !els.railTabs.length) return;
+function wireMemoryControls() {
+  // ADD
+  document.querySelectorAll(".nova-memory-add-btn").forEach(function (btn) {
+    if (btn.__wired) return;
+    btn.__wired = true;
 
-  els.railTabs.forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      const tab = String(btn.getAttribute("data-rail-tab") || "artifacts");
-      setRailTab(tab);
-      setRailSelectedItem("", "");
-      openRail();
+    btn.addEventListener("click", async function () {
+      const text = prompt("Enter memory:");
+      if (!text) return;
 
-      if (els.railViewer) {
-        els.railViewer.hidden = false;
-        els.railViewer.innerHTML =
-          '<div class="nova-viewer-shell">' +
-          '<div class="nova-viewer-empty">' +
-          '<div class="nova-viewer-empty-title">' +
-          (tab === "memory" ? "Memory" : tab === "web" ? "Web" : "Artifacts") +
-          "</div>" +
-          '<div class="nova-viewer-empty-copy">Select an item to view details.</div>' +
-          "</div>" +
-          "</div>";
-      }
+      const res = await fetch("/api/memory/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
 
-      if (tab === "web" && typeof renderWeb === "function") {
-        renderWeb();
-      }
-      if (tab === "memory" && typeof renderMemory === "function") {
+      const data = await res.json();
+      if (data?.data?.memory) {
+      state.memory = data.data.memory;
         renderMemory();
       }
-      if (tab === "artifacts" && typeof renderArtifacts === "function") {
-        renderArtifacts();
+    });
+  });
+
+  // DELETE
+  document.querySelectorAll("[data-memory-delete]").forEach(function (btn) {
+    if (btn.__wired) return;
+    btn.__wired = true;
+
+    btn.addEventListener("click", async function (e) {
+      e.stopPropagation();
+
+      const id = btn.getAttribute("data-memory-delete");
+      if (!id) return;
+
+      const res = await fetch("/api/memory/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+
+      const data = await res.json();
+      if (data?.data?.memory) {
+        state.memory = data.data.memory;
+        renderMemory();
       }
     });
   });
 }
 
 function wireMemoryClicks() {
-  if (!els.memoryList || els.memoryList.dataset.bound === "1") return;
-  els.memoryList.dataset.bound = "1";
+  if (!els.memoryList) return;
 
-  els.memoryList.addEventListener("click", function (e) {
-    const btn = e.target.closest("[data-memory-open]");
+  // 🔥 REMOVE LOCK (this was breaking it)
+  els.memoryList.dataset.bound = "";
+
+  els.memoryList.onclick = function (e) {
+    if (e.target.closest("[data-memory-delete]")) return;
+
+    const btn = e.target.closest("[data-memory-id]");
     if (!btn) return;
 
-    const memoryId = String(btn.getAttribute("data-memory-open") || "").trim();
+    const memoryId = String(btn.getAttribute("data-memory-id") || "").trim();
     if (!memoryId) return;
 
     const item = safeArray(state.memory).find(function (entry) {
@@ -4757,7 +4803,7 @@ function wireMemoryClicks() {
 
     if (els.railTitle) els.railTitle.textContent = "Memory";
     if (els.railSubtitle) els.railSubtitle.textContent = String(item.kind || "note");
-  });
+  };
 }
 
 function normalizeMemoryItem(item) {
@@ -4933,47 +4979,57 @@ function renderMemory() {
   if (!els.memoryList) {
     els.memoryList = document.querySelector("[data-memory-list]");
   }
+
   if (!els.memoryList) return;
 
-  if (!state.rail || state.rail.tab !== "memory") {
-    return;
-  }
+  const items = safeArray(state.memory).map(normalizeMemoryItem);
 
-  const items = safeArray(state.memory);
-
+  // EMPTY STATE
   if (!items.length) {
     els.memoryList.innerHTML =
       '<div class="nova-memory-empty">' +
-      '<div class="nova-memory-empty-title">No saved memory yet</div>' +
-      '<div class="nova-memory-empty-copy">Memory will appear here when this lane is actively used.</div>' +
+        '<div class="nova-memory-empty-title">No saved memory yet</div>' +
+        '<div class="nova-memory-empty-copy">Add something important to remember.</div>' +
+        '<button class="nova-memory-add-btn">+ Add Memory</button>' +
       '</div>';
+
+    if (typeof wireMemoryControls === "function") {
+      wireMemoryControls();
+    }
+
     return;
   }
 
-  const html = items.map(function (item) {
-    const title = String(item.title || item.name || item.key || "Memory").trim();
-    const preview = String(
-      item.preview ||
-      item.value ||
-      item.text ||
-      item.content ||
-      item.summary ||
-      ""
-    ).trim();
+  // TOP BAR
+  let html =
+    '<div class="nova-memory-toolbar">' +
+      '<button class="nova-memory-add-btn">+ Add Memory</button>' +
+    '</div>';
 
-    const id = String(item.id || "").trim();
+  // ITEMS
+  html += items.map(function (item) {
+    const id = escapeHtml(item.id || item.key || item.title || item.text || "");
+    const title = escapeHtml(item.title || item.key || "Memory");
+    const text = escapeHtml(item.text || item.value || item.content || item.preview || "");
 
     return (
-      '<div class="nova-memory-card" data-memory-open="' + escapeHtml(id) + '">' +
-        '<div class="nova-memory-card-title">' + escapeHtml(title) + '</div>' +
-        (preview
-          ? '<div class="nova-memory-card-preview">' + escapeHtml(preview.slice(0, 200)) + '</div>'
-          : "") +
+      '<div class="nova-memory-card" data-memory-id="' + id + '">' +
+        '<div class="nova-memory-card-title">' + title + '</div>' +
+        (text ? '<div class="nova-memory-card-preview">' + text.slice(0, 200) + '</div>' : "") +
+        '<button class="nova-memory-delete" data-memory-delete="' + id + '">Remove</button>' +
       '</div>'
     );
   }).join("");
 
-  els.memoryList.innerHTML = html;
+els.memoryList.innerHTML = html;
+
+if (typeof wireMemoryClicks === "function") {
+  wireMemoryClicks();
+}
+
+if (typeof wireMemoryControls === "function") {
+  wireMemoryControls();
+}
 }
 
 function renderMemoryViewer(item) {
