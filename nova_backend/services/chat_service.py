@@ -79,6 +79,24 @@ class ChatService:
             max_follow_links=5,
         )
 
+    def handle(self, user_text: str, session_id: str = "", attachments=None):
+        attachments = attachments or []
+
+        session_id = self._ensure_session_id(session_id)
+        user_text = self._safe_str(user_text)
+
+        decision = self._decide_route(
+            user_text=user_text,
+            attachments=attachments,
+        )
+
+        working_state = self._maybe_update_working_state(session_id, user_text)
+        working_context_block = self._build_working_context_block(session_id)
+
+        self._maybe_write_memory(decision, user_text, session_id)
+
+        return result
+
     def _clean_artifact_text(self, value: str, limit: int = 300) -> str:
         text = re.sub(r"\s+", " ", self._safe_str(value)).strip()
         if not text:
@@ -753,6 +771,44 @@ class ChatService:
 
         should_save = False
         kind = "note"
+
+        important_patterns = [
+            "i am",
+            "i’m",
+            "im ",
+            "my goal",
+            "i want",
+            "i prefer",
+            "i like",
+            "i am building",
+            "i'm building",
+            "i work on",
+            "remember",
+            "from now on",
+        ]
+
+        junk_patterns = [
+            "ok",
+            "okay",
+            "next",
+            "go",
+            "test",
+            "hello",
+            "hi",
+            "yo",
+        ]
+
+        should_save = False
+
+        for p in important_patterns:
+            if p in lowered:
+                should_save = True
+                break
+
+        for j in junk_patterns:
+            if lowered.strip() == j:
+                should_save = False
+                break
 
         # profile / identity
         if any(x in lowered for x in ["my name is", "i am ", "i'm ", "call me"]):
@@ -3360,7 +3416,7 @@ Write the exact goal in one sentence.
 
         def _clean_value(value: str) -> str:
             value = self._safe_str(value).strip()
-            value = value.strip(" \t\r\n-:;,.")
+            value = value.strip("+    ← (FOUR SPACES — press space 4 times)\r\n-:;,.")
             return value
 
         def _set_if_present(field_name: str, value: str):
@@ -3657,95 +3713,168 @@ Write the exact goal in one sentence.
 
             return "\n".join(lines).strip()
 
-    def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
-        text = self._normalize_memory_text_for_save(user_text)
-        lowered = text.lower()
+def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
+    if not isinstance(decision, dict):
+        return
 
-        if not text:
-            return
+    # 🔥 allow override for important memory even if save_memory is false
+    if not decision.get("save_memory"):
+        pass
 
-        should_save = False
+    text = self._normalize_memory_text_for_save(user_text)
+    lowered = text.lower()
+
+    should_save = False
+    kind = "note"
+
+    important_patterns = [
+        "i am",
+        "i’m",
+        "im ",
+        "my goal",
+        "i want",
+        "i prefer",
+        "i like",
+        "i am building",
+        "i'm building",
+        "i work on",
+        "remember",
+        "from now on",
+    ]
+
+    junk_patterns = [
+        "ok",
+        "okay",
+        "next",
+        "go",
+        "test",
+        "hello",
+        "hi",
+        "yo",
+    ]
+
+    # 🔥 importance detection
+    for p in important_patterns:
+        if p in lowered:
+            should_save = True
+            break
+
+    for j in junk_patterns:
+        if lowered.strip() == j:
+            should_save = False
+            break
+
+    # 🔥 classification
+
+    # profile / identity
+    if any(x in lowered for x in ["my name is", "i am ", "i'm ", "call me"]):
+        should_save = True
+        kind = "profile"
+
+    # style / communication
+    elif any(
+        x in lowered
+        for x in [
+            "answer me",
+            "talk to me",
+            "respond with",
+            "be direct",
+            "no fluff",
+            "tldr",
+            "smff",
+        ]
+    ):
+        should_save = True
+        kind = "style"
+
+    # preferences
+    elif any(
+        x in lowered
+        for x in [
+            "my favorite",
+            "my favourite",
+            "favorite color is",
+            "favourite color is",
+            "i prefer",
+            "i like",
+            "i love",
+            "i enjoy",
+            "i usually",
+            "i always",
+            "from now on",
+            "going forward",
+        ]
+    ):
+        should_save = True
+        kind = "preference"
+
+    # project / work
+    elif any(
+        x in lowered
+        for x in [
+            "i'm building",
+            "i am building",
+            "my project",
+            "i'm working on",
+            "i am working on",
+            "working on",
+            "nova",
+        ]
+    ):
+        should_save = True
+        kind = "project"
+
+    # goals
+    elif any(x in lowered for x in ["i want to", "my goal", "i plan to"]):
+        should_save = True
+        kind = "goal"
+
+    # explicit memory instruction
+    elif "remember that" in lowered:
+        should_save = True
         kind = "note"
-        clean_memory = text
 
-        if "my name is " in lowered:
-            name = text.split("my name is", 1)[-1].strip(" .,!?:;")
-            if name:
-                should_save = True
-                kind = "profile"
-                clean_memory = f"User's name is {name.title()}."
+    if not should_save:
+        return
 
-        elif "call me " in lowered:
-            name = text.split("call me", 1)[-1].strip(" .,!?:;")
-            if name:
-                should_save = True
-                kind = "profile"
-                clean_memory = f"User prefers to be called {name.title()}."
+    if not self._should_save_memory_text(text, kind=kind):
+        return
 
-        elif any(x in lowered for x in ["i'm working on ", "i am working on ", "working on "]):
-            clean = text
-            for marker in ["i'm working on ", "i am working on ", "working on "]:
-                if marker in lowered:
-                    clean = text[lowered.find(marker) + len(marker):].strip(" .,!?:;")
-                    break
+    # 🔥 prevent duplicates
+    try:
+        existing_items = []
+        if hasattr(self, "memory") and self.memory and hasattr(self.memory, "all"):
+            existing_items = self.memory.all() or []
 
-            if clean:
-                should_save = True
-                kind = "project"
-                clean_memory = f"User is working on {clean}."
+        for item in existing_items:
+            if not isinstance(item, dict):
+                continue
 
-        elif any(x in lowered for x in ["i'm building ", "i am building ", "my project is "]):
-            clean = text
-            for marker in ["i'm building ", "i am building ", "my project is "]:
-                if marker in lowered:
-                    clean = text[lowered.find(marker) + len(marker):].strip(" .,!?:;")
-                    break
+            existing_text = self._normalize_memory_text_for_save(item.get("text", ""))
+            existing_kind = self._safe_str(item.get("kind")).lower().strip()
+            existing_session = self._safe_str(item.get("session_id")).strip()
 
-            if clean:
-                should_save = True
-                kind = "project"
-                clean_memory = f"User is building {clean}."
+            if (
+                existing_text
+                and existing_text.lower() == text.lower()
+                and existing_kind == kind
+                and existing_session == self._safe_str(session_id)
+            ):
+                return
 
-        elif any(x in lowered for x in ["i prefer ", "from now on ", "going forward "]):
-            should_save = True
-            kind = "preference"
-            clean_memory = f"User preference: {text.strip(' .,!?:;')}."
+    except Exception:
+        pass
 
-        elif any(x in lowered for x in ["my goal is ", "i want to ", "i plan to "]):
-            should_save = True
-            kind = "goal"
-            clean_memory = f"User goal: {text.strip(' .,!?:;')}."
-
-        elif "remember that" in lowered:
-            clean = text.split("remember that", 1)[-1].strip(" .,!?:;")
-            if clean:
-                should_save = True
-                kind = "note"
-                clean_memory = clean[0].upper() + clean[1:] + "."
-
-        if not should_save:
-            return
-
-        if not self._should_save_memory_text(clean_memory, kind=kind):
-            return
-
-        try:
-            existing_items = []
-            if hasattr(self, "memory") and self.memory and hasattr(self.memory, "all"):
-                existing_items = self.memory.all() or []
-
-            for item in existing_items:
-                if not isinstance(item, dict):
-                    continue
-
-                existing_text = self._normalize_memory_text_for_save(item.get("text", ""))
-                existing_kind = self._safe_str(item.get("kind")).lower().strip()
-
-                if existing_text.lower() == clean_memory.lower() and existing_kind == kind:
-                    return
-
-        except Exception:
-            pass
+    # 🔥 save memory
+    try:
+        self.memory.add_memory({
+            "text": text,
+            "kind": kind,
+            "source": "auto",
+            "session_id": session_id,
+        })
+    except Exception as e:
+        print("MEMORY WRITE FAILED:", e)
 
     def _memory_text_tokens(self, value: str) -> set[str]:
             text = self._safe_str(value).lower()
@@ -3827,11 +3956,13 @@ Write the exact goal in one sentence.
             return 0.0
 
     def _memory_session_bonus(self, item: dict, session_id: str = "") -> float:
-            current_session = self._safe_str(session_id)
-            item_session = self._safe_str(item.get("session_id"))
-            if current_session and item_session and current_session == item_session:
-                return 1.5
-            return 0.0
+        current_session = self._safe_str(session_id)
+        item_session = self._safe_str(item.get("session_id"))
+
+        if current_session and item_session and current_session == item_session:
+            return 0.75   # ↓ reduced from 1.5
+
+        return 0.0
 
     def _score_memory_item(self, item: dict, user_text: str, session_id: str = "") -> float:
             if not isinstance(item, dict):
@@ -3877,9 +4008,9 @@ Write the exact goal in one sentence.
                 generic_penalty -= 4.0
 
             return (
-                overlap_score
+                (overlap_score * 2.0)
                 + exact_phrase_score
-                + contains_named_value
+                + (contains_named_value * 1.5)
                 + kind_score
                 + time_score
                 + session_score
@@ -3912,6 +4043,20 @@ Write the exact goal in one sentence.
                 return True
 
             return False
+
+    def _is_image_generation_request(self, user_text: str) -> bool:
+        text = self._safe_str(user_text).lower()
+        triggers = [
+            "generate image",
+            "create image",
+            "make image",
+            "draw",
+            "picture of",
+            "image of",
+            "photo of",
+            "make me a picture",
+        ]
+        return any(t in text for t in triggers)
 
         # ==============================
         # IMAGE HELPERS
@@ -4321,18 +4466,21 @@ Write the exact goal in one sentence.
         decision: dict,
         session_id: str = "",
         working_context_block: str = "",
+        memory_context: str = "",
     ) -> str:
 
         user_text = self._safe_str(user_text)
         decision = decision if isinstance(decision, dict) else {}
 
-        memory_items = self._rank_memory_context(
-            user_text=user_text,
-            limit=int(decision.get("memory_limit") or self.memory_limit),
-            session_id=session_id,
-        )
+        memory_block = self._safe_str(memory_context).strip()
 
-        memory_block = self._format_memory_context(memory_items[:3])
+        if not memory_block:
+            memory_items = self._rank_memory_context(
+                user_text=user_text,
+                limit=int(decision.get("memory_limit") or self.memory_limit),
+                session_id=session_id,
+            )
+            memory_block = self._format_memory_context(memory_items[:3])
 
         session = self._get_session_payload(session_id)
         messages = session.get("messages", []) if isinstance(session, dict) else []
@@ -4356,8 +4504,18 @@ Write the exact goal in one sentence.
 
         if memory_block:
             sections.append(
-                "Known facts about the user (use these as truth when answering):\n"
+                "Known facts, preferences, and communication style about the user. Treat these as active instructions when relevant:\n"
                 f"{memory_block}"
+            )
+
+            sections.append(
+                "Execution-aware reasoning instructions:\n"
+                "- Do NOT restart or re-plan completed work.\n"
+                "- Assume previous steps are already implemented and working.\n"
+                "- Continue from the current phase, not from the beginning.\n"
+                "- Give the next concrete implementation step, not a full plan.\n"
+                "- Keep responses short, direct, and actionable.\n"
+                "- Align with the user's saved communication style."
             )
 
         if working_context_block:
@@ -4420,8 +4578,14 @@ Write the exact goal in one sentence.
                 limit=int(decision.get("memory_limit") or 3),
                 session_id=session_id,
             )
+
             if not isinstance(memory_used, list):
                 memory_used = []
+
+            pinned = [m for m in memory_used if isinstance(m, dict) and m.get("pinned")]
+            non_pinned = [m for m in memory_used if isinstance(m, dict) and not m.get("pinned")]
+            memory_used = (pinned + non_pinned)[:3]
+
             memory_used = memory_used[:3]
         except Exception as e:
             print("MEMORY_USED RANK FAILED:", e)
@@ -4432,11 +4596,14 @@ Write the exact goal in one sentence.
             attachments=attachments,
         )
 
+        memory_context = self._format_memory_context(memory_used)
+
         prompt = self._build_chat_input(
             user_text=user_text,
             decision=decision,
             session_id=session_id,
             working_context_block=working_context_block,
+            memory_context=memory_context,
         )
 
         print("=== NOVA PROMPT START ===")
@@ -5210,200 +5377,36 @@ Write the exact goal in one sentence.
     # ==============================
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         attachments = attachments or []
-        saved_artifact = None
 
-        try:
-            user_text = self._safe_str(user_text)
-            session_id = self._ensure_session_id(session_id)
+        session_id = self._ensure_session_id(session_id)
+        user_text = self._safe_str(user_text)
 
-            print("HANDLE SESSION_ID =", session_id)
+        decision = {
+            "route": self.ROUTE_GENERAL_CHAT,
+            "mode": "chat",
+            "confidence": 0.55,
+            "use_memory": True,
+            "save_memory": True,
+            "save_artifact": False,
+            "has_attachments": bool(attachments),
+            "url": "",
+            "memory_limit": self.memory_limit,
+            "reasons": ["recovery_bypass_decide_route"],
+        }
 
-            user_msg = self._build_user_message(user_text, attachments=attachments)
-            auto_exec_match = self._looks_like_auto_execution_request(user_text)
-            progress_exec_match = self._looks_like_execution_progression(user_text)
+        assistant_msg = self._build_assistant_message(
+            text="Nova recovery mode active.",
+            attachments=[],
+        )
 
-            print("HANDLE USER_TEXT =", repr(user_text))
-            print("HANDLE AUTO_EXEC_MATCH =", auto_exec_match)
-            print("HANDLE PROGRESS_EXEC_MATCH =", progress_exec_match)
+        self._maybe_write_memory(decision, user_text, session_id)
 
-            if auto_exec_match:
-                print("HANDLE ROUTE = auto_execute")
-                return self._auto_execute_request(
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=self._build_user_message(user_text, attachments=attachments),
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=None,
+        )
 
-            if progress_exec_match:
-                print("HANDLE ROUTE = advance_execution")
-                return self._advance_execution_request(
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
-
-            print("HANDLE ROUTE = normal_chat")
-
-            auto_run_after_plan = any(
-                x in self._safe_str(user_text).lower()
-                for x in [
-                    "run all",
-                    "auto execute",
-                    "finish the plan",
-                    "do it all",
-                    "complete it",
-                ]
-            )
-
-            latest_execution = self._find_latest_execution_artifact(session_id=session_id)
-
-            latest_execution = self._find_latest_execution_artifact(session_id=session_id)
-
-            if "plan" in self._safe_str(user_text).lower():
-                print("AUTO PLAN: generating execution plan")
-                saved_artifact = self._build_execution_plan(user_text, session_id)
-
-                if auto_run_after_plan:
-                    print("AUTO PLAN: immediately auto-executing")
-                    return self._auto_execute_request(
-                        user_text="auto execute",
-                        session_id=session_id,
-                        attachments=attachments,
-                    )
-
-                assistant_text = "Execution plan created.\n\nUse 'run it' to advance one step."
-
-                if isinstance(saved_artifact, dict) and saved_artifact.get("body"):
-                    assistant_text += "\n\n" + self._safe_str(saved_artifact.get("body"))
-
-                assistant_msg = self._build_assistant_message(
-                    text=assistant_text,
-                    attachments=[],
-                )
-
-                return self._finalize_response(
-                    session_id=session_id,
-                    user_text=user_text,
-                    user_msg=user_msg,
-                    assistant_msg=assistant_msg,
-                    decision={
-                        "route": "execution",
-                        "mode": "plan_creation",
-                        "save_artifact": True,
-                        "save_memory": False,
-                        "use_memory": True,
-                    },
-                    saved_artifact=saved_artifact,
-                )
-
-            working_state = self._maybe_update_working_state(session_id, user_text)
-            working_context_block = self._build_working_context_block(session_id)
-
-            decision = self._decide_route(
-                user_text=user_text,
-                attachments=attachments,
-            )
-
-            if "open the first one" in (user_text or "").lower():
-                decision["route"] = "web_fetch"
-                decision["mode"] = "followup_web_open"
-                decision["source_index"] = 1
-
-            if decision.get("route") == "web_fetch":
-                return self._execute_web_fetch(
-                    decision=decision,
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
-
-            if decision.get("route") == "web":
-                decision["route"] = self.ROUTE_WEB_FETCH
-                decision["mode"] = "web"
-                decision["url"] = user_text
-                return self._execute_web_fetch(
-                    decision=decision,
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
-
-            assistant_text = self._execute_general_chat(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-                decision=decision,
-                working_state=working_state,
-                working_context_block=working_context_block,
-            )
-
-            assistant_msg = self._build_assistant_message(
-                text=self._safe_str(assistant_text),
-                attachments=[],
-            )
-
-            self._maybe_write_memory(decision, user_text, session_id)
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision=decision,
-                saved_artifact=saved_artifact,
-            )
-
-        except Exception as e:
-            import traceback
-
-            tb = traceback.format_exc()
-            print("HANDLE FAILED:", e)
-            print(tb)
-
-            safe_session_id = session_id
-            try:
-                safe_session_id = self._ensure_session_id(session_id)
-            except Exception:
-                pass
-
-            safe_user_text = ""
-            try:
-                safe_user_text = self._safe_str(user_text)
-            except Exception:
-                safe_user_text = ""
-
-            try:
-                safe_user_msg = self._build_user_message(
-                    safe_user_text,
-                    attachments=attachments or [],
-                )
-            except Exception:
-                safe_user_msg = {
-                    "role": "user",
-                    "text": safe_user_text,
-                    "attachments": attachments or [],
-                }
-
-            assistant_msg = self._build_assistant_message(
-                text=(
-                    "I hit an internal error while handling that request.\n\n"
-                    f"{type(e).__name__}: {self._safe_str(e)}\n\n"
-                    f"{tb}"
-                ),
-                attachments=[],
-            )
-
-            return self._finalize_response(
-                session_id=safe_session_id,
-                user_text=safe_user_text,
-                user_msg=safe_user_msg,
-                assistant_msg=assistant_msg,
-                decision={
-                    "route": "chat",
-                    "mode": "safe_fallback",
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": True,
-                },
-                saved_artifact=None,
-            )

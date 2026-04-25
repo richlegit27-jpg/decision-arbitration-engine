@@ -51,10 +51,13 @@
       state.artifacts = safeArray(data.artifacts);
     }
 
-    if (Array.isArray(data.memory)) {
-      state.memory = data.memory.map(normalizeMemoryItem);
-    }
+if (Array.isArray(data.artifacts)) {
+  state.artifacts = data.artifacts;
+}
 
+if (Array.isArray(data.memory)) {
+  state.memory = data.memory;
+}
     renderChat();
     renderArtifacts();
     renderMemory();
@@ -1973,41 +1976,41 @@ function renderChat() {
   if (els.chatThread.__lastRenderHtml !== nextHtml) {
     els.chatThread.innerHTML = nextHtml;
 
-// 🔥 SOURCE CLICK HANDLER (RIGHT RAIL VIEWER)
-document.querySelectorAll(".source-row").forEach(function (el) {
-  el.addEventListener("click", function () {
-    let url = el.getAttribute("data-url") || "";
+    document.querySelectorAll(".source-row").forEach(function (el) {
+      el.addEventListener("click", function () {
+        let url = el.getAttribute("data-url") || "";
 
-    if (!url) {
-      const link = el.querySelector("a[href]");
-      if (link) {
-        url = link.getAttribute("href") || "";
-      }
-    }
+        if (!url) {
+          const link = el.querySelector("a[href]");
+          if (link) {
+            url = link.getAttribute("href") || "";
+          }
+        }
 
-    if (!url) {
-      console.warn("NO URL FOUND FOR SOURCE ROW");
-      return;
-    }
+        if (!url) {
+          console.warn("NO URL FOUND FOR SOURCE ROW");
+          return;
+        }
 
-    const rail = document.querySelector("[data-right-rail]");
-    const viewer = document.querySelector("[data-rail-viewer]");
-    if (!rail || !viewer) return;
+        const rail = document.querySelector("[data-right-rail]");
+        const viewer = document.querySelector("[data-rail-viewer]");
+        if (!rail || !viewer) return;
 
-    rail.classList.add("is-open");
-    document.body.classList.add("is-rail-open");
-    viewer.hidden = false;
+        rail.classList.add("is-open");
+        document.body.classList.add("is-rail-open");
+        viewer.hidden = false;
 
-    viewer.innerHTML = `
-      <div class="nova-viewer-shell">
-        <div class="nova-viewer-title">Source preview</div>
-        <div class="nova-viewer-body">
-          <a href="${url}" target="_blank" rel="noopener noreferrer">Open full article</a>
-        </div>
-      </div>
-    `;
-  });
-});
+        viewer.innerHTML = `
+          <div class="nova-viewer-shell">
+            <div class="nova-viewer-title">Source preview</div>
+            <div class="nova-viewer-body">
+              <a href="${url}" target="_blank" rel="noopener noreferrer">Open full article</a>
+            </div>
+          </div>
+        `;
+      });
+    });
+
     els.chatThread.__lastRenderHtml = nextHtml;
   }
 
@@ -2040,6 +2043,55 @@ document.querySelectorAll(".source-row").forEach(function (el) {
         const tab = String(btn.getAttribute("data-rail-tab") || "artifacts").trim();
         if (typeof setRailTab === "function") setRailTab(tab);
         if (typeof openRail === "function") openRail();
+      });
+    });
+  }
+
+  const memoryEl = document.getElementById("nova-memory-list");
+
+  if (memoryEl) {
+    const memory = (state.memory || []).slice().sort(function (a, b) {
+      const ap = a && a.pinned ? 1 : 0;
+      const bp = b && b.pinned ? 1 : 0;
+      return bp - ap;
+    });
+
+    memoryEl.innerHTML = memory.map(function (item) {
+      const id = String(item.id || "");
+      const text = String(item.text || "");
+
+      return `
+        <div class="nova-memory-item" data-id="${id}">
+          <div>
+            <div>${item.pinned ? "📌" : "🧠"} ${text}</div>
+            <small>${String(item.kind || "note")} · ${String(item.source || "manual")}</small>
+          </div>
+          <button class="nova-memory-pin" data-id="${id}">📌</button>
+          <button class="nova-memory-delete" data-id="${id}">Remove</button>
+        </div>
+      `;
+    }).join("") || `<div class="nova-empty">No memory yet</div>`;
+
+    memoryEl.querySelectorAll(".nova-memory-delete").forEach(function (btn) {
+      btn.addEventListener("click", async function () {
+        const id = this.getAttribute("data-id");
+
+        try {
+          const res = await fetch("/api/memory/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: id }),
+          });
+
+          const data = await res.json();
+
+          if (data.ok) {
+            state.memory = data.memory || [];
+            renderChat();
+          }
+        } catch (err) {
+          console.error("Delete memory failed", err);
+        }
       });
     });
   }

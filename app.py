@@ -1188,6 +1188,30 @@ def api_memory_add():
         message="Memory added.",
     )
 
+@app.post("/api/memory/pin")
+@guarded_json_route
+def api_memory_pin():
+    data = get_json_body(request)
+    memory_id = get_str(data, "id") or get_str(data, "memory_id")
+    pinned = bool(data.get("pinned", True))
+
+    if not memory_id:
+        return error_response(
+            error="id is required.",
+            code="missing_id",
+        ), 400
+
+    item = memory_service.pin_memory(memory_id, pinned=pinned)
+    memory = memory_service.all()
+
+    return ok_response(
+        data={
+            "item": item,
+            "memory": memory,
+            "count": len(memory),
+        },
+        message="Memory pinned." if pinned else "Memory unpinned.",
+    )
 
 @app.post("/api/memory/delete")
 @guarded_json_route

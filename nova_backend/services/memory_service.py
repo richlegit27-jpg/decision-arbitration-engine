@@ -97,10 +97,16 @@ class MemoryService:
 
             if existing_text == new_text and existing_kind == new_kind:
                 existing = dict(existing or {})
+
+                count = int(existing.get("count") or 1) + 1
+
                 existing.update(item)
+                existing["count"] = count
                 existing["updated_at"] = now
-                if not existing.get("created_at"):
-                    existing["created_at"] = now
+
+                if count >= 3:
+                    existing["pinned"] = True
+                    existing["weight"] = 10.0
 
                 memory[i] = existing
                 data["memory"] = memory
@@ -159,6 +165,21 @@ class MemoryService:
         self._write_store(data)
 
         return item
+
+    def pin_memory(self, memory_id: str, pinned: bool = True) -> dict | None:
+        memory_id = str(memory_id or "").strip()
+        if not memory_id:
+            return None
+
+        for item in self._items:
+            if str(item.get("id") or "") == memory_id:
+                item["pinned"] = bool(pinned)
+                item["weight"] = 10.0 if pinned else float(item.get("weight") or 1.0)
+                item["updated_at"] = self._now()
+                self._save()
+                return item
+
+        return None
 
     def delete_memory(self, memory_id: str) -> bool:
         target = str(memory_id or "").strip()
