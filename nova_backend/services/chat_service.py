@@ -192,36 +192,30 @@ class ChatService:
         decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
 
+        # build prompt
+        prompt = self._safe_str(decision.get("prompt"))
+        if not prompt:
+            prompt = self._image_prompt_from_text(user_text)
+
+        # build user message
         user_msg = self._build_user_message(
             user_text,
             attachments=attachments,
         )
 
-        prompt = self._safe_str(decision.get("prompt"))
-        if not prompt:
-            prompt = self._image_prompt_from_text(user_text)
-
         try:
-            response = self.client.images.generate(
-                model="gpt-image-1",
+            # 🔥 USE THE WORKING IMAGE PIPELINE
+            result = self._handle_image_generation(
                 prompt=prompt,
-                size="1024x1024",
+                session_id=session_id,
             )
 
-            image_base64 = response.data[0].b64_json
+            image_url = self._safe_str(result.get("image_url")) if isinstance(result, dict) else ""
+            saved_artifact = result.get("saved_artifact") if isinstance(result, dict) else None
 
-            import base64
-            import os
-            import uuid
-
-            filename = f"img_{uuid.uuid4().hex}.png"
-            filepath = os.path.join(self.uploads_dir, filename)
-
-            with open(filepath, "wb") as f:
-                f.write(base64.b64decode(image_base64))
-
-            image_url = f"/api/uploads/{filename}"
-            assistant_text = "Image generated successfully."
+            assistant_text = self._safe_str(result.get("text")) if isinstance(result, dict) else ""
+            if not assistant_text:
+                assistant_text = f"Generated image for: {prompt}"
 
             assistant_msg = self._build_assistant_message(
                 text=assistant_text,
@@ -229,12 +223,9 @@ class ChatService:
                     {
                         "type": "image",
                         "url": image_url,
-                        "filename": filename,
-                        "prompt": prompt,
-                        "mime_type": "image/png",
-                        "content_type": "image/png",
+                        "name": "Generated Image",
                     }
-                ],
+                ] if image_url else [],
                 meta={
                     "type": "image_generation",
                     "image_url": image_url,
@@ -242,16 +233,13 @@ class ChatService:
                 },
             )
 
-            # 🔥 CRITICAL LINE (this fixes your issue)
-            assistant_msg["image_url"] = image_url
-
             return self._finalize_response(
                 session_id=session_id,
                 user_text=user_text,
                 user_msg=user_msg,
                 assistant_msg=assistant_msg,
                 decision=decision,
-                saved_artifact=None,
+                saved_artifact=saved_artifact,
             )
 
         except Exception as e:
@@ -2057,203 +2045,94 @@ class ChatService:
         )
         return any(trigger in t for trigger in triggers)
 
-    def _decide_route(
-        self,
-        user_text: str,
-        session_id: str = "",
-        attachments=None,
-    ) -> dict:
-        attachments = attachments or []
-        text = self._safe_str(user_text)
-        lowered = text.lower()
+def _decide_route(
+    self,
+    user_text: str,
+    attachments=None,
+    session_id: str = "",
+) -> dict:
 
-        # 🔥 FORCE URL FETCH (HIGHEST PRIORITY)
-        if self._looks_like_url(text):
-            return {
-                "route": self.ROUTE_WEB_FETCH,
-                "mode": "web",
-                "confidence": 1.0,
-                "use_memory": False,
-                "save_memory": False,
-                "save_artifact": True,
-                "has_attachments": False,
-                "url": self._extract_first_url(text),
-                "memory_limit": self.memory_limit,
-                "reasons": ["forced_url_fetch"],
-                "session_id": self._safe_str(session_id),
-            }
+    user_text = self._safe_str(user_text)
+    lower_text = user_text.lower()
 
-        # CONTINUATION: open from previous web results
-        if len(lowered.split()) <= 6:
-            import re
+    attachments = attachments or []
 
-            match = re.search(r"(first|second|third|fourth|fifth|\d+)", lowered)
+    # =========================
+    # IMAGE GENERATION (PRIORITY)
+    # =========================
+    image_triggers = (
+        "generate an image",
+        "make an image",
+        "create an image",
+        "draw ",
+        "picture of",
+        "image of",
+        "render ",
+    )
 
-            if any(word in lowered for word in ["open", "show", "click", "view"]) and match:
-                word = match.group(1)
-                mapping = {
-                    "first": 1,
-                    "second": 2,
-                    "third": 3,
-                    "fourth": 4,
-                    "fifth": 5,
-                }
-
-                index = mapping.get(word)
-                if not index:
-                    try:
-                        index = int(word)
-                    except Exception:
-                        index = 1
-
-                return {
-                    "route": self.ROUTE_WEB_FETCH,
-                    "mode": "followup_web_open",
-                    "confidence": 0.99,
-                    "use_memory": False,
-                    "save_memory": False,
-                    "save_artifact": True,
-                    "has_attachments": False,
-                    "url": "",
-                    "memory_limit": self.memory_limit,
-                    "source_index": index,
-                    "reasons": ["continuation_web_open"],
-                    "session_id": self._safe_str(session_id),
-                }
-
-        # 🔥 IMAGE GENERATION (HIGH PRIORITY)
-        if self._is_image_generation_request(user_text):
-            return {
-                "route": self.ROUTE_IMAGE_GENERATION,
-                "mode": "image",
-                "confidence": 0.99,
-                "use_memory": False,
-                "save_memory": False,
-                "save_artifact": True,
-                "has_attachments": bool(attachments),
-                "url": "",
-                "prompt": self._image_prompt_from_text(user_text),
-                "memory_limit": self.memory_limit,
-                "reasons": ["image_trigger_early"],
-                "session_id": self._safe_str(session_id),
-            }
-
-        # 🔥 FORCE MEMORY FOR PERSONAL QUERIES
-        personal_memory_queries = (
-            "what is my",
-            "what's my",
-            "who am i",
-            "what do you know about me",
-            "about me",
-            "my favorite",
-            "my favourite",
-            "my name",
-            "what am i working on",
-        )
-
-        if any(q in lowered for q in personal_memory_queries):
-            return {
-                "route": self.ROUTE_GENERAL_CHAT,
-                "mode": "memory",
-                "confidence": 0.99,
-                "use_memory": True,
-                "save_memory": False,
-                "save_artifact": False,
-                "has_attachments": False,
-                "url": "",
-                "memory_limit": self.memory_limit,
-                "reasons": ["forced_memory_priority"],
-                "session_id": self._safe_str(session_id),
-            }
-
-        # 🔥 FORCE WEB ROUTE FOR LIVE QUERIES
-        if any(word in lowered for word in [
-            "latest", "news", "price", "stock", "weather", "time",
-            "current", "today", "update", "updates"
-        ]):
-            return {
-                "route": self.ROUTE_WEB_FETCH,
-                "mode": "web",
-                "confidence": 1.0,
-                "use_memory": False,
-                "save_memory": False,
-                "save_artifact": True,
-                "has_attachments": False,
-                "url": text,
-                "memory_limit": self.memory_limit,
-                "reasons": ["forced_live_query"],
-                "session_id": self._safe_str(session_id),
-            }
-
-        decision = {
-            "route": self.ROUTE_GENERAL_CHAT,
-            "mode": "chat",
-            "confidence": 0.50,
-            "use_memory": True,
-            "save_memory": True,
-            "save_artifact": False,
-            "has_attachments": bool(attachments),
-            "url": "",
-            "memory_limit": self.memory_limit,
-            "reasons": [],
-            "session_id": self._safe_str(session_id),
+    if any(trigger in lower_text for trigger in image_triggers):
+        return {
+            "route": "image_generation",
+            "mode": "image_generation",
+            "confidence": 0.95,
+            "reasons": ["image_generation_intent"],
+            "save_artifact": True,
+            "save_memory": False,
+            "use_memory": False,
+            "prompt": user_text,
         }
 
-        if not text:
-            decision["reasons"].append("empty_input")
-            return decision
+    # =========================
+    # IMAGE ANALYSIS (attachments)
+    # =========================
+    if attachments:
+        return {
+            "route": "image_analysis",
+            "mode": "image_analysis",
+            "confidence": 0.9,
+            "reasons": ["attachment_present"],
+            "save_artifact": True,
+            "save_memory": False,
+            "use_memory": False,
+        }
 
-        planning_phrases = (
-            "make a plan",
-            "create a plan",
-            "build a plan",
-            "plan this",
-            "plan it",
-            "give me a plan",
-            "step by step plan",
-            "next steps",
-        )
+    # =========================
+    # WEB SEARCH
+    # =========================
+    web_triggers = (
+        "latest",
+        "news",
+        "today",
+        "current",
+        "price",
+        "stock",
+        "bitcoin",
+        "nvidia",
+    )
 
-        if lowered in planning_phrases or self._looks_like_planning(text):
-            decision.update(
-                {
-                    "route": self.ROUTE_PLANNING,
-                    "mode": "planning",
-                    "confidence": 0.99,
-                    "save_artifact": True,
-                    "save_memory": False,
-                    "use_memory": True,
-                }
-            )
-            decision["reasons"].append("planning_hard_lock")
-            return decision
+    if any(trigger in lower_text for trigger in web_triggers):
+        return {
+            "route": "web",
+            "mode": "web_fetch",
+            "confidence": 0.85,
+            "reasons": ["web_intent"],
+            "save_artifact": True,
+            "save_memory": False,
+            "use_memory": False,
+        }
 
-        if attachments:
-            decision.update(
-                {
-                    "route": self.ROUTE_ATTACHMENT_ANALYSIS,
-                    "mode": "analysis",
-                    "confidence": 0.90,
-                    "save_artifact": True,
-                }
-            )
-            decision["reasons"].append("attachments_present")
-            return decision
-
-        if self._looks_like_memory_recall(text):
-            decision.update(
-                {
-                    "route": self.ROUTE_MEMORY_RECALL,
-                    "mode": "memory",
-                    "confidence": 0.82,
-                    "save_memory": False,
-                }
-            )
-            decision["reasons"].append("memory_recall_trigger")
-            return decision
-
-        decision["reasons"].append("default_general_chat")
-        return decision
+    # =========================
+    # DEFAULT CHAT
+    # =========================
+    return {
+        "route": "chat",
+        "mode": "chat",
+        "confidence": 0.6,
+        "reasons": ["default_chat"],
+        "save_artifact": False,
+        "save_memory": True,
+        "use_memory": True,
+    }
 
     # ==============================
     # EXECUTION SYSTEM
