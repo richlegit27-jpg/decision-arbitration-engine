@@ -837,14 +837,12 @@ class ChatService:
             pass
 
         try:
-            self._call_first(
-                self.memory,
-                ["add_memory", "create_memory", "save_memory", "create"],
-                text=text,
-                kind=kind,
-                source="router_auto",
-                session_id=session_id,
-            )
+            self.memory.add_memory({
+                "text": text,
+                "kind": kind,
+                "source": "router_auto",
+                "session_id": session_id,
+            })
         except Exception as e:
             print("MEMORY WRITE FAILED:", e)
 
