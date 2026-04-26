@@ -128,19 +128,12 @@ class ChatService:
             intent=decision.get("intent") if isinstance(decision, dict) else "",
         )
 
-        should_inject_working_context = bool(
-            isinstance(decision, dict)
-            and (
-                decision.get("intent") in ("debugging", "coding", "planning")
-                or decision.get("route") in ("debugging", "coding", "planning", "execution")
-            )
-        )
-
-        working_context_payload = self._build_working_context_payload(session_id)
-
-        print("WORKING_CONTEXT_SHOULD_INJECT =", should_inject_working_context)
-        print("WORKING_CONTEXT_PAYLOAD =", working_context_payload)
-        assistant_msg["memory_used"] = assistant_msg.get("memory_used", [])
+        should_inject_working_context = False
+        working_context_payload = {
+            "show": False,
+            "text": "",
+            "state": {},
+        }
 
         self._persist_turn(session_id, user_msg, assistant_msg)
 
@@ -149,21 +142,14 @@ class ChatService:
             fallback_messages=[user_msg, assistant_msg],
         )
 
-        print(
-            "FINALIZE_FRESH_SESSION_WORKING_STATE =",
-            (fresh_session or {}).get("working_state"),
-        )
-
         payload = {
             "ok": True,
             "active_session_id": session_id,
             "assistant_message": assistant_msg,
             "working_context": {
-                "show": bool(
-                    should_inject_working_context and working_context_payload.get("show")
-                ),
-                "text": working_context_payload.get("text", ""),
-                "state": working_context_payload.get("state", {}),
+                "show": False,
+                "text": "",
+                "state": {},
             },
             "session": fresh_session,
             "saved_artifact": saved_artifact,
@@ -173,20 +159,12 @@ class ChatService:
             "debug": {
                 "decision": decision,
                 "route": "chat_service.handle",
-                "route_taken": decision.get("route"),
-                "working_context_injected": should_inject_working_context,
-                "working_context_available": working_context_payload.get("show", False),
+                "route_taken": decision.get("route") if isinstance(decision, dict) else "",
+                "working_context_injected": False,
+                "working_context_available": False,
                 "working_context_payload": working_context_payload,
             },
         }
-
-        payload = self._attach_execution(
-            payload,
-            user_text,
-            assistant_msg,
-            decision,
-            session_id=session_id,
-        )
 
         return payload
 
@@ -358,83 +336,6 @@ class ChatService:
         # ❌ REMOVE DUPLICATE REWRITE HERE
         # (rewrite happens only in _finalize_response)
 
-        # 🔥 AUTO-OPEN PROJECT FILE (REAL VERSION)
-        if decision.get("intent") == "debugging":
-            import os
-
-            base_path = r"C:\Users\Owner\nova"
-            keywords = [
-                "chat_service.py",
-                "app.py",
-                "session",
-                "route",
-                "api",
-                "service",
-                "memory",
-                "artifact",
-                "web",
-                "error",
-                "bug",
-            ]
-
-            matches = []
-
-            for root, _, files in os.walk(base_path):
-                for f in files:
-                    full_path = os.path.join(root, f)
-                    lower = full_path.lower()
-
-                    if any(x in lower for x in [".bak", "backup", "__pycache__", ".pyc", ".ignore"]):
-                        continue
-
-                    if not f.endswith((".py", ".js", ".html", ".css", ".ts", ".tsx", ".json")):
-                        continue
-
-                    score = 0
-                    for k in keywords:
-                        if k in lower:
-                            score += 1
-
-                    if lower.endswith(r"\nova_backend\services\chat_service.py"):
-                        score += 20
-
-                    if score > 0:
-                        matches.append((score, full_path))
-
-            matches.sort(key=lambda item: item[0], reverse=True)
-
-            if matches:
-                best_file = matches[0][1]
-                self._set_session_meta(session_id, "last_file_path", best_file)
-
-                snippet = ""
-                try:
-                    with open(best_file, "r", encoding="utf-8", errors="ignore") as f:
-                        lines = f.readlines()
-
-                    preview_lines = lines[:80]
-                    snippet = "".join(preview_lines).strip()
-
-                    if len(lines) > 80:
-                        snippet += "\n\n# ... file continues ..."
-                except Exception as e:
-                    snippet = f"Could not read file: {type(e).__name__}: {e}"
-
-                assistant_text = (
-                    "Target file:\n\n"
-                    f"notepad {best_file}\n\n"
-                    "Snippet:\n\n"
-                    "```python\n"
-                    f"{snippet}\n"
-                    "```\n\n"
-                    "Next move: say `fix this file` and I’ll analyze this snippet, identify the likely bug, and return the corrected full function/file."
-                )
-            else:
-                assistant_text = (
-                    "No strong file match found.\n\n"
-                    "Run:\n"
-                    "Get-ChildItem -Path C:\\Users\\Owner\\nova -Recurse -File | Select-Object FullName"
-                )
 
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
@@ -769,7 +670,7 @@ Code:
         user_text = self._safe_str(user_text)
 
         # AUTO-FIX TRIGGER
-        if user_text.strip().lower() in ("fix this file", "fix it"):
+        if False and user_text.strip().lower() in ("fix this file", "fix it"):
             print("AUTO FIX TRIGGER DETECTED")
 
             return self._auto_fix_last_snippet(session_id=session_id)
@@ -788,7 +689,7 @@ Code:
             mode=decision.get("mode") if isinstance(decision, dict) else "",
         )
 
-        decision["intent"] = intent.get("intent")
+        decision["intent"] = "chat"
         decision["intent_confidence"] = intent.get("confidence")
         decision["intent_reasons"] = intent.get("reasons", [])
 
@@ -816,14 +717,6 @@ Code:
                 session_id=session_id,
                 attachments=attachments,
             )
-
-        # TRACK LAST ACTIVE FILE
-        if isinstance(attachments, list):
-            for a in attachments:
-                if isinstance(a, dict):
-                    file_path = self._safe_str(a.get("path") or a.get("file_path"))
-                    if file_path:
-                        self._set_session_meta(session_id, "last_file_path", file_path)
 
         result = self._execute_general_chat(
             user_text=user_text,
@@ -2709,6 +2602,8 @@ Code:
             decision=decision,
         )
 
+        return payload
+
         if not execution:
             return payload
 
@@ -3324,183 +3219,18 @@ Write the exact goal in one sentence.
         return updated, done, total
 
     def _auto_execute_request(self, user_text: str, session_id: str = "", attachments=None):
-        attachments = attachments or []
-        session_id = self._safe_str(session_id)
-        user_text = self._safe_str(user_text)
-
-        latest = self._find_latest_execution_artifact(session_id=session_id)
-        user_msg = self._build_user_message(user_text, attachments=attachments)
-
-        if not latest:
-            assistant_msg = self._build_assistant_message(
-                text="No execution found. Start with a plan first.",
-                attachments=[],
-            )
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision={
-                    "route": "execution_auto",
-                    "mode": "execution_auto",
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": True,
-                },
-                saved_artifact=None,
-            )
-
-        assistant_msg = self._build_assistant_message(
-            text="Auto execution started.",
-            attachments=[],
-        )
-
-        return self._finalize_response(
-            session_id=session_id,
+        # 🔒 Execution system disabled during stabilization
+        return self._execute_general_chat(
             user_text=user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
+            session_id=session_id,
+            attachments=attachments,
             decision={
-                "route": "execution_auto",
-                "mode": "execution_auto",
+                "route": self.ROUTE_GENERAL_CHAT,
+                "intent": "chat",
                 "save_artifact": False,
-                "save_memory": False,
-                "use_memory": True,
+                "save_memory": True,
             },
-            saved_artifact=None,
         )
-
-        execution = self._normalize_execution_state(latest.get("execution") or {})
-        if not execution:
-            assistant_msg = self._build_assistant_message(
-                text="Execution state is missing. Start with a new plan first.",
-                attachments=[],
-            )
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision={
-                    "route": "execution_auto",
-                    "mode": "execution_auto",
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": True,
-                },
-            )
-
-        max_steps = 20
-        safety = 0
-        last_step_output = ""
-        saved_artifact = None
-        blocked = False
-        error_text = ""
-
-        while safety < max_steps:
-            status = self._safe_str(execution.get("status")).lower()
-            if status == "complete":
-                break
-
-            try:
-                result = self._execute_current_step(
-                    execution=execution,
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                )
-            except Exception as exc:
-                error_text = f"Auto execution failed on step {safety + 1}: {self._safe_str(exc)}"
-                blocked = True
-                break
-
-            execution = self._normalize_execution_state(
-                result.get("execution") or execution
-            )
-            last_step_output = self._safe_str(result.get("step_output"))
-            saved_artifact = result.get("saved_artifact") or saved_artifact
-
-            if last_step_output and last_step_output.lower().startswith("step blocked"):
-                blocked = True
-                break
-
-            status = self._safe_str(execution.get("status")).lower()
-            if status in {"blocked", "error"}:
-                blocked = True
-                break
-
-            safety += 1
-
-        if safety >= max_steps and self._safe_str(execution.get("status")).lower() != "complete":
-            blocked = True
-            if not last_step_output:
-                last_step_output = f"Stopped after reaching the safety cap of {max_steps} auto-executed steps."
-
-        final_body = self._render_execution(execution)
-
-        canonical_artifact = {
-            "kind": "execution",
-            "title": self._safe_str(execution.get("goal")) or "Execution",
-            "body": final_body,
-            "execution": execution,
-            "meta": {
-                "execution": execution,
-                "execution_id": self._safe_str(execution.get("id")),
-                "status": self._safe_str(execution.get("status")),
-                "progress": execution.get("progress", 0),
-                "current_step": self._safe_str(execution.get("current_step")),
-                "goal": self._safe_str(execution.get("goal")),
-                "auto_executed": True,
-                "safety_count": safety,
-            },
-        }
-
-        saved_artifact = self._call_first(
-            self.artifacts,
-            ["save_artifact", "create", "save", "create_artifact", "add_artifact"],
-            canonical_artifact,
-        )
-
-        status = self._safe_str(execution.get("status")).lower()
-        if error_text:
-            assistant_text = "Execution stopped with an error."
-        elif blocked or status in {"blocked", "error"}:
-            assistant_text = "Execution stopped before completion."
-        elif status == "complete":
-            assistant_text = "Execution complete."
-        else:
-            assistant_text = "Execution paused."
-
-        if last_step_output:
-            assistant_text += "\n\nLast step output:\n" + last_step_output
-
-        if error_text:
-            assistant_text += "\n\n" + error_text
-
-        if final_body:
-            assistant_text += "\n\n" + final_body
-
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text,
-            attachments=[],
-        )
-
-        return self._finalize_response(
-            session_id=session_id,
-            user_text=user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision={
-                "route": "execution_auto",
-                "mode": "execution_auto",
-                "save_artifact": True,
-                "save_memory": False,
-                "use_memory": True,
-            },
-            saved_artifact=saved_artifact,
-        )
-
         # ==============================
         # SESSION HELPERS
         # ==============================

@@ -46,51 +46,8 @@ class ResponseRewriteService:
         self.voice_profile = NOVA_VOICE_PROFILE
 
     def rewrite(self, text: str, user_text: str = "", route: str = "", intent: str = "") -> str:
-        original = self._clean(text)
+        return str(text or "").strip()
 
-        if not original:
-            return ""
-
-        route = (route or "").lower()
-        intent = (intent or "").lower()
-
-        # intent-first control
-        print("INTENT DEBUG =", intent)
-        if intent == "debugging":
-            return original
-
-        rewritten = original
-
-        rewritten = self._remove_weak_openers(rewritten)
-        rewritten = self._remove_dead_weight(rewritten)
-
-        for phrase in self.voice_profile.get("avoid", []):
-            rewritten = re.sub(re.escape(phrase), "", rewritten, flags=re.IGNORECASE)
-
-        if intent == "coding":
-            rewritten = self._force_command_style(rewritten)
-
-        elif intent == "planning":
-            rewritten = self._force_structured_style(rewritten)
-
-        elif intent == "writing":
-            rewritten = self._force_direct_style(rewritten)
-
-        else:
-            rewritten = self._force_direct_style(rewritten)
-
-        rewritten = self._extract_strongest_line(rewritten)
-        rewritten = self._tighten_spacing(rewritten)
-
-        if self.voice_profile.get("execution_first"):
-            rewritten = self._force_execution_first(rewritten)
-
-        rewritten = self._enforce_voice_tone(rewritten)
-
-        if self._looks_empty_or_weak(rewritten):
-            return original
-
-        return rewritten.strip()
     def _clean(self, text: str) -> str:
         if text is None:
             return ""
