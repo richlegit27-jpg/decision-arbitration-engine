@@ -405,10 +405,29 @@ class ChatService:
 
             if matches:
                 best_file = matches[0][1]
+                self._set_session_meta(session_id, "last_file_path", best_file)
+
+                snippet = ""
+                try:
+                    with open(best_file, "r", encoding="utf-8", errors="ignore") as f:
+                        lines = f.readlines()
+
+                    preview_lines = lines[:80]
+                    snippet = "".join(preview_lines).strip()
+
+                    if len(lines) > 80:
+                        snippet += "\n\n# ... file continues ..."
+                except Exception as e:
+                    snippet = f"Could not read file: {type(e).__name__}: {e}"
+
                 assistant_text = (
-                    "Open this file:\n\n"
+                    "Target file:\n\n"
                     f"notepad {best_file}\n\n"
-                    "Paste it here and I’ll give you the exact fix."
+                    "Snippet:\n\n"
+                    "```python\n"
+                    f"{snippet}\n"
+                    "```\n\n"
+                    "Next move: say `fix this file` and I’ll analyze this snippet, identify the likely bug, and return the corrected full function/file."
                 )
             else:
                 assistant_text = (
@@ -432,6 +451,209 @@ class ChatService:
             decision=decision,
             saved_artifact=None,
         )
+
+    def _auto_fix_last_snippet(self, session_id: str) -> dict:
+        session = self._get_session_payload(session_id)
+
+        last_file_path = None
+        if isinstance(session, dict):
+            state = session.get("working_state") or {}
+            last_file_path = self._safe_str(state.get("last_file_path"))
+
+        user_msg = self._build_user_message("fix this file")
+
+        decision = {
+            "route": "auto_fix",
+            "intent": "debugging",
+        }
+
+        if not last_file_path:
+            assistant_msg = self._build_assistant_message(
+                text="No file selected. Say `fix this file` after opening or uploading a file."
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text="fix this file",
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
+
+        try:
+            with open(last_file_path, "r", encoding="utf-8") as f:
+                file_content = f.read()
+        except Exception as e:
+            print("FILE READ FAILED:", e)
+
+            assistant_msg = self._build_assistant_message(
+                text="Could not read the file."
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text="fix this file",
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
+
+        prompt = f"""
+You are fixing a broken code file.
+
+Return ONLY the corrected full file.
+Do NOT explain anything.
+
+File path:
+{last_file_path}
+
+Code:
+{file_content}
+"""
+
+        try:
+            response = self.client.responses.create(
+                model=self.chat_model,
+                input=prompt,
+            )
+
+            fixed_code = self._extract_response_text(response)
+
+        except Exception as e:
+            print("AUTO FIX FAILED:", e)
+
+            assistant_msg = self._build_assistant_message(
+                text="Auto-fix model call failed. File was not changed."
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text="fix this file",
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
+
+        fixed_code = self._safe_str(fixed_code).strip()
+
+        if fixed_code.startswith("```"):
+            fixed_code = fixed_code.strip("`").strip()
+            if fixed_code.startswith("python"):
+                fixed_code = fixed_code[6:].strip()
+
+        if not fixed_code:
+            assistant_msg = self._build_assistant_message(
+                text="Auto-fix returned empty code. File was not changed."
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text="fix this file",
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
+
+        if "class ChatService" not in fixed_code and "def " not in fixed_code:
+            assistant_msg = self._build_assistant_message(
+                text="Auto-fix output did not look like valid Python code. File was not changed."
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text="fix this file",
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
+
+        preview = (
+            "Auto-fix generated. File was NOT changed yet.\n\n"
+            f"Target file:\n{last_file_path}\n\n"
+            "Next move:\n"
+            "Say `apply fix` to write this version to disk."
+        )
+
+        self._set_session_meta(session_id, "pending_fix_file_path", last_file_path)
+        self._set_session_meta(session_id, "pending_fix_code", fixed_code)
+
+        assistant_msg = self._build_assistant_message(text=preview)
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text="fix this file",
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+        ) 
+
+    def _apply_pending_fix(self, session_id: str) -> dict:
+        session = self._get_session_payload(session_id)
+
+        pending_file_path = ""
+        pending_fix_code = ""
+
+        if isinstance(session, dict):
+            state = session.get("working_state") or {}
+            pending_file_path = self._safe_str(state.get("pending_fix_file_path"))
+            pending_fix_code = self._safe_str(state.get("pending_fix_code"))
+
+        user_msg = self._build_user_message("apply fix")
+
+        decision = {
+            "route": "auto_fix_apply",
+            "intent": "debugging",
+        }
+
+        if not pending_file_path or not pending_fix_code:
+            assistant_msg = self._build_assistant_message(
+                text="No pending fix found. Run `fix this file` first."
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text="apply fix",
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
+
+        try:
+            with open(pending_file_path, "r", encoding="utf-8") as f:
+                current_content = f.read()
+
+            backup_path = pending_file_path + ".autofix.bak"
+
+            with open(backup_path, "w", encoding="utf-8") as f:
+                f.write(current_content)
+
+            with open(pending_file_path, "w", encoding="utf-8") as f:
+                f.write(pending_fix_code)
+
+            self._set_session_meta(session_id, "pending_fix_file_path", "")
+            self._set_session_meta(session_id, "pending_fix_code", "")
+
+            assistant_msg = self._build_assistant_message(
+                text=f"Fix applied.\n\nBackup created:\n{backup_path}\n\nFile updated:\n{pending_file_path}"
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text="apply fix",
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
+
+        except Exception as e:
+            print("APPLY FIX FAILED:", e)
+
+            assistant_msg = self._build_assistant_message(
+                text=f"Could not apply pending fix: {type(e).__name__}: {self._safe_str(e)}"
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text="apply fix",
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
+
     def _execute_web_fetch(
         self,
         decision: dict,
@@ -546,6 +768,12 @@ class ChatService:
         session_id = self._ensure_session_id(session_id)
         user_text = self._safe_str(user_text)
 
+        # AUTO-FIX TRIGGER
+        if user_text.strip().lower() in ("fix this file", "fix it"):
+            print("AUTO FIX TRIGGER DETECTED")
+
+            return self._auto_fix_last_snippet(session_id=session_id)
+
         print("CHAT_SERVICE_HANDLE_HIT:", user_text)
 
         decision = self._decide_route(
@@ -588,6 +816,14 @@ class ChatService:
                 session_id=session_id,
                 attachments=attachments,
             )
+
+        # TRACK LAST ACTIVE FILE
+        if isinstance(attachments, list):
+            for a in attachments:
+                if isinstance(a, dict):
+                    file_path = self._safe_str(a.get("path") or a.get("file_path"))
+                    if file_path:
+                        self._set_session_meta(session_id, "last_file_path", file_path)
 
         result = self._execute_general_chat(
             user_text=user_text,
@@ -3331,6 +3567,15 @@ Write the exact goal in one sentence.
             "messages": fallback_messages,
         }
 
+    def _set_session_meta(self, session_id: str, key: str, value):
+        try:
+            if hasattr(self.session_service, "update_working_state"):
+                patch = {key: value}
+                self.session_service.update_working_state(session_id, patch)
+                return
+        except Exception as e:
+            print("SET SESSION META FAILED:", e)
+
     def _get_sessions_list(self) -> list:
         data = self._call_first(
             self.sessions,
@@ -5288,8 +5533,4 @@ Write the exact goal in one sentence.
             return {"ok": False, "error": str(e), "tool_name": tool_name}
 
         return {"ok": False, "error": f"Unknown tool: {tool_name}", "tool_name": tool_name}
-
-    # ==============================
-    # PUBLIC ENTRY
-    # ==============================
 
