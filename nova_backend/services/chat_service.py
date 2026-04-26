@@ -125,21 +125,21 @@ class ChatService:
             text=self._safe_str(assistant_msg.get("text")),
             user_text=user_text,
             route=decision.get("route") if isinstance(decision, dict) else "",
+            intent=decision.get("intent") if isinstance(decision, dict) else "",
         )
 
-        print("FINALIZE_ASSISTANT_TEXT =", repr(assistant_msg.get("text")))
-
-        should_inject_working_context = self._should_inject_working_context(
-            decision=decision,
-            user_text=user_text,
-            assistant_msg=assistant_msg,
+        should_inject_working_context = bool(
+            isinstance(decision, dict)
+            and (
+                decision.get("intent") in ("debugging", "coding", "planning")
+                or decision.get("route") in ("debugging", "coding", "planning", "execution")
+            )
         )
 
         working_context_payload = self._build_working_context_payload(session_id)
 
         print("WORKING_CONTEXT_SHOULD_INJECT =", should_inject_working_context)
         print("WORKING_CONTEXT_PAYLOAD =", working_context_payload)
-
         assistant_msg["memory_used"] = assistant_msg.get("memory_used", [])
 
         self._persist_turn(session_id, user_msg, assistant_msg)
@@ -348,16 +348,25 @@ class ChatService:
             if isinstance(m, dict) and m.get("id")
         ]
 
-        assistant_text = self._shape_assistant_response(
-            assistant_text=assistant_text,
-            user_text=user_text,
-        )
+        # 🔥 DO NOT SHAPE DEBUGGING RESPONSES
+        if decision.get("intent") != "debugging":
+            assistant_text = self._shape_assistant_response(
+                assistant_text=assistant_text,
+                user_text=user_text,
+            )
 
-        assistant_text = self.rewrite_service.rewrite(
-            text=assistant_text,
-            user_text=user_text,
-            route=decision.get("route") if isinstance(decision, dict) else "",
-        )
+        # ❌ REMOVE DUPLICATE REWRITE HERE
+        # (rewrite happens only in _finalize_response)
+
+        # 🔥 AUTO-DETECT LOGIN FILES
+        if decision.get("intent") == "debugging":
+            assistant_text = (
+                "Run this:\n\n"
+                "Get-ChildItem -Path C:\\Users\\Owner\\nova -Recurse -File |\n"
+                "Select-String -Pattern \"login|signin|auth|password|401|error|exception\" |\n"
+                "Select-Object Path -Unique\n\n"
+                "Then open the most likely auth file (look for auth/login route) and send it."
+            )
 
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
@@ -374,7 +383,6 @@ class ChatService:
             decision=decision,
             saved_artifact=None,
         )
-
     def _execute_web_fetch(
         self,
         decision: dict,
@@ -506,6 +514,9 @@ class ChatService:
         decision["intent"] = intent.get("intent")
         decision["intent_confidence"] = intent.get("confidence")
         decision["intent_reasons"] = intent.get("reasons", [])
+
+        print("HANDLE_INTENT_DEBUG =", decision.get("intent"))
+        print("HANDLE_DECISION_DEBUG =", decision)
 
         if "image" in user_text.lower():
             decision["route"] = self.ROUTE_IMAGE_GENERATION
@@ -1631,6 +1642,18 @@ class ChatService:
             mode = (decision.get("mode") or "").strip()
             if mode:
                 parts.append(f"Current operating mode: {mode}.")
+
+        intent = self._safe_str((decision or {}).get("intent")).lower()
+
+        if intent == "debugging":
+            parts.append(
+                "DEBUGGING MODE: Do not give generic debugging checklists. "
+                "Do not list frameworks. "
+                "Do not say 'check logs' without giving the exact command. "
+                "Prefer PowerShell commands, exact file paths, search anchors, and full-file fixes. "
+                "If the exact file is unknown, ask for ONE specific missing item: the file path or error log. "
+                "Use the user's style: direct, endgame, no filler."
+            )
 
         return "\n\n".join([p for p in parts if p]).strip()
 
@@ -3924,160 +3947,7 @@ Write the exact goal in one sentence.
             return "\n".join(lines).strip()
 
     def _shape_assistant_response(self, assistant_text: str, user_text: str = "") -> str:
-        text = self._safe_str(assistant_text).strip()
-        user_text = self._safe_str(user_text).lower()
-
-        # HARD OVERRIDE FOR REWRITE / TONE COMMANDS
-        override_requests = [
-            "make it hit harder",
-            "hit harder",
-            "make it less dry",
-            "less dry",
-            "rewrite",
-            "say it better",
-            "make it better",
-        ]
-
-        if any(req in user_text for req in override_requests):
-            return "I’m building Nova to outclass ChatGPT — sharper memory, stronger execution, and no dead-weight chatbot energy."
-
-        if not text:
-            return text
-
-        lowered = text.lower()
-
-        # FORCE SINGLE-LINE COMMIT MODE FOR REWRITE / TONE REQUESTS
-        commit_requests = [
-            "make it hit harder",
-            "hit harder",
-            "make it less dry",
-            "less dry",
-            "make it better",
-            "rewrite",
-            "say it better",
-        ]
-
-        if any(req in user_text for req in commit_requests):
-            lines = [line.strip() for line in text.splitlines() if line.strip()]
-
-            # Prefer bold/generated one-liners if model gave options
-            for line in lines:
-                clean = line.replace("*", "").strip()
-                if (
-                    len(clean) >= 25
-                    and not clean.lower().startswith((
-                        "try one of these",
-                        "absolutely",
-                        "sure",
-                        "here are",
-                        "depending on",
-                        "if you want",
-                        "more aggressive",
-                        "more polished",
-                        "more founder",
-                        "more cold",
-                    ))
-                    and not clean.startswith("-")
-                    and not clean.startswith("#")
-                ):
-                    return clean
-
-            # Hard fallback
-            return "I’m building Nova to outclass ChatGPT — sharper memory, stronger execution, and no dead-weight chatbot energy."
-
-        # 🔥 FORCE SINGLE ANSWER (no lists/options)
-        if "make it" in user_text or "rewrite" in user_text:
-            # kill list-style responses
-            if "\n-" in text or "\n###" in text:
-                # take the strongest line only
-                lines = [l.strip() for l in text.splitlines() if l.strip()]
-
-                # grab first strong sentence-like line
-                for line in lines:
-                    if len(line) > 20:
-                        return line
-
-                return lines[0] if lines else text
-
-        # Kill weak chatbot openings
-        weak_openers = [
-            "sure",
-            "of course",
-            "absolutely",
-            "here's",
-            "here is",
-            "if you want",
-        ]
-
-        for opener in weak_openers:
-            if lowered.startswith(opener):
-                parts = text.split("\n", 1)
-                text = parts[1].strip() if len(parts) > 1 else text
-                break
-
-        # Replace soft language with stronger builder language
-        replacements = {
-            "You can": "Do this:",
-            "you can": "do this:",
-            "You could": "Do this:",
-            "you could": "do this:",
-            "If you want,": "",
-            "if you want,": "",
-            "Maybe": "Move:",
-            "maybe": "move:",
-            "Consider": "Use:",
-            "consider": "use:",
-            "I recommend": "The move is",
-            "I would": "Do",
-        }
-
-        for old, new in replacements.items():
-            text = text.replace(old, new)
-
-        # Strong routing for next-step questions
-        if "what should" in user_text or "next" in user_text:
-            if not text.lower().startswith(("this is the move", "next move", "do this")):
-                text = "This is the move:\n\n" + text
-
-        # Strong routing for "less dry" / personality feedback
-        if "less dry" in user_text or "hit harder" in user_text or "more punch" in user_text:
-            if "nova" in text.lower():
-                text = text
-            else:
-                text = (
-                    "Nova needs more bite, not more fluff.\n\n"
-                    + text
-                )
-
-        # Safety edge: confident, not hateful
-        banned_edges = [
-            "slur",
-            "hateful",
-            "dehumanize",
-        ]
-        if any(x in text.lower() for x in banned_edges):
-            text = "Harder tone is fine. Toxic is not. Keep Nova sharp, useful, and controlled."
-
-        # Trim rambling
-        if len(text) > 1000:
-            text = text[:1000].rstrip() + "..."
-
-        # Clean spacing
-        lines = [line.rstrip() for line in text.splitlines()]
-        cleaned = []
-        blanks = 0
-
-        for line in lines:
-            if not line.strip():
-                blanks += 1
-                if blanks <= 1:
-                    cleaned.append(line)
-                continue
-
-            blanks = 0
-            cleaned.append(line)
-
-        return "\n".join(cleaned).strip()
+        return self._safe_str(assistant_text).strip()
 
     def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
         if not isinstance(decision, dict):

@@ -45,58 +45,52 @@ class ResponseRewriteService:
 
         self.voice_profile = NOVA_VOICE_PROFILE
 
-    def rewrite(self, text: str, user_text: str = "", route: str = "") -> str:
+    def rewrite(self, text: str, user_text: str = "", route: str = "", intent: str = "") -> str:
         original = self._clean(text)
-
-        # 🔥 HARD EXECUTION OVERRIDE (absolute)
-        lowered_input = self._clean(user_text).lower()
-
-        if "bug" in lowered_input or "fix" in lowered_input:
-            return "Reproduce the bug."
 
         if not original:
             return ""
 
+        route = (route or "").lower()
+        intent = (intent or "").lower()
+
+        # intent-first control
+        print("INTENT DEBUG =", intent)
+        if intent == "debugging":
+            return original
+
         rewritten = original
 
-        # base cleanup
         rewritten = self._remove_weak_openers(rewritten)
         rewritten = self._remove_dead_weight(rewritten)
 
-        # 🔥 enforce voice profile (remove avoided phrases)
         for phrase in self.voice_profile.get("avoid", []):
             rewritten = re.sub(re.escape(phrase), "", rewritten, flags=re.IGNORECASE)
 
-        # 🔥 route-aware tone control
-        route = (route or "").lower()
-
-        # 🔥 execution-first override
-        if self.voice_profile.get("execution_first"):
-            rewritten = self._force_execution_first(rewritten)
-
-        if route in ("coding", "analysis"):
+        if intent == "coding":
             rewritten = self._force_command_style(rewritten)
 
-        elif route in ("planning",):
+        elif intent == "planning":
             rewritten = self._force_structured_style(rewritten)
 
-        elif route in ("general_chat", "chat"):
+        elif intent == "writing":
             rewritten = self._force_direct_style(rewritten)
 
-        # fallback tightening
+        else:
+            rewritten = self._force_direct_style(rewritten)
+
         rewritten = self._extract_strongest_line(rewritten)
         rewritten = self._tighten_spacing(rewritten)
 
-        # 🔥 FINAL OVERRIDE (must be last)
         if self.voice_profile.get("execution_first"):
             rewritten = self._force_execution_first(rewritten)
+
+        rewritten = self._enforce_voice_tone(rewritten)
 
         if self._looks_empty_or_weak(rewritten):
             return original
 
-        rewritten = self._enforce_voice_tone(rewritten)
         return rewritten.strip()
-
     def _clean(self, text: str) -> str:
         if text is None:
             return ""
@@ -181,10 +175,6 @@ class ResponseRewriteService:
 
     def _force_execution_first(self, text: str) -> str:
         lowered = self._clean(text).lower()
-
-        # 🔥 hard override for bug/fix context
-        if "bug" in lowered or "fix" in lowered:
-            return "Reproduce the bug."
 
         # 🔥 force action extraction only (no soft fallback)
         lines = re.split(r"[.!?\n]", text)
