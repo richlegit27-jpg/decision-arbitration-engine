@@ -358,14 +358,16 @@ class ChatService:
         # ❌ REMOVE DUPLICATE REWRITE HERE
         # (rewrite happens only in _finalize_response)
 
-        # 🔥 AUTO-DETECT LOGIN FILES
+        # 🔥 AUTO-OPEN FILE DISCOVERY FOR DEBUGGING
         if decision.get("intent") == "debugging":
             assistant_text = (
                 "Run this:\n\n"
                 "Get-ChildItem -Path C:\\Users\\Owner\\nova -Recurse -File |\n"
                 "Select-String -Pattern \"login|signin|auth|password|401|error|exception\" |\n"
                 "Select-Object Path -Unique\n\n"
-                "Then open the most likely auth file (look for auth/login route) and send it."
+                "Then open the first likely login/auth file with:\n\n"
+                "notepad <PASTE_PATH_HERE>\n\n"
+                "Paste that file here and I’ll give you the exact fix."
             )
 
         assistant_msg = self._build_assistant_message(

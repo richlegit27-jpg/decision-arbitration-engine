@@ -2,7 +2,6 @@ import time
 from urllib.parse import urlparse
 
 from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
-
 from auth_utils import (
     bootstrap_password_from_env,
     change_password,
@@ -89,12 +88,7 @@ def _is_exempt_request() -> bool:
     if _is_public_path(path):
         return True
 
-    endpoint = request.endpoint or ""
-    if endpoint.startswith("password_gate."):
-        return True
-
     return False
-
 
 def _get_fail_state(ip: str) -> dict:
     state = FAILED_LOGINS.get(ip)

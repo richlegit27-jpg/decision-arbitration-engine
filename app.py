@@ -43,6 +43,7 @@ app = Flask(
     template_folder=str(BASE_DIR / "templates"),
     static_folder=str(BASE_DIR / "static"),
 )
+
 CORS(app)
 
 ensure_dir(DATA_DIR)
