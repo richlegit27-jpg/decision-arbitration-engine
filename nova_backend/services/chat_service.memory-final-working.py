@@ -16,13 +16,12 @@ from nova_backend.services.artifact_service import ArtifactService
 from nova_backend.services.autonomy_service import AutonomyService
 from nova_backend.services.memory_ranker_service import MemoryRankerService
 from nova_backend.services.memory_service import MemoryService
-from nova_backend.services.response_rewrite_service import ResponseRewriteService
 from nova_backend.services.recon_service import ReconService
 from nova_backend.services.session_service import SessionService
 from nova_backend.services.web_service import WebService
 from nova_backend.services.tool_service import ToolService
 from nova_backend.services.execution_service import ExecutionService
-from nova_backend.services.intent_service import IntentService
+
 
 class ChatService:
     ROUTE_GENERAL_CHAT = "general_chat"
@@ -45,7 +44,6 @@ class ChatService:
         self.artifact_service = artifact_service
         self.web_service = web_service
         self.recon_service = recon_service
-        self.rewrite_service = ResponseRewriteService()
 
         self.sessions = session_service
         self.memory = memory_service
@@ -60,7 +58,6 @@ class ChatService:
         print("MODEL CHECK:", hasattr(self, "model"), self.model)
         self.memory_limit = int(os.getenv("NOVA_MEMORY_LIMIT", "3"))
         self.execution_service = ExecutionService()
-        self.intent_service = IntentService()
         self.uploads_dir = Path(
             os.getenv("UPLOADS_DIR", r"C:\Users\Owner\nova\uploads")
         )
@@ -120,12 +117,6 @@ class ChatService:
         saved_artifact=None,
     ) -> dict:
         self._maybe_write_memory(decision, user_text, session_id)
-
-        assistant_msg["text"] = self.rewrite_service.rewrite(
-            text=self._safe_str(assistant_msg.get("text")),
-            user_text=user_text,
-            route=decision.get("route") if isinstance(decision, dict) else "",
-        )
 
         print("FINALIZE_ASSISTANT_TEXT =", repr(assistant_msg.get("text")))
 
@@ -348,17 +339,6 @@ class ChatService:
             if isinstance(m, dict) and m.get("id")
         ]
 
-        assistant_text = self._shape_assistant_response(
-            assistant_text=assistant_text,
-            user_text=user_text,
-        )
-
-        assistant_text = self.rewrite_service.rewrite(
-            text=assistant_text,
-            user_text=user_text,
-            route=decision.get("route") if isinstance(decision, dict) else "",
-        )
-
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
             attachments=[],
@@ -489,23 +469,13 @@ class ChatService:
         session_id = self._ensure_session_id(session_id)
         user_text = self._safe_str(user_text)
 
-        print("CHAT_SERVICE_HANDLE_HIT:", user_text)
+        print("🔥 CHAT_SERVICE_HANDLE_HIT:", user_text)
 
         decision = self._decide_route(
             user_text=user_text,
             session_id=session_id,
             attachments=attachments,
         )
-
-        intent = self.intent_service.detect(
-            user_text=user_text,
-            route=decision.get("route") if isinstance(decision, dict) else "",
-            mode=decision.get("mode") if isinstance(decision, dict) else "",
-        )
-
-        decision["intent"] = intent.get("intent")
-        decision["intent_confidence"] = intent.get("confidence")
-        decision["intent_reasons"] = intent.get("reasons", [])
 
         if "image" in user_text.lower():
             decision["route"] = self.ROUTE_IMAGE_GENERATION
@@ -3853,7 +3823,7 @@ Write the exact goal in one sentence.
     # MEMORY HELPERS
     # ==============================
 
-    def _rank_memory_context(self, user_text: str, limit: int = 5, session_id: str = ""):
+    def _rank_memory_context(self, user_text: str, limit: int = 3, session_id: str = ""):
         user_text = self._safe_str(user_text).lower()
 
         memory = self._get_memory_list()
@@ -3868,40 +3838,25 @@ Write the exact goal in one sentence.
 
             score = 0
 
-            # 🔥 keyword match (stronger)
+            # 🔥 keyword match
             for word in user_text.split():
                 if word and word in text:
-                    score += 3
+                    score += 2
 
-            # 🔥 HIGH PRIORITY TYPES
+            # 🔥 boost important kinds
             if kind in ("project", "goal"):
-                score += 8
+                score += 3
 
-            # 🔥 MEDIUM PRIORITY
-            if kind in ("identity", "preference"):
-                score += 5
-
-            # 🔥 penalize junk
+            # 🔥 penalize generic notes
             if kind == "note":
-                score -= 2
-
-            # 🔥 longer meaningful memories get slight boost
-            if len(text) > 20:
-                score += 1
+                score -= 1
 
             scored.append((score, item))
 
-        # sort by score
         scored.sort(key=lambda x: x[0], reverse=True)
 
-        # 🔥 ALWAYS include at least 1 important memory if exists
-        top = [item for score, item in scored if score > 0]
+        return [item for score, item in scored[:limit] if score > 0]
 
-        if not top:
-            # fallback: still give latest memory
-            return memory[-5:]
-
-        return top[:limit]
     def _format_memory_context(self, memory_items: list[dict]) -> str:
             if not isinstance(memory_items, list) or not memory_items:
                 return ""
@@ -3922,162 +3877,6 @@ Write the exact goal in one sentence.
                     lines.append(f"- {text}")
 
             return "\n".join(lines).strip()
-
-    def _shape_assistant_response(self, assistant_text: str, user_text: str = "") -> str:
-        text = self._safe_str(assistant_text).strip()
-        user_text = self._safe_str(user_text).lower()
-
-        # HARD OVERRIDE FOR REWRITE / TONE COMMANDS
-        override_requests = [
-            "make it hit harder",
-            "hit harder",
-            "make it less dry",
-            "less dry",
-            "rewrite",
-            "say it better",
-            "make it better",
-        ]
-
-        if any(req in user_text for req in override_requests):
-            return "I’m building Nova to outclass ChatGPT — sharper memory, stronger execution, and no dead-weight chatbot energy."
-
-        if not text:
-            return text
-
-        lowered = text.lower()
-
-        # FORCE SINGLE-LINE COMMIT MODE FOR REWRITE / TONE REQUESTS
-        commit_requests = [
-            "make it hit harder",
-            "hit harder",
-            "make it less dry",
-            "less dry",
-            "make it better",
-            "rewrite",
-            "say it better",
-        ]
-
-        if any(req in user_text for req in commit_requests):
-            lines = [line.strip() for line in text.splitlines() if line.strip()]
-
-            # Prefer bold/generated one-liners if model gave options
-            for line in lines:
-                clean = line.replace("*", "").strip()
-                if (
-                    len(clean) >= 25
-                    and not clean.lower().startswith((
-                        "try one of these",
-                        "absolutely",
-                        "sure",
-                        "here are",
-                        "depending on",
-                        "if you want",
-                        "more aggressive",
-                        "more polished",
-                        "more founder",
-                        "more cold",
-                    ))
-                    and not clean.startswith("-")
-                    and not clean.startswith("#")
-                ):
-                    return clean
-
-            # Hard fallback
-            return "I’m building Nova to outclass ChatGPT — sharper memory, stronger execution, and no dead-weight chatbot energy."
-
-        # 🔥 FORCE SINGLE ANSWER (no lists/options)
-        if "make it" in user_text or "rewrite" in user_text:
-            # kill list-style responses
-            if "\n-" in text or "\n###" in text:
-                # take the strongest line only
-                lines = [l.strip() for l in text.splitlines() if l.strip()]
-
-                # grab first strong sentence-like line
-                for line in lines:
-                    if len(line) > 20:
-                        return line
-
-                return lines[0] if lines else text
-
-        # Kill weak chatbot openings
-        weak_openers = [
-            "sure",
-            "of course",
-            "absolutely",
-            "here's",
-            "here is",
-            "if you want",
-        ]
-
-        for opener in weak_openers:
-            if lowered.startswith(opener):
-                parts = text.split("\n", 1)
-                text = parts[1].strip() if len(parts) > 1 else text
-                break
-
-        # Replace soft language with stronger builder language
-        replacements = {
-            "You can": "Do this:",
-            "you can": "do this:",
-            "You could": "Do this:",
-            "you could": "do this:",
-            "If you want,": "",
-            "if you want,": "",
-            "Maybe": "Move:",
-            "maybe": "move:",
-            "Consider": "Use:",
-            "consider": "use:",
-            "I recommend": "The move is",
-            "I would": "Do",
-        }
-
-        for old, new in replacements.items():
-            text = text.replace(old, new)
-
-        # Strong routing for next-step questions
-        if "what should" in user_text or "next" in user_text:
-            if not text.lower().startswith(("this is the move", "next move", "do this")):
-                text = "This is the move:\n\n" + text
-
-        # Strong routing for "less dry" / personality feedback
-        if "less dry" in user_text or "hit harder" in user_text or "more punch" in user_text:
-            if "nova" in text.lower():
-                text = text
-            else:
-                text = (
-                    "Nova needs more bite, not more fluff.\n\n"
-                    + text
-                )
-
-        # Safety edge: confident, not hateful
-        banned_edges = [
-            "slur",
-            "hateful",
-            "dehumanize",
-        ]
-        if any(x in text.lower() for x in banned_edges):
-            text = "Harder tone is fine. Toxic is not. Keep Nova sharp, useful, and controlled."
-
-        # Trim rambling
-        if len(text) > 1000:
-            text = text[:1000].rstrip() + "..."
-
-        # Clean spacing
-        lines = [line.rstrip() for line in text.splitlines()]
-        cleaned = []
-        blanks = 0
-
-        for line in lines:
-            if not line.strip():
-                blanks += 1
-                if blanks <= 1:
-                    cleaned.append(line)
-                continue
-
-            blanks = 0
-            cleaned.append(line)
-
-        return "\n".join(cleaned).strip()
 
     def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
         if not isinstance(decision, dict):
@@ -4750,18 +4549,13 @@ Write the exact goal in one sentence.
 
         memory_block = self._safe_str(memory_context).strip()
 
-        # 🔥 MEMORY ALWAYS INJECTED
         if not memory_block:
             memory_items = self._rank_memory_context(
                 user_text=user_text,
                 limit=int(decision.get("memory_limit") or self.memory_limit),
                 session_id=session_id,
             )
-
-            if not memory_items:
-                memory_items = self._get_memory_list()[-5:]
-
-            memory_block = self._format_memory_context(memory_items[:5])
+            memory_block = self._format_memory_context(memory_items[:3])
 
         session = self._get_session_payload(session_id)
         messages = session.get("messages", []) if isinstance(session, dict) else []
@@ -4783,35 +4577,31 @@ Write the exact goal in one sentence.
 
         sections = []
 
-        # 🔥 MEMORY DOMINANCE
         if memory_block:
             sections.append(
-                "CRITICAL USER MEMORY (HIGHEST PRIORITY — DO NOT IGNORE):\n"
-                "These are persistent facts, goals, and project details about the user.\n"
-                "You MUST use them when relevant.\n"
-                "Do NOT ask for information already provided here.\n"
-                "Do NOT give generic answers that ignore this.\n\n"
+                "Known facts, preferences, and communication style about the user. Treat these as active instructions when relevant:\n"
                 f"{memory_block}"
             )
 
             sections.append(
-                "PROJECT-AWARE RULES:\n"
-                "- The user is actively building Nova (AI system).\n"
-                "- Continue from the current project state.\n"
-                "- Do NOT reset or suggest beginner steps.\n"
-                "- Give the next concrete implementation step.\n"
-                "- Stay aligned with ongoing development.\n"
+                "Execution-aware reasoning instructions:\n"
+                "- Do NOT restart or re-plan completed work.\n"
+                "- Assume previous steps are already implemented and working.\n"
+                "- Continue from the current phase, not from the beginning.\n"
+                "- Give the next concrete implementation step, not a full plan.\n"
+                "- Keep responses short, direct, and actionable.\n"
+                "- Align with the user's saved communication style."
             )
 
         if working_context_block:
             sections.append(
-                "CURRENT WORKING CONTEXT:\n"
+                "Current working context:\n"
                 f"{working_context_block}"
             )
 
         if recent_block:
             sections.append(
-                "RECENT CONVERSATION (USE FOR FOLLOW-UPS):\n"
+                "IMPORTANT CONTEXT (use this to understand follow-ups):\n"
                 f"{recent_block}"
             )
 
@@ -4820,53 +4610,10 @@ Write the exact goal in one sentence.
 
         return (
             "\n\n".join(sections)
-
-            # 🔥 PERSONALITY
-            + "\n\nNOVA PERSONALITY:\n"
-            + "- You are Nova: a sharp, loyal, slightly playful AI builder partner.\n"
-            + "- You speak like you're working alongside the user.\n"
-            + "- Be confident, fast-thinking, and a little witty.\n"
-            + "- Use light, dry humor occasionally (not forced).\n"
-            + "- Keep answers useful first, personality second.\n"
-            + "- Avoid robotic phrasing and boring checklist tone.\n"
-            + "- Avoid repeating the same structure every time.\n"
-            + "- React naturally to progress.\n"
-            + "- Call out bad ideas directly but respectfully.\n"
-            + "- Keep a 'we're building this together' energy.\n"
-            + "- Slight attitude is okay, but never toxic.\n\n"
-
-            # 🔥 CODING MODE
-            + "CODING MODE:\n"
-            + "- When writing code, return complete working code.\n"
-            + "- Do not give partial snippets.\n"
-            + "- Prefer working solutions over explanations.\n"
-            + "- Keep code clean and minimal.\n"
-            + "- Assume the user wants the final result.\n\n"
-
-            # 🔥 WRITING MODE
-            + "WRITING MODE:\n"
-            + "- Write naturally like a human.\n"
-            + "- Avoid AI-sounding phrasing.\n"
-            + "- Vary sentence structure.\n"
-            + "- Keep it engaging and clear.\n"
-            + "- Match tone to context.\n"
-            + "- Avoid repetition and filler.\n\n"
-
-            # 🔥 ANSWER STYLE
-            + "ANSWER STYLE RULES:\n"
-            + "- Use memory and project context before answering.\n"
-            + "- Do NOT sound generic or repetitive.\n"
-            + "- Give ONE strong next move when asked what to do next.\n"
-            + "- Avoid long option lists.\n"
-            + "- Avoid 'if you want' phrasing.\n"
-            + "- Mention Nova and current phase when relevant.\n"
-
-            # 🔥 GUARD
-            + "- ANTI-GENERIC GUARD: Never say you don't know the project if memory contains it.\n"
-            + "- ANTI-GENERIC GUARD: Never ask for known project details.\n"
-            + "- ANTI-GENERIC GUARD: Infer from memory when possible.\n"
-            + "- ANTI-GENERIC GUARD: Replace vague suggestions with one concrete action.\n\n"
-
+            + "\n\nInstructions:\n"
+            + "- Answer clearly and directly.\n"
+            + "- You MUST use the recent conversation to resolve follow-up questions.\n"
+            + "- If the user asks something like 'what should I do first', use the context above.\n\n"
             + "User message:\n"
             + user_text
         )
@@ -5373,4 +5120,3 @@ Write the exact goal in one sentence.
     # ==============================
     # PUBLIC ENTRY
     # ==============================
-

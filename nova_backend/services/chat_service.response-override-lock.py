@@ -16,13 +16,12 @@ from nova_backend.services.artifact_service import ArtifactService
 from nova_backend.services.autonomy_service import AutonomyService
 from nova_backend.services.memory_ranker_service import MemoryRankerService
 from nova_backend.services.memory_service import MemoryService
-from nova_backend.services.response_rewrite_service import ResponseRewriteService
 from nova_backend.services.recon_service import ReconService
 from nova_backend.services.session_service import SessionService
 from nova_backend.services.web_service import WebService
 from nova_backend.services.tool_service import ToolService
 from nova_backend.services.execution_service import ExecutionService
-from nova_backend.services.intent_service import IntentService
+
 
 class ChatService:
     ROUTE_GENERAL_CHAT = "general_chat"
@@ -45,7 +44,6 @@ class ChatService:
         self.artifact_service = artifact_service
         self.web_service = web_service
         self.recon_service = recon_service
-        self.rewrite_service = ResponseRewriteService()
 
         self.sessions = session_service
         self.memory = memory_service
@@ -60,7 +58,6 @@ class ChatService:
         print("MODEL CHECK:", hasattr(self, "model"), self.model)
         self.memory_limit = int(os.getenv("NOVA_MEMORY_LIMIT", "3"))
         self.execution_service = ExecutionService()
-        self.intent_service = IntentService()
         self.uploads_dir = Path(
             os.getenv("UPLOADS_DIR", r"C:\Users\Owner\nova\uploads")
         )
@@ -120,12 +117,6 @@ class ChatService:
         saved_artifact=None,
     ) -> dict:
         self._maybe_write_memory(decision, user_text, session_id)
-
-        assistant_msg["text"] = self.rewrite_service.rewrite(
-            text=self._safe_str(assistant_msg.get("text")),
-            user_text=user_text,
-            route=decision.get("route") if isinstance(decision, dict) else "",
-        )
 
         print("FINALIZE_ASSISTANT_TEXT =", repr(assistant_msg.get("text")))
 
@@ -353,12 +344,6 @@ class ChatService:
             user_text=user_text,
         )
 
-        assistant_text = self.rewrite_service.rewrite(
-            text=assistant_text,
-            user_text=user_text,
-            route=decision.get("route") if isinstance(decision, dict) else "",
-        )
-
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
             attachments=[],
@@ -489,23 +474,13 @@ class ChatService:
         session_id = self._ensure_session_id(session_id)
         user_text = self._safe_str(user_text)
 
-        print("CHAT_SERVICE_HANDLE_HIT:", user_text)
+        print("🔥 CHAT_SERVICE_HANDLE_HIT:", user_text)
 
         decision = self._decide_route(
             user_text=user_text,
             session_id=session_id,
             attachments=attachments,
         )
-
-        intent = self.intent_service.detect(
-            user_text=user_text,
-            route=decision.get("route") if isinstance(decision, dict) else "",
-            mode=decision.get("mode") if isinstance(decision, dict) else "",
-        )
-
-        decision["intent"] = intent.get("intent")
-        decision["intent_confidence"] = intent.get("confidence")
-        decision["intent_reasons"] = intent.get("reasons", [])
 
         if "image" in user_text.lower():
             decision["route"] = self.ROUTE_IMAGE_GENERATION
@@ -5373,4 +5348,3 @@ Write the exact goal in one sentence.
     # ==============================
     # PUBLIC ENTRY
     # ==============================
-

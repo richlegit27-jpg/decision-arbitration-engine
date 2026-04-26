@@ -1237,6 +1237,41 @@ def api_memory_delete():
         message="Memory deleted." if deleted else "Memory not found.",
     )
 
+@app.post("/api/memory/update")
+@guarded_json_route
+def api_memory_update():
+    data = get_json_body(request)
+
+    memory_id = str(data.get("id") or "").strip()
+    text = str(data.get("text") or "").strip()
+    kind = str(data.get("kind") or "note").strip()
+
+    if not memory_id:
+        return error_response("Missing memory id", code="missing_id"), 400
+
+    if not text:
+        return error_response("Missing memory text", code="missing_text"), 400
+
+    items = memory_service.all()
+
+    updated = None
+    for item in items:
+        if str(item.get("id")) == memory_id:
+            item["text"] = text
+            item["kind"] = kind
+            item["updated_at"] = iso_now()
+            updated = item
+            break
+
+    if not updated:
+        return error_response("Memory not found", code="not_found"), 404
+
+    memory_service._write_store({"memory": items})
+
+    return ok_response(
+        item=updated,
+        message="Memory updated."
+    )
 
 @app.post("/api/memory/cleanup")
 @guarded_json_route

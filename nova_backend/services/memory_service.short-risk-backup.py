@@ -21,7 +21,8 @@ class MemoryService:
         if not isinstance(data, dict):
             return {"memory": []}
 
-        if not isinstance(data.get("memory"), list):
+        memory = data.get("memory")
+        if not isinstance(memory, list):
             data["memory"] = []
 
         return data
@@ -29,29 +30,15 @@ class MemoryService:
     def _write_store(self, data: Dict[str, Any]) -> None:
         save_json_file(self.memory_file, data)
 
-    def _base_weight_for_kind(self, kind: str, pinned: bool = False) -> float:
-        if pinned:
-            return 10.0
-
-        k = str(kind or "note").strip().lower()
-
-        if k in ("project", "goal"):
-            return 6.0
-        if k in ("profile", "preference"):
-            return 5.0
-        if k == "fact":
-            return 3.0
-
-        return 1.0
-
+    # =========================
+    # DECAY SYSTEM
+    # =========================
     def _apply_memory_decay(self, item: Dict[str, Any]) -> Dict[str, Any]:
-        item = dict(item or {})
-
         if item.get("pinned"):
             item["weight"] = 10.0
             return item
 
-        weight = float(item.get("weight") or self._base_weight_for_kind(item.get("kind")))
+        weight = float(item.get("weight") or 1.0)
         updated_at = str(item.get("updated_at") or item.get("created_at") or "")
 
         if not updated_at:
@@ -67,7 +54,9 @@ class MemoryService:
             if updated.tzinfo is None:
                 updated = updated.replace(tzinfo=timezone.utc)
 
-            age_days = max(0, (datetime.now(timezone.utc) - updated).days)
+            now = datetime.now(timezone.utc)
+            age_days = max(0, (now - updated).days)
+
             decay_steps = age_days // 30
             decayed = weight - (decay_steps * 0.35)
 
@@ -87,9 +76,9 @@ class MemoryService:
         items.sort(
             key=lambda x: (
                 float(x.get("weight") or 1.0),
-                str(x.get("updated_at") or ""),
+                x.get("updated_at", "")
             ),
-            reverse=True,
+            reverse=True
         )
 
         return items
@@ -108,7 +97,6 @@ class MemoryService:
         for item in self.all():
             if str(item.get("id") or "").strip() == target:
                 return item
-
         return None
 
     def add_memory(self, item: Dict[str, Any]) -> Dict[str, Any]:
@@ -118,54 +106,37 @@ class MemoryService:
         item = dict(item or {})
         now = iso_now()
 
-        new_text = str(item.get("text") or "").strip()
-        new_text_key = new_text.lower()
+        new_text = str(item.get("text") or "").strip().lower()
         new_kind = str(item.get("kind") or "note").strip().lower()
-        pinned = bool(item.get("pinned"))
 
-        item["text"] = new_text
-        item["kind"] = new_kind
-        item["weight"] = float(item.get("weight") or self._base_weight_for_kind(new_kind, pinned=pinned))
+        # ===== BASE WEIGHT =====
+        if item.get("pinned"):
+            item["weight"] = 10.0
+        elif new_kind in ("project", "goal"):
+            item["weight"] = 6.0
+        elif new_kind in ("profile", "preference"):
+            item["weight"] = 5.0
+        elif new_kind in ("fact",):
+            item["weight"] = 3.0
+        else:
+            item["weight"] = float(item.get("weight") or 1.0)
 
-        preference_keys = (
-            "favorite color",
-            "favourite color",
-            "communication style",
-            "name is",
-            "prefers to be called",
-        )
-
-        for key in preference_keys:
-            if key in new_text_key:
-                for i, existing in enumerate(memory):
-                    existing = dict(existing or {})
-                    existing_text = str(existing.get("text") or "").strip().lower()
-                    existing_kind = str(existing.get("kind") or "note").strip().lower()
-
-                    if key in existing_text and existing_kind == new_kind:
-                        existing.update(item)
-                        existing["updated_at"] = now
-                        existing["created_at"] = existing.get("created_at") or now
-
-                        memory[i] = existing
-                        data["memory"] = memory
-                        self._write_store(data)
-                        return existing
-
+        # ===== DEDUP + REINFORCEMENT =====
         for i, existing in enumerate(memory):
-            existing = dict(existing or {})
-            existing_text = str(existing.get("text") or "").strip().lower()
-            existing_kind = str(existing.get("kind") or "note").strip().lower()
+            existing_text = str((existing or {}).get("text") or "").strip().lower()
+            existing_kind = str((existing or {}).get("kind") or "note").strip().lower()
 
-            if existing_text == new_text_key and existing_kind == new_kind:
+            if existing_text == new_text and existing_kind == new_kind:
+                existing = dict(existing or {})
+
                 count = int(existing.get("count") or 1) + 1
-                existing_weight = float(existing.get("weight") or item.get("weight") or 1.0)
+                existing_weight = float(existing.get("weight") or item["weight"])
 
                 existing.update(item)
                 existing["count"] = count
                 existing["updated_at"] = now
-                existing["created_at"] = existing.get("created_at") or now
 
+                # 🔥 reinforcement
                 existing["weight"] = min(10.0, existing_weight + 1.25)
 
                 if count >= 3:
@@ -177,13 +148,16 @@ class MemoryService:
                 self._write_store(data)
                 return existing
 
+        # ===== NEW ITEM =====
         if not item.get("id"):
             import uuid
             item["id"] = f"memory_{uuid.uuid4().hex}"
 
+        item["kind"] = new_kind
         item["updated_at"] = now
-        item["created_at"] = item.get("created_at") or now
-        item["count"] = int(item.get("count") or 1)
+
+        if not item.get("created_at"):
+            item["created_at"] = now
 
         memory.append(item)
 
@@ -206,19 +180,13 @@ class MemoryService:
             import uuid
             item["id"] = f"memory_{uuid.uuid4().hex}"
 
-        kind = str(item.get("kind") or "note").strip().lower()
-        item["kind"] = kind
         item["updated_at"] = now
-        item["created_at"] = item.get("created_at") or now
-
-        if item.get("pinned"):
-            item["weight"] = 10.0
-        elif not item.get("weight"):
-            item["weight"] = self._base_weight_for_kind(kind)
+        if not item.get("created_at"):
+            item["created_at"] = now
 
         replaced = False
         for i, existing in enumerate(memory):
-            if str((existing or {}).get("id") or "") == str(item["id"]):
+            if str(existing.get("id") or "") == str(item["id"]):
                 memory[i] = item
                 replaced = True
                 break
@@ -244,10 +212,9 @@ class MemoryService:
 
         for i, item in enumerate(memory):
             item = dict(item or {})
-
             if str(item.get("id") or "").strip() == target:
                 item["pinned"] = bool(pinned)
-                item["weight"] = 10.0 if pinned else self._base_weight_for_kind(item.get("kind"))
+                item["weight"] = 10.0 if pinned else max(1.0, float(item.get("weight") or 1.0))
                 item["updated_at"] = iso_now()
 
                 memory[i] = item
@@ -279,89 +246,3 @@ class MemoryService:
 
     def clear(self) -> None:
         self._write_store({"memory": []})
-
-    def cleanup_memories(self) -> Dict[str, Any]:
-        junk_patterns = (
-            "traceback",
-            "attributeerror",
-            "nameerror",
-            "unboundlocalerror",
-            "taberror",
-            "syntaxerror",
-            "indentationerror",
-            "internal error",
-            "chat_service.py",
-            "nova_backend",
-            "copy regenerate",
-        )
-
-        items = self.all()
-        cleaned = []
-        removed = []
-
-        for item in items:
-            text = str(item.get("text") or "").lower()
-
-            if any(pattern in text for pattern in junk_patterns):
-                removed.append(item)
-                continue
-
-            cleaned.append(item)
-
-        self._write_store({"memory": cleaned})
-
-        return {
-            "removed": len(removed),
-            "kept": len(cleaned),
-            "memory": cleaned,
-        }
-
-    def promote_memories(self) -> Dict[str, Any]:
-        data = self._read_store()
-        memory = data.get("memory", [])
-
-        promoted = 0
-        updated_items = []
-
-        for item in memory:
-            item = dict(item or {})
-            kind = str(item.get("kind") or "note").strip().lower()
-            count = int(item.get("count") or 1)
-            text = str(item.get("text") or "").strip()
-
-            if not text:
-                updated_items.append(item)
-                continue
-
-            base_weight = self._base_weight_for_kind(kind, pinned=bool(item.get("pinned")))
-            current_weight = float(item.get("weight") or base_weight)
-
-            if item.get("pinned"):
-                item["weight"] = 10.0
-            elif count >= 3:
-                item["pinned"] = True
-                item["weight"] = 10.0
-                promoted += 1
-            else:
-                item["weight"] = max(current_weight, base_weight)
-
-            updated_items.append(item)
-
-        self._write_store({"memory": updated_items})
-
-        return {
-            "promoted": promoted,
-            "kept": len(updated_items),
-            "memory": self.all(),
-        }
-
-    def cleanup_and_promote_memories(self) -> Dict[str, Any]:
-        cleanup_result = self.cleanup_memories()
-        promote_result = self.promote_memories()
-
-        return {
-            "removed": cleanup_result.get("removed", 0),
-            "promoted": promote_result.get("promoted", 0),
-            "kept": promote_result.get("kept", 0),
-            "memory": self.all(),
-        }
