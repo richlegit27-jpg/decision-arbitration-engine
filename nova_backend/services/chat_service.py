@@ -358,17 +358,64 @@ class ChatService:
         # ❌ REMOVE DUPLICATE REWRITE HERE
         # (rewrite happens only in _finalize_response)
 
-        # 🔥 AUTO-OPEN FILE DISCOVERY FOR DEBUGGING
+        # 🔥 AUTO-OPEN PROJECT FILE (REAL VERSION)
         if decision.get("intent") == "debugging":
-            assistant_text = (
-                "Run this:\n\n"
-                "Get-ChildItem -Path C:\\Users\\Owner\\nova -Recurse -File |\n"
-                "Select-String -Pattern \"login|signin|auth|password|401|error|exception\" |\n"
-                "Select-Object Path -Unique\n\n"
-                "Then open the first likely login/auth file with:\n\n"
-                "notepad <PASTE_PATH_HERE>\n\n"
-                "Paste that file here and I’ll give you the exact fix."
-            )
+            import os
+
+            base_path = r"C:\Users\Owner\nova"
+            keywords = [
+                "chat_service.py",
+                "app.py",
+                "session",
+                "route",
+                "api",
+                "service",
+                "memory",
+                "artifact",
+                "web",
+                "error",
+                "bug",
+            ]
+
+            matches = []
+
+            for root, _, files in os.walk(base_path):
+                for f in files:
+                    full_path = os.path.join(root, f)
+                    lower = full_path.lower()
+
+                    if any(x in lower for x in [".bak", "backup", "__pycache__", ".pyc", ".ignore"]):
+                        continue
+
+                    if not f.endswith((".py", ".js", ".html", ".css", ".ts", ".tsx", ".json")):
+                        continue
+
+                    score = 0
+                    for k in keywords:
+                        if k in lower:
+                            score += 1
+
+                    if lower.endswith(r"\nova_backend\services\chat_service.py"):
+                        score += 20
+
+                    if score > 0:
+                        matches.append((score, full_path))
+
+            matches.sort(key=lambda item: item[0], reverse=True)
+
+            if matches:
+                best_file = matches[0][1]
+                assistant_text = (
+                    "Open this file:\n\n"
+                    f"notepad {best_file}\n\n"
+                    "Paste it here and I’ll give you the exact fix."
+                )
+            else:
+                assistant_text = (
+                    "No strong file match found.\n\n"
+                    "Run:\n"
+                    "Get-ChildItem -Path C:\\Users\\Owner\\nova -Recurse -File | Select-Object FullName"
+                )
 
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
