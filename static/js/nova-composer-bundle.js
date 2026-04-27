@@ -285,7 +285,6 @@ function linkifyText(text) {
       upload_error: String(raw.upload_error || ""),
     };
   }
-
 function normalizeMessage(raw) {
   if (!raw || typeof raw !== "object") return null;
 
@@ -294,8 +293,10 @@ function normalizeMessage(raw) {
   }
 
   const item = raw;
+
   const role = String(item.role || "assistant");
   const kind = String(item.kind || "");
+
   const text = normalizeText(
     (item.ui && item.ui.message && item.ui.message.text) ||
     item.text ||
@@ -305,9 +306,9 @@ function normalizeMessage(raw) {
     ""
   ).trim();
 
-if (role === "assistant" && !text && kind !== "working_context") {
-  // keep empty assistant messages — do not drop
-}
+  if (role === "assistant" && !text && kind !== "working_context") {
+    // keep empty assistant messages
+  }
 
   if (
     typeof text === "string" &&
@@ -321,13 +322,20 @@ if (role === "assistant" && !text && kind !== "working_context") {
     return null;
   }
 
+  // 🔥 HARD META PRESERVE (this is the key)
+  const meta =
+    item.meta ||
+    raw.meta ||
+    (raw.assistant_message && raw.assistant_message.meta) ||
+    {};
+
   return {
     id: item.id || makeId("msg"),
     role: role,
     kind: kind,
     text: text,
     attachments: Array.isArray(item.attachments) ? item.attachments : [],
-    meta: item.meta || {},
+    meta: meta, // ← FIXED
     created_at: item.created_at || new Date().toISOString(),
     pending: Boolean(item.pending),
     streaming: Boolean(item.streaming),
@@ -335,8 +343,6 @@ if (role === "assistant" && !text && kind !== "working_context") {
     stopped: Boolean(item.stopped),
   };
 }
-
-
 function buildWorkingContextFromWorkingState(rawState) {
   const state = rawState && typeof rawState === "object" ? rawState : {};
 
@@ -1032,11 +1038,11 @@ function upsertMessage(rawMessage) {
 
     if (message.id && item.id === message.id) return true;
 
-    return (
-      String(item.role || "") === String(message.role || "") &&
-      String(item.text || "").trim() === String(message.text || "").trim() &&
-      String(item.created_at || "") === String(message.created_at || "")
-    );
+return (
+  String(item.role || "") === String(message.role || "") &&
+  String(item.text || "").trim() &&
+  String(item.text || "").trim() === String(message.text || "").trim()
+);
   });
 
   if (existingIndex >= 0) {
@@ -1777,137 +1783,6 @@ function linkifySourceLines(html) {
   );
 }
 
-function renderMessageCard(message) {
-  if (!message) return "";
-
-  if (message.kind === "working_context") {
-    return (
-      '<article class="message-card message-card--assistant message-card--working-context" data-message-id="' +
-      escapeHtml(message.id) +
-      '">' +
-      renderWorkingContextCard(message.working_context) +
-      "</article>"
-    );
-  }
-
-  const role = String(message.role || "assistant");
-  const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
-  const attachments = safeArray(message.attachments);
-
-  const firstImageAttachment = attachments.find(function (att) {
-    if (!att) return false;
-    const type = String(att.type || "").toLowerCase();
-    const url = String(att.url || "").toLowerCase();
-    const filename = String(att.filename || "").toLowerCase();
-    const mime = String(att.mime_type || att.content_type || "").toLowerCase();
-
-    return (
-      type === "image" ||
-      mime.startsWith("image/") ||
-      url.endsWith(".png") ||
-      url.endsWith(".jpg") ||
-      url.endsWith(".jpeg") ||
-      url.endsWith(".webp") ||
-      filename.endsWith(".png") ||
-      filename.endsWith(".jpg") ||
-      filename.endsWith(".jpeg") ||
-      filename.endsWith(".webp")
-    );
-  });
-
-  const imageUrl = resolveUploadUrl(
-    message.image_url ||
-    (message.artifact && message.artifact.image_url) ||
-    (message.viewer && message.viewer.image_url) ||
-    (message.meta && message.meta.image_url) ||
-    (firstImageAttachment && firstImageAttachment.url) ||
-    ""
-  );
-
-const imageHtml = imageUrl
-  ? '<div class="message-attachments">' +
-      '<div class="message-attachment message-attachment--image">' +
-        '<a href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noopener noreferrer">' +
-          '<img src="' + escapeHtml(imageUrl) + '" alt="Generated image" class="message-attachment__image">' +
-        '</a>' +
-        '<div class="message-attachment__footer">' +
-          '<a href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noopener noreferrer" class="message-attachment__name">Generated image</a>' +
-          '<div class="message-attachment__actions">' +
-            '<a href="' + escapeHtml(imageUrl) + '" download class="message-attachment__action">Download</a>' +
-            '<button type="button" class="message-attachment__action" data-copy-url="' + escapeHtml(imageUrl) + '">Copy URL</button>' +
-            '<button type="button" class="message-attachment__action" data-regenerate-image-message="' + escapeHtml(message.id || "") + '">Regenerate</button>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-    '</div>'
-  : "";
-
-  const nonImageAttachments = attachments.filter(function (att) {
-    return att !== firstImageAttachment;
-  });
-
-  const attachmentsHtml = nonImageAttachments.length
-    ? '<div class="message-attachments">' + nonImageAttachments.map(renderAttachmentBlock).join("") + "</div>"
-    : "";
-
-  const rawText = String(message.text || "").trim();
-
-  const textHtml = rawText
-    ? '<div class="message-text-inline" style="display:block !important; white-space:pre-wrap !important; color:#ffffff !important; background:rgba(255,255,255,0.04) !important; padding:10px 12px !important; border-radius:10px !important; margin:8px 0 10px 0 !important; line-height:1.45 !important;">' +
-        linkifySourceLines(rawText) +
-      "</div>"
-    : "";
-
-  const bodyHtml = textHtml
-    ? textHtml
-    : message.pending || message.streaming
-    ? '<div class="message-card__body"><span class="message-card__typing"><span class="message-card__dot"></span><span class="message-card__dot"></span><span class="message-card__dot"></span></span></div>'
-    : "";
-
-  const metaBits = [];
-  if (message.pending || message.streaming) metaBits.push("Streaming");
-  if (message.error) metaBits.push("Error");
-  if (message.stopped) metaBits.push("Stopped");
-  if (message.source) metaBits.push(message.source);
-
-  const metaHtml = metaBits.length
-    ? '<div class="message-card__meta">' + escapeHtml(metaBits.join(" · ")) + "</div>"
-    : "";
-
-  const memoryUsed = Array.isArray(message.memory_used) ? message.memory_used : [];
-
-  const memoryUsedIds = memoryUsed
-    .map(function (item) {
-      return String((item && item.id) || "").trim();
-    })
-    .filter(Boolean);
-
-  const memoryUsedHtml = (role !== "user" && memoryUsedIds.length)
-    ? '<button type="button" class="message-card__memory-used" data-memory-used-open="' +
-        escapeHtml(memoryUsedIds.join(",")) +
-      '">Memory used: ' + memoryUsedIds.length + '</button>'
-    : "";
-
-  return (
-    '<article class="message-card ' +
-    roleClass +
-    '" data-message-id="' +
-    escapeHtml(message.id) +
-    '">' +
-    '<div class="message-card__header">' +
-    '<div class="message-card__role">' +
-    escapeHtml(role === "user" ? "You" : "Nova") +
-    "</div>" +
-    metaHtml +
-    "</div>" +
-    bodyHtml +
-    imageHtml +
-    attachmentsHtml +
-    memoryUsedHtml +
-    renderMessageActions(message) +
-    "</article>"
-  );
-}
 function normalizeWorkingContext(raw) {
   const input = raw && typeof raw === "object" ? raw : {};
   const rawState =
@@ -1962,19 +1837,143 @@ function linkifySourceLines(text) {
       }
 
       output.push(
-        '<div class="source-row" data-url="' + escapeHtml(url) + '" data-title="' + escapeHtml(title) + '" data-preview="' + escapeHtml(source + " — " + title) + '">' +
-          escapeHtml(index) + ". " +
-          '<span class="source-name">' + escapeHtml(source) + '</span> — ' +
-          '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(title) + '</a>' +
-        '</div>'
+        '<div class="source-row" data-no-chat-action="1" data-url="' +
+          escapeHtml(url) +
+          '" data-title="' +
+          escapeHtml(title) +
+          '" data-preview="' +
+          escapeHtml(source + " — " + title) +
+          '">' +
+          escapeHtml(index) +
+          ". " +
+          '<span class="source-name">' +
+          escapeHtml(source) +
+          "</span> — " +
+          '<a href="' +
+          escapeHtml(url) +
+          '" target="_blank" rel="noopener noreferrer" data-no-chat-action="1">' +
+          escapeHtml(title) +
+          "</a>" +
+          "</div>"
       );
-
     } else {
       output.push(escapeHtml(line));
     }
   }
 
   return output.join("<br>");
+}
+
+document.addEventListener("click", function (e) {
+  const protectedEl = e.target.closest("[data-no-chat-action='1']");
+
+  const sourceEl = e.target.closest(".source-card, .source-row");
+
+  if (protectedEl && !sourceEl) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+
+  const el = sourceEl;
+  if (!el) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  let url =
+    el.getAttribute("data-source-url") ||
+    el.getAttribute("data-url") ||
+    "";
+
+  if (!url) {
+    const link = el.querySelector("a[href]");
+    if (link) url = link.getAttribute("href") || "";
+  }
+
+  if (!url) return;
+
+  const title =
+    el.getAttribute("data-title") ||
+    el.textContent ||
+    "Source preview";
+
+  const rail = document.querySelector("[data-right-rail]");
+  const viewer = document.querySelector("[data-rail-viewer]");
+
+  if (!rail || !viewer) {
+    window.open(url, "_blank");
+    return;
+  }
+
+  rail.classList.add("is-open");
+  document.body.classList.add("is-rail-open");
+  viewer.hidden = false;
+
+  viewer.innerHTML = `
+    <div class="nova-viewer-shell">
+      <div class="nova-viewer-title">${escapeHtml(title)}</div>
+      <div class="nova-viewer-body">
+        <p style="opacity:.75;font-size:12px;margin-bottom:10px;">Source preview</p>
+        <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" data-no-chat-action="1">
+          Open full article
+        </a>
+      </div>
+    </div>
+  `;
+});
+
+function renderSourceList(message) {
+  try {
+    if (!message || message.role !== "assistant") return "";
+
+    const meta = message.meta || {};
+    const urls = Array.isArray(meta.source_urls) ? meta.source_urls : [];
+
+    if (!urls.length) return "";
+
+    return (
+      '<div class="source-list">' +
+        '<div class="source-title">Sources</div>' +
+        urls.slice(0, 5).map(function (url) {
+          let domain = "source";
+
+          try {
+            domain = new URL(url).hostname.replace("www.", "");
+          } catch (e) {}
+
+          return (
+            '<div class="source-row" data-url="' + escapeHtml(url) + '">' +
+              escapeHtml(domain) +
+            "</div>"
+          );
+        }).join("") +
+      "</div>"
+    );
+  } catch (err) {
+    console.warn("renderSourceList failed:", err);
+    return "";
+  }
+}
+
+function renderQualityBadge(msg) {
+  if (!msg || msg.role !== "assistant") return "";
+
+  const meta = msg.meta || {};
+  const score = meta.quality_score;
+  const grade = meta.grade;
+
+  if (!score || !grade) return "";
+
+  return `
+    <div style="
+      margin-top:8px;
+      font-size:11px;
+      opacity:0.7;
+    ">
+      Confidence: ${score} (${grade})
+    </div>
+  `;
 }
 
 function wireWorkingContextPanel() {
@@ -1997,43 +1996,62 @@ function wireWorkingContextPanel() {
   });
 }
 
-// 🔥 SOURCE CLICK GLOBAL
-if (!window.__sourceClickBound) {
-  window.__sourceClickBound = true;
+function renderMessageCard(message) {
+  if (!message) return "";
 
-  document.addEventListener("click", function (e) {
-    const el = e.target.closest(".source-row");
-    if (!el) return;
+  const role = String(message.role || "assistant");
+  const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
+  const rawText = String(message.text || "").trim();
 
-    let url = el.getAttribute("data-url") || "";
+  const bodyHtml = rawText
+    ? '<div class="message-text-inline" style="display:block !important; white-space:pre-wrap !important; color:#ffffff !important; background:rgba(255,255,255,0.04) !important; padding:10px 12px !important; border-radius:10px !important; margin:8px 0 10px 0 !important; line-height:1.45 !important;">' +
+        linkifySourceLines(rawText) +
+      "</div>"
+    : "";
 
-    if (!url) {
-      const link = el.querySelector("a[href]");
-      if (link) url = link.getAttribute("href") || "";
+  let memoryBadgeHtml = "";
+
+  try {
+    const meta =
+      message.meta && Object.keys(message.meta).length > 0
+        ? message.meta
+        : (message.assistant_message && message.assistant_message.meta) || {};
+
+    const used = Array.isArray(meta.used_memory) ? meta.used_memory : [];
+    const count = meta.used_memory_count || used.length;
+    const confidence = meta.memory_confidence;
+
+    if (role !== "user" && count > 0) {
+      let label = "Memory used: " + escapeHtml(count);
+
+      if (typeof confidence === "number") {
+        label += " • Confidence: " + Math.round(confidence * 100) + "%";
+      }
+
+      memoryBadgeHtml =
+        '<button class="memory-used-badge" type="button" ' +
+        "data-memory='" +
+        encodeURIComponent(JSON.stringify(used)) +
+        "'>" +
+        label +
+        "</button>";
     }
+  } catch (e) {
+    console.warn("memory badge failed", e);
+  }
 
-    if (!url) {
-      console.warn("NO URL FOUND FOR SOURCE ROW");
-      return;
-    }
-
-    const rail = document.querySelector("[data-right-rail]");
-    const viewer = document.querySelector("[data-rail-viewer]");
-    if (!rail || !viewer) return;
-
-    rail.classList.add("is-open");
-    document.body.classList.add("is-rail-open");
-    viewer.hidden = false;
-
-    viewer.innerHTML = `
-      <div class="nova-viewer-shell">
-        <div class="nova-viewer-title">Source preview</div>
-        <div class="nova-viewer-body">
-          <a href="${url}" target="_blank" rel="noopener noreferrer">Open full article</a>
-        </div>
-      </div>
-    `;
-  });
+  return (
+    '<article class="message-card ' +
+    roleClass +
+    '" data-message-id="' +
+    escapeHtml(message.id) +
+    '">' +
+    bodyHtml +
+    memoryBadgeHtml +
+    renderSourceList(message) +
+    renderMessageActions(message) +
+    "</article>"
+  );
 }
 
 function renderChat() {
@@ -2175,10 +2193,13 @@ function renderChat() {
             body: JSON.stringify({ id: id }),
           });
 
-          const data = await res.json();
+const data = await res.json();
 
-          if (data.ok) {
-            state.memory = data.memory || [];
+window.__lastResponse = data;
+console.log("FULL RESPONSE:", data);
+
+if (!data.ok) { 
+           state.memory = data.memory || [];
             renderChat();
           }
         } catch (err) {
@@ -2997,7 +3018,14 @@ function finalizeStreamMessage(payload) {
     error: false,
     stopped: false,
     attachments: Array.isArray(data.attachments) ? data.attachments : [],
-    meta: data.meta && typeof data.meta === "object" ? data.meta : {},
+    meta:
+  (data &&
+    data.assistant_message &&
+    typeof data.assistant_message.meta === "object" &&
+    data.assistant_message.meta) ||
+  (data && typeof data.meta === "object" && data.meta) ||
+  {},
+
     artifact: data.artifact && typeof data.artifact === "object" ? data.artifact : {},
     viewer: data.viewer && typeof data.viewer === "object" ? data.viewer : {},
     image_url:
@@ -3563,9 +3591,9 @@ async function consumeChatJson(payload) {
     throw new Error("A generation is already running.");
   }
 
-setBusyUi(true);
-state.stream.running = true;
-updateTopbarFromState();
+  setBusyUi(true);
+  state.stream.running = true;
+  updateTopbarFromState();
 
   try {
     const response = await fetch("/api/chat", {
@@ -3611,34 +3639,41 @@ updateTopbarFromState();
       data.assistant_message.artifact = data.saved_artifact;
     }
 
-     applyStatePayload(data || {});
+    // 🔥 DEBUG
+    window.__lastResponse = data;
+    console.log("FULL CHAT RESPONSE:", data);
 
-    // 🔥 AUTO-OPEN LATEST ARTIFACT
+    // 🔥 APPLY STATE FIRST
+    applyStatePayload(data || {});
+
+    // 🔥 FORCE REAL ASSISTANT MESSAGE (WITH META)
+    if (data && data.assistant_message) {
+      if (state.stream && state.stream.targetMessageId) {
+        removeMessage(state.stream.targetMessageId);
+      }
+
+      upsertMessage(data.assistant_message);
+    }
+
+    // 🔥 AUTO-OPEN ARTIFACT
     if (data && data.saved_artifact && data.saved_artifact.id) {
       openArtifactFromStateOrBackend(data.saved_artifact.id);
     }
 
-    if (state.stream && state.stream.targetMessageId) {
-      removeMessage(state.stream.targetMessageId);
-    }
+    // 🔥 CLEAN STREAM FLAGS
+    state.messages = (state.messages || []).map(function (msg) {
+      if (!msg || String(msg.role || "") !== "assistant") return msg;
 
-if (state.stream && state.stream.targetMessageId) {
-  removeMessage(state.stream.targetMessageId);
-}
+      return {
+        ...msg,
+        pending: false,
+        streaming: false,
+        stopped: false,
+        error: false,
+      };
+    });
 
-state.messages = (state.messages || []).map(function (msg) {
-  if (!msg || String(msg.role || "") !== "assistant") return msg;
-
-  return {
-    ...msg,
-    pending: false,
-    streaming: false,
-    stopped: false,
-    error: false,
-  };
-});
-
-renderChat();
+    renderChat();
 
     flushTokensNow();
     clearTokenRenderState();
@@ -3692,6 +3727,21 @@ async function sendMessage() {
     document.querySelector("textarea");
 
   const text = String((inputEl && inputEl.value) || "").trim();
+
+  if (
+    text.startsWith("Memory used:") ||
+    text.includes("Confidence:") ||
+    /^Memory used:\s*\d+/i.test(text)
+  ) {
+    console.warn("[Nova] blocked UI badge text from sending:", text);
+
+    if (inputEl) {
+      inputEl.value = "";
+      autoResizeTextarea();
+    }
+
+    return;
+  }
 
   console.log("sendMessage ENTERED", {
     hasInput: !!inputEl,
@@ -3775,8 +3825,18 @@ async function sendMessage() {
     console.log("LOAD STATE FINISHED");
   }
 
-  appendUserMessageLocal(text, attachments);
+// 🚫 prevent duplicate user message (backend will return it)
+const alreadyExists = (state.messages || []).some(function (msg) {
+  return (
+    msg &&
+    msg.role === "user" &&
+    String(msg.text || "").trim() === String(text || "").trim()
+  );
+});
 
+if (!alreadyExists) {
+  appendUserMessageLocal(text, attachments);
+}
   if (els.chatInput) {
     els.chatInput.value = "";
     autoResizeTextarea();

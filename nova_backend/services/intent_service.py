@@ -17,39 +17,50 @@ class IntentService:
         route = str(route or "").strip().lower()
         mode = str(mode or "").strip().lower()
 
-        if self._has_any(text, [
-            "bug", "fix", "error", "issue", "traceback", "exception",
-            "broken", "not working", "doesn't work", "doesnt work",
-            "isn't working", "isnt working", "crash", "fail",
-            "debug", "problem", "500"
-        ]):
-            return self._result(self.INTENT_DEBUGGING, 0.99, ["debugging_signal"])
+        # 🔥 DEBUG / CODING
+        if self._has_any(text, ["bug", "fix", "error", "traceback", "exception", "broken", "not working", "500"]):
+            return self._result(self.INTENT_DEBUGGING, 0.95, ["debugging_signal"])
 
-        if len(text.split()) <= 5 and self._has_any(text, ["fix", "bug", "error"]):
-            return self._result(self.INTENT_DEBUGGING, 0.9, ["short_debug_command"])
-
-        if self._has_any(text, [
-            "code", "function", "class", "python", "javascript",
-            "html", "css", "flask"
-        ]):
+        # 🔥 CODING
+        if self._has_any(text, ["code", "function", "class", "python", "javascript", "html", "css"]):
             return self._result(self.INTENT_CODING, 0.85, ["coding_signal"])
 
-        if self._has_any(text, [
-            "plan", "roadmap", "steps", "strategy", "next move"
-        ]):
-            return self._result(self.INTENT_PLANNING, 0.85, ["planning_signal"])
+        # 🔥 PLANNING
+        if self._has_any(text, ["plan", "steps", "roadmap", "what should i do", "next step"]):
+            return self._result(self.INTENT_PLANNING, 0.8, ["planning_signal"])
 
-        if self._has_any(text, [
-            "write", "rewrite", "make this sound", "caption", "pitch"
-        ]):
-            return self._result(self.INTENT_WRITING, 0.8, ["writing_signal"])
+        # 🔥 IMAGE
+        if self._has_any(text, ["generate image", "create image", "draw", "art", "picture"]):
+            return self._result(self.INTENT_IMAGE, 0.9, ["image_signal"])
 
-        if "image" in route or "image" in mode:
-            return self._result(self.INTENT_IMAGE, 0.9, ["route_image"])
+        # 🔥 URL DETECTION (AUTO WEB)
+        if "http://" in text or "https://" in text or "www." in text:
+            return self._result(self.INTENT_WEB, 0.99, ["url_detected"])
 
-        if "web" in route or "web" in mode:
-            return self._result(self.INTENT_WEB, 0.9, ["route_web"])
+        # 🔥 LIVE DATA / FACT QUERIES (STRONG MATCH)
+        if (
+            "weather" in text
+            or "temperature" in text
+            or "news" in text
+            or "latest" in text
+            or "today" in text
+            or "now" in text
+            or "stock" in text
+            or "price" in text
+            or "score" in text
+            or "standings" in text
+            or "stats" in text
+            or "results" in text
+            or "who won" in text
+            or "record" in text
+        ):
+            return self._result(self.INTENT_WEB, 0.99, ["live_data_query"])
 
+        # 🔥 SPORTS FORCE
+        if any(team in text for team in ["lakers", "nba", "nfl", "mlb", "nhl"]):
+            return self._result(self.INTENT_WEB, 0.99, ["sports_query"])
+
+        # 🔥 DEFAULT CHAT
         return self._result(self.INTENT_CHAT, 0.5, ["default_chat"])
 
     def _has_any(self, text: str, terms: list[str]) -> bool:

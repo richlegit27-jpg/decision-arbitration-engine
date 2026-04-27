@@ -119,7 +119,49 @@ class ChatService:
         decision: dict,
         saved_artifact=None,
     ) -> dict:
+
         self._maybe_write_memory(decision, user_text, session_id)
+
+        assistant_msg = assistant_msg if isinstance(assistant_msg, dict) else {}
+        decision = decision if isinstance(decision, dict) else {}
+
+        assistant_msg.setdefault("role", "assistant")
+        assistant_msg.setdefault("text", "")
+        assistant_msg.setdefault("attachments", [])
+        assistant_msg.setdefault("meta", {})
+        assistant_msg.setdefault("memory_used", [])
+
+        # 🔥 FORCE MEMORY META INTO EVERY RESPONSE
+        used_memory_items = getattr(self, "_last_used_memory_items", []) or []
+
+        used_memory_full = [
+            {
+                "id": self._safe_str(m.get("id")),
+                "text": self._safe_str(m.get("text")),
+                "kind": self._safe_str(m.get("kind")),
+                "pinned": bool(m.get("pinned")),
+                "weight": m.get("weight", 1),
+            }
+            for m in used_memory_items
+            if isinstance(m, dict) and self._safe_str(m.get("text"))
+        ]
+
+        memory_confidence = 0.0
+        try:
+            total_weight = sum(float(m.get("weight", 1)) for m in used_memory_items)
+            if total_weight > 0:
+                memory_confidence = 1.0  # full confidence since these were used
+        except Exception:
+            pass
+
+        assistant_msg["meta"].update({
+            "used_memory": used_memory_full,
+            "used_memory_count": len(used_memory_full),
+            "memory_confidence": memory_confidence,
+        })
+
+        # preserve rewrite behavior
+        original_meta = dict(assistant_msg.get("meta") or {})
 
         assistant_msg["text"] = self.rewrite_service.rewrite(
             text=self._safe_str(assistant_msg.get("text")),
@@ -127,6 +169,8 @@ class ChatService:
             route=decision.get("route") if isinstance(decision, dict) else "",
             intent=decision.get("intent") if isinstance(decision, dict) else "",
         )
+
+        assistant_msg["meta"] = original_meta
 
         should_inject_working_context = False
         working_context_payload = {
@@ -160,7 +204,7 @@ class ChatService:
                 "decision": decision,
                 "route": "chat_service.handle",
                 "route_taken": decision.get("route") if isinstance(decision, dict) else "",
-                "working_context_injected": False,
+                "working_context_injected": should_inject_working_context,
                 "working_context_available": False,
                 "working_context_payload": working_context_payload,
             },
@@ -187,19 +231,14 @@ class ChatService:
             attachments=attachments,
         )
 
+        # 🔥 BUILD MEMORY CONTEXT (THIS SETS _last_used_memory_items)
         if not memory_context:
             memory_context = self._build_memory_context_for_chat(user_text, decision)
 
         memory_items = self._rank_memory_context(
             user_text=user_text,
-            limit=3,
+            limit=8,
             session_id=session_id,
-        )
-
-        intelligence = self._fuse_response_intelligence(
-            user_text=user_text,
-            decision=decision,
-            memory_items=memory_items,
         )
 
         model_messages = self._compose_model_messages(
@@ -214,115 +253,63 @@ class ChatService:
                 model=self.chat_model,
                 input=model_messages,
             )
-
             assistant_text = self._extract_response_text(response)
-
-            # 🔥 INTENT-WEIGHT FUSION OUTPUT CONTROL
-            try:
-                text = str(assistant_text or "").strip()
-                sentences = [
-                    s.strip()
-                    for s in text.replace("\n", " ").split(". ")
-                    if s.strip()
-                ]
-
-                answer_length = intelligence.get("answer_length")
-                is_simple_command = bool(intelligence.get("is_simple_command"))
-                needs_explanation = bool(intelligence.get("needs_explanation"))
-
-                print("INTELLIGENCE DEBUG:", {
-                    "answer_length": answer_length,
-                    "intent": intelligence.get("intent"),
-                    "route": intelligence.get("route"),
-                    "needs_explanation": needs_explanation,
-                    "is_simple_command": is_simple_command,
-                    "memory_used": [
-                        m.get("text")
-                        for m in memory_items
-                        if isinstance(m, dict)
-                    ],
-                })
-
-                if answer_length == "short":
-                    if is_simple_command:
-                        assistant_text = sentences[0] if sentences else text
-                    elif not needs_explanation:
-                        assistant_text = ". ".join(sentences[:2]) if sentences else text
-                    else:
-                        assistant_text = text
-
-                elif answer_length == "long":
-                    assistant_text = text
-
-                if assistant_text and not assistant_text.endswith((".", "!", "?")):
-                    assistant_text += "."
-
-                # 🔥 SELF-CHECK LAYER
-                self_check = self._self_check_response(
-                    user_text=user_text,
-                    assistant_text=assistant_text,
-                    intelligence=intelligence,
-                )
-
-                print("SELF CHECK DEBUG:", self_check)
-
-                # 🔥 AUTO-REVISE LAYER
-                if self_check.get("should_revise"):
-                    revise_prompt = [
-                        {
-                            "role": "user",
-                            "content": (
-                                "Revise this assistant answer before sending.\n"
-                                "Return only the improved final answer.\n\n"
-                                f"User request:\n{user_text}\n\n"
-                                f"Detected issues:\n{self_check.get('issues')}\n\n"
-                                f"Current answer:\n{assistant_text}"
-                            ),
-                        }
-                    ]
-
-                    try:
-                        revise_response = self.client.responses.create(
-                            model=self.chat_model,
-                            input=revise_prompt,
-                        )
-
-                        revised_text = self._extract_response_text(revise_response)
-
-                        if revised_text:
-                            assistant_text = revised_text.strip()
-                            print("AUTO REVISE APPLIED:", self_check.get("issues"))
-
-                    except Exception as e:
-                        print("AUTO REVISE FAILED:", e)
-
-            except Exception:
-                pass
-
-            if not assistant_text:
-                assistant_text = "No response generated."
 
         except Exception as e:
             print("GENERAL CHAT ERROR:", e)
-            assistant_text = f"Something went wrong generating a response: {type(e).__name__}: {self._safe_str(e)}"
+            assistant_text = "Something went wrong."
+
+        if not assistant_text:
+            assistant_text = "No response generated."
+
+        # 🔥 GET ACTUAL MEMORY USED
+        used_memory_items = getattr(self, "_last_used_memory_items", []) or []
 
         memory_used_ids = [
             m.get("id")
-            for m in memory_items
+            for m in used_memory_items
             if isinstance(m, dict) and m.get("id")
         ]
 
-        if intelligence.get("shape_response"):
-            assistant_text = self._shape_assistant_response(
-                assistant_text=assistant_text,
-                user_text=user_text,
-            )
+        # 🔥 BUILD MEMORY PAYLOAD
+        used_memory_full = [
+            {
+                "id": self._safe_str(m.get("id")),
+                "text": self._safe_str(m.get("text")),
+                "kind": self._safe_str(m.get("kind")),
+                "pinned": bool(m.get("pinned")),
+                "weight": m.get("weight", 1),
+            }
+            for m in used_memory_items
+            if isinstance(m, dict) and self._safe_str(m.get("text"))
+        ]
 
+        # 🔥 CONFIDENCE
+        memory_confidence = 0.0
+        try:
+            total_weight = 0.0
+            used_weight = 0.0
+
+            for m in used_memory_items:
+                w = float(m.get("weight", 1))
+                total_weight += w
+                if m.get("id") in memory_used_ids:
+                    used_weight += w
+
+            if total_weight > 0:
+                memory_confidence = round(used_weight / total_weight, 2)
+
+        except Exception as e:
+            print("CONFIDENCE FAIL:", e)
+
+        # 🔥 BUILD FINAL MESSAGE (THIS WAS YOUR BUG)
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
             attachments=[],
             meta={
-                "intelligence": intelligence,
+                "used_memory": used_memory_full,
+                "used_memory_count": len(used_memory_full),
+                "memory_confidence": memory_confidence,
             },
             memory_used=memory_used_ids,
         )
@@ -661,106 +648,179 @@ Code:
 
         word_count = len(assistant_text.split())
         issues = []
-        should_revise = False
+        score = 100
 
         if not assistant_text:
             issues.append("empty_response")
-            should_revise = True
+            score -= 100
 
-        if needs_explanation and word_count < 35:
-            issues.append("too_short_for_explanation")
-            should_revise = True
+        if "i don’t know" in assistant_lc or "i don't know" in assistant_lc:
+            issues.append("uncertain_response")
+            score -= 20
 
-        if "what is" in user_text_lc and word_count < 25:
-            issues.append("weak_definition")
-            should_revise = True
+        if "paste it here" in assistant_lc:
+            issues.append("asks_for_paste_instead_of_solving")
+            score -= 35
+
+        if "if you want" in assistant_lc:
+            issues.append("soft_followup_language")
+            score -= 10
 
         if answer_length == "short" and word_count > 80:
             issues.append("too_long_for_short_mode")
-            should_revise = True
+            score -= 25
 
-        if needs_explanation and word_count < 120 and not any(
-            marker in assistant_lc
-            for marker in ["example", "for example", "in simple", "basically"]
-        ):
-            issues.append("missing_simple_example")
-            should_revise = True
+        if answer_length == "short" and word_count <= 45:
+            score += 5
 
-        if any(
-            word in user_text_lc
-            for word in ["drug", "ibogaine", "opioid", "withdrawal", "medicine", "treatment"]
-        ):
-            if not any(
-                word in assistant_lc
-                for word in ["risk", "doctor", "medical", "danger", "supervision"]
-            ):
-                issues.append("missing_safety_context")
-                should_revise = True
+        if needs_explanation and word_count < 35:
+            issues.append("too_short_for_explanation")
+            score -= 25
+
+        if "what is" in user_text_lc and word_count < 25:
+            issues.append("weak_definition")
+            score -= 25
+
+        if any(x in user_text_lc for x in ["fix", "bug", "error", "traceback", "not working"]):
+            if not any(x in assistant_lc for x in ["file", "replace", "run", "python", "powershell", "notepad"]):
+                issues.append("debug_response_not_actionable")
+                score -= 30
+
+        if any(x in user_text_lc for x in ["smff", "full file", "full function"]):
+            if "def " not in assistant_text and "```" not in assistant_text:
+                issues.append("missing_full_code")
+                score -= 35
+
+        if word_count < 8 and not needs_explanation:
+            issues.append("too_short")
+            score -= 15
+
+        if word_count > 220 and answer_length == "short":
+            issues.append("bloated_response")
+            score -= 35
+
+        score = max(0, min(100, int(score)))
+
+        if score < 50:
+            grade = "weak"
+        elif score < 75:
+            grade = "ok"
+        elif score < 90:
+            grade = "strong"
+        else:
+            grade = "excellent"
+
+        should_revise = score < 70
 
         return {
             "ok": not should_revise,
             "should_revise": should_revise,
+            "quality_score": score,
+            "grade": grade,
             "issues": issues,
             "word_count": word_count,
         }
 
     def _execute_web_fetch(
         self,
-        decision: dict,
         user_text: str,
         session_id: str,
         attachments=None,
+        decision=None,
     ) -> dict:
+
+        decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
-
-        print("ENTERED _execute_web_fetch")
-        print("WEB_FETCH decision =", decision)
-
-        mode = self._safe_str(decision.get("mode"))
-        direct_url = self._safe_str(decision.get("url"))
 
         user_msg = self._build_user_message(
             user_text,
             attachments=attachments,
         )
 
-        if direct_url:
-            print("DIRECT URL FETCH =", direct_url)
-            return self._handle_web_fetch(direct_url, session_id=session_id)
+        try:
+            web_result = self._web_search(user_text)
+        except Exception as e:
+            print("WEB SEARCH ERROR:", e)
+            web_result = {}
 
-        if mode == "followup_web_open":
-            session = self._get_session_payload(session_id)
-            messages = session.get("messages") if isinstance(session, dict) else []
-            index = int(decision.get("source_index") or 1)
-            urls = []
+        results = web_result.get("results") if isinstance(web_result, dict) else []
+        if not isinstance(results, list):
+            results = []
 
-            for msg in reversed(messages or []):
-                if not isinstance(msg, dict):
+        def _format_web_summary(items: list) -> str:
+            if not items:
+                return "No useful sources found."
+
+            lines = []
+            seen = set()
+
+            for i, item in enumerate(items[:5], start=1):
+                title = self._safe_str(item.get("title"))
+                url = self._safe_str(item.get("url"))
+
+                if not title or title in seen:
                     continue
-                if self._safe_str(msg.get("role")) != "assistant":
-                    continue
 
-                meta = msg.get("meta") if isinstance(msg.get("meta"), dict) else {}
-                meta_urls = meta.get("source_urls")
+                seen.add(title)
 
-                if isinstance(meta_urls, list) and meta_urls:
-                    urls = [self._safe_str(u) for u in meta_urls if self._safe_str(u)]
-                    if urls:
-                        break
+                try:
+                    domain = url.split("/")[2].replace("www.", "")
+                except Exception:
+                    domain = "source"
 
-            if urls and len(urls) >= index:
-                target_url = urls[index - 1]
-                print("FOLLOWUP OPEN URL =", target_url)
-                return self._handle_web_fetch(target_url, session_id=session_id)
+                lines.append(f"{i}. {domain} — {title}")
 
-            return {
-                "ok": True,
-                "assistant_message": "I couldn’t find that source to open.",
+            if not lines:
+                return "No useful sources found."
+
+            return "— Top sources —\n" + "\n".join(lines)
+
+        assistant_text = _format_web_summary(results)
+
+        artifact = None
+        if results:
+            artifact = {
+                "type": "web_result",
+                "query": user_text,
+                "items": results,
+                "created_at": self._now_iso(),
             }
 
-        search_query = self._safe_str(user_text)
-        return self._handle_web_fetch(search_query, session_id=session_id) 
+        source_urls = []
 
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+
+            url = (
+                self._safe_str(item.get("url"))
+                or self._safe_str(item.get("link"))
+                or self._safe_str(item.get("href"))
+                or self._safe_str(item.get("source_url"))
+                or self._safe_str(item.get("final_url"))
+            )
+
+            if url:
+                source_urls.append(url)
+
+        print("DEBUG SOURCE URLS:", source_urls)
+
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            attachments=[],
+            meta={
+                "source_urls": source_urls,
+            },
+        )
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=artifact,
+        )
 
     def _is_image_generation_request(self, user_text: str) -> bool:
         text = str(user_text or "").strip().lower()
@@ -4778,7 +4838,6 @@ Write the exact goal in one sentence.
         # ==============================
         # MODEL HELPERS
         # ==============================
-
     def _build_chat_input(
         self,
         user_text: str,
@@ -4788,93 +4847,90 @@ Write the exact goal in one sentence.
         memory_context: str = "",
     ) -> str:
 
-        import time
-
         user_text = self._safe_str(user_text)
         decision = decision if isinstance(decision, dict) else {}
 
-        memory_block = self._safe_str(memory_context).strip()
+        memory_items = self._rank_memory_context(
+            user_text=user_text,
+            limit=8,
+            session_id=session_id,
+        )
 
-        # 🔥 MEMORY ALWAYS INJECTED
-        if not memory_block:
-            memory_items = self._rank_memory_context(
-                user_text=user_text,
-                limit=int(decision.get("memory_limit") or self.memory_limit),
-                session_id=session_id,
-            )
+        dominant_items = []
+        pinned_items = []
+        normal_items = []
 
-            if not memory_items:
-                memory_items = self._get_memory_list()[-10:]
+        for item in memory_items:
+            if not isinstance(item, dict):
+                continue
 
-            # 🔥 STRUCTURED + DECAY + IMPORTANCE
-            rules = []
-            identity = []
-            preferences = []
-            context = []
+            text = self._safe_str(item.get("text"))
+            if not text:
+                continue
 
-            now = int(time.time())
+            kind = self._safe_str(item.get("kind")).lower()
+            pinned = bool(item.get("pinned"))
+            weight = item.get("weight", 1)
 
-            for m in memory_items:
-                text = self._safe_str(m.get("text"))
-                if not text:
-                    continue
+            try:
+                weight_num = float(weight)
+            except Exception:
+                weight_num = 1.0
 
-                lower = text.lower()
+            if pinned:
+                pinned_items.append(item)
+            elif kind in ["preference", "goal", "project", "profile"]:
+                dominant_items.append(item)
+            elif weight_num >= 2:
+                dominant_items.append(item)
+            else:
+                normal_items.append(item)
 
-                # 🔥 importance
-                importance = int(m.get("importance") or 1)
+        selected_memory = []
+        seen = set()
 
-                # 🔥 decay
-                created = m.get("created_at") or m.get("createdAt") or ""
-                age_penalty = 0
+        # 🔥 1. FORCE PINNED FIRST (no limits yet)
+        for item in memory_items:
+            if not isinstance(item, dict):
+                continue
 
-                try:
-                    if created:
-                        created_ts = int(
-                            __import__("datetime")
-                            .datetime.fromisoformat(created.replace("Z", ""))
-                            .timestamp()
-                        )
-                        age_days = (now - created_ts) / 86400
+            if not item.get("pinned"):
+                continue
 
-                        if age_days > 7:
-                            age_penalty = 1
-                        if age_days > 30:
-                            age_penalty = 2
-                except Exception:
-                    pass
+            text = self._safe_str(item.get("text"))
+            key = text.lower().strip()
 
-                score = importance - age_penalty
+            if not key or key in seen:
+                continue
 
-                # 🔥 drop weak memory
-                if score <= 0:
-                    continue
+            seen.add(key)
+            selected_memory.append(item)
 
-                # 🔥 categorize
-                if "from now on" in lower or "always" in lower or "never" in lower:
-                    rules.append(text)
-                elif lower.startswith("my "):
-                    identity.append(text)
-                elif "i prefer" in lower or "i like" in lower:
-                    preferences.append(text)
-                else:
-                    context.append(text)
+        # 🔥 2. THEN FILL REST (up to 5 total)
+        for item in memory_items:
+            if not isinstance(item, dict):
+                continue
 
-            memory_sections = []
+            if item.get("pinned"):
+                continue
 
-            if rules:
-                memory_sections.append("USER RULES:\n- " + "\n- ".join(rules))
+            text = self._safe_str(item.get("text"))
+            key = text.lower().strip()
 
-            if identity:
-                memory_sections.append("USER IDENTITY:\n- " + "\n- ".join(identity))
+            if not key or key in seen:
+                continue
 
-            if preferences:
-                memory_sections.append("USER PREFERENCES:\n- " + "\n- ".join(preferences))
+            seen.add(key)
+            selected_memory.append(item)
 
-            if context:
-                memory_sections.append("USER CONTEXT:\n- " + "\n- ".join(context))
+            if len(selected_memory) >= 5:
+                break
 
-            memory_block = "\n\n".join(memory_sections)
+        memory_block = self._format_memory_context(selected_memory)
+        self._last_used_memory_items = selected_memory
+
+        if memory_context:
+            memory_block = self._safe_str(memory_context)
 
         session = self._get_session_payload(session_id)
         messages = session.get("messages", []) if isinstance(session, dict) else []
@@ -4898,24 +4954,10 @@ Write the exact goal in one sentence.
 
         if memory_block:
             sections.append(
-                "CRITICAL USER MEMORY (ABSOLUTE PRIORITY):\n"
-                "These are persistent truths about the user.\n"
-                "You MUST obey these.\n"
-                "You MUST NOT contradict them.\n"
-                "You MUST adapt your response style to match them.\n"
-                "If a rule exists, it overrides all other instructions.\n"
-                "If a preference exists, follow it unless explicitly told otherwise.\n"
-                "If identity exists, assume it is always true.\n\n"
+                "IMPORTANT USER MEMORY:\n"
+                "Use this memory as active instruction context. "
+                "Prefer it over generic assistant behavior when relevant.\n"
                 f"{memory_block}"
-            )
-
-            sections.append(
-                "MEMORY APPLICATION RULES:\n"
-                "- Apply USER RULES before answering.\n"
-                "- Apply USER PREFERENCES to tone and format.\n"
-                "- Use USER CONTEXT to avoid generic responses.\n"
-                "- Do NOT ignore memory even if the question is simple.\n"
-                "- Do NOT restate memory unless relevant.\n"
             )
 
         if working_context_block:
@@ -4930,30 +4972,21 @@ Write the exact goal in one sentence.
                 f"{recent_block}"
             )
 
-        if not sections:
-            return user_text
-
-        # 🔥 FORCE CLAMP OUTPUT
-        if "short answers" in memory_block.lower():
-            return (
-                "\n\n".join(sections)
-                + "\n\nOUTPUT CONSTRAINT:\nRespond in ONE sentence only.\n\nUser message:\n"
-                + user_text
-            )
-
-        return (
-            "\n\n".join(sections)
-            + "\n\nSTRICT RESPONSE MODE:\n"
-            + "- ALWAYS obey USER RULES first.\n"
-            + "- If user says 'short answers', respond in 1–2 sentences MAX.\n"
-            + "- NEVER output lists unless explicitly asked.\n"
-            + "- NEVER give multiple steps.\n"
-            + "- Return ONLY the most important next action.\n"
-            + "- Cut all explanations.\n"
-            + "\n\nUser message:\n"
-            + user_text
+        sections.append(
+            "USER MESSAGE:\n"
+            f"{user_text}"
         )
 
+        sections.append(
+            "RESPONSE RULES:\n"
+            "- Be direct.\n"
+            "- Use the user's saved preferences when relevant.\n"
+            "- For code help, prefer full-file or exact replacement blocks.\n"
+            "- Include file paths when discussing project files.\n"
+            "- Do not give generic chatbot filler."
+        )
+
+        return "\n\n".join(sections).strip()
     def _build_common_state_payload(self, session_id: str = "") -> dict:
         session = self._get_session_payload(session_id)
 
@@ -5453,3 +5486,34 @@ Write the exact goal in one sentence.
 
         return {"ok": False, "error": f"Unknown tool: {tool_name}", "tool_name": tool_name}
 
+    def _cleanup_memory_items(self) -> None:
+        try:
+            memories = getattr(self.memory_service, "memories", None)
+            if not isinstance(memories, list):
+                return
+
+            cleaned = []
+            seen = set()
+
+            for memory in memories:
+                text = self._safe_str(memory.get("text")).strip().lower()
+
+                if not text or len(text) < 4:
+                    continue
+
+                if text in ["ok","hi","yo","test","next","go"]:
+                    continue
+
+                if text in seen:
+                    continue
+
+                seen.add(text)
+                cleaned.append(memory)
+
+            self.memory_service.memories = cleaned
+
+            if hasattr(self.memory_service, "_save"):
+                self.memory_service._save()
+
+        except Exception as e:
+            print("MEMORY CLEANUP FAILED:", e)
