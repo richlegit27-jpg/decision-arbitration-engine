@@ -111,6 +111,43 @@ class MemoryService:
 
         return None
 
+    def summarize_memory_list(self, memory: list) -> list:
+        if len(memory) <= 80:
+            return memory
+
+        strong = [
+            m for m in memory
+            if float(m.get("weight", 1.0)) >= 3.0 or bool(m.get("pinned"))
+        ]
+
+        weak = [
+            m for m in memory
+            if float(m.get("weight", 1.0)) < 3.0 and not bool(m.get("pinned"))
+        ]
+
+        summary_texts = []
+        for m in weak[-20:]:
+            text = str(m.get("text") or "").strip()
+            if text:
+                summary_texts.append(text)
+
+        if summary_texts:
+            import uuid
+            summary = {
+                "id": f"memory_summary_{uuid.uuid4().hex}",
+                "text": "Memory summary: " + "; ".join(summary_texts[:10]),
+                "kind": "summary",
+                "source": "memory-summary",
+                "weight": 2.0,
+                "count": 1,
+                "pinned": False,
+                "created_at": iso_now(),
+                "updated_at": iso_now(),
+            }
+            strong.append(summary)
+
+        return strong[-100:]
+
     def add_memory(self, item: Dict[str, Any]) -> Dict[str, Any]:
         data = self._read_store()
         memory = data.get("memory", [])
@@ -122,6 +159,25 @@ class MemoryService:
         new_text_key = new_text.lower()
         new_kind = str(item.get("kind") or "note").strip().lower()
         pinned = bool(item.get("pinned"))
+
+        # 🔥 CONFLICT RESOLUTION (newer overrides older)
+        conflict_groups = [
+            ("short answers", "long answers"),
+            ("concise", "detailed"),
+            ("formal", "casual"),
+        ]
+
+        for a, b in conflict_groups:
+            if a in new_text_key or b in new_text_key:
+                for i, existing in enumerate(memory):
+                    existing = dict(existing or {})
+                    existing_text = str(existing.get("text") or "").lower()
+
+                    if (a in existing_text or b in existing_text) and existing_text != new_text_key:
+                        existing["weight"] = 0.5
+                        existing["pinned"] = False
+                        existing["updated_at"] = now
+                        memory[i] = existing
 
         item["text"] = new_text
         item["kind"] = new_kind
@@ -135,6 +191,7 @@ class MemoryService:
             "prefers to be called",
         )
 
+        # 🔥 KEYED PREFERENCE REPLACEMENT
         for key in preference_keys:
             if key in new_text_key:
                 for i, existing in enumerate(memory):
@@ -152,6 +209,7 @@ class MemoryService:
                         self._write_store(data)
                         return existing
 
+        # 🔥 DUPLICATE REINFORCEMENT
         for i, existing in enumerate(memory):
             existing = dict(existing or {})
             existing_text = str(existing.get("text") or "").strip().lower()
@@ -166,7 +224,29 @@ class MemoryService:
                 existing["updated_at"] = now
                 existing["created_at"] = existing.get("created_at") or now
 
-                existing["weight"] = min(10.0, existing_weight + 1.25)
+                # 🔥 DECAY BEFORE BOOST
+                try:
+                    from datetime import datetime
+                    created_at = existing.get("created_at")
+                    if created_at:
+                        created_ts = datetime.fromisoformat(created_at.replace("Z", ""))
+                        age_days = (datetime.utcnow() - created_ts).days
+
+                        if age_days > 7:
+                            existing_weight *= 0.85
+                        if age_days > 30:
+                            existing_weight *= 0.65
+                except Exception:
+                    pass
+
+                # 🔥 IMPORTANCE BOOST
+                boost = 1.25
+                if existing.get("pinned"):
+                    boost = 0.5
+                if "from now on" in existing_text or "always" in existing_text:
+                    boost = 2.0
+
+                existing["weight"] = min(10.0, existing_weight + boost)
 
                 if count >= 3:
                     existing["pinned"] = True
@@ -177,6 +257,7 @@ class MemoryService:
                 self._write_store(data)
                 return existing
 
+        # 🔥 NEW MEMORY
         if not item.get("id"):
             import uuid
             item["id"] = f"memory_{uuid.uuid4().hex}"
@@ -186,6 +267,12 @@ class MemoryService:
         item["count"] = int(item.get("count") or 1)
 
         memory.append(item)
+
+        # 🔥 CLEANUP WEAK MEMORY
+        memory = [
+            m for m in memory
+            if float(m.get("weight", 1.0)) > 0.5
+        ]
 
         MAX_MEMORY_ITEMS = 100
         memory = memory[-MAX_MEMORY_ITEMS:]

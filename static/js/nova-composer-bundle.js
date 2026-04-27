@@ -3699,6 +3699,8 @@ async function sendMessage() {
     inputValue: inputEl ? inputEl.value : null
   });
 
+  await maybeAutoSaveMemoryFromChatText(text);
+
   if (/^\/image|generate image|create image|draw/i.test(text)) {
     const tempId = "gen_" + Date.now();
 
@@ -4873,12 +4875,176 @@ function wireWebLinks() {
   });
 }
 
+async function maybeAutoSaveMemoryFromChatText(userText) {
+  const text = String(userText || "").trim();
+  if (!text) return;
+
+  const lower = text.toLowerCase();
+
+  // 🚫 junk filter
+  if (
+    lower.length < 5 ||
+    lower === "hi" ||
+    lower.startsWith("auto memory saving")
+  ) {
+    return;
+  }
+
+  const triggers = [
+    "remember that ",
+    "remember this ",
+    "note that ",
+    "save this ",
+    "add this to memory ",
+    "store this "
+  ];
+
+  let memoryText = "";
+
+  for (let i = 0; i < triggers.length; i++) {
+    if (lower.startsWith(triggers[i])) {
+      memoryText = text.slice(triggers[i].length).trim();
+      break;
+    }
+  }
+
+  if (!memoryText) {
+    const autoPatterns = [
+      /^my .+ is .+/i,
+      /^i prefer .+/i,
+      /^i like .+/i,
+      /^i want .+/i,
+      /^i am working on .+/i,
+      /^i'm working on .+/i,
+      /^from now on .+/i
+    ];
+
+    const shouldAutoSave = autoPatterns.some((p) => p.test(text));
+    if (!shouldAutoSave) return;
+
+    memoryText = text;
+  }
+
+  // 🧠 DEDUPE
+  const exists = (state.memory || []).some((m) => {
+    return String(m.text || "").toLowerCase() === memoryText.toLowerCase();
+  });
+
+  if (exists) return;
+
+  // 🔥 IMPORTANCE SCORING
+  let importance = 1; // default low
+
+  if (/^my .+ is .+/i.test(memoryText)) importance = 3; // identity
+  else if (/from now on|always|never/i.test(memoryText)) importance = 3; // rules
+  else if (/i prefer|i like/i.test(memoryText)) importance = 2; // preference
+  else if (/working on/i.test(memoryText)) importance = 2; // project
+
+  try {
+    const res = await fetch("/api/memory/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: memoryText,
+        kind: "note",
+        source: "chat-auto",
+        importance: importance
+      })
+    });
+
+    const data = await res.json();
+
+    const memoryList =
+      (data && data.data && data.data.memory) ||
+      data.memory ||
+      [];
+
+    if (Array.isArray(memoryList)) {
+      // 🔥 SORT BY IMPORTANCE
+      const normalized = memoryList.map(normalizeMemoryItem);
+
+      normalized.sort((a, b) => {
+        const ai = Number(a.importance || 1);
+        const bi = Number(b.importance || 1);
+        return bi - ai; // high first
+      });
+
+      state.memory = normalized;
+      renderMemory();
+      wireMemoryControls();
+      wireMemoryClicks();
+    }
+  } catch (err) {
+    console.error("Auto memory save failed", err);
+  }
+}
+
 function wireMemoryControls() {
+  console.log("WIRE MEMORY CONTROLS ACTIVE");
+
+  const addBtn = document.querySelector("[data-memory-add-button]");
+  const input = document.querySelector("[data-memory-add-text]");
+
+  // ✅ ADD MEMORY (button click)
+  if (addBtn && !addBtn.__novaMemoryAddWired) {
+    addBtn.__novaMemoryAddWired = true;
+
+    addBtn.onclick = async function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const cleanText = input ? String(input.value || "").trim() : "";
+
+      if (!cleanText) {
+        alert("Type a memory first.");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/memory/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: cleanText,
+            kind: "note",
+            source: "manual",
+          }),
+        });
+
+        const data = await res.json();
+        console.log("MEMORY ADD RESPONSE", data);
+
+        if (data && data.ok && data.data && Array.isArray(data.data.memory)) {
+          state.memory = data.data.memory.map(normalizeMemoryItem);
+          renderMemory();
+
+          if (input) input.value = "";
+        }
+      } catch (err) {
+        console.error("Memory add failed", err);
+      }
+    };
+  }
+
+  // ✅ ENTER TO SAVE (no button needed)
+  if (input && !input.__novaMemoryEnterWired) {
+    input.__novaMemoryEnterWired = true;
+
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (addBtn) addBtn.click();
+      }
+    });
+  }
+
+  // ✅ DELETE MEMORY
   document.querySelectorAll("[data-memory-delete]").forEach(function (btn) {
     if (btn.__wired) return;
     btn.__wired = true;
 
-    btn.addEventListener("click", async function (e) {
+    btn.onclick = async function (e) {
+      e.preventDefault();
       e.stopPropagation();
 
       const id = btn.getAttribute("data-memory-delete");
@@ -4892,45 +5058,27 @@ function wireMemoryControls() {
         });
 
         const data = await res.json();
+        console.log("MEMORY DELETE RESPONSE", data);
 
         if (data && data.ok && data.data && Array.isArray(data.data.memory)) {
           state.memory = data.data.memory.map(normalizeMemoryItem);
           renderMemory();
         }
-
       } catch (err) {
         console.error("Memory delete failed", err);
       }
-    });
+    };
   });
 }
 
-function wireMemoryClicks() {
-  if (!els.memoryList) return;
+ function wireMemoryClicks() {
+  if (!els || !els.memoryList) return;
 
-  els.memoryList.dataset.bound = "";
+  if (els.memoryList.__wiredClicks) return;
+  els.memoryList.__wiredClicks = true;
 
-  els.memoryList.onclick = function (e) {
+  els.memoryList.addEventListener("click", function (e) {
     if (e.target.closest("[data-memory-delete]")) return;
-
-    const usedBtn = e.target.closest("[data-memory-used-open]");
-    if (usedBtn) {
-      const ids = String(usedBtn.getAttribute("data-memory-used-open") || "")
-        .split(",")
-        .map(function (id) { return id.trim(); })
-        .filter(Boolean);
-
-      if (ids.length) {
-        openRail();
-        setRailTab("memory");
-        setRailSelectedItem("memory", ids[0]);
-
-        const item = findMemoryById(ids[0]);
-        renderMemoryViewer(item);
-      }
-
-      return;
-    }
 
     const btn = e.target.closest("[data-memory-id]");
     if (!btn) return;
@@ -4952,7 +5100,7 @@ function wireMemoryClicks() {
 
     if (els.railTitle) els.railTitle.textContent = "Memory";
     if (els.railSubtitle) els.railSubtitle.textContent = String(item.kind || "note");
-  };
+  });
 }
 
 function normalizeMemoryItem(item) {
@@ -5173,6 +5321,35 @@ function renderMemory() {
       groups.note.push(item);
     }
   });
+
+function wireMemoryClicks() {
+  if (!els.memoryList) return;
+
+  els.memoryList.onclick = function (e) {
+    if (e.target.closest("[data-memory-delete]")) return;
+
+    const btn = e.target.closest("[data-memory-id]");
+    if (!btn) return;
+
+    const memoryId = String(btn.getAttribute("data-memory-id") || "").trim();
+    if (!memoryId) return;
+
+    const item = safeArray(state.memory).find(function (entry) {
+      return String(entry.id || "") === memoryId;
+    });
+
+    if (!item) return;
+
+    openRail();
+    setRailTab("memory");
+    setRailSelectedItem("memory", memoryId);
+
+    renderMemoryViewer(item);
+
+    if (els.railTitle) els.railTitle.textContent = "Memory";
+    if (els.railSubtitle) els.railSubtitle.textContent = String(item.kind || "note");
+  };
+}
 
   function renderMemorySection(title, list) {
     if (!list.length) return "";

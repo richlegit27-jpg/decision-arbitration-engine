@@ -168,107 +168,6 @@ class ChatService:
 
         return payload
 
-    def _execute_image_generation(
-        self,
-        user_text: str,
-        session_id: str,
-        attachments=None,
-        decision=None,
-    ) -> dict:
-
-        decision = decision if isinstance(decision, dict) else {}
-        attachments = attachments or []
-
-        prompt = self._safe_str(decision.get("prompt"))
-        if not prompt:
-            prompt = self._image_prompt_from_text(user_text)
-
-        user_msg = self._build_user_message(
-            user_text,
-            attachments=attachments,
-        )
-
-        try:
-            result = self.client.images.generate(
-                model=self.image_model,
-                prompt=prompt,
-                size=self.image_size,
-            )
-
-            first = result.data[0] if getattr(result, "data", None) else None
-            image_b64 = getattr(first, "b64_json", None) if first else None
-            if not image_b64:
-                raise ValueError("Image API returned no b64_json")
-
-            image_bytes = base64.b64decode(image_b64)
-            filename = f"generated_{uuid.uuid4().hex}.png"
-            filepath = self.uploads_dir / filename
-
-            with open(filepath, "wb") as f:
-                f.write(image_bytes)
-
-            image_url = f"/api/uploads/{filename}"
-
-            saved_artifact = None
-            try:
-                saved_artifact = self._persist_image_generation_artifact(
-                    session_id=session_id,
-                    prompt=prompt,
-                    image_url=image_url,
-                    revised_prompt="",
-                    parent_artifact_id="",
-                    source_type="generated",
-                    generation_mode="text_to_image",
-                )
-            except Exception as e:
-                print("IMAGE ARTIFACT SAVE FAILED:", e)
-
-            assistant_msg = self._build_assistant_message(
-                text=f"Generated image for: {prompt}",
-                attachments=[
-                    {
-                        "type": "image",
-                        "url": image_url,
-                        "name": "Generated Image",
-                    }
-                ],
-                meta={
-                    "type": "image_generation",
-                    "image_url": image_url,
-                    "prompt": prompt,
-                },
-            )
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision=decision,
-                saved_artifact=saved_artifact,
-            )
-
-        except Exception as e:
-            print("IMAGE GENERATION FAILED:", e)
-
-            assistant_msg = self._build_assistant_message(
-                text=f"I hit an error generating the image: {type(e).__name__}: {self._safe_str(e)}",
-                attachments=[],
-                meta={
-                    "type": "image_generation_error",
-                    "error": str(e),
-                },
-            )
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision=decision,
-                saved_artifact=None,
-            )
-
     def _execute_general_chat(
         self,
         decision=None,
@@ -291,6 +190,18 @@ class ChatService:
         if not memory_context:
             memory_context = self._build_memory_context_for_chat(user_text, decision)
 
+        memory_items = self._rank_memory_context(
+            user_text=user_text,
+            limit=3,
+            session_id=session_id,
+        )
+
+        intelligence = self._fuse_response_intelligence(
+            user_text=user_text,
+            decision=decision,
+            memory_items=memory_items,
+        )
+
         model_messages = self._compose_model_messages(
             user_text=user_text,
             session=self._get_session_payload(session_id),
@@ -305,7 +216,88 @@ class ChatService:
             )
 
             assistant_text = self._extract_response_text(response)
-            assistant_text = self._safe_str(assistant_text).strip()
+
+            # 🔥 INTENT-WEIGHT FUSION OUTPUT CONTROL
+            try:
+                text = str(assistant_text or "").strip()
+                sentences = [
+                    s.strip()
+                    for s in text.replace("\n", " ").split(". ")
+                    if s.strip()
+                ]
+
+                answer_length = intelligence.get("answer_length")
+                is_simple_command = bool(intelligence.get("is_simple_command"))
+                needs_explanation = bool(intelligence.get("needs_explanation"))
+
+                print("INTELLIGENCE DEBUG:", {
+                    "answer_length": answer_length,
+                    "intent": intelligence.get("intent"),
+                    "route": intelligence.get("route"),
+                    "needs_explanation": needs_explanation,
+                    "is_simple_command": is_simple_command,
+                    "memory_used": [
+                        m.get("text")
+                        for m in memory_items
+                        if isinstance(m, dict)
+                    ],
+                })
+
+                if answer_length == "short":
+                    if is_simple_command:
+                        assistant_text = sentences[0] if sentences else text
+                    elif not needs_explanation:
+                        assistant_text = ". ".join(sentences[:2]) if sentences else text
+                    else:
+                        assistant_text = text
+
+                elif answer_length == "long":
+                    assistant_text = text
+
+                if assistant_text and not assistant_text.endswith((".", "!", "?")):
+                    assistant_text += "."
+
+                # 🔥 SELF-CHECK LAYER
+                self_check = self._self_check_response(
+                    user_text=user_text,
+                    assistant_text=assistant_text,
+                    intelligence=intelligence,
+                )
+
+                print("SELF CHECK DEBUG:", self_check)
+
+                # 🔥 AUTO-REVISE LAYER
+                if self_check.get("should_revise"):
+                    revise_prompt = [
+                        {
+                            "role": "user",
+                            "content": (
+                                "Revise this assistant answer before sending.\n"
+                                "Return only the improved final answer.\n\n"
+                                f"User request:\n{user_text}\n\n"
+                                f"Detected issues:\n{self_check.get('issues')}\n\n"
+                                f"Current answer:\n{assistant_text}"
+                            ),
+                        }
+                    ]
+
+                    try:
+                        revise_response = self.client.responses.create(
+                            model=self.chat_model,
+                            input=revise_prompt,
+                        )
+
+                        revised_text = self._extract_response_text(revise_response)
+
+                        if revised_text:
+                            assistant_text = revised_text.strip()
+                            print("AUTO REVISE APPLIED:", self_check.get("issues"))
+
+                    except Exception as e:
+                        print("AUTO REVISE FAILED:", e)
+
+            except Exception:
+                pass
 
             if not assistant_text:
                 assistant_text = "No response generated."
@@ -314,33 +306,24 @@ class ChatService:
             print("GENERAL CHAT ERROR:", e)
             assistant_text = f"Something went wrong generating a response: {type(e).__name__}: {self._safe_str(e)}"
 
-        memory_items = self._rank_memory_context(
-            user_text=user_text,
-            limit=3,
-            session_id=session_id,
-        )
-
         memory_used_ids = [
             m.get("id")
             for m in memory_items
             if isinstance(m, dict) and m.get("id")
         ]
 
-        # 🔥 DO NOT SHAPE DEBUGGING RESPONSES
-        if decision.get("intent") != "debugging":
+        if intelligence.get("shape_response"):
             assistant_text = self._shape_assistant_response(
                 assistant_text=assistant_text,
                 user_text=user_text,
             )
 
-        # ❌ REMOVE DUPLICATE REWRITE HERE
-        # (rewrite happens only in _finalize_response)
-
-
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
             attachments=[],
-            meta={},
+            meta={
+                "intelligence": intelligence,
+            },
             memory_used=memory_used_ids,
         )
 
@@ -483,6 +466,54 @@ Code:
             decision=decision,
         ) 
 
+    def _resolve_answer_length_preference(self, user_text: str, memory_items: list) -> str:
+        """
+        Returns: "short" | "long" | "normal"
+        Priority:
+        1. current user message
+        2. latest preference memory
+        3. default
+        """
+
+        user_text_lc = str(user_text or "").lower().strip()
+
+        # 🔥 1. HARD USER OVERRIDE (strongest)
+        if any(p in user_text_lc for p in [
+            "don't give short",
+            "dont give short",
+            "no short answers",
+            "long answers",
+            "full answers",
+            "more detail",
+            "explain more",
+        ]):
+            return "long"
+
+        if any(p in user_text_lc for p in [
+            "short answers",
+            "keep it short",
+            "be concise",
+            "quick answer",
+            "one sentence",
+        ]):
+            return "short"
+
+        # 🔥 2. MEMORY (most recent wins)
+        for m in reversed(memory_items or []):
+            if not isinstance(m, dict):
+                continue
+
+            text = str(m.get("text") or "").lower()
+
+            if "long answers" in text or "full answers" in text:
+                return "long"
+
+            if "short answers" in text:
+                return "short"
+
+        # 🔥 3. DEFAULT
+        return "normal"
+
     def _apply_pending_fix(self, session_id: str) -> dict:
         session = self._get_session_payload(session_id)
 
@@ -554,6 +585,124 @@ Code:
                 assistant_msg=assistant_msg,
                 decision=decision,
             )
+
+    def _fuse_response_intelligence(
+        self,
+        user_text: str = "",
+        decision=None,
+        memory_items=None,
+    ) -> dict:
+        decision = decision if isinstance(decision, dict) else {}
+        memory_items = memory_items or []
+
+        user_text_lc = str(user_text or "").lower().strip()
+        intent = str(decision.get("intent") or decision.get("mode") or "").lower().strip()
+        route = str(decision.get("route") or "").lower().strip()
+
+        answer_length = self._resolve_answer_length_preference(
+            user_text=user_text,
+            memory_items=memory_items,
+        )
+
+        needs_explanation = any(
+            phrase in user_text_lc
+            for phrase in [
+                "why",
+                "how",
+                "explain",
+                "what is",
+                "what are",
+                "who is",
+                "where is",
+                "when",
+                "tell me about",
+                "difference between",
+                "pros and cons",
+                "random fact",
+                "general knowledge",
+            ]
+        )
+
+        is_simple_command = len(user_text_lc.split()) <= 4
+
+        if intent == "debugging" or "debug" in route:
+            answer_length = "normal"
+            shape_response = False
+        elif needs_explanation and answer_length != "short":
+            answer_length = "long"
+            shape_response = True
+        else:
+            shape_response = True
+
+        return {
+            "answer_length": answer_length,
+            "needs_explanation": needs_explanation,
+            "is_simple_command": is_simple_command,
+            "shape_response": shape_response,
+            "intent": intent,
+            "route": route,
+        }
+
+    def _self_check_response(
+        self,
+        user_text: str = "",
+        assistant_text: str = "",
+        intelligence=None,
+    ) -> dict:
+
+        intelligence = intelligence if isinstance(intelligence, dict) else {}
+
+        user_text_lc = str(user_text or "").lower().strip()
+        assistant_text = str(assistant_text or "").strip()
+        assistant_lc = assistant_text.lower()
+
+        answer_length = str(intelligence.get("answer_length") or "normal").lower()
+        needs_explanation = bool(intelligence.get("needs_explanation"))
+
+        word_count = len(assistant_text.split())
+        issues = []
+        should_revise = False
+
+        if not assistant_text:
+            issues.append("empty_response")
+            should_revise = True
+
+        if needs_explanation and word_count < 35:
+            issues.append("too_short_for_explanation")
+            should_revise = True
+
+        if "what is" in user_text_lc and word_count < 25:
+            issues.append("weak_definition")
+            should_revise = True
+
+        if answer_length == "short" and word_count > 80:
+            issues.append("too_long_for_short_mode")
+            should_revise = True
+
+        if needs_explanation and word_count < 120 and not any(
+            marker in assistant_lc
+            for marker in ["example", "for example", "in simple", "basically"]
+        ):
+            issues.append("missing_simple_example")
+            should_revise = True
+
+        if any(
+            word in user_text_lc
+            for word in ["drug", "ibogaine", "opioid", "withdrawal", "medicine", "treatment"]
+        ):
+            if not any(
+                word in assistant_lc
+                for word in ["risk", "doctor", "medical", "danger", "supervision"]
+            ):
+                issues.append("missing_safety_context")
+                should_revise = True
+
+        return {
+            "ok": not should_revise,
+            "should_revise": should_revise,
+            "issues": issues,
+            "word_count": word_count,
+        }
 
     def _execute_web_fetch(
         self,
@@ -4639,6 +4788,8 @@ Write the exact goal in one sentence.
         memory_context: str = "",
     ) -> str:
 
+        import time
+
         user_text = self._safe_str(user_text)
         decision = decision if isinstance(decision, dict) else {}
 
@@ -4653,9 +4804,77 @@ Write the exact goal in one sentence.
             )
 
             if not memory_items:
-                memory_items = self._get_memory_list()[-5:]
+                memory_items = self._get_memory_list()[-10:]
 
-            memory_block = self._format_memory_context(memory_items[:5])
+            # 🔥 STRUCTURED + DECAY + IMPORTANCE
+            rules = []
+            identity = []
+            preferences = []
+            context = []
+
+            now = int(time.time())
+
+            for m in memory_items:
+                text = self._safe_str(m.get("text"))
+                if not text:
+                    continue
+
+                lower = text.lower()
+
+                # 🔥 importance
+                importance = int(m.get("importance") or 1)
+
+                # 🔥 decay
+                created = m.get("created_at") or m.get("createdAt") or ""
+                age_penalty = 0
+
+                try:
+                    if created:
+                        created_ts = int(
+                            __import__("datetime")
+                            .datetime.fromisoformat(created.replace("Z", ""))
+                            .timestamp()
+                        )
+                        age_days = (now - created_ts) / 86400
+
+                        if age_days > 7:
+                            age_penalty = 1
+                        if age_days > 30:
+                            age_penalty = 2
+                except Exception:
+                    pass
+
+                score = importance - age_penalty
+
+                # 🔥 drop weak memory
+                if score <= 0:
+                    continue
+
+                # 🔥 categorize
+                if "from now on" in lower or "always" in lower or "never" in lower:
+                    rules.append(text)
+                elif lower.startswith("my "):
+                    identity.append(text)
+                elif "i prefer" in lower or "i like" in lower:
+                    preferences.append(text)
+                else:
+                    context.append(text)
+
+            memory_sections = []
+
+            if rules:
+                memory_sections.append("USER RULES:\n- " + "\n- ".join(rules))
+
+            if identity:
+                memory_sections.append("USER IDENTITY:\n- " + "\n- ".join(identity))
+
+            if preferences:
+                memory_sections.append("USER PREFERENCES:\n- " + "\n- ".join(preferences))
+
+            if context:
+                memory_sections.append("USER CONTEXT:\n- " + "\n- ".join(context))
+
+            memory_block = "\n\n".join(memory_sections)
 
         session = self._get_session_payload(session_id)
         messages = session.get("messages", []) if isinstance(session, dict) else []
@@ -4677,24 +4896,26 @@ Write the exact goal in one sentence.
 
         sections = []
 
-        # 🔥 MEMORY DOMINANCE
         if memory_block:
             sections.append(
-                "CRITICAL USER MEMORY (HIGHEST PRIORITY — DO NOT IGNORE):\n"
-                "These are persistent facts, goals, and project details about the user.\n"
-                "You MUST use them when relevant.\n"
-                "Do NOT ask for information already provided here.\n"
-                "Do NOT give generic answers that ignore this.\n\n"
+                "CRITICAL USER MEMORY (ABSOLUTE PRIORITY):\n"
+                "These are persistent truths about the user.\n"
+                "You MUST obey these.\n"
+                "You MUST NOT contradict them.\n"
+                "You MUST adapt your response style to match them.\n"
+                "If a rule exists, it overrides all other instructions.\n"
+                "If a preference exists, follow it unless explicitly told otherwise.\n"
+                "If identity exists, assume it is always true.\n\n"
                 f"{memory_block}"
             )
 
             sections.append(
-                "PROJECT-AWARE RULES:\n"
-                "- The user is actively building Nova (AI system).\n"
-                "- Continue from the current project state.\n"
-                "- Do NOT reset or suggest beginner steps.\n"
-                "- Give the next concrete implementation step.\n"
-                "- Stay aligned with ongoing development.\n"
+                "MEMORY APPLICATION RULES:\n"
+                "- Apply USER RULES before answering.\n"
+                "- Apply USER PREFERENCES to tone and format.\n"
+                "- Use USER CONTEXT to avoid generic responses.\n"
+                "- Do NOT ignore memory even if the question is simple.\n"
+                "- Do NOT restate memory unless relevant.\n"
             )
 
         if working_context_block:
@@ -4705,63 +4926,31 @@ Write the exact goal in one sentence.
 
         if recent_block:
             sections.append(
-                "RECENT CONVERSATION (USE FOR FOLLOW-UPS):\n"
+                "RECENT CONVERSATION:\n"
                 f"{recent_block}"
             )
 
         if not sections:
             return user_text
 
+        # 🔥 FORCE CLAMP OUTPUT
+        if "short answers" in memory_block.lower():
+            return (
+                "\n\n".join(sections)
+                + "\n\nOUTPUT CONSTRAINT:\nRespond in ONE sentence only.\n\nUser message:\n"
+                + user_text
+            )
+
         return (
             "\n\n".join(sections)
-
-            # 🔥 PERSONALITY
-            + "\n\nNOVA PERSONALITY:\n"
-            + "- You are Nova: a sharp, loyal, slightly playful AI builder partner.\n"
-            + "- You speak like you're working alongside the user.\n"
-            + "- Be confident, fast-thinking, and a little witty.\n"
-            + "- Use light, dry humor occasionally (not forced).\n"
-            + "- Keep answers useful first, personality second.\n"
-            + "- Avoid robotic phrasing and boring checklist tone.\n"
-            + "- Avoid repeating the same structure every time.\n"
-            + "- React naturally to progress.\n"
-            + "- Call out bad ideas directly but respectfully.\n"
-            + "- Keep a 'we're building this together' energy.\n"
-            + "- Slight attitude is okay, but never toxic.\n\n"
-
-            # 🔥 CODING MODE
-            + "CODING MODE:\n"
-            + "- When writing code, return complete working code.\n"
-            + "- Do not give partial snippets.\n"
-            + "- Prefer working solutions over explanations.\n"
-            + "- Keep code clean and minimal.\n"
-            + "- Assume the user wants the final result.\n\n"
-
-            # 🔥 WRITING MODE
-            + "WRITING MODE:\n"
-            + "- Write naturally like a human.\n"
-            + "- Avoid AI-sounding phrasing.\n"
-            + "- Vary sentence structure.\n"
-            + "- Keep it engaging and clear.\n"
-            + "- Match tone to context.\n"
-            + "- Avoid repetition and filler.\n\n"
-
-            # 🔥 ANSWER STYLE
-            + "ANSWER STYLE RULES:\n"
-            + "- Use memory and project context before answering.\n"
-            + "- Do NOT sound generic or repetitive.\n"
-            + "- Give ONE strong next move when asked what to do next.\n"
-            + "- Avoid long option lists.\n"
-            + "- Avoid 'if you want' phrasing.\n"
-            + "- Mention Nova and current phase when relevant.\n"
-
-            # 🔥 GUARD
-            + "- ANTI-GENERIC GUARD: Never say you don't know the project if memory contains it.\n"
-            + "- ANTI-GENERIC GUARD: Never ask for known project details.\n"
-            + "- ANTI-GENERIC GUARD: Infer from memory when possible.\n"
-            + "- ANTI-GENERIC GUARD: Replace vague suggestions with one concrete action.\n\n"
-
-            + "User message:\n"
+            + "\n\nSTRICT RESPONSE MODE:\n"
+            + "- ALWAYS obey USER RULES first.\n"
+            + "- If user says 'short answers', respond in 1–2 sentences MAX.\n"
+            + "- NEVER output lists unless explicitly asked.\n"
+            + "- NEVER give multiple steps.\n"
+            + "- Return ONLY the most important next action.\n"
+            + "- Cut all explanations.\n"
+            + "\n\nUser message:\n"
             + user_text
         )
 

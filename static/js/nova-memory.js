@@ -1,6 +1,9 @@
 (function () {
   "use strict";
 
+  console.warn("[NovaMemory] disabled because composer bundle owns memory UI");
+  return;
+
   const state = {
     items: [],
     filtered: [],
@@ -323,17 +326,25 @@ async function addMemory() {
       payload.saved_item ||
       null;
 
-    if (savedItem && savedItem.id) {
-      state.items = (state.items || []).map(function (item) {
-        return item.id === tempItem.id ? savedItem : item;
-      });
-      buildKindOptions();
-      applyFilters();
-    } else {
-      await loadMemory();
-    }
+if (savedItem && savedItem.id) {
+  // replace temp item cleanly
+  state.items = [savedItem].concat(
+    (state.items || []).filter(function (item) {
+      return item.id !== tempItem.id;
+    })
+  );
 
+  state.selectedId = savedItem.id;
+
+  buildKindOptions();
+  applyFilters();
+  renderList(); // 🔥 force immediate UI update
+
+} else {
+  await loadMemory();
+}
     setStatus("Memory saved", "ok");
+    renderList();
   } catch (err) {
     console.error("[NovaMemory] add failed:", err);
 

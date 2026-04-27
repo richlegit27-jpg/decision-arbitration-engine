@@ -1,58 +1,14 @@
 {
   "memory": [
     {
-      "text": "I prefer short direct answers with SMFF for code.",
-      "kind": "preference",
-      "source": "auto",
-      "session_id": "session_a2f1fb582f0545a488a5f8f0e922d30b",
-      "weight": 5.0,
-      "id": "memory_a73c272d14344203a52420a569bee47a",
-      "updated_at": "2026-04-25T23:42:40.047748+00:00",
-      "created_at": "2026-04-25T23:42:40.047748+00:00",
-      "count": 1
-    },
-    {
-      "text": "going to the gym later",
-      "kind": "preference",
-      "source": "manual",
-      "session_id": "",
-      "weight": 5.0,
-      "id": "memory_51a63096d7ae47e2802384821b299352",
-      "updated_at": "2026-04-26T00:43:11.760853+00:00",
-      "created_at": "2026-04-26T00:43:11.760853+00:00",
-      "count": 1
-    },
-    {
       "text": "my name is richard",
       "kind": "profile",
       "source": "auto",
-      "session_id": "session_e48549e57ef54dacbf3753199636ce76",
+      "session_id": "session_5d835d7fec804721bc2e055e9df8b5e7",
       "weight": 5.0,
-      "id": "memory_6b9154ee602a4bcc83f7bbae8b81b2be",
-      "updated_at": "2026-04-26T00:43:40.224100+00:00",
-      "created_at": "2026-04-26T00:43:40.224100+00:00",
-      "count": 1
-    },
-    {
-      "text": "i'm working on kicking chatgppt in the butt and i want you to tell him can  you remember",
-      "kind": "project",
-      "source": "auto",
-      "session_id": "session_e48549e57ef54dacbf3753199636ce76",
-      "weight": 6.0,
-      "id": "memory_da24499c4b724f7c9980cf4c843125c6",
-      "updated_at": "2026-04-26T01:00:10.223955+00:00",
-      "created_at": "2026-04-26T01:00:10.223955+00:00",
-      "count": 1
-    },
-    {
-      "text": "did you forget that i'm working on building my own ai project i told you earlier",
-      "kind": "project",
-      "source": "auto",
-      "session_id": "session_e48549e57ef54dacbf3753199636ce76",
-      "weight": 6.0,
-      "id": "memory_4b25e35474c84d1d87304817617fcc10",
-      "updated_at": "2026-04-26T01:05:16.349187+00:00",
-      "created_at": "2026-04-26T01:05:16.349187+00:00",
+      "id": "memory_9dc1e530701f445b8f737a498571385c",
+      "updated_at": "2026-04-26T22:52:10.511734+00:00",
+      "created_at": "2026-04-26T22:52:10.511734+00:00",
       "count": 1
     }
   ]
