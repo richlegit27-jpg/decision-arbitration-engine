@@ -234,7 +234,17 @@ function resolveUploadUrl(url) {
 
     const urls = Array.isArray(meta.source_urls) ? meta.source_urls : [];
 
-    let html = `<div class="nova-msg-text">${escapeHtml(mainText)}</div>`;
+const mission = (meta && (meta.strategy || meta.mission)) || "";
+let badge = "";
+
+if (mission) {
+  badge = `<div class="mission-badge">${escapeHtml(mission)}</div>`;
+}
+
+let html = `
+  ${badge}
+  <div class="nova-msg-text">${escapeHtml(mainText)}</div>
+`;
     html += `<div class="nova-sources">`;
 
     lines.forEach((line, index) => {
@@ -1969,19 +1979,214 @@ function wireWorkingContextPanel() {
   });
 }
 
+function renderChatPolishBadges(message) {
+  if (!message || String(message.role || "") !== "assistant") {
+    return "";
+  }
+
+  const meta =
+    message.meta && typeof message.meta === "object"
+      ? message.meta
+      : {};
+
+  const mission =
+    meta.mission && typeof meta.mission === "object"
+      ? meta.mission
+      : {};
+
+  const strategy = String(meta.strategy || "").trim();
+  const missionLabel = String(
+    mission.title ||
+    mission.name ||
+    mission.goal ||
+    ""
+  ).trim();
+
+  const usedMemoryCount = Number(meta.used_memory_count || 0);
+  const executionMode = Boolean(meta.execution_mode);
+  const activeTask = String(meta.active_task || "").trim();
+  const nextStep = String(meta.next_step || "").trim();
+
+  const badges = [];
+
+  if (strategy && strategy !== "direct") {
+    badges.push({
+      className: "nova-chat-polish-badge--strategy",
+      label: "",
+      value: strategy.toUpperCase(),
+    });
+  }
+
+  if (executionMode) {
+    badges.push({
+      className: "nova-chat-polish-badge--execution",
+      label: "",
+      value: "EXECUTION",
+    });
+  }
+
+  if (missionLabel) {
+    badges.push({
+      className: "nova-chat-polish-badge--mission",
+      label: "Mission",
+      value: missionLabel,
+    });
+  }
+
+  if (activeTask) {
+    badges.push({
+      className: "nova-chat-polish-badge--task",
+      label: "Task",
+      value: activeTask.length > 48 ? activeTask.slice(0, 48) + "..." : activeTask,
+    });
+  }
+
+  if (nextStep) {
+    badges.push({
+      className: "nova-chat-polish-badge--next",
+      label: "Next",
+      value: nextStep.length > 48 ? nextStep.slice(0, 48) + "..." : nextStep,
+    });
+  }
+
+  if (usedMemoryCount > 0) {
+    badges.push({
+      className: "nova-chat-polish-badge--memory",
+      label: "Memory",
+      value: String(usedMemoryCount),
+    });
+  }
+
+  if (!badges.length) {
+    return "";
+  }
+
+  const priority = [
+    "nova-chat-polish-badge--execution",
+    "nova-chat-polish-badge--strategy",
+    "nova-chat-polish-badge--mission",
+    "nova-chat-polish-badge--task",
+    "nova-chat-polish-badge--next",
+    "nova-chat-polish-badge--memory",
+  ];
+
+  badges.sort(function (a, b) {
+    return priority.indexOf(a.className) - priority.indexOf(b.className);
+  });
+
+  const visibleBadges = badges.slice(0, 3);
+
+  return (
+    '<div class="nova-chat-polish-badges">' +
+      visibleBadges
+        .map(function (badge) {
+          const label = String(badge.label || "").trim();
+          const value = String(badge.value || "").trim();
+
+          if (!value) {
+            return "";
+          }
+
+          return (
+            '<span class="nova-chat-polish-badge ' +
+              escapeHtml(badge.className) +
+            '">' +
+              (label
+                ? '<strong>' + escapeHtml(label) + ':</strong> '
+                : "") +
+              escapeHtml(value) +
+            "</span>"
+          );
+        })
+        .join("") +
+    "</div>"
+  );
+}
+
+function renderMarkdown(text) {
+  if (!text) return "";
+
+  let html = String(text);
+
+  // === CODE BLOCKS (```...```) ===
+  html = html.replace(/```([\s\S]*?)```/g, function (_, code) {
+    return (
+      '<pre class="code-block"><code>' +
+      escapeHtml(code.trim()) +
+      "</code></pre>"
+    );
+  });
+
+  // === INLINE CODE (`...`) ===
+  html = html.replace(/`([^`]+)`/g, function (_, code) {
+    return '<code class="inline-code">' + escapeHtml(code) + "</code>";
+  });
+
+  // === HEADERS ===
+  html = html.replace(/^### (.*$)/gim, "<h3>$1</h3>");
+  html = html.replace(/^## (.*$)/gim, "<h2>$1</h2>");
+  html = html.replace(/^# (.*$)/gim, "<h1>$1</h1>");
+
+  // === BOLD ===
+  html = html.replace(/\*\*(.*?)\*\*/gim, "<strong>$1</strong>");
+
+  // === LISTS ===
+  html = html.replace(/(?:^\- .*(?:\n|$))+?/gim, function (match) {
+    const items = match
+      .trim()
+      .split("\n")
+      .map(line => "<li>" + line.replace(/^\- /, "") + "</li>")
+      .join("");
+    return "<ul>" + items + "</ul>";
+  });
+
+  // === PARAGRAPHS ===
+  html = html
+    .split(/\n{2,}/)
+    .map(block => {
+      block = block.trim();
+
+      if (
+        block.startsWith("<h") ||
+        block.startsWith("<ul") ||
+        block.startsWith("<pre")
+      ) {
+        return block;
+      }
+
+      return "<p>" + block + "</p>";
+    })
+    .join("");
+
+  // === LINE BREAKS ===
+  html = html.replace(/\n/g, "<br>");
+
+  return html;
+}
 function renderMessageCard(message) {
   if (!message) return "";
 
   const role = String(message.role || "assistant");
-  const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
+
+  const roleClass =
+    role === "user"
+      ? "message-card--user"
+      : "message-card--assistant";
+
   const rawText = String(message.text || "").trim();
 
-  const renderedText = role === "assistant"
-    ? renderSources(rawText, message.meta || {})
+  // ✅ FIXED ORDER: markdown FIRST, then sources
+const renderedText =
+  role === "assistant"
+    ? (
+        rawText.includes("— Top sources —")
+          ? renderSources(rawText, message.meta || {})
+          : renderMarkdown(rawText)
+      )
     : escapeHtml(rawText);
 
   const bodyHtml = rawText
-    ? '<div class="message-text-inline" style="display:block !important; white-space:pre-wrap!important; color:#ffffff !important; background:rgba(255,255,255,0.04) !important; padding:10px 12px !important; border-radius:10px !important; margin:8px 0 10px 0 !important; line-height:1.45 !important;">' +
+    ? '<div class="message-text-inline" style="display:block !important; white-space:pre-wrap!important; color:#ffffff !important; background:rgba(255,255,255,0.04) !important; padding:10px 12px !important; border-radius:10px !important; margin:4px 0 6px 0 !important; line-height:1.6 !important;">' +
         renderedText +
       "</div>"
     : "";
@@ -1992,9 +2197,13 @@ function renderMessageCard(message) {
     const meta =
       message.meta && Object.keys(message.meta).length > 0
         ? message.meta
-        : (message.assistant_message && message.assistant_message.meta) || {};
+        : (message.assistant_message &&
+           message.assistant_message.meta) || {};
 
-    const used = Array.isArray(meta.used_memory) ? meta.used_memory : [];
+    const used = Array.isArray(meta.used_memory)
+      ? meta.used_memory
+      : [];
+
     const count = meta.used_memory_count || used.length;
     const confidence = meta.memory_confidence;
 
@@ -2002,30 +2211,38 @@ function renderMessageCard(message) {
       let label = "Memory used: " + escapeHtml(count);
 
       if (typeof confidence === "number") {
-        label += " • Confidence: " + Math.round(confidence * 100) + "%";
+        label +=
+          " • Confidence: " +
+          Math.round(confidence * 100) +
+          "%";
       }
 
-memoryBadgeHtml =
-  '<button class="memory-used-badge" type="button" ' +
-  'data-no-chat-action="1" ' +
-  'data-memory-used="' + encodeURIComponent(JSON.stringify(used)) + '">' +
-  label +
-  "</button>";
+      memoryBadgeHtml =
+        '<button class="memory-used-badge" type="button" ' +
+        'data-no-chat-action="1" ' +
+        'data-memory-used="' +
+        encodeURIComponent(JSON.stringify(used)) +
+        '">' +
+        label +
+        "</button>";
     }
   } catch (e) {
     console.warn("memory badge failed", e);
   }
 
+  const polishBadgesHtml = renderChatPolishBadges(message);
+
   return (
     '<article class="message-card ' +
-    roleClass +
-    '" data-message-id="' +
-    escapeHtml(message.id) +
-    '">' +
-    bodyHtml +
-    memoryBadgeHtml +
-    renderSourceList(message) +
-    renderMessageActions(message) +
+      roleClass +
+      '" data-message-id="' +
+      escapeHtml(message.id) +
+      '">' +
+      polishBadgesHtml +
+      bodyHtml +
+      memoryBadgeHtml +
+      renderSourceList(message) +
+      renderMessageActions(message) +
     "</article>"
   );
 }
@@ -5663,9 +5880,9 @@ async function consumeChatStreamStable(payload) {
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
+
     let buffer = "";
     let sawDoneMarker = false;
-    let sawAnyEvent = false;
 
     while (true) {
       const result = await reader.read();
@@ -5694,7 +5911,6 @@ async function consumeChatStreamStable(payload) {
 
         try {
           const evt = JSON.parse(jsonStr);
-          sawAnyEvent = true;
           handleStreamEvent(evt);
         } catch (error) {
           console.error("stream event parse failed", jsonStr, error);
@@ -5707,12 +5923,13 @@ async function consumeChatStreamStable(payload) {
     }
 
     const trailing = String(buffer || "").trim();
+
     if (trailing.startsWith("data:")) {
       const trailingJson = trailing.replace(/^data:\s*/, "").trim();
+
       if (trailingJson && trailingJson !== "[DONE]") {
         try {
           const evt = JSON.parse(trailingJson);
-          sawAnyEvent = true;
           handleStreamEvent(evt);
         } catch (error) {
           console.error("trailing stream event parse failed", trailingJson, error);
@@ -5722,47 +5939,60 @@ async function consumeChatStreamStable(payload) {
       }
     }
 
-flushTokensNow();
+    flushTokensNow();
 
-console.warn("[NovaComposerBundle] final /api/state refresh disabled to prevent chat wipe");
+    console.warn("[NovaComposerBundle] final /api/state refresh disabled to prevent chat wipe");
 
-if (state.stream && state.stream.targetMessageId) {
-  finalizeStreamMessage({
-    message_id: state.stream.targetMessageId,
-    text: (
-      findMessageById(state.stream.targetMessageId) &&
-      findMessageById(state.stream.targetMessageId).text
-    ) || "",
-    artifacts: Array.isArray(state.artifacts) ? state.artifacts : [],
-    memory: Array.isArray(state.memory) ? state.memory : [],
-    sessions: Array.isArray(state.sessions) ? state.sessions : [],
-    session_id: state.activeSessionId || "",
-  });
-}
+    if (state.stream && state.stream.targetMessageId) {
+      const targetMessage = findMessageById(state.stream.targetMessageId);
 
-clearTokenRenderState();
-finishStreamUi({ statusState: "idle", statusText: "Ready" });
-renderChat();
-renderSessionList();
-renderArtifacts();
-renderMemory();
-if (typeof renderWeb === "function") {
-  renderWeb();
-}
-updateTopbarFromState();
-scrollChatToBottom(true);
+      finalizeStreamMessage({
+        message_id: state.stream.targetMessageId,
+        text: (targetMessage && targetMessage.text) || "",
+        artifacts: Array.isArray(state.artifacts) ? state.artifacts : [],
+        memory: Array.isArray(state.memory) ? state.memory : [],
+        sessions: Array.isArray(state.sessions) ? state.sessions : [],
+        session_id: state.activeSessionId || "",
+      });
+    }
 
+    clearTokenRenderState();
+
+    finishStreamUi({
+      statusState: "idle",
+      statusText: "Ready",
+    });
+
+    renderChat();
+    renderSessionList();
+    renderArtifacts();
+    renderMemory();
+
+    if (typeof renderWeb === "function") {
+      renderWeb();
+    }
+
+    updateTopbarFromState();
+    scrollChatToBottom(true);
   } catch (error) {
     flushTokensNow();
     clearTokenRenderState();
 
     if (error && error.name === "AbortError") {
-      finishStreamUi({ statusState: "idle", statusText: "Stopped" });
+      finishStreamUi({
+        statusState: "idle",
+        statusText: "Stopped",
+      });
+
       updateTopbarFromState();
       return;
     }
 
-    finishStreamUi({ statusState: "error", statusText: "Error" });
+    finishStreamUi({
+      statusState: "error",
+      statusText: "Error",
+    });
+
     updateTopbarFromState();
     throw error;
   } finally {

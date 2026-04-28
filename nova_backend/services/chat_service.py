@@ -250,11 +250,23 @@ class ChatService:
         state = session.get("working_state") if isinstance(session, dict) else {}
         state = state or {}
 
+        mission_mode = self._safe_str(state.get("mission_mode"))
+
         active_task = self._safe_str(state.get("active_task"))
         next_step = self._safe_str(state.get("next_step"))
 
-        if is_continue and active_task:
-            user_text = f"Continue task: {active_task}. Next step: {next_step}"
+        if is_continue:
+            mission = decision.get("mission") if isinstance(decision, dict) else {}
+            mission = mission if isinstance(mission, dict) else {}
+
+            if active_task:
+                user_text = f"Continue task: {active_task}. Next step: {next_step}"
+            else:
+                user_text = (
+                    "Continue current Nova build phase. "
+                    f"Mission mode: {mission.get('mode') or 'continue'}. "
+                    f"Next move: {mission.get('next_move') or 'Choose the next concrete implementation step.'}"
+                )
 
         user_msg = self._build_user_message(
             original_user_text,
@@ -285,6 +297,52 @@ class ChatService:
                     "- Always move the task forward."
                 )
             })
+
+        mission = decision.get("mission") if isinstance(decision, dict) else {}
+        mission_mode = str(mission.get("mode") or "").lower()
+
+        if is_continue and mission_mode == "debugging":
+            assistant_text = (
+                "Next move:\n\n"
+                "Paste the exact compile error so we can fix it."
+            )
+
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                attachments=[],
+                meta={"forced": "continue_debug"},
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=original_user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+                saved_artifact=None,
+            ) 
+        if mission_mode == "full_file":
+            assistant_text = (
+                "SMFF mode active.\n\n"
+                "Send the file name, function, or task.\n"
+                "I will return full file or full replacement.\n"
+                "No partial snippets."
+            )
+
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                attachments=[],
+                meta={"forced": "smff"},
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=original_user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+                saved_artifact=None,
+            )
 
         try:
             response = self.client.responses.create(
@@ -359,53 +417,24 @@ class ChatService:
         ]
 
         meta_payload = {
+            # === CHAT POLISH: STRATEGY / MISSION FEED ===
+            "mission": decision.get("mission", {}) if isinstance(decision, dict) else {},
+            "strategy": decision.get("strategy", "") if isinstance(decision, dict) else "",
+
+            # === MEMORY ===
             "used_memory": used_memory_full,
             "used_memory_count": len(used_memory_full),
             "memory_confidence": 1.0,
+
+            # === EXECUTION STATE ===
             "execution_mode": bool(is_execution or active_task),
-            "active_task": active_task or original_user_text if is_execution else active_task,
+            "active_task": (
+                active_task or original_user_text
+                if is_execution
+                else active_task
+            ),
             "next_step": next_step_out,
         }
-
-        # === HARD FINAL DEBUG RESPONSE OVERRIDE ===
-        try:
-            intelligence = self._fuse_response_intelligence(
-                user_text=user_text,
-                assistant_text=assistant_text,
-                decision=decision,
-            )
-
-            self_check = self._self_check_response(
-                user_text=user_text,
-                assistant_text=assistant_text,
-                intelligence=intelligence,
-            )
-
-            print("HARD_FINAL_INTELLIGENCE:", intelligence)
-            print("HARD_FINAL_SELF_CHECK:", self_check)
-
-            if (
-                isinstance(intelligence, dict)
-                and intelligence.get("intent") == "debugging"
-                and (
-                    "paste the bug context" in assistant_text.lower()
-                    or "paste" in assistant_text.lower()
-                    or "send one of these" in assistant_text.lower()
-                    or "what’s the symptom" in assistant_text.lower()
-                    or "what's the symptom" in assistant_text.lower()
-                )
-            ):
-                assistant_text = (
-                    "Run compile first:\n\n"
-                    "```powershell\n"
-                    "python -m py_compile C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py\n"
-                    "```\n\n"
-                    "Then paste the exact error."
-                )
-                hard_override_applied = True
-
-        except Exception as e:
-            print("HARD_FINAL_DEBUG_OVERRIDE_ERROR:", e)
 
         # === BUILD FINAL MESSAGE ===
         if assistant_text:
@@ -790,7 +819,21 @@ class ChatService:
     ) -> dict:
 
         decision = decision if isinstance(decision, dict) else {}
+        mission = decision.get("mission") if isinstance(decision, dict) else {}
+        mission = mission if isinstance(mission, dict) else {}
+        mission_mode = str(mission.get("mode") or "").lower()
         assistant_text = self._safe_str(assistant_text)
+
+        revision_prompt = (
+            "Rewrite the assistant response before the user sees it.\n\n"
+            f"Mission mode: {mission_mode}\n"
+            f"Mission task: {mission.get('current_task') or ''}\n"
+            f"Mission next move: {mission.get('next_move') or ''}\n\n"
+            "Rules:\n"
+            "- Be direct\n"
+            "- Remove fluff\n"
+            "- Follow mission intent strictly\n"
+        )
 
         if not assistant_text:
             assistant_text = "No response generated."
@@ -973,88 +1016,74 @@ class ChatService:
             "is_learning": is_learning,
         }
 
+def _shape_response_with_strategy(
+    self,
+    user_text: str = "",
+    assistant_text: str = "",
+    intelligence=None,
+) -> str:
+    intelligence = intelligence if isinstance(intelligence, dict) else {}
 
-    def _shape_response_with_strategy(
-        self,
-        user_text: str = "",
-        assistant_text: str = "",
-        intelligence=None,
-    ) -> str:
+    text = self._safe_str(assistant_text).strip()
+    user_lc = self._safe_str(user_text).lower().strip()
 
-        intelligence = intelligence if isinstance(intelligence, dict) else {}
-        user_lc = self._safe_str(user_text).lower().strip()
-        assistant_text = self._safe_str(assistant_text).strip()
+    strategy = self._safe_str(
+        intelligence.get("strategy") or ""
+    ).lower().strip()
 
-        if not assistant_text:
-            return assistant_text
+    if not text:
+        return text
 
-        strategy = self._safe_str(intelligence.get("strategy")).lower()
+    # === HARD COMMAND LOCKS ===
 
-        if user_lc in ["smff", "snff"]:
-            return (
-                "SMFF mode active.\n\n"
-                "Next move:\n"
-                "Send the file name, function name, or current task.\n\n"
-                "I will return:\n"
-                "- the full file path\n"
-                "- the full replacement block or full file\n"
-                "- the compile/test command\n"
-                "- no vague snippets"
-            )
-        if user_lc in ["next", "continue", "go", "keep going", "next step"]:
-            return (
-                "Next move:\n\n"
-                "Test the response strategy with one real coding prompt, not single-word prompts.\n\n"
-                "Use this:\n"
-                "`fix my bug smff`\n\n"
-                "That should trigger full-file/action mode instead of generic clarification."
-            )
+    if user_lc in ["smff", "snff", "ff"]:
+        return (
+            "SMFF mode active.\n\n"
+            "Send the file name, function, or task.\n"
+            "I will return full file or full replacement.\n"
+            "No partial snippets."
+        )
 
-        if user_lc == "indent":
-            return (
-                "Indent means clean up the spacing so the code block is properly aligned.\n\n"
-                "For Python, that usually means:\n"
-                "- class methods use 4 spaces inside the class\n"
-                "- function bodies use 8 spaces inside a class method\n"
-                "- nested blocks use another 4 spaces each\n\n"
-                "Paste the block and I’ll return it properly indented."
-            )
+    if user_lc in ["next", "continue", "go", "keep going", "next step"]:
+        if not text.lower().startswith("next"):
+            return "Next move:\n\n" + text
+        return text
 
-        if user_lc in ["what does this do", "what does this mean"]:
-            return (
-                "Paste the exact code or command above the question.\n\n"
-                "Then I’ll explain:\n"
-                "1. what it does\n"
-                "2. why it exists\n"
-                "3. what could break\n"
-                "4. whether to keep, change, or delete it"
-            )
+    # === STRATEGY LOCKS ===
 
-        if strategy == "full_file":
-            return assistant_text
+    if strategy in ["full_file", "smff"]:
+        return text
 
-        if strategy == "exact_edit":
-            if "notepad " not in assistant_text.lower() and "c:\\" not in assistant_text.lower():
-                assistant_text = "Use the exact file path and anchor before editing.\n\n" + assistant_text
-            return assistant_text
+    if strategy in ["exact_edit"]:
+        if "notepad " not in text.lower() and "c:\\" not in text.lower():
+            return "Use the exact file path and anchor before editing.\n\n" + text
+        return text
 
-        if strategy == "debug_triage":
-            return assistant_text
+    if strategy in ["debug_triage", "debugging"]:
+        if not text.lower().startswith("likely cause"):
+            return "Likely cause:\n\n" + text
+        return text
 
-        if strategy == "continue_mission":
-            if "next" not in assistant_text.lower()[:80]:
-                assistant_text = "Next move:\n\n" + assistant_text
-            return assistant_text
+    if strategy in ["continue_mission", "continue"]:
+        if not text.lower().startswith("next"):
+            return "Next move:\n\n" + text
+        return text
 
-        if strategy == "teach_clear":
-            if "core takeaway" not in assistant_text.lower():
-                assistant_text = assistant_text.rstrip() + "\n\nCore takeaway: understand the main cause, then apply the smallest correct fix."
-            return assistant_text
+    if strategy in ["teach_clear", "learning"]:
+        if "core takeaway:" not in text.lower():
+            return text.rstrip() + "\n\nCore takeaway: fix the root cause, not the symptom."
+        return text
 
-        if strategy == "direct_answer":
-            return assistant_text.strip()
+    if strategy in ["web_fetch", "fetcher"]:
+        return text.strip()
 
-        return assistant_text
+    if strategy in ["planner", "planning", "plan"]:
+        if not text.lower().startswith("plan"):
+            return "Plan:\n\n" + text
+        return text
+
+    return text.strip()
+
     def _decide_response_strategy(
         self,
         user_text: str = "",
@@ -1377,6 +1406,10 @@ class ChatService:
     ) -> dict:
         decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
+
+        mission = decision.get("mission") if isinstance(decision, dict) else {}
+        mission = mission if isinstance(mission, dict) else {}
+        mission_mode = str(mission.get("mode") or "").lower()
 
         user_msg = self._build_user_message(
             user_text,
@@ -1841,6 +1874,55 @@ class ChatService:
 
             return text or "Generate an image."
 
+    def _detect_mission_state(self, user_text: str = "", decision=None) -> dict:
+        decision = decision if isinstance(decision, dict) else {}
+        text = self._safe_str(user_text).lower().strip()
+
+        mission = {
+            "mode": "general",
+            "current_task": "",
+            "next_move": "",
+            "needs_full_file": False,
+        }
+
+        if any(x in text for x in ["fix my bug", "fix bug", "error", "traceback", "syntaxerror", "indentationerror"]):
+            mission.update({
+                "mode": "debugging",
+                "current_task": "Fix current Nova bug",
+                "next_move": "Run compile, inspect exact error, apply smallest safe fix.",
+                "needs_full_file": True,
+            })
+            return mission
+
+        if text in ["smff", "snff"] or "smff" in text:
+            mission.update({
+                "mode": "full_file",
+                "current_task": "Provide full-file or full-block replacement",
+                "next_move": "Use exact file path, anchor, replacement, and test command.",
+                "needs_full_file": True,
+            })
+            return mission
+
+        if text in ["next", "continue", "go", "keep going", "next step"]:
+            mission.update({
+                "mode": "continue",
+                "current_task": "Continue current Nova build phase",
+                "next_move": "Choose the next concrete implementation step.",
+                "needs_full_file": False,
+            })
+            return mission
+
+        if "latest" in text or "news" in text or str(decision.get("route") or "").lower() == "web":
+            mission.update({
+                "mode": "web_fetch",
+                "current_task": "Fetch and summarize current information",
+                "next_move": "Return concise summary with sources when available.",
+                "needs_full_file": False,
+            })
+            return mission
+
+        return mission
+
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         print("HANDLE IS BEING CALLED")
         attachments = attachments or []
@@ -1856,6 +1938,31 @@ class ChatService:
         except Exception as e:
             print("DECISION_ERROR:", e)
             decision = {}
+
+        mission = self._detect_mission_state(
+            user_text=user_text,
+            decision=decision,
+        )
+
+        decision["mission"] = mission
+        decision["strategy"] = mission.get("mode")
+
+        print("MISSION_STATE:", mission)
+
+        try:
+            if mission.get("mode") not in ["general", "continue"]:
+                session = self._get_session_payload(session_id)
+                state = session.get("working_state") if isinstance(session, dict) else {}
+                state = state if isinstance(state, dict) else {}
+
+                state["active_task"] = mission.get("current_task") or user_text
+                state["next_step"] = mission.get("next_move") or ""
+                state["mission_mode"] = mission.get("mode") or "general"
+
+                self.session_service.update_working_state(session_id, state)
+                print("MISSION_MEMORY_SAVED:", state)
+        except Exception as e:
+            print("MISSION_MEMORY_SAVE_ERROR:", e)
 
         route = str(decision.get("route") or "").lower()
 
