@@ -24,6 +24,8 @@ from nova_backend.services.tool_service import ToolService
 from nova_backend.services.execution_service import ExecutionService
 from nova_backend.services.intent_service import IntentService
 
+
+
 class ChatService:
     ROUTE_GENERAL_CHAT = "general_chat"
     ROUTE_IMAGE_GENERATION = "image_generation"
@@ -31,6 +33,52 @@ class ChatService:
     ROUTE_ATTACHMENT_ANALYSIS = "attachment_analysis"
     ROUTE_PLANNING = "planning"
     ROUTE_MEMORY_RECALL = "memory_recall"
+
+    def _source_quality_score(self, url: str = "", title: str = "") -> int:
+        text = f"{url} {title}".lower()
+
+        bad_domains = [
+            "instagram.com",
+            "facebook.com",
+            "tiktok.com",
+            "pinterest.com",
+            "threads.net",
+        ]
+
+        if any(domain in text for domain in bad_domains):
+            return -999
+
+        official_sources = [
+            "nba.com",
+            "pistons.com",
+        ]
+
+        top_news_sources = [
+            "usatoday.com",
+            "sportsillustrated.com",
+            "si.com",
+            "espn.com",
+            "apnews.com",
+            "reuters.com",
+        ]
+
+        decent_sources = [
+            "heavy.com",
+            "yahoo.com",
+            "cbssports.com",
+            "bleacherreport.com",
+        ]
+
+        if any(domain in text for domain in official_sources):
+            return 100
+
+        if any(domain in text for domain in top_news_sources):
+            return 80
+
+        if any(domain in text for domain in decent_sources):
+            return 55
+
+        return 10
 
     def __init__(
         self,
@@ -82,6 +130,7 @@ class ChatService:
             max_follow_links=5,
         )
 
+ 
     def _build_user_message(self, text: str, attachments=None, meta=None) -> dict:
         attachments = attachments or []
         meta = meta or {}
@@ -141,7 +190,13 @@ class ChatService:
         session["messages"] = messages
 
         try:
-            self.sessions.save(session_id, session)
+            existing = self.sessions.get_session(session_id)
+            existing_messages = existing.get("messages", []) if isinstance(existing, dict) else []
+            existing_count = len(existing_messages) if isinstance(existing_messages, list) else 0
+
+            for msg in messages[existing_count:]:
+                self.sessions.append_message(session_id, msg)
+
         except Exception as e:
             print("SESSION SAVE ERROR:", e)
 
@@ -575,6 +630,167 @@ class ChatService:
             "word_count": word_count,
         }
 
+    def _web_search(self, query: str) -> dict:
+        query = self._safe_str(query).strip()
+        if not query:
+            return {"results": []}
+
+        import requests
+        import re
+        from urllib.parse import quote_plus, urlparse
+        from xml.etree import ElementTree as ET
+
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
+
+        # -------------------------
+        # 1. DuckDuckGo HTML
+        # -------------------------
+        try:
+            url = "https://duckduckgo.com/html/?q=" + quote_plus(query)
+            res = requests.get(url, headers=headers, timeout=10)
+
+            html = res.text or ""
+            results = []
+
+            for match in re.finditer(
+                r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
+                html,
+                re.S
+            ):
+                link = match.group(1).replace("&amp;", "&")
+                title = re.sub(r"<.*?>", "", match.group(2)).strip()
+
+                snippet_match = re.search(
+                    r'class="result__snippet"[^>]*>(.*?)</',
+                    html[match.end():match.end() + 500],
+                    re.S
+                )
+
+                snippet = ""
+                if snippet_match:
+                    snippet = re.sub(r"<.*?>", "", snippet_match.group(1)).strip()
+
+                title = re.sub(r"\s+", " ", title).strip()
+                snippet = re.sub(r"\s+", " ", snippet).strip()
+
+                if not title or title.lower() in ["here", "click", "link"]:
+                    continue
+
+                if "duckduckgo.com" in link:
+                    continue
+
+                results.append({
+                    "title": title,
+                    "snippet": snippet,
+                    "content": snippet,
+                    "url": link,
+                })
+
+                if len(results) >= 5:
+                    break
+
+            if results:
+                print("SEARCH: DuckDuckGo HTML success")
+                return {"results": results}
+
+        except Exception as e:
+            print("DDG HTML FAILED:", e)
+
+        # -------------------------
+        # 2. DuckDuckGo Lite
+        # -------------------------
+        try:
+            url = "https://lite.duckduckgo.com/lite/?q=" + quote_plus(query)
+            res = requests.get(url, headers=headers, timeout=10)
+
+            html = res.text or ""
+            results = []
+
+            for match in re.finditer(
+                r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
+                html,
+                re.S
+            ):
+                link = match.group(1)
+                title = re.sub(r"<.*?>", "", match.group(2))
+                title = re.sub(r"\s+", " ", title).strip()
+
+                if not title or title.lower() in ["here", "click", "link"]:
+                    continue
+
+                if "http" not in link:
+                    continue
+
+                if "duckduckgo.com" in link:
+                    continue
+
+                results.append({
+                    "title": title,
+                    "snippet": "",
+                    "content": "",
+                    "url": link,
+                })
+
+                if len(results) >= 5:
+                    break
+
+            if results:
+                print("SEARCH: DuckDuckGo Lite success")
+                return {"results": results}
+
+        except Exception as e:
+            print("DDG LITE FAILED:", e)
+
+        # -------------------------
+        # 3. Google News RSS
+        # -------------------------
+        try:
+            url = "https://news.google.com/rss/search?q=" + quote_plus(query)
+            res = requests.get(url, headers=headers, timeout=10)
+
+            root = ET.fromstring(res.content)
+            results = []
+
+            for item in root.findall(".//item"):
+                title = item.findtext("title") or ""
+                link = item.findtext("link") or ""
+                description = item.findtext("description") or ""
+
+                description = re.sub(r"<.*?>", "", description)
+                description = re.sub(r"\s+", " ", description).strip()
+
+                real_source = ""
+                if " - " in title:
+                    parts = title.split(" - ")
+                    if len(parts) >= 2:
+                        real_source = parts[-1].strip()
+
+                domain = urlparse(link).netloc.replace("www.", "")
+                source_label = real_source or domain
+
+                results.append({
+                    "title": title.split(" - ")[0].strip(),
+                    "snippet": description,
+                    "content": description,
+                    "url": link,
+                    "source": source_label,
+                })
+
+                if len(results) >= 5:
+                    break
+
+            if results:
+                print("SEARCH: Google News RSS success")
+                return {"results": results}
+
+        except Exception as e:
+            print("GOOGLE RSS FAILED:", e)
+
+        print("SEARCH: ALL FALLBACKS FAILED")
+        return {"results": []}
+
     def _execute_web_fetch(
         self,
         user_text: str,
@@ -582,7 +798,6 @@ class ChatService:
         attachments=None,
         decision=None,
     ) -> dict:
-
         decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
 
@@ -591,90 +806,416 @@ class ChatService:
             attachments=attachments,
         )
 
+        query = self._safe_str(
+            decision.get("query")
+            or decision.get("search_query")
+            or decision.get("url")
+            or user_text
+        ).strip()
+
+        freshness_words = [
+            "latest",
+            "today",
+            "right now",
+            "current",
+            "breaking",
+            "recent",
+            "news",
+            "update",
+            "updates",
+        ]
+
+        wants_fresh = any(word in query.lower() for word in freshness_words)
+
+        if wants_fresh and "today" not in query.lower():
+            query = query + " today"
+
+        web_result = {}
+
         try:
-            web_result = self._web_search(user_text)
-        except Exception as e:
-            print("WEB SEARCH ERROR:", e)
+            if hasattr(self, "_web_search"):
+                web_result = self._web_search(query)
+
+            if not web_result or not web_result.get("results"):
+                print("WEB_FETCH_FALLBACK: using duckduckgo")
+
+                import requests
+                from bs4 import BeautifulSoup
+
+                url = f"https://duckduckgo.com/html/?q={query}"
+                res = requests.get(url, timeout=10)
+                soup = BeautifulSoup(res.text, "html.parser")
+
+                results = []
+
+                for a in soup.select("a.result__a")[:5]:
+                    title = a.get_text(strip=True)
+                    link = a.get("href")
+
+                    results.append({
+                        "title": title,
+                        "url": link,
+                        "snippet": "",
+                        "source": "duckduckgo",
+                    })
+
+                web_result = {"results": results}
+
+        except Exception as exc:
+            print("WEB_FETCH_TOTAL_FAIL:", exc)
+            web_result = {"results": []}
+
+        except Exception as exc:
+            print("WEB_FETCH_PRIMARY_FAILED:", exc)
             web_result = {}
 
-        results = web_result.get("results") if isinstance(web_result, dict) else []
+        print("WEB_FETCH_QUERY:", query)
+        print("WEB_FETCH_RESULT_TYPE:", type(web_result))
+        print("WEB_FETCH_RESULT:", web_result)
+
+        if not isinstance(web_result, dict):
+            web_result = {"body": str(web_result or ""), "results": []}
+
+        results = web_result.get("results")
         if not isinstance(results, list):
             results = []
 
-        def _format_web_summary(items: list) -> str:
-            if not items:
-                return "No useful sources found."
-
-            lines = []
-            seen = set()
-
-            for i, item in enumerate(items[:5], start=1):
-                title = self._safe_str(item.get("title"))
-                url = self._safe_str(item.get("url"))
-
-                if not title or title in seen:
-                    continue
-
-                seen.add(title)
-
-                try:
-                    domain = url.split("/")[2].replace("www.", "")
-                except Exception:
-                    domain = "source"
-
-                lines.append(f"{i}. {domain} — {title}")
-
-            if not lines:
-                return "No useful sources found."
-
-            return "— Top sources —\n" + "\n".join(lines)
-
-        assistant_text = _format_web_summary(results)
-
-        artifact = None
-        if results:
-            artifact = {
-                "type": "web_result",
-                "query": user_text,
-                "items": results,
-                "created_at": self._now_iso(),
-            }
+        body = self._safe_str(
+            web_result.get("body")
+            or web_result.get("text")
+            or web_result.get("content")
+            or ""
+        ).strip()
 
         source_urls = []
+        source_lines = []
 
-        for item in results:
+        stale_words = [
+            "march 28",
+            "march 27",
+            "march 26",
+            "march 25",
+            "2025",
+            "last season",
+            "schedule update",
+            "added on march",
+        ]
+
+        fresh_words = [
+            "today",
+            "latest",
+            "injury report",
+            "updated",
+            "update",
+            "announced",
+            "breaking",
+            "starter",
+            "starters",
+            "tonight",
+            "game vs",
+            "vs.",
+            "april 2026",
+            "2026",
+        ]
+
+        filtered_results = []
+
+        for item in results[:12]:
             if not isinstance(item, dict):
                 continue
 
-            url = (
-                self._safe_str(item.get("url"))
-                or self._safe_str(item.get("link"))
-                or self._safe_str(item.get("href"))
-                or self._safe_str(item.get("source_url"))
-                or self._safe_str(item.get("final_url"))
-            )
+            title = self._safe_str(item.get("title") or item.get("name") or "").strip()
+            url = self._safe_str(item.get("url") or item.get("href") or item.get("link") or "").strip()
+            snippet = self._safe_str(item.get("snippet") or item.get("description") or item.get("body") or "").strip()
+            source = self._safe_str(item.get("source") or item.get("domain") or "").strip()
+
+            combined = f"{title} {snippet} {source} {url}".lower()
+
+            is_stale = any(word in combined for word in stale_words)
+            looks_fresh = any(word in combined for word in fresh_words)
+
+            if wants_fresh:
+                if is_stale and not looks_fresh:
+                    continue
+
+            filtered_results.append({
+                "title": title,
+                "url": url,
+                "snippet": snippet,
+                "source": source,
+            })
+
+        # 🔥 fallback if filter removed everything
+        if not filtered_results:
+            filtered_results = results[:5]
+
+        for item in filtered_results[:5]:
+            title = item["title"]
+            url = self._resolve_google_news_url(item["url"])
+            snippet = item["snippet"]
+            source = item["source"]
+
+            if not title and not url:
+                continue
 
             if url:
                 source_urls.append(url)
 
-        print("DEBUG SOURCE URLS:", source_urls)
+            label = title
+            if source:
+                label = f"{source} — {title}" if title else source
+
+            source_lines.append(label)
+
+            if snippet and snippet not in body:
+                body += "\n\n" + snippet
+
+        if not body and source_lines:
+            body = "\n".join(source_lines)
+
+        if not body:
+            assistant_text = (
+                "No verified fresh web results were retrieved.\n\n"
+                "Try a more specific query with a team, person, date, or source."
+            )
+        else:
+            prompt = (
+                "Give a clear, confident, concise summary of the latest news using ONLY the fetched web text below.\n"
+                "Prioritize the most recent and relevant items.\n"
+                "Do not hedge with phrases like 'freshness is uncertain' unless absolutely necessary.\n"
+                "Do not invent facts. Keep it direct and readable.\n\n"
+                f"User asked:\n{user_text}\n\n"
+                f"Web results:\n{body}\n"
+            )
+
+            assistant_text = ""
+
+            try:
+                model_messages = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You summarize fresh web results. Be direct. "
+                            "Do not make up dates, scores, injuries, trades, or news."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ]
+
+                response = self.client.chat.completions.create(
+                    model=getattr(self, "model", "gpt-4o-mini"),
+                    messages=model_messages,
+                    temperature=0.2,
+                )
+
+                assistant_text = (
+                    response.choices[0].message.content
+                    if response and response.choices
+                    else ""
+                ).strip()
+
+            except Exception as exc:
+                print("WEB_FETCH_SUMMARY_FAILED:", exc)
+                assistant_text = body[:1800].strip()
+
+            if source_lines:
+                assistant_text += "\n\n— Top sources —\n"
+
+                query_lc = str(query or user_text or "").lower()
+
+                wants_injury = any(k in query_lc for k in [
+                    "injury", "injuries", "status", "available",
+                    "availability", "playing", "playing today",
+                    "is he playing", "out", "questionable"
+                ])
+
+                wants_betting = any(k in query_lc for k in [
+                    "odds", "betting", "spread", "prediction",
+                    "parlay", "prop bet", "props", "best bets", "picks"
+                ])
+
+                ranked_lines = []
+
+                for line in source_lines:
+                    text = str(line or "").lower()
+
+                    # ❌ kill garbage
+                    if any(bad in text for bad in [
+                        "instagram.com",
+                        "facebook.com",
+                        "tiktok.com",
+                    ]):
+                        continue
+
+                    score = 10
+
+                    # normalize HARD
+                    t = text.strip()
+                    tl = t.lower()
+
+                    # --- INJURY SIGNAL BOOST ---
+                    injury_keywords = [
+                        "injury", "injuries", "status", "report",
+                        "update", "out", "questionable",
+                        "available", "availability",
+                        "playing", "playing today", "is he playing",
+                        "is he out", "starting", "lineup", "starting lineup"
+                    ]
+
+                    has_injury_signal = any(k in tl for k in injury_keywords)
+
+                    if has_injury_signal and wants_injury:
+                        score += 120
+
+                    # --- MIXED / LOW VALUE PENALTY ---
+                    mixed_keywords = [
+                        "odds", "betting", "spread", "prediction",
+                        "parlay", "stream", "live stream",
+                        "how to watch", "tickets"
+                    ]
+                    has_mixed_signal = any(k in tl for k in mixed_keywords)
+
+                    if has_mixed_signal and not wants_betting:
+                        score -= 80
+
+                    if has_mixed_signal and wants_injury:
+                        score -= 120
+
+                    pure_betting_sites = [
+                        "sportsbook wire", "covers.com", "covers —",
+                        "odds shark", "action network", "draftkings",
+                        "fanduel", "betmgm"
+                    ]
+
+                    if any(site in tl for site in pure_betting_sites) and wants_injury:
+                        score -= 70
+
+                    real_news_sources = [
+                        "detroit free press", "freep.com",
+                        "usa today", "yahoo sports",
+                        "sports illustrated", "si.com",
+                        "espn", "nba.com"
+                    ]
+
+                    if any(site in tl for site in real_news_sources):
+                        score += 35
+
+                    # --- CLEAN INJURY BONUS ---
+                    if has_injury_signal and wants_injury and not has_mixed_signal:
+                        score += 60
+
+                    # 🔥 SOURCE BOOST (DO NOT RESET SCORE)
+                    if "nba —" in t or t.startswith("nba") or " nba " in t:
+                        score += 120
+
+                    elif "usa today" in tl:
+                        score += 100
+
+                    elif "sports illustrated" in tl or "si.com" in tl:
+                        score += 95
+
+                    elif "espn" in tl:
+                        score += 85
+
+                    elif "heavy.com" in tl or "heavy —" in t:
+                        score += 60
+
+                    elif "yahoo" in tl:
+                        score += 50
+
+                    # --- DIRECT AVAILABILITY / INJURY ARTICLE OVERRIDE ---
+                    if wants_injury and any(k in tl for k in [
+                        "playing today",
+                        "is cade cunningham playing",
+                        "injury",
+                        "injuries",
+                        "status",
+                        "availability"
+                    ]):
+                        score += 700
+
+                    # --- HARD BETTING FARM DROP WHEN INJURY IS REQUESTED ---
+                    if wants_injury and any(k in tl for k in [
+                        "sportsbook wire",
+                        "covers.com",
+                        "best bets",
+                        "picks & best bets",
+                        "prop bets"
+                    ]):
+                        score -= 200
+
+                    # --- FINAL HARD OVERRIDE (WINNER TAKE TOP) ---
+                    if wants_injury and "free press" in tl and any(k in tl for k in [
+                        "playing", "injury", "injuries", "status"
+                    ]):
+                        score = 9999
+
+                    if (
+                        wants_injury
+                        and "detroit free press" in tl
+                        and any(k in tl for k in ["playing", "injury", "injuries", "status"])
+                    ):
+                        score = 9999
+
+                    print("RANK_DEBUG:", score, line)
+                    ranked_lines.append((score, line))
+
+                ranked_lines.sort(key=lambda x: x[0], reverse=True)
+
+                # --- LOCK OUTPUT ORDER: INJURY WINNER FIRST ---
+                if wants_injury:
+                    injury_winners = []
+                    others = []
+
+                    for item in ranked_lines:
+                        _, line = item
+                        line_lc = str(line or "").lower()
+
+                        if "free press" in line_lc and any(k in line_lc for k in [
+                            "playing",
+                            "playing today",
+                            "injury",
+                            "injuries",
+                            "status",
+                            "availability",
+                        ]):
+                            injury_winners.append(item)
+                        else:
+                            others.append(item)
+
+                    ranked_lines = injury_winners + others
+
+                ranked_lines = ranked_lines[:5]
+
+                assistant_text += "\n"
+
+                for index, (_, line) in enumerate(ranked_lines, start=1):
+                    assistant_text += f"{index}. {line}\n"
 
         assistant_msg = self._build_assistant_message(
-            text=assistant_text,
-            attachments=[],
+            assistant_text,
             meta={
-                "source_urls": source_urls,
+                "route": "web",
+                "query": query,
+                "fresh": wants_fresh,
+                "source_urls": source_urls[:5],
             },
         )
 
         return self._finalize_response(
-            session_id=session_id,
-            user_text=user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision=decision,
-            saved_artifact=artifact,
+            session_id,
+            user_msg,
+            assistant_msg,
+            decision,
         )
+
+    def _resolve_google_news_url(self, url: str) -> str:
+        try:
+            import requests
+            res = requests.get(url, timeout=5, allow_redirects=True)
+            return res.url
+        except Exception:
+            return url
 
     def _is_image_generation_request(self, user_text: str) -> bool:
         text = str(user_text or "").strip().lower()
@@ -688,11 +1229,9 @@ class ChatService:
         keywords = ["generate", "create", "make", "draw", "render", "design"]
         image_words = ["image", "picture", "photo", "art", "scene", "visual"]
 
-        # 🔥 strong match
         if any(k in text for k in keywords) and any(i in text for i in image_words):
             return True
 
-        # 🔥 looser match (for natural language like "cyberpunk city")
         if any(k in text for k in keywords):
             return True
 
@@ -734,15 +1273,76 @@ class ChatService:
 
         print("CHAT_SERVICE_HANDLE_HIT:", user_text)
 
-        # 🔥 BYPASS ALL ROUTING
+        try:
+            intent = self.intent_service.detect(user_text=user_text)
+            intent = intent if isinstance(intent, dict) else {}
+
+            intent_name = self._safe_str(intent.get("intent")).lower()
+
+            route_map = {
+                "web": self.ROUTE_WEB_FETCH,
+                "image": self.ROUTE_IMAGE_GENERATION,
+                "chat": self.ROUTE_GENERAL_CHAT,
+                "coding": self.ROUTE_GENERAL_CHAT,
+                "debugging": self.ROUTE_GENERAL_CHAT,
+                "planning": self.ROUTE_GENERAL_CHAT,
+                "writing": self.ROUTE_GENERAL_CHAT,
+            }
+
+            decision = {
+                "route": route_map.get(intent_name, self.ROUTE_GENERAL_CHAT),
+                "mode": intent_name or "chat",
+                "confidence": float(intent.get("confidence") or 0.55),
+                "reasons": intent.get("reasons") or [],
+                "save_memory": True,
+            }
+
+        except Exception as e:
+            print("INTENT DETECTION ERROR:", e)
+            decision = {
+                "route": self.ROUTE_GENERAL_CHAT,
+                "mode": "chat",
+                "confidence": 0.55,
+                "reasons": ["intent_detection_error"],
+                "save_memory": True,
+            }
+
+        decision = decision if isinstance(decision, dict) else {}
+
+        print("CHAT_SERVICE_DECISION:", decision)
+
+        route = self._safe_str(decision.get("route")).lower()
+
+        if route == self.ROUTE_WEB_FETCH:
+            result = self._execute_web_fetch(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+                decision=decision,
+            )
+
+            self._maybe_write_memory(decision, user_text, session_id)
+            return result
+
+        if route == self.ROUTE_IMAGE_GENERATION:
+            result = self._execute_image_generation(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+                decision=decision,
+            )
+
+            self._maybe_write_memory(decision, user_text, session_id)
+            return result
+
         result = self._execute_general_chat(
-            decision={},
+            decision=decision,
             user_text=user_text,
             session_id=session_id,
             attachments=attachments,
         )
 
-        self._maybe_write_memory({}, user_text, session_id)
+        self._maybe_write_memory(decision, user_text, session_id)
 
         return result
 
@@ -1509,7 +2109,35 @@ class ChatService:
                     lines = []
                     lines.append("\n— Top sources —")
 
-                    for idx, item in enumerate(cleaned[:5], start=1):
+                    ranked_sources = []
+
+
+
+
+                    for item in cleaned:
+                        if not isinstance(item, dict):
+                            continue
+
+                        url = str(item.get("url") or "")
+                        title = str(item.get("title") or "")
+                        domain = str(item.get("domain") or "")
+
+                        score = self._source_quality_score(url, title + " " + domain)
+
+                        if score <= -999:
+                            continue
+
+                        item["_quality_score"] = score
+                        ranked_sources.append(item)
+
+                    ranked_sources.sort(
+                        key=lambda x: x.get("_quality_score", 0),
+                        reverse=True,
+                    )
+
+                    cleaned = ranked_sources[:5]
+
+                    for idx, item in enumerate(cleaned, start=1):
                         title = str(item.get("title") or "").strip()
                         domain = str(item.get("domain") or "").strip()
                         url = str(item.get("url") or "").strip()

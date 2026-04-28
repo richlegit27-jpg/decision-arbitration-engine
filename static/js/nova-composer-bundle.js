@@ -1,6 +1,14 @@
 (function () {
   "use strict";
 
+  function qs(selector, root) {
+    return (root || document).querySelector(selector);
+  }
+
+  function qsa(selector, root) {
+    return Array.from((root || document).querySelectorAll(selector));
+  }
+
   if (window.NovaComposerBundle) return;
 
   function log() {
@@ -9,61 +17,70 @@
     } catch (_) {}
   }
 
-  function applyBackendSessionState(payload, explicitSessionId) {
-    const data = payload && typeof payload === "object" ? payload : {};
+function applyBackendSessionState(payload, explicitSessionId) {
+  const data = payload && typeof payload === "object" ? payload : {};
 
-    if (explicitSessionId && typeof data === "object" && data) {
-      data.active_session_id = data.active_session_id || explicitSessionId;
-    }
-
-    if (typeof hydrateFromState === "function") {
-      hydrateFromState(data || {});
-      return;
-    }
-
-    const resolvedSession =
-      data.session && typeof data.session === "object"
-        ? data.session
-        : data.active_session && typeof data.active_session === "object"
-          ? data.active_session
-          : null;
-
-    const resolvedSessionId = String(
-      explicitSessionId ||
-      data.active_session_id ||
-      (resolvedSession && resolvedSession.id) ||
-      data.session_id ||
-      state.activeSessionId ||
-      ""
-    ).trim();
-
-    if (resolvedSessionId) {
-      state.activeSessionId = resolvedSessionId;
-    }
-
-    if (resolvedSession && Array.isArray(resolvedSession.messages)) {
-      state.messages = resolvedSession.messages.map(normalizeMessage);
-    } else if (Array.isArray(data.messages)) {
-      state.messages = data.messages.map(normalizeMessage);
-    }
-
-    if (Array.isArray(data.artifacts)) {
-      state.artifacts = safeArray(data.artifacts);
-    }
-
-if (Array.isArray(data.artifacts)) {
-  state.artifacts = data.artifacts;
-}
-
-if (Array.isArray(data.memory)) {
-  state.memory = data.memory;
-}
-    renderChat();
-    renderArtifacts();
-    renderMemory();
-    updateTopbarFromState();
-    scrollChatToBottom(true);
+  if (explicitSessionId && typeof data === "object" && data) {
+    data.active_session_id = data.active_session_id || explicitSessionId;
   }
+
+  if (typeof hydrateFromState === "function") {
+    hydrateFromState(data || {});
+    return;
+  }
+
+  const resolvedSession =
+    data.session && typeof data.session === "object"
+      ? data.session
+      : data.active_session && typeof data.active_session === "object"
+        ? data.active_session
+        : null;
+
+  const resolvedSessionId = String(
+    explicitSessionId ||
+    data.active_session_id ||
+    (resolvedSession && resolvedSession.id) ||
+    data.session_id ||
+    state.activeSessionId ||
+    ""
+  ).trim();
+
+  if (resolvedSessionId) {
+    state.activeSessionId = resolvedSessionId;
+  }
+
+  if (resolvedSession && Array.isArray(resolvedSession.messages)) {
+    const incoming = resolvedSession.messages.map(normalizeMessage);
+
+    if (incoming.length > 0) {
+      state.messages = incoming;
+    } else {
+      console.warn("[NovaComposerBundle] blocked resolvedSession empty overwrite");
+    }
+  } else if (Array.isArray(data.messages)) {
+    const incoming = data.messages.map(normalizeMessage);
+
+    if (incoming.length > 0) {
+      state.messages = incoming;
+    } else {
+      console.warn("[NovaComposerBundle] blocked data.messages empty overwrite");
+    }
+  }
+
+  if (Array.isArray(data.artifacts)) {
+    state.artifacts = safeArray(data.artifacts);
+  }
+
+  if (Array.isArray(data.memory)) {
+    state.memory = data.memory;
+  }
+
+  renderChat();
+  renderArtifacts();
+  renderMemory();
+  updateTopbarFromState();
+  scrollChatToBottom(true);
+}
 
   async function jumpToSessionAndSync(sessionId, options) {
     const opts = options || {};
@@ -186,10 +203,6 @@ function resolveUploadUrl(url) {
     } catch (_) {}
   }
 
-  function qs(selector, root) {
-    return (root || document).querySelector(selector);
-  }
-
   function qsa(selector, root) {
     return Array.from((root || document).querySelectorAll(selector));
   }
@@ -203,7 +216,46 @@ function resolveUploadUrl(url) {
       .replace(/'/g, "&#39;");
   }
 
-function linkifyText(text) {
+  function renderSources(assistantText, meta = {}) {
+    const text = String(assistantText || "");
+
+    if (!text.includes("— Top sources —")) {
+      return escapeHtml(text);
+    }
+
+    const parts = text.split("— Top sources —");
+    const mainText = parts[0].trim();
+    const sourcesText = parts.slice(1).join("— Top sources —").trim();
+
+    const lines = sourcesText
+      .split("\n")
+      .map(line => line.trim())
+      .filter(Boolean);
+
+    const urls = Array.isArray(meta.source_urls) ? meta.source_urls : [];
+
+    let html = `<div class="nova-msg-text">${escapeHtml(mainText)}</div>`;
+    html += `<div class="nova-sources">`;
+
+    lines.forEach((line, index) => {
+      const url = urls[index] || "";
+      const label = line.replace(/^\d+\.\s*/, "");
+
+      html += `
+        <button class="source-row" type="button" data-url="${escapeHtml(url)}"
+data-title="${escapeHtml(label)}"
+data-preview="${escapeHtml(label)}">
+          <span class="source-index">${index + 1}.</span>
+          <span class="source-label">${escapeHtml(label)}</span>
+        </button>
+      `;
+    });
+
+    html += `</div>`;
+    return html;
+  }
+
+  function linkifyText(text) {
   const safe = escapeHtml(String(text || ""));
 
   return safe.replace(
@@ -1110,212 +1162,43 @@ function removeMessage(messageId) {
 function applyStatePayload(payload) {
   const data = payload && typeof payload === "object" ? payload : {};
 
-// 🔥 LOCK: respect rail first, fallback to backend
-let nextSessionId = "";
+  let nextSessionId = state.activeSessionId;
 
-if (window.NovaSessionRail?.getActiveSessionId) {
-  const railId = window.NovaSessionRail.getActiveSessionId();
-  if (railId) {
-    nextSessionId = railId;
-  }
-}
-
-if (!nextSessionId) {
-  nextSessionId = String(
-    data.active_session_id ||
-    data.session_id ||
-    (data.session && data.session.id) ||
-    (data.active_session && data.active_session.id) ||
-    ""
-  ).trim();
-}
-
-state.activeSessionId = nextSessionId;
-
-  if (Array.isArray(data.sessions)) {
-    setSessions(data.sessions);
+  if (!nextSessionId) {
+    nextSessionId = String(
+      data.active_session_id ||
+      data.session_id ||
+      (data.session && data.session.id) ||
+      ""
+    ).trim();
   }
 
-if (Array.isArray(data.artifacts)) {
-  state.artifacts = data.artifacts;
-}
+  if (nextSessionId) {
+    state.activeSessionId = nextSessionId;
+  }
 
-  const incomingMessages = (function () {
-    const incoming =
-      (data.active_session && Array.isArray(data.active_session.messages)
-        ? data.active_session.messages
-        : data.session && Array.isArray(data.session.messages)
-        ? data.session.messages
-        : Array.isArray(data.messages)
-        ? data.messages
-        : []) || [];
+  const activeSession =
+    (Array.isArray(data.sessions) &&
+      data.sessions.find(function (s) {
+        return String(s.id) === String(state.activeSessionId);
+      })) ||
+    data.session;
 
-    return incoming
-      .map(function (msg) {
-        if (!msg || typeof msg !== "object") return null;
+  if (activeSession && Array.isArray(activeSession.messages)) {
+    const incomingMessages = activeSession.messages.map(normalizeMessage);
 
-        if (msg.ok === true && msg.assistant_message) {
-          msg = msg.assistant_message;
-        }
-
-        if (
-          typeof msg.text === "string" &&
-          (
-            msg.text.includes("'ok': True") ||
-            msg.text.includes('"ok": true') ||
-            msg.text.includes("'assistant_message':") ||
-            msg.text.includes('"assistant_message":')
-          )
-        ) {
-          return null;
-        }
-
-        return normalizeMessage(msg);
-      })
-      .filter(Boolean);
-  })();
-
-  const currentMessages = Array.isArray(state.messages)
-    ? state.messages
-        .filter(function (msg) {
-          return msg && msg.kind !== "working_context";
-        })
-        .map(normalizeMessage)
-    : [];
-
-  const dedupeMessages = function (messages) {
-    return (messages || []).filter(function (msg, index, arr) {
-      if (!msg) return false;
-      if (msg.kind === "working_context") return false;
-
-      const role = String(msg.role || "");
-      const text = String(msg.text || "").trim();
-      const created = String(msg.created_at || "");
-      const id = String(msg.id || "");
-
-      const firstMatchIndex = arr.findIndex(function (other) {
-        return (
-          other &&
-          (
-            (id && String(other.id || "") === id) ||
-            (
-              String(other.role || "") === role &&
-              String(other.text || "").trim() === text &&
-              String(other.created_at || "") === created
-            )
-          )
-        );
-      });
-
-      return firstMatchIndex === index;
-    });
-  };
-
-  const incomingIds = new Set(
-    incomingMessages
-      .map(function (msg) {
-        return String((msg && msg.id) || "").trim();
-      })
-      .filter(Boolean)
-  );
-
-  const mergedMessages = incomingMessages.slice();
-
-  currentMessages.forEach(function (msg) {
-    const id = String((msg && msg.id) || "").trim();
-    if (id && !incomingIds.has(id)) {
-      mergedMessages.push(msg);
-    }
-  });
-
-  const finalMessages = dedupeMessages(mergedMessages);
-  const currentAssistantCount = currentMessages.filter(function (msg) {
-    return msg && String(msg.role || "") === "assistant";
-  }).length;
-  const finalAssistantCount = finalMessages.filter(function (msg) {
-    return msg && String(msg.role || "") === "assistant";
-  }).length;
-
-// 🔥 FINAL: always trust backend state
-state.messages = finalMessages;
-
-  state.messages = state.messages.filter(function (msg) {
-    return msg && msg.kind !== "working_context";
-  });
-
-  const sessionWorkingState =
-    (data.active_session && data.active_session.working_state) ||
-    (data.session && data.session.working_state) ||
-    {};
-
-  const explicitWorkingContext =
-    normalizeWorkingContext(
-      (data.working_context && typeof data.working_context === "object"
-        ? data.working_context
-        : null) ||
-      (data.session &&
-      data.session.working_context &&
-      typeof data.session.working_context === "object"
-        ? data.session.working_context
-        : null) ||
-      emptyWorkingContext()
-    );
-
-  const previousWorkingContext = normalizeWorkingContext(
-    state.workingContext || emptyWorkingContext()
-  );
-
-  const sessionWorkingContext =
-    buildWorkingContextFromWorkingState(sessionWorkingState);
-
-  state.workingContext = sessionWorkingContext.show
-    ? Object.assign({}, sessionWorkingContext, {
-        collapsed: previousWorkingContext.collapsed,
-      })
-    : emptyWorkingContext();
-
-const backendWorkingContext =
-  (data.working_context_payload && data.working_context_payload.show
-    ? data.working_context_payload
-    : null) ||
-  (data.working_context && typeof data.working_context === "object"
-    ? data.working_context
-    : null);
-
-if (backendWorkingContext) {
-  const liveWorkingContext = normalizeWorkingContext(backendWorkingContext);
-  state.workingContext = liveWorkingContext.show
-    ? Object.assign({}, liveWorkingContext, {
-        collapsed: previousWorkingContext.collapsed,
-      })
-    : emptyWorkingContext();
-}
-
-if (data.assistant_message) {
-  const assistantMsg = normalizeMessage(data.assistant_message);
-
-  if (assistantMsg) {
-    const exists = state.messages.some(function (msg) {
-      return (
-        msg &&
-        msg.role === "assistant" &&
-        String(msg.text || "").trim() === String(assistantMsg.text || "").trim()
-      );
-    });
-
-    if (!exists) {
-      upsertMessage(assistantMsg);
+    if (incomingMessages.length > 0) {
+      state.messages = incomingMessages;
+    } else {
+      console.warn("[NovaComposerBundle] BLOCKED empty overwrite");
     }
   }
-}
 
-state.artifacts = safeArray(data.artifacts);
-state.memory = safeArray(data.memory).map(normalizeMemoryItem);
-state.web = safeArray(data.web);
-
-  if (window.NovaArtifacts && typeof window.NovaArtifacts.reload === "function") {
-    window.NovaArtifacts.reload();
-  }
+  state.sessions = Array.isArray(data.sessions) ? data.sessions : state.sessions;
+  state.artifacts = Array.isArray(data.artifacts) ? data.artifacts : state.artifacts;
+  state.memory = Array.isArray(data.memory)
+    ? data.memory.map(normalizeMemoryItem)
+    : state.memory;
 
   renderSessionList();
   renderChat();
@@ -1334,24 +1217,12 @@ state.web = safeArray(data.web);
   }
 
   updateTopbarFromState();
-
-  try {
-    window.dispatchEvent(
-      new CustomEvent("nova:composer-state", {
-        detail: {
-          session_id: state.activeSessionId,
-          artifacts: state.artifacts || [],
-        },
-      })
-    );
-  } catch (e) {
-    console.warn("composer-state dispatch failed", e);
-  }
 }
 
 // ==============================
 // 🔥 UNIFIED SESSION SWITCH (LOCKED)
 // ==============================
+
 window.openSessionFromBackend = async function (sessionId) {
   const id = String(sessionId || "").trim();
   if (!id) return false;
@@ -1426,32 +1297,74 @@ window.NovaAnalyzeArtifactImage = async function (imageUrl, artifact) {
 // ==============================
 
 document.addEventListener("click", async function (event) {
+
+  // 🔥 MEMORY BADGE CLICK
+  const memoryBadge = event.target.closest("[data-memory-used]");
+  if (memoryBadge) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    try {
+      const raw = decodeURIComponent(memoryBadge.getAttribute("data-memory-used") || "[]");
+      const items = JSON.parse(raw);
+
+      const rail = document.querySelector("[data-right-rail]");
+      const viewer = document.querySelector("[data-rail-viewer]");
+      if (!rail || !viewer) return;
+
+      rail.classList.add("is-open");
+      document.body.classList.add("is-rail-open");
+      viewer.hidden = false;
+
+viewer.innerHTML = `
+  <div class="nova-viewer-shell">
+    <div class="nova-viewer-title">Memory Used</div>
+
+    <div class="nova-viewer-body">
+      ${items.map(function (item) {
+        return `
+          <div style="
+            margin-bottom:10px;
+            padding:10px;
+            border-radius:10px;
+            background:rgba(255,255,255,0.05);
+            border:1px solid rgba(255,255,255,0.08);
+          ">
+            <div style="font-size:13px;line-height:1.4;">
+              ${escapeHtml(item.text || "")}
+            </div>
+
+            <div style="font-size:11px;opacity:.6;margin-top:4px;">
+              ${escapeHtml(item.kind || "memory")} • ${escapeHtml(item.source || "auto")}
+            </div>
+          </div>
+        `;
+      }).join("") || "<div style='opacity:.6;'>No memory items</div>"}
+    </div>
+  </div>
+`;
+
+    } catch (err) {
+      console.error("memory badge click failed", err);
+    }
+
+    return;
+  }
+
+  // 🔥 IMAGE REGENERATE (message-based)
   const imageRegenBtn = event.target.closest("[data-regenerate-image-message]");
   if (imageRegenBtn) {
     event.preventDefault();
     event.stopPropagation();
 
     const messageId = String(imageRegenBtn.getAttribute("data-regenerate-image-message") || "").trim();
-    console.log("IMAGE REGEN MESSAGE ID:", messageId);
-
-    if (!messageId) {
-      console.warn("IMAGE REGEN MISSING MESSAGE ID");
-      return;
-    }
+    if (!messageId) return;
 
     const userMsg = currentUserMessageForRegenerate(messageId);
-    if (!userMsg) {
-      console.warn("IMAGE REGEN COULD NOT FIND USER MESSAGE");
-      return;
-    }
+    if (!userMsg) return;
 
     const prompt = String(userMsg.text || "").trim();
-    console.log("IMAGE REGEN PROMPT:", prompt);
-
-    if (!prompt) {
-      console.warn("IMAGE REGEN EMPTY PROMPT");
-      return;
-    }
+    if (!prompt) return;
 
     const payload = {
       user_text: prompt.startsWith("/image") ? prompt : "/image " + prompt,
@@ -1459,29 +1372,23 @@ document.addEventListener("click", async function (event) {
       attachments: [],
     };
 
-    console.log("IMAGE REGEN PAYLOAD:", payload);
-
     if (typeof consumeChatStream === "function") {
       await consumeChatStream(payload);
     } else if (typeof consumeChatStreamStable === "function") {
       await consumeChatStreamStable(payload);
     } else if (typeof consumeChatJson === "function") {
       await consumeChatJson(payload);
-    } else {
-      console.warn("No chat consumer found");
     }
 
     return;
   }
-  // 🔥 IMAGE REGENERATE (PUT THIS FIRST)
 
-
-  // 👇 your existing handlers stay below this  const imageRegenBtn = event.target.closest("[data-regenerate-image]");
-  if (imageRegenBtn) {
+  // 🔥 IMAGE REGENERATE (simple)
+  const imageRegenSimple = event.target.closest("[data-regenerate-image]");
+  if (imageRegenSimple) {
     event.preventDefault();
 
-    const prompt = String(imageRegenBtn.getAttribute("data-regenerate-image") || "").trim();
-
+    const prompt = String(imageRegenSimple.getAttribute("data-regenerate-image") || "").trim();
     if (prompt) {
       sendMessage("/image " + prompt);
     }
@@ -1489,6 +1396,7 @@ document.addEventListener("click", async function (event) {
     return;
   }
 
+  // 🔥 COPY MESSAGE
   const copyBtn = event.target.closest("[data-copy-message]");
   if (copyBtn) {
     const messageId = String(copyBtn.getAttribute("data-copy-message") || "").trim();
@@ -1504,13 +1412,14 @@ document.addEventListener("click", async function (event) {
 
     try {
       await navigator.clipboard.writeText(text);
-      console.log("copied");
     } catch (err) {
       console.warn("copy failed", err);
     }
+
     return;
   }
 
+  // 🔥 REGENERATE MESSAGE
   const messageRegenBtn = event.target.closest("[data-regenerate-message]");
   if (messageRegenBtn) {
     const messageId = String(messageRegenBtn.getAttribute("data-regenerate-message") || "").trim();
@@ -1535,6 +1444,7 @@ document.addEventListener("click", async function (event) {
 
     return;
   }
+
 });
 
   function currentUserMessageForRegenerate(targetAssistantId) {
@@ -1866,7 +1776,6 @@ function linkifySourceLines(text) {
 
 document.addEventListener("click", function (e) {
   const protectedEl = e.target.closest("[data-no-chat-action='1']");
-
   const sourceEl = e.target.closest(".source-card, .source-row");
 
   if (protectedEl && !sourceEl) {
@@ -1875,31 +1784,70 @@ document.addEventListener("click", function (e) {
     return;
   }
 
-  const el = sourceEl;
-  if (!el) return;
+  if (!sourceEl) return;
 
   e.preventDefault();
   e.stopPropagation();
 
-  let url =
-    el.getAttribute("data-source-url") ||
-    el.getAttribute("data-url") ||
-    "";
+let url =
+  sourceEl.getAttribute("data-source-url") ||
+  sourceEl.getAttribute("data-url") ||
+  "";
 
-  if (!url) {
-    const link = el.querySelector("a[href]");
-    if (link) url = link.getAttribute("href") || "";
+if (!url) {
+  const link = sourceEl.querySelector("a[href]");
+  if (link) url = link.getAttribute("href") || "";
+}
+
+if (!url) return;
+
+const title =
+  sourceEl.getAttribute("data-title") ||
+  sourceEl.getAttribute("data-preview") ||
+  sourceEl.textContent ||
+  "Source preview";
+
+const preview = sourceEl.getAttribute("data-preview") || "";
+
+let domain = "Source";
+let favicon = "";
+
+try {
+  const parsed = new URL(url);
+  domain = parsed.hostname.replace(/^www\./, "");
+  favicon =
+    "https://www.google.com/s2/favicons?domain=" +
+    encodeURIComponent(parsed.hostname) +
+    "&sz=32";
+} catch (_) {}
+
+const rail = document.querySelector("[data-right-rail]");
+const viewer = document.querySelector("[data-rail-viewer]");
+const titleEl = document.querySelector("[data-rail-title]");
+const subtitleEl = document.querySelector("[data-rail-subtitle]");
+
+  if (!rail || !viewer) {
+    window.open(url, "_blank");
+    return;
   }
 
-  if (!url) return;
+  // 🔥 open rail
+  openRail();
+  setRailTab("web");
 
-  const title =
-    el.getAttribute("data-title") ||
-    el.textContent ||
-    "Source preview";
+  // 🔥 header
+  if (titleEl) titleEl.textContent = title;
+  if (subtitleEl) subtitleEl.textContent = url;
 
-  const rail = document.querySelector("[data-right-rail]");
-  const viewer = document.querySelector("[data-rail-viewer]");
+  // 🔥 preview UI
+  viewer.hidden = false;
+  viewer.innerHTML =
+    '<div class="nova-viewer-shell">' +
+      '<div style="font-size:13px;opacity:0.7;margin-bottom:10px;">Preview</div>' +
+      '<div style="font-weight:600;margin-bottom:8px;">' + escapeHtml(title) + '</div>' +
+      '<div style="font-size:13px;opacity:0.8;margin-bottom:12px;">' + escapeHtml(preview || url) + '</div>' +
+      '<a href="' + escapeHtml(url) + '" target="_blank" style="color:#4da3ff;text-decoration:underline;">Open full article →</a>' +
+    '</div>';
 
   if (!rail || !viewer) {
     window.open(url, "_blank");
@@ -1912,11 +1860,65 @@ document.addEventListener("click", function (e) {
 
   viewer.innerHTML = `
     <div class="nova-viewer-shell">
-      <div class="nova-viewer-title">${escapeHtml(title)}</div>
+      <div class="nova-viewer-title">Source Preview</div>
+
       <div class="nova-viewer-body">
-        <p style="opacity:.75;font-size:12px;margin-bottom:10px;">Source preview</p>
-        <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" data-no-chat-action="1">
-          Open full article
+        <div style="
+          display:flex;
+          align-items:center;
+          gap:10px;
+          margin-bottom:12px;
+          padding:10px;
+          border-radius:12px;
+          background:rgba(255,255,255,0.05);
+          border:1px solid rgba(255,255,255,0.08);
+        ">
+          ${
+            favicon
+              ? `<img src="${escapeHtml(favicon)}" style="width:24px;height:24px;border-radius:6px;">`
+              : `<div style="width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,0.1);"></div>`
+          }
+
+          <div style="min-width:0;">
+            <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              ${escapeHtml(domain)}
+            </div>
+            <div style="font-size:11px;opacity:.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              ${escapeHtml(url)}
+            </div>
+          </div>
+        </div>
+
+        <div style="
+          padding:12px;
+          border-radius:12px;
+          background:rgba(255,255,255,0.035);
+          border:1px solid rgba(255,255,255,0.08);
+          margin-bottom:12px;
+        ">
+          <div style="font-size:14px;font-weight:700;line-height:1.35;margin-bottom:6px;">
+            ${escapeHtml(title)}
+          </div>
+          <div style="font-size:12px;opacity:.7;">
+            Click below to open the full source in a new tab.
+          </div>
+        </div>
+
+        <a href="${escapeHtml(url)}"
+           target="_blank"
+           rel="noopener noreferrer"
+           data-no-chat-action="1"
+           style="
+             display:inline-flex;
+             padding:9px 12px;
+             border-radius:10px;
+             background:rgba(255,255,255,0.09);
+             color:#fff;
+             text-decoration:none;
+             font-size:13px;
+             font-weight:700;
+           ">
+          Open full article →
         </a>
       </div>
     </div>
@@ -1924,36 +1926,7 @@ document.addEventListener("click", function (e) {
 });
 
 function renderSourceList(message) {
-  try {
-    if (!message || message.role !== "assistant") return "";
-
-    const meta = message.meta || {};
-    const urls = Array.isArray(meta.source_urls) ? meta.source_urls : [];
-
-    if (!urls.length) return "";
-
-    return (
-      '<div class="source-list">' +
-        '<div class="source-title">Sources</div>' +
-        urls.slice(0, 5).map(function (url) {
-          let domain = "source";
-
-          try {
-            domain = new URL(url).hostname.replace("www.", "");
-          } catch (e) {}
-
-          return (
-            '<div class="source-row" data-url="' + escapeHtml(url) + '">' +
-              escapeHtml(domain) +
-            "</div>"
-          );
-        }).join("") +
-      "</div>"
-    );
-  } catch (err) {
-    console.warn("renderSourceList failed:", err);
-    return "";
-  }
+  return "";
 }
 
 function renderQualityBadge(msg) {
@@ -2003,9 +1976,13 @@ function renderMessageCard(message) {
   const roleClass = role === "user" ? "message-card--user" : "message-card--assistant";
   const rawText = String(message.text || "").trim();
 
+  const renderedText = role === "assistant"
+    ? renderSources(rawText, message.meta || {})
+    : escapeHtml(rawText);
+
   const bodyHtml = rawText
-    ? '<div class="message-text-inline" style="display:block !important; white-space:pre-wrap !important; color:#ffffff !important; background:rgba(255,255,255,0.04) !important; padding:10px 12px !important; border-radius:10px !important; margin:8px 0 10px 0 !important; line-height:1.45 !important;">' +
-        linkifySourceLines(rawText) +
+    ? '<div class="message-text-inline" style="display:block !important; white-space:pre-wrap!important; color:#ffffff !important; background:rgba(255,255,255,0.04) !important; padding:10px 12px !important; border-radius:10px !important; margin:8px 0 10px 0 !important; line-height:1.45 !important;">' +
+        renderedText +
       "</div>"
     : "";
 
@@ -2028,13 +2005,12 @@ function renderMessageCard(message) {
         label += " • Confidence: " + Math.round(confidence * 100) + "%";
       }
 
-      memoryBadgeHtml =
-        '<button class="memory-used-badge" type="button" ' +
-        "data-memory='" +
-        encodeURIComponent(JSON.stringify(used)) +
-        "'>" +
-        label +
-        "</button>";
+memoryBadgeHtml =
+  '<button class="memory-used-badge" type="button" ' +
+  'data-no-chat-action="1" ' +
+  'data-memory-used="' + encodeURIComponent(JSON.stringify(used)) + '">' +
+  label +
+  "</button>";
     }
   } catch (e) {
     console.warn("memory badge failed", e);
@@ -2085,41 +2061,6 @@ function renderChat() {
 
   if (els.chatThread.__lastRenderHtml !== nextHtml) {
     els.chatThread.innerHTML = nextHtml;
-
-    document.querySelectorAll(".source-row").forEach(function (el) {
-      el.addEventListener("click", function () {
-        let url = el.getAttribute("data-url") || "";
-
-        if (!url) {
-          const link = el.querySelector("a[href]");
-          if (link) {
-            url = link.getAttribute("href") || "";
-          }
-        }
-
-        if (!url) {
-          console.warn("NO URL FOUND FOR SOURCE ROW");
-          return;
-        }
-
-        const rail = document.querySelector("[data-right-rail]");
-        const viewer = document.querySelector("[data-rail-viewer]");
-        if (!rail || !viewer) return;
-
-        rail.classList.add("is-open");
-        document.body.classList.add("is-rail-open");
-        viewer.hidden = false;
-
-        viewer.innerHTML = `
-          <div class="nova-viewer-shell">
-            <div class="nova-viewer-title">Source preview</div>
-            <div class="nova-viewer-body">
-              <a href="${url}" target="_blank" rel="noopener noreferrer">Open full article</a>
-            </div>
-          </div>
-        `;
-      });
-    });
 
     els.chatThread.__lastRenderHtml = nextHtml;
   }
@@ -3561,15 +3502,14 @@ function appendUserMessageLocal(text, attachments) {
     meta: {},
   };
 
-  if (!Array.isArray(state.messages)) {
-    state.messages = [];
-  }
-
+if (!Array.isArray(state.messages)) {
+    console.warn("[NovaComposerBundle] prevented message reset");
+    return;
+}
   state.messages.push(userMessage);
   renderChat();
   return userMessage;
 }
-
 async function consumeChatJson(payload) {
   state.stream = state.stream || {
     running: false,
@@ -3579,11 +3519,6 @@ async function consumeChatJson(payload) {
     messageId: "",
     targetMessageId: "",
     startedAt: 0,
-  };
-
-  state.execution = state.execution || {
-    active: false,
-    steps: [],
   };
 
   if (state.stream.running) {
@@ -3607,6 +3542,7 @@ async function consumeChatJson(payload) {
     });
 
     const rawText = await response.text();
+
     log("consumeChatJson status", response.status);
     log("consumeChatJson raw response", rawText);
 
@@ -3615,12 +3551,6 @@ async function consumeChatJson(payload) {
       data = rawText ? JSON.parse(rawText) : {};
     } catch (parseError) {
       warn("consumeChatJson JSON parse failed", parseError);
-
-      if (rawText.indexOf("data:") >= 0) {
-        showToast("Chat returned stream data to JSON mode.", "error");
-        throw new Error("Chat returned stream data to JSON mode.");
-      }
-
       throw new Error("Chat returned invalid JSON.");
     }
 
@@ -3630,37 +3560,44 @@ async function consumeChatJson(payload) {
       throw new Error(message);
     }
 
-    if (data && data.saved_artifact && data.saved_artifact.image_url) {
-      if (!data.assistant_message) {
-        data.assistant_message = {};
-      }
-
-      data.assistant_message.image_url = data.saved_artifact.image_url;
-      data.assistant_message.artifact = data.saved_artifact;
-    }
-
-    // 🔥 DEBUG
     window.__lastResponse = data;
     console.log("FULL CHAT RESPONSE:", data);
 
-    // 🔥 APPLY STATE FIRST
-    applyStatePayload(data || {});
-
-    // 🔥 FORCE REAL ASSISTANT MESSAGE (WITH META)
-    if (data && data.assistant_message) {
-      if (state.stream && state.stream.targetMessageId) {
-        removeMessage(state.stream.targetMessageId);
-      }
-
-      upsertMessage(data.assistant_message);
+    if (state.stream && state.stream.targetMessageId) {
+      removeMessage(state.stream.targetMessageId);
     }
 
-    // 🔥 AUTO-OPEN ARTIFACT
+    // Load backend state if present.
+    applyStatePayload(data || {});
+
+    // ✅ ASSISTANT RENDER LOCK:
+    // If backend returned assistant_message but applyStatePayload did not render it,
+    // insert it once here.
+    const assistantMsg =
+      data && data.assistant_message && typeof data.assistant_message === "object"
+        ? normalizeMessage(data.assistant_message)
+        : null;
+
+    if (assistantMsg && String(assistantMsg.text || "").trim()) {
+      const assistantText = String(assistantMsg.text || "").trim();
+
+      const exists = (state.messages || []).some(function (msg) {
+        return (
+          msg &&
+          String(msg.role || "") === "assistant" &&
+          String(msg.text || "").trim() === assistantText
+        );
+      });
+
+      if (!exists) {
+        upsertMessage(assistantMsg);
+      }
+    }
+
     if (data && data.saved_artifact && data.saved_artifact.id) {
       openArtifactFromStateOrBackend(data.saved_artifact.id);
     }
 
-    // 🔥 CLEAN STREAM FLAGS
     state.messages = (state.messages || []).map(function (msg) {
       if (!msg || String(msg.role || "") !== "assistant") return msg;
 
@@ -3675,18 +3612,21 @@ async function consumeChatJson(payload) {
 
     renderChat();
 
-    flushTokensNow();
-    clearTokenRenderState();
-
-    if (state.stream) {
-      state.stream.running = false;
-      state.stream.controller = null;
-      state.stream.buffer = "";
-      state.stream.placeholderId = "";
-      state.stream.messageId = "";
-      state.stream.targetMessageId = "";
-      state.stream.startedAt = 0;
+    if (typeof flushTokensNow === "function") {
+      flushTokensNow();
     }
+
+    if (typeof clearTokenRenderState === "function") {
+      clearTokenRenderState();
+    }
+
+    state.stream.running = false;
+    state.stream.controller = null;
+    state.stream.buffer = "";
+    state.stream.placeholderId = "";
+    state.stream.messageId = "";
+    state.stream.targetMessageId = "";
+    state.stream.startedAt = 0;
 
     finishStreamUi({
       statusState: "idle",
@@ -3699,6 +3639,7 @@ async function consumeChatJson(payload) {
       statusText: "Error",
       statusState: "error",
     });
+
     throw error;
   }
 }
@@ -3726,31 +3667,47 @@ async function sendMessage() {
     document.querySelector("[data-chat-input]") ||
     document.querySelector("textarea");
 
-  const text = String((inputEl && inputEl.value) || "").trim();
+  const rawValue =
+    inputEl && typeof inputEl.value === "string"
+      ? inputEl.value
+      : "";
+
+  let text = String(rawValue || "").trim();
+
+  // 🔒 BLOCK UI / DEBUG JUNK INPUT
+  if (
+    !inputEl ||
+    inputEl !== els.chatInput ||
+    text.length > 5000
+  ) {
+    console.warn("[Nova] blocked invalid input:", text);
+    return;
+  }
+
+  const lower = text.toLowerCase();
 
   if (
-    text.startsWith("Memory used:") ||
-    text.includes("Confidence:") ||
-    /^Memory used:\s*\d+/i.test(text)
+    lower.includes("debug meta") ||
+    lower.includes("memory used") ||
+    lower.includes("confidence:")
   ) {
-    console.warn("[Nova] blocked UI badge text from sending:", text);
+    console.warn("[Nova] blocked UI/debug text:", text);
 
     if (inputEl) {
       inputEl.value = "";
       autoResizeTextarea();
     }
-
     return;
   }
 
   console.log("sendMessage ENTERED", {
     hasInput: !!inputEl,
     text: text,
-    inputValue: inputEl ? inputEl.value : null
   });
 
   await maybeAutoSaveMemoryFromChatText(text);
 
+  // 🎨 IMAGE PLACEHOLDER
   if (/^\/image|generate image|create image|draw/i.test(text)) {
     const tempId = "gen_" + Date.now();
 
@@ -3768,6 +3725,7 @@ async function sendMessage() {
     state.imageGenPlaceholderId = tempId;
   }
 
+  // 📎 ATTACHMENTS
   const attachments = (state.pendingUploads || [])
     .filter(function (item) {
       return (
@@ -3796,7 +3754,6 @@ async function sendMessage() {
     });
 
   if (!text && !attachments.length) {
-    console.log("SEND BLOCKED: empty text and no attachments");
     showToast("Type a message first.", "info");
     return;
   }
@@ -3805,38 +3762,29 @@ async function sendMessage() {
   state.execution.steps = [];
   renderExecution();
 
-  console.log("ACTIVE SESSION BEFORE", state.activeSessionId);
-
   if (!state.activeSessionId) {
-    console.log("CREATING NEW SESSION...");
-
     const created = await apiPost("/api/sessions/new", {});
-    console.log("SESSION CREATE RESPONSE", created);
 
     if (created && created.session && created.session.id) {
       state.activeSessionId = String(created.session.id);
     } else if (created && created.active_session_id) {
       state.activeSessionId = String(created.active_session_id);
     }
-
-    console.log("ACTIVE SESSION AFTER CREATE", state.activeSessionId);
-
-    await loadState();
-    console.log("LOAD STATE FINISHED");
   }
 
-// 🚫 prevent duplicate user message (backend will return it)
-const alreadyExists = (state.messages || []).some(function (msg) {
-  return (
-    msg &&
-    msg.role === "user" &&
-    String(msg.text || "").trim() === String(text || "").trim()
-  );
-});
+  // 🚫 PREVENT DUPLICATE USER MESSAGE
+  const alreadyExists = (state.messages || []).some(function (msg) {
+    return (
+      msg &&
+      msg.role === "user" &&
+      String(msg.text || "").trim() === text
+    );
+  });
 
-if (!alreadyExists) {
-  appendUserMessageLocal(text, attachments);
-}
+  if (!alreadyExists) {
+    appendUserMessageLocal(text, attachments);
+  }
+
   if (els.chatInput) {
     els.chatInput.value = "";
     autoResizeTextarea();
@@ -3845,7 +3793,7 @@ if (!alreadyExists) {
   clearPendingUploads();
 
   try {
-    const isImageCommand = String(text || "").trim().toLowerCase().startsWith("/image");
+    const isImageCommand = text.toLowerCase().startsWith("/image");
     const location = await getBrowserLocation();
 
     const payload = {
@@ -3900,10 +3848,6 @@ if (!alreadyExists) {
     }
 
     warn("sendMessage failed", error);
-    showToast(
-      error && error.message ? error.message : "Send failed.",
-      "error"
-    );
   }
 }
 
@@ -3959,7 +3903,6 @@ async function createNewChat() {
     els.chatInput.value = "";
     autoResizeTextarea();
   }
-  await loadState();
 }
 
 async function copyMessage(messageId) {
@@ -4012,7 +3955,6 @@ async function renameSession(sessionId) {
   });
 
   applyStatePayload(payload || {});
-  await loadState();
   showToast("Session renamed.", "success");
 }
 
@@ -4033,7 +3975,6 @@ async function togglePinSession(sessionId) {
   });
 
   applyStatePayload(payload || {});
-  await loadState();
   showToast(!pinned ? "Session pinned." : "Session unpinned.", "success");
 }
 
@@ -4054,7 +3995,6 @@ async function deleteSession(sessionId) {
   });
 
   applyStatePayload(payload || {});
-  await loadState();
   showToast("Session deleted.", "success");
 }
 
@@ -4712,7 +4652,6 @@ async function boot() {
   els.artifactEmpty = document.querySelector("[data-artifact-empty]");
 
   try {
-    await loadState();
   } catch (error) {
     warn("boot state load failed", error);
     renderChat();
@@ -5493,10 +5432,13 @@ function renderMemoryViewer(item) {
     '<div class="nova-viewer-shell">' +
     '<div class="nova-viewer-card">' +
     '<div class="nova-viewer-kicker">Memory</div>' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;">' +
     '<div class="nova-viewer-title">' + escapeHtml(item.kind || "note") + "</div>" +
+    '<button data-close-rail="1" style="background:transparent;border:none;color:#fff;font-size:18px;cursor:pointer;">×</button>' +
+    "</div>" +
     '<div class="nova-viewer-meta">' +
     escapeHtml(item.source || "memory") +
-    (item.session_id ? " Â· " + escapeHtml(item.session_id) : "") +
+    (item.session_id ? " · " + escapeHtml(item.session_id) : "") +
     "</div>" +
     '<pre class="nova-artifact-meta-pre">' + escapeHtml(item.text || item.preview || "") + "</pre>" +
     "</div>" +
@@ -5547,9 +5489,15 @@ function mergeAssistantReplyIntoState(payload) {
   }
 
   if (finalEvent && Array.isArray(finalEvent.messages) && finalEvent.messages.length) {
-    state.messages = finalEvent.messages.map(function (msg) {
+    const incomingFinalMessages = finalEvent.messages.map(function (msg) {
       return typeof normalizeMessage === "function" ? normalizeMessage(msg) : msg;
     });
+
+    if (incomingFinalMessages.length >= (state.messages || []).length) {
+      state.messages = incomingFinalMessages;
+    } else {
+      console.warn("blocked finalEvent overwrite");
+    }
   } else if (finalEvent && finalEvent.message && typeof finalEvent.message === "object") {
     const msgObj = typeof normalizeMessage === "function"
       ? normalizeMessage(finalEvent.message)
@@ -5620,7 +5568,9 @@ function mergeAssistantReplyIntoState(payload) {
   if (typeof renderArtifacts === "function") {
     renderArtifacts();
   }
+
   renderMemory();
+
   if (typeof renderSessions === "function") {
     renderSessions();
   }
@@ -5774,12 +5724,7 @@ async function consumeChatStreamStable(payload) {
 
 flushTokensNow();
 
-try {
-  const latestState = await apiGet("/api/state");
-  applyStatePayload(latestState || {});
-} catch (error) {
-  console.warn("final state refresh failed", error);
-}
+console.warn("[NovaComposerBundle] final /api/state refresh disabled to prevent chat wipe");
 
 if (state.stream && state.stream.targetMessageId) {
   finalizeStreamMessage({
@@ -5981,9 +5926,28 @@ function syncArtifactViewerToActiveSession() {
 
 async function loadState() {
   const payload = await apiGet("/api/state");
+
+  if (!payload || typeof payload !== "object") {
+    return payload;
+  }
+
+  if (payload.session && state.activeSessionId) {
+    const payloadSessionId = String(payload.session.id || payload.active_session_id || "").trim();
+    const activeId = String(state.activeSessionId || "").trim();
+
+    if (payloadSessionId && activeId && payloadSessionId !== activeId) {
+      console.warn("[NovaComposerBundle] skipped stale /api/state payload", {
+        payloadSessionId,
+        activeId,
+      });
+      return payload;
+    }
+  }
+
   applyStatePayload(payload || {});
   return payload;
 }
+
 boot();
 
 if (typeof initShellExtensions === "function") {
@@ -6035,3 +5999,4 @@ setTimeout(() => {
 }, 500);
 
 })();
+

@@ -12,59 +12,62 @@ class IntentService:
     INTENT_WEB = "web"
     INTENT_CHAT = "chat"
 
-def detect(self, user_text: str = "", route: str = "", mode: str = "") -> dict:
-    text = str(user_text or "").strip().lower()
-    route = str(route or "").strip().lower()
-    mode = str(mode or "").strip().lower()
+    def detect(self, user_text: str = "", route: str = "", mode: str = "") -> dict:
+        text = str(user_text or "").strip().lower()
+        route = str(route or "").strip().lower()
+        mode = str(mode or "").strip().lower()
 
-    # 🌐 FORCE WEB FOR FRESH/CURRENT REQUESTS
-    fresh_words = [
-        "latest",
-        "today",
-        "current",
-        "right now",
-        "recent",
-        "newest",
-        "news",
-        "update",
-        "updates",
-        "what happened",
-        "score",
-        "standings",
-        "stock",
-        "earnings",
-        "price",
-        "weather",
-    ]
+        fresh_words = [
+            "latest",
+            "today",
+            "current",
+            "right now",
+            "recent",
+            "newest",
+            "news",
+            "update",
+            "updates",
+            "what happened",
+            "score",
+            "standings",
+            "stock",
+            "earnings",
+            "price",
+            "weather",
+        ]
 
-    if self._has_any(text, fresh_words):
-        return self._result(self.INTENT_WEB, 0.98, ["fresh_web_trigger"])
+        if self._has_any(text, fresh_words):
+            return self._result(self.INTENT_WEB, 0.98, ["fresh_web_trigger"])
 
-    # 🌐 FORCE WEB FOR URLS
-    if "http://" in text or "https://" in text or "www." in text:
-        return self._result(self.INTENT_WEB, 0.98, ["url_detected"])
+        if "http://" in text or "https://" in text or "www." in text:
+            return self._result(self.INTENT_WEB, 0.98, ["url_detected"])
 
-    # 🐛 DEBUGGING
-    if self._has_any(text, ["bug", "fix", "error", "traceback", "exception", "broken", "not working", "500"]):
-        return self._result(self.INTENT_DEBUGGING, 0.95, ["debugging_signal"])
+        if self._has_any(text, [
+            "open the first",
+            "open first",
+            "open 1",
+            "first one",
+            "open the top",
+            "top one",
+        ]):
+            return self._result(self.INTENT_WEB, 0.96, ["followup_open_request"])
 
-    # 🎨 IMAGE
-    if self._has_any(text, ["generate image", "create image", "draw", "/image"]):
-        return self._result(self.INTENT_IMAGE, 0.95, ["image_signal"])
+        if self._has_any(text, ["bug", "fix", "error", "traceback", "exception", "broken", "not working", "500"]):
+            return self._result(self.INTENT_DEBUGGING, 0.95, ["debugging_signal"])
 
-    # 💻 CODING
-    if self._has_any(text, ["code", "function", "class", "python", "javascript", "html", "css", "smff"]):
-        return self._result(self.INTENT_CODING, 0.9, ["coding_signal"])
+        if self._has_any(text, ["generate image", "create image", "draw", "/image"]):
+            return self._result(self.INTENT_IMAGE, 0.95, ["image_signal"])
 
-    # 🧠 PLANNING
-    if self._has_any(text, ["plan", "next step", "roadmap", "strategy"]):
-        return self._result(self.INTENT_PLANNING, 0.85, ["planning_signal"])
+        if self._has_any(text, ["code", "function", "class", "python", "javascript", "html", "css", "smff"]):
+            return self._result(self.INTENT_CODING, 0.9, ["coding_signal"])
 
-    # ✍️ WRITING
-    if self._has_any(text, ["write", "rewrite", "draft", "email", "story"]):
-        return self._result(self.INTENT_WRITING, 0.85, ["writing_signal"])
+        if self._has_any(text, ["plan", "next step", "roadmap", "strategy"]):
+            return self._result(self.INTENT_PLANNING, 0.85, ["planning_signal"])
 
-    return self._result(self.INTENT_CHAT, 0.55, ["default_chat"])
+        if self._has_any(text, ["write", "rewrite", "draft", "email", "story"]):
+            return self._result(self.INTENT_WRITING, 0.85, ["writing_signal"])
+
+        return self._result(self.INTENT_CHAT, 0.55, ["default_chat"])
 
     def _has_any(self, text: str, terms: list[str]) -> bool:
         return any(term in text for term in terms)
