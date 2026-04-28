@@ -124,20 +124,19 @@ class ChatService:
 
         decision = decision if isinstance(decision, dict) else {}
 
-        session_id = self._ensure_session_id(session_id)
-
+        # 🧠 LOAD SESSION
         session = self._get_session_payload(session_id) or {}
-        messages = session.get("messages")
-        if not isinstance(messages, list):
-            messages = []
+        messages = session.get("messages") or []
 
+        # 👤 APPEND USER
         if isinstance(user_msg, dict):
             messages.append(user_msg)
 
+        # 🤖 APPEND ASSISTANT
         if isinstance(assistant_msg, dict):
             messages.append(assistant_msg)
 
-        session["id"] = session_id
+        # 💾 SAVE BACK
         session["messages"] = messages
 
         try:
@@ -145,14 +144,11 @@ class ChatService:
         except Exception as e:
             print("SESSION SAVE ERROR:", e)
 
+        # 🔥 RETURN CLEAN RESPONSE
         return {
             "ok": True,
             "assistant_message": assistant_msg,
-            "session": {
-                **session,
-                "id": session_id,
-            },
-            "active_session_id": session_id,
+            "session": session,  # 👈 IMPORTANT
             "session_id": session_id,
             "saved_artifact": saved_artifact,
             "artifacts": self._get_artifacts_list(),

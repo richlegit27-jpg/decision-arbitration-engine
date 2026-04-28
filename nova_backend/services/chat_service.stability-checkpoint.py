@@ -124,20 +124,19 @@ class ChatService:
 
         decision = decision if isinstance(decision, dict) else {}
 
-        session_id = self._ensure_session_id(session_id)
-
+        # 🧠 LOAD SESSION
         session = self._get_session_payload(session_id) or {}
-        messages = session.get("messages")
-        if not isinstance(messages, list):
-            messages = []
+        messages = session.get("messages") or []
 
+        # 👤 APPEND USER
         if isinstance(user_msg, dict):
             messages.append(user_msg)
 
+        # 🤖 APPEND ASSISTANT
         if isinstance(assistant_msg, dict):
             messages.append(assistant_msg)
 
-        session["id"] = session_id
+        # 💾 SAVE BACK
         session["messages"] = messages
 
         try:
@@ -145,14 +144,11 @@ class ChatService:
         except Exception as e:
             print("SESSION SAVE ERROR:", e)
 
+        # 🔥 RETURN CLEAN RESPONSE
         return {
             "ok": True,
             "assistant_message": assistant_msg,
-            "session": {
-                **session,
-                "id": session_id,
-            },
-            "active_session_id": session_id,
+            "session": session,  # 👈 IMPORTANT
             "session_id": session_id,
             "saved_artifact": saved_artifact,
             "artifacts": self._get_artifacts_list(),
@@ -176,136 +172,211 @@ class ChatService:
         working_state=None,
     ) -> dict:
 
-        decision = decision if isinstance(decision, dict) else {}
-        attachments = attachments or []
+        if getattr(self, "_active_request", False):
+            print("BLOCKED DUPLICATE EXECUTION")
+            return {"ok": True}
 
-        original_user_text = user_text
-        text_lc = (user_text or "").lower()
+        self._active_request = True
 
-        execution_keywords = [
-            "build", "create", "make", "fix", "implement",
-            "add", "write", "generate", "set up"
-        ]
-        is_execution = any(k in text_lc for k in execution_keywords)
+        try:
+            decision = decision if isinstance(decision, dict) else {}
+            attachments = attachments or []
 
-        continue_triggers = ["continue", "next", "run it", "go"]
-        is_continue = any(k == text_lc.strip() for k in continue_triggers)
+            user_msg = self._build_user_message(
+                user_text,
+                attachments=attachments,
+            )
 
-        session = self._get_session_payload(session_id)
-        state = session.get("working_state") if isinstance(session, dict) else {}
-        state = state or {}
+            if not memory_context:
+                memory_context = self._build_memory_context_for_chat(user_text, decision)
 
-        active_task = self._safe_str(state.get("active_task"))
-        next_step = self._safe_str(state.get("next_step"))
+            model_messages = self._compose_model_messages(
+                user_text=user_text,
+                session=self._get_session_payload(session_id),
+                decision=decision,
+                memory_context=memory_context,
+            )
 
-        if is_continue and active_task:
-            user_text = f"Continue task: {active_task}. Next step: {next_step}"
-
-        user_msg = self._build_user_message(
-            original_user_text,
-            attachments=attachments,
-        )
-
-        if not memory_context:
-            memory_context = self._build_memory_context_for_chat(user_text, decision)
-
-        model_messages = self._compose_model_messages(
-            user_text=user_text,
-            session=session,
-            decision=decision,
-            memory_context=memory_context,
-        )
-
-        if is_execution or active_task:
-            model_messages.insert(0, {
-                "role": "system",
-                "content": (
-                    "You are an execution-focused AI.\n"
-                    f"Current task: {active_task or original_user_text}\n"
-                    f"Next step hint: {next_step}\n\n"
-                    "Rules:\n"
-                    "- Be direct.\n"
-                    "- Output real work: code, commands, files, or exact actions.\n"
-                    "- Do not stop at explanation.\n"
-                    "- Always move the task forward."
+            try:
+                response = self.client.responses.create(
+                    model=self.chat_model,
+                    input=model_messages,
                 )
-            })
+                assistant_text = self._extract_response_text(response)
+
+            except Exception as e:
+                print("GENERAL CHAT ERROR:", e)
+                assistant_text = "Something went wrong."
+
+            if not assistant_text:
+                assistant_text = "No response generated."
+
+            used_memory_items = getattr(self, "_last_used_memory_items", []) or []
+
+            used_memory_full = [
+                {
+                    "id": self._safe_str(m.get("id")),
+                    "text": self._safe_str(m.get("text")),
+                    "kind": self._safe_str(m.get("kind")),
+                    "pinned": bool(m.get("pinned")),
+                    "weight": m.get("weight", 1),
+                }
+                for m in used_memory_items
+                if isinstance(m, dict) and self._safe_str(m.get("text"))
+            ]
+
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                attachments=[],
+                meta={
+                    "used_memory": used_memory_full,
+                    "used_memory_count": len(used_memory_full),
+                    "memory_confidence": 1.0,
+                },
+                memory_used=[m.get("id") for m in used_memory_items if isinstance(m, dict)],
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+                saved_artifact=None,
+            )
+
+        finally:
+            self._active_request = False
+
+    def _auto_fix_last_snippet(self, session_id: str) -> dict:
+        session = self._get_session_payload(session_id)
+
+        last_file_path = None
+        if isinstance(session, dict):
+            state = session.get("working_state") or {}
+            last_file_path = self._safe_str(state.get("last_file_path"))
+
+        user_msg = self._build_user_message("fix this file")
+
+        decision = {
+            "route": "auto_fix",
+            "intent": "debugging",
+        }
+
+        if not last_file_path:
+            assistant_msg = self._build_assistant_message(
+                text="No file selected. Say `fix this file` after opening or uploading a file."
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text="fix this file",
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
+
+        try:
+            with open(last_file_path, "r", encoding="utf-8") as f:
+                file_content = f.read()
+        except Exception as e:
+            print("FILE READ FAILED:", e)
+
+            assistant_msg = self._build_assistant_message(
+                text="Could not read the file."
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text="fix this file",
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
+
+        prompt = f"""
+You are fixing a broken code file.
+
+Return ONLY the corrected full file.
+Do NOT explain anything.
+
+File path:
+{last_file_path}
+
+Code:
+{file_content}
+"""
 
         try:
             response = self.client.responses.create(
                 model=self.chat_model,
-                input=model_messages,
+                input=prompt,
             )
-            assistant_text = self._extract_response_text(response)
+
+            fixed_code = self._extract_response_text(response)
 
         except Exception as e:
-            print("GENERAL CHAT ERROR:", e)
-            assistant_text = "Something went wrong."
+            print("AUTO FIX FAILED:", e)
 
-        if not assistant_text:
-            assistant_text = "No response generated."
+            assistant_msg = self._build_assistant_message(
+                text="Auto-fix model call failed. File was not changed."
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text="fix this file",
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
 
-        next_step_out = ""
-        try:
-            for line in (assistant_text or "").split("\n"):
-                if "step" in line.lower():
-                    next_step_out = line.strip()
-                    break
-        except Exception:
-            pass
+        fixed_code = self._safe_str(fixed_code).strip()
 
-        used_memory_items = getattr(self, "_last_used_memory_items", []) or []
+        if fixed_code.startswith("```"):
+            fixed_code = fixed_code.strip("`").strip()
+            if fixed_code.startswith("python"):
+                fixed_code = fixed_code[6:].strip()
 
-        memory_text = " ".join([
-            self._safe_str(m.get("text"))
-            for m in used_memory_items
-            if isinstance(m, dict)
-        ]).lower()
+        if not fixed_code:
+            assistant_msg = self._build_assistant_message(
+                text="Auto-fix returned empty code. File was not changed."
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text="fix this file",
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
 
-        if "name is richard" in memory_text:
-            if "your name is" in (assistant_text or "").lower():
-                assistant_text = "Your name is Richard."
+        if "class ChatService" not in fixed_code and "def " not in fixed_code:
+            assistant_msg = self._build_assistant_message(
+                text="Auto-fix output did not look like valid Python code. File was not changed."
+            )
+            return self._finalize_response(
+                session_id=session_id,
+                user_text="fix this file",
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
 
-        try:
-            if any(x in memory_text for x in ["prefer direct", "be direct", "no fluff", "keep answers short"]):
-                assistant_text = (assistant_text or "").strip()
-        except Exception as e:
-            print("STYLE CLAMP ERROR:", e)
-
-        used_memory_full = [
-            {
-                "id": self._safe_str(m.get("id")),
-                "text": self._safe_str(m.get("text")),
-                "kind": self._safe_str(m.get("kind")),
-                "pinned": bool(m.get("pinned")),
-                "weight": m.get("weight", 1),
-            }
-            for m in used_memory_items
-            if isinstance(m, dict) and self._safe_str(m.get("text"))
-        ]
-
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text,
-            attachments=[],
-            meta={
-                "used_memory": used_memory_full,
-                "used_memory_count": len(used_memory_full),
-                "memory_confidence": 1.0,
-                "execution_mode": bool(is_execution or active_task),
-                "active_task": active_task or original_user_text if is_execution else active_task,
-                "next_step": next_step_out,
-            },
-            memory_used=[m.get("id") for m in used_memory_items if isinstance(m, dict)],
+        preview = (
+            "Auto-fix generated. File was NOT changed yet.\n\n"
+            f"Target file:\n{last_file_path}\n\n"
+            "Next move:\n"
+            "Say `apply fix` to write this version to disk."
         )
+
+        self._set_session_meta(session_id, "pending_fix_file_path", last_file_path)
+        self._set_session_meta(session_id, "pending_fix_code", fixed_code)
+
+        assistant_msg = self._build_assistant_message(text=preview)
 
         return self._finalize_response(
             session_id=session_id,
-            user_text=original_user_text,
+            user_text="fix this file",
             user_msg=user_msg,
             assistant_msg=assistant_msg,
             decision=decision,
-            saved_artifact=None,
-        )
+        ) 
 
     def _resolve_answer_length_preference(self, user_text: str, memory_items: list) -> str:
         """
@@ -4646,150 +4717,155 @@ Write the exact goal in one sentence.
         # ==============================
         # MODEL HELPERS
         # ==============================
+    def _build_chat_input(
+        self,
+        user_text: str,
+        decision: dict,
+        session_id: str = "",
+        working_context_block: str = "",
+        memory_context: str = "",
+    ) -> str:
 
-def _build_chat_input(
-    self,
-    user_text: str,
-    decision: dict,
-    session_id: str = "",
-    working_context_block: str = "",
-    memory_context: str = "",
-) -> str:
+        user_text = self._safe_str(user_text)
+        decision = decision if isinstance(decision, dict) else {}
 
-    user_text = self._safe_str(user_text)
-    decision = decision if isinstance(decision, dict) else {}
-
-    memory_items = self._rank_memory_context(
-        user_text=user_text,
-        limit=12,
-        session_id=session_id,
-    )
-
-    selected_memory = []
-    seen = set()
-
-    def add_memory_item(item):
-        if not isinstance(item, dict):
-            return
-
-        text = self._safe_str(item.get("text"))
-        key = text.lower().strip()
-
-        if not key or key in seen:
-            return
-
-        seen.add(key)
-        selected_memory.append(item)
-
-    # 1. Pinned memories always win.
-    for item in memory_items:
-        if isinstance(item, dict) and item.get("pinned"):
-            add_memory_item(item)
-
-    # 2. High-value memory types come next.
-    for item in memory_items:
-        if not isinstance(item, dict):
-            continue
-
-        if item.get("pinned"):
-            continue
-
-        kind = self._safe_str(item.get("kind")).lower()
-        if kind in ["preference", "goal", "project", "profile"]:
-            add_memory_item(item)
-
-    # 3. Heavy weighted memories next.
-    for item in memory_items:
-        if not isinstance(item, dict):
-            continue
-
-        if item in selected_memory:
-            continue
-
-        try:
-            weight_num = float(item.get("weight", 1))
-        except Exception:
-            weight_num = 1.0
-
-        if weight_num >= 2:
-            add_memory_item(item)
-
-    # 4. Fill the rest with normal ranked memories.
-    for item in memory_items:
-        if len(selected_memory) >= 7:
-            break
-
-        add_memory_item(item)
-
-    selected_memory = selected_memory[:7]
-
-    memory_block = self._format_memory_context(selected_memory)
-    self._last_used_memory_items = selected_memory
-
-    if memory_context:
-        memory_block = self._safe_str(memory_context)
-
-    session = self._get_session_payload(session_id)
-    messages = session.get("messages", []) if isinstance(session, dict) else []
-
-    recent_lines = []
-    for msg in messages[-8:]:
-        if not isinstance(msg, dict):
-            continue
-
-        role = self._safe_str(msg.get("role"))
-        text = self._safe_str(msg.get("text"))
-
-        if not role or not text:
-            continue
-
-        recent_lines.append(f"{role}: {text}")
-
-    recent_block = "\n".join(recent_lines)
-
-    sections = []
-
-    if memory_block:
-        sections.append(
-            "IMPORTANT USER MEMORY:\n"
-            "Use this memory as active instruction context. "
-            "Prefer it over generic assistant behavior when relevant.\n"
-            f"{memory_block}"
+        memory_items = self._rank_memory_context(
+            user_text=user_text,
+            limit=8,
+            session_id=session_id,
         )
 
-    if working_context_block:
+        dominant_items = []
+        pinned_items = []
+        normal_items = []
+
+        for item in memory_items:
+            if not isinstance(item, dict):
+                continue
+
+            text = self._safe_str(item.get("text"))
+            if not text:
+                continue
+
+            kind = self._safe_str(item.get("kind")).lower()
+            pinned = bool(item.get("pinned"))
+            weight = item.get("weight", 1)
+
+            try:
+                weight_num = float(weight)
+            except Exception:
+                weight_num = 1.0
+
+            if pinned:
+                pinned_items.append(item)
+            elif kind in ["preference", "goal", "project", "profile"]:
+                dominant_items.append(item)
+            elif weight_num >= 2:
+                dominant_items.append(item)
+            else:
+                normal_items.append(item)
+
+        selected_memory = []
+        seen = set()
+
+        # 🔥 1. FORCE PINNED FIRST (no limits yet)
+        for item in memory_items:
+            if not isinstance(item, dict):
+                continue
+
+            if not item.get("pinned"):
+                continue
+
+            text = self._safe_str(item.get("text"))
+            key = text.lower().strip()
+
+            if not key or key in seen:
+                continue
+
+            seen.add(key)
+            selected_memory.append(item)
+
+        # 🔥 2. THEN FILL REST (up to 5 total)
+        for item in memory_items:
+            if not isinstance(item, dict):
+                continue
+
+            if item.get("pinned"):
+                continue
+
+            text = self._safe_str(item.get("text"))
+            key = text.lower().strip()
+
+            if not key or key in seen:
+                continue
+
+            seen.add(key)
+            selected_memory.append(item)
+
+            if len(selected_memory) >= 5:
+                break
+
+        memory_block = self._format_memory_context(selected_memory)
+        self._last_used_memory_items = selected_memory
+
+        if memory_context:
+            memory_block = self._safe_str(memory_context)
+
+        session = self._get_session_payload(session_id)
+        messages = session.get("messages", []) if isinstance(session, dict) else []
+
+        recent_lines = []
+        for msg in messages[-8:]:
+            if not isinstance(msg, dict):
+                continue
+
+            role = self._safe_str(msg.get("role"))
+            text = self._safe_str(msg.get("text"))
+
+            if not role or not text:
+                continue
+
+            recent_lines.append(f"{role}: {text}")
+
+        recent_block = "\n".join(recent_lines)
+
+        sections = []
+
+        if memory_block:
+            sections.append(
+                "IMPORTANT USER MEMORY:\n"
+                "Use this memory as active instruction context. "
+                "Prefer it over generic assistant behavior when relevant.\n"
+                f"{memory_block}"
+            )
+
+        if working_context_block:
+            sections.append(
+                "CURRENT WORKING CONTEXT:\n"
+                f"{working_context_block}"
+            )
+
+        if recent_block:
+            sections.append(
+                "RECENT CONVERSATION:\n"
+                f"{recent_block}"
+            )
+
         sections.append(
-            "CURRENT WORKING CONTEXT:\n"
-            f"{working_context_block}"
+            "USER MESSAGE:\n"
+            f"{user_text}"
         )
 
-    if recent_block:
         sections.append(
-            "RECENT CONVERSATION:\n"
-            f"{recent_block}"
+            "RESPONSE RULES:\n"
+            "- Be direct.\n"
+            "- Use the user's saved preferences when relevant.\n"
+            "- For code help, prefer full-file or exact replacement blocks.\n"
+            "- Include file paths when discussing project files.\n"
+            "- Do not give generic chatbot filler."
         )
 
-    sections.append(
-        "USER MESSAGE:\n"
-        f"{user_text}"
-    )
-
-    sections.append(
-        "RESPONSE RULES:\n"
-        "- Be direct.\n"
-        "- Use the user's saved preferences when relevant.\n"
-        "- For code help, prefer full-file or exact replacement blocks.\n"
-        "- Include file paths when discussing project files.\n"
-        "- Do not give generic chatbot filler."
-    )
-
-    final_chat_input = "\n\n".join(sections).strip()
-
-    print("MEMORY_DOMINANCE_USED_COUNT:", len(selected_memory))
-    print("MEMORY_DOMINANCE_BLOCK_PRESENT:", bool(memory_block))
-
-    return final_chat_input
-
+        return "\n\n".join(sections).strip()
     def _build_common_state_payload(self, session_id: str = "") -> dict:
         session = self._get_session_payload(session_id)
 

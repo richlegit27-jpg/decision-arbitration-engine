@@ -2,13 +2,24 @@
   "memory": [
     {
       "text": "my name is richard",
+      "kind": "note",
+      "source": "chat-auto",
+      "session_id": "",
+      "weight": 1.0,
+      "id": "memory_c77be2b2e51a4d7ca4ed5e7746f201e6",
+      "updated_at": "2026-04-27T22:02:53.407909+00:00",
+      "created_at": "2026-04-27T22:02:53.407909+00:00",
+      "count": 1
+    },
+    {
+      "text": "my name is richard",
       "kind": "profile",
       "source": "auto",
-      "session_id": "session_5d835d7fec804721bc2e055e9df8b5e7",
+      "session_id": "session_a39b711a890143dda1f0c0bf7290b8d8",
       "weight": 5.0,
-      "id": "memory_9dc1e530701f445b8f737a498571385c",
-      "updated_at": "2026-04-26T22:52:10.511734+00:00",
-      "created_at": "2026-04-26T22:52:10.511734+00:00",
+      "id": "memory_4b95954052234f3fac11435a975cb7a4",
+      "updated_at": "2026-04-27T22:02:55.894953+00:00",
+      "created_at": "2026-04-27T22:02:55.894953+00:00",
       "count": 1
     }
   ]
