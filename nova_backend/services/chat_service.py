@@ -367,19 +367,6 @@ class ChatService:
             "next_step": next_step_out,
         }
 
-        # === INTELLIGENCE DEBUG ATTACH ===
-        try:
-            meta_payload["intelligence"] = intelligence if isinstance(intelligence, dict) else {}
-            meta_payload["self_check"] = self_check if isinstance(self_check, dict) else {}
-
-            print(
-                "INTELLIGENCE_META_ATTACH_HIT:",
-                meta_payload.get("intelligence"),
-                meta_payload.get("self_check"),
-            )
-        except Exception as e:
-            print("META_INTELLIGENCE_ATTACH_ERROR:", e)
-
         # === HARD FINAL DEBUG RESPONSE OVERRIDE ===
         try:
             intelligence = self._fuse_response_intelligence(
@@ -408,67 +395,31 @@ class ChatService:
                     or "what's the symptom" in assistant_text.lower()
                 )
             ):
-                print("HARD_FINAL_DEBUG_OVERRIDE_APPLIED")
-
                 assistant_text = (
-                    "Likely issue: Nova has no concrete error context yet, so start with the fastest triage path.\n\n"
-                    "Do this now:\n"
-                    "1. Check the terminal running Flask.\n"
-                    "2. Look for the first red traceback line or 500 error.\n"
-                    "3. If it is frontend-related, open DevTools → Console and Network.\n"
-                    "4. Identify the failing file, route, or line number.\n\n"
-                    "Fast commands:\n"
+                    "Run compile first:\n\n"
                     "```powershell\n"
                     "python -m py_compile C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py\n"
-                    "python C:\\Users\\Owner\\nova\\app.py\n"
                     "```\n\n"
-                    "Next move: fix the first traceback line, not the whole app."
+                    "Then paste the exact error."
                 )
+                hard_override_applied = True
 
         except Exception as e:
             print("HARD_FINAL_DEBUG_OVERRIDE_ERROR:", e)
 
-        assistant_msg = self._build_assistant_message(
-            text=assistant_text,
-            attachments=[],
-            meta=meta_payload,
-        )
-
-        # === FINAL INTELLIGENCE ENFORCEMENT ===
-
-        try:
-            self_check = self._self_check_response(
-                user_text=user_text,
-                assistant_text=assistant_text,
-                intelligence=intelligence,
+        # === BUILD FINAL MESSAGE ===
+        if assistant_text:
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                attachments=[],
+                meta=meta_payload,
             )
-
-            print("FINAL_INTELLIGENCE:", intelligence)
-            print("FINAL_SELF_CHECK:", self_check)
-
-            if self_check.get("should_revise"):
-                print("FINAL_REVISION_TRIGGERED")
-
-                if intelligence.get("intent") == "debugging":
-                    assistant_text = (
-                        "Likely issue: missing context or failing code path.\n\n"
-                        "Do this now:\n"
-                        "1. Check terminal or console for the exact error\n"
-                        "2. Identify the failing file and line\n"
-                        "3. Look for traceback or status code\n\n"
-                        "Then send the error line or stack trace."
-                    )
-
-                    assistant_msg = self._build_assistant_message(
-                        text=assistant_text,
-                        attachments=[],
-                        meta=meta_payload,
-                    )
-
-                    hard_override_applied = True
-
-        except Exception as e:
-            print("FINAL_INTELLIGENCE_ERROR:", e)
+        else:
+            assistant_msg = self._build_assistant_message(
+                text="No response generated.",
+                attachments=[],
+                meta=meta_payload,
+            )
 
         return self._finalize_response(
             session_id=session_id,
@@ -856,6 +807,24 @@ class ChatService:
             print("INTELLIGENCE_FUSE_ERROR:", e)
             intelligence = {}
 
+        intelligence = intelligence if isinstance(intelligence, dict) else {}
+
+        try:
+            strategy = self._decide_response_strategy(
+                user_text=user_text,
+                decision=decision,
+                intelligence=intelligence,
+            )
+        except Exception as e:
+            print("STRATEGY_ERROR:", e)
+            strategy = {}
+
+        strategy = strategy if isinstance(strategy, dict) else {}
+
+        intelligence["strategy"] = strategy.get("strategy")
+        intelligence["next_move"] = strategy.get("next_move")
+        intelligence["response_strategy"] = strategy
+
         try:
             self_check = self._self_check_response(
                 user_text=user_text,
@@ -866,83 +835,377 @@ class ChatService:
             print("SELF_CHECK_ERROR:", e)
             self_check = {"should_revise": False, "issues": []}
 
-        print("INTELLIGENCE_FUSED:", intelligence)
-        print("SELF_CHECK_RESULT:", self_check)
+        self_check = self_check if isinstance(self_check, dict) else {
+            "should_revise": False,
+            "issues": [],
+        }
 
-        if (
-            isinstance(intelligence, dict)
-            and intelligence.get("intent") == "debugging"
-            and isinstance(self_check, dict)
-            and self_check.get("should_revise")
-        ):
-            issues = self_check.get("issues", [])
-            print("HARD_DEBUG_OVERRIDE_TRIGGERED:", issues)
-
-            assistant_text = (
-                "Likely issue: missing context or failing code path.\n\n"
-                "Do this now:\n"
-                "1. Run your app and capture the exact error.\n"
-                "2. Check terminal or browser console.\n"
-                "3. Look for: stack trace, status code, or failing line.\n\n"
-                "Fast triage:\n"
-                "- Python: run with full traceback\n"
-                "- Flask: check server logs for 500 errors\n"
-                "- JS: open DevTools → Console + Network tab\n\n"
-                "Next step: send the exact error message or failing line."
+        try:
+            assistant_text = self._shape_response_with_strategy(
+                user_text=user_text,
+                assistant_text=assistant_text,
+                intelligence=intelligence,
             )
-
-            hard_override_applied = True
-
-        if (
-            not hard_override_applied
-            and isinstance(self_check, dict)
-            and self_check.get("should_revise")
-        ):
-            try:
-                revision_prompt = (
-                    "Rewrite the assistant response before the user sees it.\n\n"
-                    "User request:\n"
-                    f"{user_text}\n\n"
-                    "Current weak response:\n"
-                    f"{assistant_text}\n\n"
-                    "Detected issues:\n"
-                    f"{', '.join(self_check.get('issues', []))}\n\n"
-                    "Style rules:\n"
-                    + "\n".join(intelligence.get("style_rules", [])) + "\n\n"
-                    "Next action:\n"
-                    f"{intelligence.get('next_action', '')}\n\n"
-                    "Rewrite rules:\n"
-                    "- Be direct. No filler.\n"
-                    "- Do not sound like ChatGPT or a helpdesk.\n"
-                    "- Do not ask unnecessary questions.\n"
-                    "- Speak like you already understand the task.\n"
-                    "- Give the answer or next move immediately.\n"
-                    "- For debugging: lead with the likely cause and fix.\n"
-                    "- For coding: give exact code or exact change.\n"
-                    "- For explanations: make it clear, not long.\n"
-                    "- Never say 'if you want'.\n"
-                    "- Never say 'provide more details' unless absolutely required.\n"
-                    "- Act like an execution-focused AI, not a conversational assistant.\n\n"
-                    "Return only the improved final response."
-                )
-
-                revised = self._call_model([
-                    {"role": "user", "content": revision_prompt}
-                ])
-
-                if isinstance(revised, str) and revised.strip():
-                    assistant_text = revised.strip()
-                    print("REVISION_APPLIED")
-
-            except Exception as e:
-                print("REVISION_ERROR:", e)
+        except Exception as e:
+            print("FINAL_SHAPE_ERROR:", e)
 
         return {
             "assistant_text": assistant_text,
-            "intelligence": intelligence if isinstance(intelligence, dict) else {},
-            "self_check": self_check if isinstance(self_check, dict) else {},
+            "intelligence": intelligence,
+            "self_check": self_check,
             "hard_override_applied": hard_override_applied,
         }
+
+    def _decide_response_strategy(
+        self,
+        user_text: str = "",
+        decision=None,
+        intelligence=None,
+    ) -> dict:
+
+        decision = decision if isinstance(decision, dict) else {}
+        intelligence = intelligence if isinstance(intelligence, dict) else {}
+
+        text = self._safe_str(user_text).lower().strip()
+
+        route = self._safe_str(decision.get("route")).lower()
+        mode = self._safe_str(decision.get("mode")).lower()
+        intent = self._safe_str(intelligence.get("intent") or decision.get("intent") or mode or route or "chat").lower()
+
+        wants_full_file = any(
+            phrase in text
+            for phrase in [
+                "smff",
+                "full file",
+                "full code",
+                "send me full file",
+                "whole file",
+            ]
+        )
+
+        wants_exact_edit = any(
+            phrase in text
+            for phrase in [
+                "replace",
+                "anchor",
+                "where",
+                "what do i replace",
+                "what line",
+                "indent",
+                "fix this block",
+            ]
+        )
+
+        wants_continue = text in [
+            "next",
+            "continue",
+            "go",
+            "keep going",
+            "next step",
+        ]
+
+        is_debugging = (
+            intent == "debugging"
+            or mode == "debugging"
+            or any(
+                phrase in text
+                for phrase in [
+                    "bug",
+                    "error",
+                    "traceback",
+                    "exception",
+                    "broken",
+                    "not working",
+                    "500",
+                    "syntaxerror",
+                    "indentationerror",
+                    "taberror",
+                ]
+            )
+        )
+
+        is_learning = any(
+            phrase in text
+            for phrase in [
+                "what is",
+                "what does",
+                "why",
+                "how does",
+                "how do",
+                "explain",
+            ]
+        )
+
+        if wants_full_file:
+            strategy = "full_file"
+            next_move = "Return the full file or full replacement code."
+
+        elif wants_exact_edit:
+            strategy = "exact_edit"
+            next_move = "Give the exact anchor, replacement block, and placement."
+
+        elif is_debugging:
+            strategy = "debug_triage"
+            next_move = "Lead with likely cause, then give the fastest verification command."
+
+        elif wants_continue:
+            strategy = "continue_mission"
+            next_move = "Infer the current mission and give the next concrete step."
+
+        elif is_learning:
+            strategy = "teach_clear"
+            next_move = "Explain clearly, then give the core takeaway."
+
+        else:
+            strategy = "direct_answer"
+            next_move = "Answer directly with no filler."
+
+        return {
+            "strategy": strategy,
+            "next_move": next_move,
+            "intent": intent,
+            "route": route,
+            "mode": mode,
+            "wants_full_file": wants_full_file,
+            "wants_exact_edit": wants_exact_edit,
+            "wants_continue": wants_continue,
+            "is_debugging": is_debugging,
+            "is_learning": is_learning,
+        }
+
+
+    def _shape_response_with_strategy(
+        self,
+        user_text: str = "",
+        assistant_text: str = "",
+        intelligence=None,
+    ) -> str:
+
+        intelligence = intelligence if isinstance(intelligence, dict) else {}
+        user_lc = self._safe_str(user_text).lower().strip()
+        assistant_text = self._safe_str(assistant_text).strip()
+
+        if not assistant_text:
+            return assistant_text
+
+        strategy = self._safe_str(intelligence.get("strategy")).lower()
+
+        if user_lc in ["smff", "snff"]:
+            return (
+                "SMFF mode active.\n\n"
+                "Next move:\n"
+                "Send the file name, function name, or current task.\n\n"
+                "I will return:\n"
+                "- the full file path\n"
+                "- the full replacement block or full file\n"
+                "- the compile/test command\n"
+                "- no vague snippets"
+            )
+        if user_lc in ["next", "continue", "go", "keep going", "next step"]:
+            return (
+                "Next move:\n\n"
+                "Test the response strategy with one real coding prompt, not single-word prompts.\n\n"
+                "Use this:\n"
+                "`fix my bug smff`\n\n"
+                "That should trigger full-file/action mode instead of generic clarification."
+            )
+
+        if user_lc == "indent":
+            return (
+                "Indent means clean up the spacing so the code block is properly aligned.\n\n"
+                "For Python, that usually means:\n"
+                "- class methods use 4 spaces inside the class\n"
+                "- function bodies use 8 spaces inside a class method\n"
+                "- nested blocks use another 4 spaces each\n\n"
+                "Paste the block and I’ll return it properly indented."
+            )
+
+        if user_lc in ["what does this do", "what does this mean"]:
+            return (
+                "Paste the exact code or command above the question.\n\n"
+                "Then I’ll explain:\n"
+                "1. what it does\n"
+                "2. why it exists\n"
+                "3. what could break\n"
+                "4. whether to keep, change, or delete it"
+            )
+
+        if strategy == "full_file":
+            return assistant_text
+
+        if strategy == "exact_edit":
+            if "notepad " not in assistant_text.lower() and "c:\\" not in assistant_text.lower():
+                assistant_text = "Use the exact file path and anchor before editing.\n\n" + assistant_text
+            return assistant_text
+
+        if strategy == "debug_triage":
+            return assistant_text
+
+        if strategy == "continue_mission":
+            if "next" not in assistant_text.lower()[:80]:
+                assistant_text = "Next move:\n\n" + assistant_text
+            return assistant_text
+
+        if strategy == "teach_clear":
+            if "core takeaway" not in assistant_text.lower():
+                assistant_text = assistant_text.rstrip() + "\n\nCore takeaway: understand the main cause, then apply the smallest correct fix."
+            return assistant_text
+
+        if strategy == "direct_answer":
+            return assistant_text.strip()
+
+        return assistant_text
+    def _decide_response_strategy(
+        self,
+        user_text: str = "",
+        decision=None,
+        intelligence=None,
+    ) -> dict:
+
+        decision = decision if isinstance(decision, dict) else {}
+        intelligence = intelligence if isinstance(intelligence, dict) else {}
+
+        text = self._safe_str(user_text).lower().strip()
+
+        route = self._safe_str(decision.get("route")).lower()
+        mode = self._safe_str(decision.get("mode")).lower()
+        intent = self._safe_str(intelligence.get("intent") or decision.get("intent") or mode or route or "chat").lower()
+
+        wants_full_file = any(
+            phrase in text
+            for phrase in [
+                "smff",
+                "full file",
+                "full code",
+                "send me full file",
+                "whole file",
+            ]
+        )
+
+        wants_exact_edit = any(
+            phrase in text
+            for phrase in [
+                "replace",
+                "anchor",
+                "where",
+                "what do i replace",
+                "what line",
+                "indent",
+                "fix this block",
+            ]
+        )
+
+        wants_continue = text in [
+            "next",
+            "continue",
+            "go",
+            "keep going",
+            "next step",
+        ]
+
+        is_debugging = (
+            intent == "debugging"
+            or mode == "debugging"
+            or any(
+                phrase in text
+                for phrase in [
+                    "bug",
+                    "error",
+                    "traceback",
+                    "exception",
+                    "broken",
+                    "not working",
+                    "500",
+                    "syntaxerror",
+                    "indentationerror",
+                    "taberror",
+                ]
+            )
+        )
+
+        is_learning = any(
+            phrase in text
+            for phrase in [
+                "what is",
+                "what does",
+                "why",
+                "how does",
+                "how do",
+                "explain",
+            ]
+        )
+
+        if wants_full_file:
+            strategy = "full_file"
+            next_move = "Return the full file or full replacement code."
+
+        elif wants_exact_edit:
+            strategy = "exact_edit"
+            next_move = "Give the exact anchor, replacement block, and placement."
+
+        elif is_debugging:
+            strategy = "debug_triage"
+            next_move = "Lead with likely cause, then give the fastest verification command."
+
+        elif wants_continue:
+            strategy = "continue_mission"
+            next_move = "Infer the current mission and give the next concrete step."
+
+        elif is_learning:
+            strategy = "teach_clear"
+            next_move = "Explain clearly, then give the core takeaway."
+
+        else:
+            strategy = "direct_answer"
+            next_move = "Answer directly with no filler."
+
+        return {
+            "strategy": strategy,
+            "next_move": next_move,
+            "intent": intent,
+            "route": route,
+            "mode": mode,
+            "wants_full_file": wants_full_file,
+            "wants_exact_edit": wants_exact_edit,
+            "wants_continue": wants_continue,
+            "is_debugging": is_debugging,
+            "is_learning": is_learning,
+        }
+
+    def _build_response_policy_prompt(
+        self,
+        user_text: str = "",
+        decision=None,
+        intelligence=None,
+    ) -> str:
+
+        decision = decision if isinstance(decision, dict) else {}
+        intelligence = intelligence if isinstance(intelligence, dict) else {}
+
+        strategy = self._safe_str(intelligence.get("strategy") or "direct_answer")
+        next_move = self._safe_str(intelligence.get("next_move") or "")
+        user_lc = self._safe_str(user_text).lower().strip()
+
+        return (
+            "NOVA RESPONSE POLICY:\n"
+            "- Answer like an execution-focused AI, not a generic chatbot.\n"
+            "- Be direct, useful, and specific.\n"
+            "- Do not add filler, soft disclaimers, or fake helpfulness.\n"
+            "- Do not ask clarification questions unless the task is truly blocked.\n"
+            "- Infer the likely next move from the current mission.\n"
+            "- When the user says next, continue the current task instead of asking what they want.\n"
+            "- When the user asks for code, provide complete usable code or exact replacement blocks.\n"
+            "- For code edits, include the file path, anchor text, placement, and compile/test command.\n"
+            "- For Python/Flask/Nova work, prefer PowerShell commands.\n"
+            "- For debugging, lead with likely cause, then give the fastest verification/fix.\n"
+            "- For explanations, explain clearly and finish with the core takeaway.\n"
+            "- Never say 'if you want'.\n"
+            "- Never say 'provide more details' unless there is no actionable path.\n"
+            "- Never give vague snippets when the user is asking for implementation.\n\n"
+            f"Detected strategy: {strategy}\n"
+            f"Recommended next move: {next_move}\n"
+            f"Current user message: {user_lc}\n"
+        )
 
     def _web_search(self, query: str) -> dict:
         query = self._safe_str(query).strip()
@@ -1579,6 +1842,7 @@ class ChatService:
             return text or "Generate an image."
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
+        print("HANDLE IS BEING CALLED")
         attachments = attachments or []
 
         session_id = self._ensure_session_id(session_id)
@@ -1586,78 +1850,41 @@ class ChatService:
 
         print("CHAT_SERVICE_HANDLE_HIT:", user_text)
 
+        decision = {}
         try:
-            intent = self.intent_service.detect(user_text=user_text)
-            intent = intent if isinstance(intent, dict) else {}
+            decision = self._decide(user_text=user_text)
+        except Exception as e:
+            print("DECISION_ERROR:", e)
+            decision = {}
 
-            intent_name = self._safe_str(intent.get("intent")).lower()
+        route = str(decision.get("route") or "").lower()
 
-            route_map = {
-                "web": self.ROUTE_WEB_FETCH,
-                "image": self.ROUTE_IMAGE_GENERATION,
-                "chat": self.ROUTE_GENERAL_CHAT,
-                "coding": self.ROUTE_GENERAL_CHAT,
-                "debugging": self.ROUTE_GENERAL_CHAT,
-                "planning": self.ROUTE_GENERAL_CHAT,
-                "writing": self.ROUTE_GENERAL_CHAT,
-            }
+        try:
+            if route == "web":
+                return self._execute_web_fetch(
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                    decision=decision,
+                )
 
-            decision = {
-                "route": route_map.get(intent_name, self.ROUTE_GENERAL_CHAT),
-                "mode": intent_name or "chat",
-                "confidence": float(intent.get("confidence") or 0.55),
-                "reasons": intent.get("reasons") or [],
-                "save_memory": True,
-            }
+            return self._execute_general_chat(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+                decision=decision,
+            )
 
         except Exception as e:
-            print("INTENT DETECTION ERROR:", e)
-            decision = {
-                "route": self.ROUTE_GENERAL_CHAT,
-                "mode": "chat",
-                "confidence": 0.55,
-                "reasons": ["intent_detection_error"],
-                "save_memory": True,
+            print("EXECUTION_ERROR:", e)
+            return {
+                "ok": False,
+                "error": str(e),
+                "session": session_id,
+                "debug": {
+                    "route": route,
+                },
             }
-
-        decision = decision if isinstance(decision, dict) else {}
-
-        print("CHAT_SERVICE_DECISION:", decision)
-
-        route = self._safe_str(decision.get("route")).lower()
-
-        if route == self.ROUTE_WEB_FETCH:
-            result = self._execute_web_fetch(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-                decision=decision,
-            )
-
-            self._maybe_write_memory(decision, user_text, session_id)
-            return result
-
-        if route == self.ROUTE_IMAGE_GENERATION:
-            result = self._execute_image_generation(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-                decision=decision,
-            )
-
-            self._maybe_write_memory(decision, user_text, session_id)
-            return result
-
-        result = self._execute_general_chat(
-            decision=decision,
-            user_text=user_text,
-            session_id=session_id,
-            attachments=attachments,
-        )
-
-        self._maybe_write_memory(decision, user_text, session_id)
-
-        return result
 
     def _clean_artifact_text(self, value: str, limit: int = 300) -> str:
         text = re.sub(r"\s+", " ", self._safe_str(value)).strip()
