@@ -300,6 +300,25 @@ class ChatService:
         if not assistant_text:
             assistant_text = "No response generated."
 
+        intelligence_result = self._apply_response_intelligence(
+            user_text=user_text,
+            assistant_text=assistant_text,
+            decision=decision,
+        )
+
+        assistant_text = intelligence_result.get("assistant_text", assistant_text)
+        intelligence = intelligence_result.get("intelligence", {})
+        self_check = intelligence_result.get("self_check", {})
+        hard_override_applied = bool(intelligence_result.get("hard_override_applied"))
+
+        # Optional: enforce short mode hard clamp
+        if isinstance(intelligence, dict):
+            answer_length = str(intelligence.get("answer_length") or "").lower()
+            if answer_length == "short" and len(assistant_text.split()) > 120:
+                assistant_text = " ".join(assistant_text.split()[:120])
+
+        # === INTELLIGENCE LAYER END ===
+
         next_step_out = ""
         try:
             for line in (assistant_text or "").split("\n"):
@@ -339,19 +358,117 @@ class ChatService:
             if isinstance(m, dict) and self._safe_str(m.get("text"))
         ]
 
+        meta_payload = {
+            "used_memory": used_memory_full,
+            "used_memory_count": len(used_memory_full),
+            "memory_confidence": 1.0,
+            "execution_mode": bool(is_execution or active_task),
+            "active_task": active_task or original_user_text if is_execution else active_task,
+            "next_step": next_step_out,
+        }
+
+        # === INTELLIGENCE DEBUG ATTACH ===
+        try:
+            meta_payload["intelligence"] = intelligence if isinstance(intelligence, dict) else {}
+            meta_payload["self_check"] = self_check if isinstance(self_check, dict) else {}
+
+            print(
+                "INTELLIGENCE_META_ATTACH_HIT:",
+                meta_payload.get("intelligence"),
+                meta_payload.get("self_check"),
+            )
+        except Exception as e:
+            print("META_INTELLIGENCE_ATTACH_ERROR:", e)
+
+        # === HARD FINAL DEBUG RESPONSE OVERRIDE ===
+        try:
+            intelligence = self._fuse_response_intelligence(
+                user_text=user_text,
+                assistant_text=assistant_text,
+                decision=decision,
+            )
+
+            self_check = self._self_check_response(
+                user_text=user_text,
+                assistant_text=assistant_text,
+                intelligence=intelligence,
+            )
+
+            print("HARD_FINAL_INTELLIGENCE:", intelligence)
+            print("HARD_FINAL_SELF_CHECK:", self_check)
+
+            if (
+                isinstance(intelligence, dict)
+                and intelligence.get("intent") == "debugging"
+                and (
+                    "paste the bug context" in assistant_text.lower()
+                    or "paste" in assistant_text.lower()
+                    or "send one of these" in assistant_text.lower()
+                    or "what’s the symptom" in assistant_text.lower()
+                    or "what's the symptom" in assistant_text.lower()
+                )
+            ):
+                print("HARD_FINAL_DEBUG_OVERRIDE_APPLIED")
+
+                assistant_text = (
+                    "Likely issue: Nova has no concrete error context yet, so start with the fastest triage path.\n\n"
+                    "Do this now:\n"
+                    "1. Check the terminal running Flask.\n"
+                    "2. Look for the first red traceback line or 500 error.\n"
+                    "3. If it is frontend-related, open DevTools → Console and Network.\n"
+                    "4. Identify the failing file, route, or line number.\n\n"
+                    "Fast commands:\n"
+                    "```powershell\n"
+                    "python -m py_compile C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py\n"
+                    "python C:\\Users\\Owner\\nova\\app.py\n"
+                    "```\n\n"
+                    "Next move: fix the first traceback line, not the whole app."
+                )
+
+        except Exception as e:
+            print("HARD_FINAL_DEBUG_OVERRIDE_ERROR:", e)
+
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
             attachments=[],
-            meta={
-                "used_memory": used_memory_full,
-                "used_memory_count": len(used_memory_full),
-                "memory_confidence": 1.0,
-                "execution_mode": bool(is_execution or active_task),
-                "active_task": active_task or original_user_text if is_execution else active_task,
-                "next_step": next_step_out,
-            },
-            memory_used=[m.get("id") for m in used_memory_items if isinstance(m, dict)],
+            meta=meta_payload,
         )
+
+        # === FINAL INTELLIGENCE ENFORCEMENT ===
+
+        try:
+            self_check = self._self_check_response(
+                user_text=user_text,
+                assistant_text=assistant_text,
+                intelligence=intelligence,
+            )
+
+            print("FINAL_INTELLIGENCE:", intelligence)
+            print("FINAL_SELF_CHECK:", self_check)
+
+            if self_check.get("should_revise"):
+                print("FINAL_REVISION_TRIGGERED")
+
+                if intelligence.get("intent") == "debugging":
+                    assistant_text = (
+                        "Likely issue: missing context or failing code path.\n\n"
+                        "Do this now:\n"
+                        "1. Check terminal or console for the exact error\n"
+                        "2. Identify the failing file and line\n"
+                        "3. Look for traceback or status code\n\n"
+                        "Then send the error line or stack trace."
+                    )
+
+                    assistant_msg = self._build_assistant_message(
+                        text=assistant_text,
+                        attachments=[],
+                        meta=meta_payload,
+                    )
+
+                    hard_override_applied = True
+
+        except Exception as e:
+            print("FINAL_INTELLIGENCE_ERROR:", e)
 
         return self._finalize_response(
             session_id=session_id,
@@ -474,69 +591,151 @@ class ChatService:
                 text=f"Could not apply pending fix: {type(e).__name__}: {self._safe_str(e)}"
             )
 
-            return self._finalize_response(
-                session_id=session_id,
-                user_text="apply fix",
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision=decision,
-            )
+        return self._finalize_response(
+            session_id=session_id,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+        )
 
     def _fuse_response_intelligence(
         self,
         user_text: str = "",
+        assistant_text: str = "",
         decision=None,
-        memory_items=None,
     ) -> dict:
+
         decision = decision if isinstance(decision, dict) else {}
-        memory_items = memory_items or []
 
-        user_text_lc = str(user_text or "").lower().strip()
-        intent = str(decision.get("intent") or decision.get("mode") or "").lower().strip()
-        route = str(decision.get("route") or "").lower().strip()
+        user_lc = str(user_text or "").lower().strip()
+        assistant_lc = str(assistant_text or "").lower().strip()
 
-        answer_length = self._resolve_answer_length_preference(
-            user_text=user_text,
-            memory_items=memory_items,
-        )
+        route = str(decision.get("route") or "").lower()
+        mode = str(decision.get("mode") or "").lower()
+        intent = str(decision.get("intent") or mode or route or "chat").lower()
 
         needs_explanation = any(
-            phrase in user_text_lc
+            phrase in user_lc
             for phrase in [
                 "why",
-                "how",
-                "explain",
+                "what does",
                 "what is",
-                "what are",
-                "who is",
-                "where is",
-                "when",
-                "tell me about",
-                "difference between",
-                "pros and cons",
-                "random fact",
-                "general knowledge",
+                "explain",
+                "how does",
+                "how do",
             ]
         )
 
-        is_simple_command = len(user_text_lc.split()) <= 4
+        is_debugging = any(
+            phrase in user_lc
+            for phrase in [
+                "bug",
+                "fix",
+                "error",
+                "traceback",
+                "exception",
+                "broken",
+                "not working",
+                "500",
+                "syntaxerror",
+                "indentationerror",
+                "taberror",
+            ]
+        )
 
-        if intent == "debugging" or "debug" in route:
+        wants_code = any(
+            phrase in user_lc
+            for phrase in [
+                "smff",
+                "full file",
+                "full code",
+                "replace",
+                "paste this",
+                "code",
+                "function",
+                "class",
+            ]
+        )
+
+        wants_short = any(
+            phrase in user_lc
+            for phrase in [
+                "short",
+                "quick",
+                "tldr",
+                "direct",
+                "no yapping",
+                "don't talk too much",
+            ]
+        )
+
+        if is_debugging:
+            intent = "debugging"
+        elif wants_code:
+            intent = "coding"
+        elif needs_explanation:
+            intent = "explanation"
+
+        if wants_short:
+            answer_length = "short"
+        elif intent in ["debugging", "coding"]:
+            answer_length = "actionable"
+        elif needs_explanation:
             answer_length = "normal"
-            shape_response = False
-        elif needs_explanation and answer_length != "short":
-            answer_length = "long"
-            shape_response = True
         else:
-            shape_response = True
+            answer_length = "short"
+
+        style_rules = []
+
+        if intent == "debugging":
+            style_rules.extend([
+                "Give the likely cause first.",
+                "Give the exact next fix or command.",
+                "Do not ask for pasted files unless there is no actionable next step.",
+                "Prefer file path, anchor, and replacement instructions.",
+            ])
+
+        elif intent == "coding":
+            style_rules.extend([
+                "Prefer full-file or exact replacement code.",
+                "Include the file path when known.",
+                "Avoid partial vague snippets.",
+            ])
+
+        elif intent == "explanation":
+            style_rules.extend([
+                "Explain clearly.",
+                "Use concrete terms.",
+                "Keep the answer structured but not bloated.",
+            ])
+
+        else:
+            style_rules.extend([
+                "Be concise.",
+                "Answer directly.",
+                "Avoid generic chatbot filler.",
+            ])
+
+        if intent == "debugging":
+            next_action = "Give exact fix, command, file path, or anchor."
+        elif intent == "coding":
+            next_action = "Provide full-file code or exact replacement instructions."
+        elif intent == "explanation":
+            next_action = "Explain clearly, then summarize the core takeaway."
+        else:
+            next_action = "Answer directly and avoid filler."
 
         return {
-            "answer_length": answer_length,
-            "needs_explanation": needs_explanation,
-            "is_simple_command": is_simple_command,
-            "shape_response": shape_response,
             "intent": intent,
             "route": route,
+            "mode": mode,
+            "answer_length": answer_length,
+            "needs_explanation": needs_explanation,
+            "is_debugging": is_debugging,
+            "wants_code": wants_code,
+            "wants_short": wants_short,
+            "style_rules": style_rules,
+            "assistant_word_count": len(assistant_lc.split()),
         }
 
     def _self_check_response(
@@ -554,80 +753,195 @@ class ChatService:
 
         answer_length = str(intelligence.get("answer_length") or "normal").lower()
         needs_explanation = bool(intelligence.get("needs_explanation"))
+        intent = str(intelligence.get("intent") or "").lower()
+        mode = str(intelligence.get("mode") or "").lower()
 
         word_count = len(assistant_text.split())
         issues = []
-        score = 100
+        should_revise = False
+
+        debugging_signals = [
+            "bug",
+            "fix",
+            "error",
+            "traceback",
+            "exception",
+            "broken",
+            "not working",
+            "500",
+            "syntaxerror",
+            "indentationerror",
+            "taberror",
+        ]
+
+        weak_phrases = [
+            "paste it here",
+            "paste the bug context",
+            "send me the file",
+            "send the code",
+            "send one of these",
+            "send the code and",
+            "what’s the symptom",
+            "what's the symptom",
+            "tell me what you need",
+            "i can help",
+            "if you want",
+            "provide more details",
+            "please provide",
+        ]
+
+        is_debugging = (
+            intent == "debugging"
+            or mode == "debugging"
+            or any(signal in user_text_lc for signal in debugging_signals)
+        )
 
         if not assistant_text:
             issues.append("empty_response")
-            score -= 100
+            should_revise = True
 
-        if "i don’t know" in assistant_lc or "i don't know" in assistant_lc:
-            issues.append("uncertain_response")
-            score -= 20
+        if any(phrase in assistant_lc for phrase in weak_phrases):
+            issues.append("weak_generic_phrase")
+            should_revise = True
 
-        if "paste it here" in assistant_lc:
-            issues.append("asks_for_paste_instead_of_solving")
-            score -= 35
+        if is_debugging and word_count < 35:
+            issues.append("debugging_answer_too_thin")
+            should_revise = True
 
-        if "if you want" in assistant_lc:
-            issues.append("soft_followup_language")
-            score -= 10
-
-        if answer_length == "short" and word_count > 80:
-            issues.append("too_long_for_short_mode")
-            score -= 25
-
-        if answer_length == "short" and word_count <= 45:
-            score += 5
+        if is_debugging and "paste" in assistant_lc and "exact" not in assistant_lc:
+            issues.append("lazy_debugging_response")
+            should_revise = True
 
         if needs_explanation and word_count < 35:
             issues.append("too_short_for_explanation")
-            score -= 25
+            should_revise = True
 
         if "what is" in user_text_lc and word_count < 25:
             issues.append("weak_definition")
-            score -= 25
+            should_revise = True
 
-        if any(x in user_text_lc for x in ["fix", "bug", "error", "traceback", "not working"]):
-            if not any(x in assistant_lc for x in ["file", "replace", "run", "python", "powershell", "notepad"]):
-                issues.append("debug_response_not_actionable")
-                score -= 30
-
-        if any(x in user_text_lc for x in ["smff", "full file", "full function"]):
-            if "def " not in assistant_text and "```" not in assistant_text:
-                issues.append("missing_full_code")
-                score -= 35
-
-        if word_count < 8 and not needs_explanation:
-            issues.append("too_short")
-            score -= 15
-
-        if word_count > 220 and answer_length == "short":
-            issues.append("bloated_response")
-            score -= 35
-
-        score = max(0, min(100, int(score)))
-
-        if score < 50:
-            grade = "weak"
-        elif score < 75:
-            grade = "ok"
-        elif score < 90:
-            grade = "strong"
-        else:
-            grade = "excellent"
-
-        should_revise = score < 70
+        if answer_length == "short" and word_count > 120:
+            issues.append("too_long_for_short_mode")
+            should_revise = True
 
         return {
-            "ok": not should_revise,
             "should_revise": should_revise,
-            "quality_score": score,
-            "grade": grade,
             "issues": issues,
             "word_count": word_count,
+            "is_debugging": is_debugging,
+        }
+
+    def _apply_response_intelligence(
+        self,
+        user_text: str = "",
+        assistant_text: str = "",
+        decision=None,
+    ) -> dict:
+
+        decision = decision if isinstance(decision, dict) else {}
+        assistant_text = self._safe_str(assistant_text)
+
+        if not assistant_text:
+            assistant_text = "No response generated."
+
+        hard_override_applied = False
+
+        try:
+            intelligence = self._fuse_response_intelligence(
+                user_text=user_text,
+                assistant_text=assistant_text,
+                decision=decision,
+            )
+        except Exception as e:
+            print("INTELLIGENCE_FUSE_ERROR:", e)
+            intelligence = {}
+
+        try:
+            self_check = self._self_check_response(
+                user_text=user_text,
+                assistant_text=assistant_text,
+                intelligence=intelligence,
+            )
+        except Exception as e:
+            print("SELF_CHECK_ERROR:", e)
+            self_check = {"should_revise": False, "issues": []}
+
+        print("INTELLIGENCE_FUSED:", intelligence)
+        print("SELF_CHECK_RESULT:", self_check)
+
+        if (
+            isinstance(intelligence, dict)
+            and intelligence.get("intent") == "debugging"
+            and isinstance(self_check, dict)
+            and self_check.get("should_revise")
+        ):
+            issues = self_check.get("issues", [])
+            print("HARD_DEBUG_OVERRIDE_TRIGGERED:", issues)
+
+            assistant_text = (
+                "Likely issue: missing context or failing code path.\n\n"
+                "Do this now:\n"
+                "1. Run your app and capture the exact error.\n"
+                "2. Check terminal or browser console.\n"
+                "3. Look for: stack trace, status code, or failing line.\n\n"
+                "Fast triage:\n"
+                "- Python: run with full traceback\n"
+                "- Flask: check server logs for 500 errors\n"
+                "- JS: open DevTools → Console + Network tab\n\n"
+                "Next step: send the exact error message or failing line."
+            )
+
+            hard_override_applied = True
+
+        if (
+            not hard_override_applied
+            and isinstance(self_check, dict)
+            and self_check.get("should_revise")
+        ):
+            try:
+                revision_prompt = (
+                    "Rewrite the assistant response before the user sees it.\n\n"
+                    "User request:\n"
+                    f"{user_text}\n\n"
+                    "Current weak response:\n"
+                    f"{assistant_text}\n\n"
+                    "Detected issues:\n"
+                    f"{', '.join(self_check.get('issues', []))}\n\n"
+                    "Style rules:\n"
+                    + "\n".join(intelligence.get("style_rules", [])) + "\n\n"
+                    "Next action:\n"
+                    f"{intelligence.get('next_action', '')}\n\n"
+                    "Rewrite rules:\n"
+                    "- Be direct. No filler.\n"
+                    "- Do not sound like ChatGPT or a helpdesk.\n"
+                    "- Do not ask unnecessary questions.\n"
+                    "- Speak like you already understand the task.\n"
+                    "- Give the answer or next move immediately.\n"
+                    "- For debugging: lead with the likely cause and fix.\n"
+                    "- For coding: give exact code or exact change.\n"
+                    "- For explanations: make it clear, not long.\n"
+                    "- Never say 'if you want'.\n"
+                    "- Never say 'provide more details' unless absolutely required.\n"
+                    "- Act like an execution-focused AI, not a conversational assistant.\n\n"
+                    "Return only the improved final response."
+                )
+
+                revised = self._call_model([
+                    {"role": "user", "content": revision_prompt}
+                ])
+
+                if isinstance(revised, str) and revised.strip():
+                    assistant_text = revised.strip()
+                    print("REVISION_APPLIED")
+
+            except Exception as e:
+                print("REVISION_ERROR:", e)
+
+        return {
+            "assistant_text": assistant_text,
+            "intelligence": intelligence if isinstance(intelligence, dict) else {},
+            "self_check": self_check if isinstance(self_check, dict) else {},
+            "hard_override_applied": hard_override_applied,
         }
 
     def _web_search(self, query: str) -> dict:
@@ -1157,7 +1471,6 @@ class ChatService:
                     ):
                         score = 9999
 
-                    print("RANK_DEBUG:", score, line)
                     ranked_lines.append((score, line))
 
                 ranked_lines.sort(key=lambda x: x[0], reverse=True)
