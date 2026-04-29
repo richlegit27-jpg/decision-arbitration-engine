@@ -2279,21 +2279,8 @@ function renderChat() {
 
   wireWorkingContextPanel();
 
-  const firstSourceRow = els.chatThread.querySelector(".source-row");
-  const firstSourceKey = firstSourceRow
-    ? firstSourceRow.getAttribute("data-url")
-    : "";
-
-  if (
-    firstSourceRow &&
-    firstSourceKey &&
-    els.chatThread.__autoOpenedSource !== firstSourceKey
-  ) {
-    els.chatThread.__autoOpenedSource = firstSourceKey;
-    setTimeout(function () {
-      firstSourceRow.click();
-    }, 300);
-  }
+// auto-open disabled (manual click only)
+els.chatThread.__autoOpenedSource = "";
 
   if (typeof wireRailTabs === "function") {
     wireRailTabs();
