@@ -1339,28 +1339,52 @@ document.addEventListener("click", async function (event) {
 
 viewer.innerHTML = `
   <div class="nova-viewer-shell">
-    <div class="nova-viewer-title">Memory Used</div>
 
-    <div class="nova-viewer-body">
-      ${items.map(function (item) {
-        return `
-          <div style="
-            margin-bottom:10px;
-            padding:10px;
-            border-radius:10px;
-            background:rgba(255,255,255,0.05);
-            border:1px solid rgba(255,255,255,0.08);
-          ">
-            <div style="font-size:13px;line-height:1.4;">
-              ${escapeHtml(item.text || "")}
-            </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      ${
+        favicon
+          ? `<img src="${escapeHtml(favicon)}" style="width:22px;height:22px;border-radius:6px;">`
+          : `<div style="width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,0.12);"></div>`
+      }
 
-            <div style="font-size:11px;opacity:.6;margin-top:4px;">
-              ${escapeHtml(item.kind || "memory")} â€¢ ${escapeHtml(item.source || "auto")}
-            </div>
-          </div>
-        `;
-      }).join("") || "<div style='opacity:.6;'>No memory items</div>"}
+      <div style="min-width:0;">
+        <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ${escapeHtml(domain)}
+        </div>
+
+        <div style="font-size:11px;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ${escapeHtml(safeUrl)}
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:700;line-height:1.35;margin-bottom:6px;">
+        ${escapeHtml(title)}
+      </div>
+
+      <div style="font-size:12px;opacity:.7;line-height:1.4;">
+        ${escapeHtml(preview || "Click below to open the full article.")}
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;">
+      <a href="${escapeHtml(safeUrl)}"
+         target="_blank"
+         rel="noopener noreferrer"
+         data-no-chat-action="1"
+         style="padding:8px 12px;border-radius:10px;background:#fff;color:#000;text-decoration:none;font-size:13px;font-weight:700;">
+        Open article
+      </a>
+
+      <button data-copy-url="${escapeHtml(safeUrl)}"
+        style="padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.12);font-size:13px;">
+        Copy link
+      </button>
+    </div>
+
+  </div>
+`;}).join("") || "<div style='opacity:.6;'>No memory items</div>"}
     </div>
   </div>
 `;
@@ -1895,71 +1919,53 @@ if (memBtn) {
   viewer.hidden = false;
 
   viewer.innerHTML = `
-    <div class="nova-viewer-shell">
-      <div class="nova-viewer-title">Source Preview</div>
+  <div class="nova-viewer-shell">
 
-      <div class="nova-viewer-body">
-        <div style="
-          display:flex;
-          align-items:center;
-          gap:10px;
-          margin-bottom:12px;
-          padding:10px;
-          border-radius:12px;
-          background:rgba(255,255,255,0.05);
-          border:1px solid rgba(255,255,255,0.08);
-        ">
-          ${
-            favicon
-              ? `<img src="${escapeHtml(favicon)}" style="width:24px;height:24px;border-radius:6px;">`
-              : `<div style="width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,0.1);"></div>`
-          }
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      ${
+        favicon
+          ? `<img src="${escapeHtml(favicon)}" style="width:22px;height:22px;border-radius:6px;">`
+          : `<div style="width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,0.12);"></div>`
+      }
 
-          <div style="min-width:0;">
-            <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-              ${escapeHtml(domain)}
-            </div>
-            <div style="font-size:11px;opacity:.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-              ${escapeHtml(safeUrl)}
-            </div>
-          </div>
+      <div style="min-width:0;">
+        <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ${escapeHtml(domain)}
         </div>
 
-        <div style="
-          padding:12px;
-          border-radius:12px;
-          background:rgba(255,255,255,0.035);
-          border:1px solid rgba(255,255,255,0.08);
-          margin-bottom:12px;
-        ">
-          <div style="font-size:14px;font-weight:700;line-height:1.35;margin-bottom:6px;">
-            ${escapeHtml(title)}
-          </div>
-          <div style="font-size:12px;opacity:.7;">
-            ${escapeHtml(preview || "Click below to open the full source in a new tab.")}
-          </div>
+        <div style="font-size:11px;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ${escapeHtml(safeUrl)}
         </div>
-
-        <a href="${escapeHtml(safeUrl)}"
-           target="_blank"
-           rel="noopener noreferrer"
-           data-no-chat-action="1"
-           style="
-             display:inline-flex;
-             padding:9px 12px;
-             border-radius:10px;
-             background:rgba(255,255,255,0.09);
-             color:#fff;
-             text-decoration:none;
-             font-size:13px;
-             font-weight:700;
-           ">
-          Open full article â†’
-        </a>
       </div>
     </div>
-  `;
-});
+
+    <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:700;line-height:1.35;margin-bottom:6px;">
+        ${escapeHtml(title)}
+      </div>
+
+      <div style="font-size:12px;opacity:.7;line-height:1.4;">
+        ${escapeHtml(preview || "Click below to open the full article.")}
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;">
+      <a href="${escapeHtml(safeUrl)}"
+         target="_blank"
+         rel="noopener noreferrer"
+         data-no-chat-action="1"
+         style="padding:8px 12px;border-radius:10px;background:#fff;color:#000;text-decoration:none;font-size:13px;font-weight:700;">
+        Open article
+      </a>
+
+      <button data-copy-url="${escapeHtml(safeUrl)}"
+        style="padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.12);font-size:13px;">
+        Copy link
+      </button>
+    </div>
+
+  </div>
+`;});
 
 function renderSourceList(message) {
   return "";
@@ -6220,6 +6226,7 @@ setTimeout(() => {
 }, 500);
 
 })();
+
 
 
 
