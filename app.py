@@ -632,6 +632,16 @@ def api_chat():
             attachments=attachments,
         )
 
+        if result is None:
+            result = {
+                "ok": False,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": "Nova returned no response from chat_service.handle().",
+                },
+                "session_id": session_id,
+            }
+
         if not isinstance(result, dict):
             result = {
                 "ok": True,
@@ -664,6 +674,8 @@ def api_chat():
         return json_ok(**{k: v for k, v in payload.items() if v is not None})
 
     except Exception as exc:
+        import traceback
+        traceback.print_exc()
         return json_error(str(exc), 500)
 
 @app.get("/api/sessions/<session_id>")
@@ -1231,4 +1243,4 @@ def api_uploads(filename: str):
 # MAIN
 # -----------------------
 if __name__ == "__main__":
-    app.run(debug=False, port=5001)
+    app.run(debug=True, port=5001)

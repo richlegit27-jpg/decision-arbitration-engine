@@ -1,13 +1,13 @@
 ﻿from __future__ import annotations
 
-import base64
+import base64   
 import os
 import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, List
-
+  
 from openai import OpenAI
 
 from nova_backend.models.session import new_message
@@ -130,7 +130,7 @@ class ChatService:
             max_follow_links=5,
         )
 
-
+ 
     def _build_user_message(self, text: str, attachments=None, meta=None) -> dict:
         attachments = attachments or []
         meta = meta or {}
@@ -262,6 +262,7 @@ class ChatService:
         print("AUTO_FIX_FILE_HIT:", user_text)
 
         import os
+        import re
         import time
         import py_compile
         import shutil
@@ -346,148 +347,51 @@ class ChatService:
                     "ok": False,
                 }
 
-        if len(raw_code) > 12000:
-            assistant_text = (
-                "Auto-fix paused.\n\n"
-                f"File:\n{file_path}\n\n"
-                "Reason: file is too large for safe whole-file auto-fix.\n\n"
-                "Use a targeted function, pasted block, or traceback instead."
-            )
+        fixed_code = raw_code.replace("\t", "    ").strip()
 
-            assistant_msg = self._build_assistant_message(text=assistant_text)
+        # expand inline def safely (ONLY once)
+        if fixed_code.startswith("def ") and ":" in fixed_code:
+            parts = fixed_code.split(":", 1)
+            if len(parts) == 2:
+                header = parts[0].strip() + ":"
+                body = parts[1].strip()
 
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=self._build_user_message(user_text),
-                assistant_msg=assistant_msg,
-                decision={"route": "auto_fix_too_large"},
-            )
+                if body and "\n" not in body:
+                    fixed_code = f"{header}\n    {body}"
 
-        # =============================
-        # MODEL-BASED FIX ENGINE
-        # =============================
+        import textwrap
+        fixed_code = textwrap.dedent(fixed_code).strip()
 
-        fix_prompt = (
-            "You are fixing a Python file.\n"
-            "Return ONLY the complete corrected Python file.\n"
-            "No markdown. No explanation. No code fences.\n\n"
-            f"USER BUG REQUEST:\n{user_text}\n\n"
-            f"FILE PATH:\n{file_path}\n\n"
-            "CURRENT FILE CONTENT:\n"
-            f"{raw_code}"
-        )
+        # normalize indentation once
+        lines = fixed_code.splitlines()
+        repaired_lines = []
 
-        try:
-            model_response = self.client.responses.create(
-                model=self.model,
-                input=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are an expert Python repair engine. "
-                            "Preserve existing architecture. "
-                            "Fix only what is necessary. "
-                            "Return the full corrected file only."
-                        ),
-                    },
-                    {
-                        "role": "user",
-                        "content": fix_prompt,
-                    },
-                ],
-            )
+        for index, line in enumerate(lines):
+            stripped = line.strip()
 
-            fixed_code = self._safe_str(model_response.output_text).strip()
+            if not stripped:
+                repaired_lines.append("")
+                continue
 
-            if fixed_code.startswith("```"):
-                fixed_code = re.sub(r"^```(?:python|py)?\s*", "", fixed_code, flags=re.IGNORECASE)
-                fixed_code = re.sub(r"\s*```$", "", fixed_code).strip()
+            if index > 0:
+                previous = repaired_lines[-1].rstrip() if repaired_lines else ""
+                if previous.endswith(":") and not line.startswith((" ", "\t")):
+                    repaired_lines.append("    " + stripped)
+                    continue
 
-            if not fixed_code:
-                raise ValueError("model returned empty fixed code")
+            repaired_lines.append(line.rstrip())
 
-        except Exception as e:
-            assistant_text = (
-                "Auto-fix failed.\n\n"
-                f"File: {file_path}\n"
-                f"Reason: model fix failed: {type(e).__name__}: {self._safe_str(e)}"
-            )
-
-            assistant_msg = self._build_assistant_message(text=assistant_text)
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=self._build_user_message(user_text),
-                assistant_msg=assistant_msg,
-                decision={"route": "auto_fix_model_failed"},
-            )
+        fixed_code = "\n".join(repaired_lines).rstrip() + "\n"
 
         backup_path = None
 
-        # =============================
-        # SAVE AS PENDING FIX (NO WRITE)
-        # =============================
-
         try:
-            self._set_session_meta(session_id, "pending_fix_file_path", file_path)
-            self._set_session_meta(session_id, "pending_fix_code", fixed_code)
+            if os.path.exists(file_path):
+                backup_path = f"{file_path}.bak_{int(time.time())}"
+                shutil.copy2(file_path, backup_path)
 
-            assistant_text = (
-                "Auto-fix prepared.\n\n"
-                f"File:\n{file_path}\n\n"
-                "Preview of fix:\n"
-                "```python\n"
-                f"{fixed_code[:2000]}\n"
-                "```\n\n"
-                "Fix is ready but not applied.\n\n"
-                "Say `apply fix` to write it."
-            )
-
-            assistant_msg = self._build_assistant_message(text=assistant_text)
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=self._build_user_message(user_text),
-                assistant_msg=assistant_msg,
-                decision={"route": "auto_fix_prepare"},
-            )
-
-        except Exception as e:
-            assistant_text = (
-                "Auto-fix failed.\n\n"
-                f"File: {file_path}\n"
-                f"Error: {type(e).__name__}: {self._safe_str(e)}"
-            )
-
-            assistant_msg = self._build_assistant_message(text=assistant_text)
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=self._build_user_message(user_text),
-                assistant_msg=assistant_msg,
-                decision={"route": "auto_fix_error"},
-            )
-
-        except Exception as e:
-            assistant_text = (
-                "Auto-fix failed.\n\n"
-                f"File: {file_path}\n"
-                f"Error: {type(e).__name__}: {self._safe_str(e)}"
-            )
-
-            assistant_msg = self._build_assistant_message(text=assistant_text)
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=self._build_user_message(user_text),
-                assistant_msg=assistant_msg,
-                decision={"route": "auto_fix_error"},
-            )
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(fixed_code)
 
             compile_ok = True
             compile_output = ""
@@ -518,7 +422,7 @@ class ChatService:
             return {
                 "assistant_message": {"text": assistant_text},
                 "session": self._get_session_payload(session_id),
-                "ok": True,
+                "ok": compile_ok,
             }
 
         except Exception as e:
@@ -634,8 +538,8 @@ class ChatService:
                 assistant_msg=assistant_msg,
                 decision=decision,
                 saved_artifact=None,
-            )
-
+            ) 
+ 
         is_memory_request = original_user_text.lower().strip().startswith((
             "remember ",
             "remember:",
@@ -876,36 +780,14 @@ class ChatService:
             with open(backup_path, "w", encoding="utf-8") as f:
                 f.write(current_content)
 
-            mode = self._get_session_meta(session_id, "pending_fix_mode") or "file"
-            func_name = self._get_session_meta(session_id, "pending_fix_func_name") or ""
-
-            if mode == "function" and func_name:
-                pattern = rf"(def\s+{re.escape(func_name)}\s*\(.*?\):\n(?:\s+.*\n)*)"
-
-                updated = re.sub(
-                    pattern,
-                    pending_fix_code.rstrip() + "\n",
-                    current_content,
-                    flags=re.DOTALL,
-                )
-
-                with open(pending_file_path, "w", encoding="utf-8") as f:
-                    f.write(updated)
-            else:
-                with open(pending_file_path, "w", encoding="utf-8") as f:
-                    f.write(pending_fix_code)
+            with open(pending_file_path, "w", encoding="utf-8") as f:
+                f.write(pending_fix_code)
 
             self._set_session_meta(session_id, "pending_fix_file_path", "")
             self._set_session_meta(session_id, "pending_fix_code", "")
-            self._set_session_meta(session_id, "pending_fix_mode", "")
-            self._set_session_meta(session_id, "pending_fix_func_name", "")
 
             assistant_msg = self._build_assistant_message(
-                text=(
-                    f"Auto-fix applied.\n\n"
-                    f"File:\n{pending_file_path}\n\n"
-                    f"Backup:\n{backup_path}"
-                )
+                text=f"Fix applied.\n\nBackup created:\n{backup_path}\n\nFile updated:\n{pending_file_path}"
             )
 
             return self._finalize_response(
@@ -917,16 +799,18 @@ class ChatService:
             )
 
         except Exception as e:
+            print("APPLY FIX FAILED:", e)
+
             assistant_msg = self._build_assistant_message(
                 text=f"Could not apply pending fix: {type(e).__name__}: {self._safe_str(e)}"
             )
-            return self._finalize_response(
-                session_id=session_id,
-                user_text="apply fix",
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision=decision,
-            )
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+        )
 
     def _fuse_response_intelligence(
         self,
@@ -1360,90 +1244,6 @@ class ChatService:
     ) -> dict:
         decision = decision if isinstance(decision, dict) else {}
         assistant_text = self._safe_str(assistant_text).strip()
-
-        user_text_lc = self._safe_str(user_text).lower().strip()
-
-        # ===== DIRECT ACTION MODE =====
-        has_file_path = (
-            ":\\" in user_text_lc
-            or ".py" in user_text_lc
-            or ".js" in user_text_lc
-            or ".html" in user_text_lc
-            or ".css" in user_text_lc
-        )
-
-        has_error = any(x in user_text_lc for x in [
-            "error:",
-            "traceback",
-            "syntaxerror",
-            "indentationerror",
-            "attributeerror",
-            "typeerror",
-            "nameerror",
-            "500",
-            "failed",
-        ])
-
-        if any(x in user_text_lc for x in [
-            "fix this",
-            "fix it",
-            "error",
-            "bug",
-            "not working",
-            "broken",
-            "stuck",
-        ]):
-            if has_file_path and has_error:
-                return {
-                    "assistant_text": (
-                        "Got it. I have the file path and error.\n\n"
-                        "Next step: generate the fix preview, then safe-apply only if it compiles."
-                    ),
-                    "intelligence": {
-                        "strategy": "bug_ready_to_fix",
-                        "next_move": "generate_safe_fix_preview",
-                    },
-                    "self_check": {
-                        "should_revise": False,
-                        "issues": [],
-                    },
-                    "hard_override_applied": True,
-                }
-
-            if has_file_path:
-                return {
-                    "assistant_text": (
-                        "I have the file path.\n\n"
-                        "Now send the exact error or traceback."
-                    ),
-                    "intelligence": {
-                        "strategy": "bug_missing_error",
-                        "next_move": "request_error",
-                    },
-                    "self_check": {
-                        "should_revise": False,
-                        "issues": [],
-                    },
-                    "hard_override_applied": True,
-                }
-
-            return {
-                "assistant_text": (
-                    "Send the file path and the exact error.\n\n"
-                    "Example:\n"
-                    "fix this file C:\\Users\\Owner\\nova\\path\\file.py\n"
-                    "error: paste the traceback"
-                ),
-                "intelligence": {
-                    "strategy": "direct_bug_intake",
-                    "next_move": "request_error_and_file",
-                },
-                "self_check": {
-                    "should_revise": False,
-                    "issues": [],
-                },
-                "hard_override_applied": True,
-            }
 
         if assistant_text.startswith("Auto-fix applied."):
             return {
@@ -2233,6 +2033,7 @@ class ChatService:
             return {"results": []}
 
         import requests
+        import re
         from urllib.parse import quote_plus, urlparse
         from xml.etree import ElementTree as ET
 
@@ -2910,270 +2711,27 @@ class ChatService:
                 "needs_full_file": False,
             })
             return mission
-
     def _guess_path_from_text(self, text: str) -> str:
         text = self._safe_str(text)
 
         windows_py_match = re.search(r"([A-Za-z]:\\[^\n\r\t\"']+?\.py)\b", text)
         if windows_py_match:
-            return windows_py_match.group(1).strip().rstrip(".,:;)]}")
+            return windows_py_match.group(1).strip()
 
         windows_path_match = re.search(r"([A-Za-z]:\\[^\n\r\t\"']+)", text)
         if windows_path_match:
             raw = windows_path_match.group(1).strip()
-            raw = re.split(
-                r"\s+error\s*:|\s+traceback\s*:|\s+bug\s*:",
-                raw,
-                maxsplit=1,
-                flags=re.IGNORECASE,
-            )[0].strip()
-            return raw.rstrip(".,:;)]}")
+            raw = re.split(r"\s+error\s*:|\s+traceback\s*:|\s+bug\s*:", raw, maxsplit=1, flags=re.IGNORECASE)[0].strip()
+            return raw
 
         py_path_match = re.search(r"([A-Za-z0-9_./\\-]+\.py)\b", text)
         if py_path_match:
-            raw = py_path_match.group(1).strip().rstrip(".,:;)]}")
+            raw = py_path_match.group(1).strip()
             if os.path.isabs(raw):
                 return raw
             return os.path.abspath(raw)
 
         return ""
-
-    def _extract_function_from_file(self, file_path: str, func_name: str) -> str:
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-        except Exception:
-            return ""
-
-        start_index = None
-        base_indent = None
-
-        pattern = re.compile(rf"^(\s*)def\s+{re.escape(func_name)}\s*\(")
-
-        for index, line in enumerate(lines):
-            match = pattern.match(line)
-            if match:
-                start_index = index
-                base_indent = len(match.group(1))
-                break
-
-        if start_index is None:
-            return ""
-
-        end_index = len(lines)
-
-        for index in range(start_index + 1, len(lines)):
-            line = lines[index]
-
-            if not line.strip():
-                continue
-
-            current_indent = len(line) - len(line.lstrip(" "))
-
-            if current_indent <= base_indent and re.match(r"^\s*(def|class)\s+", line):
-                end_index = index
-                break
-
-        return "".join(lines[start_index:end_index]).rstrip()
-
-    def _normalize_function_indent(self, fixed_code: str, original_code: str) -> str:
-        fixed_code = self._safe_str(fixed_code).replace("\t", "    ")
-        original_code = self._safe_str(original_code).replace("\t", "    ")
-
-        if not fixed_code.strip():
-            return ""
-
-        base_indent = "    "
-
-        for line in original_code.splitlines():
-            stripped = line.lstrip(" ")
-            if stripped.startswith("def "):
-                base_indent = line[: len(line) - len(stripped)]
-                break
-
-        lines = []
-        started = False
-
-        for raw in fixed_code.splitlines():
-            line = raw.rstrip()
-            stripped = line.strip()
-
-            if not stripped:
-                if started:
-                    lines.append("")
-                continue
-
-            if stripped.startswith("```") or stripped.lower() in ("python", "py"):
-                continue
-
-            if stripped.startswith("import ") or stripped.startswith("from "):
-                continue
-
-            if stripped.startswith("def "):
-                started = True
-
-            if started:
-                lines.append(line)
-
-        if not lines:
-            return ""
-
-        def_indent = None
-        for line in lines:
-            stripped = line.lstrip(" ")
-            if stripped.startswith("def "):
-                def_indent = len(line) - len(stripped)
-                break
-
-        if def_indent is None:
-            return ""
-
-        rebuilt = []
-
-        for line in lines:
-            if not line.strip():
-                rebuilt.append("")
-                continue
-
-            current_indent = len(line) - len(line.lstrip(" "))
-            stripped = line.lstrip(" ")
-
-            if current_indent < def_indent:
-                return ""
-
-            relative_indent = current_indent - def_indent
-            rebuilt.append(base_indent + (" " * relative_indent) + stripped)
-
-        return "\n".join(rebuilt).rstrip()
-
-    def _execute_auto_fix_function(
-        self,
-        func_name: str,
-        file_path: str,
-        user_text: str,
-        session_id: str,
-    ) -> dict:
-        snippet = self._extract_function_from_file(file_path, func_name)
-
-        if not snippet:
-            assistant_text = (
-                "Auto-fix failed.\n\n"
-                f"Function not found:\n{func_name}\n\n"
-                f"File:\n{file_path}"
-            )
-            assistant_msg = self._build_assistant_message(text=assistant_text)
-
-            return {
-                "assistant_message": assistant_msg,
-                "session": self._get_session_payload(session_id),
-                "ok": True,
-            }
-
-        try:
-            import os
-            import shutil
-            import subprocess
-
-            fixed_code = snippet
-
-            fixed_code = self._normalize_function_indent(
-                fixed_code=fixed_code,
-                original_code=snippet,
-            )
-
-            fixed_code = self._safe_str(fixed_code)
-
-            if not fixed_code.strip():
-                fixed_code = self._safe_str(snippet)
-
-            if not fixed_code.strip():
-                assistant_text = "Auto-fix failed.\n\nGenerated code was empty."
-                assistant_msg = self._build_assistant_message(text=assistant_text)
-
-                return {
-                    "assistant_message": assistant_msg,
-                    "session": self._get_session_payload(session_id),
-                    "ok": True,
-                }
-
-            with open(file_path, "r", encoding="utf-8") as f:
-                original_code = f.read()
-
-            new_code = original_code.replace(snippet, fixed_code, 1)
-            temp_path = file_path + ".tmp_autofix.py"
-
-            with open(temp_path, "w", encoding="utf-8") as f:
-                f.write(new_code)
-
-            result = subprocess.run(
-                ["python", "-m", "py_compile", temp_path],
-                capture_output=True,
-                text=True,
-            )
-
-            compile_ok = result.returncode == 0
-            compile_output = (result.stderr or result.stdout or "").strip()
-
-            if compile_ok:
-                backup_path = file_path + ".bak_autofix"
-                shutil.copy(file_path, backup_path)
-
-                with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(new_code)
-
-                try:
-                    os.remove(temp_path)
-                except Exception:
-                    pass
-
-                assistant_text = (
-                    "Auto-fix applied safely.\n\n"
-                    f"Function: {func_name}\n\n"
-                    f"Backup created:\n{backup_path}\n\n"
-                    "Fix:\n"
-                    "```python\n"
-                    f"{fixed_code}\n"
-                    "```"
-                )
-            else:
-                try:
-                    os.remove(temp_path)
-                except Exception:
-                    pass
-
-                assistant_text = (
-                    "Auto-fix blocked. Compile failed.\n\n"
-                    f"Function: {func_name}\n\n"
-                    "Error:\n"
-                    f"{compile_output}\n\n"
-                    "Fix preview:\n"
-                    "```python\n"
-                    f"{fixed_code}\n"
-                    "```"
-                )
-
-            assistant_msg = self._build_assistant_message(text=assistant_text)
-
-            return {
-                "assistant_message": assistant_msg,
-                "session": self._get_session_payload(session_id),
-                "ok": True,
-            }
-
-        except Exception as e:
-            print("AUTO_FIX_FUNCTION_ERROR:", e)
-
-            assistant_text = (
-                "Auto-fix failed due to an internal error.\n\n"
-                f"{str(e)}"
-            )
-            assistant_msg = self._build_assistant_message(text=assistant_text)
-
-            return {
-                "assistant_message": assistant_msg,
-                "session": self._get_session_payload(session_id),
-                "ok": True,
-            }
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         print("HANDLE IS BEING CALLED")
@@ -3182,80 +2740,12 @@ class ChatService:
         session_id = self._ensure_session_id(session_id)
         user_text = self._safe_str(user_text)
 
-        # =============================
-        # FUNCTION-LEVEL AUTO FIX
-        # =============================
-
-        func_match = re.search(
-            r"fix function\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\s+(.+)",
-            user_text,
-            re.IGNORECASE,
-        )
-
-        if func_match:
-            func_name = func_match.group(1).strip()
-            path = self._guess_path_from_text(func_match.group(2))
-
-            if path:
-                return self._execute_auto_fix_function(
-                    func_name=func_name,
-                    file_path=path,
-                    user_text=user_text,
-                    session_id=session_id,
-                )
-
-        target_func_match = re.search(
-            r"target function\s*:\s*([A-Za-z_][A-Za-z0-9_]*)",
-            user_text,
-            re.IGNORECASE,
-        )
-
-        if target_func_match:
-            func_name = target_func_match.group(1).strip()
-            path = self._guess_path_from_text(user_text)
-
-            if path:
-                return self._execute_auto_fix_function(
-                    func_name=func_name,
-                    file_path=path,
-                    user_text=user_text,
-                    session_id=session_id,
-                )
-
         # ==============================
         # HARD ROUTE: AUTO-FIX FILE (IMPROVED)
         # ==============================
 
         lowered = user_text.lower()
-
-        # ===== INTELLIGENCE GUARD =====
-        if "fix this" in lowered and "error" not in lowered:
-            assistant_msg = self._build_assistant_message(
-                text=(
-                    "Send the file path and the exact error.\n\n"
-                    "Example:\n"
-                    "fix this file C:\\Users\\Owner\\nova\\path\\file.py\n"
-                    "error: paste the traceback"
-                )
-            )
-            return {
-                "ok": True,
-                "assistant_message": assistant_msg,
-                "session": self._get_session_payload(session_id),
-                "debug": {"route_taken": "bug_intake_guard"},
-            }
-
         path = self._guess_path_from_text(user_text)
-
-        # ===== STORE BUG CONTEXT =====
-        try:
-            state = self.session_service.get_working_state(session_id) or {}
-            state["last_file_path"] = path
-            if "error" in lowered:
-                state["last_error"] = user_text
-            self.session_service.update_working_state(session_id, state)
-        except Exception as e:
-            print("BUG_CONTEXT_SAVE_ERROR:", e)
 
         print("PATH DETECTED:", path)
 
@@ -3329,6 +2819,7 @@ class ChatService:
 
             if code_intent and (auto_fix_requested or "```" in user_text):
                 import os
+                import re
                 import shutil
                 import time
 
@@ -3392,52 +2883,53 @@ class ChatService:
                         if stripped.startswith(("return", "pass", "break", "continue")):
                             indent_level = max(indent_level - 1, 0)
 
+                    fixed_code = "\n".join(fixed_lines) + "\n"
 
-                # ---- verify python syntax after write ----
-                compile_output = ""
-                compile_ok = True
+                    # ---- verify python syntax after write ----
+                    compile_output = ""
+                    compile_ok = True
 
-                if file_path.lower().endswith(".py"):
-                    try:
-                        import subprocess
+                    if file_path.lower().endswith(".py"):
+                        try:
+                            import subprocess
 
-                        result = subprocess.run(
-                            ["python", "-m", "py_compile", file_path],
-                            capture_output=True,
-                            text=True,
+                            result = subprocess.run(
+                                ["python", "-m", "py_compile", file_path],
+                                capture_output=True,
+                                text=True,
+                            )
+
+                            compile_ok = result.returncode == 0
+                            compile_output = (result.stderr or result.stdout or "").strip()
+
+                        except Exception as e:
+                            compile_ok = False
+                            compile_output = f"Compile check failed: {e}"
+
+                    print("AUTO_FIX_WRITE_SUCCESS:", file_path)
+
+                    assistant_message = {
+                        "text": (
+                            "Auto-fix applied.\n\n"
+                            f"File: {file_path}\n"
+                            f"Backup: {backup_path or 'none'}\n\n"
+                            "Fix:\n"
+                            "- normalized indentation\n"
+                            "- replaced tabs with 4 spaces\n\n"
+                            "Result:\n"
+                            "```python\n"
+                            f"{pending_fix_code.strip()}\n"
+                            "```\n\n"
+                            f"Compile check: {'passed' if compile_ok else 'failed'}\n"
+                            f"{compile_output if compile_output else ''}"
                         )
+                    }
 
-                        compile_ok = result.returncode == 0
-                        compile_output = (result.stderr or result.stdout or "").strip()
-                    except Exception as e:
-                        compile_ok = False
-                        compile_output = f"Compile check failed: {e}"
-
-                print("AUTO_FIX_WRITE_SUCCESS:", file_path)
-
-                assistant_message = {
-                    "text": (
-                        "Auto-fix applied.\n\n"
-                        f"File: {file_path}\n"
-                        f"Backup: {backup_path or 'none'}\n\n"
-                        "Fix:\n"
-                        "- normalized indentation\n"
-                        "- replaced tabs with 4 spaces\n\n"
-                        "Result:\n"
-                        "```python\n"
-                        f"{pending_fix_code.strip()}\n"
-                        "```\n\n"
-                        f"Compile check: {'passed' if compile_ok else 'failed'}\n"
-                        f"{compile_output if compile_output else ''}"
-                    )
-                }
-
-                return {
-                    "assistant_message": assistant_message,
-                    "session": self._get_session_payload(session_id),
-                    "ok": True,
-                }
-
+                    return {
+                        "assistant_message": assistant_message,
+                        "session": self._get_session_payload(session_id),
+                        "ok": True,
+                    }
         except Exception as e:
             print("AUTO_FIX_ERROR:", e)
 
@@ -3452,14 +2944,12 @@ class ChatService:
             state = session.get("working_state") if isinstance(session, dict) else {}
             state = state if isinstance(state, dict) else {}
             last_intent = str(state.get("mission_mode") or "").lower().strip()
-
         except Exception:
             last_intent = ""
 
         decision = {}
         try:
             decision = self._decide(user_text=user_text)
-
         except Exception as e:
             print("DECISION_ERROR:", e)
             decision = {}
@@ -4749,7 +4239,7 @@ class ChatService:
             })
 
         messages.append({
-            "role": "user",
+            "role": "user", 
             "content": user_text or ""
         })
 
@@ -5746,10 +5236,10 @@ class ChatService:
                 step_output = """Plan:
 
 Goal:
-    Create a clear actionable plan.
+Create a clear actionable plan.
 
 Steps:
-    1. Define the objective
+1. Define the objective
 2. Break into tasks
 3. Prioritize tasks
 4. Assign timeline
@@ -5758,7 +5248,7 @@ Steps:
 7. Review and adjust
 
 Next action:
-    Write the exact goal in one sentence.
+Write the exact goal in one sentence.
 """
             elif step_index == 3:
                 step_output = "Plan structure verified for completeness and usability."
@@ -5916,7 +5406,7 @@ Next action:
             if isinstance(step, dict) and step.get("status") == "done":
                 done += 1
         return done
-
+ 
     def _get_execution_artifacts_source(self):
         artifacts = []
 
@@ -6507,7 +5997,7 @@ Next action:
             from datetime import datetime, timezone
             merged["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-            return merged
+            return merged  
 
     def _extract_working_state_updates(self, user_text: str, current_state: dict | None = None) -> dict:
         text = self._safe_str(user_text).strip()
@@ -6651,7 +6141,7 @@ Next action:
     # =========================
     # WORKING STATE HELPERS
     # =========================
-
+            
     def _format_working_state_context(self, session_id: str) -> str:
             state = self._get_working_state(session_id)
             if not isinstance(state, dict) or not state:
@@ -7485,7 +6975,7 @@ Next action:
                     "status_code": result.get("status_code"),
                     "artifact_kind": self._safe_str(final_artifact.get("kind")) if isinstance(final_artifact, dict) else "web_result",
                 },
-            }
+            } 
 
     def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
         attachments = attachments or []
@@ -8134,28 +7624,17 @@ def _build_chat_input(
             "decision": tool_decision,
             "result": tool_result,
         }
- 
+
     def _guess_path_from_text(self, text: str) -> str:
         text = self._safe_str(text)
 
-        windows_py_match = re.search(r"([A-Za-z]:\\[^\n\r\t\"']+?\.py)\b", text)
-        if windows_py_match:
-            return windows_py_match.group(1).strip().rstrip(".,:;)]}")
-
         windows_path_match = re.search(r"([A-Za-z]:\\[^\n\r\t\"']+)", text)
         if windows_path_match:
-            raw = windows_path_match.group(1).strip()
-            raw = re.split(
-                r"\s+error\s*:|\s+traceback\s*:|\s+bug\s*:",
-                raw,
-                maxsplit=1,
-                flags=re.IGNORECASE,
-            )[0].strip()
-            return raw.rstrip(".,:;)]}")
+            return windows_path_match.group(1).strip()
 
         py_path_match = re.search(r"([A-Za-z0-9_./\\-]+\.py)\b", text)
         if py_path_match:
-            raw = py_path_match.group(1).strip().rstrip(".,:;)]}")
+            raw = py_path_match.group(1).strip()
             if os.path.isabs(raw):
                 return raw
             return os.path.abspath(raw)

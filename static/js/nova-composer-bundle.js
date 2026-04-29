@@ -70,17 +70,39 @@ function applyBackendSessionState(payload, explicitSessionId) {
   if (Array.isArray(data.artifacts)) {
     state.artifacts = safeArray(data.artifacts);
   }
-
   if (Array.isArray(data.memory)) {
     state.memory = data.memory;
   }
 
-  renderChat();
-  renderArtifacts();
-  renderMemory();
-  updateTopbarFromState();
-  scrollChatToBottom(true);
-}
+  if (typeof renderChat === "function") {
+    renderChat();
+  } else if (typeof window.renderChat === "function") {
+    window.renderChat();
+  }
+
+  if (typeof renderArtifacts === "function") {
+    renderArtifacts();
+  } else if (typeof window.renderArtifacts === "function") {
+    window.renderArtifacts();
+  }
+
+  if (typeof renderMemory === "function") {
+    renderMemory();
+  } else if (typeof window.renderMemory === "function") {
+    window.renderMemory();
+  }
+
+  if (typeof updateTopbarFromState === "function") {
+    updateTopbarFromState();
+  } else if (typeof window.updateTopbarFromState === "function") {
+    window.updateTopbarFromState();
+  }
+
+  if (typeof scrollChatToBottom === "function") {
+    scrollChatToBottom(true);
+  } else if (typeof window.scrollChatToBottom === "function") {
+    window.scrollChatToBottom(true);
+  }
 
   async function jumpToSessionAndSync(sessionId, options) {
     const opts = options || {};
@@ -989,23 +1011,28 @@ function setBusyUi(isBusy) {
   }
 }
 
-if (els.sendButton) {
-  els.sendButton.onclick = function (event) {
-    event.preventDefault();
-    console.log("SEND BUTTON CLICKED");
-    sendMessage();
-  };
-}
+els.sendButton.onclick = function (event) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  if (window.__novaSendingMessage) return;
+  window.__novaSendingMessage = true;
+
+  Promise.resolve(sendMessage()).finally(function () {
+    setTimeout(function () {
+      window.__novaSendingMessage = false;
+    }, 500);
+  });
+};
 
 if (els.chatInput) {
   els.chatInput.addEventListener("input", autoResizeTextarea);
-  els.chatInput.addEventListener("keydown", function (event) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      sendMessage();
-    }
-  });
-}
+els.chatInput.addEventListener("keydown", function (event) {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    sendMessage();
+  }
+});
 
   function autoResizeTextarea() {
     if (!els.chatInput) return;
@@ -1807,37 +1834,36 @@ document.addEventListener("click", function (e) {
   const protectedEl = e.target.closest("[data-no-chat-action='1']");
   const sourceEl = e.target.closest(".source-card, .source-row");
 
-// =============================
-// MEMORY CLICK REVEAL
-// =============================
-const memBtn = e.target.closest(".memory-dominance-badge, .memory-used-badge");
+  // =============================
+  // MEMORY CLICK REVEAL
+  // =============================
+  const memBtn = e.target.closest(".memory-dominance-badge, .memory-used-badge");
 
-if (memBtn) {
-  e.preventDefault();
-  e.stopPropagation();
+  if (memBtn) {
+    e.preventDefault();
+    e.stopPropagation();
 
-  try {
-    const raw = memBtn.getAttribute("data-memory-used") || "";
-    const decoded = decodeURIComponent(raw);
-    const memoryList = JSON.parse(decoded || "[]");
+    try {
+      const raw = memBtn.getAttribute("data-memory-used") || "";
+      const decoded = decodeURIComponent(raw);
+      const memoryList = JSON.parse(decoded || "[]");
 
-    if (!memoryList.length) return;
+      if (!memoryList.length) return;
 
-    openRail();
-    setRailTab("memory");
+      openRail();
+      setRailTab("memory");
 
-    // push memory into rail viewer
-    if (typeof renderMemoryViewer === "function") {
-      renderMemoryViewer(memoryList);
-    } else {
-      console.warn("renderMemoryViewer not found");
+      if (typeof renderMemoryViewer === "function") {
+        renderMemoryViewer(memoryList);
+      } else {
+        console.warn("renderMemoryViewer not found");
+      }
+    } catch (err) {
+      console.warn("memory click failed", err);
     }
-  } catch (err) {
-    console.warn("memory click failed", err);
-  }
 
-  return;
-}
+    return;
+  }
 
   if (protectedEl && !sourceEl) {
     e.preventDefault();
@@ -1845,15 +1871,17 @@ if (memBtn) {
     return;
   }
 
+  // 🔥 CRITICAL FIX (missing before)
   if (!sourceEl) return;
 
-  e.preventDefault();
-  e.stopPropagation();
+  let url =
+    sourceEl.getAttribute("data-source-url") ||
+    sourceEl.getAttribute("data-url") ||
+    "";
 
-if (url === "{preview}" || url === "%7Bpreview%7D") {
-  url = "";
-}
-
+  if (url === "{preview}" || url === "%7Bpreview%7D") {
+    url = "";
+  }
 
   if (!url) {
     const link = sourceEl.querySelector("a[href]");
@@ -6244,6 +6272,4 @@ setTimeout(() => {
   const attachBtn = document.querySelector('[data-attach-button]');
   if (attachBtn) attachBtn.textContent = '+';
 }, 500);
-
-})();
 
