@@ -2175,7 +2175,10 @@ function renderMarkdown(text) {
 }
 
 function renderMessageCard(message) {
-  if (!message) return "";
+  if (!message || typeof message !== "object") {
+    console.warn("renderMessageCard received invalid message", message);
+    return "";
+  }
 
   const role = String(message.role || "assistant");
 
