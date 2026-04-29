@@ -1016,39 +1016,75 @@ class ChatService:
     ) -> dict:
         decision = decision if isinstance(decision, dict) else {}
         assistant_text = self._safe_str(assistant_text).strip()
-
-        user_text_lc = self._safe_str(user_text).lower().strip()
+        user_text_clean = self._safe_str(user_text).strip()
+        user_text_lc = user_text_clean.lower()
 
         # =============================
-        # HARD COMMON-PROMPT OVERRIDE (FIXED)
+        # HARD BUG/STUCK INTAKE GATE
+        # Only fires for short, vague repair prompts.
+        # Normal questions must pass through.
         # =============================
 
-        stuck_signals = [
+        stuck_exact = {
             "fix this",
+            "fix it",
             "not working",
             "it's not working",
             "its not working",
             "broken",
-            "error",
             "stuck",
+            "i'm stuck",
+            "im stuck",
             "idk",
             "i dont know",
             "i don't know",
             "what now",
             "help",
             "confused",
-        ]
+        }
 
-        if any(signal in user_text_lc for signal in stuck_signals):
+        explain_exact = {
+            "explain this",
+            "what is this",
+            "what does this mean",
+        }
+
+        word_count = len(user_text_lc.split())
+
+        is_short_stuck_prompt = (
+            user_text_lc in stuck_exact
+            or (
+                word_count <= 6
+                and any(signal in user_text_lc for signal in stuck_exact)
+            )
+        )
+
+        if is_short_stuck_prompt:
             return {
                 "assistant_text": (
-                    "Do this:\n"
-                    "1. Paste the error\n"
-                    "2. Paste the file path\n\n"
-                    "I’ll fix it."
+                    "Hi Richard. What bug are we fixing right now? "
+                    "Paste the error, file, or failing behavior and I’ll help patch it."
                 ),
                 "intelligence": {
-                    "strategy": "force_next_step",
+                    "strategy": "bug_intake",
+                    "next_move": "request_error_file_or_behavior",
+                },
+                "self_check": {
+                    "should_revise": False,
+                    "issues": [],
+                },
+                "hard_override_applied": True,
+            }
+
+        if user_text_lc in explain_exact:
+            return {
+                "assistant_text": (
+                    "What do you want me to explain?\n"
+                    "Paste the text, code, error, screenshot, or link, and I’ll break it down clearly."
+                ),
+                "intelligence": {
+                    "strategy": "clarify_missing_subject",
+                    "next_move": "request_subject_to_explain",
                 },
                 "self_check": {
                     "should_revise": False,
@@ -1063,7 +1099,7 @@ class ChatService:
         hard_override_applied = False
 
         if not assistant_text:
-            assistant_text = "No response generated."
+            assistant_text = "I couldn’t generate a useful answer from that. Send the exact thing you want handled."
 
         try:
             intelligence = self._fuse_response_intelligence(
@@ -1089,8 +1125,8 @@ class ChatService:
 
         strategy = strategy if isinstance(strategy, dict) else {}
 
-        intelligence["strategy"] = strategy.get("strategy")
-        intelligence["next_move"] = strategy.get("next_move")
+        intelligence["strategy"] = strategy.get("strategy") or intelligence.get("strategy") or "normal_answer"
+        intelligence["next_move"] = strategy.get("next_move") or intelligence.get("next_move")
         intelligence["response_strategy"] = strategy
 
         try:
