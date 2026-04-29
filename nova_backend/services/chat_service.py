@@ -1183,33 +1183,9 @@ class ChatService:
         if not text:
             return "Done."
 
-        vague_fix_inputs = [
-            "fix this",
-            "it's not working",
-            "its not working",
-            "not working",
-            "broken",
-            "error",
-        ]
-
-        if any(user_text_lc == v or user_text_lc.startswith(v) for v in vague_fix_inputs):
-            return (
-                "Paste:\n"
-                "- the error\n"
-                "- the file path\n\n"
-                "I’ll fix it."
-            )
-
-        if user_text_lc in ["help", "what do we do", "what now", "next"]:
-            return (
-                "Tell me what you're trying to do.\n\n"
-                "I’ll give you the next step."
-            )
-
         kill_phrases = [
             "i can help",
             "let me know",
-            "if you want",
             "feel free",
             "hopefully",
             "in conclusion",
@@ -1233,18 +1209,104 @@ class ChatService:
 
         text = "\n".join(lines).strip()
 
+        bad_endings = [
+            "Example:",
+            "Here’s how:",
+            "Here's how:",
+            "This prints:",
+            "That prints:",
+            "Output:",
+            "Result:",
+        ]
+
+        for bad in bad_endings:
+            if text.endswith(bad):
+                text = text[: -len(bad)].strip()
+
+        lines = [line.rstrip() for line in text.splitlines() if line.strip()]
+
+        while lines:
+            last = lines[-1].strip()
+            last_lc = last.lower()
+
+            if (
+                last.endswith(":")
+                or last.endswith("-")
+                or last_lc in {"example", "output", "result", "here’s how", "here's how"}
+            ):
+                lines.pop()
+                continue
+
+            break
+
+        text = "\n".join(lines).strip()
+
         if user_text_lc.startswith("latest"):
             useful = [line for line in text.split("\n") if line.strip()]
-            return "\n".join(useful[:4]).strip() or text
+            text = "\n".join(useful[:6]).strip() or text
 
         if any(line.strip().startswith(("1.", "2.", "3.", "4.", "5.")) for line in text.split("\n")):
-            text = "\n".join(text.split("\n")[:5]).strip()
+            text = "\n".join(text.split("\n")[:7]).strip()
 
         if response_policy.get("answer_length") == "short":
             text = "\n".join(text.split("\n")[:6]).strip()
 
         if response_policy.get("user_frustrated"):
             text = text.replace("please", "").replace("kindly", "").strip()
+
+        # =============================
+        # ANSWER PUNCH
+        # =============================
+
+        punch_rewrites = {
+            "javascript is a programming language used to make websites interactive.": (
+                "JavaScript = the language that makes websites interactive."
+            ),
+            "python is a high-level programming language.": (
+                "Python = a readable programming language used for scripts, apps, automation, data, and AI."
+            ),
+            "css stands for cascading style sheets.": (
+                "CSS = the styling language for webpages."
+            ),
+            "html stands for hypertext markup language.": (
+                "HTML = the structure language of webpages."
+            ),
+        }
+
+        lines = text.split("\n")
+        if lines:
+            first_lc = lines[0].strip().lower()
+            if first_lc in punch_rewrites:
+                lines[0] = punch_rewrites[first_lc]
+
+        text = "\n".join(lines).strip()
+
+        # =============================
+        # AUTHORITY TONE
+        # =============================
+
+        hedges = [
+            "maybe",
+            "perhaps",
+            "possibly",
+            "generally",
+            "typically",
+            "usually",
+            "kind of",
+            "sort of",
+        ]
+
+        strong_lines = []
+        for line in text.split("\n"):
+            clean_line = line.strip()
+
+            if len(clean_line.split()) > 5:
+                for hedge in hedges:
+                    clean_line = clean_line.replace(hedge, "").replace(hedge.title(), "")
+
+            strong_lines.append(" ".join(clean_line.split()))
+
+        text = "\n".join(strong_lines).strip()
 
         return text or "Done."
 

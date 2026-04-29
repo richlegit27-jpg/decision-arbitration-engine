@@ -234,34 +234,63 @@ function resolveUploadUrl(url) {
 
     const urls = Array.isArray(meta.source_urls) ? meta.source_urls : [];
 
-const mission = (meta && (meta.strategy || meta.mission)) || "";
-let badge = "";
+    const mission = (meta && (meta.strategy || meta.mission)) || "";
+    const badge = mission
+      ? `<div class="mission-badge">${escapeHtml(String(mission))}</div>`
+      : "";
 
-if (mission) {
-  badge = `<div class="mission-badge">${escapeHtml(mission)}</div>`;
-}
+    let html = `
+      ${badge}
+      <div class="nova-msg-text">${escapeHtml(mainText)}</div>
+      <div class="nova-sources">
+        <div class="nova-sources-title">Sources</div>
+    `;
 
-let html = `
-  ${badge}
-  <div class="nova-msg-text">${escapeHtml(mainText)}</div>
-`;
-    html += `<div class="nova-sources">`;
-
-    lines.forEach((line, index) => {
+    lines.slice(0, 6).forEach((line, index) => {
       const url = urls[index] || "";
-      const label = line.replace(/^\d+\.\s*/, "");
+      const label = line.replace(/^\d+\.\s*/, "").trim();
+
+      let domain = "source";
+      let favicon = "";
+
+      try {
+        if (url) {
+          const parsed = new URL(url);
+          domain = parsed.hostname.replace(/^www\./, "");
+          favicon = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(parsed.hostname)}&sz=32`;
+        }
+      } catch (error) {
+        domain = "source";
+      }
 
       html += `
-        <button class="source-row" type="button" data-url="${escapeHtml(url)}"
-data-title="${escapeHtml(label)}"
-data-preview="${escapeHtml(label + ' — ' + (url || ''))}">
-          <span class="source-index">${index + 1}.</span>
-          <span class="source-label">${escapeHtml(label)}</span>
+        <button
+          class="source-row"
+          type="button"
+          data-url="${escapeHtml(url)}"
+          data-source-url="${escapeHtml(url)}"
+          data-title="${escapeHtml(label)}"
+          data-domain="${escapeHtml(domain)}"
+          data-preview="${escapeHtml(label)}"
+        >
+          <span class="source-index">${index + 1}</span>
+          ${
+            favicon
+              ? `<img class="source-favicon" src="${escapeHtml(favicon)}" alt="" loading="lazy">`
+              : `<span class="source-favicon source-favicon-empty"></span>`
+          }
+          <span class="source-main">
+            <span class="source-label">${escapeHtml(label)}</span>
+            <span class="source-domain">${escapeHtml(domain)}</span>
+          </span>
         </button>
       `;
     });
 
-    html += `</div>`;
+    html += `
+      </div>
+    `;
+
     return html;
   }
 
