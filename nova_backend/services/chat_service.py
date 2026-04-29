@@ -175,6 +175,38 @@ class ChatService:
 
         session_id = self._ensure_session_id(session_id)
 
+        try:
+            self._maybe_write_memory(decision, user_text, session_id)
+        except Exception as e:
+            print("FINALIZE_MEMORY_WRITE_ERROR:", e)
+
+        if isinstance(assistant_msg, dict):
+            meta = assistant_msg.get("meta")
+            if not isinstance(meta, dict):
+                meta = {}
+
+            used_memory_items = []
+
+            for key in ("memory_used", "used_memory", "memories_used"):
+                value = meta.get(key)
+                if isinstance(value, list):
+                    used_memory_items = value
+                    break
+
+            if not used_memory_items:
+                try:
+                    ranked = self._rank_memory_context(user_text, limit=6)
+                    if isinstance(ranked, list):
+                        used_memory_items = ranked
+                except Exception as e:
+                    print("FINALIZE_MEMORY_USED_ERROR:", e)
+
+            meta["memory_used"] = used_memory_items
+            meta["used_memory"] = used_memory_items
+            meta["memory_used_count"] = len(used_memory_items)
+            meta["used_memory_count"] = len(used_memory_items)
+            assistant_msg["meta"] = meta
+
         session = self._get_session_payload(session_id) or {}
         messages = session.get("messages")
         if not isinstance(messages, list):
@@ -321,7 +353,17 @@ class ChatService:
                 decision=decision,
                 saved_artifact=None,
             ) 
-        if mission_mode == "full_file":
+ 
+        is_memory_request = original_user_text.lower().strip().startswith((
+            "remember ",
+            "remember:",
+            "save this",
+            "store this",
+            "note that",
+        ))
+
+        if mission_mode == "full_file" and not is_memory_request:
+
             assistant_text = (
                 "SMFF mode active.\n\n"
                 "Send the file name, function, or task.\n"
@@ -5655,55 +5697,65 @@ Write the exact goal in one sentence.
     # MEMORY HELPERS
     # ==============================
 
-    def _rank_memory_context(self, user_text: str, limit: int = 5, session_id: str = ""):
-        user_text = self._safe_str(user_text).lower()
+    def _rank_memory_context(self, user_text: str = "", limit: int = 6):
+        memories = self._get_memory_list()
+        if not isinstance(memories, list):
+            return []
 
-        memory = self._get_memory_list()
+        query = str(user_text or "").lower().strip()
+        query_words = set(query.replace("?", " ").replace(".", " ").split())
+
         scored = []
 
-        for item in memory:
+        for item in memories:
             if not isinstance(item, dict):
                 continue
 
-            text = self._safe_str(item.get("text")).lower()
-            kind = self._safe_str(item.get("kind")).lower()
+            text = str(item.get("text") or "").strip()
+            if not text:
+                continue
 
+            kind = str(item.get("kind") or "").lower()
+            source = str(item.get("source") or "").lower()
+            pinned = bool(item.get("pinned"))
+            weight = int(item.get("weight") or 0)
+
+            lower = text.lower()
             score = 0
 
-            # ðŸ”¥ keyword match (stronger)
-            for word in user_text.split():
-                if word and word in text:
-                    score += 3
+            if pinned:
+                score += 100
 
-            # ðŸ”¥ HIGH PRIORITY TYPES
-            if kind in ("project", "goal"):
+            score += weight * 5
+
+            if kind == "preference":
+                score += 35
+            elif kind == "profile":
+                score += 25
+            elif kind == "project":
+                score += 20
+            elif kind == "goal":
+                score += 15
+
+            if "code" in query and ("code" in lower or "smff" in lower or "full-file" in lower or "full file" in lower):
+                score += 80
+
+            if "remember" in query or "how i like" in query or "prefer" in query:
+                score += 50
+
+            for word in query_words:
+                if len(word) >= 4 and word in lower:
+                    score += 8
+
+            if source.startswith("manual"):
                 score += 8
-
-            # ðŸ”¥ MEDIUM PRIORITY
-            if kind in ("identity", "preference"):
-                score += 5
-
-            # ðŸ”¥ penalize junk
-            if kind == "note":
-                score -= 2
-
-            # ðŸ”¥ longer meaningful memories get slight boost
-            if len(text) > 20:
-                score += 1
 
             scored.append((score, item))
 
-        # sort by score
-        scored.sort(key=lambda x: x[0], reverse=True)
+        scored.sort(key=lambda pair: pair[0], reverse=True)
 
-        # ðŸ”¥ ALWAYS include at least 1 important memory if exists
-        top = [item for score, item in scored if score > 0]
+        return [item for score, item in scored[: max(1, int(limit or 6))]]
 
-        if not top:
-            # fallback: still give latest memory
-            return memory[-5:]
-
-        return top[:limit]
     def _format_memory_context(self, memory_items: list[dict]) -> str:
             if not isinstance(memory_items, list) or not memory_items:
                 return ""
@@ -5729,11 +5781,9 @@ Write the exact goal in one sentence.
         return self._safe_str(assistant_text).strip()
 
     def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
-        if not isinstance(decision, dict):
-            return
-
+        print("MAYBE_WRITE_MEMORY_HIT:", user_text)
         text = self._normalize_memory_text_for_save(user_text)
-        lowered = text.lower()
+        lowered = text.lower().strip()
 
         if not text:
             return
@@ -5741,9 +5791,45 @@ Write the exact goal in one sentence.
         should_save = False
         kind = "note"
 
+        # ===== HARD SAVE MEMORY COMMANDS =====
+
+        hard_memory_prefixes = (
+            "remember ",
+            "remember:",
+            "remember that ",
+            "remember this ",
+            "save this ",
+            "store this ",
+            "note that ",
+        )
+        if lowered.startswith(hard_memory_prefixes):
+            try:
+                self.memory.add_memory({
+                    "text": text,
+                    "kind": "preference",
+                    "source": "manual",
+                    "session_id": session_id,
+                })
+                print("FORCED MEMORY SAVE:", text)
+            except Exception as e:
+                print("FORCED MEMORY SAVE FAILED:", e)
+            return
+
+            kind = "preference" if any(x in lowered for x in [
+                "i like",
+                "i prefer",
+                "smff",
+                "full-file",
+                "full file",
+                "powershell",
+                "direct answers",
+                "no partial snippets",
+                "clean indentation",
+            ]) else "note"
+
         # ===== MEMORY CLASSIFICATION =====
 
-        if any(x in lowered for x in [
+        elif any(x in lowered for x in [
             "my name is",
             "call me",
             "prefers to be called",
@@ -5760,8 +5846,14 @@ Write the exact goal in one sentence.
             "tldr",
             "smff",
             "i prefer",
+            "i like",
             "from now on",
             "going forward",
+            "full-file",
+            "full file",
+            "powershell",
+            "no partial snippets",
+            "clean indentation",
         ]):
             should_save = True
             kind = "preference"
@@ -5787,16 +5879,12 @@ Write the exact goal in one sentence.
             should_save = True
             kind = "goal"
 
-        elif "remember that" in lowered or "remember this" in lowered:
-            should_save = True
-            kind = "note"
-
         # ===== FILTER =====
 
         if len(text.split()) < 4:
             should_save = False
 
-        if lowered.strip() in (
+        if lowered in (
             "hello", "hi", "ok", "okay", "thanks", "lol", "next", "go", "test"
         ):
             should_save = False
@@ -5808,6 +5896,7 @@ Write the exact goal in one sentence.
             return
 
         # ===== DUPLICATE PREVENTION =====
+
         try:
             existing_items = []
             if hasattr(self, "memory") and self.memory and hasattr(self.memory, "all"):
@@ -5819,20 +5908,15 @@ Write the exact goal in one sentence.
 
                 existing_text = self._normalize_memory_text_for_save(item.get("text", ""))
                 existing_kind = self._safe_str(item.get("kind")).lower().strip()
-                existing_session = self._safe_str(item.get("session_id")).strip()
 
-                if (
-                    existing_text
-                    and existing_text.lower() == text.lower()
-                    and existing_kind == kind
-                    and existing_session == self._safe_str(session_id)
-                ):
+                if existing_text and existing_text.lower() == text.lower() and existing_kind == kind:
                     return
 
         except Exception:
             pass
 
         # ===== SAVE =====
+
         try:
             self.memory.add_memory({
                 "text": text,
@@ -6418,7 +6502,6 @@ def _build_chat_input(
     working_context_block: str = "",
     memory_context: str = "",
 ) -> str:
-
     user_text = self._safe_str(user_text)
     decision = decision if isinstance(decision, dict) else {}
 
@@ -6510,6 +6593,30 @@ def _build_chat_input(
 
     recent_block = "\n".join(recent_lines)
 
+    # === MEMORY STYLE INJECTION ===
+    memory_style_block = ""
+    try:
+        memory_text = str(memory_block or memory_context or "").lower()
+
+        if (
+            "smff" in memory_text
+            or "full-file" in memory_text
+            or "full file" in memory_text
+            or "powershell" in memory_text
+            or "direct answers" in memory_text
+        ):
+            memory_style_block = (
+                "USER STYLE OVERRIDE FROM MEMORY:\n"
+                "- When helping with code, respond in SMFF style.\n"
+                "- Give full-file or full-block replacements instead of tiny snippets.\n"
+                "- Include exact file paths when useful.\n"
+                "- Use PowerShell commands for Windows steps.\n"
+                "- Be direct, practical, and avoid unnecessary back-and-forth."
+            )
+
+    except Exception as e:
+        print("MEMORY_STYLE_INJECTION_ERROR:", e)
+
     # ==============================
     # RESPONSE POLICY INJECTION
     # ==============================
@@ -6522,6 +6629,9 @@ def _build_chat_input(
     response_policy_block = self._format_response_policy_for_prompt(response_policy)
 
     sections = []
+
+    if memory_style_block:
+        sections.append(memory_style_block)
 
     if memory_block:
         sections.append(
@@ -6562,6 +6672,7 @@ def _build_chat_input(
 
     print("MEMORY_DOMINANCE_USED_COUNT:", len(selected_memory))
     print("MEMORY_DOMINANCE_BLOCK_PRESENT:", bool(memory_block))
+    print("MEMORY_STYLE_BLOCK_PRESENT:", bool(memory_style_block))
 
     return final_chat_input
 
