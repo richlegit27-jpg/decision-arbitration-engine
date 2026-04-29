@@ -233,6 +233,7 @@ function resolveUploadUrl(url) {
       .filter(Boolean);
 
     const urls = Array.isArray(meta.source_urls) ? meta.source_urls : [];
+    const sourceMeta = Array.isArray(meta.sources) ? meta.sources : [];
 
 const mission = (meta && (meta.strategy || meta.mission)) || "";
 let badge = "";
@@ -248,8 +249,19 @@ let html = `
     html += `<div class="nova-sources">`;
 
     lines.forEach((line, index) => {
-      const url = urls[index] || "";
-      const label = line.replace(/^\d+\.\s*/, "");
+const sourceItem = sourceMeta[index] && typeof sourceMeta[index] === "object"
+  ? sourceMeta[index]
+  : {};
+
+const url =
+  urls[index] ||
+  sourceItem.url ||
+  sourceItem.link ||
+  "";
+
+const label =
+  sourceItem.title ||
+  line.replace(/^\d+\.\s*/, "").trim();
 
       html += `
         <button class="source-row" type="button" data-url="${escapeHtml(url)}"
@@ -893,12 +905,10 @@ function openRail() {
 
   syncRailTruth();
 
-  if (els.railTabs && els.railTabs.length) {
-    const activeTab =
-      state.rail && state.rail.tab ? state.rail.tab : "artifacts";
+  const activeTab =
+    state.rail && state.rail.tab ? state.rail.tab : "artifacts";
 
-    setRailTab(activeTab);
-  }
+  setRailTab(activeTab);
 
   if (state.rail && state.rail.selectedKind && state.rail.selectedId) {
     setRailSelectedItem(state.rail.selectedKind, state.rail.selectedId);
@@ -906,6 +916,7 @@ function openRail() {
 
   if (typeof renderArtifacts === "function") renderArtifacts();
   if (typeof renderMemory === "function") renderMemory();
+  if (typeof renderWeb === "function") renderWeb();
 
   syncRailReopenVisibility();
 }
