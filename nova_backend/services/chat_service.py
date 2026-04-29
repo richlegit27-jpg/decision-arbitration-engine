@@ -422,6 +422,7 @@ class ChatService:
                 "used_count": len(used_memory_full),
                 "top_memory": used_memory_full[:3],
             },
+
             # === CHAT POLISH: STRATEGY / MISSION FEED ===
             "mission": decision.get("mission", {}) if isinstance(decision, dict) else {},
             "strategy": decision.get("strategy", "") if isinstance(decision, dict) else "",
@@ -1013,93 +1014,56 @@ class ChatService:
         assistant_text: str = "",
         decision=None,
     ) -> dict:
-
-        response_policy = self._build_response_policy(
-            user_text=user_text,
-            decision=decision,
-        )
-
         decision = decision if isinstance(decision, dict) else {}
-        mission = decision.get("mission") if isinstance(decision, dict) else {}
-        mission = mission if isinstance(mission, dict) else {}
-        mission_mode = str(mission.get("mode") or "").lower()
-        assistant_text = self._safe_str(assistant_text)
+        assistant_text = self._safe_str(assistant_text).strip()
+
+        user_text_lc = self._safe_str(user_text).lower().strip()
 
         # =============================
-        # ANTI-GENERIC CLAMP
-        # =============================
-        try:
-            weak_phrases = [
-                "i can help",
-                "if you want",
-                "let me know",
-                "feel free",
-                "you can",
-                "it depends",
-                "here are some",
-                "in conclusion",
-                "overall",
-                "hopefully",
-                "this should help",
-                "you might want",
-                "one option is",
-            ]
-
-            cleaned_lines = []
-            for line in assistant_text.split("\n"):
-                line_lc = line.lower().strip()
-
-                if any(p in line_lc for p in weak_phrases):
-                    continue
-
-                if not line.strip():
-                    continue
-
-                cleaned_lines.append(line.strip())
-
-            if cleaned_lines:
-                assistant_text = "\n".join(cleaned_lines)
-
-        except Exception as e:
-            print("ANTI_GENERIC_ERROR:", e)
-
-        # =============================
-        # APPLY RESPONSE POLICY
+        # HARD COMMON-PROMPT OVERRIDE (FIXED)
         # =============================
 
-        try:
-            if response_policy.get("answer_length") == "short":
-                assistant_text = assistant_text.strip()
+        stuck_signals = [
+            "fix this",
+            "not working",
+            "it's not working",
+            "its not working",
+            "broken",
+            "error",
+            "stuck",
+            "idk",
+            "i dont know",
+            "i don't know",
+            "what now",
+            "help",
+            "confused",
+        ]
 
-            if response_policy.get("user_frustrated"):
-                assistant_text = assistant_text.strip()
+        if any(signal in user_text_lc for signal in stuck_signals):
+            return {
+                "assistant_text": (
+                    "Do this:\n"
+                    "1. Paste the error\n"
+                    "2. Paste the file path\n\n"
+                    "I’ll fix it."
+                ),
+                "intelligence": {
+                    "strategy": "force_next_step",
+                },
+                "self_check": {
+                    "should_revise": False,
+                    "issues": [],
+                },
+                "hard_override_applied": True,
+            }
 
-            if response_policy.get("needs_steps"):
-                # keep structure, avoid long paragraphs
-                pass
+        mission = decision.get("mission") if isinstance(decision.get("mission"), dict) else {}
+        mission_mode = str(mission.get("mode") or "").lower().strip()
 
-            if response_policy.get("needs_commands"):
-                # commands already handled upstream, just keep clean
-                pass
-
-        except Exception as e:
-            print("RESPONSE_POLICY_APPLY_ERROR:", e)
-
-        revision_prompt = (
-            "Rewrite the assistant response before the user sees it.\n\n"
-            f"Mission mode: {mission_mode}\n"
-            f"Mission task: {mission.get('current_task') or ''}\n"
-            f"Mission next move: {mission.get('next_move') or ''}\n\n"
-            "Rules:\n"
-            "- Be direct\n"
-            "- Remove fluff\n"
-            "- Follow mission intent strictly\n"
-        )
+        hard_override_applied = False
 
         if not assistant_text:
             assistant_text = "No response generated."
-
-        hard_override_applied = False
 
         try:
             intelligence = self._fuse_response_intelligence(
@@ -1144,14 +1108,20 @@ class ChatService:
             "issues": [],
         }
 
+        response_policy = self._build_response_policy(
+            user_text=user_text,
+            decision=decision,
+        )
+
         try:
-            assistant_text = self._shape_response_with_strategy(
+            assistant_text = self._clean_final_response_text(
+                assistant_text,
+                response_policy=response_policy,
+                mission_mode=mission_mode,
                 user_text=user_text,
-                assistant_text=assistant_text,
-                intelligence=intelligence,
             )
         except Exception as e:
-            print("FINAL_SHAPE_ERROR:", e)
+            print("FINAL_CLEAN_ERROR:", e)
 
         return {
             "assistant_text": assistant_text,
@@ -1159,6 +1129,88 @@ class ChatService:
             "self_check": self_check,
             "hard_override_applied": hard_override_applied,
         }
+
+    def _clean_final_response_text(
+        self,
+        text: str,
+        response_policy=None,
+        mission_mode: str = "",
+        user_text: str = "",
+    ) -> str:
+        text = self._safe_str(text).strip()
+        user_text_raw = self._safe_str(user_text).strip()
+        user_text_lc = user_text_raw.lower()
+        response_policy = response_policy if isinstance(response_policy, dict) else {}
+
+        print("CLEAN_FINAL_HIT:", user_text_raw)
+
+        if not text:
+            return "Done."
+
+        vague_fix_inputs = [
+            "fix this",
+            "it's not working",
+            "its not working",
+            "not working",
+            "broken",
+            "error",
+        ]
+
+        if any(user_text_lc == v or user_text_lc.startswith(v) for v in vague_fix_inputs):
+            return (
+                "Paste:\n"
+                "- the error\n"
+                "- the file path\n\n"
+                "I’ll fix it."
+            )
+
+        if user_text_lc in ["help", "what do we do", "what now", "next"]:
+            return (
+                "Tell me what you're trying to do.\n\n"
+                "I’ll give you the next step."
+            )
+
+        kill_phrases = [
+            "i can help",
+            "let me know",
+            "if you want",
+            "feel free",
+            "hopefully",
+            "in conclusion",
+            "overall",
+            "you might want",
+            "one option is",
+        ]
+
+        lines = []
+        for line in text.split("\n"):
+            clean = line.strip()
+            lc = clean.lower()
+
+            if not clean:
+                continue
+
+            if any(p in lc for p in kill_phrases):
+                continue
+
+            lines.append(clean)
+
+        text = "\n".join(lines).strip()
+
+        if user_text_lc.startswith("latest"):
+            useful = [line for line in text.split("\n") if line.strip()]
+            return "\n".join(useful[:4]).strip() or text
+
+        if any(line.strip().startswith(("1.", "2.", "3.", "4.", "5.")) for line in text.split("\n")):
+            text = "\n".join(text.split("\n")[:5]).strip()
+
+        if response_policy.get("answer_length") == "short":
+            text = "\n".join(text.split("\n")[:6]).strip()
+
+        if response_policy.get("user_frustrated"):
+            text = text.replace("please", "").replace("kindly", "").strip()
+
+        return text or "Done."
 
     def _decide_response_strategy(
         self,
