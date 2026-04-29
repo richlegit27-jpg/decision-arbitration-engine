@@ -2173,67 +2173,55 @@ function renderMarkdown(text) {
 
   return html;
 }
-
 function renderMessageCard(message) {
   if (!message) return "";
 
   const role = String(message.role || "assistant");
+  const text = String(message.content || "");
 
-  const roleClass =
-    role === "user"
-      ? "message-card--user"
-      : "message-card--assistant";
-
-  const rawText = String(message.text || "").trim();
-
-  let renderedText =
-    role === "assistant"
-      ? (
-          rawText.includes("— Top sources —")
-            ? renderSources(rawText, message.meta || {})
-            : renderMarkdown(rawText)
-        )
-      : escapeHtml(rawText);
-
-  renderedText = String(renderedText || "")
-    .replace(/<img\b[^>]*>/gi, "")
-    .replace(/alt="[^"]*"<\/p>/gi, "")
-    .replace(/href="\{preview\}"/g, 'href="#"')
-    .replace(/src="\{preview\}"/g, "")
-    .replace(/\{preview\}/g, "")
-    .replace(/href="[^"]{0,2}"/g, 'href="#"')
-    .replace(/href=""/g, 'href="#"');
-
-  const bodyHtml = rawText
-    ? '<div class="message-text-inline">' + renderedText + '</div>'
-    : "";
-
-  let memoryBadgeHtml = "";
+  let html = `<div class="nova-msg ${role}">`;
 
   try {
-    const meta = message.meta || {};
-    const used = Array.isArray(meta.used_memory) ? meta.used_memory : [];
-    const count = meta.used_memory_count || used.length;
+    html += `<div class="nova-msg-text">${renderSources(text, message.meta || {})}</div>`;
+  } catch (e) {
+    console.warn("renderSources failed", e);
+    html += `<div class="nova-msg-text">${escapeHtml(text)}</div>`;
+  }
 
-    if (role !== "user" && count > 0) {
-      memoryBadgeHtml =
-        '<button class="memory-used-badge" type="button" data-no-chat-action="1">' +
-        "Memory used: " + count +
-        "</button>";
+  // ✅ POLISH BADGES
+  let polishBadgesHtml = "";
+  try {
+    polishBadgesHtml = renderChatPolishBadges(message);
+  } catch (e) {
+    console.warn("polish badges failed", e);
+  }
+
+  // ✅ MEMORY DOMINANCE (safe)
+  let memoryDominanceHtml = "";
+  try {
+    const memoryDominance =
+      message.meta && message.meta.memory_dominance
+        ? message.meta.memory_dominance
+        : null;
+
+    if (memoryDominance) {
+      memoryDominanceHtml = `
+        <div class="nova-memory-dominance">
+          Memory used: ${memoryDominance.used || 0}
+        </div>
+      `;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn("memory dominance failed", e);
+  }
 
-  const polishBadgesHtml = renderChatPolishBadges(message);
+  html += polishBadgesHtml;
+  html += memoryDominanceHtml;
 
-  return `
-    <div class="message-card ${roleClass}">
-      ${bodyHtml}
-      ${memoryBadgeHtml}
-      ${polishBadgesHtml}
-    </div>
-  `;
+  html += `</div>`;
+
+  return html;
 }
-
 function renderChat() {
   if (!els.chatThread) return;
 

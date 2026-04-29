@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64   
 import os
@@ -417,6 +417,11 @@ class ChatService:
         ]
 
         meta_payload = {
+            "memory_dominance": {
+                "enabled": True,
+                "used_count": len(used_memory_full),
+                "top_memory": used_memory_full[:3],
+            },
             # === CHAT POLISH: STRATEGY / MISSION FEED ===
             "mission": decision.get("mission", {}) if isinstance(decision, dict) else {},
             "strategy": decision.get("strategy", "") if isinstance(decision, dict) else "",
@@ -470,7 +475,7 @@ class ChatService:
 
         user_text_lc = str(user_text or "").lower().strip()
 
-        # 🔥 1. HARD USER OVERRIDE (strongest)
+        # ðŸ”¥ 1. HARD USER OVERRIDE (strongest)
         if any(p in user_text_lc for p in [
             "don't give short",
             "dont give short",
@@ -491,7 +496,7 @@ class ChatService:
         ]):
             return "short"
 
-        # 🔥 2. MEMORY (most recent wins)
+        # ðŸ”¥ 2. MEMORY (most recent wins)
         for m in reversed(memory_items or []):
             if not isinstance(m, dict):
                 continue
@@ -504,7 +509,7 @@ class ChatService:
             if "short answers" in text:
                 return "short"
 
-        # 🔥 3. DEFAULT
+        # ðŸ”¥ 3. DEFAULT
         return "normal"
 
     def _apply_pending_fix(self, session_id: str) -> dict:
@@ -761,7 +766,7 @@ class ChatService:
             "send the code",
             "send one of these",
             "send the code and",
-            "what’s the symptom",
+            "whatâ€™s the symptom",
             "what's the symptom",
             "tell me what you need",
             "i can help",
@@ -811,6 +816,197 @@ class ChatService:
             "is_debugging": is_debugging,
         }
 
+    def _build_response_policy(self, user_text: str = "", decision=None) -> dict:
+        """
+        Central response policy layer.
+
+        This does NOT answer the user.
+        It tells Nova HOW to answer:
+        - short/direct
+        - SMFF/full-file mode
+        - debugging mode
+        - frustrated user mode
+        - latest/news mode
+        - command-first mode
+        """
+
+        decision = decision if isinstance(decision, dict) else {}
+        text = str(user_text or "").strip()
+        lower = text.lower()
+
+        policy = {
+            "mode": "normal",
+            "answer_length": "normal",
+            "tone": "direct",
+            "needs_steps": False,
+            "needs_full_file": False,
+            "needs_commands": False,
+            "needs_latest": False,
+            "needs_debug": False,
+            "user_frustrated": False,
+            "avoid_examples": False,
+            "prefer_power_shell": True,
+            "instruction": "",
+        }
+
+        # -----------------------------
+        # User frustration / urgency
+        # -----------------------------
+        frustration_markers = [
+            "fuck",
+            "wtf",
+            "this sucks",
+            "waste of time",
+            "madness",
+            "annoying",
+            "broken again",
+            "i don't know what to do",
+            "im lost",
+            "i'm lost",
+        ]
+
+        if any(marker in lower for marker in frustration_markers):
+            policy["user_frustrated"] = True
+            policy["tone"] = "calm_direct"
+            policy["answer_length"] = "short"
+            policy["needs_steps"] = True
+
+            policy["instruction"] += (
+                "User is frustrated. Do not lecture. Do not explain feelings. "
+                "Give the fix first. Use short confident language. "
+                "One path forward only. Maximum 5 lines unless full code is requested.\n"
+            )
+
+        # -----------------------------
+        # SMFF / full-file mode
+        # -----------------------------
+        smff_markers = [
+            "smff",
+            "full file",
+            "whole file",
+            "give me the whole",
+            "full replacement",
+            "replace the whole",
+        ]
+
+        if any(marker in lower for marker in smff_markers):
+            policy["mode"] = "smff"
+            policy["needs_full_file"] = True
+            policy["answer_length"] = "full"
+            policy["avoid_examples"] = True
+            policy["instruction"] += (
+                "User wants SMFF/full-file style. Provide complete replacement code "
+                "or a complete helper block with exact file path and anchor. "
+                "Avoid tiny partial snippets unless the user only pasted a small block.\n"
+            )
+
+        # -----------------------------
+        # Debugging mode
+        # -----------------------------
+        debug_markers = [
+            "error",
+            "traceback",
+            "syntaxerror",
+            "indentationerror",
+            "taberror",
+            "uncaught",
+            "404",
+            "500",
+            "not found",
+            "failed to load",
+            "broken",
+            "compile",
+        ]
+
+        if any(marker in lower for marker in debug_markers):
+            policy["needs_debug"] = True
+            policy["needs_steps"] = True
+            policy["needs_commands"] = True
+            policy["answer_length"] = "short"
+            policy["instruction"] += (
+                "User is debugging. Identify the root cause first, then give the exact "
+                "replacement or exact command. Do not wander.\n"
+            )
+
+        # -----------------------------
+        # Next-step mode
+        # -----------------------------
+        next_markers = [
+            "next",
+            "what now",
+            "what next",
+            "go",
+            "continue",
+            "keep going",
+        ]
+
+        if lower in next_markers:
+            policy["mode"] = "next_step"
+            policy["needs_steps"] = True
+            policy["answer_length"] = "ultra_short"
+            policy["instruction"] += (
+                "User said next. Reply with ONE concrete next action only. "
+                "No explanation. No menu. No markdown essay. Maximum 3 short lines.\n"
+            )
+
+        # -----------------------------
+        # Latest/news mode
+        # -----------------------------
+        latest_markers = [
+            "latest",
+            "fresh",
+            "today",
+            "current",
+            "right now",
+            "news",
+            "update",
+        ]
+
+        if any(marker in lower for marker in latest_markers):
+            policy["needs_latest"] = True
+            policy["instruction"] += (
+                "User wants current information. Prefer fresh web/search route when available. "
+                "Answer in words first, then sources if useful.\n"
+            )
+
+        # -----------------------------
+        # PowerShell / command mode
+        # -----------------------------
+        command_markers = [
+            "powershell",
+            "command",
+            "run this",
+            "compile",
+            "restart",
+            "test",
+        ]
+
+        if any(marker in lower for marker in command_markers):
+            policy["needs_commands"] = True
+            policy["prefer_power_shell"] = True
+            policy["instruction"] += (
+                "Use PowerShell commands when commands are needed.\n"
+            )
+
+        # -----------------------------
+        # User dislikes examples
+        # -----------------------------
+        no_example_markers = [
+            "no examples",
+            "don't give examples",
+            "dont give examples",
+            "just the code",
+            "only the code",
+        ]
+
+        if any(marker in lower for marker in no_example_markers):
+            policy["avoid_examples"] = True
+            policy["instruction"] += (
+                "Avoid examples. Give the exact needed code or action only.\n"
+            )
+
+        return policy
+
     def _apply_response_intelligence(
         self,
         user_text: str = "",
@@ -818,11 +1014,76 @@ class ChatService:
         decision=None,
     ) -> dict:
 
+        response_policy = self._build_response_policy(
+            user_text=user_text,
+            decision=decision,
+        )
+
         decision = decision if isinstance(decision, dict) else {}
         mission = decision.get("mission") if isinstance(decision, dict) else {}
         mission = mission if isinstance(mission, dict) else {}
         mission_mode = str(mission.get("mode") or "").lower()
         assistant_text = self._safe_str(assistant_text)
+
+        # =============================
+        # ANTI-GENERIC CLAMP
+        # =============================
+        try:
+            weak_phrases = [
+                "i can help",
+                "if you want",
+                "let me know",
+                "feel free",
+                "you can",
+                "it depends",
+                "here are some",
+                "in conclusion",
+                "overall",
+                "hopefully",
+                "this should help",
+                "you might want",
+                "one option is",
+            ]
+
+            cleaned_lines = []
+            for line in assistant_text.split("\n"):
+                line_lc = line.lower().strip()
+
+                if any(p in line_lc for p in weak_phrases):
+                    continue
+
+                if not line.strip():
+                    continue
+
+                cleaned_lines.append(line.strip())
+
+            if cleaned_lines:
+                assistant_text = "\n".join(cleaned_lines)
+
+        except Exception as e:
+            print("ANTI_GENERIC_ERROR:", e)
+
+        # =============================
+        # APPLY RESPONSE POLICY
+        # =============================
+
+        try:
+            if response_policy.get("answer_length") == "short":
+                assistant_text = assistant_text.strip()
+
+            if response_policy.get("user_frustrated"):
+                assistant_text = assistant_text.strip()
+
+            if response_policy.get("needs_steps"):
+                # keep structure, avoid long paragraphs
+                pass
+
+            if response_policy.get("needs_commands"):
+                # commands already handled upstream, just keep clean
+                pass
+
+        except Exception as e:
+            print("RESPONSE_POLICY_APPLY_ERROR:", e)
 
         revision_prompt = (
             "Rewrite the assistant response before the user sees it.\n\n"
@@ -1016,73 +1277,81 @@ class ChatService:
             "is_learning": is_learning,
         }
 
-def _shape_response_with_strategy(
-    self,
-    user_text: str = "",
-    assistant_text: str = "",
-    intelligence=None,
-) -> str:
-    intelligence = intelligence if isinstance(intelligence, dict) else {}
+    def _shape_response_with_strategy(
+        self,
+        user_text: str = "",
+        assistant_text: str = "",
+        intelligence=None,
+    ) -> str:
 
-    text = self._safe_str(assistant_text).strip()
-    user_lc = self._safe_str(user_text).lower().strip()
+        intelligence = intelligence if isinstance(intelligence, dict) else {}
 
-    strategy = self._safe_str(
-        intelligence.get("strategy") or ""
-    ).lower().strip()
+        text = self._safe_str(assistant_text).strip()
+        user_lc = self._safe_str(user_text).lower().strip()
 
-    if not text:
-        return text
+        strategy = self._safe_str(
+            intelligence.get("strategy") or ""
+        ).lower().strip()
 
-    # === HARD COMMAND LOCKS ===
+        if not text:
+            return text
 
-    if user_lc in ["smff", "snff", "ff"]:
-        return (
-            "SMFF mode active.\n\n"
-            "Send the file name, function, or task.\n"
-            "I will return full file or full replacement.\n"
-            "No partial snippets."
-        )
+        # === HARD COMMAND LOCKS ===
+        if user_lc in ["smff", "snff", "ff"]:
+            return (
+                "SMFF mode active.\n\n"
+                "Send the file name, function, or task.\n"
+                "I will return full file or full replacement.\n"
+                "No partial snippets."
+            )
 
-    if user_lc in ["next", "continue", "go", "keep going", "next step"]:
-        if not text.lower().startswith("next"):
-            return "Next move:\n\n" + text
-        return text
+        if user_lc in ["next", "continue", "go", "keep going", "next step"]:
+            if not text.lower().startswith("next"):
+                return "Next move:\n\n" + text
+            return text
 
-    # === STRATEGY LOCKS ===
+        # === DEBUG LOCK ===
+        if strategy in ["debug_triage", "debugging"]:
+            if "error" not in user_lc:
+                return (
+                    "Likely cause:\n\n"
+                    "No actual bug details were provided yet.\n\n"
+                    "Next move:\n\n"
+                    "Paste the exact error/traceback and the file path."
+                )
 
-    if strategy in ["full_file", "smff"]:
-        return text
+        # =============================
+        # EXECUTION DOMINANCE
+        # =============================
+        execution_triggers = [
+            "build", "create", "make", "fix", "implement",
+            "add", "write", "generate", "set up"
+        ]
 
-    if strategy in ["exact_edit"]:
-        if "notepad " not in text.lower() and "c:\\" not in text.lower():
-            return "Use the exact file path and anchor before editing.\n\n" + text
-        return text
+        is_execution_intent = any(k in user_lc for k in execution_triggers)
 
-    if strategy in ["debug_triage", "debugging"]:
-        if not text.lower().startswith("likely cause"):
-            return "Likely cause:\n\n" + text
-        return text
+        if is_execution_intent:
+            # If response is explanation-heavy, force actionable output
+            if not any(x in text.lower() for x in ["def ", "class ", "import ", "```", "powershell", "cd "]):
+                return (
+                    "Next move:\n\n"
+                    "Start implementation immediately.\n"
+                    "Provide code, command, or exact file change.\n"
+                    "Do not stop at explanation."
+                )
 
-    if strategy in ["continue_mission", "continue"]:
-        if not text.lower().startswith("next"):
-            return "Next move:\n\n" + text
-        return text
+            if not text.lower().startswith("likely cause"):
+                return "Likely cause:\n\n" + text
 
-    if strategy in ["teach_clear", "learning"]:
-        if "core takeaway:" not in text.lower():
-            return text.rstrip() + "\n\nCore takeaway: fix the root cause, not the symptom."
-        return text
+            return text
 
-    if strategy in ["web_fetch", "fetcher"]:
+        # === PLAN LOCK ===
+        if strategy in ["planner", "planning", "plan"]:
+            if not text.lower().startswith("plan"):
+                return "Plan:\n\n" + text
+            return text
+
         return text.strip()
-
-    if strategy in ["planner", "planning", "plan"]:
-        if not text.lower().startswith("plan"):
-            return "Plan:\n\n" + text
-        return text
-
-    return text.strip()
 
     def _decide_response_strategy(
         self,
@@ -1555,7 +1824,7 @@ def _shape_response_with_strategy(
                 "source": source,
             })
 
-        # 🔥 fallback if filter removed everything
+        # ðŸ”¥ fallback if filter removed everything
         if not filtered_results:
             filtered_results = results[:5]
 
@@ -1573,7 +1842,7 @@ def _shape_response_with_strategy(
 
             label = title
             if source:
-                label = f"{source} — {title}" if title else source
+                label = f"{source} â€” {title}" if title else source
 
             source_lines.append(label)
 
@@ -1629,7 +1898,7 @@ def _shape_response_with_strategy(
                 assistant_text = body[:1800].strip()
 
             if source_lines:
-                assistant_text += "\n\n— Top sources —\n"
+                assistant_text += "\n\nâ€” Top sources â€”\n"
 
                 query_lc = str(query or user_text or "").lower()
 
@@ -1649,7 +1918,7 @@ def _shape_response_with_strategy(
                 for line in source_lines:
                     text = str(line or "").lower()
 
-                    # ❌ kill garbage
+                    # âŒ kill garbage
                     if any(bad in text for bad in [
                         "instagram.com",
                         "facebook.com",
@@ -1692,7 +1961,7 @@ def _shape_response_with_strategy(
                         score -= 120
 
                     pure_betting_sites = [
-                        "sportsbook wire", "covers.com", "covers —",
+                        "sportsbook wire", "covers.com", "covers â€”",
                         "odds shark", "action network", "draftkings",
                         "fanduel", "betmgm"
                     ]
@@ -1714,8 +1983,8 @@ def _shape_response_with_strategy(
                     if has_injury_signal and wants_injury and not has_mixed_signal:
                         score += 60
 
-                    # 🔥 SOURCE BOOST (DO NOT RESET SCORE)
-                    if "nba —" in t or t.startswith("nba") or " nba " in t:
+                    # ðŸ”¥ SOURCE BOOST (DO NOT RESET SCORE)
+                    if "nba â€”" in t or t.startswith("nba") or " nba " in t:
                         score += 120
 
                     elif "usa today" in tl:
@@ -1727,7 +1996,7 @@ def _shape_response_with_strategy(
                     elif "espn" in tl:
                         score += 85
 
-                    elif "heavy.com" in tl or "heavy —" in t:
+                    elif "heavy.com" in tl or "heavy â€”" in t:
                         score += 60
 
                     elif "yahoo" in tl:
@@ -1929,8 +2198,19 @@ def _shape_response_with_strategy(
 
         session_id = self._ensure_session_id(session_id)
         user_text = self._safe_str(user_text)
+        user_lc = user_text.lower().strip()
 
         print("CHAT_SERVICE_HANDLE_HIT:", user_text)
+
+        # === LIGHT CONTEXT MEMORY ===
+        last_intent = ""
+        try:
+            session = self._get_session_payload(session_id)
+            state = session.get("working_state") if isinstance(session, dict) else {}
+            state = state if isinstance(state, dict) else {}
+            last_intent = str(state.get("mission_mode") or "").lower().strip()
+        except Exception:
+            last_intent = ""
 
         decision = {}
         try:
@@ -1939,18 +2219,50 @@ def _shape_response_with_strategy(
             print("DECISION_ERROR:", e)
             decision = {}
 
-        mission = self._detect_mission_state(
-            user_text=user_text,
-            decision=decision,
-        )
+        decision = decision if isinstance(decision, dict) else {}
+
+        # === HARD INTENT RESET ===
+        if user_lc in ["hi", "hello", "yo", "hey"]:
+            mission = {
+                "mode": "general",
+                "current_task": "",
+                "next_move": "",
+                "needs_full_file": False,
+            }
+            decision["strategy"] = "direct_answer"
+
+        elif user_lc in ["make a plan", "plan", "make plan"]:
+            mission = {
+                "mode": "planning",
+                "current_task": "Create a general plan",
+                "next_move": "Return a clear structured plan.",
+                "needs_full_file": False,
+            }
+            decision["strategy"] = "planning"
+
+        elif user_lc in ["next", "continue", "go", "keep going", "next step"]:
+            mission = {
+                "mode": last_intent or "continue",
+                "current_task": "Continue current Nova build phase",
+                "next_move": "Choose the next concrete implementation step.",
+                "needs_full_file": False,
+            }
+            decision["strategy"] = "continue"
+
+        else:
+            mission = self._detect_mission_state(
+                user_text=user_text,
+                decision=decision,
+            )
+            decision["strategy"] = mission.get("mode")
 
         decision["mission"] = mission
-        decision["strategy"] = mission.get("mode")
+        decision["strategy"] = str(decision.get("strategy") or "").lower().strip()
 
         print("MISSION_STATE:", mission)
 
         try:
-            if mission.get("mode") not in ["general", "continue"]:
+            if mission.get("mode") not in ["general"]:
                 session = self._get_session_payload(session_id)
                 state = session.get("working_state") if isinstance(session, dict) else {}
                 state = state if isinstance(state, dict) else {}
@@ -2357,6 +2669,7 @@ def _shape_response_with_strategy(
     def _should_inject_working_context(self, decision, user_text, assistant_msg):
         decision = decision or {}
         user_text = self._safe_str(user_text).lower()
+        user_lc = user_text.lower().strip()
         assistant_text = self._safe_str((assistant_msg or {}).get("text")).lower()
 
         route = self._safe_str(decision.get("route")).lower()
@@ -2568,7 +2881,7 @@ def _shape_response_with_strategy(
         # Step 1: try relevant memory
         relevant_items = self._select_relevant_memory(user_text, limit=memory_limit)
 
-        # Step 2: fallback â†’ recent memory
+        # Step 2: fallback Ã¢â€ â€™ recent memory
         if not relevant_items:
             try:
                 if hasattr(self, "memory") and self.memory:
@@ -2667,7 +2980,7 @@ def _shape_response_with_strategy(
         if not lines:
             return "I do not have any saved memory yet."
 
-        return "Hereâ€™s what I remember:\n" + "\n".join(lines)
+        return "HereÃ¢â‚¬â„¢s what I remember:\n" + "\n".join(lines)
 
     def answer_from_web_results(self, query: str, results: list[dict] | None = None) -> str:
         query = str(query or "").strip()
@@ -2701,7 +3014,7 @@ def _shape_response_with_strategy(
             )
 
         if not cleaned:
-            return f'I couldn’t find strong live results for "{query}".'
+            return f'I couldnâ€™t find strong live results for "{query}".'
 
         context_blocks: list[str] = []
         for idx, item in enumerate(cleaned, start=1):
@@ -2754,7 +3067,7 @@ def _shape_response_with_strategy(
 
                 if cleaned:
                     lines = []
-                    lines.append("\n— Top sources —")
+                    lines.append("\nâ€” Top sources â€”")
 
                     ranked_sources = []
 
@@ -2789,7 +3102,7 @@ def _shape_response_with_strategy(
                         domain = str(item.get("domain") or "").strip()
                         url = str(item.get("url") or "").strip()
 
-                        lines.append(f"{idx}. {domain} — {title}")
+                        lines.append(f"{idx}. {domain} â€” {title}")
 
                         if url:
                             lines.append(url)
@@ -2814,7 +3127,7 @@ def _shape_response_with_strategy(
         if top.get("url"):
             fallback_parts.append(str(top["url"]))
 
-        return "\n".join(fallback_parts).strip() or f'Here’s what I found for "{query}".'
+        return "\n".join(fallback_parts).strip() or f'Hereâ€™s what I found for "{query}".'
 
     # =========================
     # EXECUTION GUARD HELPERS (STEP TRUTH ENFORCEMENT)
@@ -3388,7 +3701,7 @@ def _shape_response_with_strategy(
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "Iâ€™m here, but the model returned an empty response."
+        return "IÃ¢â‚¬â„¢m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -3478,7 +3791,7 @@ def _shape_response_with_strategy(
 
         if any(trigger in lower_text for trigger in image_triggers):
             return {
-                "route": self.ROUTE_IMAGE_GENERATION,   # 🔥 use constant
+                "route": self.ROUTE_IMAGE_GENERATION,   # ðŸ”¥ use constant
                 "mode": "image_generation",
                 "confidence": 0.95,
                 "reasons": ["image_generation_intent"],
@@ -3518,7 +3831,7 @@ def _shape_response_with_strategy(
 
         if any(trigger in lower_text for trigger in web_triggers):
             return {
-                "route": self.ROUTE_WEB_FETCH,   # 🔥 use constant
+                "route": self.ROUTE_WEB_FETCH,   # ðŸ”¥ use constant
                 "mode": "web_fetch",
                 "confidence": 0.85,
                 "reasons": ["web_intent"],
@@ -3562,11 +3875,11 @@ def _shape_response_with_strategy(
             return False
 
 
-        # 🔥 PLAN CREATION
+        # ðŸ”¥ PLAN CREATION
         if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
             return True
 
-        # 🔥 FALLBACK: coding / structured intent
+        # ðŸ”¥ FALLBACK: coding / structured intent
         if decision and decision.get("mode") in {"coding", "analysis"}:
             return True
 
@@ -4459,7 +4772,7 @@ Write the exact goal in one sentence.
         current_index = -1
 
         for i, line in enumerate(lines):
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "✔", "âœ”"]):
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"]):
                 step_indexes.append(i)
 
             if "[>]" in line:
@@ -4470,8 +4783,8 @@ Write the exact goal in one sentence.
     def _refresh_execution_header(self, body: str):
         lines = self._safe_str(body).splitlines()
 
-        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "✔", "âœ”"]))
-        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "✔", "âœ”"]))
+        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"]))
+        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "âœ”", "Ã¢Å“â€"]))
 
         updated = "\n".join(lines)
         updated = re.sub(
@@ -4488,8 +4801,8 @@ Write the exact goal in one sentence.
                     .replace("[ ]", "")
                     .replace("[x]", "")
                     .replace("[X]", "")
-                    .replace("✔", "")
                     .replace("âœ”", "")
+                    .replace("Ã¢Å“â€", "")
                     .strip(" -")
                     .strip()
                 )
@@ -4511,7 +4824,7 @@ Write the exact goal in one sentence.
         return updated, done, total
 
     def _auto_execute_request(self, user_text: str, session_id: str = "", attachments=None):
-        # 🔒 Execution system disabled during stabilization
+        # ðŸ”’ Execution system disabled during stabilization
         return self._execute_general_chat(
             user_text=user_text,
             session_id=session_id,
@@ -4754,7 +5067,7 @@ Write the exact goal in one sentence.
                 ]
             ):
                 if current_file:
-                    return f"Weâ€™re in `{current_file}`."
+                    return f"WeÃ¢â‚¬â„¢re in `{current_file}`."
                 return "I do not have the current file locked in yet."
 
             if any(
@@ -4833,7 +5146,7 @@ Write the exact goal in one sentence.
 
             if active_task and next_move:
                 return (
-                    f"Weâ€™re {active_task}. "
+                    f"WeÃ¢â‚¬â„¢re {active_task}. "
                     f"Next: {next_move}"
                     + (f" Current file: `{current_file}`." if current_file else "")
                     + (f" Current bug: {current_bug}." if current_bug else "")
@@ -4958,7 +5271,7 @@ Write the exact goal in one sentence.
 
         def _clean_value(value: str) -> str:
             value = self._safe_str(value).strip()
-            value = value.strip("+    ← (FOUR SPACES — press space 4 times)\r\n-:;,.")
+            value = value.strip("+    â† (FOUR SPACES â€” press space 4 times)\r\n-:;,.")
             return value
 
         def _set_if_present(field_name: str, value: str):
@@ -5207,24 +5520,24 @@ Write the exact goal in one sentence.
 
             score = 0
 
-            # 🔥 keyword match (stronger)
+            # ðŸ”¥ keyword match (stronger)
             for word in user_text.split():
                 if word and word in text:
                     score += 3
 
-            # 🔥 HIGH PRIORITY TYPES
+            # ðŸ”¥ HIGH PRIORITY TYPES
             if kind in ("project", "goal"):
                 score += 8
 
-            # 🔥 MEDIUM PRIORITY
+            # ðŸ”¥ MEDIUM PRIORITY
             if kind in ("identity", "preference"):
                 score += 5
 
-            # 🔥 penalize junk
+            # ðŸ”¥ penalize junk
             if kind == "note":
                 score -= 2
 
-            # 🔥 longer meaningful memories get slight boost
+            # ðŸ”¥ longer meaningful memories get slight boost
             if len(text) > 20:
                 score += 1
 
@@ -5233,7 +5546,7 @@ Write the exact goal in one sentence.
         # sort by score
         scored.sort(key=lambda x: x[0], reverse=True)
 
-        # 🔥 ALWAYS include at least 1 important memory if exists
+        # ðŸ”¥ ALWAYS include at least 1 important memory if exists
         top = [item for score, item in scored if score > 0]
 
         if not top:
@@ -5408,7 +5721,7 @@ Write the exact goal in one sentence.
             return 9.0
 
         if k in {"style"}:
-            return 8.0   # 🔥 NEW — how you want responses
+            return 8.0   # ðŸ”¥ NEW â€” how you want responses
 
         if k in {"preference"}:
             return 7.0
@@ -5464,7 +5777,7 @@ Write the exact goal in one sentence.
         item_session = self._safe_str(item.get("session_id"))
 
         if current_session and item_session and current_session == item_session:
-            return 0.75   # ↓ reduced from 1.5
+            return 0.75   # â†“ reduced from 1.5
 
         return 0.0
 
@@ -5571,7 +5884,7 @@ Write the exact goal in one sentence.
             "image", "picture", "photo", "art", "scene", "visual"
         ]
 
-        # 🔥 detect intent: action + image concept
+        # ðŸ”¥ detect intent: action + image concept
         if any(k in text for k in keywords) and any(i in text for i in image_words):
             return True
 
@@ -5899,10 +6212,10 @@ Write the exact goal in one sentence.
                 assistant_text = self._extract_response_text(response)
 
             except Exception:
-                assistant_text = "I couldn’t analyze that image."
+                assistant_text = "I couldnâ€™t analyze that image."
 
         else:
-            assistant_text = "I couldn’t find an image attachment to analyze."
+            assistant_text = "I couldnâ€™t find an image attachment to analyze."
 
         return {
             "ok": True,
@@ -5922,6 +6235,31 @@ Write the exact goal in one sentence.
         # MODEL HELPERS
         # ==============================
 
+    def _format_response_policy_for_prompt(self, response_policy=None) -> str:
+        response_policy = response_policy if isinstance(response_policy, dict) else {}
+
+        instruction = self._safe_str(response_policy.get("instruction")).strip()
+        mode = self._safe_str(response_policy.get("mode")).strip()
+        answer_length = self._safe_str(response_policy.get("answer_length")).strip()
+        tone = self._safe_str(response_policy.get("tone")).strip()
+
+        if not instruction and not mode:
+            return ""
+
+        return (
+            "\n\nRESPONSE POLICY — HIGH PRIORITY:\n"
+            f"- Mode: {mode or 'normal'}\n"
+            f"- Answer length: {answer_length or 'normal'}\n"
+            f"- Tone: {tone or 'direct'}\n"
+            f"- Needs full file: {bool(response_policy.get('needs_full_file'))}\n"
+            f"- Needs debug: {bool(response_policy.get('needs_debug'))}\n"
+            f"- Needs commands: {bool(response_policy.get('needs_commands'))}\n"
+            f"- User frustrated: {bool(response_policy.get('user_frustrated'))}\n\n"
+            "Follow these rules above generic assistant behavior.\n"
+            "When policy conflicts with normal style, policy wins.\n"
+            f"{instruction}\n"
+        )
+
 def _build_chat_input(
     self,
     user_text: str,
@@ -5936,7 +6274,7 @@ def _build_chat_input(
 
     memory_items = self._rank_memory_context(
         user_text=user_text,
-        limit=12,
+        limit=20,
         session_id=session_id,
     )
 
@@ -5991,12 +6329,12 @@ def _build_chat_input(
 
     # 4. Fill the rest with normal ranked memories.
     for item in memory_items:
-        if len(selected_memory) >= 7:
+        if len(selected_memory) >= 10:
             break
 
         add_memory_item(item)
 
-    selected_memory = selected_memory[:7]
+    selected_memory = selected_memory[:10]
 
     memory_block = self._format_memory_context(selected_memory)
     self._last_used_memory_items = selected_memory
@@ -6021,6 +6359,17 @@ def _build_chat_input(
         recent_lines.append(f"{role}: {text}")
 
     recent_block = "\n".join(recent_lines)
+
+    # ==============================
+    # RESPONSE POLICY INJECTION
+    # ==============================
+
+    response_policy = self._build_response_policy(
+        user_text=user_text,
+        decision=decision,
+    )
+
+    response_policy_block = self._format_response_policy_for_prompt(response_policy)
 
     sections = []
 
@@ -6056,6 +6405,7 @@ def _build_chat_input(
         "- For code help, prefer full-file or exact replacement blocks.\n"
         "- Include file paths when discussing project files.\n"
         "- Do not give generic chatbot filler."
+        + response_policy_block
     )
 
     final_chat_input = "\n\n".join(sections).strip()
