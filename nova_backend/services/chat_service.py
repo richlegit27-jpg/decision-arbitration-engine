@@ -686,6 +686,8 @@ class ChatService:
             user_text=user_text,
             assistant_text=assistant_text,
             decision=decision,
+            session_id=session_id,
+            attachments=attachments,
         )
 
         assistant_text = intelligence_result.get("assistant_text", assistant_text)
@@ -1357,8 +1359,11 @@ class ChatService:
         user_text: str = "",
         assistant_text: str = "",
         decision=None,
+        session_id: str = "",
+        attachments=None,
     ) -> dict:
         decision = decision if isinstance(decision, dict) else {}
+        attachments = attachments or []
         assistant_text = self._safe_str(assistant_text).strip()
 
         user_text_lc = self._safe_str(user_text).lower().strip()
