@@ -569,6 +569,19 @@ class ChatService:
         active_task = self._safe_str(state.get("active_task"))
         next_step = self._safe_str(state.get("next_step"))
 
+        # === HARD EXECUTION LOCK ===
+        if active_task and not is_continue:
+            print("FORCING EXECUTION MODE FROM WORKING STATE")
+
+            user_text = f"Continue task: {active_task}. Next step: {next_step}"
+
+            decision = decision if isinstance(decision, dict) else {}
+            mission = decision.get("mission") if isinstance(decision, dict) else {}
+            mission = mission if isinstance(mission, dict) else {}
+
+            mission["mode"] = "execution"
+            decision["mission"] = mission
+
         if is_continue:
             mission = decision.get("mission") if isinstance(decision, dict) else {}
             mission = mission if isinstance(mission, dict) else {}
@@ -1659,6 +1672,48 @@ class ChatService:
             )
         except Exception as e:
             print("FINAL_CLEAN_ERROR:", e)
+
+        # === EXECUTION RENDER HOOK (SAFE) ===
+        mission = decision.get("mission") or {}
+        execution = mission.get("execution")
+
+        if isinstance(execution, dict):
+            try:
+                assistant_text = self._render_execution(execution, include_prefix=True)
+            except Exception as e:
+                print("EXECUTION_RENDER_ERROR:", e)
+
+        # === EXECUTION STEP (SAFE: SINGLE STEP ONLY) ===
+        try:
+            mission = decision.get("mission") or {}
+            execution = mission.get("execution")
+
+            if isinstance(execution, dict):
+                status = str(execution.get("status") or "").lower()
+
+                if status not in ["complete", "completed", "done"]:
+                    exec_result = self._execute_current_step(
+                        execution=execution,
+                        user_text=user_text,
+                        session_id=session_id,
+                        attachments=attachments,
+                    )
+
+                    if isinstance(exec_result, dict):
+                        execution = exec_result.get("execution") or execution
+
+                        # persist it
+                        try:
+                            self._persist_execution_artifact(session_id, execution)
+                        except Exception as e:
+                            print("EXECUTION_SAVE_ERROR:", e)
+
+                        # update mission
+                        decision["mission"] = decision.get("mission") or {}
+                        decision["mission"]["execution"] = execution
+
+        except Exception as e:
+            print("EXECUTION_STEP_ERROR:", e)
 
         return {
             "assistant_text": assistant_text,
