@@ -7004,6 +7004,39 @@ Next action:
         if last_result and last_result.status == "success":
             next_step_text = "review execution result and choose the next move"
 
+            if isinstance(last_result.output, dict):
+                echo_data = last_result.output.get("echo")
+                if isinstance(echo_data, dict):
+                    current_next = str(echo_data.get("next_move") or "").strip().lower()
+
+                    if current_next in {"build execution loop", "build_execution_loop"}:
+                        next_step_text = "verify execution loop"
+                    elif current_next in {"verify execution loop", "verify_execution_loop"}:
+                        next_step_text = "persist execution result"
+                    elif current_next in {"persist execution result", "persist_execution_result"}:
+                        next_step_text = "choose next autonomous task"
+
+            try:
+                self._update_working_state(
+                    session_id,
+                    {
+                        "next_move": next_step_text,
+                        "last_execution_status": "success",
+                        "last_execution_steps": len(results),
+                        "last_execution_output": last_result.output,
+                    },
+                )
+            except Exception:
+                pass
+
+            return (
+                f"Continuing: {active_task or 'saved task'}\n"
+                f"Executed: {move_type}\n\n"
+                f"Steps: {len(results)}\n"
+                f"Next Move: {next_step_text}\n\n"
+                f"Last Result:\n{last_result.output}"
+            )
+
             try:
                 self._update_working_state(
                     session_id,
