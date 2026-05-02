@@ -4,7 +4,8 @@ import py_compile
 import shutil
 import time
 import uuid
-from pathlib import Pathfrom dataclasses import dataclass, field
+from pathlib import Path
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 
@@ -122,6 +123,109 @@ def default_executor(move: NextMove) -> ExecutionResult:
                 move_id=move.id,
                 status="success",
                 output={"echo": payload},
+            )
+
+        if move_type == "apply_function_fix":
+            file_path = str(payload.get("file_path") or "").strip()
+            function_name = str(payload.get("function_name") or "").strip()
+            replacement = str(payload.get("replacement") or "")
+
+            if not file_path:
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error="Missing file_path.",
+                )
+
+            if not function_name:
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error="Missing function_name.",
+                )
+
+            if not replacement.strip():
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error="Missing replacement function code.",
+                )
+
+            path = Path(file_path)
+
+            if not path.exists():
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error=f"File does not exist: {file_path}",
+                )
+
+            original = path.read_text(encoding="utf-8")
+            lines = original.splitlines()
+
+            start_index = None
+
+            for index, line in enumerate(lines):
+                stripped = line.lstrip()
+                if stripped.startswith(f"def {function_name}("):
+                    start_index = index
+                    break
+
+            if start_index is None:
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error=f"Function not found: {function_name}",
+                )
+
+            base_indent = len(lines[start_index]) - len(lines[start_index].lstrip())
+            end_index = len(lines)
+
+            for index in range(start_index + 1, len(lines)):
+                line = lines[index]
+                stripped = line.strip()
+
+                if not stripped:
+                    continue
+
+                indent = len(line) - len(line.lstrip())
+
+                if indent <= base_indent and (
+                    stripped.startswith("def ")
+                    or stripped.startswith("class ")
+                ):
+                    end_index = index
+                    break
+
+            backup_path = path.with_suffix(path.suffix + f".bak_{int(time.time())}")
+            shutil.copy2(path, backup_path)
+
+            replacement_lines = replacement.strip("\n").splitlines()
+            new_lines = lines[:start_index] + replacement_lines + lines[end_index:]
+
+            path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+            compile_ok = True
+            compile_error = ""
+
+            if path.suffix == ".py":
+                try:
+                    py_compile.compile(str(path), doraise=True)
+                except Exception as e:
+                    compile_ok = False
+                    compile_error = str(e)
+
+            return ExecutionResult(
+                move_id=move.id,
+                status="success" if compile_ok else "failed",
+                output={
+                    "file_path": str(path),
+                    "backup_path": str(backup_path),
+                    "function_name": function_name,
+                    "compile_ok": compile_ok,
+                    "compile_error": compile_error,
+                },
+                error=compile_error,
             )
 
         if move_type == "apply_file_fix":
