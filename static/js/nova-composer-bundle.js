@@ -1,6 +1,41 @@
 (function () {
   "use strict";
 
+  // 🔥 EXECUTION CLICK HANDLER (TOP PRIORITY)
+  document.addEventListener("click", function (event) {
+    const button = event.target.closest("[data-exec-action]");
+    if (!button) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const action = button.getAttribute("data-exec-action") || "";
+    const sessionId = String(state.activeSessionId || "").trim();
+
+    console.log("EXECUTION BUTTON CLICKED", { action, sessionId });
+
+    if (!sessionId || !action) return;
+
+    fetch("/api/execution/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: sessionId,
+        action: action,
+      }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        console.log("EXECUTION CONTROL RESPONSE", data);
+
+        if (data && data.execution_state) {
+          state.execution = data.execution_state;
+          window.NovaComposerState = state;
+          renderExecution();
+        }
+      });
+
+  }, true);
   function qs(selector, root) {
     return (root || document).querySelector(selector);
   }
@@ -6292,6 +6327,6 @@ document.addEventListener("click", function (event) {
       button.disabled = false;
       button.textContent = originalText;
     });
-});
+}, true);
 
 })();
