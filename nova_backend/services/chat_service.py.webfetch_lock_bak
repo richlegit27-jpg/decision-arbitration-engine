@@ -714,11 +714,7 @@ class ChatService:
             attachments=attachments,
         )
 
-        # lock web fetch output (prevent duplication)
-        if decision.get("route") == "web_fetch":
-            assistant_text = assistant_text
-        else:
-            assistant_text = intelligence_result.get("assistant_text", assistant_text)
+        assistant_text = intelligence_result.get("assistant_text", assistant_text)
         intelligence = intelligence_result.get("intelligence", {})
         self_check = intelligence_result.get("self_check", {})
         hard_override_applied = bool(intelligence_result.get("hard_override_applied"))
@@ -2473,57 +2469,9 @@ class ChatService:
         decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
 
-        text = str(user_text or "").strip()
-
-        # =============================
-        # HARD URL MODE
-        # =============================
-        if text.startswith("http://") or text.startswith("https://"):
-            source = {
-                "title": text,
-                "url": text,
-                "source": text,
-            }
-
-            final_text = (
-                "Opened link:\n"
-                f"{text}\n\n"
-                "— Top sources —\n"
-                f"1. {text} — {text}"
-            )
-
-            user_msg = self._build_user_message(
-                user_text,
-                attachments=attachments,
-            )
-
-            # HARD DEDUPE WEB OUTPUT
-            chunks = assistant_text.split("\nHere’s the latest")
-            if len(chunks) > 1:
-                assistant_text = chunks[-1]
-                assistant_text = "Here’s the latest" + assistant_text
-
-            assistant_msg = self._build_assistant_message(
-                assistant_text,
-                meta={
-                    "route": "web",
-                    "strategy": "web_fetch",
-                    "query": text,
-                    "fresh": False,
-                    "source_urls": [text],
-                    "sources": [source],
-                },
-            )
-
-            return self._finalize_response(
-                session_id,
-                user_msg,
-                assistant_msg,
-                decision,
-            )
-
         mission = decision.get("mission") if isinstance(decision, dict) else {}
         mission = mission if isinstance(mission, dict) else {}
+        mission_mode = str(mission.get("mode") or "").lower()
 
         user_msg = self._build_user_message(
             user_text,
@@ -2589,6 +2537,10 @@ class ChatService:
             print("WEB_FETCH_TOTAL_FAIL:", exc)
             web_result = {"results": []}
 
+        except Exception as exc:
+            print("WEB_FETCH_PRIMARY_FAILED:", exc)
+            web_result = {}
+
         print("WEB_FETCH_QUERY:", query)
         print("WEB_FETCH_RESULT_TYPE:", type(web_result))
         print("WEB_FETCH_RESULT:", web_result)
@@ -2609,9 +2561,38 @@ class ChatService:
 
         source_urls = []
         source_lines = []
-        sources = []
 
-        for item in results[:5]:
+        stale_words = [
+            "march 28",
+            "march 27",
+            "march 26",
+            "march 25",
+            "2025",
+            "last season",
+            "schedule update",
+            "added on march",
+        ]
+
+        fresh_words = [
+            "today",
+            "latest",
+            "injury report",
+            "updated",
+            "update",
+            "announced",
+            "breaking",
+            "starter",
+            "starters",
+            "tonight",
+            "game vs",
+            "vs.",
+            "april 2026",
+            "2026",
+        ]
+
+        filtered_results = []
+
+        for item in results[:12]:
             if not isinstance(item, dict):
                 continue
 
@@ -2620,25 +2601,43 @@ class ChatService:
             snippet = self._safe_str(item.get("snippet") or item.get("description") or item.get("body") or "").strip()
             source = self._safe_str(item.get("source") or item.get("domain") or "").strip()
 
+            combined = f"{title} {snippet} {source} {url}".lower()
+
+            is_stale = any(word in combined for word in stale_words)
+            looks_fresh = any(word in combined for word in fresh_words)
+
+            if wants_fresh:
+                if is_stale and not looks_fresh:
+                    continue
+
+            filtered_results.append({
+                "title": title,
+                "url": url,
+                "snippet": snippet,
+                "source": source,
+            })
+
+        # ðŸ”¥ fallback if filter removed everything
+        if not filtered_results:
+            filtered_results = results[:5]
+
+        for item in filtered_results[:5]:
+            title = item["title"]
+            url = self._resolve_google_news_url(item["url"])
+            snippet = item["snippet"]
+            source = item["source"]
+
             if not title and not url:
                 continue
 
             if url:
-                url = self._resolve_google_news_url(url)
                 source_urls.append(url)
 
             label = title
             if source:
-                label = f"{source} — {title}" if title else source
+                label = f"{source} â€” {title}" if title else source
 
             source_lines.append(label)
-
-            sources.append({
-                "title": title or source or url,
-                "url": url,
-                "source": source,
-                "snippet": snippet,
-            })
 
             if snippet and snippet not in body:
                 body += "\n\n" + snippet
@@ -2655,6 +2654,7 @@ class ChatService:
             prompt = (
                 "Give a clear, confident, concise summary of the latest news using ONLY the fetched web text below.\n"
                 "Prioritize the most recent and relevant items.\n"
+                "Do not hedge with phrases like 'freshness is uncertain' unless absolutely necessary.\n"
                 "Do not invent facts. Keep it direct and readable.\n\n"
                 f"User asked:\n{user_text}\n\n"
                 f"Web results:\n{body}\n"
@@ -2690,42 +2690,186 @@ class ChatService:
                 print("WEB_FETCH_SUMMARY_FAILED:", exc)
                 assistant_text = body[:1800].strip()
 
-            if sources:
-                assistant_text += "\n\n"
+            if source_lines:
+                assistant_text += "\n\nâ€” Top sources â€”\n"
 
-                for index, item in enumerate(sources[:5], start=1):
-                    title = self._safe_str(item.get("title")).strip()
-                    source = self._safe_str(item.get("source")).strip()
-                    url = self._safe_str(item.get("url")).strip()
+                query_lc = str(query or user_text or "").lower()
 
-                    line = f"{source} — {title}" if source else title
+                wants_injury = any(k in query_lc for k in [
+                    "injury", "injuries", "status", "available",
+                    "availability", "playing", "playing today",
+                    "is he playing", "out", "questionable"
+                ])
 
-                    assistant_text += f"{index}source\n"
-                    assistant_text += f"{line}\n"
+                wants_betting = any(k in query_lc for k in [
+                    "odds", "betting", "spread", "prediction",
+                    "parlay", "prop bet", "props", "best bets", "picks"
+                ])
 
-                    if url:
-                        assistant_text += f"{url}\n"
+                ranked_lines = []
 
-        # HARD WEB DEDUPE: keep only the last generated summary
-        markers = [
-            "\nHere’s the latest",
-            "\nHere are the latest",
-            "\nLatest ",
-        ]
+                for line in source_lines:
+                    text = str(line or "").lower()
 
-        for marker in markers:
-            if marker in assistant_text:
-                assistant_text = marker.strip() + assistant_text.split(marker)[-1]
+                    # âŒ kill garbage
+                    if any(bad in text for bad in [
+                        "instagram.com",
+                        "facebook.com",
+                        "tiktok.com",
+                    ]):
+                        continue
+
+                    score = 10
+
+                    # normalize HARD
+                    t = text.strip()
+                    tl = t.lower()
+
+                    # --- INJURY SIGNAL BOOST ---
+                    injury_keywords = [
+                        "injury", "injuries", "status", "report",
+                        "update", "out", "questionable",
+                        "available", "availability",
+                        "playing", "playing today", "is he playing",
+                        "is he out", "starting", "lineup", "starting lineup"
+                    ]
+
+                    has_injury_signal = any(k in tl for k in injury_keywords)
+
+                    if has_injury_signal and wants_injury:
+                        score += 120
+
+                    # --- MIXED / LOW VALUE PENALTY ---
+                    mixed_keywords = [
+                        "odds", "betting", "spread", "prediction",
+                        "parlay", "stream", "live stream",
+                        "how to watch", "tickets"
+                    ]
+                    has_mixed_signal = any(k in tl for k in mixed_keywords)
+
+                    if has_mixed_signal and not wants_betting:
+                        score -= 80
+
+                    if has_mixed_signal and wants_injury:
+                        score -= 120
+
+                    pure_betting_sites = [
+                        "sportsbook wire", "covers.com", "covers â€”",
+                        "odds shark", "action network", "draftkings",
+                        "fanduel", "betmgm"
+                    ]
+
+                    if any(site in tl for site in pure_betting_sites) and wants_injury:
+                        score -= 70
+
+                    real_news_sources = [
+                        "detroit free press", "freep.com",
+                        "usa today", "yahoo sports",
+                        "sports illustrated", "si.com",
+                        "espn", "nba.com"
+                    ]
+
+                    if any(site in tl for site in real_news_sources):
+                        score += 35
+
+                    # --- CLEAN INJURY BONUS ---
+                    if has_injury_signal and wants_injury and not has_mixed_signal:
+                        score += 60
+
+                    # ðŸ”¥ SOURCE BOOST (DO NOT RESET SCORE)
+                    if "nba â€”" in t or t.startswith("nba") or " nba " in t:
+                        score += 120
+
+                    elif "usa today" in tl:
+                        score += 100
+
+                    elif "sports illustrated" in tl or "si.com" in tl:
+                        score += 95
+
+                    elif "espn" in tl:
+                        score += 85
+
+                    elif "heavy.com" in tl or "heavy â€”" in t:
+                        score += 60
+
+                    elif "yahoo" in tl:
+                        score += 50
+
+                    # --- DIRECT AVAILABILITY / INJURY ARTICLE OVERRIDE ---
+                    if wants_injury and any(k in tl for k in [
+                        "playing today",
+                        "is cade cunningham playing",
+                        "injury",
+                        "injuries",
+                        "status",
+                        "availability"
+                    ]):
+                        score += 700
+
+                    # --- HARD BETTING FARM DROP WHEN INJURY IS REQUESTED ---
+                    if wants_injury and any(k in tl for k in [
+                        "sportsbook wire",
+                        "covers.com",
+                        "best bets",
+                        "picks & best bets",
+                        "prop bets"
+                    ]):
+                        score -= 200
+
+                    # --- FINAL HARD OVERRIDE (WINNER TAKE TOP) ---
+                    if wants_injury and "free press" in tl and any(k in tl for k in [
+                        "playing", "injury", "injuries", "status"
+                    ]):
+                        score = 9999
+
+                    if (
+                        wants_injury
+                        and "detroit free press" in tl
+                        and any(k in tl for k in ["playing", "injury", "injuries", "status"])
+                    ):
+                        score = 9999
+
+                    ranked_lines.append((score, line))
+
+                ranked_lines.sort(key=lambda x: x[0], reverse=True)
+
+                # --- LOCK OUTPUT ORDER: INJURY WINNER FIRST ---
+                if wants_injury:
+                    injury_winners = []
+                    others = []
+
+                    for item in ranked_lines:
+                        _, line = item
+                        line_lc = str(line or "").lower()
+
+                        if "free press" in line_lc and any(k in line_lc for k in [
+                            "playing",
+                            "playing today",
+                            "injury",
+                            "injuries",
+                            "status",
+                            "availability",
+                        ]):
+                            injury_winners.append(item)
+                        else:
+                            others.append(item)
+
+                    ranked_lines = injury_winners + others
+
+                ranked_lines = ranked_lines[:5]
+
+                assistant_text += "\n"
+
+                for index, (_, line) in enumerate(ranked_lines, start=1):
+                    assistant_text += f"{index}. {line}\n"
 
         assistant_msg = self._build_assistant_message(
             assistant_text,
             meta={
                 "route": "web",
-                "strategy": "web_fetch",
                 "query": query,
                 "fresh": wants_fresh,
                 "source_urls": source_urls[:5],
-                "sources": sources[:5],
             },
         )
 
@@ -2734,7 +2878,7 @@ class ChatService:
             user_msg,
             assistant_msg,
             decision,
-        ) 
+        )
 
     def _resolve_google_news_url(self, url: str) -> str:
         try:
@@ -3489,7 +3633,7 @@ class ChatService:
         route = str(decision.get("route") or "").lower()
 
         try:
-            if route == self.ROUTE_WEB_FETCH:
+            if route == "web":
                 return self._execute_web_fetch(
                     user_text=user_text,
                     session_id=session_id,
@@ -4211,7 +4355,6 @@ class ChatService:
 
         return "HereÃ¢â‚¬â„¢s what I remember:\n" + "\n".join(lines)
 
-
     def answer_from_web_results(self, query: str, results: list[dict] | None = None) -> str:
         query = str(query or "").strip()
         items = results if isinstance(results, list) else []
@@ -4268,8 +4411,7 @@ class ChatService:
             "If the results are weak, be honest but still give the best concise answer possible. "
             "Do not invent facts beyond the provided results. "
             "Keep it short and natural. "
-            "Do not write a Top sources list yourself. "
-            "The app will add sources separately."
+            "When you include a Top sources list, include each source URL on the line directly after that source."
         )
 
         user_prompt = (
@@ -4294,16 +4436,16 @@ class ChatService:
                 text = str(response).strip()
 
             if text:
-                import re
-
-                text = re.split(r"[-–—]\s*Top sources\s*[-–—]", text, flags=re.IGNORECASE)[0].strip()
-                text = re.split(r"\bTop sources\b", text, flags=re.IGNORECASE)[0].strip()
-
                 sources_block = ""
 
                 if cleaned:
                     lines = []
+                    lines.append("\nâ€” Top sources â€”")
+
                     ranked_sources = []
+
+
+
 
                     for item in cleaned:
                         if not isinstance(item, dict):
@@ -4326,15 +4468,14 @@ class ChatService:
                         reverse=True,
                     )
 
-                    cleaned_ranked = ranked_sources[:5]
+                    cleaned = ranked_sources[:5]
 
-                    for idx, item in enumerate(cleaned_ranked, start=1):
+                    for idx, item in enumerate(cleaned, start=1):
                         title = str(item.get("title") or "").strip()
                         domain = str(item.get("domain") or "").strip()
                         url = str(item.get("url") or "").strip()
 
-                        lines.append(f"{idx}source")
-                        lines.append(f"{domain} — {title}")
+                        lines.append(f"{idx}. {domain} â€” {title}")
 
                         if url:
                             lines.append(url)
@@ -4342,28 +4483,15 @@ class ChatService:
 
                     sources_block = "\n" + "\n".join(lines)
 
-                    sources_block = "\n" + "\n".join(lines)
+                return {
+                    "text": text + sources_block,
+                    "source_urls": source_urls,
+                }
 
-            import re
-
-            clean_text = re.split(r"[-–—]\s*Top sources\s*[-–—]", text, flags=re.IGNORECASE)[0]
-            clean_text = re.split(r"\bTop sources\b", clean_text, flags=re.IGNORECASE)[0]
-
-            text = clean_text.strip() + sources_block
-
-            if "Top sources" in text:
-                text = text.split("Top sources")[0].strip() + sources_block
-
-            if "— Top sources —" in text:
-                text = text.split("— Top sources —")[0].strip() + sources_block
-
-            return text
-
-        except Exception as e:
-            print("WEB RESPONSE ERROR:", e)
+        except Exception:
+            pass
 
         top = cleaned[0]
-
         fallback_parts = []
         if top.get("title"):
             fallback_parts.append(str(top["title"]))
@@ -5023,7 +5151,7 @@ class ChatService:
         session_id: str = "",
     ) -> dict:
 
-        user_text = self._safe_str(user_text).strip()
+        user_text = self._safe_str(user_text)
         lower_text = user_text.lower()
 
         attachments = attachments or []
@@ -5043,7 +5171,7 @@ class ChatService:
 
         if any(trigger in lower_text for trigger in image_triggers):
             return {
-                "route": self.ROUTE_IMAGE_GENERATION,
+                "route": self.ROUTE_IMAGE_GENERATION,   # ðŸ”¥ use constant
                 "mode": "image_generation",
                 "confidence": 0.95,
                 "reasons": ["image_generation_intent"],
@@ -5054,7 +5182,7 @@ class ChatService:
             }
 
         # =========================
-        # IMAGE / FILE ANALYSIS
+        # IMAGE ANALYSIS (attachments)
         # =========================
         if attachments:
             return {
@@ -5068,55 +5196,28 @@ class ChatService:
             }
 
         # =========================
-        # WEB FETCH AUTO-DETECT LOCK
+        # WEB SEARCH
         # =========================
-        has_url = (
-            "http://" in lower_text
-            or "https://" in lower_text
-            or lower_text.startswith("www.")
-        )
-
-        live_web_triggers = (
+        web_triggers = (
             "latest",
-            "today",
-            "yesterday",
-            "last night",
-            "this week",
-            "right now",
-            "current",
             "news",
-            "update",
-            "updates",
-            "score",
-            "scores",
-            "who won",
-            "what happened",
-            "sources",
-            "source",
+            "today",
+            "current",
             "price",
             "stock",
             "bitcoin",
-            "crypto",
             "nvidia",
-            "nba",
-            "nfl",
-            "nhl",
-            "mlb",
-            "ufc",
         )
 
-        wants_live_web = any(trigger in lower_text for trigger in live_web_triggers)
-
-        if has_url or wants_live_web:
+        if any(trigger in lower_text for trigger in web_triggers):
             return {
-                "route": self.ROUTE_WEB_FETCH,
+                "route": self.ROUTE_WEB_FETCH,   # ðŸ”¥ use constant
                 "mode": "web_fetch",
-                "confidence": 0.95 if has_url else 0.9,
-                "reasons": ["web_fetch_lock_auto_detect"],
+                "confidence": 0.85,
+                "reasons": ["web_intent"],
                 "save_artifact": True,
                 "save_memory": False,
                 "use_memory": False,
-                "query": user_text,
             }
 
         # =========================

@@ -1,41 +1,6 @@
 (function () {
   "use strict";
 
-  // 🔥 EXECUTION CLICK HANDLER (TOP PRIORITY)
-  document.addEventListener("click", function (event) {
-    const button = event.target.closest("[data-exec-action]");
-    if (!button) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    const action = button.getAttribute("data-exec-action") || "";
-    const sessionId = String(state.activeSessionId || "").trim();
-
-    console.log("EXECUTION BUTTON CLICKED", { action, sessionId });
-
-    if (!sessionId || !action) return;
-
-    fetch("/api/execution/control", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        session_id: sessionId,
-        action: action,
-      }),
-    })
-      .then(r => r.json())
-      .then(data => {
-        console.log("EXECUTION CONTROL RESPONSE", data);
-
-        if (data && data.execution_state) {
-          state.execution = data.execution_state;
-          window.NovaComposerState = state;
-          renderExecution();
-        }
-      });
-
-  }, true);
   function qs(selector, root) {
     return (root || document).querySelector(selector);
   }
@@ -251,66 +216,79 @@ function resolveUploadUrl(url) {
       .replace(/'/g, "&#39;");
   }
 
-  function renderSources(assistantText, meta = {}) {
-    const text = String(assistantText || "");
+function renderSources(assistantText, meta = {}) {
+  const text = String(assistantText || "");
 
-    if (!text.includes("— Top sources —")) {
-      return escapeHtml(text);
-    }
-
-    const parts = text.split("— Top sources —");
-    const mainText = parts[0].trim();
-    const sourcesText = parts.slice(1).join("— Top sources —").trim();
-
-    const lines = sourcesText
-      .split("\n")
-      .map(line => line.trim())
-      .filter(Boolean);
-
-    const urls = Array.isArray(meta.source_urls) ? meta.source_urls : [];
-    const sourceMeta = Array.isArray(meta.sources) ? meta.sources : [];
-
-const mission = (meta && (meta.strategy || meta.mission)) || "";
-let badge = "";
-
-if (mission) {
-  badge = `<div class="mission-badge">${escapeHtml(mission)}</div>`;
-}
-
-let html = `
-  ${badge}
-  <div class="nova-msg-text">${escapeHtml(mainText)}</div>
-`;
-    html += `<div class="nova-sources">`;
-
-    lines.forEach((line, index) => {
-const sourceItem = sourceMeta[index] && typeof sourceMeta[index] === "object"
-  ? sourceMeta[index]
-  : {};
-
-const url =
-  urls[index] ||
-  sourceItem.url ||
-  sourceItem.link ||
-  "";
-
-const label =
-  sourceItem.title ||
-  line.replace(/^\d+\.\s*/, "").trim();
-
-      html += `
-        <button class="source-row" type="button" data-url="${escapeHtml(url)}"
-data-title="${escapeHtml(label)}"
-data-preview="${escapeHtml(label + ' — ' + (url || ''))}">
-          <span class="source-index">${index + 1}.</span>
-          <span class="source-label">${escapeHtml(label)}</span>
-        </button>
-      `;
-    });
-
-    html += `</div>`;
-    return html;
+  if (!text.includes("— Top sources —")) {
+    return renderMarkdown(text);
   }
+
+  const parts = text.split("— Top sources —");
+  const mainText = parts[0].trim();
+  const rawSources = parts.slice(1).join("— Top sources —").trim();
+
+  const urls = Array.isArray(meta.source_urls) ? meta.source_urls : [];
+  const sourceMeta = Array.isArray(meta.sources) ? meta.sources : [];
+
+  const lines = rawSources
+    .split("\n")
+    .map(function (line) {
+      return line.trim();
+    })
+    .filter(Boolean);
+
+  const cards = lines.map(function (line, index) {
+    const cleanLine = line.replace(/^\d+\.\s*/, "").trim();
+    const item = sourceMeta[index] && typeof sourceMeta[index] === "object"
+      ? sourceMeta[index]
+      : {};
+
+    const url = urls[index] || item.url || item.link || "";
+    const title = item.title || cleanLine || url || "Source";
+    const snippet = item.snippet || item.description || "";
+
+    let domain = "source";
+    try {
+      if (url) {
+        domain = new URL(url).hostname.replace(/^www\./, "");
+      }
+    } catch (_) {}
+
+    return (
+      '<button type="button" class="nova-source-card source-card" data-no-chat-action="1" data-url="' +
+      escapeHtml(url) +
+      '" data-title="' +
+      escapeHtml(title) +
+      '" data-preview="' +
+      escapeHtml(snippet || title) +
+      '">' +
+        '<div class="nova-source-card-top">' +
+          '<span class="nova-source-number">' +
+            escapeHtml(String(index + 1)) +
+          '</span>' +
+          '<span class="nova-source-domain">' +
+            escapeHtml(domain) +
+          '</span>' +
+        '</div>' +
+        '<div class="nova-source-title">' +
+          escapeHtml(title) +
+        '</div>' +
+        (snippet
+          ? '<div class="nova-source-snippet">' + escapeHtml(snippet) + '</div>'
+          : '') +
+      '</button>'
+    );
+  }).join("");
+
+  return (
+    '<div class="nova-msg-text">' +
+      renderMarkdown(mainText) +
+    '</div>' +
+    '<div class="nova-source-grid">' +
+      cards +
+    '</div>'
+  );
+}
 
   function linkifyText(text) {
   const safe = escapeHtml(String(text || ""));
@@ -769,80 +747,111 @@ if (els.ttsToggleButton) {
 }
 
 function renderExecution() {
-  const container =
-    document.querySelector("#execution-panel") ||
-    document.querySelector("[data-execution-panel]");
+  const panel = document.querySelector('[data-rail-panel="execution"]');
+  if (!panel) return;
 
-  if (!container) return;
+  panel.hidden = false;
+  panel.classList.add("is-active");
+  panel.style.display = "block";
+  panel.style.visibility = "visible";
+  panel.style.pointerEvents = "auto";
+  panel.style.position = "relative";
+  panel.style.zIndex = "9999";
 
-  const execution = state.execution || {};
+  let container = panel.querySelector("[data-execution-panel]");
+  if (!container) {
+    container = document.createElement("div");
+    container.setAttribute("data-execution-panel", "");
+    panel.appendChild(container);
+  }
 
-  container.hidden = false;
+  container.style.pointerEvents = "auto";
+  container.style.position = "relative";
+  container.style.zIndex = "10000";
 
-  const status =
-    execution.status ||
-    execution.last_execution_status ||
-    execution.state ||
-    "idle";
+  const execution =
+    state.execution ||
+    window.NovaExecutionState ||
+    {
+      status: "idle",
+      steps: [],
+      history: [],
+    };
 
-  const rawSteps = Array.isArray(execution.steps) ? execution.steps : [];
+  const steps = Array.isArray(execution.steps) ? execution.steps : [];
+  const history = Array.isArray(execution.history) ? execution.history : [];
 
-  const stepCount =
-    rawSteps.length ||
-    Number(execution.last_execution_steps || execution.step_count || 0);
+  container.innerHTML = `
+    <div class="nova-panel-shell" style="pointer-events:auto;position:relative;z-index:10001;">
+      <div class="nova-panel-title">Execution</div>
 
-  const steps =
-    rawSteps.length
-      ? rawSteps
-      : stepCount > 0
-        ? Array.from({ length: stepCount }, function (_, index) {
-            return {
-              title: "Step " + (index + 1),
-              status: status === "step_requested" ? "running" : "planned",
-            };
-          })
-        : [];
+      <div class="nova-panel-card" style="pointer-events:auto;position:relative;z-index:10002;">
+        <button type="button" data-exec-action="run_step" onclick="window.runExecutionAction('run_step', this)" style="pointer-events:auto;position:relative;z-index:10003;">Run Step</button>
+        <button type="button" data-exec-action="run_all" onclick="window.runExecutionAction('run_all', this)" style="pointer-events:auto;position:relative;z-index:10003;">Run All</button>
+        <button type="button" data-exec-action="retry" onclick="window.runExecutionAction('retry', this)" style="pointer-events:auto;position:relative;z-index:10003;">Retry</button>
+        <button type="button" data-exec-action="stop" onclick="window.runExecutionAction('stop', this)" style="pointer-events:auto;position:relative;z-index:10003;">Stop</button>
+      </div>
 
-  const history =
-    Array.isArray(execution.history)
-      ? execution.history
-      : Array.isArray(execution.execution_history)
-        ? execution.execution_history
-        : [];
+      <div class="nova-panel-card">
+        <div><strong>Status:</strong> ${escapeHtml(execution.status || "idle")}</div>
+        <div><strong>Steps:</strong> ${escapeHtml(String(steps.length))}</div>
+      </div>
 
-  const stepsHtml = steps.length
-    ? steps.map(function (step) {
-        const s = String(step.status || "planned").toLowerCase();
-        let icon = "○";
-
-        if (s === "completed" || s === "done") icon = "✓";
-        else if (s === "running" || s === "step_requested") icon = "→";
-        else if (s === "failed" || s === "error") icon = "⚠";
-
-        return (
-          '<div class="exec-step exec-' + escapeHtml(s) + '">' +
-            '<span class="exec-icon">' + icon + '</span>' +
-            '<span class="exec-text">' +
-              escapeHtml(step.title || step.text || "Step") +
-            '</span>' +
-          '</div>'
-        );
-      }).join("")
-    : '<div class="nova-panel-muted">No steps yet.</div>';
-
-  const historyHtml = history.length
-    ? history.map(function (h) {
-        if (typeof h === "string") {
-          return '<div class="exec-history-item">' + escapeHtml(h) + '</div>';
+      <div class="nova-panel-subtitle">Steps</div>
+      <div class="nova-panel-card">
+        ${
+          steps.length
+            ? steps.map(function (step, index) {
+                return `
+                  <div class="exec-step-item">
+                    <strong>${escapeHtml(step.title || "Step " + (index + 1))}</strong>
+                    <div>Status: ${escapeHtml(step.status || "pending")}</div>
+                  </div>
+                `;
+              }).join("")
+            : '<div class="nova-panel-muted">No steps yet. Click Run Step.</div>'
         }
+      </div>
 
-        return (
-          '<div class="exec-history-item">' +
-            escapeHtml(h.action || h.type || h.event || JSON.stringify(h)) +
-          '</div>'
-        );
-      }).join("")
-    : '<div class="nova-panel-muted">No history yet.</div>';
+      <div class="nova-panel-subtitle">History</div>
+      <div class="nova-panel-card">
+        ${
+          history.length
+            ? history.map(function (item) {
+                return '<div class="exec-history-item">' + escapeHtml(String(item || "")) + '</div>';
+              }).join("")
+            : '<div class="nova-panel-muted">No history yet.</div>'
+        }
+      </div>
+    </div>
+  `;
+}
+
+window.renderExecution = renderExecution;
+window.renderExecutionPanel = renderExecution;
+
+function renderExecution() {
+  const panel = document.querySelector('[data-rail-panel="execution"]');
+  if (!panel) return;
+
+  let container = panel.querySelector("[data-execution-panel]");
+  if (!container) {
+    container = document.createElement("div");
+    container.setAttribute("data-execution-panel", "");
+    panel.appendChild(container);
+  }
+
+  const execution =
+    state.execution ||
+    window.NovaExecutionState ||
+    {
+      status: "idle",
+      steps: [],
+      history: [],
+    };
+
+  const steps = Array.isArray(execution.steps) ? execution.steps : [];
+  const history = Array.isArray(execution.history) ? execution.history : [];
 
   container.innerHTML = `
     <div class="nova-panel-shell">
@@ -856,18 +865,55 @@ function renderExecution() {
       </div>
 
       <div class="nova-panel-card">
-        <div><strong>Status:</strong> ${escapeHtml(status)}</div>
-        <div><strong>Steps:</strong> ${escapeHtml(String(stepCount))}</div>
+        <div><strong>Status:</strong> ${escapeHtml(execution.status || "idle")}</div>
+        <div><strong>Steps:</strong> ${escapeHtml(String(steps.length))}</div>
       </div>
 
       <div class="nova-panel-subtitle">Steps</div>
-      <div class="nova-panel-card">${stepsHtml}</div>
+      <div class="nova-panel-card">
+        ${
+          steps.length
+            ? steps.map(function (step, index) {
+                return `
+                  <div class="exec-step-item">
+                    <strong>${escapeHtml(step.title || "Step " + (index + 1))}</strong>
+                    <div>Status: ${escapeHtml(step.status || "pending")}</div>
+                  </div>
+                `;
+              }).join("")
+            : '<div class="nova-panel-muted">No steps yet. Click Run Step.</div>'
+        }
+      </div>
 
       <div class="nova-panel-subtitle">History</div>
-      <div class="nova-panel-card">${historyHtml}</div>
+      <div class="nova-panel-card">
+        ${
+          history.length
+            ? history.map(function (item) {
+                return '<div class="exec-history-item">' + escapeHtml(String(item || "")) + '</div>';
+              }).join("")
+            : '<div class="nova-panel-muted">No history yet.</div>'
+        }
+      </div>
     </div>
   `;
+
+  container.onclick = function (event) {
+    const button = event.target.closest("[data-exec-action]");
+    if (!button) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    runExecutionAction(
+      String(button.getAttribute("data-exec-action") || "").trim(),
+      button
+    );
+  };
 }
+
+window.renderExecution = renderExecution;
+window.renderExecutionPanel = renderExecution;
 
 function getSessionArtifactsForRail() {
   const activeSessionId = String(state.activeSessionId || "").trim();
@@ -933,7 +979,7 @@ function setRailTab(tabName) {
   const requested = String(tabName || "artifacts").trim().toLowerCase();
 
   const nextTab =
-    requested === "memory" || requested === "web" || requested === "artifacts"
+    requested === "memory" || requested === "web" || requested === "artifacts" || requested === "execution"
       ? requested
       : "artifacts";
 
@@ -962,6 +1008,7 @@ function setRailTab(tabName) {
     els.railTitle.textContent =
       nextTab === "memory" ? "Memory" :
       nextTab === "web" ? "Web" :
+      nextTab === "execution" ? "Execution" :
       "Artifacts";
   }
 
@@ -969,6 +1016,7 @@ function setRailTab(tabName) {
     els.railSubtitle.textContent =
       nextTab === "memory" ? "Saved memory" :
       nextTab === "web" ? "Recent web results" :
+      nextTab === "execution" ? "Agent controls and execution history" :
       "Session artifacts";
   }
 
@@ -976,6 +1024,8 @@ function setRailTab(tabName) {
     if (typeof renderMemory === "function") renderMemory();
   } else if (nextTab === "web") {
     if (typeof renderWeb === "function") renderWeb();
+  } else if (nextTab === "execution") {
+    if (typeof renderExecution === "function") renderExecution();
   } else {
     if (typeof renderArtifacts === "function") renderArtifacts();
   }
@@ -1009,9 +1059,15 @@ function openRail() {
     setRailSelectedItem(state.rail.selectedKind, state.rail.selectedId);
   }
 
+if (state.rail && state.rail.tab === "execution") {
+  if (typeof renderExecution === "function") {
+    renderExecution();
+  }
+} else {
   if (typeof renderArtifacts === "function") renderArtifacts();
   if (typeof renderMemory === "function") renderMemory();
   if (typeof renderWeb === "function") renderWeb();
+}
 
   syncRailReopenVisibility();
 }
@@ -1856,21 +1912,35 @@ function linkifySourceLines(text) {
   const output = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const line = (lines[i] || "").trim();
 
-    const match = line.match(/^\s*(\d+)\.\s*(.+?)\s*[—-]\s*(.+?)\s*$/);
+    // NEW FORMAT: "1source"
+    const match = line.match(/^(\d+)source$/i);
 
     if (match) {
       const index = match[1];
-      const source = match[2].trim();
-      const title = match[3].trim();
 
+      const nextLine = (lines[i + 1] || "").trim();     // domain — title
+      const nextNext = (lines[i + 2] || "").trim();     // url
+
+      let domain = "";
+      let title = "";
       let url = "";
 
-      const nextLine = (lines[i + 1] || "").trim();
-      if (nextLine.startsWith("http://") || nextLine.startsWith("https://")) {
-        url = nextLine;
-        i++;
+      // Parse "domain — title"
+      const parts = nextLine.split("—");
+      if (parts.length >= 2) {
+        domain = parts[0].trim();
+        title = parts.slice(1).join("—").trim();
+      } else {
+        title = nextLine;
+      }
+
+      if (nextNext.startsWith("http")) {
+        url = nextNext;
+        i += 2;
+      } else {
+        i += 1;
       }
 
       output.push(
@@ -1879,185 +1949,22 @@ function linkifySourceLines(text) {
           '" data-title="' +
           escapeHtml(title) +
           '" data-preview="' +
-          escapeHtml(source + " — " + title) +
+          escapeHtml(domain + " — " + title) +
           '">' +
-          escapeHtml(index) +
-          ". " +
-          '<span class="source-name">' +
-          escapeHtml(source) +
-          "</span> — " +
-          '<a href="' +
-          escapeHtml(url) +
-          '" target="_blank" rel="noopener noreferrer" data-no-chat-action="1">' +
-          escapeHtml(title) +
-          "</a>" +
-          "</div>"
+          '<span class="source-index">' + index + '</span>' +
+          '<span class="source-domain">' + escapeHtml(domain) + '</span>' +
+          '<span class="source-title">' + escapeHtml(title) + '</span>' +
+        '</div>'
       );
-    } else {
-      output.push(escapeHtml(line));
+
+      continue;
     }
+
+    output.push(escapeHtml(line));
   }
 
-  return output.join("<br>");
+  return output.join("\n");
 }
-
-document.addEventListener("click", function (e) {
-  const protectedEl = e.target.closest("[data-no-chat-action='1']");
-  const sourceEl = e.target.closest(".source-card, .source-row");
-
-// =============================
-// MEMORY CLICK REVEAL
-// =============================
-const memBtn = e.target.closest(".memory-dominance-badge, .memory-used-badge");
-
-if (memBtn) {
-  e.preventDefault();
-  e.stopPropagation();
-
-  try {
-    const raw = memBtn.getAttribute("data-memory-used") || "";
-    const decoded = decodeURIComponent(raw);
-    const memoryList = JSON.parse(decoded || "[]");
-
-    if (!memoryList.length) return;
-
-    openRail();
-    setRailTab("memory");
-
-    // push memory into rail viewer
-    if (typeof renderMemoryViewer === "function") {
-      renderMemoryViewer(memoryList);
-    } else {
-      console.warn("renderMemoryViewer not found");
-    }
-  } catch (err) {
-    console.warn("memory click failed", err);
-  }
-
-  return;
-}
-
-  if (protectedEl && !sourceEl) {
-    e.preventDefault();
-    e.stopPropagation();
-    return;
-  }
-
-  if (!sourceEl) return;
-
-  e.preventDefault();
-  e.stopPropagation();
-
-  let url =
-    sourceEl.getAttribute("data-source-url") ||
-    sourceEl.getAttribute("data-url") ||
-    "";
-
-  if (url === "{preview}" || url === "%7Bpreview%7D") {
-  url = "";
-}
-
-
-  if (!url) {
-    const link = sourceEl.querySelector("a[href]");
-    if (link) url = link.getAttribute("href") || "";
-  }
-
-  const safeUrl =
-    url && url !== "{preview}" && url !== "%7Bpreview%7D"
-      ? url
-      : "";
-
-  if (!safeUrl) return;
-
-  const title =
-    sourceEl.getAttribute("data-title") ||
-    sourceEl.getAttribute("data-preview") ||
-    sourceEl.textContent ||
-    "Source preview";
-
-  const preview = sourceEl.getAttribute("data-preview") || "";
-
-  let domain = "Source";
-  let favicon = "";
-
-  try {
-    const parsed = new URL(safeUrl);
-    domain = parsed.hostname.replace(/^www\./, "");
-    favicon =
-      "https://www.google.com/s2/favicons?domain=" +
-      encodeURIComponent(parsed.hostname) +
-      "&sz=32";
-  } catch (_) {}
-
-  const rail = document.querySelector("[data-right-rail]");
-  const viewer = document.querySelector("[data-rail-viewer]");
-  const titleEl = document.querySelector("[data-rail-title]");
-  const subtitleEl = document.querySelector("[data-rail-subtitle]");
-
-  if (!rail || !viewer) {
-    window.open(safeUrl, "_blank");
-    return;
-  }
-
-  openRail();
-  setRailTab("web");
-
-  if (titleEl) titleEl.textContent = title;
-  if (subtitleEl) subtitleEl.textContent = safeUrl;
-
-  rail.classList.add("is-open");
-  document.body.classList.add("is-rail-open");
-  viewer.hidden = false;
-
-  viewer.innerHTML = `
-  <div class="nova-viewer-shell">
-
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-      ${
-        favicon
-          ? `<img src="${escapeHtml(favicon)}" style="width:22px;height:22px;border-radius:6px;">`
-          : `<div style="width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,0.12);"></div>`
-      }
-
-      <div style="min-width:0;">
-        <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${escapeHtml(domain)}
-        </div>
-
-        <div style="font-size:11px;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${escapeHtml(safeUrl)}
-        </div>
-      </div>
-    </div>
-
-    <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);margin-bottom:12px;">
-      <div style="font-size:14px;font-weight:700;line-height:1.35;margin-bottom:6px;">
-        ${escapeHtml(title)}
-      </div>
-
-      <div style="font-size:12px;opacity:.7;line-height:1.4;">
-        ${escapeHtml(preview || "Click below to open the full article.")}
-      </div>
-    </div>
-
-    <div style="display:flex;gap:8px;">
-      <a href="${escapeHtml(safeUrl)}"
-         target="_blank"
-         rel="noopener noreferrer"
-         data-no-chat-action="1"
-         style="padding:8px 12px;border-radius:10px;background:#fff;color:#000;text-decoration:none;font-size:13px;font-weight:700;">
-        Open article
-      </a>
-
-      <button data-copy-url="${escapeHtml(safeUrl)}"
-        style="padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.12);font-size:13px;">
-        Copy link
-      </button>
-    </div>
-
-  </div>
-`;});
 
 function renderSourceList(message) {
   return "";
@@ -2301,16 +2208,35 @@ function renderMessageCard(message) {
       ? "message-card--user"
       : "message-card--assistant";
 
-  const rawText = String(message.text || "").trim();
+  let rawText = String(message.text || "").trim();
+
+// 🔥 CLEAN SOURCE GARBAGE BLOCK
+if (role === "assistant") {
+  rawText = String(rawText || "")
+    .replace(/\n+\d+\s*source\s*\n[\s\S]*$/i, "")
+    .replace(/\n+\d+source\s*\n[\s\S]*$/i, "")
+    .replace(/\n+\s*Top sources\s*\n+[\s\S]*$/i, "")
+    .replace(/\n+\s*Sources\s*\n+[\s\S]*$/i, "")
+    .trim();
+}
+
+  const hasMetaSources =
+    message &&
+    message.meta &&
+    Array.isArray(message.meta.sources) &&
+    message.meta.sources.length > 0;
 
   let renderedText =
     role === "assistant"
       ? (
-          rawText.includes("— Top sources —")
-            ? renderSources(rawText, message.meta || {})
-            : renderMarkdown(rawText)
+          linkifySourceLines(rawText) ||
+          (
+            hasMetaSources
+              ? renderMarkdown(rawText) + renderSources("", message.meta || {})
+              : renderMarkdown(rawText)
+          )
         )
-      : escapeHtml(rawText);
+      : renderMarkdown(rawText);
 
   renderedText = String(renderedText || "")
     .replace(/<img\b[^>]*>/gi, "")
@@ -3791,7 +3717,7 @@ async function consumeChatJson(payload) {
       body: JSON.stringify(payload || {}),
     });
 
-    const rawText = await response.text();
+    let rawText = await response.text();
 
     log("consumeChatJson status", response.status);
     log("consumeChatJson raw response", rawText);
@@ -4978,6 +4904,62 @@ function wireSidebar() {
 
   closeSidebar();
 }
+
+window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, title) {
+  url = String(url || "").trim();
+  title = String(title || "Source preview").trim();
+
+  if (!url) return;
+
+  if (typeof openRail === "function") openRail();
+  if (typeof setRailTab === "function") setRailTab("web");
+
+  const viewer =
+    document.querySelector("[data-rail-viewer]") ||
+    document.querySelector("#webMount") ||
+    document.querySelector('[data-rail-panel="web"]') ||
+    document.querySelector(".nova-rail-content");
+
+  if (!viewer) {
+    console.warn("No web preview viewer found");
+    return;
+  }
+
+  viewer.innerHTML = `
+    <div class="nova-viewer-shell">
+      <div class="nova-viewer-title">${escapeHtml(title)}</div>
+      <div class="nova-viewer-body">
+        <p>Loading preview...</p>
+      </div>
+    </div>
+  `;
+
+  fetch("/api/web/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: url }),
+  })
+    .then(function (response) {
+      return response.json();
+    })
+    .then(function (data) {
+      viewer.innerHTML = `
+        <div class="nova-viewer-shell">
+          <div class="nova-viewer-title">${escapeHtml((data && data.title) || title)}</div>
+          <div class="nova-viewer-body">
+            <p>${escapeHtml((data && data.preview) || "No preview found.").replace(/\n/g, "<br>")}</p>
+            <button type="button" onclick="window.open('${escapeHtml((data && data.url) || url)}', '_blank')">
+              Open full article →
+            </button>
+          </div>
+        </div>
+      `;
+    })
+    .catch(function (error) {
+      console.error("SOURCE PREVIEW ERROR:", error);
+      viewer.innerHTML = "<p>Failed to load preview.</p>";
+    });
+};
 
 
 function renderWeb() {
@@ -6192,7 +6174,6 @@ function syncArtifactViewerToActiveSession() {
   state.rail.selectedId = firstId;
   openArtifactFromStateOrBackend(firstId);
 }
-
 async function loadState() {
   const payload = await apiGet("/api/state");
 
@@ -6260,73 +6241,101 @@ window.NovaComposerBundle = {
 };
 
 window.NovaComposerState = state;
-window.renderExecution = renderExecution;
 
 setTimeout(() => {
   const voiceBtn = document.querySelector('[data-action="voice"]');
-  if (voiceBtn) voiceBtn.textContent = 'Mic';
+  if (voiceBtn) voiceBtn.textContent = "Mic";
 
-  const attachBtn = document.querySelector('[data-attach-button]');
-  if (attachBtn) attachBtn.textContent = '+';
+  const attachBtn = document.querySelector("[data-attach-button]");
+  if (attachBtn) attachBtn.textContent = "+";
 }, 500);
 
-document.addEventListener("click", function (event) {
-  const button = event.target.closest("[data-exec-action]");
-  if (!button) return;
+// === EXECUTION PANEL FIX ===
+(function () {
+  function renderExecutionPanel() {
+    const panel = document.querySelector('[data-rail-panel="execution"]');
+    if (!panel) return;
 
-  event.preventDefault();
-  event.stopPropagation();
+    let mount = panel.querySelector("[data-execution-panel]");
+    if (!mount) {
+      mount = document.createElement("div");
+      mount.setAttribute("data-execution-panel", "");
+      panel.appendChild(mount);
+    }
 
-  const action = button.getAttribute("data-exec-action") || "";
-  const sessionId = String(state.activeSessionId || "").trim();
+    panel.hidden = false;
+    panel.classList.add("is-active");
+    panel.style.display = "block";
+    panel.style.visibility = "visible";
 
-  console.log("EXECUTION BUTTON CLICKED", {
-    action: action,
-    sessionId: sessionId,
-  });
+    const execution =
+      window.NovaExecutionState ||
+      (window.NovaComposerState && window.NovaComposerState.execution) ||
+      state.execution ||
+      { status: "idle", steps: [], history: [] };
 
-  if (!sessionId || !action) {
-    console.warn("EXECUTION CLICK BLOCKED", {
-      action: action,
-      sessionId: sessionId,
-    });
-    return;
+    const steps = Array.isArray(execution.steps) ? execution.steps : [];
+    const history = Array.isArray(execution.history) ? execution.history : [];
+
+    mount.innerHTML = `
+      <div class="nova-panel-shell">
+        <div class="nova-panel-title">Execution</div>
+
+<div class="nova-panel-card">
+  <button type="button" onclick="window.runExecutionAction('run_step', this)">Run Step</button>
+  <button type="button" onclick="window.runExecutionAction('run_all', this)">Run All</button>
+  <button type="button" onclick="window.runExecutionAction('retry', this)">Retry</button>
+  <button type="button" onclick="window.runExecutionAction('stop', this)">Stop</button>
+</div>
+
+        <div class="nova-panel-card">
+          <div><strong>Status:</strong> ${escapeHtml(execution.status || "idle")}</div>
+          <div><strong>Steps:</strong> ${steps.length}</div>
+        </div>
+
+        <div class="nova-panel-subtitle">Steps</div>
+        <div class="nova-panel-card">
+          ${
+            steps.length
+              ? steps.map((s, i) => `
+                <div class="exec-step-item">
+                  <strong>${escapeHtml(s.title || "Step " + (i + 1))}</strong>
+                  <div>Status: ${escapeHtml(s.status || "pending")}</div>
+                </div>
+              `).join("")
+              : '<div class="nova-panel-muted">No steps yet. Click Run Step.</div>'
+          }
+        </div>
+
+        <div class="nova-panel-subtitle">History</div>
+        <div class="nova-panel-card">
+          ${
+            history.length
+              ? history.map(function (h) {
+                  return `<div class="exec-history-item">${escapeHtml(String(h || ""))}</div>`;
+                }).join("")
+              : '<div class="nova-panel-muted">No history yet.</div>'
+          }
+        </div>
+      </div>
+    `;
   }
 
-  button.disabled = true;
-  const originalText = button.textContent;
-  button.textContent = "Running...";
+  window.renderExecution = renderExecutionPanel;
+  window.renderExecutionPanel = renderExecutionPanel;
 
-  fetch("/api/execution/control", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      session_id: sessionId,
-      action: action,
-    }),
-  })
-    .then(function (response) {
-      return response.json();
-    })
-    .then(function (data) {
-      console.log("EXECUTION CONTROL RESPONSE", data);
+  document.addEventListener("click", function (event) {
+    const tab = event.target.closest('[data-rail-tab="execution"]');
+    if (!tab) return;
 
-      if (data && data.ok && data.execution_state) {
-        state.execution = data.execution_state;
-        window.NovaComposerState = state;
-        window.NovaComposerState.execution = data.execution_state;
-        renderExecution();
-      }
-    })
-    .catch(function (err) {
-      console.error("EXECUTION CONTROL ERROR", err);
-    })
-    .finally(function () {
-      button.disabled = false;
-      button.textContent = originalText;
-    });
-}, true);
+    event.preventDefault();
+    event.stopPropagation();
+
+    renderExecutionPanel();
+    setTimeout(renderExecutionPanel, 100);
+  }, true);
+
+  setTimeout(renderExecutionPanel, 300);
+})();
 
 })();

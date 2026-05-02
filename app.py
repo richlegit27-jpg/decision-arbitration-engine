@@ -1243,72 +1243,122 @@ def api_uploads(filename: str):
         }), 500
 
 @app.route("/api/execution/control", methods=["POST"])
-def api_execution_control():
-    try:
-        payload = request.get_json(silent=True) or {}
+def execution_control():
+    data = request.get_json(silent=True) or {}
 
-        session_id = str(payload.get("session_id") or "").strip()
-        action = str(payload.get("action") or "").strip()
+    session_id = str(data.get("session_id") or "").strip()
+    action = str(data.get("action") or "").strip()
 
-        if not session_id:
-            return jsonify({"ok": False, "error": "Missing session_id"}), 400
-
-        if not action:
-            return jsonify({"ok": False, "error": "Missing action"}), 400
-
-        state = EXECUTION_STATE_CACHE.get(session_id)
-        if not isinstance(state, dict):
-            state = {}
-
-        history = state.get("execution_history")
-        if not isinstance(history, list):
-            history = []
-
-        history.append({
-            "type": action,
-            "details": {
-                "action": action,
-                "session_id": session_id,
-            },
-        })
-
-        history = history[-50:]
-
-        status = "clicked"
-        next_move = "Execution action received: " + action
-
-        if action == "run_step":
-            status = "step_requested"
-            next_move = "Run the next execution step."
-        elif action == "run_all":
-            status = "run_all_requested"
-            next_move = "Continue running all available execution steps."
-        elif action == "retry":
-            status = "retry_requested"
-            next_move = "Retry the last execution step."
-        elif action == "stop":
-            status = "stopped"
-            next_move = "Execution stopped."
-
-        state.update({
-            "execution_history": history,
-            "last_execution_status": status,
-            "last_execution_action": action,
-            "last_execution_steps": len(history),
-            "next_move": next_move,
-        })
-
-        EXECUTION_STATE_CACHE[session_id] = state
-
+    if not session_id:
         return jsonify({
-            "ok": True,
-            "session_id": session_id,
-            "action": action,
-            "execution_state": state,
+            "ok": False,
+            "error": "missing session_id",
+            "execution_state": {
+                "status": "error",
+                "steps": [],
+                "history": ["missing session_id"],
+            },
+        }), 400
+
+    if not action:
+        return jsonify({
+            "ok": False,
+            "error": "missing action",
+            "execution_state": {
+                "status": "error",
+                "steps": [],
+                "history": ["missing action"],
+            },
+        }), 400
+
+    working = chat_service._get_working_state(session_id) or {}
+    execution = working.get("execution")
+
+    if not isinstance(execution, dict):
+        execution = {}
+
+    steps = execution.get("steps")
+    if not isinstance(steps, list):
+        steps = []
+
+    history = execution.get("history")
+    if not isinstance(history, list):
+        history = []
+
+    execution = {
+        "status": str(execution.get("status") or "idle"),
+        "steps": steps,
+        "history": history,
+        "last_action": str(execution.get("last_action") or ""),
+        "current_step": str(execution.get("current_step") or ""),
+    }
+
+    if action == "run_step":
+        step_num = len(execution["steps"]) + 1
+        step_title = f"Step {step_num}"
+
+        execution["steps"].append({
+            "title": step_title,
+            "status": "done",
+            "output": f"{step_title} completed.",
         })
 
-    except Exception as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 500
+        execution["history"].append(f"run_step: {step_title}")
+        execution["status"] = "running"
+        execution["last_action"] = action
+        execution["current_step"] = step_title
+
+    elif action == "run_all":
+        start_num = len(execution["steps"]) + 1
+
+        for offset in range(3):
+            step_num = start_num + offset
+            step_title = f"Step {step_num}"
+
+            execution["steps"].append({
+                "title": step_title,
+                "status": "done",
+                "output": f"{step_title} completed.",
+            })
+
+        execution["history"].append("run_all: added 3 completed steps")
+        execution["status"] = "complete"
+        execution["last_action"] = action
+        execution["current_step"] = "Run all complete"
+
+    elif action == "retry":
+        if execution["steps"]:
+            last_step = execution["steps"][-1]
+            last_step["status"] = "done"
+            last_step["output"] = "Retry completed."
+
+        execution["history"].append("retry")
+        execution["status"] = "running"
+        execution["last_action"] = action
+        execution["current_step"] = "Retry complete"
+
+    elif action == "stop":
+        execution["history"].append("stop")
+        execution["status"] = "stopped"
+        execution["last_action"] = action
+        execution["current_step"] = "Stopped"
+
+    else:
+        execution["history"].append(f"unknown action: {action}")
+        execution["status"] = "error"
+        execution["last_action"] = action
+        execution["current_step"] = "Unknown action"
+
+    chat_service._update_working_state(session_id, {
+        "execution": execution,
+    })
+
+    return jsonify({
+        "ok": True,
+        "action": action,
+        "session_id": session_id,
+        "execution_state": execution,
+    })
 
 @app.route("/api/debug/execution", methods=["GET"])
 def api_debug_execution():

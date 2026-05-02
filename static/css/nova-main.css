@@ -10038,3 +10038,152 @@ button:active,
   color: #c9d1d9;
   background: rgba(255,255,255,0.06);
 }
+
+[data-rail-panel="execution"] {
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 50 !important;
+}
+
+[data-rail-panel="execution"] [data-execution-panel],
+[data-rail-panel="execution"] button {
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 60 !important;
+}
+
+.nova-source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.nova-source-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.055);
+  border-radius: 16px;
+  padding: 13px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.nova-source-card:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.nova-source-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.nova-source-number {
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.nova-source-domain {
+  font-size: 12px;
+  opacity: 0.78;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 🔥 FORCE SOURCE CARD VISIBILITY */
+
+.nova-source-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+  gap: 14px !important;
+  margin-top: 18px !important;
+}
+
+.nova-source-card {
+  display: block !important;
+  width: 100% !important;
+  padding: 14px !important;
+  border-radius: 16px !important;
+
+  background: rgba(255,255,255,0.08) !important;
+  border: 1px solid rgba(255,255,255,0.2) !important;
+
+  color: white !important;
+  text-align: left !important;
+
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.nova-source-card:hover {
+  transform: translateY(-2px) !important;
+  background: rgba(255,255,255,0.14) !important;
+  border-color: rgba(255,255,255,0.35) !important;
+}
+
+.nova-source-card-top {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin-bottom: 8px !important;
+}
+
+.nova-source-number {
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  font-size: 12px !important;
+  font-weight: bold !important;
+
+  background: rgba(255,255,255,0.2) !important;
+}
+
+.nova-source-domain {
+  font-size: 12px !important;
+  opacity: 0.75 !important;
+}
+
+.nova-source-title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+}
+
+.nova-source-card {
+  margin-bottom: 12px !important;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28) !important;
+  outline: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.nova-source-title {
+  margin-top: 8px !important;
+  display: block !important;
+}
+
+.message-text-inline .nova-source-grid {
+  margin-top: 18px !important;
+  margin-bottom: 12px !important;
+}
+
+.nova-source-title {
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 650;
+}
