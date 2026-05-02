@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   "use strict";
 
   function qs(selector, root) {
@@ -219,13 +219,13 @@ function resolveUploadUrl(url) {
   function renderSources(assistantText, meta = {}) {
     const text = String(assistantText || "");
 
-    if (!text.includes("â€” Top sources â€”")) {
+    if (!text.includes("— Top sources —")) {
       return escapeHtml(text);
     }
 
-    const parts = text.split("â€” Top sources â€”");
+    const parts = text.split("— Top sources —");
     const mainText = parts[0].trim();
-    const sourcesText = parts.slice(1).join("â€” Top sources â€”").trim();
+    const sourcesText = parts.slice(1).join("— Top sources —").trim();
 
     const lines = sourcesText
       .split("\n")
@@ -266,7 +266,7 @@ const label =
       html += `
         <button class="source-row" type="button" data-url="${escapeHtml(url)}"
 data-title="${escapeHtml(label)}"
-data-preview="${escapeHtml(label + ' â€” ' + (url || ''))}">
+data-preview="${escapeHtml(label + ' — ' + (url || ''))}">
           <span class="source-index">${index + 1}.</span>
           <span class="source-label">${escapeHtml(label)}</span>
         </button>
@@ -308,7 +308,7 @@ data-preview="${escapeHtml(label + ' â€” ' + (url || ''))}">
     const text = normalizeText(value).trim();
     const max = Number(limit || 100);
     if (text.length <= max) return text;
-    return text.slice(0, Math.max(0, max - 1)).trimEnd() + "Ã¢â‚¬Â¦";
+    return text.slice(0, Math.max(0, max - 1)).trimEnd() + "â€¦";
   }
 
   function isImageMime(mime) {
@@ -396,7 +396,7 @@ function normalizeMessage(raw) {
     return null;
   }
 
-  // ðŸ”¥ HARD META PRESERVE (this is the key)
+  // 🔥 HARD META PRESERVE (this is the key)
   const meta =
     item.meta ||
     raw.meta ||
@@ -409,7 +409,7 @@ function normalizeMessage(raw) {
     kind: kind,
     text: text,
     attachments: Array.isArray(item.attachments) ? item.attachments : [],
-    meta: meta, // â† FIXED
+    meta: meta, // ← FIXED
     created_at: item.created_at || new Date().toISOString(),
     pending: Boolean(item.pending),
     streaming: Boolean(item.streaming),
@@ -461,7 +461,7 @@ function buildWorkingContextFromWorkingState(rawState) {
 function attachmentSummary(attachment) {
     const name = attachment.filename || attachment.name || "attachment";
     const size = formatBytes(attachment.size);
-    return size ? name + " Ã‚Â· " + size : name;
+    return size ? name + " Â· " + size : name;
   }
 
   const els = {
@@ -605,13 +605,13 @@ function updateTtsToggleUi() {
   els.ttsToggleButton.classList.toggle("is-playing", playing);
 
   if (playing) {
-    els.ttsToggleButton.textContent = "â¹";
+    els.ttsToggleButton.textContent = "⏹";
     els.ttsToggleButton.setAttribute("aria-label", "Stop voice reply");
     els.ttsToggleButton.setAttribute("title", "Stop voice reply");
     return;
   }
 
-  els.ttsToggleButton.textContent = enabled ? "ðŸ”Š" : "ðŸ”‡";
+  els.ttsToggleButton.textContent = enabled ? "🔊" : "🔇";
   els.ttsToggleButton.setAttribute(
     "aria-label",
     enabled ? "Voice replies on" : "Voice replies muted"
@@ -756,11 +756,11 @@ function renderExecution() {
   container.innerHTML = state.execution.steps
     .map(function (step) {
       const status = String(step.status || "planned").toLowerCase();
-      let icon = "â—‹";
+      let icon = "○";
 
-      if (status === "completed" || status === "done") icon = "âœ“";
-      else if (status === "running") icon = "â†’";
-      else if (status === "failed" || status === "error") icon = "âš ";
+      if (status === "completed" || status === "done") icon = "✓";
+      else if (status === "running") icon = "→";
+      else if (status === "failed" || status === "error") icon = "⚠";
 
       return (
         '<div class="exec-step exec-' + escapeHtml(status) + '">' +
@@ -1241,7 +1241,7 @@ function applyStatePayload(payload) {
 }
 
 // ==============================
-// ðŸ”¥ UNIFIED SESSION SWITCH (LOCKED)
+// 🔥 UNIFIED SESSION SWITCH (LOCKED)
 // ==============================
 
 window.openSessionFromBackend = async function (sessionId) {
@@ -1258,7 +1258,7 @@ window.openSessionFromBackend = async function (sessionId) {
 
 
 // ==============================
-// ðŸ”¥ ARTIFACT â†’ CHAT BRIDGE
+// 🔥 ARTIFACT → CHAT BRIDGE
 // ==============================
 
 window.NovaArtifactChatAction = function (text) {
@@ -1283,7 +1283,7 @@ window.NovaSendMessage = async function () {
   }
 };
 
-// ðŸ‘‡ PUT IT RIGHT HERE
+// 👇 PUT IT RIGHT HERE
 window.NovaAnalyzeArtifactImage = async function (imageUrl, artifact) {
   const url = String(imageUrl || "").trim();
 if (!url || url.includes("{preview}")) return;
@@ -1314,12 +1314,12 @@ if (!url || url.includes("{preview}")) return;
 };
 
 // ==============================
-// ðŸ”¥ COPY + REGENERATE FIX (PUT THIS HERE)
+// 🔥 COPY + REGENERATE FIX (PUT THIS HERE)
 // ==============================
 
 document.addEventListener("click", async function (event) {
 
-  // ðŸ”¥ MEMORY BADGE CLICK
+  // 🔥 MEMORY BADGE CLICK
   const memoryBadge = event.target.closest("[data-memory-used]");
   if (memoryBadge) {
     event.preventDefault();
@@ -1393,7 +1393,7 @@ viewer.innerHTML = `
     return;
   }
 
-  // ðŸ”¥ IMAGE REGENERATE (message-based)
+  // 🔥 IMAGE REGENERATE (message-based)
   const imageRegenBtn = event.target.closest("[data-regenerate-image-message]");
   if (imageRegenBtn) {
     event.preventDefault();
@@ -1425,7 +1425,7 @@ viewer.innerHTML = `
     return;
   }
 
-  // 🔥 IMAGE REGENERATE (simple)
+  // ?? IMAGE REGENERATE (simple)
   const imageRegenSimple = event.target.closest("[data-regenerate-image]");
   if (imageRegenSimple) {
     event.preventDefault();
@@ -1438,7 +1438,7 @@ viewer.innerHTML = `
     return;
   }
 
-  // ðŸ”¥ COPY MESSAGE
+  // 🔥 COPY MESSAGE
   const copyBtn = event.target.closest("[data-copy-message]");
   if (copyBtn) {
     const messageId = String(copyBtn.getAttribute("data-copy-message") || "").trim();
@@ -1461,7 +1461,7 @@ viewer.innerHTML = `
     return;
   }
 
-  // ðŸ”¥ REGENERATE MESSAGE
+  // 🔥 REGENERATE MESSAGE
   const messageRegenBtn = event.target.closest("[data-regenerate-message]");
   if (messageRegenBtn) {
     const messageId = String(messageRegenBtn.getAttribute("data-regenerate-message") || "").trim();
@@ -1540,12 +1540,12 @@ viewer.innerHTML = `
     const removeButton = removable
       ? '<button type="button" class="nova-upload-chip__remove" data-upload-remove="' +
         escapeHtml(item.id) +
-        '" aria-label="Remove attachment">Ãƒâ€”</button>'
+        '" aria-label="Remove attachment">Ã—</button>'
       : "";
 
     const statusHtml =
       status === "uploading"
-        ? '<span class="nova-upload-chip__status">UploadingÃ¢â‚¬Â¦</span>'
+        ? '<span class="nova-upload-chip__status">Uploadingâ€¦</span>'
         : status === "error"
         ? '<span class="nova-upload-chip__status nova-upload-chip__status--error">' +
           escapeHtml(error || "Upload failed") +
@@ -1598,7 +1598,7 @@ function renderAttachmentBlock(attachment) {
   if (mime) sub.push(mime);
   if (item.size) sub.push(formatBytes(item.size));
 
-  const subText = sub.join(" Ã‚Â· ");
+  const subText = sub.join(" Â· ");
 
   if (item.url && isImageMime(mime)) {
     return (
@@ -1687,7 +1687,7 @@ function renderAttachmentBlock(attachment) {
     '<a href="' +
     escapeHtml(href || "#") +
     '" target="_blank" rel="noopener noreferrer" class="message-attachment__file-link">' +
-    '<div class="message-attachment__icon">ðŸ“Ž</div>' +
+    '<div class="message-attachment__icon">📎</div>' +
     '<div class="message-attachment__footer">' +
     '<div class="message-attachment__name">' +
     escapeHtml(name) +
@@ -1763,7 +1763,7 @@ function linkifySourceLines(text) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    const match = line.match(/^\s*(\d+)\.\s*(.+?)\s*[â€”-]\s*(.+?)\s*$/);
+    const match = line.match(/^\s*(\d+)\.\s*(.+?)\s*[—-]\s*(.+?)\s*$/);
 
     if (match) {
       const index = match[1];
@@ -1784,13 +1784,13 @@ function linkifySourceLines(text) {
           '" data-title="' +
           escapeHtml(title) +
           '" data-preview="' +
-          escapeHtml(source + " â€” " + title) +
+          escapeHtml(source + " — " + title) +
           '">' +
           escapeHtml(index) +
           ". " +
           '<span class="source-name">' +
           escapeHtml(source) +
-          "</span> â€” " +
+          "</span> — " +
           '<a href="' +
           escapeHtml(url) +
           '" target="_blank" rel="noopener noreferrer" data-no-chat-action="1">' +
@@ -2211,7 +2211,7 @@ function renderMessageCard(message) {
   let renderedText =
     role === "assistant"
       ? (
-          rawText.includes("â€” Top sources â€”")
+          rawText.includes("— Top sources —")
             ? renderSources(rawText, message.meta || {})
             : renderMarkdown(rawText)
         )
@@ -2327,10 +2327,10 @@ els.chatThread.__autoOpenedSource = "";
       return `
         <div class="nova-memory-item" data-id="${id}">
           <div>
-            <div>${item.pinned ? "ðŸ“Œ" : "ðŸ§ "} ${text}</div>
-            <small>${String(item.kind || "note")} Â· ${String(item.source || "manual")}</small>
+            <div>${item.pinned ? "📌" : "🧠"} ${text}</div>
+            <small>${String(item.kind || "note")} · ${String(item.source || "manual")}</small>
           </div>
-          <button class="nova-memory-pin" data-id="${id}">ðŸ“Œ</button>
+          <button class="nova-memory-pin" data-id="${id}">📌</button>
           <button class="nova-memory-delete" data-id="${id}">Remove</button>
         </div>
       `;
@@ -2447,19 +2447,84 @@ function syncExecutionFromArtifacts() {
 }
 
 function renderExecutionPanel() {
-  const mount = document.querySelector("[data-execution-panel]");
+  const panel =
+    document.querySelector("[data-execution-panel]") ||
+    document.querySelector('[data-rail-panel="execution"]');
+
+  if (!panel) return;
 
   const novaState = window.NovaComposerState || state || {};
-
   const sessionId =
     novaState.activeSessionId ||
     (novaState.session && novaState.session.id) ||
     "";
 
-  if (!mount) return;
+  const execution =
+    state.execution_state ||
+    state.execution ||
+    novaState.execution_state ||
+    novaState.execution ||
+    {};
+
+  const task =
+    execution.task ||
+    execution.active_task ||
+    execution.current_task ||
+    "None";
+
+  const next =
+    execution.next ||
+    execution.next_step ||
+    execution.next_move ||
+    "None";
+
+  const status =
+    execution.status ||
+    execution.state ||
+    "idle";
+
+  const steps = Array.isArray(execution.steps)
+    ? execution.steps
+    : [];
+
+  const history = Array.isArray(execution.history)
+    ? execution.history
+    : [];
+
+  panel.innerHTML = `
+    <div class="nova-panel-shell">
+      <div class="nova-panel-title">Execution</div>
+
+      <div class="nova-panel-card">
+        <button type="button" data-exec-action="run_step">Run Step</button>
+        <button type="button" data-exec-action="run_all">Run All</button>
+        <button type="button" data-exec-action="retry">Retry</button>
+        <button type="button" data-exec-action="stop">Stop</button>
+      </div>
+
+      <div class="nova-panel-card">
+        <div><strong>Task:</strong> ${escapeHtml(task)}</div>
+        <div><strong>Next:</strong> ${escapeHtml(next)}</div>
+        <div><strong>Status:</strong> ${escapeHtml(status)}</div>
+        <div><strong>Steps:</strong> ${steps.length}</div>
+      </div>
+
+      <div class="nova-panel-subtitle">History</div>
+
+      ${
+        history.length
+          ? `<div class="nova-panel-card">${history
+              .map(function (item) {
+                return `<div>${escapeHtml(String(item || ""))}</div>`;
+              })
+              .join("")}</div>`
+          : `<div class="nova-panel-muted">No history yet.</div>`
+      }
+    </div>
+  `;
 
   function wireExecutionButtons() {
-    mount.querySelectorAll("[data-exec-action]").forEach(function (button) {
+    panel.querySelectorAll("[data-exec-action]").forEach(function (button) {
       if (button.__novaExecutionWired) return;
       button.__novaExecutionWired = true;
 
@@ -2505,8 +2570,8 @@ function renderExecutionPanel() {
     });
   }
 
-  function renderShell(extraHtml) {
-    mount.innerHTML = `
+   function renderShell(extraHtml) {
+    panel.innerHTML = `
       <div class="nova-panel-shell">
         <div class="nova-panel-title">Execution</div>
 
@@ -3852,7 +3917,7 @@ async function consumeChatJson(payload) {
     // Load backend state if present.
     applyStatePayload(data || {});
 
-    // âœ… ASSISTANT RENDER LOCK:
+    // ✅ ASSISTANT RENDER LOCK:
     // If backend returned assistant_message but applyStatePayload did not render it,
     // insert it once here.
     const assistantMsg =
@@ -3956,7 +4021,7 @@ async function sendMessage() {
 
   let text = String(rawValue || "").trim();
 
-  // ðŸ”’ BLOCK UI / DEBUG JUNK INPUT
+  // 🔒 BLOCK UI / DEBUG JUNK INPUT
   if (
     !inputEl ||
     inputEl !== els.chatInput ||
@@ -3989,14 +4054,14 @@ async function sendMessage() {
 
   await maybeAutoSaveMemoryFromChatText(text);
 
-  // ðŸŽ¨ IMAGE PLACEHOLDER
+  // 🎨 IMAGE PLACEHOLDER
   if (/^\/image|generate image|create image|draw/i.test(text)) {
     const tempId = "gen_" + Date.now();
 
     upsertMessage({
       id: tempId,
       role: "assistant",
-      text: "ðŸŽ¨ Generating image...",
+      text: "🎨 Generating image...",
       pending: true,
       streaming: false,
       error: false,
@@ -4007,7 +4072,7 @@ async function sendMessage() {
     state.imageGenPlaceholderId = tempId;
   }
 
-  // ðŸ“Ž ATTACHMENTS
+  // 📎 ATTACHMENTS
   const attachments = (state.pendingUploads || [])
     .filter(function (item) {
       return (
@@ -4054,7 +4119,7 @@ async function sendMessage() {
     }
   }
 
-  // ðŸš« PREVENT DUPLICATE USER MESSAGE
+  // 🚫 PREVENT DUPLICATE USER MESSAGE
   const alreadyExists = (state.messages || []).some(function (msg) {
     return (
       msg &&
@@ -4120,7 +4185,7 @@ async function sendMessage() {
     upsertMessage({
       id: makeId("assistant_error"),
       role: "assistant",
-      text: "âš ï¸ Something went wrong sending the message.",
+      text: "⚠️ Something went wrong sending the message.",
       error: true,
     });
 
@@ -4318,7 +4383,7 @@ async function recordVoiceOnce() {
   });
 
   recorder.start();
-  showToast("ðŸŽ¤ Recording... click again to send", "info");
+  showToast("🎤 Recording... click again to send", "info");
 
   return new Promise(function (resolve, reject) {
     recorder.addEventListener("stop", function () {
@@ -4463,7 +4528,7 @@ function updateTtsToggleUi() {
 
   els.ttsToggleButton.classList.toggle("is-muted", muted);
   els.ttsToggleButton.classList.toggle("is-playing", playing);
-  els.ttsToggleButton.textContent = muted ? "ðŸ”‡" : "ðŸ”Š";
+  els.ttsToggleButton.textContent = muted ? "🔇" : "🔊";
 
   if (muted) {
     els.ttsToggleButton.setAttribute("aria-label", "Voice replies muted");
@@ -4721,7 +4786,7 @@ async function autoPlayTtsForAssistantMessage(message) {
 }
 
 function bindEvents() {
-  // ðŸ”¥ FIXED composer submit (with debug + safety)
+  // 🔥 FIXED composer submit (with debug + safety)
   if (els.composerForm) {
     els.composerForm.addEventListener("submit", function (event) {
       console.log("COMPOSER SUBMIT FIRED");
@@ -4785,7 +4850,7 @@ function bindEvents() {
     });
   }
 
-  // ðŸ”¥ execution buttons
+  // 🔥 execution buttons
   if (els.execRunStepButton) {
     els.execRunStepButton.addEventListener("click", function (event) {
       event.preventDefault();
@@ -5170,7 +5235,7 @@ async function maybeAutoSaveMemoryFromChatText(userText) {
 
   const lower = text.toLowerCase();
 
-  // ðŸš« junk filter
+  // 🚫 junk filter
   if (
     lower.length < 5 ||
     lower === "hi" ||
@@ -5214,14 +5279,14 @@ async function maybeAutoSaveMemoryFromChatText(userText) {
     memoryText = text;
   }
 
-  // ðŸ§  DEDUPE
+  // 🧠 DEDUPE
   const exists = (state.memory || []).some((m) => {
     return String(m.text || "").toLowerCase() === memoryText.toLowerCase();
   });
 
   if (exists) return;
 
-  // ðŸ”¥ IMPORTANCE SCORING
+  // 🔥 IMPORTANCE SCORING
   let importance = 1; // default low
 
   if (/^my .+ is .+/i.test(memoryText)) importance = 3; // identity
@@ -5249,7 +5314,7 @@ async function maybeAutoSaveMemoryFromChatText(userText) {
       [];
 
     if (Array.isArray(memoryList)) {
-      // ðŸ”¥ SORT BY IMPORTANCE
+      // 🔥 SORT BY IMPORTANCE
       const normalized = memoryList.map(normalizeMemoryItem);
 
       normalized.sort((a, b) => {
@@ -5274,7 +5339,7 @@ function wireMemoryControls() {
   const addBtn = document.querySelector("[data-memory-add-button]");
   const input = document.querySelector("[data-memory-add-text]");
 
-  // âœ… ADD MEMORY (button click)
+  // ✅ ADD MEMORY (button click)
   if (addBtn && !addBtn.__novaMemoryAddWired) {
     addBtn.__novaMemoryAddWired = true;
 
@@ -5315,7 +5380,7 @@ function wireMemoryControls() {
     };
   }
 
-  // âœ… ENTER TO SAVE (no button needed)
+  // ✅ ENTER TO SAVE (no button needed)
   if (input && !input.__novaMemoryEnterWired) {
     input.__novaMemoryEnterWired = true;
 
@@ -5327,7 +5392,7 @@ function wireMemoryControls() {
     });
   }
 
-  // âœ… DELETE MEMORY
+  // ✅ DELETE MEMORY
   document.querySelectorAll("[data-memory-delete]").forEach(function (btn) {
     if (btn.__wired) return;
     btn.__wired = true;
@@ -5417,7 +5482,7 @@ function summarizeMemoryText(value, limit) {
   const max = typeof limit === "number" ? limit : 140;
   if (!text) return "";
   if (text.length <= max) return text;
-  return text.slice(0, max) + "Ã¢â‚¬Â¦";
+  return text.slice(0, max) + "â€¦";
 }
 
 function findMemoryById(memoryId) {
@@ -5501,7 +5566,7 @@ function renderWorkingContextPanel() {
 
   const collapsedClass = wc.collapsed ? " is-collapsed" : "";
   const buttonLabel = wc.collapsed ? "Expand working context" : "Collapse working context";
-  const chevron = wc.collapsed ? "â–¸" : "â–¾";
+  const chevron = wc.collapsed ? "▸" : "▾";
 
   console.log("renderWorkingContextPanel HTML", wc, items);
 
@@ -5706,7 +5771,7 @@ function renderMemoryViewer(memoryList) {
   const container = document.querySelector(".nova-rail-content");
   if (!container) return;
 
-  // ðŸ”¥ normalize to array
+  // 🔥 normalize to array
   if (!Array.isArray(memoryList)) {
     memoryList = memoryList ? [memoryList] : [];
   }
@@ -6349,8 +6414,8 @@ document.addEventListener("click", function (event) {
   event.preventDefault();
 
   const action = button.getAttribute("data-exec-action") || "";
-  const novaState = window.NovaComposerState || {};
 
+  const novaState = window.NovaComposerState || {};
   const sessionId =
     novaState.activeSessionId ||
     (novaState.session && novaState.session.id) ||
@@ -6372,18 +6437,31 @@ document.addEventListener("click", function (event) {
       action: action,
     }),
   })
-    .then(function (res) {
-      return res.json();
+    .then(function (response) {
+      return response.json();
     })
-    .then(function () {
-      if (typeof window.renderExecutionPanel === "function") {
-        window.renderExecutionPanel();
+    .then(function (data) {
+      console.log("EXECUTION CONTROL RESPONSE", data);
+
+      if (data && data.ok && data.execution_state) {
+        // ?? HARD SYNC STATE (THIS WAS MISSING)
+        window.NovaComposerState = window.NovaComposerState || {};
+        window.NovaComposerState.execution_state = data.execution_state;
+        window.NovaComposerState.execution = data.execution_state;
+
+        if (typeof state !== "undefined") {
+          state.execution_state = data.execution_state;
+          state.execution = data.execution_state;
+        }
+
+        // ?? FORCE PANEL RE-RENDER
+        if (typeof window.renderExecutionPanel === "function") {
+          window.renderExecutionPanel();
+        }
       }
     })
-    .catch(function () {
-      if (typeof window.renderExecutionPanel === "function") {
-        window.renderExecutionPanel();
-      }
+    .catch(function (err) {
+      console.error("EXECUTION CONTROL ERROR", err);
     })
     .finally(function () {
       button.disabled = false;
