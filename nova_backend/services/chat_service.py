@@ -612,19 +612,29 @@ class ChatService:
         )
 
         if is_execution:
-            model_messages.insert(0, {
-                "role": "system",
-                "content": (
-                    "You are an execution-focused AI.\n"
-                    f"Current task: {active_task or original_user_text}\n"
-                    f"Next step hint: {next_step}\n\n"
-                    "Rules:\n"
-                    "- Be direct.\n"
-                    "- Output real work: code, commands, files, or exact actions.\n"
-                    "- Do not stop at explanation.\n"
-                    "- Always move the task forward."
-                )
-            })
+            try:
+                auto_result = self._run_execution_autoloop(session_id)
+
+                return {
+                    "ok": True,
+                    "assistant_message": auto_result,
+                    "session": {
+                        "id": session_id,
+                    },
+                    "meta": {
+                        "mode": "execution",
+                        "autonomous": True,
+                    },
+                }
+
+            except Exception as e:
+                return {
+                    "ok": False,
+                    "assistant_message": f"Execution error:\n{str(e)}",
+                    "session": {
+                        "id": session_id,
+                    },
+                }
 
         mission = decision.get("mission") if isinstance(decision, dict) else {}
         mission_mode = str(mission.get("mode") or "").lower()
@@ -6965,22 +6975,54 @@ Next action:
 
     def _run_execution_next_move(self, active_task: str, next_move: str, session_id: str) -> str:
         active_task = self._safe_str(active_task).strip()
-        next_move_raw = (
-            self._safe_str(next_move)
-            + " "
-            + self._safe_str(active_task)
-        ).strip().lower()
+        next_move = self._safe_str(next_move).strip()
+        session_id = self._safe_str(session_id).strip() or "default"
+
+        combined_text = f"{next_move} {active_task}".strip().lower()
 
         move_type = "echo"
 
-        if "build execution loop" in next_move_raw:
+        if "build execution loop" in combined_text or "build_execution_loop" in combined_text:
             move_type = "build_execution_loop"
-        elif "verify execution loop" in next_move_raw:
+        elif "verify execution loop" in combined_text or "verify_execution_loop" in combined_text:
             move_type = "verify_execution_loop"
-        elif "persist execution result" in next_move_raw:
+        elif "persist execution result" in combined_text or "persist_execution_result" in combined_text:
             move_type = "persist_execution_result"
-        elif "review execution result" in next_move_raw:
-            move_type = "persist_execution_result"
+        elif "review execution result" in combined_text or "review_execution_result" in combined_text:
+            move_type = "review_execution_result"
+
+        if "fix this file" in combined_text:
+            results = self.execution_handler.run_chain(
+                NextMove(
+                    id=f"{session_id}:apply_fix",
+                    type="apply_file_fix",
+                    payload={
+                        "file_path": active_task,
+                        "content": next_move,
+                    },
+                )
+            )
+
+            last_result = results[-1] if results else None
+
+            if last_result and last_result.status == "success":
+                return str(last_result.output)
+
+            if last_result:
+                return f"File fix failed:\n{last_result.error}"
+
+            return "File fix produced no result."
+
+        if "fix this function" in combined_text:
+            return (
+                "Function-level auto-fix trigger is ready.\n\n"
+                "Send the exact function replacement code next, like:\n\n"
+                "fix this function _run_execution_next_move in C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py\n"
+                "```python\n"
+                "def _run_execution_next_move(...):\n"
+                "    ...\n"
+                "```"
+            )
 
         move = NextMove(
             id=f"{session_id}:chain",
@@ -7013,8 +7055,11 @@ Next action:
         if last_result and last_result.status == "success":
             next_step_text = "review execution result and choose the next move"
 
-            if isinstance(last_result.output, dict):
-                echo_data = last_result.output.get("echo")
+            output = last_result.output
+
+            if isinstance(output, dict):
+                echo_data = output.get("echo")
+
                 if isinstance(echo_data, dict):
                     current_next = str(echo_data.get("next_move") or "").strip().lower()
 
@@ -7025,7 +7070,7 @@ Next action:
                     elif current_next in {"persist execution result", "persist_execution_result"}:
                         next_step_text = "choose next autonomous task"
 
-            followup_move = None
+            followup_results = []
 
             if next_step_text == "persist execution result":
                 followup_move = NextMove(
@@ -7038,12 +7083,15 @@ Next action:
                     },
                 )
 
-            if followup_move:
                 followup_results = self.execution_handler.run_chain(followup_move)
+
                 if followup_results:
                     last_followup = followup_results[-1]
+
                     if last_followup and last_followup.status == "success":
                         last_result = last_followup
+
+            total_steps = len(results) + len(followup_results)
 
             try:
                 self._update_working_state(
@@ -7051,7 +7099,7 @@ Next action:
                     {
                         "next_move": next_step_text,
                         "last_execution_status": "success",
-                        "last_execution_steps": len(results),
+                        "last_execution_steps": total_steps,
                         "last_execution_output": last_result.output,
                     },
                 )
@@ -7061,12 +7109,24 @@ Next action:
             return (
                 f"Continuing: {active_task or 'saved task'}\n"
                 f"Executed: {move_type}\n\n"
-                f"Steps: {len(results)}\n"
+                f"Steps: {total_steps}\n"
                 f"Next Move: {next_step_text}\n\n"
                 f"Last Result:\n{last_result.output}"
             )
 
         if last_result:
+            try:
+                self._update_working_state(
+                    session_id,
+                    {
+                        "last_execution_status": "failed",
+                        "last_execution_steps": len(results),
+                        "last_execution_error": last_result.error,
+                    },
+                )
+            except Exception:
+                pass
+
             return (
                 f"Continuing: {active_task or 'saved task'}\n"
                 f"Execution failed: {move_type}\n\n"
@@ -7078,6 +7138,242 @@ Next action:
             f"Continuing: {active_task or 'saved task'}\n"
             f"Execution produced no result."
         )
+
+    def _run_execution_autoloop(self, session_id: str, max_steps: int = 5) -> str:
+        """
+        Runs execution loop automatically with self-healing.
+        """
+
+        state = self._get_working_state(session_id) or {}
+
+        active_task = self._safe_str(state.get("active_task"))
+        next_move = self._safe_str(state.get("next_move"))
+
+        if not active_task:
+            return "No active task to execute."
+
+        results_log = []
+
+        for step in range(max_steps):
+            result = self._run_execution_next_move(
+                active_task=active_task,
+                next_move=next_move,
+                session_id=session_id,
+            )
+
+            results_log.append(result)
+
+            self._record_execution_history(
+                session_id=session_id,
+                event_type="step_result",
+                details={
+                    "step": step + 1,
+                    "next_move": next_move,
+                    "result": result,
+                },
+            )
+
+            # 🔥 detect failure
+            if isinstance(result, str) and "Execution failed" in result:
+                fix_result = self._attempt_self_fix(
+                    session_id=session_id,
+                    active_task=active_task,
+                    error_text=result,
+                )
+
+                results_log.append("AUTO-FIX ATTEMPT:\n" + fix_result)
+
+                # retry after fix
+                retry_result = self._run_execution_next_move(
+                    active_task=active_task,
+                    next_move=next_move,
+                    session_id=session_id,
+                )
+
+                results_log.append("RETRY RESULT:\n" + retry_result)
+
+            # refresh state
+            state = self._get_working_state(session_id) or {}
+            next_move = self._safe_str(state.get("next_move"))
+
+            if not next_move:
+                break
+
+            if next_move.lower() in {
+                "choose next autonomous task",
+                "complete",
+                "done",
+            }:
+                break
+
+        return "\n\n--- AUTO LOOP ---\n\n".join(results_log)
+
+    def _attempt_function_self_fix(self, session_id: str, active_task: str, error_text: str) -> str:
+        """
+        Safer self-fix path for function-scoped repairs.
+        """
+
+        session_id = self._safe_str(session_id).strip() or "default"
+        active_task = self._safe_str(active_task).strip()
+        error_text = self._safe_str(error_text).strip()
+
+        if not active_task:
+            return "Function self-fix skipped: no active task."
+
+        try:
+            fix_move = NextMove(
+                id=f"{session_id}:function_auto_fix",
+                type="apply_function_fix",
+                payload={
+                    "target": active_task,
+                    "error": error_text,
+                },
+            )
+
+            results = self.execution_handler.run_chain(fix_move)
+            last = results[-1] if results else None
+
+            if last and last.status == "success":
+                return str(last.output)
+
+            if last:
+                return f"Function auto-fix failed:\n{last.error}"
+
+            return "Function auto-fix produced no result."
+
+        except Exception as e:
+            return f"Function auto-fix exception:\n{str(e)}"
+
+    def _record_execution_history(
+        self,
+        session_id: str,
+        event_type: str,
+        details: dict | None = None,
+    ) -> None:
+        session_id = self._safe_str(session_id).strip()
+        event_type = self._safe_str(event_type).strip() or "execution_event"
+        details = details if isinstance(details, dict) else {}
+
+        if not session_id:
+            return
+
+        try:
+            state = self._get_working_state(session_id) or {}
+            history = state.get("execution_history")
+
+            if not isinstance(history, list):
+                history = []
+
+            history.append(
+                {
+                    "type": event_type,
+                    "details": details,
+                }
+            )
+
+            self._update_working_state(
+                session_id,
+                {
+                    "execution_history": history[-50:],
+                },
+            )
+
+        except Exception:
+            pass
+
+    def _classify_execution_error(self, error_text: str) -> str:
+        error_text_lc = self._safe_str(error_text).lower()
+
+        if "indentationerror" in error_text_lc or "taberror" in error_text_lc:
+            return "indentation"
+
+        if "syntaxerror" in error_text_lc:
+            return "syntax"
+
+        if "modulenotfounderror" in error_text_lc or "importerror" in error_text_lc:
+            return "import"
+
+        if "nameerror" in error_text_lc:
+            return "name"
+
+        if "attributeerror" in error_text_lc:
+            return "attribute"
+
+        if "typeerror" in error_text_lc:
+            return "type"
+
+        if "keyerror" in error_text_lc:
+            return "key"
+
+        if "filenotfounderror" in error_text_lc:
+            return "missing_file"
+
+        return "unknown"
+
+    def _attempt_self_fix(self, session_id: str, active_task: str, error_text: str) -> str:
+        """
+        Smart self-fix dispatcher.
+        Tries safer function-level fix first, then falls back to file-level fix.
+        """
+
+        session_id = self._safe_str(session_id).strip() or "default"
+        active_task = self._safe_str(active_task).strip()
+        error_text = self._safe_str(error_text).strip()
+
+        if not active_task:
+            return "Auto-fix skipped: no active task."
+
+        error_kind = self._classify_execution_error(error_text)
+
+        if error_kind in {"import", "missing_file"}:
+            return (
+                f"Auto-fix paused: {error_kind} error needs file/dependency context.\n\n"
+                f"Error:\n{error_text}"
+            )
+
+        function_fix_result = self._attempt_function_self_fix(
+            session_id=session_id,
+            active_task=active_task,
+            error_text=error_text,
+        )
+
+        if "failed" not in function_fix_result.lower() and "exception" not in function_fix_result.lower():
+            return function_fix_result
+
+        try:
+            fix_move = NextMove(
+                id=f"{session_id}:file_auto_fix",
+                type="apply_file_fix",
+                payload={
+                    "file_path": active_task,
+                    "content": error_text,
+                },
+            )
+
+            results = self.execution_handler.run_chain(fix_move)
+            last = results[-1] if results else None
+
+            if last and last.status == "success":
+                return str(last.output)
+
+            if last:
+                return (
+                    "Function auto-fix failed, then file auto-fix failed:\n\n"
+                    f"Function result:\n{function_fix_result}\n\n"
+                    f"File error:\n{last.error}"
+                )
+
+            return (
+                "Function auto-fix failed, then file auto-fix produced no result.\n\n"
+                f"Function result:\n{function_fix_result}"
+            )
+
+        except Exception as e:
+            return (
+                "Function auto-fix failed, then file auto-fix raised an exception:\n\n"
+                f"Function result:\n{function_fix_result}\n\n"
+                f"File exception:\n{str(e)}"
+            )
 
     def _rank_memory_context(self, user_text: str = "", limit: int = 6):
         memories = self._get_memory_list()

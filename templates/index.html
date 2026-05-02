@@ -63,18 +63,6 @@
         </div>
       </header>
 
-      <div id="execution-panel" class="execution-panel" data-execution-panel hidden>
-  <div data-execution-empty>No execution yet</div>
-  <div data-execution-content hidden></div>
-
-  <div class="execution-controls">
-    <button data-exec-run-step>Run Step</button>
-    <button data-exec-run-all>Run All</button>
-    <button data-exec-stop>Stop</button>
-    <button data-exec-show-plan>Show Plan</button>
-  </div>
-</div>
-
       <section class="nova-chat-thread" data-chat-thread>
         <div class="nova-empty-state" data-chat-empty hidden>
           <div class="nova-empty-state-title">Nova is live</div>
@@ -182,41 +170,51 @@
           </button>
         </div>
       </div>
+<div class="nova-rail-tabs" role="tablist" aria-label="Nova right rail tabs">
+  <button
+    class="nova-rail-tab is-active"
+    type="button"
+    role="tab"
+    aria-selected="true"
+    aria-pressed="true"
+    data-rail-tab="artifacts"
+  >
+    Artifacts
+  </button>
 
-      <div class="nova-rail-tabs" role="tablist" aria-label="Nova right rail tabs">
-        <button
-          class="nova-rail-tab is-active"
-          type="button"
-          role="tab"
-          aria-selected="true"
-          aria-pressed="true"
-          data-rail-tab="artifacts"
-        >
-          Artifacts
-        </button>
+  <button
+    class="nova-rail-tab"
+    type="button"
+    role="tab"
+    aria-selected="false"
+    aria-pressed="false"
+    data-rail-tab="memory"
+  >
+    Memory
+  </button>
 
-        <button
-          class="nova-rail-tab"
-          type="button"
-          role="tab"
-          aria-selected="false"
-          aria-pressed="false"
-          data-rail-tab="memory"
-        >
-          Memory
-        </button>
+  <button
+    class="nova-rail-tab"
+    type="button"
+    role="tab"
+    aria-selected="false"
+    aria-pressed="false"
+    data-rail-tab="web"
+  >
+    Web
+  </button>
 
-        <button
-          class="nova-rail-tab"
-          type="button"
-          role="tab"
-          aria-selected="false"
-          aria-pressed="false"
-          data-rail-tab="web"
-        >
-          Web
-        </button>
-      </div>
+  <button
+    class="nova-rail-tab"
+    type="button"
+    role="tab"
+    aria-selected="false"
+    aria-pressed="false"
+    data-rail-tab="execution"
+  >
+    Execution
+  </button>
+</div>
 
       <div class="nova-rail-panel is-active" data-rail-panel="artifacts">
         <div class="nova-rail-empty" data-artifact-empty>
@@ -237,6 +235,7 @@
       </p>
     </div>
   </div>
+
   <textarea
     data-memory-add-text
     placeholder="Add a memory..."
@@ -252,34 +251,39 @@
   <button type="button" data-memory-add-button>
     Add
   </button>
-</div>
+
   <div id="memory-list" class="memory-list" data-memory-list></div>
 </div>
-      <div class="nova-rail-panel" data-rail-panel="web" hidden>
-        <div class="nova-rail-empty" data-web-empty>
-          <div class="nova-rail-empty-title">No web results yet</div>
-          <div class="nova-rail-empty-copy">
-            Fetched pages and web summaries will show here.
-          </div>
-        </div>
 
-        <div id="webMount"></div>
-      </div>
-
-      <div class="nova-viewer" data-rail-viewer hidden>
-        <div class="nova-viewer-shell">
-          <div class="nova-viewer-empty">
-            <div class="nova-viewer-empty-title">Nothing selected</div>
-            <div class="nova-viewer-empty-copy">
-              Select an artifact, memory item, or web result to view details.
-            </div>
-          </div>
-        </div>
-      </div>
-    </aside>
+<div class="nova-rail-panel" data-rail-panel="web" hidden>
+  <div class="nova-rail-empty" data-web-empty>
+    <div class="nova-rail-empty-title">No web results yet</div>
+    <div class="nova-rail-empty-copy">
+      Fetched pages and web summaries will show here.
+    </div>
   </div>
 
-  <div class="nova-sidebar-backdrop" data-sidebar-backdrop hidden></div>
+  <div id="webMount"></div>
+</div>
+
+<div class="nova-rail-panel" data-rail-panel="execution" hidden>
+  <div data-execution-panel></div>
+</div>
+
+<div class="nova-viewer" data-rail-viewer hidden>
+  <div class="nova-viewer-shell">
+    <div class="nova-viewer-empty">
+      <div class="nova-viewer-empty-title">Nothing selected</div>
+      <div class="nova-viewer-empty-copy">
+        Select an artifact, memory item, or web result to view details.
+      </div>
+    </div>
+  </div>
+</div>
+</aside>
+</div>
+
+<div class="nova-sidebar-backdrop" data-sidebar-backdrop hidden></div>
 
 <div id="rail-reopen-root">
   <button
@@ -291,7 +295,7 @@
 </div>
 
 <!-- <script src="/static/js/nova-execution-viewer.js"></script> -->
-<script src="/static/js/nova-composer-bundle.js?v=source-click-005"></script>
+<script src="/static/js/nova-composer-bundle.js?v=execution-fix-007"></script>
 <script src="/static/js/nova-session-rail.js?v=session-rail-fix-2026-04-20-001"></script>
 <script src="/static/js/nova-memory.js?v=memory-panel-2026-04-15-002"></script>
 </body>

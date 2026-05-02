@@ -68,8 +68,10 @@ chat_service = ChatService(
     memory_service=memory_service,
     artifact_service=artifact_service,
     web_service=web_service,
-    recon_service=recon_service,
+    recon_service=recon_service,  
 )
+
+EXECUTION_STATE_CACHE = {}
 
 print("CHAT SERVICE OBJ =", chat_service)
 print("CHAT SERVICE TYPE =", type(chat_service))
@@ -1239,6 +1241,122 @@ def api_uploads(filename: str):
             "error": str(e),
             "filename": str(filename or ""),
         }), 500
+
+@app.route("/api/execution/control", methods=["POST"])
+def api_execution_control():
+    try:
+        payload = request.get_json(silent=True) or {}
+
+        session_id = str(payload.get("session_id") or "").strip()
+        action = str(payload.get("action") or "").strip()
+
+        if not session_id:
+            return jsonify({"ok": False, "error": "Missing session_id"}), 400
+
+        if not action:
+            return jsonify({"ok": False, "error": "Missing action"}), 400
+
+        state = EXECUTION_STATE_CACHE.get(session_id)
+        if not isinstance(state, dict):
+            state = {}
+
+        history = state.get("execution_history")
+        if not isinstance(history, list):
+            history = []
+
+        history.append({
+            "type": action,
+            "details": {
+                "action": action,
+                "session_id": session_id,
+            },
+        })
+
+        history = history[-50:]
+
+        status = "clicked"
+        next_move = "Execution action received: " + action
+
+        if action == "run_step":
+            status = "step_requested"
+            next_move = "Run the next execution step."
+        elif action == "run_all":
+            status = "run_all_requested"
+            next_move = "Continue running all available execution steps."
+        elif action == "retry":
+            status = "retry_requested"
+            next_move = "Retry the last execution step."
+        elif action == "stop":
+            status = "stopped"
+            next_move = "Execution stopped."
+
+        state.update({
+            "execution_history": history,
+            "last_execution_status": status,
+            "last_execution_action": action,
+            "last_execution_steps": len(history),
+            "next_move": next_move,
+        })
+
+        EXECUTION_STATE_CACHE[session_id] = state
+
+        return jsonify({
+            "ok": True,
+            "session_id": session_id,
+            "action": action,
+            "execution_state": state,
+        })
+
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+@app.route("/api/debug/execution", methods=["GET"])
+def api_debug_execution():
+    try:
+        session_id = str(request.args.get("session_id") or "").strip()
+
+        if not session_id:
+            return jsonify({
+                "ok": False,
+                "error": "Missing session_id",
+                "active_task": "",
+                "next_move": "",
+                "last_execution_status": "idle",
+                "last_execution_steps": 0,
+                "execution_history": [],
+            }), 400
+
+        state = EXECUTION_STATE_CACHE.get(session_id)
+        if not isinstance(state, dict):
+            state = {}
+
+        history = state.get("execution_history")
+        if not isinstance(history, list):
+            history = []
+
+        return jsonify({
+            "ok": True,
+            "session_id": session_id,
+            "active_task": state.get("active_task") or "",
+            "next_move": state.get("next_move") or "",
+            "last_execution_status": state.get("last_execution_status") or "idle",
+            "last_execution_action": state.get("last_execution_action") or "",
+            "last_execution_steps": state.get("last_execution_steps") or len(history),
+            "execution_history": history,
+            "working_state": state,
+        })
+
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": str(exc),
+            "active_task": "",
+            "next_move": "",
+            "last_execution_status": "error",
+            "last_execution_steps": 0,
+            "execution_history": [],
+        }), 500
+
 # -----------------------
 # MAIN
 # -----------------------

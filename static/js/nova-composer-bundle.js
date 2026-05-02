@@ -1384,9 +1384,6 @@ viewer.innerHTML = `
     </div>
 
   </div>
-`;}).join("") || "<div style='opacity:.6;'>No memory items</div>"}
-    </div>
-  </div>
 `;
 
     } catch (err) {
@@ -1428,7 +1425,7 @@ viewer.innerHTML = `
     return;
   }
 
-  // ðŸ”¥ IMAGE REGENERATE (simple)
+  // 🔥 IMAGE REGENERATE (simple)
   const imageRegenSimple = event.target.closest("[data-regenerate-image]");
   if (imageRegenSimple) {
     event.preventDefault();
@@ -2450,62 +2447,131 @@ function syncExecutionFromArtifacts() {
 }
 
 function renderExecutionPanel() {
-  if (!els.executionPanel || !els.executionContent || !els.executionEmpty) return;
+  const mount = document.querySelector("[data-execution-panel]");
 
-  syncExecutionFromArtifacts();
+  const novaState = window.NovaComposerState || state || {};
 
-  const execution = state.execution || {};
-  const steps = Array.isArray(execution.steps) ? execution.steps : [];
-  const total = steps.length;
-  const progress = Number(execution.progress || 0);
-  const percent = total > 0 ? Math.max(0, Math.min(100, (progress / total) * 100)) : 0;
-  const status = String(execution.status || "").toLowerCase();
+  const sessionId =
+    novaState.activeSessionId ||
+    (novaState.session && novaState.session.id) ||
+    "";
 
-  if (!execution.raw) {
-    els.executionPanel.hidden = true;
-    els.executionEmpty.hidden = true;
-    els.executionContent.hidden = true;
-    els.executionContent.innerHTML = "";
+  if (!mount) return;
+
+  function wireExecutionButtons() {
+    mount.querySelectorAll("[data-exec-action]").forEach(function (button) {
+      if (button.__novaExecutionWired) return;
+      button.__novaExecutionWired = true;
+
+      button.addEventListener("click", function () {
+        const action = button.getAttribute("data-exec-action") || "";
+
+        const currentState = window.NovaComposerState || state || {};
+        const currentSessionId =
+          currentState.activeSessionId ||
+          (currentState.session && currentState.session.id) ||
+          "";
+
+        if (!currentSessionId || !action) return;
+
+        button.disabled = true;
+        const originalText = button.textContent;
+        button.textContent = "Running...";
+
+        fetch("/api/execution/control", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            session_id: currentSessionId,
+            action: action,
+          }),
+        })
+          .then(function (res) {
+            return res.json();
+          })
+          .then(function () {
+            renderExecutionPanel();
+          })
+          .catch(function () {
+            renderExecutionPanel();
+          })
+          .finally(function () {
+            button.disabled = false;
+            button.textContent = originalText;
+          });
+      });
+    });
+  }
+
+  function renderShell(extraHtml) {
+    mount.innerHTML = `
+      <div class="nova-panel-shell">
+        <div class="nova-panel-title">Execution</div>
+
+        <div class="nova-panel-card">
+          <button type="button" data-exec-action="run_step">Run Step</button>
+          <button type="button" data-exec-action="run_all">Run All</button>
+          <button type="button" data-exec-action="retry">Retry</button>
+          <button type="button" data-exec-action="stop">Stop</button>
+        </div>
+
+        ${extraHtml || ""}
+      </div>
+    `;
+
+    wireExecutionButtons();
+  }
+
+  if (!sessionId) {
+    renderShell(`<div class="nova-panel-muted">No active session found yet.</div>`);
     return;
   }
 
-  const stepsHtml = steps.map(function (step, index) {
-    const title = escapeHtml((step && step.title) || `Step ${index + 1}`);
-    const isDone = index < progress || String((step && step.status) || "").toLowerCase() === "done";
-    const isCurrent = index === Number(execution.currentStepIndex || 0) && status !== "complete";
-    const isBlocked = status === "blocked" && isCurrent;
+  renderShell(`<div class="nova-panel-muted">Loading execution state...</div>`);
 
-    const classes = [
-      "execution-step",
-      isDone ? "is-done" : "",
-      isCurrent ? "is-current" : "",
-      isBlocked ? "is-blocked" : "",
-    ].filter(Boolean).join(" ");
+  fetch("/api/debug/execution?session_id=" + encodeURIComponent(sessionId))
+    .then(function (res) {
+      return res.json();
+    })
+    .then(function (data) {
+      const history =
+        data && Array.isArray(data.execution_history)
+          ? data.execution_history
+          : [];
 
-    return `
-      <div class="${classes}">
-        <div>${isDone ? "âœ“" : isCurrent ? ">" : "â€¢"} ${title}</div>
-      </div>
-    `;
-  }).join("");
+      renderShell(`
+        <div class="nova-panel-card">
+          <div><strong>Task:</strong> ${escapeHtml((data && data.active_task) || "None")}</div>
+          <div><strong>Next:</strong> ${escapeHtml((data && data.next_move) || "None")}</div>
+          <div><strong>Status:</strong> ${escapeHtml((data && data.last_execution_status) || "idle")}</div>
+          <div><strong>Steps:</strong> ${escapeHtml(String((data && data.last_execution_steps) || 0))}</div>
+        </div>
 
-  els.executionPanel.hidden = false;
-  els.executionEmpty.hidden = true;
-  els.executionContent.hidden = false;
-  els.executionContent.innerHTML = `
-    <div class="execution-card">
-      <div class="execution-goal">${escapeHtml(execution.goal || "Execution")}</div>
-      <div class="execution-meta">
-        Status: ${escapeHtml(execution.status || "unknown")} Â·
-        Progress: ${progress}/${total} Â·
-        Current: ${escapeHtml(execution.currentStep || "complete")}
-      </div>
-      <div class="execution-progress">
-        <div class="execution-progress-bar" style="width:${percent}%"></div>
-      </div>
-      <div class="execution-steps">${stepsHtml}</div>
-    </div>
-  `;
+        <div class="nova-panel-subtitle">History</div>
+
+        ${
+          history.length
+            ? history
+                .slice()
+                .reverse()
+                .map(function (item) {
+                  return `
+                    <div class="nova-panel-card">
+                      <div><strong>${escapeHtml(item.type || "event")}</strong></div>
+                      <pre>${escapeHtml(JSON.stringify(item.details || {}, null, 2))}</pre>
+                    </div>
+                  `;
+                })
+                .join("")
+            : `<div class="nova-panel-muted">No history yet.</div>`
+        }
+      `);
+    })
+    .catch(function () {
+      renderShell(`<div class="nova-panel-muted">Execution route not loaded yet.</div>`);
+    });
 }
 
 function getSessionArtifactsForRail() {
@@ -4945,7 +5011,15 @@ function wireSidebar() {
   closeSidebar();
 }
 
+
 function renderWeb() {
+  renderExecutionPanel();
+
+  if (state.webPreviewOpen) {
+    console.log("renderWeb skipped: preview open");
+    return;
+  }
+
   if (!els.webList) {
     els.webList = document.querySelector("[data-web-list]");
   }
@@ -6217,6 +6291,9 @@ window.NovaComposerBundle = {
   jumpToSessionAndSync,
 };
 
+window.NovaComposerState = state;
+window.renderExecutionPanel = renderExecutionPanel;
+
 setTimeout(() => {
   const voiceBtn = document.querySelector('[data-action="voice"]');
   if (voiceBtn) voiceBtn.textContent = 'Mic';
@@ -6226,7 +6303,90 @@ setTimeout(() => {
 }, 500);
 
 })();
+document.addEventListener("click", function (event) {
+  const tab = event.target.closest('[data-rail-tab="execution"]');
+  if (!tab) return;
 
+  event.preventDefault();
 
+  document.querySelectorAll("[data-rail-tab]").forEach(function (item) {
+    item.classList.remove("is-active");
+    item.setAttribute("aria-selected", "false");
+    item.setAttribute("aria-pressed", "false");
+  });
 
+  tab.classList.add("is-active");
+  tab.setAttribute("aria-selected", "true");
+  tab.setAttribute("aria-pressed", "true");
 
+  document.querySelectorAll("[data-rail-panel]").forEach(function (panel) {
+    panel.classList.remove("is-active");
+    panel.hidden = true;
+  });
+
+  const executionPanel = document.querySelector('[data-rail-panel="execution"]');
+
+  if (executionPanel) {
+    executionPanel.classList.add("is-active");
+    executionPanel.hidden = false;
+  }
+
+  const title = document.querySelector("[data-rail-title]");
+  const subtitle = document.querySelector("[data-rail-subtitle]");
+
+  if (title) title.textContent = "Execution";
+  if (subtitle) subtitle.textContent = "Agent controls and execution history";
+
+  if (typeof window.renderExecutionPanel === "function") {
+    window.renderExecutionPanel();
+  }
+});
+
+document.addEventListener("click", function (event) {
+  const button = event.target.closest("[data-exec-action]");
+  if (!button) return;
+
+  event.preventDefault();
+
+  const action = button.getAttribute("data-exec-action") || "";
+  const novaState = window.NovaComposerState || {};
+
+  const sessionId =
+    novaState.activeSessionId ||
+    (novaState.session && novaState.session.id) ||
+    "";
+
+  if (!sessionId || !action) return;
+
+  button.disabled = true;
+  const originalText = button.textContent;
+  button.textContent = "Running...";
+
+  fetch("/api/execution/control", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      session_id: sessionId,
+      action: action,
+    }),
+  })
+    .then(function (res) {
+      return res.json();
+    })
+    .then(function () {
+      if (typeof window.renderExecutionPanel === "function") {
+        window.renderExecutionPanel();
+      }
+    })
+    .catch(function () {
+      if (typeof window.renderExecutionPanel === "function") {
+        window.renderExecutionPanel();
+      }
+    })
+    .finally(function () {
+      button.disabled = false;
+      button.textContent = originalText;
+    });
+});
