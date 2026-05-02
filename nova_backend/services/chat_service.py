@@ -6973,11 +6973,27 @@ Next action:
             move_type = "build_execution_loop"
 
         move = NextMove(
-            id=f"{session_id}:{move_type}",
-            type=move_type,
+            id=f"{session_id}:chain",
+            type="chain",
             payload={
-                "task": active_task,
-                "raw": next_move,
+                "next": [
+                    {
+                        "type": "log",
+                        "payload": {
+                            "task": active_task,
+                            "raw": next_move,
+                            "session_id": session_id,
+                        },
+                    },
+                    {
+                        "type": "echo",
+                        "payload": {
+                            "message": "Execution chain continued.",
+                            "task": active_task,
+                            "next_move": next_move,
+                        },
+                    },
+                ]
             },
         )
 
