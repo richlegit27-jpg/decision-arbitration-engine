@@ -740,37 +740,98 @@ function renderExecution() {
 
   if (!container) return;
 
-if (
-  !state.execution ||
-  !Array.isArray(state.execution.steps) ||
-  !state.execution.steps.length
-) {
-  container.innerHTML = "";
-  container.hidden = true;
-  return;
-}
+  const execution = state.execution || {};
 
   container.hidden = false;
 
-  container.innerHTML = state.execution.steps
-    .map(function (step) {
-      const status = String(step.status || "planned").toLowerCase();
-      let icon = "○";
+  const status =
+    execution.status ||
+    execution.last_execution_status ||
+    execution.state ||
+    "idle";
 
-      if (status === "completed" || status === "done") icon = "✓";
-      else if (status === "running") icon = "→";
-      else if (status === "failed" || status === "error") icon = "⚠";
+  const rawSteps = Array.isArray(execution.steps) ? execution.steps : [];
 
-      return (
-        '<div class="exec-step exec-' + escapeHtml(status) + '">' +
-          '<span class="exec-icon">' + icon + '</span>' +
-          '<span class="exec-text">' +
-            escapeHtml(step.title || step.text || "") +
-          '</span>' +
-        '</div>'
-      );
-    })
-    .join("");
+  const stepCount =
+    rawSteps.length ||
+    Number(execution.last_execution_steps || execution.step_count || 0);
+
+  const steps =
+    rawSteps.length
+      ? rawSteps
+      : stepCount > 0
+        ? Array.from({ length: stepCount }, function (_, index) {
+            return {
+              title: "Step " + (index + 1),
+              status: status === "step_requested" ? "running" : "planned",
+            };
+          })
+        : [];
+
+  const history =
+    Array.isArray(execution.history)
+      ? execution.history
+      : Array.isArray(execution.execution_history)
+        ? execution.execution_history
+        : [];
+
+  const stepsHtml = steps.length
+    ? steps.map(function (step) {
+        const s = String(step.status || "planned").toLowerCase();
+        let icon = "○";
+
+        if (s === "completed" || s === "done") icon = "✓";
+        else if (s === "running" || s === "step_requested") icon = "→";
+        else if (s === "failed" || s === "error") icon = "⚠";
+
+        return (
+          '<div class="exec-step exec-' + escapeHtml(s) + '">' +
+            '<span class="exec-icon">' + icon + '</span>' +
+            '<span class="exec-text">' +
+              escapeHtml(step.title || step.text || "Step") +
+            '</span>' +
+          '</div>'
+        );
+      }).join("")
+    : '<div class="nova-panel-muted">No steps yet.</div>';
+
+  const historyHtml = history.length
+    ? history.map(function (h) {
+        if (typeof h === "string") {
+          return '<div class="exec-history-item">' + escapeHtml(h) + '</div>';
+        }
+
+        return (
+          '<div class="exec-history-item">' +
+            escapeHtml(h.action || h.type || h.event || JSON.stringify(h)) +
+          '</div>'
+        );
+      }).join("")
+    : '<div class="nova-panel-muted">No history yet.</div>';
+
+  container.innerHTML = `
+    <div class="nova-panel-shell">
+      <div class="nova-panel-title">Execution</div>
+
+      <div class="nova-panel-card">
+        <button type="button" data-exec-action="run_step">Run Step</button>
+        <button type="button" data-exec-action="run_all">Run All</button>
+        <button type="button" data-exec-action="retry">Retry</button>
+        <button type="button" data-exec-action="stop">Stop</button>
+      </div>
+
+      <div class="nova-panel-card">
+        <div><strong>Status:</strong> ${escapeHtml(status)}</div>
+        <div><strong>Steps:</strong> ${escapeHtml(String(stepCount))}</div>
+      </div>
+
+      <div class="nova-panel-subtitle">Steps</div>
+      <div class="nova-panel-card">${stepsHtml}</div>
+
+      <div class="nova-panel-subtitle">History</div>
+      <div class="nova-panel-card">${historyHtml}</div>
+    </div>
+  `;
 }
 
 function getSessionArtifactsForRail() {
@@ -6174,60 +6235,28 @@ setTimeout(() => {
   if (attachBtn) attachBtn.textContent = '+';
 }, 500);
 
-})();
-document.addEventListener("click", function (event) {
-  const tab = event.target.closest('[data-rail-tab="execution"]');
-  if (!tab) return;
-
-  event.preventDefault();
-
-  document.querySelectorAll("[data-rail-tab]").forEach(function (item) {
-    item.classList.remove("is-active");
-    item.setAttribute("aria-selected", "false");
-    item.setAttribute("aria-pressed", "false");
-  });
-
-  tab.classList.add("is-active");
-  tab.setAttribute("aria-selected", "true");
-  tab.setAttribute("aria-pressed", "true");
-
-  document.querySelectorAll("[data-rail-panel]").forEach(function (panel) {
-    panel.classList.remove("is-active");
-    panel.hidden = true;
-  });
-
-  const executionPanel = document.querySelector('[data-rail-panel="execution"]');
-
-  if (executionPanel) {
-    executionPanel.classList.add("is-active");
-    executionPanel.hidden = false;
-  }
-
-  const title = document.querySelector("[data-rail-title]");
-  const subtitle = document.querySelector("[data-rail-subtitle]");
-
-  if (title) title.textContent = "Execution";
-  if (subtitle) subtitle.textContent = "Agent controls and execution history";
-
-if (typeof window.renderExecution === "function") {
-  window.renderExecution();
-}});
-
 document.addEventListener("click", function (event) {
   const button = event.target.closest("[data-exec-action]");
   if (!button) return;
 
   event.preventDefault();
+  event.stopPropagation();
 
   const action = button.getAttribute("data-exec-action") || "";
+  const sessionId = String(state.activeSessionId || "").trim();
 
-  const novaState = window.NovaComposerState || state || {};
-  const sessionId =
-    novaState.activeSessionId ||
-    (novaState.session && novaState.session.id) ||
-    "";
+  console.log("EXECUTION BUTTON CLICKED", {
+    action: action,
+    sessionId: sessionId,
+  });
 
-  if (!sessionId || !action) return;
+  if (!sessionId || !action) {
+    console.warn("EXECUTION CLICK BLOCKED", {
+      action: action,
+      sessionId: sessionId,
+    });
+    return;
+  }
 
   button.disabled = true;
   const originalText = button.textContent;
@@ -6251,13 +6280,9 @@ document.addEventListener("click", function (event) {
 
       if (data && data.ok && data.execution_state) {
         state.execution = data.execution_state;
-
         window.NovaComposerState = state;
         window.NovaComposerState.execution = data.execution_state;
-
-        if (typeof renderExecution === "function") {
-          renderExecution();
-        }
+        renderExecution();
       }
     })
     .catch(function (err) {
@@ -6268,3 +6293,5 @@ document.addEventListener("click", function (event) {
       button.textContent = originalText;
     });
 });
+
+})();
