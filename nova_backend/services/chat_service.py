@@ -6965,12 +6965,22 @@ Next action:
 
     def _run_execution_next_move(self, active_task: str, next_move: str, session_id: str) -> str:
         active_task = self._safe_str(active_task).strip()
-        next_move_raw = self._safe_str(next_move).strip().lower()
+        next_move_raw = (
+            self._safe_str(next_move)
+            + " "
+            + self._safe_str(active_task)
+        ).strip().lower()
 
-        move_type = "unknown"
+        move_type = "echo"
 
         if "build execution loop" in next_move_raw:
             move_type = "build_execution_loop"
+        elif "verify execution loop" in next_move_raw:
+            move_type = "verify_execution_loop"
+        elif "persist execution result" in next_move_raw:
+            move_type = "persist_execution_result"
+        elif "review execution result" in next_move_raw:
+            move_type = "persist_execution_result"
 
         move = NextMove(
             id=f"{session_id}:chain",
@@ -6986,7 +6996,7 @@ Next action:
                         },
                     },
                     {
-                        "type": "echo",
+                        "type": move_type,
                         "payload": {
                             "message": "Execution chain continued.",
                             "task": active_task,
@@ -6998,7 +7008,6 @@ Next action:
         )
 
         results = self.execution_handler.run_chain(move)
-
         last_result = results[-1] if results else None
 
         if last_result and last_result.status == "success":
@@ -7016,26 +7025,25 @@ Next action:
                     elif current_next in {"persist execution result", "persist_execution_result"}:
                         next_step_text = "choose next autonomous task"
 
-            try:
-                self._update_working_state(
-                    session_id,
-                    {
-                        "next_move": next_step_text,
-                        "last_execution_status": "success",
-                        "last_execution_steps": len(results),
-                        "last_execution_output": last_result.output,
+            followup_move = None
+
+            if next_step_text == "persist execution result":
+                followup_move = NextMove(
+                    id=f"{session_id}:persist",
+                    type="persist_execution_result",
+                    payload={
+                        "task": active_task,
+                        "source": move_type,
+                        "result": last_result.output,
                     },
                 )
-            except Exception:
-                pass
 
-            return (
-                f"Continuing: {active_task or 'saved task'}\n"
-                f"Executed: {move_type}\n\n"
-                f"Steps: {len(results)}\n"
-                f"Next Move: {next_step_text}\n\n"
-                f"Last Result:\n{last_result.output}"
-            )
+            if followup_move:
+                followup_results = self.execution_handler.run_chain(followup_move)
+                if followup_results:
+                    last_followup = followup_results[-1]
+                    if last_followup and last_followup.status == "success":
+                        last_result = last_followup
 
             try:
                 self._update_working_state(

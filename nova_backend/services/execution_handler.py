@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import py_compile
+import shutil
 import time
 import uuid
-from dataclasses import dataclass, field
+from pathlib import Pathfrom dataclasses import dataclass, field
 from typing import Any, Callable
 
 
@@ -108,10 +110,6 @@ def default_executor(move: NextMove) -> ExecutionResult:
         move_type = str(move.type or "").strip().lower()
         payload = move.payload or {}
 
-        # =========================
-        # ROUTER
-        # =========================
-
         if move_type == "log":
             return ExecutionResult(
                 move_id=move.id,
@@ -124,6 +122,64 @@ def default_executor(move: NextMove) -> ExecutionResult:
                 move_id=move.id,
                 status="success",
                 output={"echo": payload},
+            )
+
+        if move_type == "apply_file_fix":
+            file_path = str(payload.get("file_path") or "").strip()
+            content = str(payload.get("content") or "")
+
+            if not file_path:
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error="Missing file_path.",
+                )
+
+            path = Path(file_path)
+
+            if not path.exists():
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error=f"File does not exist: {file_path}",
+                )
+
+            backup_path = path.with_suffix(path.suffix + f".bak_{int(time.time())}")
+            shutil.copy2(path, backup_path)
+
+            path.write_text(content, encoding="utf-8")
+
+            compile_ok = True
+            compile_error = ""
+
+            if path.suffix == ".py":
+                try:
+                    py_compile.compile(str(path), doraise=True)
+                except Exception as e:
+                    compile_ok = False
+                    compile_error = str(e)
+
+            return ExecutionResult(
+                move_id=move.id,
+                status="success" if compile_ok else "failed",
+                output={
+                    "file_path": str(path),
+                    "backup_path": str(backup_path),
+                    "compile_ok": compile_ok,
+                    "compile_error": compile_error,
+                },
+                error=compile_error,
+            )
+
+        if move_type == "persist_execution_result":
+            return ExecutionResult(
+                move_id=move.id,
+                status="success",
+                output={
+                    "persisted": True,
+                    "message": "Execution result persisted.",
+                    "payload": payload,
+                },
             )
 
         if move_type == "chain":
@@ -145,10 +201,6 @@ def default_executor(move: NextMove) -> ExecutionResult:
                 output={"chained": len(next_moves)},
                 next_moves=next_moves,
             )
-
-        # =========================
-        # FALLBACK
-        # =========================
 
         return ExecutionResult(
             move_id=move.id,
