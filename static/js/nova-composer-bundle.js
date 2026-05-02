@@ -740,16 +740,15 @@ function renderExecution() {
 
   if (!container) return;
 
-  if (
-    !state.execution ||
-    !state.execution.active ||
-    !Array.isArray(state.execution.steps) ||
-    !state.execution.steps.length
-  ) {
-    container.innerHTML = "";
-    container.hidden = true;
-    return;
-  }
+if (
+  !state.execution ||
+  !Array.isArray(state.execution.steps) ||
+  !state.execution.steps.length
+) {
+  container.innerHTML = "";
+  container.hidden = true;
+  return;
+}
 
   container.hidden = false;
 
@@ -2365,7 +2364,7 @@ if (!data.ok) {
 
   updateTopbarFromState();
   scrollChatToBottom(true);
-  renderExecutionPanel();
+  renderExecution();
 }
 
 function renderSessionList() {
@@ -2446,198 +2445,6 @@ function syncExecutionFromArtifacts() {
   state.execution = latest;
 }
 
-function renderExecutionPanel() {
-  const panel =
-    document.querySelector("[data-execution-panel]") ||
-    document.querySelector('[data-rail-panel="execution"]');
-
-  if (!panel) return;
-
-  const novaState = window.NovaComposerState || state || {};
-  const sessionId =
-    novaState.activeSessionId ||
-    (novaState.session && novaState.session.id) ||
-    "";
-
-  const execution =
-    state.execution_state ||
-    state.execution ||
-    novaState.execution_state ||
-    novaState.execution ||
-    {};
-
-  const task =
-    execution.task ||
-    execution.active_task ||
-    execution.current_task ||
-    "None";
-
-  const next =
-    execution.next ||
-    execution.next_step ||
-    execution.next_move ||
-    "None";
-
-  const status =
-    execution.status ||
-    execution.state ||
-    "idle";
-
-  const steps = Array.isArray(execution.steps)
-    ? execution.steps
-    : [];
-
-  const history = Array.isArray(execution.history)
-    ? execution.history
-    : [];
-
-  panel.innerHTML = `
-    <div class="nova-panel-shell">
-      <div class="nova-panel-title">Execution</div>
-
-      <div class="nova-panel-card">
-        <button type="button" data-exec-action="run_step">Run Step</button>
-        <button type="button" data-exec-action="run_all">Run All</button>
-        <button type="button" data-exec-action="retry">Retry</button>
-        <button type="button" data-exec-action="stop">Stop</button>
-      </div>
-
-      <div class="nova-panel-card">
-        <div><strong>Task:</strong> ${escapeHtml(task)}</div>
-        <div><strong>Next:</strong> ${escapeHtml(next)}</div>
-        <div><strong>Status:</strong> ${escapeHtml(status)}</div>
-        <div><strong>Steps:</strong> ${steps.length}</div>
-      </div>
-
-      <div class="nova-panel-subtitle">History</div>
-
-      ${
-        history.length
-          ? `<div class="nova-panel-card">${history
-              .map(function (item) {
-                return `<div>${escapeHtml(String(item || ""))}</div>`;
-              })
-              .join("")}</div>`
-          : `<div class="nova-panel-muted">No history yet.</div>`
-      }
-    </div>
-  `;
-
-  function wireExecutionButtons() {
-    panel.querySelectorAll("[data-exec-action]").forEach(function (button) {
-      if (button.__novaExecutionWired) return;
-      button.__novaExecutionWired = true;
-
-      button.addEventListener("click", function () {
-        const action = button.getAttribute("data-exec-action") || "";
-
-        const currentState = window.NovaComposerState || state || {};
-        const currentSessionId =
-          currentState.activeSessionId ||
-          (currentState.session && currentState.session.id) ||
-          "";
-
-        if (!currentSessionId || !action) return;
-
-        button.disabled = true;
-        const originalText = button.textContent;
-        button.textContent = "Running...";
-
-        fetch("/api/execution/control", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            session_id: currentSessionId,
-            action: action,
-          }),
-        })
-          .then(function (res) {
-            return res.json();
-          })
-          .then(function () {
-            renderExecutionPanel();
-          })
-          .catch(function () {
-            renderExecutionPanel();
-          })
-          .finally(function () {
-            button.disabled = false;
-            button.textContent = originalText;
-          });
-      });
-    });
-  }
-
-   function renderShell(extraHtml) {
-    panel.innerHTML = `
-      <div class="nova-panel-shell">
-        <div class="nova-panel-title">Execution</div>
-
-        <div class="nova-panel-card">
-          <button type="button" data-exec-action="run_step">Run Step</button>
-          <button type="button" data-exec-action="run_all">Run All</button>
-          <button type="button" data-exec-action="retry">Retry</button>
-          <button type="button" data-exec-action="stop">Stop</button>
-        </div>
-
-        ${extraHtml || ""}
-      </div>
-    `;
-
-    wireExecutionButtons();
-  }
-
-  if (!sessionId) {
-    renderShell(`<div class="nova-panel-muted">No active session found yet.</div>`);
-    return;
-  }
-
-  renderShell(`<div class="nova-panel-muted">Loading execution state...</div>`);
-
-  fetch("/api/debug/execution?session_id=" + encodeURIComponent(sessionId))
-    .then(function (res) {
-      return res.json();
-    })
-    .then(function (data) {
-      const history =
-        data && Array.isArray(data.execution_history)
-          ? data.execution_history
-          : [];
-
-      renderShell(`
-        <div class="nova-panel-card">
-          <div><strong>Task:</strong> ${escapeHtml((data && data.active_task) || "None")}</div>
-          <div><strong>Next:</strong> ${escapeHtml((data && data.next_move) || "None")}</div>
-          <div><strong>Status:</strong> ${escapeHtml((data && data.last_execution_status) || "idle")}</div>
-          <div><strong>Steps:</strong> ${escapeHtml(String((data && data.last_execution_steps) || 0))}</div>
-        </div>
-
-        <div class="nova-panel-subtitle">History</div>
-
-        ${
-          history.length
-            ? history
-                .slice()
-                .reverse()
-                .map(function (item) {
-                  return `
-                    <div class="nova-panel-card">
-                      <div><strong>${escapeHtml(item.type || "event")}</strong></div>
-                      <pre>${escapeHtml(JSON.stringify(item.details || {}, null, 2))}</pre>
-                    </div>
-                  `;
-                })
-                .join("")
-            : `<div class="nova-panel-muted">No history yet.</div>`
-        }
-      `);
-    })
-    .catch(function () {
-      renderShell(`<div class="nova-panel-muted">Execution route not loaded yet.</div>`);
-    });
-}
 
 function getSessionArtifactsForRail() {
   const activeSessionId = String(state.activeSessionId || "").trim();
@@ -5004,7 +4811,7 @@ async function boot() {
     renderChat();
     renderSessionList();
     renderArtifacts();
-    renderExecutionPanel();
+    renderExecution();
     renderMemory();
   }
 
@@ -5078,7 +4885,7 @@ function wireSidebar() {
 
 
 function renderWeb() {
-  renderExecutionPanel();
+  renderExecution();
 
   if (state.webPreviewOpen) {
     console.log("renderWeb skipped: preview open");
@@ -6357,7 +6164,7 @@ window.NovaComposerBundle = {
 };
 
 window.NovaComposerState = state;
-window.renderExecutionPanel = renderExecutionPanel;
+window.renderExecution = renderExecution;
 
 setTimeout(() => {
   const voiceBtn = document.querySelector('[data-action="voice"]');
@@ -6402,10 +6209,9 @@ document.addEventListener("click", function (event) {
   if (title) title.textContent = "Execution";
   if (subtitle) subtitle.textContent = "Agent controls and execution history";
 
-  if (typeof window.renderExecutionPanel === "function") {
-    window.renderExecutionPanel();
-  }
-});
+if (typeof window.renderExecution === "function") {
+  window.renderExecution();
+}});
 
 document.addEventListener("click", function (event) {
   const button = event.target.closest("[data-exec-action]");
@@ -6415,7 +6221,7 @@ document.addEventListener("click", function (event) {
 
   const action = button.getAttribute("data-exec-action") || "";
 
-  const novaState = window.NovaComposerState || {};
+  const novaState = window.NovaComposerState || state || {};
   const sessionId =
     novaState.activeSessionId ||
     (novaState.session && novaState.session.id) ||
@@ -6444,19 +6250,13 @@ document.addEventListener("click", function (event) {
       console.log("EXECUTION CONTROL RESPONSE", data);
 
       if (data && data.ok && data.execution_state) {
-        // ?? HARD SYNC STATE (THIS WAS MISSING)
-        window.NovaComposerState = window.NovaComposerState || {};
-        window.NovaComposerState.execution_state = data.execution_state;
+        state.execution = data.execution_state;
+
+        window.NovaComposerState = state;
         window.NovaComposerState.execution = data.execution_state;
 
-        if (typeof state !== "undefined") {
-          state.execution_state = data.execution_state;
-          state.execution = data.execution_state;
-        }
-
-        // ?? FORCE PANEL RE-RENDER
-        if (typeof window.renderExecutionPanel === "function") {
-          window.renderExecutionPanel();
+        if (typeof renderExecution === "function") {
+          renderExecution();
         }
       }
     })
