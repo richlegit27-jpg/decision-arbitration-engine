@@ -218,41 +218,31 @@ function resolveUploadUrl(url) {
 
 function renderSources(assistantText, meta = {}) {
   const text = String(assistantText || "");
+  const sourceMeta = Array.isArray(meta.sources) ? meta.sources : [];
 
-  if (!text.includes("— Top sources —")) {
+  if (!text.includes("— Top sources —") && sourceMeta.length === 0) {
     return renderMarkdown(text);
   }
 
   const parts = text.split("— Top sources —");
+
   const mainText = parts[0].trim();
-  const rawSources = parts.slice(1).join("— Top sources —").trim();
 
-  const urls = Array.isArray(meta.source_urls) ? meta.source_urls : [];
-  const sourceMeta = Array.isArray(meta.sources) ? meta.sources : [];
+// sourceMeta already declared above
 
-  const lines = rawSources
-    .split("\n")
-    .map(function (line) {
-      return line.trim();
-    })
-    .filter(Boolean);
+  if (!sourceMeta.length) {
+    return (
+      '<div class="nova-msg-text">' +
+        renderMarkdown(mainText) +
+      '</div>'
+    );
+  }
 
-  const cards = lines.map(function (line, index) {
-    const cleanLine = line.replace(/^\d+\.\s*/, "").trim();
-    const item = sourceMeta[index] && typeof sourceMeta[index] === "object"
-      ? sourceMeta[index]
-      : {};
-
-    const url = urls[index] || item.url || item.link || "";
-    const title = item.title || cleanLine || url || "Source";
-    const snippet = item.snippet || item.description || "";
-
-    let domain = "source";
-    try {
-      if (url) {
-        domain = new URL(url).hostname.replace(/^www\./, "");
-      }
-    } catch (_) {}
+  const cards = sourceMeta.map(function (item, index) {
+    const title = String(item.title || "").trim();
+    const url = String(item.url || "").trim();
+    const domain = String(item.source || "").trim();
+    const snippet = String(item.snippet || title || "").trim();
 
     return (
       '<button type="button" class="nova-source-card source-card" data-no-chat-action="1" data-url="' +
@@ -260,14 +250,14 @@ function renderSources(assistantText, meta = {}) {
       '" data-title="' +
       escapeHtml(title) +
       '" data-preview="' +
-      escapeHtml(snippet || title) +
+      escapeHtml(snippet) +
       '">' +
         '<div class="nova-source-card-top">' +
           '<span class="nova-source-number">' +
             escapeHtml(String(index + 1)) +
           '</span>' +
           '<span class="nova-source-domain">' +
-            escapeHtml(domain) +
+            escapeHtml(domain || "source") +
           '</span>' +
         '</div>' +
         '<div class="nova-source-title">' +
@@ -409,12 +399,15 @@ function normalizeMessage(raw) {
     return null;
   }
 
-  // 🔥 HARD META PRESERVE (this is the key)
-  const meta =
-    item.meta ||
-    raw.meta ||
-    (raw.assistant_message && raw.assistant_message.meta) ||
-    {};
+// 🔥 HARD META PRESERVE (fixed correctly)
+const meta =
+  (item && typeof item.meta === "object" && item.meta) ||
+  (raw && typeof raw.meta === "object" && raw.meta) ||
+  (raw &&
+    raw.assistant_message &&
+    typeof raw.assistant_message.meta === "object" &&
+    raw.assistant_message.meta) ||
+  {};
 
   return {
     id: item.id || makeId("msg"),
@@ -1908,63 +1901,78 @@ function linkifySourceLines(text) {
   const raw = String(text || "");
   if (!raw) return "";
 
-  const lines = raw.split(/\r?\n/);
-  const output = [];
+  const markerMatch = raw.match(/(?:—|-|–)?\s*Top sources\s*(?:—|-|–)?/i);
+
+  if (!markerMatch) {
+    return escapeHtml(raw).replace(/\n/g, "<br>");
+  }
+
+  const before = raw.slice(0, markerMatch.index).trim();
+  const after = raw.slice(markerMatch.index + markerMatch[0].length).trim();
+
+  const lines = after
+    .split(/\r?\n/)
+    .map(function (line) {
+      return line.trim();
+    })
+    .filter(Boolean);
+
+  const html = [];
+
+  if (before) {
+    html.push(escapeHtml(before).replace(/\n/g, "<br>"));
+  }
+
+  html.push('<div class="nova-source-grid" data-source-grid="1">');
 
   for (let i = 0; i < lines.length; i++) {
-    const line = (lines[i] || "").trim();
+    const sourceLine = lines[i] || "";
+    const nextLine = lines[i + 1] || "";
 
-    // NEW FORMAT: "1source"
-    const match = line.match(/^(\d+)source$/i);
+    const sourceMatch = sourceLine.match(/^\s*(\d+)\.\s*(.+?)\s*[—–-]\s*(.+?)\s*$/);
 
-    if (match) {
-      const index = match[1];
-
-      const nextLine = (lines[i + 1] || "").trim();     // domain — title
-      const nextNext = (lines[i + 2] || "").trim();     // url
-
-      let domain = "";
-      let title = "";
-      let url = "";
-
-      // Parse "domain — title"
-      const parts = nextLine.split("—");
-      if (parts.length >= 2) {
-        domain = parts[0].trim();
-        title = parts.slice(1).join("—").trim();
-      } else {
-        title = nextLine;
-      }
-
-      if (nextNext.startsWith("http")) {
-        url = nextNext;
-        i += 2;
-      } else {
-        i += 1;
-      }
-
-      output.push(
-        '<div class="source-row" data-no-chat-action="1" data-url="' +
-          escapeHtml(url) +
-          '" data-title="' +
-          escapeHtml(title) +
-          '" data-preview="' +
-          escapeHtml(domain + " — " + title) +
-          '">' +
-          '<span class="source-index">' + index + '</span>' +
-          '<span class="source-domain">' + escapeHtml(domain) + '</span>' +
-          '<span class="source-title">' + escapeHtml(title) + '</span>' +
-        '</div>'
-      );
-
+    if (!sourceMatch) {
       continue;
     }
 
-    output.push(escapeHtml(line));
+    const index = sourceMatch[1];
+    const source = sourceMatch[2].trim();
+    const title = sourceMatch[3].trim();
+
+    let url = "";
+
+    if (/^https?:\/\//i.test(nextLine)) {
+      url = nextLine.trim();
+      i++;
+    }
+
+    html.push(
+      '<button type="button" class="source-row nova-source-card" data-no-chat-action="1" data-url="' +
+        escapeHtml(url) +
+        '" data-title="' +
+        escapeHtml(title) +
+        '" data-preview="' +
+        escapeHtml(source + " — " + title) +
+        '">' +
+        '<span class="nova-source-index">' +
+        escapeHtml(index) +
+        "</span>" +
+        '<span class="nova-source-body">' +
+        "<strong>" +
+        escapeHtml(title) +
+        "</strong>" +
+        "<small>" +
+        escapeHtml(source) +
+        "</small>" +
+        "</span>" +
+        "</button>"
+    );
   }
 
-  return output.join("\n");
-}
+  html.push("</div>");
+
+  return html.join("");
+} 
 
 function renderSourceList(message) {
   return "";
@@ -2210,15 +2218,23 @@ function renderMessageCard(message) {
 
   let rawText = String(message.text || "").trim();
 
-// 🔥 CLEAN SOURCE GARBAGE BLOCK
+// KEEP sources intact for card parser
 if (role === "assistant") {
-  rawText = String(rawText || "")
-    .replace(/\n+\d+\s*source\s*\n[\s\S]*$/i, "")
-    .replace(/\n+\d+source\s*\n[\s\S]*$/i, "")
-    .replace(/\n+\s*Top sources\s*\n+[\s\S]*$/i, "")
-    .replace(/\n+\s*Sources\s*\n+[\s\S]*$/i, "")
-    .trim();
+  rawText = String(rawText || "").trim();
 }
+  const seen = new Set();
+
+  rawText = rawText
+    .split(/\n+/)
+    .filter(function (line) {
+      const clean = line.trim();
+      if (!clean) return false;
+      if (seen.has(clean)) return false;
+      seen.add(clean);
+      return true;
+    })
+    .join("\n")
+    .trim();
 
   const hasMetaSources =
     message &&
@@ -2232,7 +2248,7 @@ if (role === "assistant") {
           linkifySourceLines(rawText) ||
           (
             hasMetaSources
-              ? renderMarkdown(rawText) + renderSources("", message.meta || {})
+              ? renderSources(rawText, message.meta || {})
               : renderMarkdown(rawText)
           )
         )
@@ -4854,57 +4870,6 @@ function closeSidebar() {
   }
 }
 
-function openSidebar() {
-  if (els.body) {
-    els.body.classList.add("is-sidebar-open");
-  }
-
-  if (els.sidebar) {
-    els.sidebar.classList.add("is-open");
-  }
-
-  if (els.sidebarBackdrop) {
-    els.sidebarBackdrop.hidden = false;
-  }
-}
-
-function wireSidebar() {
-  const toggleButtons = qsa("[data-sidebar-toggle]");
-
-  toggleButtons.forEach(function (button) {
-    button.onclick = function (event) {
-      if (event) event.preventDefault();
-
-      const isOpen =
-        (els.body && els.body.classList.contains("is-sidebar-open")) ||
-        (els.sidebar && els.sidebar.classList.contains("is-open"));
-
-      if (isOpen) {
-        closeSidebar();
-      } else {
-        openSidebar();
-      }
-    };
-  });
-
-  if (els.sidebarClose) {
-    els.sidebarClose.onclick = function (event) {
-      if (event) event.preventDefault();
-      closeSidebar();
-    };
-  }
-
-  if (els.sidebarBackdrop) {
-    els.sidebarBackdrop.onclick = function (event) {
-      if (event) event.preventDefault();
-      closeSidebar();
-      closeRail();
-    };
-  }
-
-  closeSidebar();
-}
-
 window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, title) {
   url = String(url || "").trim();
   title = String(title || "Source preview").trim();
@@ -4915,8 +4880,9 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
   if (typeof setRailTab === "function") setRailTab("web");
 
   const viewer =
-    document.querySelector("[data-rail-viewer]") ||
     document.querySelector("#webMount") ||
+    document.querySelector("[data-rail-viewer]") ||
+    document.querySelector('[data-rail-panel="web"] .nova-rail-content') ||
     document.querySelector('[data-rail-panel="web"]') ||
     document.querySelector(".nova-rail-content");
 
@@ -4943,12 +4909,18 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
       return response.json();
     })
     .then(function (data) {
+      console.log("SOURCE PREVIEW RESPONSE", data);
+
+      const finalUrl = String((data && data.url) || url);
+      const finalTitle = String((data && data.title) || title || "Source preview");
+      const finalPreview = String((data && data.preview) || "No preview found.");
+
       viewer.innerHTML = `
         <div class="nova-viewer-shell">
-          <div class="nova-viewer-title">${escapeHtml((data && data.title) || title)}</div>
+          <div class="nova-viewer-title">${escapeHtml(finalTitle)}</div>
           <div class="nova-viewer-body">
-            <p>${escapeHtml((data && data.preview) || "No preview found.").replace(/\n/g, "<br>")}</p>
-            <button type="button" onclick="window.open('${escapeHtml((data && data.url) || url)}', '_blank')">
+            <p>${escapeHtml(finalPreview).replace(/\n/g, "<br>")}</p>
+            <button type="button" data-open-full="${escapeHtml(finalUrl)}">
               Open full article →
             </button>
           </div>
@@ -4957,10 +4929,17 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
     })
     .catch(function (error) {
       console.error("SOURCE PREVIEW ERROR:", error);
-      viewer.innerHTML = "<p>Failed to load preview.</p>";
+
+      viewer.innerHTML = `
+        <div class="nova-viewer-shell">
+          <div class="nova-viewer-title">Source preview</div>
+          <div class="nova-viewer-body">
+            <p>Failed to load preview.</p>
+          </div>
+        </div>
+      `;
     });
 };
-
 
 function renderWeb() {
   renderExecution();
@@ -6174,6 +6153,7 @@ function syncArtifactViewerToActiveSession() {
   state.rail.selectedId = firstId;
   openArtifactFromStateOrBackend(firstId);
 }
+
 async function loadState() {
   const payload = await apiGet("/api/state");
 
@@ -6320,6 +6300,39 @@ setTimeout(() => {
       </div>
     `;
   }
+
+  document.addEventListener("click", function (event) {
+    const card = event.target.closest(".source-row");
+
+    if (!card) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const url = card.dataset.url || "";
+    const title = card.dataset.title || "Source preview";
+
+    if (!url) return;
+
+    if (typeof fetchSourcePreviewIntoRail === "function") {
+      fetchSourcePreviewIntoRail(url, title);
+    } else {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  }, true);
+
+document.addEventListener("click", function (event) {
+  const btn = event.target.closest("[data-open-full]");
+  if (!btn) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const url = btn.getAttribute("data-open-full") || "";
+  if (!url) return;
+
+  window.open(url, "_blank", "noopener,noreferrer");
+}, true);
 
   window.renderExecution = renderExecutionPanel;
   window.renderExecutionPanel = renderExecutionPanel;

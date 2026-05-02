@@ -1407,6 +1407,83 @@ def api_debug_execution():
             "execution_history": [],
         }), 500
 
+@app.route("/api/web/preview", methods=["POST"])
+def web_preview():
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url") or "").strip()
+
+    if not url:
+        return jsonify({
+            "ok": False,
+            "error": "Missing url",
+            "title": "Source preview",
+            "preview": "",
+            "url": "",
+        }), 400
+
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
+        }
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=10,
+            allow_redirects=True,
+        )
+
+        final_url = response.url or url
+        html = response.text or ""
+
+        soup = BeautifulSoup(html, "html.parser")
+
+        for tag in soup([
+            "script",
+            "style",
+            "nav",
+            "footer",
+            "header",
+            "aside",
+            "form",
+            "noscript",
+        ]):
+            tag.decompose()
+
+        title = ""
+        if soup.title and soup.title.string:
+            title = soup.title.string.strip()
+
+        text = soup.get_text("\n", strip=True)
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        preview = "\n".join(lines[:24]).strip()
+
+        if not preview:
+            preview = "Preview route is working, but no readable article text was found."
+
+        return jsonify({
+            "ok": True,
+            "title": title or "Source preview",
+            "preview": preview[:4000],
+            "url": final_url,
+        })
+
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": str(exc),
+            "title": "Source preview",
+            "preview": "Preview failed on backend.",
+            "url": url,
+        }), 500
+
 # -----------------------
 # MAIN
 # -----------------------
