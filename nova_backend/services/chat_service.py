@@ -6981,19 +6981,29 @@ Next action:
             },
         )
 
-        result = self.execution_handler.run_next_move(move)
+        results = self.execution_handler.run_chain(move)
 
-        if result.status == "success":
+        last_result = results[-1] if results else None
+
+        if last_result and last_result.status == "success":
             return (
                 f"Continuing: {active_task or 'saved task'}\n"
                 f"Executed: {move_type}\n\n"
-                f"Result:\n{result.output}"
+                f"Steps: {len(results)}\n"
+                f"Last Result:\n{last_result.output}"
+            )
+
+        if last_result:
+            return (
+                f"Continuing: {active_task or 'saved task'}\n"
+                f"Execution failed: {move_type}\n\n"
+                f"Steps: {len(results)}\n"
+                f"Error:\n{last_result.error}"
             )
 
         return (
             f"Continuing: {active_task or 'saved task'}\n"
-            f"Execution failed: {move_type}\n\n"
-            f"Error:\n{result.error}"
+            f"Execution produced no result."
         )
 
     def _rank_memory_context(self, user_text: str = "", limit: int = 6):
