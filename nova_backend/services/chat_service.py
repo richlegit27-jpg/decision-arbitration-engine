@@ -7,6 +7,11 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, List
+from nova_backend.services.execution_handler import (
+    ExecutionHandler,
+    NextMove,
+    default_executor,
+)
 
 from openai import OpenAI
 
@@ -23,8 +28,6 @@ from nova_backend.services.web_service import WebService
 from nova_backend.services.tool_service import ToolService
 from nova_backend.services.execution_service import ExecutionService
 from nova_backend.services.intent_service import IntentService
-
-
 
 class ChatService:
     ROUTE_GENERAL_CHAT = "general_chat"
@@ -95,31 +98,43 @@ class ChatService:
         self.recon_service = recon_service
         self.rewrite_service = ResponseRewriteService()
 
+        # execution engine
+        self.execution_handler = ExecutionHandler(default_executor)
+
+        # existing aliases (DO NOT REMOVE)
         self.sessions = session_service
         self.memory = memory_service
         self.artifacts = artifact_service
         self.web = web_service
         self.recon = recon_service
 
+        # config
         self.image_model = os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1")
         self.image_size = os.getenv("NOVA_IMAGE_SIZE", "1024x1024")
         self.chat_model = os.getenv("OPENAI_MODEL", "gpt-5.4")
         self.model = self.chat_model
         print("MODEL CHECK:", hasattr(self, "model"), self.model)
+
         self.memory_limit = int(os.getenv("NOVA_MEMORY_LIMIT", "3"))
+
+        # services
         self.execution_service = ExecutionService()
         self.intent_service = IntentService()
+
+        # uploads
         self.uploads_dir = Path(
             os.getenv("UPLOADS_DIR", r"C:\Users\Owner\nova\uploads")
         )
         self.uploads_dir.mkdir(parents=True, exist_ok=True)
         print("CHATSERVICE INIT uploads_dir =", self.uploads_dir)
 
+        # core clients
         self.client = OpenAI()
         self.agent = AgentService()
         self.memory_ranker = MemoryRankerService()
         self.tools = ToolService(base_dir=os.getcwd())
 
+        # autonomy
         self.autonomy = AutonomyService(
             web_service=self.web,
             recon_service=self.recon,
@@ -129,7 +144,6 @@ class ChatService:
             max_deep_js=5,
             max_follow_links=5,
         )
-
 
     def _build_user_message(self, text: str, attachments=None, meta=None) -> dict:
         attachments = attachments or []
@@ -569,31 +583,18 @@ class ChatService:
         active_task = self._safe_str(state.get("active_task"))
         next_step = self._safe_str(state.get("next_step"))
 
-        # === HARD EXECUTION LOCK ===
-        if active_task and not is_continue:
+        # === EXECUTION LOCK DISABLED ===
+        # Execution now only runs through _maybe_lock_execution_flow().
+        # Normal chat should not be hijacked just because working_state exists.
+        if False:
             print("FORCING EXECUTION MODE FROM WORKING STATE")
-
-            user_text = f"Continue task: {active_task}. Next step: {next_step}"
-
-            decision = decision if isinstance(decision, dict) else {}
-            mission = decision.get("mission") if isinstance(decision, dict) else {}
-            mission = mission if isinstance(mission, dict) else {}
-
-            mission["mode"] = "execution"
-            decision["mission"] = mission
 
         if is_continue:
             mission = decision.get("mission") if isinstance(decision, dict) else {}
             mission = mission if isinstance(mission, dict) else {}
 
-            if active_task:
-                user_text = f"Continue task: {active_task}. Next step: {next_step}"
-            else:
-                user_text = (
-                    "Continue current Nova build phase. "
-                    f"Mission mode: {mission.get('mode') or 'continue'}. "
-                    f"Next move: {mission.get('next_move') or 'Choose the next concrete implementation step.'}"
-                )
+            # Disabled: do not rewrite normal chat into execution mode
+            pass
 
         user_msg = self._build_user_message(
             original_user_text,
@@ -610,7 +611,7 @@ class ChatService:
             memory_context=memory_context,
         )
 
-        if is_execution or active_task:
+        if is_execution:
             model_messages.insert(0, {
                 "role": "system",
                 "content": (
@@ -772,12 +773,13 @@ class ChatService:
             "memory_confidence": 1.0,
 
             # === EXECUTION STATE ===
-            "execution_mode": bool(is_execution or active_task),
+            "execution_mode": bool(is_execution),
             "active_task": (
-                active_task or original_user_text
+                original_user_text
                 if is_execution
-                else active_task
+                else ""
             ),
+
             "next_step": next_step_out,
         }
 
@@ -3241,6 +3243,41 @@ class ChatService:
 
         session_id = self._ensure_session_id(session_id)
         user_text = self._safe_str(user_text)
+
+        print("EXECUTION FLOW CHECK:", user_text, session_id)
+
+        try:
+            execution_flow = self._maybe_lock_execution_flow(user_text, session_id)
+            print("EXECUTION FLOW RESULT:", execution_flow)
+
+            if execution_flow:
+                print("EXECUTION FLOW RETURNING:", execution_flow)
+
+                assistant_message = {
+                    "role": "assistant",
+                    "text": self._safe_str(execution_flow.get("text")),
+                    "attachments": [],
+                    "meta": execution_flow.get("meta") or {},
+                }
+
+                return {
+                    "ok": True,
+                    "assistant_message": assistant_message,
+                    "session": self._call_first(
+                        self.sessions,
+                        ["get_session"],
+                        session_id,
+                        default=None,
+                    ),
+                    "active_session_id": session_id,
+                    "debug": {
+                        "route": "execution_flow",
+                        "execution_flow": execution_flow,
+                    },
+                }
+
+        except Exception as e:
+            print("EXECUTION FLOW ERROR:", e)
 
         # =============================
         # FUNCTION-LEVEL AUTO FIX
@@ -6375,6 +6412,89 @@ Next action:
 
             return cleaned
 
+
+    def _set_working_state(self, session_id: str, state: dict):
+        session_id = self._safe_str(session_id).strip()
+        if not session_id:
+            return {}
+
+        if not isinstance(state, dict):
+            state = {}
+
+        clean_state = {
+            "active_task": self._safe_str(state.get("active_task")).strip(),
+            "current_file": self._safe_str(state.get("current_file")).strip(),
+            "current_bug": self._safe_str(state.get("current_bug")).strip(),
+            "last_success": self._safe_str(state.get("last_success")).strip(),
+            "next_move": self._safe_str(state.get("next_move")).strip(),
+            "checkpoint": self._safe_str(state.get("checkpoint")).strip(),
+            "updated_at": self._safe_str(state.get("updated_at")).strip(),
+        }
+
+        try:
+            return self.sessions.update_working_state(session_id, clean_state)
+        except Exception as e:
+            print("SET_WORKING_STATE_DIRECT_CALL_ERROR:", e)
+
+        return clean_state
+
+    def _update_working_state(self, session_id: str, patch: dict):
+        session_id = self._safe_str(session_id).strip()
+        if not session_id:
+            return {}
+
+        if not isinstance(patch, dict):
+            patch = {}
+
+        current_state = self._get_working_state(session_id) or {}
+
+        # -------------------------
+        # AUTO PARSE USER INTENT
+        # -------------------------
+        try:
+            user_text = self._safe_str(patch.get("user_text") or "").lower()
+
+            if user_text:
+                if "next move is" in user_text:
+                    parts = user_text.split("next move is", 1)
+
+                    left = parts[0].replace("working on", "").strip(" .:-")
+                    right = parts[1].strip(" .:-")
+
+                    if left:
+                        current_state["active_task"] = left
+
+                    if right:
+                        current_state["next_move"] = right
+
+                elif "working on" in user_text:
+                    task = user_text.replace("working on", "").strip(" .:-")
+                    if task:
+                        current_state["active_task"] = task
+
+        except Exception as e:
+            print("WORKING_STATE_PARSE_ERROR:", e)
+
+        # -------------------------
+        # APPLY PATCH
+        # -------------------------
+        for k, v in patch.items():
+            if v is not None:
+                current_state[k] = v
+
+        # -------------------------
+        # TIMESTAMP
+        # -------------------------
+        from datetime import datetime, timezone
+        current_state["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        # -------------------------
+        # SAVE
+        # -------------------------
+        self._set_working_state(session_id, current_state)
+
+        return current_state
+
     def _handle_where_are_we(self, session_id: str, user_text: str = "") -> str:
             state = self._get_working_state(session_id) or {}
 
@@ -6758,85 +6878,123 @@ Next action:
 
         return {}
 
-    def _update_working_state(self, session_id: str, patch: dict):
-        session_id = self._safe_str(session_id).strip()
+
+    def _maybe_lock_execution_flow(self, user_text: str, session_id: str) -> dict | None:
+        user_text_raw = self._safe_str(user_text).strip()
+        user_text_lc = user_text_raw.lower().strip()
+
         if not session_id:
-            return {}
+            return None
 
-        if not isinstance(patch, dict):
-            patch = {}
+        if not user_text_lc:
+            return None
 
-        current_state = self._get_working_state(session_id)
-        merged = dict(current_state)
+        # -------------------------
+        # PHASE 1: CAPTURE STATE
+        # -------------------------
+        if user_text_lc.startswith("working on ") and "next move is" in user_text_lc:
+            parts = user_text_raw.split("next move is", 1)
 
-        for key, value in patch.items():
-            if value is None:
-                continue
-            if isinstance(value, str):
-                value = value.strip()
-                if not value:
-                    continue
-            merged[key] = value
+            active_task = parts[0].replace("working on", "", 1).strip(" .:-")
+            next_move = parts[1].strip(" .:-") if len(parts) > 1 else ""
 
-        merged["updated_at"] = self._iso_now()
-
-        print("WORKING_STATE_MERGED =", merged)
-
-        # primary path
-        try:
-            updated = self.sessions.update_session(
+            state = self._update_working_state(
                 session_id,
-                {"working_state": merged},
-            ) or {}
-            persisted = updated.get("working_state")
-            print("WORKING_STATE_UPDATED_SESSION =", persisted)
-            if isinstance(persisted, dict):
-                print("FINAL_WORKING_STATE_BEFORE_RETURN =", persisted)
-                return dict(persisted)
-        except Exception as e:
-            print("WORKING_STATE_UPDATE_SESSION_FAILED =", e)
+                {
+                    "active_task": active_task,
+                    "next_move": next_move,
+                    "user_text": user_text_raw,
+                },
+            )
 
-        # fallback: force write into session store
-        try:
-            session = self.sessions.get_session(session_id) or {}
-            if isinstance(session, dict):
-                session["working_state"] = dict(merged)
+            return {
+                "ok": True,
+                "handled": True,
+                "text": (
+                    f"Task locked: {state.get('active_task') or active_task}\n"
+                    f"Next move: {state.get('next_move') or next_move}\n\n"
+                    f'Ready to execute. Say "next" to proceed.'
+                ),
+                "meta": {
+                    "route": "execution_state_locked",
+                    "working_state": state,
+                },
+            }
 
-                sessions = self.sessions.list_sessions() or []
+        # -------------------------
+        # PHASE 2: EXECUTE
+        # -------------------------
+        if user_text_lc == "next":
+            state = self._get_working_state(session_id) or {}
 
-                replaced = False
-                for i, s in enumerate(sessions):
-                    if isinstance(s, dict) and s.get("id") == session_id:
-                        sessions[i] = session
-                        replaced = True
-                        break
+            active_task = self._safe_str(state.get("active_task")).strip()
+            next_move = self._safe_str(state.get("next_move")).strip()
 
-                if not replaced:
-                    sessions.append(session)
+            if next_move:
+                return {
+                    "ok": True,
+                    "handled": True,
+                    "text": self._run_execution_next_move(
+                        active_task,
+                        next_move,
+                        session_id,
+                    ),
+                    "meta": {
+                        "route": "execution_next",
+                        "working_state": state,
+                        "active_task": active_task,
+                        "next_move": next_move,
+                    },
+                }
 
-                save_all = getattr(self.sessions, "_save_sessions", None)
-                if callable(save_all):
-                    save_all(sessions)
+            return {
+                "ok": True,
+                "handled": True,
+                "text": (
+                    "No saved next move found.\n\n"
+                    "Set one first like:\n"
+                    "working on Nova execution mode. next move is build execution loop"
+                ),
+                "meta": {
+                    "route": "execution_next_missing_state",
+                    "working_state": state,
+                },
+            }
 
-                refreshed = self.sessions.get_session(session_id) or {}
-                persisted = refreshed.get("working_state")
-                print("WORKING_STATE_FALLBACK_PERSISTED =", persisted)
+        return None
 
-                if isinstance(persisted, dict) and any(
-                    (str(v).strip() if v is not None else "") for v in persisted.values()
-                ):
-                    print("FINAL_WORKING_STATE_BEFORE_RETURN =", persisted)
-                    return dict(persisted)
+    def _run_execution_next_move(self, active_task: str, next_move: str, session_id: str) -> str:
+        active_task = self._safe_str(active_task).strip()
+        next_move_raw = self._safe_str(next_move).strip().lower()
 
-        except Exception as e:
-            print("WORKING_STATE_FALLBACK_FAILED =", e)
+        move_type = "unknown"
 
-        print("FINAL_WORKING_STATE_BEFORE_RETURN =", merged)
-        return dict(merged)
+        if "build execution loop" in next_move_raw:
+            move_type = "build_execution_loop"
 
-    # ==============================
-    # MEMORY HELPERS
-    # ==============================
+        move = NextMove(
+            id=f"{session_id}:{move_type}",
+            type=move_type,
+            payload={
+                "task": active_task,
+                "raw": next_move,
+            },
+        )
+
+        result = self.execution_handler.run_next_move(move)
+
+        if result.status == "success":
+            return (
+                f"Continuing: {active_task or 'saved task'}\n"
+                f"Executed: {move_type}\n\n"
+                f"Result:\n{result.output}"
+            )
+
+        return (
+            f"Continuing: {active_task or 'saved task'}\n"
+            f"Execution failed: {move_type}\n\n"
+            f"Error:\n{result.error}"
+        )
 
     def _rank_memory_context(self, user_text: str = "", limit: int = 6):
         memories = self._get_memory_list()
