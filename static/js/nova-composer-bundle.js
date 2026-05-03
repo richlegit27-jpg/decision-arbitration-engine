@@ -838,6 +838,7 @@ const pulse = isActive
   : "";
 
 const outputPreview =
+const canReplay = step && step.move && typeof step.move === "object";
   typeof step.output === "string"
     ? step.output
     : step.output && typeof step.output === "object"
@@ -874,6 +875,16 @@ ${
     ? `<div style="margin-top:8px;font-size:12px;opacity:.68;line-height:1.4;word-break:break-word;">
         ${escapeHtml(outputPreview)}
       </div>`
+    : ""
+}
+
+${
+  canReplay
+    ? `<button type="button"
+        data-exec-action="replay_last"
+        style="margin-top:10px;padding:7px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:12px;">
+        Replay
+      </button>`
     : ""
 }
                   </div>
