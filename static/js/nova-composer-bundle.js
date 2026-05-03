@@ -6156,158 +6156,11 @@ setTimeout(() => {
   if (attachBtn) attachBtn.textContent = "+";
 }, 500);
 
-// === EXECUTION PANEL FIX ===
-(function () {
-  function renderExecutionPanel() {
-    const panel = document.querySelector('[data-rail-panel="execution"]');
-    if (!panel) return;
-
-    panel.hidden = false;
-    panel.style.display = "block";
-    panel.style.visibility = "visible";
-    panel.style.pointerEvents = "auto";
-
-    let mount = panel.querySelector("[data-execution-panel]");
-    if (!mount) {
-      mount = document.createElement("div");
-      mount.setAttribute("data-execution-panel", "");
-      panel.appendChild(mount);
-    }
-
-    mount.hidden = false;
-    mount.style.display = "block";
-    mount.style.visibility = "visible";
-    mount.style.opacity = "1";
-
-mount.innerHTML = `
-  <div class="nova-panel-card" style="pointer-events:auto;">
-    <button type="button" data-exec-action="run_step">Run Step</button>
-    <button type="button" data-exec-action="run_all">Run All</button>
-    <button type="button" data-exec-action="retry">Retry</button>
-    <button type="button" data-exec-action="stop">Stop</button>
-  </div>
-`;
-
-    const execution =
-      window.NovaExecutionState ||
-      (window.NovaComposerState && window.NovaComposerState.execution) ||
-      state.execution ||
-      { status: "idle", steps: [], history: [] };
-
-    const steps = Array.isArray(execution.steps) ? execution.steps : [];
-    const history = Array.isArray(execution.history) ? execution.history : [];
-
-    mount.innerHTML = `
-      <div class="nova-panel-shell">
-        <div class="nova-panel-title">Execution</div>
-
-<div class="nova-panel-card">
-  <button type="button" onclick="window.runExecutionAction('run_step', this)">Run Step</button>
-  <button type="button" onclick="window.runExecutionAction('run_all', this)">Run All</button>
-  <button type="button" onclick="window.runExecutionAction('retry', this)">Retry</button>
-  <button type="button" onclick="window.runExecutionAction('stop', this)">Stop</button>
-</div>
-
-        <div class="nova-panel-card">
-          <div><strong>Status:</strong> ${escapeHtml(execution.status || "idle")}</div>
-          <div><strong>Steps:</strong> ${steps.length}</div>
-        </div>
-
-        <div class="nova-panel-subtitle">Steps</div>
-        <div class="nova-panel-card">
-          ${
-            steps.length
-              ? steps.map((s, i) => `
-                <div class="exec-step-item">
-                  <strong>${escapeHtml(s.title || "Step " + (i + 1))}</strong>
-                  <div>Status: ${escapeHtml(s.status || "pending")}</div>
-                </div>
-              `).join("")
-              : '<div class="nova-panel-muted">No steps yet. Click Run Step.</div>'
-          }
-        </div>
-
-        <div class="nova-panel-subtitle">History</div>
-        <div class="nova-panel-card">
-          ${
-            history.length
-              ? history.map(function (h) {
-                  return `<div class="exec-history-item">${escapeHtml(String(h || ""))}</div>`;
-                }).join("")
-              : '<div class="nova-panel-muted">No history yet.</div>'
-          }
-        </div>
-      </div>
-    `;
-  }
-
-  document.addEventListener("click", function (event) {
-    const card = event.target.closest(".source-row");
-
-    if (!card) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    const url = card.dataset.url || "";
-    const title = card.dataset.title || "Source preview";
-
-    if (!url) return;
-
-    if (typeof fetchSourcePreviewIntoRail === "function") {
-      fetchSourcePreviewIntoRail(url, title);
-    } else {
-      window.open(url, "_blank", "noopener,noreferrer");
-    }
-  }, true);
-
-document.addEventListener("click", function (event) {
-  const btn = event.target.closest("[data-open-full]");
-  if (!btn) return;
-
-  event.preventDefault();
-  event.stopPropagation();
-
-  const url = btn.getAttribute("data-open-full") || "";
-  if (!url) return;
-
-  window.open(url, "_blank", "noopener,noreferrer");
-}, true);
-
-  window.renderExecution = renderExecutionPanel;
-  window.renderExecutionPanel = renderExecutionPanel;
-
-  document.addEventListener("click", function (event) {
-    const tab = event.target.closest('[data-rail-tab="execution"]');
-    if (!tab) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    renderExecutionPanel();
-    setTimeout(renderExecutionPanel, 100);
-  }, true);
-
-  setTimeout(renderExecutionPanel, 300);
-})();
-
 })();
 
 // =============================
-// RAIL GLOBAL BRIDGE LOCK
+// EXECUTION GLOBAL BRIDGE RESTORE
 // =============================
-window.openRail = window.openRail || function () {
-  const rail = document.querySelector("[data-right-rail]");
-  if (!rail) {
-    console.warn("[RAIL] right rail not found");
-    return;
-  }
-
-  rail.classList.add("is-open", "open", "active");
-  rail.removeAttribute("hidden");
-  document.body.classList.add("is-rail-open");
-};
-
 window.setRailTab = window.setRailTab || function (tabName) {
   const nextTab = String(tabName || "artifacts").trim();
 
@@ -6320,108 +6173,54 @@ window.setRailTab = window.setRailTab || function (tabName) {
 
   document.querySelectorAll("[data-rail-panel]").forEach(function (panel) {
     const active = panel.getAttribute("data-rail-panel") === nextTab;
-
     panel.classList.toggle("is-active", active);
 
     if (active) {
-      panel.removeAttribute("hidden");
+      panel.hidden = false;
       panel.style.display = "block";
       panel.style.visibility = "visible";
     } else {
-      panel.setAttribute("hidden", "");
+      panel.hidden = true;
       panel.style.display = "none";
       panel.style.visibility = "hidden";
     }
   });
 
-  if (nextTab === "execution" && typeof window.renderExecution === "function") {
+  if (nextTab === "execution" && typeof window.renderExecutionPanel === "function") {
+    window.renderExecutionPanel();
+  } else if (nextTab === "execution" && typeof window.renderExecution === "function") {
     window.renderExecution();
   }
 };
 
-document.addEventListener("click", function (event) {
-  const tab = event.target.closest("[data-rail-tab]");
-  if (!tab) return;
+window.runExecutionAction = window.runExecutionAction || async function (action, button) {
+  const state = window.NovaComposerState || {};
 
-  event.preventDefault();
-  event.stopPropagation();
+  let sessionId =
+    state.activeSessionId ||
+    (state.session && state.session.id) ||
+    "";
 
-  const tabName = tab.getAttribute("data-rail-tab") || "artifacts";
+  if (!sessionId) {
+    const res = await fetch("/api/state");
+    const data = await res.json();
 
-  window.openRail();
-  window.setRailTab(tabName);
-}, true);
+    sessionId =
+      (data.session && data.session.id) ||
+      data.active_session_id ||
+      data.activeSessionId ||
+      "";
 
-// =============================
-// LEFT SIDEBAR OPEN/CLOSE BRIDGE
-// =============================
-window.openSidebar = window.openSidebar || function () {
-  const sidebar = document.querySelector("[data-left-sidebar]");
-  const backdrop = document.querySelector("[data-sidebar-backdrop]");
+    if (sessionId && window.NovaComposerState) {
+      window.NovaComposerState.activeSessionId = sessionId;
+    }
+  }
 
-  if (!sidebar) {
-    console.warn("[SIDEBAR] left sidebar not found");
+  if (!sessionId || !action) {
+    console.warn("[EXECUTION] missing session/action", { sessionId, action });
     return;
   }
 
-  sidebar.removeAttribute("hidden");
-  sidebar.classList.add("is-open", "open", "active");
-  sidebar.setAttribute("aria-hidden", "false");
-  document.body.classList.add("is-sidebar-open");
-
-  if (backdrop) {
-    backdrop.removeAttribute("hidden");
-    backdrop.classList.add("is-open", "open", "active");
-  }
-};
-
-window.closeSidebar = window.closeSidebar || function () {
-  const sidebar = document.querySelector("[data-left-sidebar]");
-  const backdrop = document.querySelector("[data-sidebar-backdrop]");
-
-  if (sidebar) {
-    sidebar.classList.remove("is-open", "open", "active");
-    sidebar.setAttribute("aria-hidden", "true");
-  }
-
-  document.body.classList.remove("is-sidebar-open");
-
-  if (backdrop) {
-    backdrop.setAttribute("hidden", "");
-    backdrop.classList.remove("is-open", "open", "active");
-  }
-};
-
-document.addEventListener("click", function (event) {
-  const toggle = event.target.closest("[data-sidebar-toggle]");
-  const close = event.target.closest("[data-sidebar-close], [data-sidebar-backdrop]");
-
-  if (!toggle && !close) return;
-
-  event.preventDefault();
-  event.stopPropagation();
-
-  const sidebar = document.querySelector("[data-left-sidebar]");
-  const isOpen =
-    sidebar &&
-    (
-      sidebar.classList.contains("is-open") ||
-      sidebar.classList.contains("open") ||
-      document.body.classList.contains("is-sidebar-open")
-    );
-
-  if (close || isOpen) {
-    window.closeSidebar();
-    return;
-  }
-
-  window.openSidebar();
-}, true);
-
-// =============================
-// EXECUTION BUTTON ACTION BRIDGE
-// =============================
-async function runExecutionRequest(sessionId, action) {
   const response = await fetch("/api/execution/control", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -6431,94 +6230,18 @@ async function runExecutionRequest(sessionId, action) {
     }),
   });
 
-  const data = await response.json();
-  console.log("[EXECUTION RESULT]", data);
-  return data;
-}
+  const result = await response.json();
+  console.log("[EXECUTION RESULT]", result);
 
-window.runExecutionAction = async function (action, button) {
-  try {
-    const state = window.NovaComposerState || {};
+  if (result && result.execution_state) {
+    window.NovaExecutionState = result.execution_state;
+    window.NovaComposerState = window.NovaComposerState || {};
+    window.NovaComposerState.execution = result.execution_state;
+  }
 
-    let sessionId =
-      state.activeSessionId ||
-      (state.session && state.session.id) ||
-      "";
-
-    // 🔥 ONLY ONE fallback (KEEP THIS ONE)
-    if (!sessionId) {
-      const res = await fetch("/api/state");
-      const data = await res.json();
-
-      sessionId =
-        (data.session && data.session.id) ||
-        data.active_session_id ||
-        data.activeSessionId ||
-        "";
-
-      if (sessionId && window.NovaComposerState) {
-        window.NovaComposerState.activeSessionId = sessionId;
-      }
-    }
-
-    if (!sessionId || !action) {
-      console.warn("[EXECUTION] missing session/action", { sessionId, action });
-      return;
-    }
-
-    let original = "";
-    if (button) {
-      original = button.textContent || "";
-      button.disabled = true;
-      button.textContent = "Running...";
-    }
-
-    const response = await fetch("/api/execution/control", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        session_id: sessionId,
-        action: action,
-      }),
-    });
-
-    const result = await response.json();
-    console.log("[EXECUTION RESULT]", result);
-
-    if (result && result.execution_state) {
-      window.NovaExecutionState = result.execution_state;
-
-      if (!window.NovaComposerState) {
-        window.NovaComposerState = {};
-      }
-
-      window.NovaComposerState.execution = result.execution_state;
-    }
-
-    if (typeof window.renderExecutionPanel === "function") {
-      window.renderExecutionPanel();
-    }
-
-    if (button) {
-      button.disabled = false;
-      button.textContent = original || action;
-    }
-
-  } catch (err) {
-    console.error("[EXECUTION ERROR]", err);
-    if (button) button.disabled = false;
+  if (typeof window.renderExecutionPanel === "function") {
+    window.renderExecutionPanel();
+  } else if (typeof window.renderExecution === "function") {
+    window.renderExecution();
   }
 };
-
-document.addEventListener("click", function (event) {
-  const button = event.target.closest("[data-exec-action]");
-  if (!button) return;
-
-  event.preventDefault();
-  event.stopPropagation();
-
-  const action = button.getAttribute("data-exec-action") || "";
-  window.runExecutionAction(action, button);
-}, true);
