@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   function qs(selector, root) {
@@ -45,9 +45,14 @@ function applyBackendSessionState(payload, explicitSessionId) {
     ""
   ).trim();
 
-  if (resolvedSessionId) {
-    state.activeSessionId = resolvedSessionId;
-  }
+if (resolvedSessionId) {
+  state.activeSessionId = resolvedSessionId;
+}
+
+window.NovaComposerState = window.NovaComposerState || {};
+window.NovaComposerState.activeSessionId = resolvedSessionId;
+state.session = state.session || {};
+state.session.id = resolvedSessionId;
 
   if (resolvedSession && Array.isArray(resolvedSession.messages)) {
     const incoming = resolvedSession.messages.map(normalizeMessage);
@@ -220,11 +225,11 @@ function renderSources(assistantText, meta = {}) {
   const text = String(assistantText || "");
   const sourceMeta = Array.isArray(meta.sources) ? meta.sources : [];
 
-  if (!text.includes("— Top sources —") && sourceMeta.length === 0) {
+  if (!text.includes("â€” Top sources â€”") && sourceMeta.length === 0) {
     return renderMarkdown(text);
   }
 
-  const parts = text.split("— Top sources —");
+  const parts = text.split("â€” Top sources â€”");
 
   const mainText = parts[0].trim();
 
@@ -311,7 +316,7 @@ function renderSources(assistantText, meta = {}) {
     const text = normalizeText(value).trim();
     const max = Number(limit || 100);
     if (text.length <= max) return text;
-    return text.slice(0, Math.max(0, max - 1)).trimEnd() + "â€¦";
+    return text.slice(0, Math.max(0, max - 1)).trimEnd() + "Ã¢â‚¬Â¦";
   }
 
   function isImageMime(mime) {
@@ -399,7 +404,7 @@ function normalizeMessage(raw) {
     return null;
   }
 
-// 🔥 HARD META PRESERVE (fixed correctly)
+// ðŸ”¥ HARD META PRESERVE (fixed correctly)
 const meta =
   (item && typeof item.meta === "object" && item.meta) ||
   (raw && typeof raw.meta === "object" && raw.meta) ||
@@ -415,7 +420,7 @@ const meta =
     kind: kind,
     text: text,
     attachments: Array.isArray(item.attachments) ? item.attachments : [],
-    meta: meta, // ← FIXED
+    meta: meta, // â† FIXED
     created_at: item.created_at || new Date().toISOString(),
     pending: Boolean(item.pending),
     streaming: Boolean(item.streaming),
@@ -467,7 +472,7 @@ function buildWorkingContextFromWorkingState(rawState) {
 function attachmentSummary(attachment) {
     const name = attachment.filename || attachment.name || "attachment";
     const size = formatBytes(attachment.size);
-    return size ? name + " Â· " + size : name;
+    return size ? name + " Ã‚Â· " + size : name;
   }
 
   const els = {
@@ -611,13 +616,13 @@ function updateTtsToggleUi() {
   els.ttsToggleButton.classList.toggle("is-playing", playing);
 
   if (playing) {
-    els.ttsToggleButton.textContent = "⏹";
+    els.ttsToggleButton.textContent = "â¹";
     els.ttsToggleButton.setAttribute("aria-label", "Stop voice reply");
     els.ttsToggleButton.setAttribute("title", "Stop voice reply");
     return;
   }
 
-  els.ttsToggleButton.textContent = enabled ? "🔊" : "🔇";
+  els.ttsToggleButton.textContent = enabled ? "ðŸ”Š" : "ðŸ”‡";
   els.ttsToggleButton.setAttribute(
     "aria-label",
     enabled ? "Voice replies on" : "Voice replies muted"
@@ -743,14 +748,6 @@ function renderExecution() {
   const panel = document.querySelector('[data-rail-panel="execution"]');
   if (!panel) return;
 
-  panel.hidden = false;
-  panel.classList.add("is-active");
-  panel.style.display = "block";
-  panel.style.visibility = "visible";
-  panel.style.pointerEvents = "auto";
-  panel.style.position = "relative";
-  panel.style.zIndex = "9999";
-
   let container = panel.querySelector("[data-execution-panel]");
   if (!container) {
     container = document.createElement("div");
@@ -758,90 +755,11 @@ function renderExecution() {
     panel.appendChild(container);
   }
 
-  container.style.pointerEvents = "auto";
-  container.style.position = "relative";
-  container.style.zIndex = "10000";
-
-  const execution =
-    state.execution ||
-    window.NovaExecutionState ||
-    {
-      status: "idle",
-      steps: [],
-      history: [],
-    };
-
-  const steps = Array.isArray(execution.steps) ? execution.steps : [];
-  const history = Array.isArray(execution.history) ? execution.history : [];
-
-  container.innerHTML = `
-    <div class="nova-panel-shell" style="pointer-events:auto;position:relative;z-index:10001;">
-      <div class="nova-panel-title">Execution</div>
-
-      <div class="nova-panel-card" style="pointer-events:auto;position:relative;z-index:10002;">
-        <button type="button" data-exec-action="run_step" onclick="window.runExecutionAction('run_step', this)" style="pointer-events:auto;position:relative;z-index:10003;">Run Step</button>
-        <button type="button" data-exec-action="run_all" onclick="window.runExecutionAction('run_all', this)" style="pointer-events:auto;position:relative;z-index:10003;">Run All</button>
-        <button type="button" data-exec-action="retry" onclick="window.runExecutionAction('retry', this)" style="pointer-events:auto;position:relative;z-index:10003;">Retry</button>
-        <button type="button" data-exec-action="stop" onclick="window.runExecutionAction('stop', this)" style="pointer-events:auto;position:relative;z-index:10003;">Stop</button>
-      </div>
-
-      <div class="nova-panel-card">
-        <div><strong>Status:</strong> ${escapeHtml(execution.status || "idle")}</div>
-        <div><strong>Steps:</strong> ${escapeHtml(String(steps.length))}</div>
-      </div>
-
-      <div class="nova-panel-subtitle">Steps</div>
-      <div class="nova-panel-card">
-        ${
-          steps.length
-            ? steps.map(function (step, index) {
-                return `
-                  <div class="exec-step-item">
-                    <strong>${escapeHtml(step.title || "Step " + (index + 1))}</strong>
-                    <div>Status: ${escapeHtml(step.status || "pending")}</div>
-                  </div>
-                `;
-              }).join("")
-            : '<div class="nova-panel-muted">No steps yet. Click Run Step.</div>'
-        }
-      </div>
-
-      <div class="nova-panel-subtitle">History</div>
-      <div class="nova-panel-card">
-        ${
-          history.length
-            ? history.map(function (item) {
-                return '<div class="exec-history-item">' + escapeHtml(String(item || "")) + '</div>';
-              }).join("")
-            : '<div class="nova-panel-muted">No history yet.</div>'
-        }
-      </div>
-    </div>
-  `;
-}
-
-window.renderExecution = renderExecution;
-window.renderExecutionPanel = renderExecution;
-
-function renderExecution() {
-  const panel = document.querySelector('[data-rail-panel="execution"]');
-  if (!panel) return;
-
-  let container = panel.querySelector("[data-execution-panel]");
-  if (!container) {
-    container = document.createElement("div");
-    container.setAttribute("data-execution-panel", "");
-    panel.appendChild(container);
-  }
-
-  const execution =
-    state.execution ||
-    window.NovaExecutionState ||
-    {
-      status: "idle",
-      steps: [],
-      history: [],
-    };
+const execution =
+  window.NovaExecutionState ||
+  (window.NovaComposerState && window.NovaComposerState.execution) ||
+  state.execution ||
+  { status: "idle", steps: [], history: [] };
 
   const steps = Array.isArray(execution.steps) ? execution.steps : [];
   const history = Array.isArray(execution.history) ? execution.history : [];
@@ -851,10 +769,10 @@ function renderExecution() {
       <div class="nova-panel-title">Execution</div>
 
       <div class="nova-panel-card">
-        <button type="button" data-exec-action="run_step">Run Step</button>
-        <button type="button" data-exec-action="run_all">Run All</button>
-        <button type="button" data-exec-action="retry">Retry</button>
-        <button type="button" data-exec-action="stop">Stop</button>
+        <button type="button" data-exec-action="run_step" onclick="window.runExecutionAction('run_step', this)">Run Step</button>
+        <button type="button" data-exec-action="run_all" onclick="window.runExecutionAction('run_all', this)">Run All</button>
+        <button type="button" data-exec-action="retry" onclick="window.runExecutionAction('retry', this)">Retry</button>
+        <button type="button" data-exec-action="stop" onclick="window.runExecutionAction('stop', this)">Stop</button>
       </div>
 
       <div class="nova-panel-card">
@@ -866,14 +784,12 @@ function renderExecution() {
       <div class="nova-panel-card">
         ${
           steps.length
-            ? steps.map(function (step, index) {
-                return `
-                  <div class="exec-step-item">
-                    <strong>${escapeHtml(step.title || "Step " + (index + 1))}</strong>
-                    <div>Status: ${escapeHtml(step.status || "pending")}</div>
-                  </div>
-                `;
-              }).join("")
+            ? steps.map((step, i) => `
+              <div>
+                <strong>${escapeHtml(step.title || "Step " + (i+1))}</strong>
+                <div>Status: ${escapeHtml(step.status || "pending")}</div>
+              </div>
+            `).join("")
             : '<div class="nova-panel-muted">No steps yet. Click Run Step.</div>'
         }
       </div>
@@ -882,9 +798,9 @@ function renderExecution() {
       <div class="nova-panel-card">
         ${
           history.length
-            ? history.map(function (item) {
-                return '<div class="exec-history-item">' + escapeHtml(String(item || "")) + '</div>';
-              }).join("")
+            ? history.map(item =>
+              `<div>${escapeHtml(String(item || ""))}</div>`
+            ).join("")
             : '<div class="nova-panel-muted">No history yet.</div>'
         }
       </div>
@@ -895,11 +811,8 @@ function renderExecution() {
     const button = event.target.closest("[data-exec-action]");
     if (!button) return;
 
-    event.preventDefault();
-    event.stopPropagation();
-
     runExecutionAction(
-      String(button.getAttribute("data-exec-action") || "").trim(),
+      button.getAttribute("data-exec-action"),
       button
     );
   };
@@ -972,7 +885,10 @@ function setRailTab(tabName) {
   const requested = String(tabName || "artifacts").trim().toLowerCase();
 
   const nextTab =
-    requested === "memory" || requested === "web" || requested === "artifacts" || requested === "execution"
+    requested === "memory" ||
+    requested === "web" ||
+    requested === "artifacts" ||
+    requested === "execution"
       ? requested
       : "artifacts";
 
@@ -1018,7 +934,17 @@ function setRailTab(tabName) {
   } else if (nextTab === "web") {
     if (typeof renderWeb === "function") renderWeb();
   } else if (nextTab === "execution") {
-    if (typeof renderExecution === "function") renderExecution();
+    requestAnimationFrame(function () {
+      if (typeof renderExecution === "function") {
+        renderExecution();
+      }
+
+      setTimeout(function () {
+        if (typeof window.renderExecution === "function") {
+          window.renderExecution();
+        }
+      }, 0);
+    });
   } else {
     if (typeof renderArtifacts === "function") renderArtifacts();
   }
@@ -1385,7 +1311,7 @@ function applyStatePayload(payload) {
 }
 
 // ==============================
-// 🔥 UNIFIED SESSION SWITCH (LOCKED)
+// ðŸ”¥ UNIFIED SESSION SWITCH (LOCKED)
 // ==============================
 
 window.openSessionFromBackend = async function (sessionId) {
@@ -1402,7 +1328,7 @@ window.openSessionFromBackend = async function (sessionId) {
 
 
 // ==============================
-// 🔥 ARTIFACT → CHAT BRIDGE
+// ðŸ”¥ ARTIFACT â†’ CHAT BRIDGE
 // ==============================
 
 window.NovaArtifactChatAction = function (text) {
@@ -1427,7 +1353,7 @@ window.NovaSendMessage = async function () {
   }
 };
 
-// 👇 PUT IT RIGHT HERE
+// ðŸ‘‡ PUT IT RIGHT HERE
 window.NovaAnalyzeArtifactImage = async function (imageUrl, artifact) {
   const url = String(imageUrl || "").trim();
 if (!url || url.includes("{preview}")) return;
@@ -1458,12 +1384,12 @@ if (!url || url.includes("{preview}")) return;
 };
 
 // ==============================
-// 🔥 COPY + REGENERATE FIX (PUT THIS HERE)
+// ðŸ”¥ COPY + REGENERATE FIX (PUT THIS HERE)
 // ==============================
 
 document.addEventListener("click", async function (event) {
 
-  // 🔥 MEMORY BADGE CLICK
+  // ðŸ”¥ MEMORY BADGE CLICK
   const memoryBadge = event.target.closest("[data-memory-used]");
   if (memoryBadge) {
     event.preventDefault();
@@ -1537,7 +1463,7 @@ viewer.innerHTML = `
     return;
   }
 
-  // 🔥 IMAGE REGENERATE (message-based)
+  // ðŸ”¥ IMAGE REGENERATE (message-based)
   const imageRegenBtn = event.target.closest("[data-regenerate-image-message]");
   if (imageRegenBtn) {
     event.preventDefault();
@@ -1582,7 +1508,7 @@ viewer.innerHTML = `
     return;
   }
 
-  // 🔥 COPY MESSAGE
+  // ðŸ”¥ COPY MESSAGE
   const copyBtn = event.target.closest("[data-copy-message]");
   if (copyBtn) {
     const messageId = String(copyBtn.getAttribute("data-copy-message") || "").trim();
@@ -1605,7 +1531,7 @@ viewer.innerHTML = `
     return;
   }
 
-  // 🔥 REGENERATE MESSAGE
+  // ðŸ”¥ REGENERATE MESSAGE
   const messageRegenBtn = event.target.closest("[data-regenerate-message]");
   if (messageRegenBtn) {
     const messageId = String(messageRegenBtn.getAttribute("data-regenerate-message") || "").trim();
@@ -1684,12 +1610,12 @@ viewer.innerHTML = `
     const removeButton = removable
       ? '<button type="button" class="nova-upload-chip__remove" data-upload-remove="' +
         escapeHtml(item.id) +
-        '" aria-label="Remove attachment">Ã—</button>'
+        '" aria-label="Remove attachment">Ãƒâ€”</button>'
       : "";
 
     const statusHtml =
       status === "uploading"
-        ? '<span class="nova-upload-chip__status">Uploadingâ€¦</span>'
+        ? '<span class="nova-upload-chip__status">UploadingÃ¢â‚¬Â¦</span>'
         : status === "error"
         ? '<span class="nova-upload-chip__status nova-upload-chip__status--error">' +
           escapeHtml(error || "Upload failed") +
@@ -1742,7 +1668,7 @@ function renderAttachmentBlock(attachment) {
   if (mime) sub.push(mime);
   if (item.size) sub.push(formatBytes(item.size));
 
-  const subText = sub.join(" Â· ");
+  const subText = sub.join(" Ã‚Â· ");
 
   if (item.url && isImageMime(mime)) {
     return (
@@ -1831,7 +1757,7 @@ function renderAttachmentBlock(attachment) {
     '<a href="' +
     escapeHtml(href || "#") +
     '" target="_blank" rel="noopener noreferrer" class="message-attachment__file-link">' +
-    '<div class="message-attachment__icon">📎</div>' +
+    '<div class="message-attachment__icon">ðŸ“Ž</div>' +
     '<div class="message-attachment__footer">' +
     '<div class="message-attachment__name">' +
     escapeHtml(name) +
@@ -1901,7 +1827,7 @@ function linkifySourceLines(text) {
   const raw = String(text || "");
   if (!raw) return "";
 
-  const markerMatch = raw.match(/(?:—|-|–)?\s*Top sources\s*(?:—|-|–)?/i);
+  const markerMatch = raw.match(/(?:â€”|-|â€“)?\s*Top sources\s*(?:â€”|-|â€“)?/i);
 
   if (!markerMatch) {
     return escapeHtml(raw).replace(/\n/g, "<br>");
@@ -1929,7 +1855,7 @@ function linkifySourceLines(text) {
     const sourceLine = lines[i] || "";
     const nextLine = lines[i + 1] || "";
 
-    const sourceMatch = sourceLine.match(/^\s*(\d+)\.\s*(.+?)\s*[—–-]\s*(.+?)\s*$/);
+    const sourceMatch = sourceLine.match(/^\s*(\d+)\.\s*(.+?)\s*[â€”â€“-]\s*(.+?)\s*$/);
 
     if (!sourceMatch) {
       continue;
@@ -1952,7 +1878,7 @@ function linkifySourceLines(text) {
         '" data-title="' +
         escapeHtml(title) +
         '" data-preview="' +
-        escapeHtml(source + " — " + title) +
+        escapeHtml(source + " â€” " + title) +
         '">' +
         '<span class="nova-source-index">' +
         escapeHtml(index) +
@@ -2364,10 +2290,10 @@ els.chatThread.__autoOpenedSource = "";
       return `
         <div class="nova-memory-item" data-id="${id}">
           <div>
-            <div>${item.pinned ? "📌" : "🧠"} ${text}</div>
-            <small>${String(item.kind || "note")} · ${String(item.source || "manual")}</small>
+            <div>${item.pinned ? "ðŸ“Œ" : "ðŸ§ "} ${text}</div>
+            <small>${String(item.kind || "note")} Â· ${String(item.source || "manual")}</small>
           </div>
-          <button class="nova-memory-pin" data-id="${id}">📌</button>
+          <button class="nova-memory-pin" data-id="${id}">ðŸ“Œ</button>
           <button class="nova-memory-delete" data-id="${id}">Remove</button>
         </div>
       `;
@@ -3762,7 +3688,7 @@ async function consumeChatJson(payload) {
     // Load backend state if present.
     applyStatePayload(data || {});
 
-    // ✅ ASSISTANT RENDER LOCK:
+    // âœ… ASSISTANT RENDER LOCK:
     // If backend returned assistant_message but applyStatePayload did not render it,
     // insert it once here.
     const assistantMsg =
@@ -3866,7 +3792,7 @@ async function sendMessage() {
 
   let text = String(rawValue || "").trim();
 
-  // 🔒 BLOCK UI / DEBUG JUNK INPUT
+  // ðŸ”’ BLOCK UI / DEBUG JUNK INPUT
   if (
     !inputEl ||
     inputEl !== els.chatInput ||
@@ -3899,14 +3825,14 @@ async function sendMessage() {
 
   await maybeAutoSaveMemoryFromChatText(text);
 
-  // 🎨 IMAGE PLACEHOLDER
+  // ðŸŽ¨ IMAGE PLACEHOLDER
   if (/^\/image|generate image|create image|draw/i.test(text)) {
     const tempId = "gen_" + Date.now();
 
     upsertMessage({
       id: tempId,
       role: "assistant",
-      text: "🎨 Generating image...",
+      text: "ðŸŽ¨ Generating image...",
       pending: true,
       streaming: false,
       error: false,
@@ -3917,7 +3843,7 @@ async function sendMessage() {
     state.imageGenPlaceholderId = tempId;
   }
 
-  // 📎 ATTACHMENTS
+  // ðŸ“Ž ATTACHMENTS
   const attachments = (state.pendingUploads || [])
     .filter(function (item) {
       return (
@@ -3964,7 +3890,7 @@ async function sendMessage() {
     }
   }
 
-  // 🚫 PREVENT DUPLICATE USER MESSAGE
+  // ðŸš« PREVENT DUPLICATE USER MESSAGE
   const alreadyExists = (state.messages || []).some(function (msg) {
     return (
       msg &&
@@ -4030,7 +3956,7 @@ async function sendMessage() {
     upsertMessage({
       id: makeId("assistant_error"),
       role: "assistant",
-      text: "⚠️ Something went wrong sending the message.",
+      text: "âš ï¸ Something went wrong sending the message.",
       error: true,
     });
 
@@ -4228,7 +4154,7 @@ async function recordVoiceOnce() {
   });
 
   recorder.start();
-  showToast("🎤 Recording... click again to send", "info");
+  showToast("ðŸŽ¤ Recording... click again to send", "info");
 
   return new Promise(function (resolve, reject) {
     recorder.addEventListener("stop", function () {
@@ -4373,7 +4299,7 @@ function updateTtsToggleUi() {
 
   els.ttsToggleButton.classList.toggle("is-muted", muted);
   els.ttsToggleButton.classList.toggle("is-playing", playing);
-  els.ttsToggleButton.textContent = muted ? "🔇" : "🔊";
+  els.ttsToggleButton.textContent = muted ? "ðŸ”‡" : "ðŸ”Š";
 
   if (muted) {
     els.ttsToggleButton.setAttribute("aria-label", "Voice replies muted");
@@ -4631,7 +4557,7 @@ async function autoPlayTtsForAssistantMessage(message) {
 }
 
 function bindEvents() {
-  // 🔥 FIXED composer submit (with debug + safety)
+  // ðŸ”¥ FIXED composer submit (with debug + safety)
   if (els.composerForm) {
     els.composerForm.addEventListener("submit", function (event) {
       console.log("COMPOSER SUBMIT FIRED");
@@ -4695,7 +4621,7 @@ function bindEvents() {
     });
   }
 
-  // 🔥 execution buttons
+  // ðŸ”¥ execution buttons
   if (els.execRunStepButton) {
     els.execRunStepButton.addEventListener("click", function (event) {
       event.preventDefault();
@@ -4921,7 +4847,7 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
           <div class="nova-viewer-body">
             <p>${escapeHtml(finalPreview).replace(/\n/g, "<br>")}</p>
             <button type="button" data-open-full="${escapeHtml(finalUrl)}">
-              Open full article →
+              Open full article â†’
             </button>
           </div>
         </div>
@@ -5099,7 +5025,7 @@ async function maybeAutoSaveMemoryFromChatText(userText) {
 
   const lower = text.toLowerCase();
 
-  // 🚫 junk filter
+  // ðŸš« junk filter
   if (
     lower.length < 5 ||
     lower === "hi" ||
@@ -5143,14 +5069,14 @@ async function maybeAutoSaveMemoryFromChatText(userText) {
     memoryText = text;
   }
 
-  // 🧠 DEDUPE
+  // ðŸ§  DEDUPE
   const exists = (state.memory || []).some((m) => {
     return String(m.text || "").toLowerCase() === memoryText.toLowerCase();
   });
 
   if (exists) return;
 
-  // 🔥 IMPORTANCE SCORING
+  // ðŸ”¥ IMPORTANCE SCORING
   let importance = 1; // default low
 
   if (/^my .+ is .+/i.test(memoryText)) importance = 3; // identity
@@ -5178,7 +5104,7 @@ async function maybeAutoSaveMemoryFromChatText(userText) {
       [];
 
     if (Array.isArray(memoryList)) {
-      // 🔥 SORT BY IMPORTANCE
+      // ðŸ”¥ SORT BY IMPORTANCE
       const normalized = memoryList.map(normalizeMemoryItem);
 
       normalized.sort((a, b) => {
@@ -5203,7 +5129,7 @@ function wireMemoryControls() {
   const addBtn = document.querySelector("[data-memory-add-button]");
   const input = document.querySelector("[data-memory-add-text]");
 
-  // ✅ ADD MEMORY (button click)
+  // âœ… ADD MEMORY (button click)
   if (addBtn && !addBtn.__novaMemoryAddWired) {
     addBtn.__novaMemoryAddWired = true;
 
@@ -5244,7 +5170,7 @@ function wireMemoryControls() {
     };
   }
 
-  // ✅ ENTER TO SAVE (no button needed)
+  // âœ… ENTER TO SAVE (no button needed)
   if (input && !input.__novaMemoryEnterWired) {
     input.__novaMemoryEnterWired = true;
 
@@ -5256,7 +5182,7 @@ function wireMemoryControls() {
     });
   }
 
-  // ✅ DELETE MEMORY
+  // âœ… DELETE MEMORY
   document.querySelectorAll("[data-memory-delete]").forEach(function (btn) {
     if (btn.__wired) return;
     btn.__wired = true;
@@ -5346,7 +5272,7 @@ function summarizeMemoryText(value, limit) {
   const max = typeof limit === "number" ? limit : 140;
   if (!text) return "";
   if (text.length <= max) return text;
-  return text.slice(0, max) + "â€¦";
+  return text.slice(0, max) + "Ã¢â‚¬Â¦";
 }
 
 function findMemoryById(memoryId) {
@@ -5430,7 +5356,7 @@ function renderWorkingContextPanel() {
 
   const collapsedClass = wc.collapsed ? " is-collapsed" : "";
   const buttonLabel = wc.collapsed ? "Expand working context" : "Collapse working context";
-  const chevron = wc.collapsed ? "▸" : "▾";
+  const chevron = wc.collapsed ? "â–¸" : "â–¾";
 
   console.log("renderWorkingContextPanel HTML", wc, items);
 
@@ -5635,7 +5561,7 @@ function renderMemoryViewer(memoryList) {
   const container = document.querySelector(".nova-rail-content");
   if (!container) return;
 
-  // 🔥 normalize to array
+  // ðŸ”¥ normalize to array
   if (!Array.isArray(memoryList)) {
     memoryList = memoryList ? [memoryList] : [];
   }
@@ -6234,6 +6160,7 @@ setTimeout(() => {
 (function () {
   function renderExecutionPanel() {
     const panel = document.querySelector('[data-rail-panel="execution"]');
+if (!panel || panel.hidden) return;
     if (!panel) return;
 
     let mount = panel.querySelector("[data-execution-panel]");
@@ -6506,52 +6433,78 @@ async function runExecutionRequest(sessionId, action) {
 }
 
 window.runExecutionAction = async function (action, button) {
-  const state = window.NovaComposerState || {};
-  const sessionId =
-    state.activeSessionId ||
-    (state.session && state.session.id) ||
-    "";
-
-  if (!sessionId || !action) {
-    console.warn("[EXECUTION] missing session/action", { sessionId, action });
-    return;
-  }
-
-  const originalText = button ? button.textContent : "";
-  if (button) {
-    button.disabled = true;
-    button.textContent = "Running...";
-  }
-
   try {
-    let data = null;
+    const state = window.NovaComposerState || {};
 
-    if (action === "run_all") {
-      for (let i = 0; i < 25; i += 1) {
-        data = await runExecutionRequest(sessionId, "run_step");
+    let sessionId =
+      state.activeSessionId ||
+      (state.session && state.session.id) ||
+      "";
 
-        if (!data || data.ok === false || data.done === true) {
-          break;
-        }
+    // 🔥 ONLY ONE fallback (KEEP THIS ONE)
+    if (!sessionId) {
+      const res = await fetch("/api/state");
+      const data = await res.json();
+
+      sessionId =
+        (data.session && data.session.id) ||
+        data.active_session_id ||
+        data.activeSessionId ||
+        "";
+
+      if (sessionId && window.NovaComposerState) {
+        window.NovaComposerState.activeSessionId = sessionId;
       }
-    } else {
-      data = await runExecutionRequest(sessionId, action);
     }
 
-    if (data && data.execution) {
-      window.NovaExecutionState = data.execution;
+    if (!sessionId || !action) {
+      console.warn("[EXECUTION] missing session/action", { sessionId, action });
+      return;
     }
 
-    if (typeof window.renderExecution === "function") {
-      window.renderExecution();
+    let original = "";
+    if (button) {
+      original = button.textContent || "";
+      button.disabled = true;
+      button.textContent = "Running...";
     }
-  } catch (error) {
-    console.error("[EXECUTION ERROR]", error);
-  } finally {
+
+    const response = await fetch("/api/execution/control", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        session_id: sessionId,
+        action: action,
+      }),
+    });
+
+    const result = await response.json();
+    console.log("[EXECUTION RESULT]", result);
+
+    if (result && result.execution_state) {
+      window.NovaExecutionState = result.execution_state;
+
+      if (!window.NovaComposerState) {
+        window.NovaComposerState = {};
+      }
+
+      window.NovaComposerState.execution = result.execution_state;
+    }
+
+    if (typeof window.renderExecutionPanel === "function") {
+      window.renderExecutionPanel();
+    }
+
     if (button) {
       button.disabled = false;
-      button.textContent = originalText;
+      button.textContent = original || action;
     }
+
+  } catch (err) {
+    console.error("[EXECUTION ERROR]", err);
+    if (button) button.disabled = false;
   }
 };
 
