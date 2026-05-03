@@ -80,14 +80,24 @@ class ExecutionHandler:
 
         while queue and steps < max_steps:
             move = queue.pop(0)
+
             result = self.run_next_move(
                 move,
                 max_retries=max_retries,
                 delay_ms=delay_ms,
             )
 
+            # 🔥 ensure output exists
+            if result.output is None:
+                result.output = {}
+
+            # 🔥 attach error to output for frontend
+            if result.status == "failed":
+                result.output["error"] = result.error or "Unknown error"
+
             results.append(result)
 
+            # 🔥 stop chain on failure
             if result.status == "failed":
                 break
 
@@ -97,7 +107,6 @@ class ExecutionHandler:
             steps += 1
 
         return results
-
 
 def make_move(move_type: str, payload: dict[str, Any] | None = None) -> NextMove:
     return NextMove(

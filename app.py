@@ -1306,7 +1306,7 @@ def execution_control():
         })
 
         execution["history"].append(f"run_step: {step_title}")
-        execution["status"] = "running"
+        execution["status"] = "complete"
         execution["last_action"] = action
         execution["current_step"] = step_title
 
@@ -1328,16 +1328,39 @@ def execution_control():
         execution["last_action"] = action
         execution["current_step"] = "Run all complete"
 
-    elif action == "retry":
-        if execution["steps"]:
-            last_step = execution["steps"][-1]
-            last_step["status"] = "done"
-            last_step["output"] = "Retry completed."
+    elif action in ("retry", "retry_failed"):
+        failed_index = None
 
-        execution["history"].append("retry")
-        execution["status"] = "running"
-        execution["last_action"] = action
-        execution["current_step"] = "Retry complete"
+        for i in range(len(execution["steps"]) - 1, -1, -1):
+            step = execution["steps"][i]
+            step_status = str(step.get("status") or "").strip().lower()
+
+            if step_status in ("failed", "error"):
+                failed_index = i
+                break
+
+        if failed_index is not None:
+            failed_step = execution["steps"][failed_index]
+            failed_title = str(failed_step.get("title") or f"Step {failed_index + 1}")
+
+            failed_step["status"] = "running"
+            failed_step["output"] = "Retrying failed step..."
+
+            execution["status"] = "running"
+            execution["last_action"] = "retry_failed"
+            execution["current_step"] = failed_title
+            execution["history"].append(f"retry_failed: {failed_title}")
+
+            failed_step["status"] = "done"
+            failed_step["output"] = "Retry successful."
+
+            execution["status"] = "complete"
+            execution["current_step"] = "Retry complete"
+        else:
+            execution["history"].append("retry_failed: no failed step found")
+            execution["status"] = "complete"
+            execution["last_action"] = "retry_failed"
+            execution["current_step"] = "No failed step found"
 
     elif action == "stop":
         execution["history"].append("stop")
@@ -1372,6 +1395,11 @@ def execution_stream():
     def send_event(name, payload):
         import json
         return f"event: {name}\ndata: {json.dumps(payload)}\n\n"
+
+    def save_execution(execution):
+        chat_service._update_working_state(session_id, {
+            "execution": execution,
+        })
 
     def generate():
         import time
@@ -1415,6 +1443,7 @@ def execution_stream():
 
                 execution["current_step"] = step_title
                 execution["status"] = "running"
+                execution["last_action"] = action
 
                 yield send_event("step_start", {
                     "step": {
@@ -1440,8 +1469,86 @@ def execution_stream():
                     "done": False,
                 })
 
-        execution["status"] = "complete"
-        execution["current_step"] = "Done"
+            execution["status"] = "complete"
+            execution["current_step"] = "Done"
+
+        elif action == "test_fail":
+            step_title = f"Failed Step {len(execution['steps']) + 1}"
+
+            failed_step = {
+                "title": step_title,
+                "status": "failed",
+                "output": {
+                    "error": "Intentional test failure.",
+                },
+            }
+
+            execution["steps"].append(failed_step)
+            execution["history"].append(f"test_fail: {step_title}")
+            execution["status"] = "error"
+            execution["last_action"] = action
+            execution["current_step"] = step_title
+
+            save_execution(execution)
+
+            yield send_event("step_done", {
+                "step": failed_step,
+                "execution_state": execution,
+                "done": False,
+            })
+
+        elif action == "retry_failed":
+            failed_index = None
+
+            for i in range(len(execution["steps"]) - 1, -1, -1):
+                step = execution["steps"][i]
+                step_status = str(step.get("status") or "").lower()
+
+                if step_status in ("failed", "error"):
+                    failed_index = i
+                    break
+
+            if failed_index is not None:
+                failed_step = execution["steps"][failed_index]
+                step_title = failed_step.get("title", f"Step {failed_index + 1}")
+
+                execution["current_step"] = step_title
+                execution["status"] = "running"
+                execution["last_action"] = action
+
+                yield send_event("step_start", {
+                    "step": {
+                        "title": step_title,
+                        "status": "running",
+                        "output": "Retrying...",
+                    },
+                    "execution_state": execution,
+                    "done": False,
+                })
+
+                time.sleep(0.3)
+
+                failed_step["status"] = "done"
+                failed_step["output"] = "Retry successful"
+
+                execution["history"].append(f"retry_failed: {step_title}")
+                execution["status"] = "complete"
+                execution["current_step"] = "Retry complete"
+
+                save_execution(execution)
+
+                yield send_event("step_done", {
+                    "step": failed_step,
+                    "execution_state": execution,
+                    "done": False,
+                })
+            else:
+                execution["history"].append("retry_failed: no failed step found")
+                execution["status"] = "complete"
+                execution["last_action"] = action
+                execution["current_step"] = "No failed step found"
+
+        save_execution(execution)
 
         yield send_event("done", {
             "ok": True,
