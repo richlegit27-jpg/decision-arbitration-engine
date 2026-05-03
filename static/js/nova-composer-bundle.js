@@ -838,12 +838,13 @@ const pulse = isActive
   : "";
 
 const outputPreview =
-const canReplay = step && step.move && typeof step.move === "object";
   typeof step.output === "string"
     ? step.output
     : step.output && typeof step.output === "object"
       ? JSON.stringify(step.output)
       : "";
+
+const canReplay = step && step.move && typeof step.move === "object";
 
                 let icon = "○";
                 if (isActive) icon = "●";
@@ -881,7 +882,8 @@ ${
 ${
   canReplay
     ? `<button type="button"
-        data-exec-action="replay_last"
+        data-exec-action="replay_step"
+        data-exec-step-index="${i}"
         style="margin-top:10px;padding:7px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:12px;">
         Replay
       </button>`
@@ -926,9 +928,12 @@ ${
 
     if (typeof window.runExecutionAction === "function") {
       window.runExecutionAction(
-        button.getAttribute("data-exec-action"),
-        button
-      );
+  button.getAttribute("data-exec-action"),
+  button,
+  {
+    step_index: button.getAttribute("data-exec-step-index")
+  }
+);
     }
   };
 }
