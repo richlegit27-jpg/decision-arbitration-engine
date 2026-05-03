@@ -837,6 +837,13 @@ const pulse = isActive
   ? "animation: novaPulse 1.2s ease-in-out infinite;"
   : "";
 
+const outputPreview =
+  typeof step.output === "string"
+    ? step.output
+    : step.output && typeof step.output === "object"
+      ? JSON.stringify(step.output)
+      : "";
+
                 let icon = "○";
                 if (isActive) icon = "●";
                 if (isDone) icon = "✓";
@@ -857,10 +864,18 @@ const pulse = isActive
                       transition:all 160ms ease;
                     "
                   >
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-                      <strong>${escapeHtml(icon)} ${escapeHtml(title)}</strong>
-                      <span style="opacity:0.72;font-size:12px;">${escapeHtml(stepStatus)}</span>
-                    </div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+  <strong>${escapeHtml(icon)} ${escapeHtml(title)}</strong>
+  <span style="opacity:0.72;font-size:12px;">${escapeHtml(stepStatus)}</span>
+</div>
+
+${
+  outputPreview
+    ? `<div style="margin-top:8px;font-size:12px;opacity:.68;line-height:1.4;word-break:break-word;">
+        ${escapeHtml(outputPreview)}
+      </div>`
+    : ""
+}
                   </div>
                 `;
               }).join("")
