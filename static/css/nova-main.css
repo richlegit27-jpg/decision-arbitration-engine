@@ -10269,3 +10269,11 @@ button:active,
 .source-card:active {
   transform: translateY(0);
 }
+
+body.is-rail-open [data-rail-panel="execution"].is-active [data-execution-panel] {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-height: 300px !important;
+  width: 100% !important;
+}

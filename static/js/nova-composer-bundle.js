@@ -6160,8 +6160,12 @@ setTimeout(() => {
 (function () {
   function renderExecutionPanel() {
     const panel = document.querySelector('[data-rail-panel="execution"]');
-if (!panel || panel.hidden) return;
     if (!panel) return;
+
+    panel.hidden = false;
+    panel.style.display = "block";
+    panel.style.visibility = "visible";
+    panel.style.pointerEvents = "auto";
 
     let mount = panel.querySelector("[data-execution-panel]");
     if (!mount) {
@@ -6170,10 +6174,10 @@ if (!panel || panel.hidden) return;
       panel.appendChild(mount);
     }
 
-panel.hidden = false;
-panel.style.display = "block";
-panel.style.visibility = "visible";
-panel.style.pointerEvents = "auto";
+    mount.hidden = false;
+    mount.style.display = "block";
+    mount.style.visibility = "visible";
+    mount.style.opacity = "1";
 
 mount.innerHTML = `
   <div class="nova-panel-card" style="pointer-events:auto;">
