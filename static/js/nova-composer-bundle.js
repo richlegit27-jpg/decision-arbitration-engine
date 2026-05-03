@@ -203,10 +203,6 @@ function resolveUploadUrl(url) {
     } catch (_) {}
   }
 
-  function qsa(selector, root) {
-    return Array.from((root || document).querySelectorAll(selector));
-  }
-
   function escapeHtml(value) {
     return String(value == null ? "" : value)
       .replace(/&/g, "&amp;")
@@ -823,90 +819,137 @@ function renderExecution() {
 window.renderExecution = renderExecution;
 window.renderExecutionPanel = renderExecution;
 
-function renderExecution() {
-  const panel = document.querySelector('[data-rail-panel="execution"]');
-  if (!panel) return;
+window.runExecutionAction = async function (action, button) {
+  const sessionId =
+    (window.NovaComposerState && window.NovaComposerState.activeSessionId) || "";
 
-  let container = panel.querySelector("[data-execution-panel]");
-  if (!container) {
-    container = document.createElement("div");
-    container.setAttribute("data-execution-panel", "");
-    panel.appendChild(container);
+  if (!sessionId) {
+    console.warn("[EXECUTION] no session");
+    return;
   }
 
-  const execution =
-    state.execution ||
-    window.NovaExecutionState ||
-    {
-      status: "idle",
-      steps: [],
-      history: [],
-    };
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Running...";
+  }
 
-  const steps = Array.isArray(execution.steps) ? execution.steps : [];
-  const history = Array.isArray(execution.history) ? execution.history : [];
+  try {
+    const res = await fetch("/api/execution/control", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        session_id: sessionId,
+        action: action,
+      }),
+    });
 
-  container.innerHTML = `
-    <div class="nova-panel-shell">
-      <div class="nova-panel-title">Execution</div>
+    const data = await res.json();
 
-      <div class="nova-panel-card">
-        <button type="button" data-exec-action="run_step">Run Step</button>
-        <button type="button" data-exec-action="run_all">Run All</button>
-        <button type="button" data-exec-action="retry">Retry</button>
-        <button type="button" data-exec-action="stop">Stop</button>
-      </div>
+    console.log("[EXECUTION RESULT]", data);
 
-      <div class="nova-panel-card">
-        <div><strong>Status:</strong> ${escapeHtml(execution.status || "idle")}</div>
-        <div><strong>Steps:</strong> ${escapeHtml(String(steps.length))}</div>
-      </div>
+    // 🔥 THIS IS THE KEY
+    if (data && typeof data === "object") {
+      if (data.execution) {
+        window.NovaExecutionState = data.execution;
+      }
 
-      <div class="nova-panel-subtitle">Steps</div>
-      <div class="nova-panel-card">
-        ${
-          steps.length
-            ? steps.map(function (step, index) {
-                return `
-                  <div class="exec-step-item">
-                    <strong>${escapeHtml(step.title || "Step " + (index + 1))}</strong>
-                    <div>Status: ${escapeHtml(step.status || "pending")}</div>
-                  </div>
-                `;
-              }).join("")
-            : '<div class="nova-panel-muted">No steps yet. Click Run Step.</div>'
+      // force UI refresh
+      if (typeof window.renderExecution === "function") {
+        window.renderExecution();
+      }
+    }
+
+  } catch (err) {
+    console.error("[EXECUTION ERROR]", err);
+  }
+
+  if (button) {
+    button.disabled = false;
+    button.textContent = action.replace("_", " ");
+  }
+};
+
+// =============================
+// AUTO EXECUTION LOOP (AGENT MODE)
+// =============================
+window.startExecutionLoop = async function () {
+  if (window.__novaExecutionLoopRunning) {
+    console.warn("[EXECUTION] loop already running");
+    return;
+  }
+
+  window.__novaExecutionLoopRunning = true;
+
+  console.log("[EXECUTION] AUTO LOOP STARTED");
+
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  try {
+    while (window.__novaExecutionLoopRunning) {
+      const sessionId =
+        (window.NovaComposerState && window.NovaComposerState.activeSessionId) || "";
+
+      if (!sessionId) {
+        console.warn("[EXECUTION] no session");
+        break;
+      }
+
+      // 🔥 run one step
+      const res = await fetch("/api/execution/control", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          action: "run_step",
+        }),
+      });
+
+      const data = await res.json();
+
+      console.log("[EXECUTION LOOP RESULT]", data);
+
+      // 🔥 update execution state
+      if (data && typeof data === "object") {
+        if (data.execution) {
+          window.NovaExecutionState = data.execution;
         }
-      </div>
 
-      <div class="nova-panel-subtitle">History</div>
-      <div class="nova-panel-card">
-        ${
-          history.length
-            ? history.map(function (item) {
-                return '<div class="exec-history-item">' + escapeHtml(String(item || "")) + '</div>';
-              }).join("")
-            : '<div class="nova-panel-muted">No history yet.</div>'
+        if (typeof window.renderExecution === "function") {
+          window.renderExecution();
         }
-      </div>
-    </div>
-  `;
+      }
 
-  container.onclick = function (event) {
-    const button = event.target.closest("[data-exec-action]");
-    if (!button) return;
+      // 🔥 STOP CONDITIONS
+      const status =
+        (data && data.execution && data.execution.status) || "";
 
-    event.preventDefault();
-    event.stopPropagation();
+      if (
+        status === "complete" ||
+        status === "done" ||
+        status === "finished"
+      ) {
+        console.log("[EXECUTION] COMPLETE");
+        break;
+      }
 
-    runExecutionAction(
-      String(button.getAttribute("data-exec-action") || "").trim(),
-      button
-    );
-  };
-}
+      if (status === "error") {
+        console.warn("[EXECUTION] STOPPED ON ERROR");
+        break;
+      }
 
-window.renderExecution = renderExecution;
-window.renderExecutionPanel = renderExecution;
+      // 🔥 wait before next step (prevents spam)
+      await sleep(800);
+    }
+  } catch (err) {
+    console.error("[EXECUTION LOOP ERROR]", err);
+  }
+
+  window.__novaExecutionLoopRunning = false;
+};
 
 function getSessionArtifactsForRail() {
   const activeSessionId = String(state.activeSessionId || "").trim();
@@ -924,57 +967,10 @@ function getSessionArtifactsForRail() {
   return sessionArtifacts;
 }
 
-function railHasRealMemory() {
-  return safeArray(state.memory).length > 0;
-}
-
-function syncRailTruth() {
-  const hasArtifacts = getSessionArtifactsForRail().length > 0;
-  const hasMemory = railHasRealMemory();
-
-  if (state.rail.tab === "web") {
-    state.rail.tab = hasArtifacts ? "artifacts" : (hasMemory ? "memory" : "artifacts");
-  }
-
-  if (state.rail.tab === "memory" && !hasMemory) {
-    state.rail.tab = hasArtifacts ? "artifacts" : "artifacts";
-  }
-
-  if (!state.rail.tab) {
-    state.rail.tab = hasArtifacts ? "artifacts" : (hasMemory ? "memory" : "artifacts");
-  }
-
-  qsa("[data-rail-tab]").forEach(function (tabEl) {
-    const tabName = String(tabEl.getAttribute("data-rail-tab") || "").trim().toLowerCase();
-
-if (tabName === "web") {
-  tabEl.hidden = false;
-  tabEl.setAttribute("aria-hidden", "false");
-  return;
-}
-
-    if (tabName === "memory") {
-      const visible = hasMemory;
-      tabEl.hidden = !visible;
-      tabEl.setAttribute("aria-hidden", visible ? "false" : "true");
-      if (!visible) {
-        tabEl.classList.remove("is-active");
-      }
-      return;
-    }
-
-    tabEl.hidden = false;
-    tabEl.setAttribute("aria-hidden", "false");
-  });
-}
-
 function setRailTab(tabName) {
   const requested = String(tabName || "artifacts").trim().toLowerCase();
-
-  const nextTab =
-    requested === "memory" || requested === "web" || requested === "artifacts" || requested === "execution"
-      ? requested
-      : "artifacts";
+  const validTabs = ["artifacts", "memory", "web", "execution"];
+  const nextTab = validTabs.includes(requested) ? requested : "artifacts";
 
   if (!state.rail) state.rail = {};
   state.rail.tab = nextTab;
@@ -983,46 +979,35 @@ function setRailTab(tabName) {
     const tab = String(tabEl.getAttribute("data-rail-tab") || "").trim().toLowerCase();
     const active = tab === nextTab;
 
-    tabEl.hidden = false;
-    tabEl.setAttribute("aria-hidden", "false");
     tabEl.classList.toggle("is-active", active);
     tabEl.setAttribute("aria-selected", active ? "true" : "false");
+    tabEl.setAttribute("aria-pressed", active ? "true" : "false");
   });
 
   qsa("[data-rail-panel]").forEach(function (panelEl) {
     const panel = String(panelEl.getAttribute("data-rail-panel") || "").trim().toLowerCase();
     const active = panel === nextTab;
 
-    panelEl.hidden = !active;
-    panelEl.classList.toggle("is-active", active);
+    panelEl.classList.remove("is-active");
+    panelEl.setAttribute("hidden", "");
+    panelEl.style.display = "none";
+    panelEl.style.visibility = "hidden";
+
+    if (active) {
+      panelEl.classList.add("is-active");
+      panelEl.removeAttribute("hidden");
+      panelEl.style.display = "block";
+      panelEl.style.visibility = "visible";
+    }
   });
 
-  if (els.railTitle) {
-    els.railTitle.textContent =
-      nextTab === "memory" ? "Memory" :
-      nextTab === "web" ? "Web" :
-      nextTab === "execution" ? "Execution" :
-      "Artifacts";
-  }
-
-  if (els.railSubtitle) {
-    els.railSubtitle.textContent =
-      nextTab === "memory" ? "Saved memory" :
-      nextTab === "web" ? "Recent web results" :
-      nextTab === "execution" ? "Agent controls and execution history" :
-      "Session artifacts";
-  }
-
-  if (nextTab === "memory") {
-    if (typeof renderMemory === "function") renderMemory();
-  } else if (nextTab === "web") {
-    if (typeof renderWeb === "function") renderWeb();
-  } else if (nextTab === "execution") {
-    if (typeof renderExecution === "function") renderExecution();
-  } else {
-    if (typeof renderArtifacts === "function") renderArtifacts();
-  }
+  if (nextTab === "memory" && typeof renderMemory === "function") renderMemory();
+  if (nextTab === "web" && typeof renderWeb === "function") renderWeb();
+  if (nextTab === "execution" && typeof renderExecution === "function") renderExecution();
+  if (nextTab === "artifacts" && typeof renderArtifacts === "function") renderArtifacts();
 }
+
+window.setRailTab = setRailTab;
 
 function syncRailReopenVisibility() {
   const el = document.querySelector("[data-rail-reopen-wrap]");
@@ -1046,21 +1031,12 @@ function openRail() {
   const activeTab =
     state.rail && state.rail.tab ? state.rail.tab : "artifacts";
 
+  // 🔥 ONLY this controls rendering now
   setRailTab(activeTab);
 
   if (state.rail && state.rail.selectedKind && state.rail.selectedId) {
     setRailSelectedItem(state.rail.selectedKind, state.rail.selectedId);
   }
-
-if (state.rail && state.rail.tab === "execution") {
-  if (typeof renderExecution === "function") {
-    renderExecution();
-  }
-} else {
-  if (typeof renderArtifacts === "function") renderArtifacts();
-  if (typeof renderMemory === "function") renderMemory();
-  if (typeof renderWeb === "function") renderWeb();
-}
 
   syncRailReopenVisibility();
 }
@@ -1483,58 +1459,17 @@ document.addEventListener("click", async function (event) {
 
 viewer.innerHTML = `
   <div class="nova-viewer-shell">
-
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-      ${
-        favicon
-          ? `<img src="${escapeHtml(favicon)}" style="width:22px;height:22px;border-radius:6px;">`
-          : `<div style="width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,0.12);"></div>`
-      }
-
-      <div style="min-width:0;">
-        <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${escapeHtml(domain)}
-        </div>
-
-        <div style="font-size:11px;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${escapeHtml(safeUrl)}
-        </div>
-      </div>
+    <div style="padding:12px;">
+      Memory panel opened.
     </div>
-
-    <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);margin-bottom:12px;">
-      <div style="font-size:14px;font-weight:700;line-height:1.35;margin-bottom:6px;">
-        ${escapeHtml(title)}
-      </div>
-
-      <div style="font-size:12px;opacity:.7;line-height:1.4;">
-        ${escapeHtml(preview || "Click below to open the full article.")}
-      </div>
-    </div>
-
-    <div style="display:flex;gap:8px;">
-      <a href="${escapeHtml(safeUrl)}"
-         target="_blank"
-         rel="noopener noreferrer"
-         data-no-chat-action="1"
-         style="padding:8px 12px;border-radius:10px;background:#fff;color:#000;text-decoration:none;font-size:13px;font-weight:700;">
-        Open article
-      </a>
-
-      <button data-copy-url="${escapeHtml(safeUrl)}"
-        style="padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.12);font-size:13px;">
-        Copy link
-      </button>
-    </div>
-
   </div>
 `;
 
-    } catch (err) {
-      console.error("memory badge click failed", err);
-    }
+} catch (err) {
+  console.error("memory badge click failed", err);
+}
 
-    return;
+   return;
   }
 
   // 🔥 IMAGE REGENERATE (message-based)
@@ -2402,7 +2337,6 @@ if (!data.ok) {
 
   updateTopbarFromState();
   scrollChatToBottom(true);
-  renderExecution();
 }
 
 function renderSessionList() {
@@ -4908,38 +4842,44 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
     .then(function (response) {
       return response.json();
     })
-    .then(function (data) {
-      console.log("SOURCE PREVIEW RESPONSE", data);
 
-      const finalUrl = String((data && data.url) || url);
-      const finalTitle = String((data && data.title) || title || "Source preview");
-      const finalPreview = String((data && data.preview) || "No preview found.");
+.then(function (data) {
 
-      viewer.innerHTML = `
-        <div class="nova-viewer-shell">
-          <div class="nova-viewer-title">${escapeHtml(finalTitle)}</div>
-          <div class="nova-viewer-body">
-            <p>${escapeHtml(finalPreview).replace(/\n/g, "<br>")}</p>
-            <button type="button" data-open-full="${escapeHtml(finalUrl)}">
-              Open full article →
-            </button>
-          </div>
-        </div>
-      `;
-    })
-    .catch(function (error) {
-      console.error("SOURCE PREVIEW ERROR:", error);
+  console.log("SOURCE PREVIEW RESPONSE", data);
 
-      viewer.innerHTML = `
-        <div class="nova-viewer-shell">
-          <div class="nova-viewer-title">Source preview</div>
-          <div class="nova-viewer-body">
-            <p>Failed to load preview.</p>
-          </div>
-        </div>
-      `;
-    });
-};
+  // execution hook
+  if (data && data.execution) {
+    state.execution = data.execution;
+    renderExecution();
+  }
+
+  const finalUrl = String((data && data.url) || url);
+  const finalTitle = String((data && data.title) || title || "Source preview");
+  const finalPreview = String((data && data.preview) || "No preview found.");
+
+  viewer.innerHTML = `
+    <div class="nova-viewer-shell">
+      <div class="nova-viewer-title">${escapeHtml(finalTitle)}</div>
+      <div class="nova-viewer-body">
+        <p>${escapeHtml(finalPreview).replace(/\n/g, "<br>")}</p>
+        <button type="button" data-open-full="${escapeHtml(finalUrl)}">
+          Open full article →
+        </button>
+      </div>
+    </div>
+  `;
+})
+.catch(function (error) {
+  console.error("SOURCE PREVIEW ERROR:", error);
+
+  viewer.innerHTML = `
+    <div class="nova-viewer-shell">
+      <div style="padding:12px;">
+        Failed to load preview.
+      </div>
+    </div>
+  `;
+});
 
 function renderWeb() {
   renderExecution();
@@ -6301,54 +6241,22 @@ setTimeout(() => {
     `;
   }
 
-  document.addEventListener("click", function (event) {
-    const card = event.target.closest(".source-row");
-
-    if (!card) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    const url = card.dataset.url || "";
-    const title = card.dataset.title || "Source preview";
-
-    if (!url) return;
-
-    if (typeof fetchSourcePreviewIntoRail === "function") {
-      fetchSourcePreviewIntoRail(url, title);
-    } else {
-      window.open(url, "_blank", "noopener,noreferrer");
-    }
-  }, true);
-
 document.addEventListener("click", function (event) {
-  const btn = event.target.closest("[data-open-full]");
-  if (!btn) return;
+  const tab = event.target.closest("[data-rail-tab]");
+  if (!tab) return;
 
   event.preventDefault();
   event.stopPropagation();
 
-  const url = btn.getAttribute("data-open-full") || "";
-  if (!url) return;
+  const tabName = tab.getAttribute("data-rail-tab");
 
-  window.open(url, "_blank", "noopener,noreferrer");
+  if (!tabName) return;
+
+  if (typeof window.openRail === "function") {
+    window.openRail();
+  }
+
+  if (typeof window.setRailTab === "function") {
+    window.setRailTab(tabName);
+  }
 }, true);
-
-  window.renderExecution = renderExecutionPanel;
-  window.renderExecutionPanel = renderExecutionPanel;
-
-  document.addEventListener("click", function (event) {
-    const tab = event.target.closest('[data-rail-tab="execution"]');
-    if (!tab) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    renderExecutionPanel();
-    setTimeout(renderExecutionPanel, 100);
-  }, true);
-
-  setTimeout(renderExecutionPanel, 300);
-})();
-
-})();

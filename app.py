@@ -634,6 +634,8 @@ def api_chat():
             attachments=attachments,
         )
 
+        print("CHAT RAW RESULT:", result)
+
         if result is None:
             result = {
                 "ok": False,

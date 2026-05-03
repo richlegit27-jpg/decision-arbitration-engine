@@ -1,0 +1,23 @@
+{
+  "overall_completion": 85,
+  "intelligence_level": 75,
+  "phase": "Endgame stabilization",
+  "locked": [
+    "core architecture",
+    "sessions",
+    "memory storage",
+    "routing",
+    "web fetch baseline",
+    "artifacts",
+    "execution baseline"
+  ],
+  "remaining": [
+    "web output consistency",
+    "source preview reliability",
+    "execution panel never empty",
+    "memory dominance",
+    "streaming final lock",
+    "self-check loop"
+  ],
+  "next_move": "Lock web output and source preview behavior first."
+}

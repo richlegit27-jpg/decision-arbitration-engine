@@ -3418,6 +3418,9 @@ class ChatService:
 
         print("EXECUTION FLOW CHECK:", user_text, session_id)
 
+        # =============================
+        # EXECUTION FLOW (FIXED)
+        # =============================
         try:
             execution_flow = self._maybe_lock_execution_flow(user_text, session_id)
             print("EXECUTION FLOW RESULT:", execution_flow)
@@ -7112,6 +7115,27 @@ Next action:
         if not session_id:
             return None
 
+        user_text_lc = self._safe_str(user_text).lower().strip()
+
+        if user_text_lc in ["run it", "run", "execute", "continue"]:
+            state = self._get_working_state(session_id) or {}
+            active_task = self._safe_str(state.get("active_task"))
+
+            if not active_task:
+                return {
+                    "text": "No active task found.",
+                    "meta": {"route": "execution_flow"},
+                }
+
+        return {
+            "text": self._run_execution_next_move(
+                active_task,
+                state.get("next_move") or "build execution loop",
+                session_id,
+            ),
+            "meta": {"route": "execution_flow"},
+        }
+
         if not user_text_lc:
             return None
 
@@ -7196,10 +7220,10 @@ Next action:
 
         combined_text = f"{next_move} {active_task}".strip().lower()
 
-        move_type = "echo"
+        move_type = "plan"
 
         if "build execution loop" in combined_text or "build_execution_loop" in combined_text:
-            move_type = "build_execution_loop"
+            move_type = "plan"
         elif "verify execution loop" in combined_text or "verify_execution_loop" in combined_text:
             move_type = "verify_execution_loop"
         elif "persist execution result" in combined_text or "persist_execution_result" in combined_text:
