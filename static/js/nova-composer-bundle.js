@@ -796,12 +796,13 @@ function renderExecution() {
     <div class="nova-panel-shell">
       <div class="nova-panel-title">Execution</div>
 
-      <div class="nova-panel-card" style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button type="button" data-exec-action="run_step" ${isRunning ? "disabled" : ""}>Run Step</button>
-        <button type="button" data-exec-action="run_all" ${isRunning ? "disabled" : ""}>Run All</button>
-        <button type="button" data-exec-action="retry" ${isRunning ? "disabled" : ""}>Retry</button>
-        <button type="button" data-exec-action="stop">Stop</button>
-      </div>
+<div class="nova-panel-card" style="display:flex;gap:8px;flex-wrap:wrap;">
+  <button type="button" data-exec-action="run_step" ${isRunning ? "disabled" : ""}>Run Step</button>
+  <button type="button" data-exec-action="run_all" ${isRunning ? "disabled" : ""}>Run All</button>
+  <button type="button" data-exec-action="retry_failed" ${isRunning ? "disabled" : ""}>Retry Failed</button>
+  <button type="button" data-exec-action="replay_last" ${isRunning ? "disabled" : ""}>Replay Last</button>
+  <button type="button" data-exec-action="stop">Stop</button>
+</div>
 
       <div class="nova-panel-card">
         <div><strong>Status:</strong> ${escapeHtml(execution.status || "idle")}</div>
@@ -825,14 +826,16 @@ function renderExecution() {
         ${
           steps.length
             ? steps.map(function (step, i) {
-                const stepStatus = String(step && step.status ? step.status : "pending").toLowerCase();
-                const title = step.title || step.text || "Step " + (i + 1);
-                const isDone = stepStatus === "done" || stepStatus === "completed" || stepStatus === "success";
-                const isError = stepStatus === "error" || stepStatus === "failed";
-                const isActive = i === currentIndex && isRunning && !isDone && !isError;
-                const pulse = isActive
-                  ? "animation: novaPulse 1.2s ease-in-out infinite;"
-                  : "";
+const stepStatus = String(step && step.status ? step.status : "pending").toLowerCase();
+const title = step.title || step.text || "Step " + (i + 1);
+const isDone = stepStatus === "done" || stepStatus === "completed" || stepStatus === "success";
+const isError = stepStatus === "error" || stepStatus === "failed";
+const isActive =
+  (i === currentIndex && isRunning && !isDone && !isError) ||
+  stepStatus === "running";
+const pulse = isActive
+  ? "animation: novaPulse 1.2s ease-in-out infinite;"
+  : "";
 
                 let icon = "○";
                 if (isActive) icon = "●";
@@ -6271,45 +6274,53 @@ document.querySelectorAll("[data-sidebar-toggle]").forEach(function (button) {
   });
 });
 
-})();
-
 // =============================
-// EXECUTION GLOBAL BRIDGE RESTORE
+// EXECUTION GLOBAL BRIDGE FIXED
 // =============================
-window.setRailTab = window.setRailTab || function (tabName) {
-  const nextTab = String(tabName || "artifacts").trim();
+window.setRailTab = function (tabName) {
+  const nextTab = String(tabName || "artifacts").trim().toLowerCase();
 
   document.querySelectorAll("[data-rail-tab]").forEach(function (tab) {
-    const active = tab.getAttribute("data-rail-tab") === nextTab;
+    const tabValue = String(tab.getAttribute("data-rail-tab") || "").trim().toLowerCase();
+    const active = tabValue === nextTab;
+
     tab.classList.toggle("is-active", active);
     tab.setAttribute("aria-selected", active ? "true" : "false");
     tab.setAttribute("aria-pressed", active ? "true" : "false");
   });
 
   document.querySelectorAll("[data-rail-panel]").forEach(function (panel) {
-    const active = panel.getAttribute("data-rail-panel") === nextTab;
-    panel.classList.toggle("is-active", active);
+    const panelValue = String(panel.getAttribute("data-rail-panel") || "").trim().toLowerCase();
+    const active = panelValue === nextTab;
 
-    if (active) {
-      panel.hidden = false;
-      panel.style.display = "block";
-      panel.style.visibility = "visible";
-    } else {
-      panel.hidden = true;
-      panel.style.display = "none";
-      panel.style.visibility = "hidden";
-    }
+    panel.classList.toggle("is-active", active);
+    panel.hidden = !active;
+    panel.style.display = active ? "block" : "none";
+    panel.style.visibility = active ? "visible" : "hidden";
   });
 
-  if (nextTab === "execution" && typeof window.renderExecutionPanel === "function") {
-    window.renderExecutionPanel();
-  } else if (nextTab === "execution" && typeof window.renderExecution === "function") {
-    window.renderExecution();
+  if (nextTab === "execution") {
+    if (typeof window.renderExecutionPanel === "function") {
+      window.renderExecutionPanel();
+    } else if (typeof window.renderExecution === "function") {
+      window.renderExecution();
+    }
   }
 };
 
 window.runExecutionAction = async function (action, button) {
   const state = window.NovaComposerState || {};
+
+// 🔥 force execution panel open immediately
+if (typeof window.setRailTab === "function") {
+  window.setRailTab("execution");
+}
+
+const rail = document.querySelector("[data-right-rail]");
+if (rail) {
+  rail.classList.add("is-open");
+  document.body.classList.add("is-rail-open");
+}
 
   let sessionId =
     state.activeSessionId ||
@@ -6338,6 +6349,16 @@ window.runExecutionAction = async function (action, button) {
 
   if (button) {
     button.disabled = true;
+  }
+
+  // 🔥 immediate UI feedback (instant step start feel)
+  window.NovaExecutionState = window.NovaExecutionState || {};
+  window.NovaExecutionState.status = "running";
+  window.NovaExecutionState.current_step = "Starting...";
+  window.NovaExecutionState.steps = window.NovaExecutionState.steps || [];
+
+  if (typeof window.renderExecution === "function") {
+    window.renderExecution();
   }
 
   try {
@@ -6407,6 +6428,7 @@ window.runExecutionAction = async function (action, button) {
         }
       });
     }
+
   } catch (err) {
     console.error("[EXECUTION STREAM ERROR]", err);
   } finally {
@@ -6428,3 +6450,5 @@ if (!document.getElementById("nova-exec-anim")) {
   `;
   document.head.appendChild(style);
 }
+
+})();

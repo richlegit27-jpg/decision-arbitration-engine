@@ -32,7 +32,7 @@ from nova_backend.services.recon_service import ReconService
 from nova_backend.services.intent_router_service import IntentRouterService
 from nova_backend.utils.file_utils import ensure_dir
 from nova_backend.services.chat_service import ChatService
-
+from nova_backend.services.execution_handler import NextMove, default_executor
 
 # -----------------------
 # APP SETUP
@@ -1299,12 +1299,13 @@ def execution_control():
         step_num = len(execution["steps"]) + 1
         step_title = f"Step {step_num}"
 
-        execution["steps"].append({
+        step = {
             "title": step_title,
             "status": "done",
-            "output": f"{step_title} completed.",
-        })
+            "output": "Step completed.",
+        }
 
+        execution["steps"].append(step)
         execution["history"].append(f"run_step: {step_title}")
         execution["status"] = "complete"
         execution["last_action"] = action
@@ -1317,16 +1318,34 @@ def execution_control():
             step_num = start_num + offset
             step_title = f"Step {step_num}"
 
-            execution["steps"].append({
+            step = {
                 "title": step_title,
                 "status": "done",
-                "output": f"{step_title} completed.",
-            })
+                "output": "Step completed.",
+            }
+
+            execution["steps"].append(step)
 
         execution["history"].append("run_all: added 3 completed steps")
         execution["status"] = "complete"
         execution["last_action"] = action
         execution["current_step"] = "Run all complete"
+
+    elif action == "test_fail":
+        step_num = len(execution["steps"]) + 1
+        step_title = f"Failed Step {step_num}"
+
+        failed_step = {
+            "title": step_title,
+            "status": "failed",
+            "output": "Simulated failure.",
+        }
+
+        execution["steps"].append(failed_step)
+        execution["history"].append(f"test_fail: {step_title}")
+        execution["status"] = "error"
+        execution["last_action"] = action
+        execution["current_step"] = step_title
 
     elif action in ("retry", "retry_failed"):
         failed_index = None
@@ -1385,6 +1404,18 @@ def execution_control():
         "execution_state": execution,
     })
 
+
+def serialize_move(move):
+    if isinstance(move, dict):
+        return move
+
+    return {
+        "id": str(getattr(move, "id", "")),
+        "type": str(getattr(move, "type", "")),
+        "payload": getattr(move, "payload", {}) if isinstance(getattr(move, "payload", {}), dict) else {},
+    }
+
+
 @app.route("/api/execution/stream", methods=["POST"])
 def execution_stream():
     data = request.get_json(silent=True) or {}
@@ -1410,18 +1441,21 @@ def execution_stream():
             yield send_event("error", {"ok": False, "error": "missing action", "done": True})
             return
 
-        execution = EXECUTION_STATE_CACHE.get(session_id) or {}
-
-        steps = execution.get("steps") if isinstance(execution.get("steps"), list) else []
-        history = execution.get("history") if isinstance(execution.get("history"), list) else []
-
-        execution = execution if isinstance(execution, dict) else {}
+        execution = EXECUTION_STATE_CACHE.get(session_id)
+        if not isinstance(execution, dict):
+            execution = {}
 
         execution.setdefault("status", "idle")
         execution.setdefault("steps", [])
         execution.setdefault("history", [])
         execution.setdefault("last_action", "")
         execution.setdefault("current_step", "")
+
+        if not isinstance(execution["steps"], list):
+            execution["steps"] = []
+
+        if not isinstance(execution["history"], list):
+            execution["history"] = []
 
         yield send_event("start", {
             "ok": True,
@@ -1438,6 +1472,15 @@ def execution_stream():
                 step_num = start_num + offset
                 step_title = f"Step {step_num}"
 
+                move = NextMove(
+                    id=f"run-all-{uuid.uuid4().hex}",
+                    type="echo",
+                    payload={
+                        "step": step_num,
+                        "message": f"{step_title} executed.",
+                    },
+                )
+
                 execution["current_step"] = step_title
                 execution["status"] = "running"
                 execution["last_action"] = action
@@ -1447,6 +1490,7 @@ def execution_stream():
                         "title": step_title,
                         "status": "running",
                         "output": f"{step_title} running...",
+                        "move": serialize_move(move),
                     },
                     "execution_state": execution,
                     "done": False,
@@ -1454,14 +1498,22 @@ def execution_stream():
 
                 time.sleep(0.4)
 
-                execution["steps"].append({
+                result = default_executor(move)
+                result_success = bool(getattr(result, "success", False))
+                result_output = getattr(result, "output", {})
+
+                step = {
                     "title": step_title,
-                    "status": "done",
-                    "output": f"{step_title} completed.",
-                })
+                    "status": "done" if result_success else "failed",
+                    "output": result_output,
+                    "move": serialize_move(move),
+                }
+
+                execution["steps"].append(step)
+                execution["history"].append(f"run_all: {step_title}")
 
                 yield send_event("step_done", {
-                    "step": execution["steps"][-1],
+                    "step": step,
                     "execution_state": execution,
                     "done": False,
                 })
@@ -1478,6 +1530,13 @@ def execution_stream():
                 "output": {
                     "error": "Intentional test failure.",
                 },
+                "move": {
+                    "type": "echo",
+                    "payload": {
+                        "retry_test": True,
+                        "message": "Real retry replay executed.",
+                    },
+                },
             }
 
             execution["steps"].append(failed_step)
@@ -1486,13 +1545,76 @@ def execution_stream():
             execution["last_action"] = action
             execution["current_step"] = step_title
 
-            save_execution(execution)
-
             yield send_event("step_done", {
                 "step": failed_step,
                 "execution_state": execution,
                 "done": False,
             })
+
+        elif action == "replay_last":
+            if not execution["steps"]:
+                execution["history"].append("replay_last: no step found")
+                execution["status"] = "complete"
+                execution["last_action"] = action
+                execution["current_step"] = "No step found"
+            else:
+                replay_step = execution["steps"][-1]
+                step_title = replay_step.get("title", "Last step")
+                move = replay_step.get("move") if isinstance(replay_step, dict) else None
+
+                if not isinstance(move, dict):
+                    replay_step["status"] = "failed"
+                    replay_step["output"] = {
+                        "error": "Replay failed: no move stored on step.",
+                    }
+                    execution["history"].append(f"replay_last_missing_move: {step_title}")
+                    execution["status"] = "error"
+                    execution["last_action"] = action
+                    execution["current_step"] = f"Replay failed: {step_title}"
+                else:
+                    execution["current_step"] = step_title
+                    execution["status"] = "running"
+                    execution["last_action"] = action
+
+                    yield send_event("step_start", {
+                        "step": {
+                            "title": step_title,
+                            "status": "running",
+                            "output": "Replaying...",
+                            "move": move,
+                        },
+                        "execution_state": execution,
+                        "done": False,
+                    })
+
+                    time.sleep(0.3)
+
+                    try:
+                        replay_result = default_executor(NextMove(
+                            id=str(move.get("id") or f"replay-{uuid.uuid4().hex}"),
+                            type=str(move.get("type") or "echo"),
+                            payload=move.get("payload") if isinstance(move.get("payload"), dict) else {},
+                        ))
+                        replay_ok = bool(getattr(replay_result, "success", False))
+                        replay_step["status"] = "done" if replay_ok else "failed"
+                        replay_step["output"] = getattr(replay_result, "output", {})
+                        execution["history"].append(f"replay_last: {step_title}")
+                        execution["status"] = "complete" if replay_ok else "error"
+                        execution["current_step"] = "Replay complete" if replay_ok else f"Replay failed: {step_title}"
+                    except Exception as exc:
+                        replay_step["status"] = "failed"
+                        replay_step["output"] = {
+                            "error": f"Replay executor crashed: {exc}",
+                        }
+                        execution["history"].append(f"replay_last_exception: {step_title}")
+                        execution["status"] = "error"
+                        execution["current_step"] = f"Replay failed: {step_title}"
+
+                    yield send_event("step_done", {
+                        "step": replay_step,
+                        "execution_state": execution,
+                        "done": False,
+                    })
 
         elif action == "retry_failed":
             failed_index = None
@@ -1525,25 +1647,72 @@ def execution_stream():
 
                 time.sleep(0.3)
 
-                failed_step["status"] = "done"
-                failed_step["output"] = "Retry successful"
+                move = failed_step.get("move") if isinstance(failed_step, dict) else None
+
+                if not isinstance(move, dict):
+                    failed_step["status"] = "failed"
+                    failed_step["output"] = {
+                        "error": "Retry failed: no move stored on failed step.",
+                    }
+                    execution["history"].append(f"retry_failed_missing_move: {step_title}")
+                    execution["status"] = "error"
+                    execution["current_step"] = f"Retry failed: {step_title}"
+
+                    yield send_event("step_done", {
+                        "step": failed_step,
+                        "execution_state": execution,
+                        "done": False,
+                    })
+                    return
+
+                try:
+                    retry_result = default_executor(NextMove(
+                        id=str(move.get("id") or f"retry-{uuid.uuid4().hex}"),
+                        type=str(move.get("type") or "echo"),
+                        payload=move.get("payload") if isinstance(move.get("payload"), dict) else {},
+                    ))
+                except Exception as exc:
+                    failed_step["status"] = "failed"
+                    failed_step["output"] = {
+                        "error": f"Retry executor crashed: {exc}",
+                    }
+                    execution["history"].append(f"retry_failed_exception: {step_title}")
+                    execution["status"] = "error"
+                    execution["current_step"] = f"Retry failed: {step_title}"
+
+                    yield send_event("step_done", {
+                        "step": failed_step,
+                        "execution_state": execution,
+                        "done": False,
+                    })
+                    return
+
+                retry_ok = bool(getattr(retry_result, "success", False))
+
+                failed_step["status"] = "done" if retry_ok else "failed"
+                failed_step["output"] = getattr(retry_result, "output", {})
 
                 execution["history"].append(f"retry_failed: {step_title}")
-                execution["status"] = "complete"
-                execution["current_step"] = "Retry complete"
-
-                save_execution(execution)
+                execution["status"] = "complete" if retry_ok else "error"
+                execution["current_step"] = "Retry complete" if retry_ok else f"Retry failed: {step_title}"
 
                 yield send_event("step_done", {
                     "step": failed_step,
                     "execution_state": execution,
                     "done": False,
                 })
+
             else:
                 execution["history"].append("retry_failed: no failed step found")
                 execution["status"] = "complete"
                 execution["last_action"] = action
                 execution["current_step"] = "No failed step found"
+
+        else:
+            execution["history"].append(f"unknown action: {action}")
+            execution["status"] = "error"
+            execution["last_action"] = action
+            execution["current_step"] = "Unknown action"
 
         save_execution(execution)
 
