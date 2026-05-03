@@ -6243,10 +6243,19 @@ setTimeout(() => {
       panel.appendChild(mount);
     }
 
-    panel.hidden = false;
-    panel.classList.add("is-active");
-    panel.style.display = "block";
-    panel.style.visibility = "visible";
+panel.hidden = false;
+panel.style.display = "block";
+panel.style.visibility = "visible";
+panel.style.pointerEvents = "auto";
+
+mount.innerHTML = `
+  <div class="nova-panel-card" style="pointer-events:auto;">
+    <button type="button" data-exec-action="run_step">Run Step</button>
+    <button type="button" data-exec-action="run_all">Run All</button>
+    <button type="button" data-exec-action="retry">Retry</button>
+    <button type="button" data-exec-action="stop">Stop</button>
+  </div>
+`;
 
     const execution =
       window.NovaExecutionState ||
@@ -6410,4 +6419,149 @@ document.addEventListener("click", function (event) {
 
   window.openRail();
   window.setRailTab(tabName);
+}, true);
+
+// =============================
+// LEFT SIDEBAR OPEN/CLOSE BRIDGE
+// =============================
+window.openSidebar = window.openSidebar || function () {
+  const sidebar = document.querySelector("[data-left-sidebar]");
+  const backdrop = document.querySelector("[data-sidebar-backdrop]");
+
+  if (!sidebar) {
+    console.warn("[SIDEBAR] left sidebar not found");
+    return;
+  }
+
+  sidebar.removeAttribute("hidden");
+  sidebar.classList.add("is-open", "open", "active");
+  sidebar.setAttribute("aria-hidden", "false");
+  document.body.classList.add("is-sidebar-open");
+
+  if (backdrop) {
+    backdrop.removeAttribute("hidden");
+    backdrop.classList.add("is-open", "open", "active");
+  }
+};
+
+window.closeSidebar = window.closeSidebar || function () {
+  const sidebar = document.querySelector("[data-left-sidebar]");
+  const backdrop = document.querySelector("[data-sidebar-backdrop]");
+
+  if (sidebar) {
+    sidebar.classList.remove("is-open", "open", "active");
+    sidebar.setAttribute("aria-hidden", "true");
+  }
+
+  document.body.classList.remove("is-sidebar-open");
+
+  if (backdrop) {
+    backdrop.setAttribute("hidden", "");
+    backdrop.classList.remove("is-open", "open", "active");
+  }
+};
+
+document.addEventListener("click", function (event) {
+  const toggle = event.target.closest("[data-sidebar-toggle]");
+  const close = event.target.closest("[data-sidebar-close], [data-sidebar-backdrop]");
+
+  if (!toggle && !close) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const sidebar = document.querySelector("[data-left-sidebar]");
+  const isOpen =
+    sidebar &&
+    (
+      sidebar.classList.contains("is-open") ||
+      sidebar.classList.contains("open") ||
+      document.body.classList.contains("is-sidebar-open")
+    );
+
+  if (close || isOpen) {
+    window.closeSidebar();
+    return;
+  }
+
+  window.openSidebar();
+}, true);
+
+// =============================
+// EXECUTION BUTTON ACTION BRIDGE
+// =============================
+async function runExecutionRequest(sessionId, action) {
+  const response = await fetch("/api/execution/control", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      session_id: sessionId,
+      action: action,
+    }),
+  });
+
+  const data = await response.json();
+  console.log("[EXECUTION RESULT]", data);
+  return data;
+}
+
+window.runExecutionAction = async function (action, button) {
+  const state = window.NovaComposerState || {};
+  const sessionId =
+    state.activeSessionId ||
+    (state.session && state.session.id) ||
+    "";
+
+  if (!sessionId || !action) {
+    console.warn("[EXECUTION] missing session/action", { sessionId, action });
+    return;
+  }
+
+  const originalText = button ? button.textContent : "";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Running...";
+  }
+
+  try {
+    let data = null;
+
+    if (action === "run_all") {
+      for (let i = 0; i < 25; i += 1) {
+        data = await runExecutionRequest(sessionId, "run_step");
+
+        if (!data || data.ok === false || data.done === true) {
+          break;
+        }
+      }
+    } else {
+      data = await runExecutionRequest(sessionId, action);
+    }
+
+    if (data && data.execution) {
+      window.NovaExecutionState = data.execution;
+    }
+
+    if (typeof window.renderExecution === "function") {
+      window.renderExecution();
+    }
+  } catch (error) {
+    console.error("[EXECUTION ERROR]", error);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  }
+};
+
+document.addEventListener("click", function (event) {
+  const button = event.target.closest("[data-exec-action]");
+  if (!button) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const action = button.getAttribute("data-exec-action") || "";
+  window.runExecutionAction(action, button);
 }, true);
