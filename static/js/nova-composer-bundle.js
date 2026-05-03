@@ -755,41 +755,101 @@ function renderExecution() {
     panel.appendChild(container);
   }
 
-const execution =
-  window.NovaExecutionState ||
-  (window.NovaComposerState && window.NovaComposerState.execution) ||
-  state.execution ||
-  { status: "idle", steps: [], history: [] };
+  const execution =
+    window.NovaExecutionState ||
+    (window.NovaComposerState && window.NovaComposerState.execution) ||
+    state.execution ||
+    { status: "idle", steps: [], history: [] };
 
   const steps = Array.isArray(execution.steps) ? execution.steps : [];
   const history = Array.isArray(execution.history) ? execution.history : [];
+  const status = String(execution.status || "idle").toLowerCase();
+
+  const isRunning =
+    status === "running" ||
+    status === "active" ||
+    status === "in_progress" ||
+    execution.done === false;
+
+  const currentIndex = Math.max(
+    0,
+    Math.min(Number(execution.currentStepIndex || execution.current_step_index || 0), Math.max(steps.length - 1, 0))
+  );
+
+  const currentStep =
+    execution.currentStep ||
+    execution.current_step ||
+    (steps[currentIndex] && (steps[currentIndex].title || steps[currentIndex].text)) ||
+    "-";
+
+  const doneCount = steps.filter(function (step) {
+    const stepStatus = String(step && step.status ? step.status : "").toLowerCase();
+    return stepStatus === "done" || stepStatus === "completed" || stepStatus === "success";
+  }).length;
+
+  const progress =
+    steps.length > 0
+      ? Math.round((doneCount / steps.length) * 100)
+      : 0;
 
   container.innerHTML = `
     <div class="nova-panel-shell">
       <div class="nova-panel-title">Execution</div>
 
-      <div class="nova-panel-card">
-        <button type="button" data-exec-action="run_step" onclick="window.runExecutionAction('run_step', this)">Run Step</button>
-        <button type="button" data-exec-action="run_all" onclick="window.runExecutionAction('run_all', this)">Run All</button>
-        <button type="button" data-exec-action="retry" onclick="window.runExecutionAction('retry', this)">Retry</button>
-        <button type="button" data-exec-action="stop" onclick="window.runExecutionAction('stop', this)">Stop</button>
+      <div class="nova-panel-card" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" data-exec-action="run_step" ${isRunning ? "disabled" : ""}>Run Step</button>
+        <button type="button" data-exec-action="run_all" ${isRunning ? "disabled" : ""}>Run All</button>
+        <button type="button" data-exec-action="retry" ${isRunning ? "disabled" : ""}>Retry</button>
+        <button type="button" data-exec-action="stop">Stop</button>
       </div>
 
       <div class="nova-panel-card">
         <div><strong>Status:</strong> ${escapeHtml(execution.status || "idle")}</div>
-        <div><strong>Steps:</strong> ${escapeHtml(String(steps.length))}</div>
+        <div><strong>Current Step:</strong> ${escapeHtml(currentStep)}</div>
+        <div><strong>Progress:</strong> ${escapeHtml(String(doneCount))}/${escapeHtml(String(steps.length))} complete</div>
+
+        <div style="margin-top:10px;height:8px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;">
+          <div style="width:${progress}%;height:100%;background:#4ade80;border-radius:999px;transition:width 180ms ease;"></div>
+        </div>
       </div>
 
       <div class="nova-panel-subtitle">Steps</div>
-      <div class="nova-panel-card">
+      <div class="nova-panel-card" data-execution-steps-list>
         ${
           steps.length
-            ? steps.map((step, i) => `
-              <div>
-                <strong>${escapeHtml(step.title || "Step " + (i+1))}</strong>
-                <div>Status: ${escapeHtml(step.status || "pending")}</div>
-              </div>
-            `).join("")
+            ? steps.map(function (step, i) {
+                const stepStatus = String(step && step.status ? step.status : "pending").toLowerCase();
+                const title = step.title || step.text || "Step " + (i + 1);
+                const isDone = stepStatus === "done" || stepStatus === "completed" || stepStatus === "success";
+                const isError = stepStatus === "error" || stepStatus === "failed";
+                const isActive = i === currentIndex && isRunning && !isDone && !isError;
+
+                let icon = "○";
+                if (isActive) icon = "●";
+                if (isDone) icon = "✓";
+                if (isError) icon = "✕";
+
+                return `
+                  <div
+                    data-execution-step-row
+                    data-active="${isActive ? "true" : "false"}"
+                    style="
+                      padding:12px;
+                      margin-bottom:8px;
+                      border-radius:12px;
+                      background:${isActive ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.045)"};
+                      border:${isActive ? "1px solid rgba(74,222,128,0.75)" : "1px solid rgba(255,255,255,0.08)"};
+                      box-shadow:${isActive ? "0 0 0 3px rgba(74,222,128,0.08)" : "none"};
+                      transition:all 160ms ease;
+                    "
+                  >
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                      <strong>${escapeHtml(icon)} ${escapeHtml(title)}</strong>
+                      <span style="opacity:0.72;font-size:12px;">${escapeHtml(stepStatus)}</span>
+                    </div>
+                  </div>
+                `;
+              }).join("")
             : '<div class="nova-panel-muted">No steps yet. Click Run Step.</div>'
         }
       </div>
@@ -798,30 +858,39 @@ const execution =
       <div class="nova-panel-card">
         ${
           history.length
-            ? history.map(item =>
-              `<div>${escapeHtml(String(item || ""))}</div>`
-            ).join("")
+            ? history.map(function (item) {
+                return `<div style="opacity:0.72;font-size:12px;margin-bottom:6px;">${escapeHtml(String(item || ""))}</div>`;
+              }).join("")
             : '<div class="nova-panel-muted">No history yet.</div>'
         }
       </div>
     </div>
   `;
 
-container.onclick = function (event) {
-  const button = event.target.closest("[data-exec-action]");
-  if (!button) return;
-
-  event.preventDefault();
-  event.stopPropagation();
-
-  if (typeof window.runExecutionAction === "function") {
-    window.runExecutionAction(
-      button.getAttribute("data-exec-action"),
-      button
-    );
+  const activeRow = container.querySelector('[data-execution-step-row][data-active="true"]');
+  if (activeRow && typeof activeRow.scrollIntoView === "function") {
+    requestAnimationFrame(function () {
+      activeRow.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest"
+      });
+    });
   }
-};
 
+  container.onclick = function (event) {
+    const button = event.target.closest("[data-exec-action]");
+    if (!button || button.disabled) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (typeof window.runExecutionAction === "function") {
+      window.runExecutionAction(
+        button.getAttribute("data-exec-action"),
+        button
+      );
+    }
+  };
 }
 
 window.renderExecution = renderExecution;
