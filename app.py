@@ -1397,9 +1397,7 @@ def execution_stream():
         return f"event: {name}\ndata: {json.dumps(payload)}\n\n"
 
     def save_execution(execution):
-        chat_service._update_working_state(session_id, {
-            "execution": execution,
-        })
+        EXECUTION_STATE_CACHE[session_id] = execution
 
     def generate():
         import time
@@ -1412,19 +1410,18 @@ def execution_stream():
             yield send_event("error", {"ok": False, "error": "missing action", "done": True})
             return
 
-        working = chat_service._get_working_state(session_id) or {}
-        execution = working.get("execution") or {}
+        execution = EXECUTION_STATE_CACHE.get(session_id) or {}
 
         steps = execution.get("steps") if isinstance(execution.get("steps"), list) else []
         history = execution.get("history") if isinstance(execution.get("history"), list) else []
 
-        execution = {
-            "status": str(execution.get("status") or "idle"),
-            "steps": steps,
-            "history": history,
-            "last_action": str(execution.get("last_action") or ""),
-            "current_step": str(execution.get("current_step") or ""),
-        }
+        execution = execution if isinstance(execution, dict) else {}
+
+        execution.setdefault("status", "idle")
+        execution.setdefault("steps", [])
+        execution.setdefault("history", [])
+        execution.setdefault("last_action", "")
+        execution.setdefault("current_step", "")
 
         yield send_event("start", {
             "ok": True,
