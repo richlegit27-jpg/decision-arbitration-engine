@@ -37,8 +37,34 @@ class ChatService:
     ROUTE_PLANNING = "planning"
     ROUTE_MEMORY_RECALL = "memory_recall"
 
+    def _safe_str(self, value) -> str:
+        try:
+            if value is None:
+                return ""
+            if isinstance(value, str):
+                return value
+            return str(value)
+        except Exception:
+            return ""
+
+    def handle(self, user_text, attachments=None, session_id=None, **kwargs):
+        session_id = session_id or kwargs.get("session_id") or ""
+        attachments = attachments or []
+
+        return self._execute_web_fetch(
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+            decision={
+                "route": self.ROUTE_WEB_FETCH,
+                "strategy": "web_fetch",
+                "query": user_text,
+            },
+        )
+
     def _source_quality_score(self, url: str = "", title: str = "") -> int:
         text = f"{url} {title}".lower()
+        score = 10
 
         bad_domains = [
             "instagram.com",
@@ -46,43 +72,349 @@ class ChatService:
             "tiktok.com",
             "pinterest.com",
             "threads.net",
+            "reddit.com",
+            "quora.com",
         ]
 
         if any(domain in text for domain in bad_domains):
             return -999
 
         official_sources = [
+            "wwe.com",
             "nba.com",
-            "pistons.com",
-        ]
-
-        top_news_sources = [
-            "usatoday.com",
-            "sportsillustrated.com",
-            "si.com",
-            "espn.com",
-            "apnews.com",
-            "reuters.com",
-        ]
-
-        decent_sources = [
-            "heavy.com",
-            "yahoo.com",
-            "cbssports.com",
-            "bleacherreport.com",
+            "nfl.com",
+            "nhl.com",
+            "mlb.com",
+            "openai.com",
+            "anthropic.com",
+            "deepmind.com",
+            "microsoft.com",
+            "google.com",
+            "apple.com",
         ]
 
         if any(domain in text for domain in official_sources):
-            return 100
+            score += 150
 
-        if any(domain in text for domain in top_news_sources):
-            return 80
+        elite_news_sources = [
+            "reuters.com",
+            "apnews.com",
+            "bbc.com",
+            "bloomberg.com",
+            "cnbc.com",
+            "cbc.ca",
+            "globalnews.ca",
+            "ctvnews.ca",
+        ]
 
-        if any(domain in text for domain in decent_sources):
-            return 55
+        if any(domain in text for domain in elite_news_sources):
+            score += 130
 
-        return 10
+        strong_news_sources = [
+            "cnn.com",
+            "nytimes.com",
+            "washingtonpost.com",
+            "theguardian.com",
+            "theverge.com",
+            "techcrunch.com",
+            "wired.com",
+            "axios.com",
+            "politico.com",
+        ]
 
+        if any(domain in text for domain in strong_news_sources):
+            score += 100
+
+        sports_sources = [
+            "espn.com",
+            "cbssports.com",
+            "sports.yahoo.com",
+            "si.com",
+            "sportsnet.ca",
+            "tsn.ca",
+            "bleacherreport.com",
+        ]
+
+        if any(domain in text for domain in sports_sources):
+            score += 90
+
+        wrestling_sources = [
+            "pwinsider.com",
+            "fightful.com",
+            "wrestlingobserver.com",
+            "wrestletalk.com",
+            "ewrestling.com",
+            "wrestlinginc.com",
+        ]
+
+        if any(domain in text for domain in wrestling_sources):
+            score += 65
+
+        junk_phrases = [
+            "top 10",
+            "best",
+            "watch",
+            "stream",
+            "how to",
+            "guide",
+            "rumors",
+            "roundup",
+            "reaction",
+            "opinion",
+            "reddit",
+        ]
+
+        if any(phrase in text for phrase in junk_phrases):
+            score -= 40
+
+        fresh_phrases = [
+            "breaking",
+            "latest",
+            "today",
+            "just in",
+            "reported",
+            "announced",
+            "released",
+        ]
+
+        if any(phrase in text for phrase in fresh_phrases):
+            score += 15
+
+        try:
+            query_words = set((self._last_web_query or "").lower().split())
+            title_words = set(title.lower().split())
+            score += len(query_words & title_words) * 8
+        except Exception:
+            pass
+
+        return score
+
+    def _clean_web_results(self, results: list) -> list:
+        cleaned = []
+        seen_domains = set()
+
+        for item in results or []:
+            if not isinstance(item, dict):
+                continue
+
+            url = str(item.get("url") or "").strip()
+            title = str(item.get("title") or "").strip()
+            snippet = str(item.get("snippet") or item.get("content") or "").strip()
+
+            if not url or not title:
+                continue
+
+            low_url = url.lower()
+
+            # decode duckduckgo redirect instead of skipping
+            if "duckduckgo.com" in low_url:
+                try:
+                    from urllib.parse import parse_qs, unquote, urlparse
+                    parsed = urlparse(url)
+                    qs = parse_qs(parsed.query)
+                    if "uddg" in qs:
+                        url = unquote(qs["uddg"][0])
+                        low_url = url.lower()
+                except Exception:
+                    continue
+
+            try:
+                from urllib.parse import urlparse
+                domain = urlparse(url).netloc.lower().replace("www.", "")
+            except Exception:
+                domain = ""
+
+            # only dedupe by domain
+            if domain and domain in seen_domains and len(cleaned) >= 3:
+                continue
+
+            if domain:
+                seen_domains.add(domain)
+
+            cleaned.append({
+                "title": title,
+                "snippet": snippet,
+                "content": snippet,
+                "url": url,
+            })
+
+        cleaned = sorted(
+            cleaned,
+            key=lambda item: self._source_quality_score(
+                item.get("url", ""),
+                item.get("title", ""),
+            ),
+            reverse=True,
+        )
+
+        return cleaned[:5]
+
+    def _web_search(self, query: str) -> dict:
+        query = self._safe_str(query).strip()
+        if not query:
+            return {"results": []}
+
+        import requests
+        import re
+        from urllib.parse import quote_plus
+        from xml.etree import ElementTree as ET
+
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
+
+        all_results = []
+
+        # -------------------------
+        # 1. DuckDuckGo HTML
+        # -------------------------
+        try:
+            url = "https://duckduckgo.com/html/?q=" + quote_plus(query)
+            res = requests.get(url, headers=headers, timeout=10)
+
+            html = res.text or ""
+            results = []
+
+            for match in re.finditer(
+                r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
+                html,
+                re.S
+            ):
+                link = match.group(1).replace("&amp;", "&")
+                title = re.sub(r"<.*?>", "", match.group(2)).strip()
+
+                snippet_match = re.search(
+                    r'class="result__snippet"[^>]*>(.*?)</',
+                    html[match.end():match.end() + 500],
+                    re.S
+                )
+
+                snippet = ""
+                if snippet_match:
+                    snippet = re.sub(r"<.*?>", "", snippet_match.group(1)).strip()
+
+                title = re.sub(r"\s+", " ", title).strip()
+                snippet = re.sub(r"\s+", " ", snippet).strip()
+
+                if not title or title.lower() in ["here", "click", "link"]:
+                    continue
+
+                if "duckduckgo.com" in link:
+                    try:
+                        from urllib.parse import parse_qs, unquote, urlparse
+                        parsed = urlparse(link)
+                        qs = parse_qs(parsed.query)
+                        if "uddg" in qs:
+                            link = unquote(qs["uddg"][0])
+                    except Exception:
+                        continue
+
+                results.append({
+                    "title": title,
+                    "snippet": snippet,
+                    "content": snippet,
+                    "url": link,
+                })
+
+                if len(results) >= 5:
+                    break
+
+            if results:
+                print("SEARCH: DuckDuckGo HTML success")
+                all_results.extend(results)
+
+        except Exception as e:
+            print("DDG HTML FAILED:", e)
+
+        # -------------------------
+        # 2. DuckDuckGo Lite
+        # -------------------------
+        try:
+            url = "https://lite.duckduckgo.com/lite/?q=" + quote_plus(query)
+            res = requests.get(url, headers=headers, timeout=10)
+
+            html = res.text or ""
+            results = []
+
+            for match in re.finditer(
+                r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
+                html,
+                re.S
+            ):
+                link = match.group(1)
+                title = re.sub(r"<.*?>", "", match.group(2))
+                title = re.sub(r"\s+", " ", title).strip()
+
+                if not title or title.lower() in ["here", "click", "link"]:
+                    continue
+
+                if "http" not in link:
+                    continue
+
+                if "duckduckgo.com" in link:
+                    continue
+
+                results.append({
+                    "title": title,
+                    "snippet": "",
+                    "content": "",
+                    "url": link,
+                })
+
+                if len(results) >= 5:
+                    break
+
+            if results:
+                print("SEARCH: DuckDuckGo Lite success")
+                all_results.extend(results)
+
+        except Exception as e:
+            print("DUCKDUCKGO_LITE_FAILED:", e)
+
+        # -------------------------
+        # 3. Google News RSS
+        # -------------------------
+        try:
+            url = "https://news.google.com/rss/search?q=" + quote_plus(query)
+            res = requests.get(url, headers=headers, timeout=10)
+
+            root = ET.fromstring(res.content)
+            results = []
+
+            for item in root.findall(".//item"):
+                title = item.findtext("title") or ""
+                link = item.findtext("link") or ""
+                description = item.findtext("description") or ""
+
+                description = re.sub(r"<.*?>", "", description)
+                description = re.sub(r"\s+", " ", description).strip()
+
+                if "news.google.com" in link.lower():
+                    continue
+
+                results.append({
+                    "title": title,
+                    "snippet": description,
+                    "content": description,
+                    "url": link,
+                })
+
+                if len(results) >= 5:
+                    break
+
+            if results:
+                print("SEARCH: Google News RSS success")
+                all_results.extend(results)
+
+        except Exception as e:
+            print("GOOGLE RSS FAILED:", e)
+
+        # -------------------------
+        # FINAL CLEAN + RETURN
+        # -------------------------
+        cleaned = self._clean_web_results(all_results)
+
+        return {"results": cleaned}
     def __init__(
         self,
         session_service: SessionService,
@@ -195,9 +527,12 @@ class ChatService:
             print("FINALIZE_MEMORY_WRITE_ERROR:", e)
 
         if isinstance(assistant_msg, dict):
-            meta = assistant_msg.get("meta")
-            if not isinstance(meta, dict):
-                meta = {}
+            existing_meta = assistant_msg.get("meta")
+            meta = existing_meta if isinstance(existing_meta, dict) else {}
+
+            # preserve existing keys (like sources)
+            meta.setdefault("sources", meta.get("sources", []))
+            meta.setdefault("source_urls", meta.get("source_urls", []))
 
             used_memory_items = []
 
@@ -272,7 +607,6 @@ class ChatService:
         session_id: str,
         attachments=None,
     ) -> dict:
-
         print("AUTO_FIX_FILE_HIT:", user_text)
 
         import os
@@ -281,12 +615,10 @@ class ChatService:
         import shutil
         import textwrap
         import traceback
+        import re
 
         attachments = attachments or []
         user_text = self._safe_str(user_text)
-        # =============================
-        # PATH DETECTION (FIXED)
-        # =============================
 
         path = self._guess_path_from_text(user_text)
 
@@ -309,26 +641,11 @@ class ChatService:
                 decision={"route": "auto_fix_failed"},
             )
 
-            assistant_text = (
-                "Auto-fix failed.\n\n"
-                "Reason: missing PATH line.\n\n"
-                "Use:\n"
-                "PATH: C:\\Users\\Owner\\nova\\test.py"
-            )
+        file_path = path.strip()
 
-            return {
-                "assistant_message": {"text": assistant_text},
-                "session": self._get_session_payload(session_id),
-                "ok": False,
-            }
-
-        file_path = path
-
-        # stop at code block if pasted inline
         if "```" in file_path:
             file_path = file_path.split("```", 1)[0].strip()
 
-        # remove accidental inline python text
         if "python" in file_path.lower():
             file_path = file_path.split("python", 1)[0].strip()
 
@@ -338,10 +655,7 @@ class ChatService:
             re.IGNORECASE | re.DOTALL,
         )
 
-        if code_match:
-            raw_code = code_match.group(1).strip()
-        else:
-            raw_code = ""
+        raw_code = code_match.group(1).strip() if code_match else ""
 
         if not raw_code:
             try:
@@ -354,11 +668,15 @@ class ChatService:
                     f"Reason: could not read file: {type(e).__name__}: {self._safe_str(e)}"
                 )
 
-                return {
-                    "assistant_message": {"text": assistant_text},
-                    "session": self._get_session_payload(session_id),
-                    "ok": False,
-                }
+                assistant_msg = self._build_assistant_message(text=assistant_text)
+
+                return self._finalize_response(
+                    session_id=session_id,
+                    user_text=user_text,
+                    user_msg=self._build_user_message(user_text),
+                    assistant_msg=assistant_msg,
+                    decision={"route": "auto_fix_read_failed"},
+                )
 
         if len(raw_code) > 12000:
             assistant_text = (
@@ -377,10 +695,6 @@ class ChatService:
                 assistant_msg=assistant_msg,
                 decision={"route": "auto_fix_too_large"},
             )
-
-        # =============================
-        # MODEL-BASED FIX ENGINE
-        # =============================
 
         fix_prompt = (
             "You are fixing a Python file.\n"
@@ -2303,165 +2617,52 @@ class ChatService:
             f"Current user message: {user_lc}\n"
         )
 
-    def _web_search(self, query: str) -> dict:
-        query = self._safe_str(query).strip()
-        if not query:
-            return {"results": []}
+    def _build_news_rss_queries(self, query: str) -> list[str]:
+        import re
 
-        import requests
-        from urllib.parse import quote_plus, urlparse
-        from xml.etree import ElementTree as ET
+        raw_query = str(query or "").strip().lower()
 
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
+        clean_query = raw_query
+        for word in ["latest", "news", "today", "current", "breaking", "updates", "update"]:
+            clean_query = clean_query.replace(word, "")
 
-        # -------------------------
-        # 1. DuckDuckGo HTML
-        # -------------------------
-        try:
-            url = "https://duckduckgo.com/html/?q=" + quote_plus(query)
-            res = requests.get(url, headers=headers, timeout=10)
+        clean_query = re.sub(r"\s+", " ", clean_query).strip()
 
-            html = res.text or ""
-            results = []
+        # 🔥 empty → global news
+        if not clean_query:
+            return [
+                "world news",
+                "breaking news",
+                "top stories",
+                "global headlines",
+            ]
 
-            for match in re.finditer(
-                r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
-                html,
-                re.S
-            ):
-                link = match.group(1).replace("&amp;", "&")
-                title = re.sub(r"<.*?>", "", match.group(2)).strip()
+        if "ai" in raw_query or "artificial intelligence" in raw_query:
+            return [
+                "AI latest news",
+                "OpenAI latest news",
+                "Anthropic latest news",
+                "Google DeepMind latest news",
+            ]
 
-                snippet_match = re.search(
-                    r'class="result__snippet"[^>]*>(.*?)</',
-                    html[match.end():match.end() + 500],
-                    re.S
-                )
+        if "bc" in raw_query or "british columbia" in raw_query:
+            return [
+                f"{clean_query} British Columbia news",
+                f"{clean_query} Vancouver news",
+                f"{clean_query} Canada news",
+            ]
 
-                snippet = ""
-                if snippet_match:
-                    snippet = re.sub(r"<.*?>", "", snippet_match.group(1)).strip()
+        if "vancouver" in raw_query:
+            return [
+                f"{clean_query} Vancouver news",
+                f"{clean_query} British Columbia news",
+            ]
 
-                title = re.sub(r"\s+", " ", title).strip()
-                snippet = re.sub(r"\s+", " ", snippet).strip()
-
-                if not title or title.lower() in ["here", "click", "link"]:
-                    continue
-
-                if "duckduckgo.com" in link:
-                    continue
-
-                results.append({
-                    "title": title,
-                    "snippet": snippet,
-                    "content": snippet,
-                    "url": link,
-                })
-
-                if len(results) >= 5:
-                    break
-
-            if results:
-                print("SEARCH: DuckDuckGo HTML success")
-                return {"results": results}
-
-        except Exception as e:
-            print("DDG HTML FAILED:", e)
-
-        # -------------------------
-        # 2. DuckDuckGo Lite
-        # -------------------------
-        try:
-            url = "https://lite.duckduckgo.com/lite/?q=" + quote_plus(query)
-            res = requests.get(url, headers=headers, timeout=10)
-
-            html = res.text or ""
-            results = []
-
-            for match in re.finditer(
-                r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
-                html,
-                re.S
-            ):
-                link = match.group(1)
-                title = re.sub(r"<.*?>", "", match.group(2))
-                title = re.sub(r"\s+", " ", title).strip()
-
-                if not title or title.lower() in ["here", "click", "link"]:
-                    continue
-
-                if "http" not in link:
-                    continue
-
-                if "duckduckgo.com" in link:
-                    continue
-
-                results.append({
-                    "title": title,
-                    "snippet": "",
-                    "content": "",
-                    "url": link,
-                })
-
-                if len(results) >= 5:
-                    break
-
-            if results:
-                print("SEARCH: DuckDuckGo Lite success")
-                return {"results": results}
-
-        except Exception as e:
-            print("DDG LITE FAILED:", e)
-
-        # -------------------------
-        # 3. Google News RSS
-        # -------------------------
-        try:
-            url = "https://news.google.com/rss/search?q=" + quote_plus(query)
-            res = requests.get(url, headers=headers, timeout=10)
-
-            root = ET.fromstring(res.content)
-            results = []
-
-            for item in root.findall(".//item"):
-                title = item.findtext("title") or ""
-                link = item.findtext("link") or ""
-                description = item.findtext("description") or ""
-
-                description = re.sub(r"<.*?>", "", description)
-                description = re.sub(r"\s+", " ", description).strip()
-
-                real_source = ""
-                if " - " in title:
-                    parts = title.split(" - ")
-                    if len(parts) >= 2:
-                        real_source = parts[-1].strip()
-
-                domain = urlparse(link).netloc.replace("www.", "")
-                source_label = real_source or domain
-
-                results.append({
-                    "title": title.split(" - ")[0].strip(),
-                    "snippet": description,
-                    "content": description,
-                    "url": link,
-                    "source": source_label,
-                })
-
-                if len(results) >= 5:
-                    break
-
-            if results:
-                print("SEARCH: Google News RSS success")
-                return {"results": results}
-
-        except Exception as e:
-            print("GOOGLE RSS FAILED:", e)
-
-        print("SEARCH: ALL FALLBACKS FAILED")
-        return {"results": []}
+        return [
+            f"{clean_query} latest news",
+            f"{clean_query} breaking news",
+            f"{clean_query} top stories",
+        ]
 
     def _execute_web_fetch(
         self,
@@ -2474,37 +2675,18 @@ class ChatService:
         attachments = attachments or []
 
         text = str(user_text or "").strip()
+        user_msg = self._build_user_message(user_text, attachments=attachments)
 
-        # =============================
-        # HARD URL MODE
-        # =============================
         if text.startswith("http://") or text.startswith("https://"):
             source = {
                 "title": text,
                 "url": text,
                 "source": text,
+                "snippet": "",
             }
 
-            final_text = (
-                "Opened link:\n"
-                f"{text}\n\n"
-                "— Top sources —\n"
-                f"1. {text} — {text}"
-            )
-
-            user_msg = self._build_user_message(
-                user_text,
-                attachments=attachments,
-            )
-
-            # HARD DEDUPE WEB OUTPUT
-            chunks = assistant_text.split("\nHere’s the latest")
-            if len(chunks) > 1:
-                assistant_text = chunks[-1]
-                assistant_text = "Here’s the latest" + assistant_text
-
             assistant_msg = self._build_assistant_message(
-                assistant_text,
+                "Opened link:\n" + text,
                 meta={
                     "route": "web",
                     "strategy": "web_fetch",
@@ -2516,19 +2698,12 @@ class ChatService:
             )
 
             return self._finalize_response(
-                session_id,
-                user_msg,
-                assistant_msg,
-                decision,
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                decision=decision,
             )
-
-        mission = decision.get("mission") if isinstance(decision, dict) else {}
-        mission = mission if isinstance(mission, dict) else {}
-
-        user_msg = self._build_user_message(
-            user_text,
-            attachments=attachments,
-        )
 
         query = self._safe_str(
             decision.get("query")
@@ -2549,56 +2724,128 @@ class ChatService:
             "updates",
         ]
 
-        wants_fresh = any(word in query.lower() for word in freshness_words)
+        if any(word in query.lower() for word in freshness_words):
+            if "today" not in query.lower():
+                query = query + " today"
 
-        if wants_fresh and "today" not in query.lower():
-            query = query + " today"
+        self._last_web_query = query
 
-        web_result = {}
+        web_result = {"results": []}
 
         try:
             if hasattr(self, "_web_search"):
                 web_result = self._web_search(query)
 
-            if not web_result or not web_result.get("results"):
-                print("WEB_FETCH_FALLBACK: using duckduckgo")
+            if not isinstance(web_result, dict):
+                web_result = {"body": str(web_result or ""), "results": []}
+
+            if not web_result.get("results"):
+                print("WEB_FETCH_FALLBACK: using Google News RSS")
 
                 import requests
-                from bs4 import BeautifulSoup
+                import xml.etree.ElementTree as ET
+                from urllib.parse import quote_plus
 
-                url = f"https://duckduckgo.com/html/?q={query}"
-                res = requests.get(url, timeout=10)
-                soup = BeautifulSoup(res.text, "html.parser")
+                rss_results = []
+                seen_rss_urls = set()
+                rss_queries = self._build_news_rss_queries(query)
 
-                results = []
+                print("RSS_QUERIES:", rss_queries)
 
-                for a in soup.select("a.result__a")[:5]:
-                    title = a.get_text(strip=True)
-                    link = a.get("href")
+                for rss_query in rss_queries:
+                    rss_url = "https://news.google.com/rss/search?q=" + quote_plus(rss_query)
+                    rss_res = requests.get(rss_url, timeout=20)
 
-                    results.append({
-                        "title": title,
-                        "url": link,
-                        "snippet": "",
-                        "source": "duckduckgo",
-                    })
+                    print("RSS_QUERY:", rss_query)
+                    print("RSS_STATUS:", rss_res.status_code)
+                    print("RSS_LEN:", len(rss_res.content))
 
-                web_result = {"results": results}
+                    try:
+                        root = ET.fromstring(rss_res.content)
+                    except Exception as e:
+                        print("RSS_PARSE_ERROR:", e)
+                        continue
 
-        except Exception as exc:
-            print("WEB_FETCH_TOTAL_FAIL:", exc)
+                    for item in root.findall(".//item"):
+                        title = self._safe_str(item.findtext("title") or "").strip()
+                        link = self._safe_str(item.findtext("link") or "").strip()
+                        description = self._safe_str(item.findtext("description") or "").strip()
+
+                        if not title or not link:
+                            continue
+
+                        if link in seen_rss_urls:
+                            continue
+
+                        seen_rss_urls.add(link)
+
+                        rss_results.append({
+                            "title": title,
+                            "snippet": description,
+                            "content": description,
+                            "url": link,
+                        })
+
+                        if len(rss_results) >= 12:
+                            break
+
+                    if len(rss_results) >= 12:
+                        break
+
+                web_result = {"results": rss_results}
+
+        except Exception as e:
+            print("WEB_FETCH_ERROR:", e)
             web_result = {"results": []}
 
         print("WEB_FETCH_QUERY:", query)
         print("WEB_FETCH_RESULT_TYPE:", type(web_result))
         print("WEB_FETCH_RESULT:", web_result)
 
-        if not isinstance(web_result, dict):
-            web_result = {"body": str(web_result or ""), "results": []}
+        raw_results = web_result.get("results", []) if isinstance(web_result, dict) else []
+        if not isinstance(raw_results, list):
+            raw_results = []
 
-        results = web_result.get("results")
-        if not isinstance(results, list):
-            results = []
+        cleaned_sources = self._clean_web_results(raw_results)
+
+        def _rank_key(item):
+            url = self._safe_str(item.get("url")).lower()
+            title = self._safe_str(item.get("title")).lower()
+
+            priority = 0
+
+            if any(x in url for x in [
+                "reuters.com", "apnews.com", "bbc.com",
+                "bloomberg.com", "cnbc.com",
+                "cbc.ca", "globalnews.ca", "ctvnews.ca"
+            ]):
+                priority += 100
+
+            if any(x in url for x in [
+                "espn.com", "cbssports.com", "sports.yahoo.com",
+                "tsn.ca", "sportsnet.ca"
+            ]):
+                priority += 80
+
+            if any(x in url for x in [
+                "pwinsider.com", "fightful.com",
+                "wrestlingobserver.com"
+            ]):
+                priority += 60
+
+            if any(x in title for x in ["rumor", "reaction", "opinion"]):
+                priority -= 40
+
+            return priority
+
+        try:
+            cleaned_sources = sorted(
+                cleaned_sources,
+                key=_rank_key,
+                reverse=True
+            )
+        except Exception as e:
+            print("FINAL_RANK_ERROR:", e)
 
         body = self._safe_str(
             web_result.get("body")
@@ -2607,44 +2854,67 @@ class ChatService:
             or ""
         ).strip()
 
-        source_urls = []
-        source_lines = []
         sources = []
+        source_urls = []
+        seen_urls = set()
 
-        for item in results[:5]:
+        from urllib.parse import urlparse
+
+        for item in cleaned_sources[:10]:
             if not isinstance(item, dict):
                 continue
 
             title = self._safe_str(item.get("title") or item.get("name") or "").strip()
+            rss_source = ""
+            if " - " in title:
+                title_parts = title.rsplit(" - ", 1)
+                title = title_parts[0].strip()
+                rss_source = title_parts[1].strip()
             url = self._safe_str(item.get("url") or item.get("href") or item.get("link") or "").strip()
-            snippet = self._safe_str(item.get("snippet") or item.get("description") or item.get("body") or "").strip()
-            source = self._safe_str(item.get("source") or item.get("domain") or "").strip()
+            snippet = self._safe_str(
+                item.get("snippet")
+                or item.get("description")
+                or item.get("body")
+                or item.get("content")
+                or ""
+            ).strip()
 
-            if not title and not url:
+            if not title or not url:
                 continue
 
-            if url:
-                url = self._resolve_google_news_url(url)
-                source_urls.append(url)
+            url = self._resolve_google_news_url(url)
 
-            label = title
-            if source:
-                label = f"{source} — {title}" if title else source
+            if not url or url in seen_urls:
+                continue
 
-            source_lines.append(label)
+            seen_urls.add(url)
+
+            parsed = urlparse(url)
+            source = parsed.netloc.replace("www.", "")
+
+            if "news.google.com" in source.lower() and rss_source:
+                source = rss_source
+            if not source:
+                source = url
 
             sources.append({
-                "title": title or source or url,
+                "title": title,
                 "url": url,
                 "source": source,
                 "snippet": snippet,
             })
 
+            source_urls.append(url)
+
             if snippet and snippet not in body:
                 body += "\n\n" + snippet
 
-        if not body and source_lines:
-            body = "\n".join(source_lines)
+        if not body and sources:
+            body = "\n".join(
+                item.get("title", "")
+                for item in sources
+                if isinstance(item, dict) and item.get("title")
+            )
 
         if not body:
             assistant_text = (
@@ -2652,31 +2922,29 @@ class ChatService:
                 "Try a more specific query with a team, person, date, or source."
             )
         else:
-            prompt = (
-                "Give a clear, confident, concise summary of the latest news using ONLY the fetched web text below.\n"
-                "Prioritize the most recent and relevant items.\n"
-                "Do not invent facts. Keep it direct and readable.\n\n"
-                f"User asked:\n{user_text}\n\n"
-                f"Web results:\n{body}\n"
-            )
-
             assistant_text = ""
 
             try:
-                model_messages = [
-                    {
-                        "role": "system",
-                        "content": (
-                            "You summarize fresh web results. Be direct. "
-                            "Do not make up dates, scores, injuries, trades, or news."
-                        ),
-                    },
-                    {"role": "user", "content": prompt},
-                ]
+                prompt = (
+                    "Give a clear, confident, concise summary of the latest news using ONLY the fetched web text below.\n"
+                    "Prioritize the most recent and relevant items.\n"
+                    "Do not invent facts. Keep it direct and readable.\n\n"
+                    f"User asked:\n{user_text}\n\n"
+                    f"Web results:\n{body}\n"
+                )
 
                 response = self.client.chat.completions.create(
                     model=getattr(self, "model", "gpt-4o-mini"),
-                    messages=model_messages,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "You summarize fresh web results. Be direct. "
+                                "Do not make up dates, scores, injuries, trades, or news."
+                            ),
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
                     temperature=0.2,
                 )
 
@@ -2690,32 +2958,26 @@ class ChatService:
                 print("WEB_FETCH_SUMMARY_FAILED:", exc)
                 assistant_text = body[:1800].strip()
 
-            if sources:
-                assistant_text += "\n\n"
+            if not assistant_text:
+                assistant_text = body[:1800].strip()
 
-                for index, item in enumerate(sources[:5], start=1):
-                    title = self._safe_str(item.get("title")).strip()
-                    source = self._safe_str(item.get("source")).strip()
-                    url = self._safe_str(item.get("url")).strip()
+        print("WEB_SOURCES_FINAL:", sources)
+        print("WEB_SOURCE_URLS_FINAL:", source_urls)
 
-                    line = f"{source} — {title}" if source else title
+        if sources:
+            assistant_text = assistant_text.strip()
+            assistant_text += "\n\n— Top sources —\n"
 
-                    assistant_text += f"{index}source\n"
-                    assistant_text += f"{line}\n"
+            for index, item in enumerate(sources[:5], start=1):
+                title = self._safe_str(item.get("title")).strip()
+                source = self._safe_str(item.get("source")).strip()
+                url = self._safe_str(item.get("url")).strip()
 
-                    if url:
-                        assistant_text += f"{url}\n"
+                line = f"{index}. {source} — {title}" if source and title else f"{index}. {title or source or url}"
+                assistant_text += line + "\n"
 
-        # HARD WEB DEDUPE: keep only the last generated summary
-        markers = [
-            "\nHere’s the latest",
-            "\nHere are the latest",
-            "\nLatest ",
-        ]
-
-        for marker in markers:
-            if marker in assistant_text:
-                assistant_text = marker.strip() + assistant_text.split(marker)[-1]
+                if url and "news.google.com" not in url.lower():
+                    assistant_text += url + "\n"
 
         assistant_msg = self._build_assistant_message(
             assistant_text,
@@ -2723,25 +2985,69 @@ class ChatService:
                 "route": "web",
                 "strategy": "web_fetch",
                 "query": query,
-                "fresh": wants_fresh,
+                "fresh": False,
                 "source_urls": source_urls[:5],
                 "sources": sources[:5],
             },
         )
 
         return self._finalize_response(
-            session_id,
-            user_msg,
-            assistant_msg,
-            decision,
-        ) 
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+        )
 
     def _resolve_google_news_url(self, url: str) -> str:
         try:
+            url = self._safe_str(url).strip()
+
+            if not url or "news.google.com" not in url.lower():
+                return url
+
             import requests
-            res = requests.get(url, timeout=5, allow_redirects=True)
-            return res.url
-        except Exception:
+
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                )
+            }
+
+            try:
+                response = requests.head(
+                    url,
+                    headers=headers,
+                    timeout=15,
+                    allow_redirects=True,
+                )
+
+                final_url = self._safe_str(response.url).strip()
+
+                if final_url and "news.google.com" not in final_url.lower():
+                    return final_url
+
+            except Exception as e:
+                print("GOOGLE_NEWS_HEAD_RESOLVE_FAILED:", e)
+
+            response = requests.get(
+                url,
+                headers=headers,
+                timeout=15,
+                allow_redirects=True,
+            )
+
+            final_url = self._safe_str(response.url).strip()
+
+            if final_url and "news.google.com" not in final_url.lower():
+                return final_url
+
+            return url
+
+        except Exception as e:
+            print("GOOGLE_NEWS_RESOLVE_FAILED:", e)
             return url
 
     def _is_image_generation_request(self, user_text: str) -> bool:
@@ -3487,6 +3793,10 @@ class ChatService:
             print("MISSION_MEMORY_SAVE_ERROR:", e)
 
         route = str(decision.get("route") or "").lower()
+
+        # 🔥 FORCE WEB FETCH FOR NEWS QUERIES
+        if any(x in user_text.lower() for x in ["news", "latest", "update", "breaking"]):
+            route = self.ROUTE_WEB_FETCH
 
         try:
             if route == self.ROUTE_WEB_FETCH:
@@ -4331,31 +4641,40 @@ class ChatService:
                     for idx, item in enumerate(cleaned_ranked, start=1):
                         title = str(item.get("title") or "").strip()
                         domain = str(item.get("domain") or "").strip()
-                        url = str(item.get("url") or "").strip()
+                        url = str(
+                            item.get("resolved_url")
+                            or item.get("publisher_url")
+                            or item.get("source_url")
+                            or item.get("url")
+                            or ""
+                        ).strip()
 
                         lines.append(f"{idx}source")
                         lines.append(f"{domain} — {title}")
 
-                        if url:
+                        if url and "news.google.com" not in url.lower():
                             lines.append(url)
                             source_urls.append(url)
 
-                    sources_block = "\n" + "\n".join(lines)
+                    sources_block = ""
 
-                    sources_block = "\n" + "\n".join(lines)
 
             import re
 
-            clean_text = re.split(r"[-–—]\s*Top sources\s*[-–—]", text, flags=re.IGNORECASE)[0]
-            clean_text = re.split(r"\bTop sources\b", clean_text, flags=re.IGNORECASE)[0]
+            # ?? HARD CLEAN — remove ANY sources text
+            clean_text = re.split(
+                r"[-–—]\s*Top sources\s*[-–—]",
+                text,
+                flags=re.IGNORECASE
+            )[0]
 
-            text = clean_text.strip() + sources_block
+            clean_text = re.split(
+                r"\bTop sources\b",
+                clean_text,
+                flags=re.IGNORECASE
+            )[0]
 
-            if "Top sources" in text:
-                text = text.split("Top sources")[0].strip() + sources_block
-
-            if "— Top sources —" in text:
-                text = text.split("— Top sources —")[0].strip() + sources_block
+            text = clean_text.strip()
 
             return text
 
@@ -4372,7 +4691,8 @@ class ChatService:
         if top.get("url"):
             fallback_parts.append(str(top["url"]))
 
-        return "\n".join(fallback_parts).strip() or f'Hereâ€™s what I found for "{query}".'
+        return "\n".join(fallback_parts).strip() or f'Here’s what I found for "{query}".'
+ 
 
     # =========================
     # EXECUTION GUARD HELPERS (STEP TRUTH ENFORCEMENT)
@@ -4799,9 +5119,6 @@ class ChatService:
         text = str(value or "").strip().lower()
         text = re.sub(r"\s+", " ", text)
         return text
-
-    def _safe_str(self, value: Any) -> str:
-        return str(value or "").strip()
 
     def _normalize_memory_text_for_save(self, text) -> str:
         raw = self._safe_str(text).strip()
@@ -7072,7 +7389,7 @@ Next action:
                 },
             )
 
-            # 🔥 detect failure
+            # ?? detect failure
             if isinstance(result, str) and "Execution failed" in result:
                 fix_result = self._attempt_self_fix(
                     session_id=session_id,
@@ -8862,3 +9179,5 @@ def _build_chat_input(
 
         except Exception as e:
             print("MEMORY CLEANUP FAILED:", e)
+
+

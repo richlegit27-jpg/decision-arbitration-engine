@@ -10187,3 +10187,85 @@ button:active,
   line-height: 1.35;
   font-weight: 650;
 }
+
+/* ================================
+   NOVA SOURCE CARDS — PREMIUM LOCK
+   ================================ */
+
+.nova-source-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.nova-source-card,
+.source-card {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.72);
+  border-radius: 16px;
+  padding: 12px 14px;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.nova-source-card:hover,
+.source-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+}
+
+.nova-source-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.nova-source-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(96, 165, 250, 0.18);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+}
+
+.nova-source-domain {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.78;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.nova-source-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.nova-source-snippet {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 0.72;
+}
+
+.nova-source-card:active,
+.source-card:active {
+  transform: translateY(0);
+}

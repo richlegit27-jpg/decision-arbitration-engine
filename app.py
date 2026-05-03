@@ -1433,6 +1433,20 @@ def web_preview():
             )
         }
 
+        # Resolve Google News RSS redirect links into the real publisher page.
+        if "news.google.com/rss/articles/" in url or "news.google.com/articles/" in url:
+            try:
+                redirect_response = requests.get(
+                    url,
+                    headers=headers,
+                    timeout=10,
+                    allow_redirects=True,
+                )
+                if redirect_response.url:
+                    url = redirect_response.url
+            except Exception:
+                pass
+
         response = requests.get(
             url,
             headers=headers,
@@ -1454,6 +1468,7 @@ def web_preview():
             "aside",
             "form",
             "noscript",
+            "svg",
         ]):
             tag.decompose()
 
@@ -1461,9 +1476,35 @@ def web_preview():
         if soup.title and soup.title.string:
             title = soup.title.string.strip()
 
-        text = soup.get_text("\n", strip=True)
+        article = soup.find("article")
+        if article:
+            text = article.get_text("\n", strip=True)
+        else:
+            text = soup.get_text("\n", strip=True)
+
         lines = [line.strip() for line in text.splitlines() if line.strip()]
-        preview = "\n".join(lines[:24]).strip()
+
+        cleaned_lines = []
+        junk_phrases = [
+            "sign in",
+            "subscribe",
+            "advertisement",
+            "cookie",
+            "privacy policy",
+            "terms of use",
+            "enable javascript",
+            "all rights reserved",
+        ]
+
+        for line in lines:
+            low = line.lower()
+            if any(junk in low for junk in junk_phrases):
+                continue
+            if len(line) < 20:
+                continue
+            cleaned_lines.append(line)
+
+        preview = "\n".join(cleaned_lines[:24]).strip()
 
         if not preview:
             preview = "Preview route is working, but no readable article text was found."

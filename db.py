@@ -80,3 +80,19 @@ def init_db() -> None:
             )
 
         connection.commit()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
