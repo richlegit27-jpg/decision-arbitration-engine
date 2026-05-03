@@ -805,7 +805,14 @@ function renderExecution() {
 
       <div class="nova-panel-card">
         <div><strong>Status:</strong> ${escapeHtml(execution.status || "idle")}</div>
-        <div><strong>Current Step:</strong> ${escapeHtml(currentStep)}</div>
+        <div>
+          <strong>Current:</strong>
+          ${
+            isRunning
+              ? `Running step ${currentIndex + 1} of ${steps.length}`
+              : escapeHtml(currentStep)
+          }
+        </div>
         <div><strong>Progress:</strong> ${escapeHtml(String(doneCount))}/${escapeHtml(String(steps.length))} complete</div>
 
         <div style="margin-top:10px;height:8px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;">
@@ -823,6 +830,9 @@ function renderExecution() {
                 const isDone = stepStatus === "done" || stepStatus === "completed" || stepStatus === "success";
                 const isError = stepStatus === "error" || stepStatus === "failed";
                 const isActive = i === currentIndex && isRunning && !isDone && !isError;
+                const pulse = isActive
+                  ? "animation: novaPulse 1.2s ease-in-out infinite;"
+                  : "";
 
                 let icon = "○";
                 if (isActive) icon = "●";
@@ -837,6 +847,7 @@ function renderExecution() {
                       padding:12px;
                       margin-bottom:8px;
                       border-radius:12px;
+		      ${pulse}
                       background:${isActive ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.045)"};
                       border:${isActive ? "1px solid rgba(74,222,128,0.75)" : "1px solid rgba(255,255,255,0.08)"};
                       box-shadow:${isActive ? "0 0 0 3px rgba(74,222,128,0.08)" : "none"};
@@ -6404,3 +6415,16 @@ window.runExecutionAction = async function (action, button) {
     }
   }
 };
+
+if (!document.getElementById("nova-exec-anim")) {
+  const style = document.createElement("style");
+  style.id = "nova-exec-anim";
+  style.innerHTML = `
+    @keyframes novaPulse {
+      0% { transform: scale(1); box-shadow: 0 0 0 rgba(74,222,128,0.4); }
+      50% { transform: scale(1.02); box-shadow: 0 0 12px rgba(74,222,128,0.6); }
+      100% { transform: scale(1); box-shadow: 0 0 0 rgba(74,222,128,0.4); }
+    }
+  `;
+  document.head.appendChild(style);
+}
