@@ -4,7 +4,7 @@ import os
 import re
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask import Flask, Response, jsonify, render_template, request, send_from_directory
 from flask_cors import CORS
 from bs4 import BeautifulSoup
 import uuid
@@ -1361,6 +1361,95 @@ def execution_control():
         "session_id": session_id,
         "execution_state": execution,
     })
+
+@app.route("/api/execution/stream", methods=["POST"])
+def execution_stream():
+    data = request.get_json(silent=True) or {}
+
+    session_id = str(data.get("session_id") or "").strip()
+    action = str(data.get("action") or "").strip()
+
+    def send_event(name, payload):
+        import json
+        return f"event: {name}\ndata: {json.dumps(payload)}\n\n"
+
+    def generate():
+        import time
+
+        if not session_id:
+            yield send_event("error", {"ok": False, "error": "missing session_id", "done": True})
+            return
+
+        if not action:
+            yield send_event("error", {"ok": False, "error": "missing action", "done": True})
+            return
+
+        working = chat_service._get_working_state(session_id) or {}
+        execution = working.get("execution") or {}
+
+        steps = execution.get("steps") if isinstance(execution.get("steps"), list) else []
+        history = execution.get("history") if isinstance(execution.get("history"), list) else []
+
+        execution = {
+            "status": str(execution.get("status") or "idle"),
+            "steps": steps,
+            "history": history,
+            "last_action": str(execution.get("last_action") or ""),
+            "current_step": str(execution.get("current_step") or ""),
+        }
+
+        yield send_event("start", {
+            "ok": True,
+            "action": action,
+            "session_id": session_id,
+            "execution_state": execution,
+            "done": False,
+        })
+
+        if action == "run_all":
+            start_num = len(execution["steps"]) + 1
+
+            for offset in range(3):
+                step_num = start_num + offset
+                step_title = f"Step {step_num}"
+
+                execution["current_step"] = step_title
+                execution["status"] = "running"
+
+                yield send_event("step_start", {
+                    "step": {
+                        "title": step_title,
+                        "status": "running",
+                        "output": f"{step_title} running...",
+                    },
+                    "execution_state": execution,
+                    "done": False,
+                })
+
+                time.sleep(0.4)
+
+                execution["steps"].append({
+                    "title": step_title,
+                    "status": "done",
+                    "output": f"{step_title} completed.",
+                })
+
+                yield send_event("step_done", {
+                    "step": execution["steps"][-1],
+                    "execution_state": execution,
+                    "done": False,
+                })
+
+        execution["status"] = "complete"
+        execution["current_step"] = "Done"
+
+        yield send_event("done", {
+            "ok": True,
+            "execution_state": execution,
+            "done": True,
+        })
+
+    return Response(generate(), mimetype="text/event-stream")
 
 @app.route("/api/debug/execution", methods=["GET"])
 def api_debug_execution():

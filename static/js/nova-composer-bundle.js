@@ -807,15 +807,21 @@ const execution =
     </div>
   `;
 
-  container.onclick = function (event) {
-    const button = event.target.closest("[data-exec-action]");
-    if (!button) return;
+container.onclick = function (event) {
+  const button = event.target.closest("[data-exec-action]");
+  if (!button) return;
 
-    runExecutionAction(
+  event.preventDefault();
+  event.stopPropagation();
+
+  if (typeof window.runExecutionAction === "function") {
+    window.runExecutionAction(
       button.getAttribute("data-exec-action"),
       button
     );
-  };
+  }
+};
+
 }
 
 window.renderExecution = renderExecution;
@@ -6156,6 +6162,35 @@ setTimeout(() => {
   if (attachBtn) attachBtn.textContent = "+";
 }, 500);
 
+// =============================
+// FIX: sidebar toggle wiring
+// =============================
+document.querySelectorAll("[data-sidebar-toggle]").forEach(function (button) {
+  if (button.__novaSidebarToggleWired) return;
+  button.__novaSidebarToggleWired = true;
+
+  button.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const body = document.body;
+    const sidebar = document.querySelector("[data-left-sidebar]");
+    const backdrop = document.querySelector("[data-sidebar-backdrop]");
+
+    const isOpen = body.classList.contains("is-sidebar-open");
+
+    if (isOpen) {
+      body.classList.remove("is-sidebar-open");
+      if (sidebar) sidebar.classList.remove("is-open");
+      if (backdrop) backdrop.hidden = true;
+    } else {
+      body.classList.add("is-sidebar-open");
+      if (sidebar) sidebar.classList.add("is-open");
+      if (backdrop) backdrop.hidden = false;
+    }
+  });
+});
+
 })();
 
 // =============================
@@ -6193,7 +6228,7 @@ window.setRailTab = window.setRailTab || function (tabName) {
   }
 };
 
-window.runExecutionAction = window.runExecutionAction || async function (action, button) {
+window.runExecutionAction = async function (action, button) {
   const state = window.NovaComposerState || {};
 
   let sessionId =
@@ -6221,27 +6256,82 @@ window.runExecutionAction = window.runExecutionAction || async function (action,
     return;
   }
 
-  const response = await fetch("/api/execution/control", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      session_id: sessionId,
-      action: action,
-    }),
-  });
-
-  const result = await response.json();
-  console.log("[EXECUTION RESULT]", result);
-
-  if (result && result.execution_state) {
-    window.NovaExecutionState = result.execution_state;
-    window.NovaComposerState = window.NovaComposerState || {};
-    window.NovaComposerState.execution = result.execution_state;
+  if (button) {
+    button.disabled = true;
   }
 
-  if (typeof window.renderExecutionPanel === "function") {
-    window.renderExecutionPanel();
-  } else if (typeof window.renderExecution === "function") {
-    window.renderExecution();
+  try {
+    const response = await fetch("/api/execution/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: sessionId,
+        action: action,
+      }),
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error("Execution stream failed");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+
+      events.forEach(function (rawEvent) {
+        if (!rawEvent || !rawEvent.trim()) return;
+
+        const lines = rawEvent.split("\n");
+        let eventName = "";
+        let data = "";
+
+        lines.forEach(function (line) {
+          if (line.startsWith("event:")) {
+            eventName = line.replace("event:", "").trim();
+          } else if (line.startsWith("data:")) {
+            data += line.replace("data:", "").trim();
+          }
+        });
+
+        if (!data) return;
+
+        let payload;
+        try {
+          payload = JSON.parse(data);
+        } catch (err) {
+          console.error("[STREAM PARSE ERROR]", err);
+          return;
+        }
+
+        console.log("[EXECUTION STREAM]", eventName, payload);
+
+        if (payload.execution_state) {
+          window.NovaExecutionState = payload.execution_state;
+          window.NovaComposerState = window.NovaComposerState || {};
+          window.NovaComposerState.execution = payload.execution_state;
+
+          if (typeof window.renderExecutionPanel === "function") {
+            window.renderExecutionPanel();
+          } else if (typeof window.renderExecution === "function") {
+            window.renderExecution();
+          }
+        }
+      });
+    }
+  } catch (err) {
+    console.error("[EXECUTION STREAM ERROR]", err);
+  } finally {
+    if (button) {
+      button.disabled = false;
+    }
   }
 };
