@@ -3249,7 +3249,10 @@ function finalizeStreamMessage(payload) {
       : "") ||
     (existing && existing.text) ||
     ""
-  );
+  )
+    .replaceAll("AUTO_EXECUTE", "")
+    .replaceAll("TEST_FAIL", "")
+    .trim();
 
   const finalMessage = normalizeMessage({
     id: targetId,
@@ -3358,10 +3361,20 @@ if (
   typeof window.runExecutionAction === "function"
 ) {
   requestAnimationFrame(() => {
-    window.runExecutionAction(autoExecuteMessage.meta.execution_action || "run_step");
+    const execResult =
+      autoExecuteMessage.meta.execution_result || {};
+
+    const status = String(execResult.status || "").toLowerCase();
+
+    if (status === "failed") {
+      window.runExecutionAction("retry_failed");
+    } else {
+      window.runExecutionAction(
+        autoExecuteMessage.meta.execution_action || "run_step"
+      );
+    }
   });
 }
-
   renderChat();
   renderSessionList();
   renderArtifacts();
@@ -3827,6 +3840,7 @@ if (!Array.isArray(state.messages)) {
   renderChat();
   return userMessage;
 }
+
 async function consumeChatJson(payload) {
   state.stream = state.stream || {
     running: false,
@@ -3897,15 +3911,16 @@ if (pendingAction && typeof window.runExecutionAction === "function") {
     // Load backend state if present.
     applyStatePayload(data || {});
 
-    // âœ… ASSISTANT RENDER LOCK:
-    // If backend returned assistant_message but applyStatePayload did not render it,
-    // insert it once here.
-    const assistantMsg =
-      data && data.assistant_message && typeof data.assistant_message === "object"
-        ? normalizeMessage(data.assistant_message)
-        : null;
+const assistantMsg =
+  data && data.assistant_message
+    ? normalizeMessage(
+        typeof data.assistant_message === "string"
+          ? { text: data.assistant_message }
+          : data.assistant_message
+      )
+    : null;
 
-    if (assistantMsg && String(assistantMsg.text || "").trim()) {
+if (assistantMsg?.text?.trim()) {
       const assistantText = String(assistantMsg.text || "").trim();
 
       const exists = (state.messages || []).some(function (msg) {

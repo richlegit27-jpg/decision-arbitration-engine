@@ -33,6 +33,7 @@ from nova_backend.services.intent_router_service import IntentRouterService
 from nova_backend.utils.file_utils import ensure_dir
 from nova_backend.services.chat_service import ChatService
 from nova_backend.services.execution_handler import NextMove, default_executor
+from nova_backend.services.execution_daemon import ExecutionDaemon
 
 # -----------------------
 # APP SETUP
@@ -1423,7 +1424,10 @@ def execution_stream():
     action = str(data.get("action") or "").strip()
     action_text = str(action or "").lower().strip()
 
-    if action_text in {"auto", "auto mode", "autopilot"}:
+    if action_text in {"fix_file", "auto_fix", "apply_fix", "apply fix"}:
+        action = "fix_file"
+
+    elif action_text in {"auto", "auto mode", "autopilot"}:
         action = "run_all"
 
     elif action_text in {
@@ -1517,6 +1521,94 @@ def execution_stream():
             "execution_state": execution,
             "done": False,
         })
+
+        if action == "fix_file":
+            execution = EXECUTION_STATE_CACHE.get(session_id) or {
+                "status": "idle",
+                "steps": [],
+                "history": [],
+                "last_action": "",
+                "current_step": "",
+            }
+
+            pending_file = ""
+            pending_code = ""
+
+            try:
+                session = session_service.get_session(session_id)
+                working_state = session.get("working_state", {}) if isinstance(session, dict) else {}
+                meta = session.get("meta", {}) if isinstance(session, dict) else {}
+
+                pending_file = str(
+                    working_state.get("pending_fix_file_path")
+                    or meta.get("pending_fix_file_path")
+                    or ""
+                ).strip()
+
+                pending_code = str(
+                    working_state.get("pending_fix_code")
+                    or meta.get("pending_fix_code")
+                    or ""
+                )
+
+            except Exception:
+                pending_file = ""
+                pending_code = ""
+
+            step = {
+                "title": "Apply pending file fix",
+                "status": "running",
+                "move": {
+                    "id": f"fix-file-{uuid.uuid4().hex}",
+                    "type": "fix_file",
+                    "payload": {
+                        "file_path": pending_file,
+                        "code": pending_code,
+                    },
+                },
+            }
+
+            execution["status"] = "running"
+            execution["current_step"] = step["title"]
+            execution["last_action"] = action
+            execution.setdefault("steps", []).append(step)
+            save_execution(execution)
+
+            yield send_event("step_start", {
+                "step": step,
+                "execution_state": execution,
+                "done": False,
+            })
+
+            result = default_executor(NextMove(
+                id=step["move"]["id"],
+                type="fix_file",
+                payload=step["move"]["payload"],
+            ))
+
+            ok = str(result.status or "").lower() == "success"
+
+            step["status"] = "done" if ok else "failed"
+            step["output"] = result.output or {"error": result.error}
+            execution["status"] = "complete" if ok else "error"
+            execution["current_step"] = "Fix applied" if ok else "Fix failed"
+            execution.setdefault("history", []).append(
+                f"fix_file: {'success' if ok else 'failed'}"
+            )
+            save_execution(execution)
+
+            yield send_event("step_done", {
+                "step": step,
+                "execution_state": execution,
+                "done": False,
+            })
+
+            yield send_event("done", {
+                "ok": ok,
+                "execution_state": execution,
+                "done": True,
+            })
+            return
 
         if action == "run_all":
             start_num = len(execution["steps"]) + 1

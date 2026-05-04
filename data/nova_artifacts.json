@@ -1,1 +1,356 @@
-[]
+{
+  "artifacts": [
+    {
+      "kind": "execution",
+      "title": "Execution Plan",
+      "body": "Steps:\n[x] Step 1: Start execution chain\n[>] Step 2: Advance execution chain\n[ ] Step 3: Complete execution chain\n\nProgress: 1/3 complete\nCurrent step: Step 2: Advance execution chain",
+      "summary": "Execution plan for: ",
+      "preview": "Steps:\n[x] Step 1: Start execution chain\n[>] Step 2: Advance execution chain\n[ ] Step 3: Complete execution chain\n\nProgress: 1/3 complete\nCu",
+      "session_id": "session_e4921cf21d2245ab82cefaa344c6c1a6",
+      "source": "execution",
+      "execution": {
+        "status": "running",
+        "steps": [
+          {
+            "title": "Step 1: Start execution chain",
+            "status": "done"
+          },
+          {
+            "title": "Step 2: Advance execution chain",
+            "status": "current"
+          },
+          {
+            "title": "Step 3: Complete execution chain",
+            "status": "pending"
+          }
+        ],
+        "history": [],
+        "last_action": "plan_created",
+        "current_step": "Step 2: Advance execution chain",
+        "goal": "",
+        "current_step_index": 1,
+        "progress": 1
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 1,
+        "total": 3,
+        "paused": false,
+        "active_execution": true
+      },
+      "id": "artifact_cd836411c4c049d1959131d1197ee112",
+      "updated_at": "2026-05-04T06:26:28.513300+00:00",
+      "created_at": "2026-05-04T06:26:28.513300+00:00"
+    },
+    {
+      "kind": "execution",
+      "title": "Execution Plan",
+      "body": "Steps:\n[x] Step 1: Start execution chain\n[x] Step 2: Advance execution chain\n[>] Step 3: Complete execution chain\n\nProgress: 2/3 complete\nCurrent step: Step 3: Complete execution chain",
+      "summary": "Execution plan for: ",
+      "preview": "Steps:\n[x] Step 1: Start execution chain\n[x] Step 2: Advance execution chain\n[>] Step 3: Complete execution chain\n\nProgress: 2/3 complete\nCu",
+      "session_id": "session_e4921cf21d2245ab82cefaa344c6c1a6",
+      "source": "execution",
+      "execution": {
+        "status": "running",
+        "steps": [
+          {
+            "title": "Step 1: Start execution chain",
+            "status": "done"
+          },
+          {
+            "title": "Step 2: Advance execution chain",
+            "status": "done"
+          },
+          {
+            "title": "Step 3: Complete execution chain",
+            "status": "current"
+          }
+        ],
+        "history": [],
+        "last_action": "plan_created",
+        "current_step": "Step 3: Complete execution chain",
+        "goal": "",
+        "current_step_index": 2,
+        "progress": 2
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 2,
+        "total": 3,
+        "paused": false,
+        "active_execution": true
+      },
+      "id": "artifact_aa09727b41b547a4a5f18ad4482c1fe1",
+      "updated_at": "2026-05-04T06:28:22.782590+00:00",
+      "created_at": "2026-05-04T06:28:22.782590+00:00"
+    },
+    {
+      "kind": "execution",
+      "title": "Execution Plan",
+      "body": "Steps:\n[x] Step 1: Start execution chain\n[x] Step 2: Advance execution chain\n[x] Step 3: Complete execution chain\n\nProgress: 3/3 complete\nCurrent step: complete",
+      "summary": "Execution plan for: ",
+      "preview": "Steps:\n[x] Step 1: Start execution chain\n[x] Step 2: Advance execution chain\n[x] Step 3: Complete execution chain\n\nProgress: 3/3 complete\nCu",
+      "session_id": "session_e4921cf21d2245ab82cefaa344c6c1a6",
+      "source": "execution",
+      "execution": {
+        "status": "complete",
+        "steps": [
+          {
+            "title": "Step 1: Start execution chain",
+            "status": "done"
+          },
+          {
+            "title": "Step 2: Advance execution chain",
+            "status": "done"
+          },
+          {
+            "title": "Step 3: Complete execution chain",
+            "status": "done"
+          }
+        ],
+        "history": [],
+        "last_action": "plan_created",
+        "current_step": "complete",
+        "goal": "",
+        "current_step_index": 3,
+        "progress": 3
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": true,
+        "done": 3,
+        "total": 3,
+        "paused": false,
+        "active_execution": false
+      },
+      "id": "artifact_0b836a5afb954d44acb7109551f452e0",
+      "updated_at": "2026-05-04T06:32:44.371810+00:00",
+      "created_at": "2026-05-04T06:32:44.371810+00:00"
+    },
+    {
+      "kind": "execution",
+      "title": "Execution Plan",
+      "body": "Steps:\n[x] Step 1: Start execution chain\n[>] Step 2: Advance execution chain\n[ ] Step 3: Complete execution chain\n\nProgress: 1/3 complete\nCurrent step: Step 2: Advance execution chain",
+      "summary": "Execution plan for: ",
+      "preview": "Steps:\n[x] Step 1: Start execution chain\n[>] Step 2: Advance execution chain\n[ ] Step 3: Complete execution chain\n\nProgress: 1/3 complete\nCu",
+      "session_id": "session_e4921cf21d2245ab82cefaa344c6c1a6",
+      "source": "execution",
+      "execution": {
+        "status": "running",
+        "steps": [
+          {
+            "title": "Step 1: Start execution chain",
+            "status": "done"
+          },
+          {
+            "title": "Step 2: Advance execution chain",
+            "status": "current"
+          },
+          {
+            "title": "Step 3: Complete execution chain",
+            "status": "pending"
+          }
+        ],
+        "history": [],
+        "last_action": "plan_created",
+        "current_step": "Step 2: Advance execution chain",
+        "goal": "",
+        "current_step_index": 1,
+        "progress": 1
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 1,
+        "total": 3,
+        "paused": false,
+        "active_execution": true
+      },
+      "id": "artifact_13dba8fc749445f68d09b8b2ad24e444",
+      "updated_at": "2026-05-04T06:56:00.035185+00:00",
+      "created_at": "2026-05-04T06:56:00.035185+00:00"
+    },
+    {
+      "kind": "execution",
+      "title": "Execution Plan",
+      "body": "Steps:\n[x] Step 1: Start execution chain\n[x] Step 2: Advance execution chain\n[>] Step 3: Complete execution chain\n\nProgress: 2/3 complete\nCurrent step: Step 3: Complete execution chain",
+      "summary": "Execution plan for: ",
+      "preview": "Steps:\n[x] Step 1: Start execution chain\n[x] Step 2: Advance execution chain\n[>] Step 3: Complete execution chain\n\nProgress: 2/3 complete\nCu",
+      "session_id": "session_e4921cf21d2245ab82cefaa344c6c1a6",
+      "source": "execution",
+      "execution": {
+        "status": "running",
+        "steps": [
+          {
+            "title": "Step 1: Start execution chain",
+            "status": "done"
+          },
+          {
+            "title": "Step 2: Advance execution chain",
+            "status": "done"
+          },
+          {
+            "title": "Step 3: Complete execution chain",
+            "status": "current"
+          }
+        ],
+        "history": [],
+        "last_action": "plan_created",
+        "current_step": "Step 3: Complete execution chain",
+        "goal": "",
+        "current_step_index": 2,
+        "progress": 2
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": false,
+        "done": 2,
+        "total": 3,
+        "paused": false,
+        "active_execution": true
+      },
+      "id": "artifact_a04662d7e18e4d2ba2d368ee0c001e55",
+      "updated_at": "2026-05-04T07:16:12.126985+00:00",
+      "created_at": "2026-05-04T07:16:12.126985+00:00"
+    },
+    {
+      "kind": "execution",
+      "title": "Execution Plan",
+      "body": "Steps:\n[x] Step 1: Start execution chain\n[x] Step 2: Advance execution chain\n[x] Step 3: Complete execution chain\n\nProgress: 3/3 complete\nCurrent step: complete",
+      "summary": "Execution plan for: ",
+      "preview": "Steps:\n[x] Step 1: Start execution chain\n[x] Step 2: Advance execution chain\n[x] Step 3: Complete execution chain\n\nProgress: 3/3 complete\nCu",
+      "session_id": "session_e4921cf21d2245ab82cefaa344c6c1a6",
+      "source": "execution",
+      "execution": {
+        "status": "complete",
+        "steps": [
+          {
+            "title": "Step 1: Start execution chain",
+            "status": "done"
+          },
+          {
+            "title": "Step 2: Advance execution chain",
+            "status": "done"
+          },
+          {
+            "title": "Step 3: Complete execution chain",
+            "status": "done"
+          }
+        ],
+        "history": [],
+        "last_action": "plan_created",
+        "current_step": "complete",
+        "goal": "",
+        "current_step_index": 3,
+        "progress": 3
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": true,
+        "done": 3,
+        "total": 3,
+        "paused": false,
+        "active_execution": false
+      },
+      "id": "artifact_0526599db68a43a19f11649a8159e877",
+      "updated_at": "2026-05-04T07:19:29.197891+00:00",
+      "created_at": "2026-05-04T07:19:29.197891+00:00"
+    },
+    {
+      "kind": "execution",
+      "title": "Execution Plan",
+      "body": "Steps:\n[x] Step 1: Start execution chain\n[x] Step 2: Advance execution chain\n[x] Step 3: Complete execution chain\n\nProgress: 3/3 complete\nCurrent step: complete",
+      "summary": "Execution plan for: ",
+      "preview": "Steps:\n[x] Step 1: Start execution chain\n[x] Step 2: Advance execution chain\n[x] Step 3: Complete execution chain\n\nProgress: 3/3 complete\nCu",
+      "session_id": "session_e4921cf21d2245ab82cefaa344c6c1a6",
+      "source": "execution",
+      "execution": {
+        "status": "complete",
+        "steps": [
+          {
+            "title": "Step 1: Start execution chain",
+            "status": "done"
+          },
+          {
+            "title": "Step 2: Advance execution chain",
+            "status": "done"
+          },
+          {
+            "title": "Step 3: Complete execution chain",
+            "status": "done"
+          }
+        ],
+        "history": [],
+        "last_action": "plan_created",
+        "current_step": "complete",
+        "goal": "",
+        "current_step_index": 3,
+        "progress": 3
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": true,
+        "done": 3,
+        "total": 3,
+        "paused": false,
+        "active_execution": false
+      },
+      "id": "artifact_a78c224f7b4143ca91bacea87a448138",
+      "updated_at": "2026-05-04T07:35:23.155497+00:00",
+      "created_at": "2026-05-04T07:35:23.155497+00:00"
+    },
+    {
+      "kind": "execution",
+      "title": "Execution Plan",
+      "body": "Steps:\n[x] Step 1: Start execution chain\n[x] Step 2: Advance execution chain\n[x] Step 3: Complete execution chain\n\nProgress: 3/3 complete\nCurrent step: complete",
+      "summary": "Execution plan for: ",
+      "preview": "Steps:\n[x] Step 1: Start execution chain\n[x] Step 2: Advance execution chain\n[x] Step 3: Complete execution chain\n\nProgress: 3/3 complete\nCu",
+      "session_id": "session_e4921cf21d2245ab82cefaa344c6c1a6",
+      "source": "execution",
+      "execution": {
+        "status": "complete",
+        "steps": [
+          {
+            "title": "Step 1: Start execution chain",
+            "status": "done"
+          },
+          {
+            "title": "Step 2: Advance execution chain",
+            "status": "done"
+          },
+          {
+            "title": "Step 3: Complete execution chain",
+            "status": "done"
+          }
+        ],
+        "history": [],
+        "last_action": "plan_created",
+        "current_step": "complete",
+        "goal": "",
+        "current_step_index": 3,
+        "progress": 3
+      },
+      "meta": {
+        "auto_generated": true,
+        "auto_executed": false,
+        "complete": true,
+        "done": 3,
+        "total": 3,
+        "paused": false,
+        "active_execution": false
+      },
+      "id": "artifact_21fde646fef1473ba0732f98bb1db1a3",
+      "updated_at": "2026-05-04T07:45:40.681270+00:00",
+      "created_at": "2026-05-04T07:45:40.681270+00:00"
+    }
+  ]
+}

@@ -125,6 +125,35 @@ def default_executor(move: NextMove) -> ExecutionResult:
         # CORE MOVES
         # =============================
 
+
+        if move_type == "test_fail":
+            return ExecutionResult(
+                move_id=move.id,
+                status="failed",
+                output={"test": "forced failure"},
+                error="Forced test failure for self-healing loop.",
+                next_moves=[
+                    make_move("retry_failed"),
+                    make_move("run_step"),
+                ],
+            )
+
+        if move_type == "run_step":
+            return ExecutionResult(
+                move_id=move.id,
+                status="success",
+                output={
+                    "message": "Run step executed.",
+                    "next_move": "review execution result and choose the next move",
+                },
+                next_moves=[
+                    make_move("run_step"),
+                    make_move("retry_failed"),
+                    make_move("run_all"),
+                    make_move("review_execution_result"),
+                ],
+            )
+
         if move_type == "log":
             return ExecutionResult(
                 move_id=move.id,
@@ -187,6 +216,56 @@ def default_executor(move: NextMove) -> ExecutionResult:
         # =============================
         # FILE OPERATIONS
         # =============================
+
+        if move_type == "fix_file":
+            file_path = str(payload.get("file_path") or "").strip()
+            new_code = str(payload.get("code") or "")
+
+            if not file_path or not new_code.strip():
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error="Missing file_path or code.",
+                )
+
+            path = Path(file_path)
+
+            if not path.exists():
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error=f"File does not exist: {file_path}",
+                )
+
+            # 🔥 backup original
+            backup_path = path.with_suffix(path.suffix + f".bak_{int(time.time())}")
+            shutil.copy2(path, backup_path)
+
+            # 🔥 write new code
+            path.write_text(new_code, encoding="utf-8")
+
+            compile_ok = True
+            compile_error = ""
+
+            # 🔥 compile check for python files
+            if path.suffix == ".py":
+                try:
+                    py_compile.compile(str(path), doraise=True)
+                except Exception as e:
+                    compile_ok = False
+                    compile_error = str(e)
+
+            return ExecutionResult(
+                move_id=move.id,
+                status="success" if compile_ok else "failed",
+                output={
+                    "file_path": str(path),
+                    "backup": str(backup_path),
+                    "compiled": compile_ok,
+                    "compile_error": compile_error,
+                },
+                error=compile_error if not compile_ok else "",
+            )
 
         if move_type == "apply_function_fix":
             file_path = str(payload.get("file_path") or "").strip()
