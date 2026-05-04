@@ -799,18 +799,56 @@ function renderExecution() {
       ? Math.round((doneCount / steps.length) * 100)
       : 0;
 
-  container.innerHTML = `
-    <div class="nova-panel-shell">
+container.innerHTML = `
+  <div class="nova-panel-shell">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
       <div class="nova-panel-title">Execution</div>
+      <div style="
+        font-size:11px;
+        padding:5px 10px;
+        border-radius:999px;
+        font-weight:700;
+        letter-spacing:.04em;
+        background:${
+          status === "error" || status === "failed"
+            ? "rgba(255,80,80,.18)"
+            : isRunning
+              ? "rgba(74,222,128,.18)"
+              : "rgba(255,255,255,.08)"
+        };
+        border:1px solid ${
+          status === "error" || status === "failed"
+            ? "rgba(255,80,80,.45)"
+            : isRunning
+              ? "rgba(74,222,128,.45)"
+              : "rgba(255,255,255,.12)"
+        };
+      ">
+        ${escapeHtml(status)}
+      </div>
+    </div>
 
 <div class="nova-panel-card" style="display:flex;gap:8px;flex-wrap:wrap;">
-  <button type="button" data-exec-action="run_step" ${isRunning ? "disabled" : ""}>Run Step</button>
-  <button type="button" data-exec-action="run_all" ${isRunning ? "disabled" : ""}>Run All</button>
-  <button type="button" data-exec-action="retry_failed" ${isRunning ? "disabled" : ""}>Retry Failed</button>
-  <button type="button" data-exec-action="replay_last" ${isRunning ? "disabled" : ""}>Replay Last</button>
-  <button type="button" data-exec-action="stop">Stop</button>
-</div>
+  <button type="button" data-exec-action="run_step" ${isRunning ? "disabled" : ""}>
+    ▶ Run Step
+  </button>
 
+  <button type="button" data-exec-action="run_all" ${isRunning ? "disabled" : ""}>
+    ⚡ Run All
+  </button>
+
+  <button type="button" data-exec-action="retry_failed" ${isRunning ? "disabled" : ""}>
+    🔁 Retry Failed
+  </button>
+
+  <button type="button" data-exec-action="replay_last" ${isRunning ? "disabled" : ""}>
+    ↺ Replay Last
+  </button>
+
+  <button type="button" data-exec-action="stop" ${!isRunning ? "disabled" : ""}>
+    ⛔ Stop
+  </button>
+</div>
       <div class="nova-panel-card">
         <div><strong>Mission:</strong> ${escapeHtml(mission.current_goal || "-")}</div>
         <div><strong>Next Action:</strong> ${escapeHtml(mission.next_action || "-")}</div>
@@ -834,73 +872,89 @@ function renderExecution() {
       <div class="nova-panel-card" data-execution-steps-list>
         ${
           steps.length
-            ? steps.map(function (step, i) {
-const stepStatus = String(step && step.status ? step.status : "pending").toLowerCase();
-const title = step.title || step.text || "Step " + (i + 1);
-const isDone = stepStatus === "done" || stepStatus === "completed" || stepStatus === "success";
-const isError = stepStatus === "error" || stepStatus === "failed";
-const isActive =
-  (i === currentIndex && isRunning && !isDone && !isError) ||
-  stepStatus === "running";
-const pulse = isActive
-  ? "animation: novaPulse 1.2s ease-in-out infinite;"
-  : "";
 
-const outputPreview =
-  typeof step.output === "string"
-    ? step.output
-    : step.output && typeof step.output === "object"
-      ? JSON.stringify(step.output)
+? steps.map(function (step, i) {
+    const stepStatus = String(step && step.status ? step.status : "pending").toLowerCase();
+    const title = step.title || step.text || "Step " + (i + 1);
+    const isDone = stepStatus === "done" || stepStatus === "completed" || stepStatus === "success";
+    const isError = stepStatus === "error" || stepStatus === "failed";
+    const isActive =
+      (i === currentIndex && isRunning && !isDone && !isError) ||
+      stepStatus === "running";
+    const pulse = isActive
+      ? "animation: novaPulse 1.2s ease-in-out infinite;"
       : "";
 
-const canReplay = step && step.move && typeof step.move === "object";
+    const outputPreview =
+      typeof step.output === "string"
+        ? step.output
+        : step.output && typeof step.output === "object"
+          ? JSON.stringify(step.output)
+          : "";
 
-                let icon = "○";
-                if (isActive) icon = "●";
-                if (isDone) icon = "✓";
-                if (isError) icon = "✕";
+    const canReplay = step && step.move && typeof step.move === "object";
 
-                return `
-                  <div
-                    data-execution-step-row
-                    data-active="${isActive ? "true" : "false"}"
-                    style="
-                      padding:12px;
-                      margin-bottom:8px;
-                      border-radius:12px;
-		      ${pulse}
-                      background:${isActive ? "rgba(74,222,128,0.12)" : "rgba(255,255,255,0.045)"};
-                      border:${isActive ? "1px solid rgba(74,222,128,0.75)" : "1px solid rgba(255,255,255,0.08)"};
-                      box-shadow:${isActive ? "0 0 0 3px rgba(74,222,128,0.08)" : "none"};
-                      transition:all 160ms ease;
-                    "
-                  >
-<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-  <strong>${escapeHtml(icon)} ${escapeHtml(title)}</strong>
-  <span style="opacity:0.72;font-size:12px;">${escapeHtml(stepStatus)}</span>
-</div>
+    let icon = "⏳";
+    if (isActive) icon = "⚡";
+    if (isDone) icon = "✅";
+    if (isError) icon = "❌";
 
-${
-  outputPreview
-    ? `<div style="margin-top:8px;font-size:12px;opacity:.68;line-height:1.4;word-break:break-word;">
-        ${escapeHtml(outputPreview)}
-      </div>`
-    : ""
-}
+    return `
+      <div
+        data-execution-step-row
+        data-active="${isActive ? "true" : "false"}"
+        style="
+          padding:12px;
+          margin-bottom:8px;
+          border-radius:12px;
+          ${pulse}
+          background:${
+            isError
+              ? "rgba(255,80,80,0.12)"
+              : isActive
+                ? "rgba(74,222,128,0.14)"
+                : "rgba(255,255,255,0.045)"
+          };
+          border:${
+            isError
+              ? "1px solid rgba(255,80,80,0.65)"
+              : isActive
+                ? "1px solid rgba(74,222,128,0.85)"
+                : "1px solid rgba(255,255,255,0.08)"
+          };
+          box-shadow:${isActive ? "0 0 0 3px rgba(74,222,128,0.08)" : "none"};
+          transition:all 160ms ease;
+        "
+      >
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <strong>${escapeHtml(icon)} ${escapeHtml(title)}</strong>
+          <span style="opacity:0.72;font-size:12px;">${escapeHtml(stepStatus)}</span>
+        </div>
 
-${
-  canReplay
-    ? `<button type="button"
-        data-exec-action="replay_step"
-        data-exec-step-index="${i}"
-        style="margin-top:10px;padding:7px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:12px;">
-        Replay
-      </button>`
-    : ""
-}
-                  </div>
-                `;
-              }).join("")
+        ${
+          outputPreview
+            ? `<div style="margin-top:8px;font-size:12px;opacity:.68;line-height:1.4;word-break:break-word;">
+                ${escapeHtml(outputPreview)}
+              </div>`
+            : ""
+        }
+
+        ${
+          canReplay
+            ? `<button
+                type="button"
+                data-exec-action="replay_step"
+                data-exec-step-index="${i}"
+                style="margin-top:10px;padding:7px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:12px;"
+              >
+                Replay
+              </button>`
+            : ""
+        }
+      </div>
+    `;
+  }).join("")
+
             : '<div class="nova-panel-muted">No steps yet. Click Run Step.</div>'
         }
       </div>
