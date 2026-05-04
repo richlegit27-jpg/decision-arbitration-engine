@@ -1421,10 +1421,12 @@ def execution_stream():
 
     session_id = str(data.get("session_id") or "").strip()
     action = str(data.get("action") or "").strip()
-
     action_text = str(action or "").lower().strip()
 
-    if action_text in {
+    if action_text in {"auto", "auto mode", "autopilot"}:
+        action = "run_all"
+
+    elif action_text in {
         "next", "nex", "continue", "continue on",
         "keep going", "go", "run next",
         "next step", "what next", "what now"
