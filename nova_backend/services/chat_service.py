@@ -117,6 +117,13 @@ class ChatService:
             return False
 
     def _auto_execute_request(self, user_text: str, session_id: str = "", attachments=None):
+        # DISABLE OLD AUTO EXECUTE PATH (route everything to advance_execution)
+        return self._advance_execution_request(
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
+
         text = str(user_text or "").lower().strip()
         session_id = str(session_id or "").strip()
 
@@ -192,6 +199,31 @@ class ChatService:
 
             if hasattr(self.execution_handler, "run_next_move"):
                 result = self.execution_handler.run_next_move(move)
+
+                # AUTO MODE LOOP
+                if text in {"auto mode", "run_all"}:
+                    try:
+                        while True:
+                            status = self._safe_str(
+                                result.get("status")
+                                if isinstance(result, dict)
+                                else getattr(result, "status", "")
+                            ).lower()
+
+                            if status in {"complete", "completed", "error", "failed"}:
+                                break
+
+                            move = NextMove(
+                                id=f"{session_id}:run_step",
+                                type="run_step",
+                                payload={},
+                            )
+
+                            result = self.execution_handler.run_next_move(move)
+
+                    except Exception:
+                        pass
+
             elif hasattr(self.execution_handler, "run_chain"):
                 chain_results = self.execution_handler.run_chain(move)
                 result = chain_results[-1] if chain_results else None
@@ -202,28 +234,45 @@ class ChatService:
             exec_debug("EXECUTION STATE AFTER RUN:", result)
 
             if getattr(result, "status", "") == "failed":
-                try:
-                    self._update_working_state(
-                        session_id,
-                        {
-                            "last_execution_status": "failed",
-                            "last_execution_error": getattr(result, "error", ""),
-                            "last_error": getattr(result, "error", ""),
-                            "active_task": action,
-                            "next_move": "self_heal_fix_file",
-                        },
-                    )
+                error_text = getattr(result, "error", "") or "Unknown execution failure."
 
-                    loop_result = self._run_execution_autoloop(session_id)
+                self._update_working_state(
+                    session_id,
+                    {
+                        "last_execution_status": "failed",
+                        "last_execution_error": error_text,
+                        "last_error": error_text,
+                        "active_task": action,
+                        "next_move": "self_heal_fix_file",
+                        "pending_execution_action": "retry_failed",
+                    },
+                )
 
-                    return {
-                        "ok": True,
-                        "result": loop_result,
-                        "action": action,
-                    }
+                assistant_msg = self._build_assistant_message(
+                    text=f"""Execution failed.
 
-                except Exception as loop_error:
-                    exec_debug("AUTO LOOP ERROR:", loop_error)
+Error:
+{error_text}
+
+Next move:
+Self-heal mode is ready. Send the broken file path and error, or trigger retry_failed after applying a fix.""",
+                    attachments=[],
+                )
+
+                return self._finalize_response(
+                    session_id=session_id,
+                    user_text=user_text,
+                    user_msg=user_msg,
+                    assistant_msg=assistant_msg,
+                    decision={
+                        "route": "execution",
+                        "mode": "self_heal_ready",
+                        "save_artifact": False,
+                        "save_memory": False,
+                        "use_memory": True,
+                    },
+                    saved_artifact=None,
+                )
 
             if result:
                 output = result.output if isinstance(result.output, dict) else {}
@@ -246,13 +295,19 @@ Next move: {next_move}
 Available actions:
 {chr(10).join(f"- {move_type}" for move_type in next_moves) if next_moves else "- none"}
 """
+                assistant_text = (
+                    assistant_text
+                    .replace("AUTO_EXECUTE", "")
+                    .replace("TEST_FAIL", "")
+                    .strip()
+                )
 
                 assistant_msg = self._build_assistant_message(
                     assistant_text,
                     meta={
                         "route": "execution",
-                        "strategy": "auto_execute",
-                        "auto_execute": True,
+                        "strategy": "execution_progress",
+                        "auto_execute": False,
                         "execution_result": {
                             "move_id": result.move_id,
                             "status": result.status,
@@ -4215,6 +4270,9 @@ Available actions:
                 "retry_failed",
                 "retry failed",
                 "test_fail",
+                "auto mode",
+                "auto",
+                "autopilot",
             }
 
             if text in triggers:
@@ -5274,7 +5332,16 @@ Available actions:
         lines.append(f"Progress: {done}/{total} complete")
         lines.append(f"Current step: {current_step}")
 
-        return "\n".join(lines).strip()
+        assistant_text = "\n".join(lines)
+
+        assistant_text = (
+            assistant_text
+            .replace("AUTO_EXECUTE", "")
+            .replace("TEST_FAIL", "")
+            .strip()
+        )
+
+        return assistant_text
 
     def _build_execution_assistant_text(self, execution):
         return self._render_execution(execution, include_prefix=True)
@@ -6423,6 +6490,13 @@ Available actions:
 
         text = (user_text or "").strip().lower()
 
+        if text == "auto mode":
+            return self._advance_execution_request(
+                user_text="run_all",
+                session_id=session_id,
+                attachments=attachments,
+            )
+
         if text == "test_fail":
             execution = {
                 "status": "error",
@@ -6438,14 +6512,21 @@ Available actions:
                         "output": "",
                     },
                 ],
-                "history": ["test_fail: Failed Step 1"],
-                "last_action": "test_fail",
+                "history": ["Failed Step 1"],
+                "last_action": "",
                 "current_step": "Failed Step 1",
             }
 
             self._persist_execution_artifact(session_id=session_id, execution=execution)
 
             assistant_text = self._build_execution_assistant_text(execution)
+
+            assistant_text = (
+                assistant_text
+                .replace("AUTO_EXECUTE", "")
+                .replace("TEST_FAIL", "")
+                .strip()
+            )
 
             assistant_msg = self._build_assistant_message(
                 assistant_text,
@@ -6517,7 +6598,42 @@ Next action:
         else:
             step_output = "Step executed."
 
-        execution = self._advance_execution_one_step(execution)
+        # AUTO MODE LOOP
+
+        if text in {
+            "auto mode",
+            "run_all",
+            "auto",
+            "autopilot",
+            "next",
+            "nex",
+            "continue",
+            "continue on",
+            "keep going",
+            "go",
+            "run next",
+            "next step",
+            "what next",
+            "what now",
+        }:
+            try:
+                for _ in range(10):  # safety cap
+                    execution = self._advance_execution_one_step(execution)
+                    execution = self._normalize_execution_state(execution)
+
+                    status = self._safe_str(execution.get("status")).lower()
+
+                    if status in {"complete", "completed", "error", "failed"}:
+                        break
+
+                execution = self._normalize_execution_state(execution)
+
+            except Exception as e:
+                exec_debug("AUTO LOOP ERROR:", e)
+        else:
+            execution = self._advance_execution_one_step(execution)
+            execution = self._normalize_execution_state(execution)
+
         execution = self._normalize_execution_state(execution)
 
         saved_artifact = None
@@ -6570,19 +6686,32 @@ Next action:
 
         plan_body = self._render_execution(execution)
 
-        if step_output:
+        status = self._safe_str(execution.get("status")).lower()
+
+        if status in {"complete", "completed"}:
+            assistant_text = "Auto-execution complete."
+        elif step_output:
             assistant_text = step_output
-            if plan_body:
-                assistant_text += "\n\n" + plan_body
         else:
             assistant_text = "Step processed."
-            if plan_body:
-                assistant_text += "\n\n" + plan_body
+
+        if plan_body:
+            assistant_text += "\n\n" + plan_body
 
         assistant_msg = self._build_assistant_message(
             text=assistant_text,
             attachments=[],
         )
+
+        if isinstance(assistant_msg, dict):
+            content = assistant_msg.get("content") or ""
+            if isinstance(content, str):
+                assistant_msg["content"] = (
+                    content
+                    .replace("AUTO_EXECUTE", "")
+                    .replace("TEST_FAIL", "")
+                    .strip()
+                )
 
         return self._finalize_response(
             session_id=session_id,
