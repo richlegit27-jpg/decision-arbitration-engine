@@ -1422,6 +1422,26 @@ def execution_stream():
     session_id = str(data.get("session_id") or "").strip()
     action = str(data.get("action") or "").strip()
 
+    action_text = str(action or "").lower().strip()
+
+    if action_text in {
+        "next", "nex", "continue", "continue on",
+        "keep going", "go", "run next",
+        "next step", "what next", "what now"
+    }:
+        execution_state = {}
+        try:
+            execution_state = EXECUTION_STATE_CACHE.get(session_id) or {}
+        except Exception:
+            execution_state = {}
+
+        status = str(execution_state.get("status") or "").lower()
+
+        if status in ("error", "failed"):
+            action = "retry_failed"
+        else:
+            action = "run_step"
+
     step_index_raw = data.get("step_index", None)
     try:
         step_index = int(step_index_raw)
