@@ -761,6 +761,13 @@ function renderExecution() {
     state.execution ||
     { status: "idle", steps: [], history: [] };
 
+  const session =
+    (window.NovaComposerState && window.NovaComposerState.session) ||
+    {};
+
+  const workingState = session.working_state || {};
+  const mission = workingState.mission || {};
+
   const steps = Array.isArray(execution.steps) ? execution.steps : [];
   const history = Array.isArray(execution.history) ? execution.history : [];
   const status = String(execution.status || "idle").toLowerCase();
@@ -805,13 +812,15 @@ function renderExecution() {
 </div>
 
       <div class="nova-panel-card">
+        <div><strong>Mission:</strong> ${escapeHtml(mission.current_goal || "-")}</div>
+        <div><strong>Next Action:</strong> ${escapeHtml(mission.next_action || "-")}</div>
         <div><strong>Status:</strong> ${escapeHtml(execution.status || "idle")}</div>
         <div>
           <strong>Current:</strong>
           ${
             isRunning
               ? `Running step ${currentIndex + 1} of ${steps.length}`
-              : escapeHtml(currentStep)
+              : escapeHtml(mission.current_step || currentStep)
           }
         </div>
         <div><strong>Progress:</strong> ${escapeHtml(String(doneCount))}/${escapeHtml(String(steps.length))} complete</div>
@@ -3283,6 +3292,19 @@ function finalizeStreamMessage(payload) {
     state.stream.placeholderId = "";
   }
 
+const autoExecuteMessage =
+  data.assistant_message && typeof data.assistant_message === "object"
+    ? data.assistant_message
+    : null;
+
+if (
+  autoExecuteMessage &&
+  autoExecuteMessage.meta &&
+  autoExecuteMessage.meta.auto_execute &&
+  typeof window.runExecutionAction === "function"
+) {
+  window.runExecutionAction(autoExecuteMessage.meta.execution_action || "run_all");
+}
   renderChat();
   renderSessionList();
   renderArtifacts();
@@ -6339,7 +6361,7 @@ window.setRailTab = function (tabName) {
   }
 };
 
-window.runExecutionAction = async function (action, button) {
+window.runExecutionAction = async function (action, button, extra = {}) {
   const state = window.NovaComposerState || {};
 
 // 🔥 force execution panel open immediately
@@ -6396,10 +6418,13 @@ if (rail) {
     const response = await fetch("/api/execution/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        session_id: sessionId,
-        action: action,
-      }),
+body: JSON.stringify({
+  session_id: sessionId,
+  action: action,
+  step_index: extra && extra.step_index != null
+    ? Number(extra.step_index)
+    : null
+}),
     });
 
     if (!response.ok || !response.body) {
@@ -6446,17 +6471,21 @@ if (rail) {
 
         console.log("[EXECUTION STREAM]", eventName, payload);
 
-        if (payload.execution_state) {
-          window.NovaExecutionState = payload.execution_state;
-          window.NovaComposerState = window.NovaComposerState || {};
-          window.NovaComposerState.execution = payload.execution_state;
+if (payload.execution_state) {
+  window.NovaExecutionState = payload.execution_state;
+  window.NovaComposerState = window.NovaComposerState || {};
+  window.NovaComposerState.execution = payload.execution_state;
 
-          if (typeof window.renderExecutionPanel === "function") {
-            window.renderExecutionPanel();
-          } else if (typeof window.renderExecution === "function") {
-            window.renderExecution();
-          }
-        }
+  if (typeof window.setRailTab === "function") {
+    window.setRailTab("execution");
+  }
+
+  if (typeof window.renderExecutionPanel === "function") {
+    window.renderExecutionPanel();
+  } else if (typeof window.renderExecution === "function") {
+    window.renderExecution();
+  }
+}
       });
     }
 

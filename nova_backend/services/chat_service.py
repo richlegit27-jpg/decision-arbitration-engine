@@ -1,12 +1,15 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import base64
 import os
 import re
 import uuid
+import logging
+
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, List
+
 from nova_backend.services.execution_handler import (
     ExecutionHandler,
     NextMove,
@@ -28,6 +31,16 @@ from nova_backend.services.web_service import WebService
 from nova_backend.services.tool_service import ToolService
 from nova_backend.services.execution_service import ExecutionService
 from nova_backend.services.intent_service import IntentService
+
+
+logger = logging.getLogger("nova.execution")
+DEBUG_EXECUTION = False
+
+
+def exec_debug(*args):
+    if DEBUG_EXECUTION:
+        logger.debug(" ".join(str(arg) for arg in args))
+
 
 class ChatService:
     ROUTE_GENERAL_CHAT = "general_chat"
@@ -58,14 +71,14 @@ class ChatService:
             elif hasattr(self, "execution_handler") and hasattr(self.execution_handler, "get_state"):
                 execution = self.execution_handler.get_state(session_id) or {}
         except Exception as e:
-            print("EXECUTION STATE LOAD ERROR:", e)
+            exec_debug("EXECUTION STATE LOAD ERROR:", e)
             execution = {}
 
         status = str(execution.get("status") or "").lower()
 
-        print("ACTIVE AUTO EXEC FUNCTION HIT")
-        print("EXECUTION STATE LOADED:", execution)
-        print("EXECUTION STATUS LOADED:", status)
+        exec_debug("ACTIVE AUTO EXEC FUNCTION HIT")
+        exec_debug("EXECUTION STATE LOADED:", execution)
+        exec_debug("EXECUTION STATUS LOADED:", status)
 
         if text == "test_fail":
             action = "test_fail"
@@ -89,8 +102,8 @@ class ChatService:
             action = "run_all"
 
         try:
-            print("EXECUTION HANDLER ABOUT TO RUN:", action, session_id)
-            print("EXECUTION HANDLER METHODS:", [x for x in dir(self.execution_handler) if "run" in x or "state" in x or "execute" in x])
+            exec_debug("EXECUTION HANDLER ABOUT TO RUN:", action, session_id)
+            exec_debug("EXECUTION HANDLER METHODS:", [x for x in dir(self.execution_handler) if "run" in x or "state" in x or "execute" in x])
 
             if action == "test_fail":
                 execution = {
@@ -128,15 +141,40 @@ class ChatService:
                     "current_step": "Step 2",
                 }
 
+            elif action == "run_all":
+                execution = {
+                    "status": "running",
+                    "steps": [
+                        {"title": "Run all", "status": "running"},
+                    ],
+                    "history": ["run_all: started"],
+                    "last_action": "run_all",
+                    "current_step": "Run all",
+                }
+
             if not hasattr(self.execution_handler, "states"):
                 self.execution_handler.states = {}
 
             self.execution_handler.states[session_id] = execution
 
-            print("EXECUTION STATE AFTER RUN:", execution)
+            mission = {
+                "current_goal": "execution_flow",
+                "current_step": execution.get("current_step"),
+                "next_action": (
+                    "retry_failed"
+                    if execution.get("status") in ("error", "failed")
+                    else "run_step"
+                ),
+                "last_action": execution.get("last_action"),
+                "status": execution.get("status"),
+            }
+
+            self._save_mission_state(session_id, mission)
+
+            exec_debug("EXECUTION STATE AFTER RUN:", execution)
 
         except Exception as e:
-            print("EXECUTION HANDLER RUN ERROR:", repr(e))
+            exec_debug("EXECUTION HANDLER RUN ERROR:", repr(e))
 
         return {
             "ok": True,
@@ -151,7 +189,6 @@ class ChatService:
             ),
             "session_id": session_id,
         }
-
     def _maybe_lock_execution_flow(self, user_text: str, session_id: str = "") -> bool:
         text = str(user_text or "").lower().strip()
 
@@ -181,6 +218,63 @@ class ChatService:
         }
 
         return text in execution_words
+
+    def _save_mission_state(self, session_id: str, mission: dict) -> None:
+        if not session_id or not isinstance(mission, dict):
+            return
+
+        try:
+            existing = self._get_session_payload(session_id)
+            working_state = existing.get("working_state", {}) if isinstance(existing, dict) else {}
+
+            if not isinstance(working_state, dict):
+                working_state = {}
+
+            working_state["mission"] = mission
+
+            if hasattr(self.sessions, "update_working_state"):
+                self.sessions.update_working_state(session_id, working_state)
+
+        except Exception as e:
+            logger.error(f"[mission] failed to save mission state: {e}")
+
+    def _resolve_mission_command(self, user_text: str, session_id: str = "") -> dict:
+        text = str(user_text or "").lower().strip()
+
+        session = self._get_session_payload(session_id)
+        working_state = session.get("working_state", {}) if isinstance(session, dict) else {}
+        mission = working_state.get("mission", {}) if isinstance(working_state, dict) else {}
+
+        if text in {"next", "nex", "continue", "resume"}:
+            return {
+                "is_mission": True,
+                "type": "continue",
+                "mission": mission,
+                "next_action": mission.get("next_action") or "run_step",
+            }
+
+        if text in {"run it", "run", "execute", "go"}:
+            return {
+                "is_mission": True,
+                "type": "execute",
+                "mission": mission,
+                "next_action": mission.get("next_action") or "run_execution",
+            }
+
+        if text in {"what next", "what now"}:
+            return {
+                "is_mission": True,
+                "type": "inspect",
+                "mission": mission,
+                "next_action": mission.get("next_action") or "inspect_state",
+            }
+
+        return {
+            "is_mission": False,
+            "type": "",
+            "mission": mission,
+            "next_action": "",
+        }
 
     def _get_session_payload(self, session_id: str = "") -> dict:
         sid = self._ensure_session_id(session_id)
@@ -507,11 +601,11 @@ class ChatService:
                     break
 
             if results:
-                print("SEARCH: DuckDuckGo HTML success")
+                exec_debug("SEARCH: DuckDuckGo HTML success")
                 all_results.extend(results)
 
         except Exception as e:
-            print("DDG HTML FAILED:", e)
+            exec_debug("DDG HTML FAILED:", e)
 
         # -------------------------
         # 2. DuckDuckGo Lite
@@ -552,11 +646,11 @@ class ChatService:
                     break
 
             if results:
-                print("SEARCH: DuckDuckGo Lite success")
+                exec_debug("SEARCH: DuckDuckGo Lite success")
                 all_results.extend(results)
 
         except Exception as e:
-            print("DUCKDUCKGO_LITE_FAILED:", e)
+            exec_debug("DUCKDUCKGO_LITE_FAILED:", e)
 
         # -------------------------
         # 3. Google News RSS
@@ -590,11 +684,11 @@ class ChatService:
                     break
 
             if results:
-                print("SEARCH: Google News RSS success")
+                exec_debug("SEARCH: Google News RSS success")
                 all_results.extend(results)
 
         except Exception as e:
-            print("GOOGLE RSS FAILED:", e)
+            exec_debug("GOOGLE RSS FAILED:", e)
 
         # -------------------------
         # FINAL CLEAN + RETURN
@@ -632,7 +726,7 @@ class ChatService:
         self.image_size = os.getenv("NOVA_IMAGE_SIZE", "1024x1024")
         self.chat_model = os.getenv("OPENAI_MODEL", "gpt-5.4")
         self.model = self.chat_model
-        print("MODEL CHECK:", hasattr(self, "model"), self.model)
+        exec_debug("MODEL CHECK:", hasattr(self, "model"), self.model)
 
         self.memory_limit = int(os.getenv("NOVA_MEMORY_LIMIT", "3"))
 
@@ -645,7 +739,7 @@ class ChatService:
             os.getenv("UPLOADS_DIR", r"C:\Users\Owner\nova\uploads")
         )
         self.uploads_dir.mkdir(parents=True, exist_ok=True)
-        print("CHATSERVICE INIT uploads_dir =", self.uploads_dir)
+        exec_debug("CHATSERVICE INIT uploads_dir =", self.uploads_dir)
 
         # core clients
         self.client = OpenAI()
@@ -711,7 +805,7 @@ class ChatService:
         try:
             self._maybe_write_memory(decision, user_text, session_id)
         except Exception as e:
-            print("FINALIZE_MEMORY_WRITE_ERROR:", e)
+            exec_debug("FINALIZE_MEMORY_WRITE_ERROR:", e)
 
         if isinstance(assistant_msg, dict):
             existing_meta = assistant_msg.get("meta")
@@ -735,7 +829,7 @@ class ChatService:
                     if isinstance(ranked, list):
                         used_memory_items = ranked
                 except Exception as e:
-                    print("FINALIZE_MEMORY_USED_ERROR:", e)
+                    exec_debug("FINALIZE_MEMORY_USED_ERROR:", e)
 
             meta["memory_used"] = used_memory_items
             meta["used_memory"] = used_memory_items
@@ -766,7 +860,7 @@ class ChatService:
                 self.sessions.append_message(session_id, msg)
 
         except Exception as e:
-            print("SESSION SAVE ERROR:", e)
+            exec_debug("SESSION SAVE ERROR:", e)
 
         return {
             "ok": True,
@@ -794,7 +888,7 @@ class ChatService:
         session_id: str,
         attachments=None,
     ) -> dict:
-        print("AUTO_FIX_FILE_HIT:", user_text)
+        exec_debug("AUTO_FIX_FILE_HIT:", user_text)
 
         import os
         import time
@@ -1088,7 +1182,7 @@ class ChatService:
         # Execution now only runs through _maybe_lock_execution_flow().
         # Normal chat should not be hijacked just because working_state exists.
         if False:
-            print("FORCING EXECUTION MODE FROM WORKING STATE")
+            exec_debug("FORCING EXECUTION MODE FROM WORKING STATE")
 
         if is_continue:
             mission = decision.get("mission") if isinstance(decision, dict) else {}
@@ -1201,7 +1295,7 @@ class ChatService:
             assistant_text = self._extract_response_text(response)
 
         except Exception as e:
-            print("GENERAL CHAT ERROR:", e)
+            exec_debug("GENERAL CHAT ERROR:", e)
             assistant_text = "Something went wrong."
 
         if not assistant_text:
@@ -1257,7 +1351,7 @@ class ChatService:
             if any(x in memory_text for x in ["prefer direct", "be direct", "no fluff", "keep answers short"]):
                 assistant_text = (assistant_text or "").strip()
         except Exception as e:
-            print("STYLE CLAMP ERROR:", e)
+            exec_debug("STYLE CLAMP ERROR:", e)
 
         used_memory_full = [
             {
@@ -2139,7 +2233,7 @@ class ChatService:
                 decision=decision,
             )
         except Exception as e:
-            print("INTELLIGENCE_FUSE_ERROR:", e)
+            exec_debug("INTELLIGENCE_FUSE_ERROR:", e)
             intelligence = {}
 
         intelligence = intelligence if isinstance(intelligence, dict) else {}
@@ -2151,7 +2245,7 @@ class ChatService:
                 intelligence=intelligence,
             )
         except Exception as e:
-            print("STRATEGY_ERROR:", e)
+            exec_debug("STRATEGY_ERROR:", e)
             strategy = {}
 
         strategy = strategy if isinstance(strategy, dict) else {}
@@ -2167,7 +2261,7 @@ class ChatService:
                 intelligence=intelligence,
             )
         except Exception as e:
-            print("SELF_CHECK_ERROR:", e)
+            exec_debug("SELF_CHECK_ERROR:", e)
             self_check = {"should_revise": False, "issues": []}
 
         self_check = self_check if isinstance(self_check, dict) else {
@@ -2188,7 +2282,7 @@ class ChatService:
                 user_text=user_text,
             )
         except Exception as e:
-            print("FINAL_CLEAN_ERROR:", e)
+            exec_debug("FINAL_CLEAN_ERROR:", e)
 
         # === EXECUTION RENDER HOOK (SAFE) ===
         mission = decision.get("mission") or {}
@@ -2198,7 +2292,7 @@ class ChatService:
             try:
                 assistant_text = self._render_execution(execution, include_prefix=True)
             except Exception as e:
-                print("EXECUTION_RENDER_ERROR:", e)
+                exec_debug("EXECUTION_RENDER_ERROR:", e)
 
         # === EXECUTION STEP (SAFE: SINGLE STEP ONLY) ===
         try:
@@ -2223,14 +2317,14 @@ class ChatService:
                         try:
                             self._persist_execution_artifact(session_id, execution)
                         except Exception as e:
-                            print("EXECUTION_SAVE_ERROR:", e)
+                            exec_debug("EXECUTION_SAVE_ERROR:", e)
 
                         # update mission
                         decision["mission"] = decision.get("mission") or {}
                         decision["mission"]["execution"] = execution
 
         except Exception as e:
-            print("EXECUTION_STEP_ERROR:", e)
+            exec_debug("EXECUTION_STEP_ERROR:", e)
 
         return {
             "assistant_text": assistant_text,
@@ -2251,7 +2345,7 @@ class ChatService:
         user_text_lc = user_text_raw.lower()
         response_policy = response_policy if isinstance(response_policy, dict) else {}
 
-        print("CLEAN_FINAL_HIT:", user_text_raw)
+        exec_debug("CLEAN_FINAL_HIT:", user_text_raw)
 
         # === SMFF HARD OVERRIDE FOR CODE HELP ===
         try:
@@ -2927,7 +3021,7 @@ class ChatService:
                 web_result = {"body": str(web_result or ""), "results": []}
 
             if not web_result.get("results"):
-                print("WEB_FETCH_FALLBACK: using Google News RSS")
+                exec_debug("WEB_FETCH_FALLBACK: using Google News RSS")
 
                 import requests
                 import xml.etree.ElementTree as ET
@@ -2937,20 +3031,20 @@ class ChatService:
                 seen_rss_urls = set()
                 rss_queries = self._build_news_rss_queries(query)
 
-                print("RSS_QUERIES:", rss_queries)
+                exec_debug("RSS_QUERIES:", rss_queries)
 
                 for rss_query in rss_queries:
                     rss_url = "https://news.google.com/rss/search?q=" + quote_plus(rss_query)
                     rss_res = requests.get(rss_url, timeout=20)
 
-                    print("RSS_QUERY:", rss_query)
-                    print("RSS_STATUS:", rss_res.status_code)
-                    print("RSS_LEN:", len(rss_res.content))
+                    exec_debug("RSS_QUERY:", rss_query)
+                    exec_debug("RSS_STATUS:", rss_res.status_code)
+                    exec_debug("RSS_LEN:", len(rss_res.content))
 
                     try:
                         root = ET.fromstring(rss_res.content)
                     except Exception as e:
-                        print("RSS_PARSE_ERROR:", e)
+                        exec_debug("RSS_PARSE_ERROR:", e)
                         continue
 
                     for item in root.findall(".//item"):
@@ -2982,12 +3076,12 @@ class ChatService:
                 web_result = {"results": rss_results}
 
         except Exception as e:
-            print("WEB_FETCH_ERROR:", e)
+            exec_debug("WEB_FETCH_ERROR:", e)
             web_result = {"results": []}
 
-        print("WEB_FETCH_QUERY:", query)
-        print("WEB_FETCH_RESULT_TYPE:", type(web_result))
-        print("WEB_FETCH_RESULT:", web_result)
+        exec_debug("WEB_FETCH_QUERY:", query)
+        exec_debug("WEB_FETCH_RESULT_TYPE:", type(web_result))
+        exec_debug("WEB_FETCH_RESULT:", web_result)
 
         raw_results = web_result.get("results", []) if isinstance(web_result, dict) else []
         if not isinstance(raw_results, list):
@@ -3032,7 +3126,7 @@ class ChatService:
                 reverse=True
             )
         except Exception as e:
-            print("FINAL_RANK_ERROR:", e)
+            exec_debug("FINAL_RANK_ERROR:", e)
 
         body = self._safe_str(
             web_result.get("body")
@@ -3142,14 +3236,14 @@ class ChatService:
                 ).strip()
 
             except Exception as exc:
-                print("WEB_FETCH_SUMMARY_FAILED:", exc)
+                exec_debug("WEB_FETCH_SUMMARY_FAILED:", exc)
                 assistant_text = body[:1800].strip()
 
             if not assistant_text:
                 assistant_text = body[:1800].strip()
 
-        print("WEB_SOURCES_FINAL:", sources)
-        print("WEB_SOURCE_URLS_FINAL:", source_urls)
+        exec_debug("WEB_SOURCES_FINAL:", sources)
+        exec_debug("WEB_SOURCE_URLS_FINAL:", source_urls)
 
         if sources:
             assistant_text = assistant_text.strip()
@@ -3217,7 +3311,7 @@ class ChatService:
                     return final_url
 
             except Exception as e:
-                print("GOOGLE_NEWS_HEAD_RESOLVE_FAILED:", e)
+                exec_debug("GOOGLE_NEWS_HEAD_RESOLVE_FAILED:", e)
 
             response = requests.get(
                 url,
@@ -3234,7 +3328,7 @@ class ChatService:
             return url
 
         except Exception as e:
-            print("GOOGLE_NEWS_RESOLVE_FAILED:", e)
+            exec_debug("GOOGLE_NEWS_RESOLVE_FAILED:", e)
             return url
 
     def _is_image_generation_request(self, user_text: str) -> bool:
@@ -3582,7 +3676,7 @@ class ChatService:
             }
 
         except Exception as e:
-            print("AUTO_FIX_FUNCTION_ERROR:", e)
+            exec_debug("AUTO_FIX_FUNCTION_ERROR:", e)
 
             assistant_text = (
                 "Auto-fix failed due to an internal error.\n\n"
@@ -3597,17 +3691,28 @@ class ChatService:
             }
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
-        print("HANDLE IS BEING CALLED")
+        exec_debug("HANDLE IS BEING CALLED")
         attachments = attachments or []
 
         session_id = self._ensure_session_id(session_id)
         user_text = self._safe_str(user_text)
 
-        print("CHAT_SERVICE_HANDLE_HIT:", user_text)
-        print("EXECUTION FLOW CHECK:", user_text, session_id)
+        mission_cmd = self._resolve_mission_command(user_text, session_id)
+
+        if mission_cmd.get("is_mission"):
+            exec_debug("MISSION COMMAND:", mission_cmd)
+
+            return self._auto_execute_request(
+                user_text=mission_cmd.get("next_action") or user_text,
+                session_id=session_id,
+                attachments=attachments,
+            )
+
+        exec_debug("CHAT_SERVICE_HANDLE_HIT:", user_text)
+        exec_debug("EXECUTION FLOW CHECK:", user_text, session_id)
 
         if self._maybe_lock_execution_flow(user_text, session_id):
-            print("EXECUTION FLOW ROUTED:", user_text)
+            exec_debug("EXECUTION FLOW ROUTED:", user_text)
             return self._auto_execute_request(
                 user_text=user_text,
                 session_id=session_id,
@@ -3687,9 +3792,9 @@ class ChatService:
                 state["last_error"] = user_text
             self.session_service.update_working_state(session_id, state)
         except Exception as e:
-            print("BUG_CONTEXT_SAVE_ERROR:", e)
+            exec_debug("BUG_CONTEXT_SAVE_ERROR:", e)
 
-        print("PATH DETECTED:", path)
+        exec_debug("PATH DETECTED:", path)
 
         if path and any(x in lowered for x in ["fix", "bug", "error", "debug"]):
             return self._execute_auto_fix_file(
@@ -3845,7 +3950,7 @@ class ChatService:
                         compile_ok = False
                         compile_output = f"Compile check failed: {e}"
 
-                print("AUTO_FIX_WRITE_SUCCESS:", file_path)
+                exec_debug("AUTO_FIX_WRITE_SUCCESS:", file_path)
 
                 assistant_message = {
                     "text": (
@@ -3871,11 +3976,11 @@ class ChatService:
                 }
 
         except Exception as e:
-            print("AUTO_FIX_ERROR:", e)
+            exec_debug("AUTO_FIX_ERROR:", e)
 
         user_lc = user_text.lower().strip()
 
-        print("CHAT_SERVICE_HANDLE_HIT:", user_text)
+        exec_debug("CHAT_SERVICE_HANDLE_HIT:", user_text)
 
         if self._maybe_lock_execution_flow(user_text, session_id):
             return self._auto_execute_request(
@@ -3900,7 +4005,7 @@ class ChatService:
             decision = self._decide(user_text=user_text)
 
         except Exception as e:
-            print("DECISION_ERROR:", e)
+            exec_debug("DECISION_ERROR:", e)
             decision = {}
 
         decision = decision if isinstance(decision, dict) else {}
@@ -3945,7 +4050,7 @@ class ChatService:
         decision["mission"] = mission
         decision["strategy"] = str(decision.get("strategy") or "").lower().strip()
 
-        print("MISSION_STATE:", mission)
+        exec_debug("MISSION_STATE:", mission)
 
         try:
             if mission.get("mode") not in ["general"]:
@@ -3958,9 +4063,9 @@ class ChatService:
                 state["mission_mode"] = mission.get("mode") or "general"
 
                 self.session_service.update_working_state(session_id, state)
-                print("MISSION_MEMORY_SAVED:", state)
+                exec_debug("MISSION_MEMORY_SAVED:", state)
         except Exception as e:
-            print("MISSION_MEMORY_SAVE_ERROR:", e)
+            exec_debug("MISSION_MEMORY_SAVE_ERROR:", e)
 
         route = str(decision.get("route") or "").lower()
 
@@ -3985,7 +4090,7 @@ class ChatService:
             )
 
         except Exception as e:
-            print("EXECUTION_ERROR:", e)
+            exec_debug("EXECUTION_ERROR:", e)
             return {
                 "ok": False,
                 "error": str(e),
@@ -4849,7 +4954,7 @@ class ChatService:
             return text
 
         except Exception as e:
-            print("WEB RESPONSE ERROR:", e)
+            exec_debug("WEB RESPONSE ERROR:", e)
 
         top = cleaned[0]
 
@@ -5012,8 +5117,8 @@ class ChatService:
         goal = str(execution.get("goal") or "").strip()
         steps = execution.get("steps") or []
 
-        print("RENDER EXECUTION =", execution)
-        print("RENDER STEPS =", steps)
+        exec_debug("RENDER EXECUTION =", execution)
+        exec_debug("RENDER STEPS =", steps)
 
         total = len(steps)
         done = sum(1 for s in steps if (s or {}).get("status") == "done")
@@ -5832,7 +5937,7 @@ class ChatService:
         try:
             sessions = self.session_service.list_sessions()
         except Exception as e:
-            print("GET PERSISTED EXECUTION LOAD SESSIONS FAILED:", e)
+            exec_debug("GET PERSISTED EXECUTION LOAD SESSIONS FAILED:", e)
             return None
 
         if isinstance(sessions, dict):
@@ -5884,7 +5989,7 @@ class ChatService:
         try:
             sessions = self.session_service.list_sessions()
         except Exception as e:
-            print("PERSIST EXECUTION LOAD SESSIONS FAILED:", e)
+            exec_debug("PERSIST EXECUTION LOAD SESSIONS FAILED:", e)
             return
 
         if isinstance(sessions, dict):
@@ -5920,7 +6025,7 @@ class ChatService:
             else:
                 self.session_service.save_sessions(items)
         except Exception as e:
-            print("PERSIST EXECUTION SAVE SESSIONS FAILED:", e)
+            exec_debug("PERSIST EXECUTION SAVE SESSIONS FAILED:", e)
 
     def _find_latest_execution_artifact(self, session_id: str = ""):
         session_id = self._safe_str(session_id)
@@ -5935,7 +6040,7 @@ class ChatService:
 
             artifacts = artifacts or []
 
-            print("ALL ARTIFACTS =", artifacts)
+            exec_debug("ALL ARTIFACTS =", artifacts)
 
             matches = []
 
@@ -5948,7 +6053,7 @@ class ChatService:
                 execution = a.get("execution") or ((a.get("meta") or {}).get("execution")) or {}
 
                 if execution:
-                    print("MATCHED EXECUTION ARTIFACT =", a)
+                    exec_debug("MATCHED EXECUTION ARTIFACT =", a)
                     matches.append(a)
 
             matches.sort(
@@ -5958,12 +6063,12 @@ class ChatService:
 
             latest = matches[0] if matches else None
 
-            print("FINAL LATEST =", latest)
+            exec_debug("FINAL LATEST =", latest)
 
             return latest
 
         except Exception as e:
-            print("FIND EXECUTION FAILED =", e)
+            exec_debug("FIND EXECUTION FAILED =", e)
             return None
 
     def _attach_execution(self, payload, user_text, assistant_msg, decision, session_id=""):
@@ -6013,7 +6118,7 @@ class ChatService:
             return False
 
         normalized = " ".join(text.split())
-        print("PROGRESS_MATCH_NORMALIZED =", repr(normalized))
+        exec_debug("PROGRESS_MATCH_NORMALIZED =", repr(normalized))
 
         triggers = {
             "run it",
@@ -6175,13 +6280,13 @@ class ChatService:
         user_text = self._safe_str(user_text)
         assistant_text = ""
 
-        print("ADVANCE SESSION_ID =", session_id)
+        exec_debug("ADVANCE SESSION_ID =", session_id)
 
         persisted_execution = self._get_persisted_execution_artifact(session_id=session_id)
         latest_artifact = self._find_latest_execution_artifact(session_id=session_id)
 
-        print("ADVANCE PERSISTED EXECUTION =", persisted_execution)
-        print("ADVANCE LATEST ARTIFACT =", latest_artifact)
+        exec_debug("ADVANCE PERSISTED EXECUTION =", persisted_execution)
+        exec_debug("ADVANCE LATEST ARTIFACT =", latest_artifact)
 
         user_msg = self._build_user_message(
             user_text,
@@ -6294,7 +6399,7 @@ Next action:
                 artifact_payload,
             )
         except Exception as e:
-            print("ADVANCE EXECUTION SAVE FAILED (positional):", e)
+            exec_debug("ADVANCE EXECUTION SAVE FAILED (positional):", e)
             saved_artifact = None
 
         if not saved_artifact:
@@ -6305,13 +6410,13 @@ Next action:
                     artifact=artifact_payload,
                 )
             except Exception as e:
-                print("ADVANCE EXECUTION SAVE FAILED (keyword artifact):", e)
+                exec_debug("ADVANCE EXECUTION SAVE FAILED (keyword artifact):", e)
                 saved_artifact = None
 
         try:
             self._persist_execution_artifact(session_id=session_id, execution=execution)
         except Exception as e:
-            print("ADVANCE EXECUTION PERSIST FAILED:", e)
+            exec_debug("ADVANCE EXECUTION PERSIST FAILED:", e)
 
         plan_body = self._render_execution(execution)
 
@@ -6498,7 +6603,7 @@ Next action:
                 artifact_payload,
             )
         except Exception as e:
-            print("BUILD EXECUTION PLAN FAILED (positional):", e)
+            exec_debug("BUILD EXECUTION PLAN FAILED (positional):", e)
             saved_artifact = None
 
         if not saved_artifact:
@@ -6509,7 +6614,7 @@ Next action:
                     artifact=artifact_payload,
                 )
             except Exception as e:
-                print("BUILD EXECUTION PLAN FAILED (keyword artifact):", e)
+                exec_debug("BUILD EXECUTION PLAN FAILED (keyword artifact):", e)
                 saved_artifact = None
 
         artifact_id = ""
@@ -6523,12 +6628,12 @@ Next action:
         try:
             self._persist_execution_artifact(session_id=session_id, execution=execution)
         except Exception as e:
-            print("BUILD EXECUTION PLAN PERSIST EXECUTION FAILED:", e)
+            exec_debug("BUILD EXECUTION PLAN PERSIST EXECUTION FAILED:", e)
 
-        print("BUILD EXECUTION PLAN SAVED =", bool(saved_artifact))
-        print("BUILD EXECUTION PLAN SESSION =", session_id)
-        print("BUILD EXECUTION PLAN ARTIFACT =", saved_artifact)
-        print("BUILD EXECUTION PLAN ACTIVE EXECUTION =", execution)
+        exec_debug("BUILD EXECUTION PLAN SAVED =", bool(saved_artifact))
+        exec_debug("BUILD EXECUTION PLAN SESSION =", session_id)
+        exec_debug("BUILD EXECUTION PLAN ARTIFACT =", saved_artifact)
+        exec_debug("BUILD EXECUTION PLAN ACTIVE EXECUTION =", execution)
 
         return saved_artifact
 
@@ -6612,7 +6717,7 @@ Next action:
             self._persist_message_fallback(session_id, user_msg)
             self._persist_message_fallback(session_id, assistant_msg)
         except Exception as e:
-            print("TURN PERSIST FAILED:", e)
+            exec_debug("TURN PERSIST FAILED:", e)
 
     def _get_session_payload(self, session_id: str, fallback_messages=None) -> dict:
         fallback_messages = fallback_messages or []
@@ -6645,7 +6750,7 @@ Next action:
                 self.session_service.update_working_state(session_id, patch)
                 return
         except Exception as e:
-            print("SET SESSION META FAILED:", e)
+            exec_debug("SET SESSION META FAILED:", e)
 
     def _get_sessions_list(self) -> list:
         data = self._call_first(
@@ -6800,7 +6905,7 @@ Next action:
         try:
             return self.sessions.update_working_state(session_id, clean_state)
         except Exception as e:
-            print("SET_WORKING_STATE_DIRECT_CALL_ERROR:", e)
+            exec_debug("SET_WORKING_STATE_DIRECT_CALL_ERROR:", e)
 
         return clean_state
 
@@ -6839,7 +6944,7 @@ Next action:
                         current_state["active_task"] = task
 
         except Exception as e:
-            print("WORKING_STATE_PARSE_ERROR:", e)
+            exec_debug("WORKING_STATE_PARSE_ERROR:", e)
 
         # -------------------------
         # APPLY PATCH
@@ -7730,7 +7835,7 @@ Next action:
         return self._safe_str(assistant_text).strip()
 
     def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
-        print("MAYBE_WRITE_MEMORY_HIT:", user_text)
+        exec_debug("MAYBE_WRITE_MEMORY_HIT:", user_text)
         text = self._normalize_memory_text_for_save(user_text)
         lowered = text.lower().strip()
 
@@ -7759,9 +7864,9 @@ Next action:
                     "source": "manual",
                     "session_id": session_id,
                 })
-                print("FORCED MEMORY SAVE:", text)
+                exec_debug("FORCED MEMORY SAVE:", text)
             except Exception as e:
-                print("FORCED MEMORY SAVE FAILED:", e)
+                exec_debug("FORCED MEMORY SAVE FAILED:", e)
             return
 
             kind = "preference" if any(x in lowered for x in [
@@ -7874,7 +7979,7 @@ Next action:
                 "session_id": session_id,
             })
         except Exception as e:
-            print("MEMORY WRITE FAILED:", e)
+            exec_debug("MEMORY WRITE FAILED:", e)
 
     def _memory_text_tokens(self, value: str) -> set[str]:
             text = self._safe_str(value).lower()
@@ -8154,7 +8259,7 @@ Next action:
             try:
                 return self.artifacts.save_artifact(artifact)
             except Exception as e:
-                print("ARTIFACT SAVE FAILED:", e)
+                exec_debug("ARTIFACT SAVE FAILED:", e)
                 return None
 
     def _persist_image_generation_artifact(
@@ -8221,7 +8326,7 @@ Next action:
                     generation_mode="text_to_image",
                 )
             except Exception as e:
-                print("IMAGE ARTIFACT SAVE FAILED:", e)
+                exec_debug("IMAGE ARTIFACT SAVE FAILED:", e)
 
             return {
                 "ok": True,
@@ -8233,7 +8338,7 @@ Next action:
             }
 
         except Exception as e:
-            print("IMAGE GENERATION FAILED:", e)
+            exec_debug("IMAGE GENERATION FAILED:", e)
             return {
                 "ok": False,
                 "text": f"Image generation failed: {e}",
@@ -8567,7 +8672,7 @@ def _build_chat_input(
             )
 
     except Exception as e:
-        print("MEMORY_STYLE_INJECTION_ERROR:", e)
+        exec_debug("MEMORY_STYLE_INJECTION_ERROR:", e)
 
     # ==============================
     # RESPONSE POLICY INJECTION
@@ -8622,9 +8727,9 @@ def _build_chat_input(
 
     final_chat_input = "\n\n".join(sections).strip()
 
-    print("MEMORY_DOMINANCE_USED_COUNT:", len(selected_memory))
-    print("MEMORY_DOMINANCE_BLOCK_PRESENT:", bool(memory_block))
-    print("MEMORY_STYLE_BLOCK_PRESENT:", bool(memory_style_block))
+    exec_debug("MEMORY_DOMINANCE_USED_COUNT:", len(selected_memory))
+    exec_debug("MEMORY_DOMINANCE_BLOCK_PRESENT:", bool(memory_block))
+    exec_debug("MEMORY_STYLE_BLOCK_PRESENT:", bool(memory_style_block))
 
     return final_chat_input
 
@@ -9233,6 +9338,6 @@ def _build_chat_input(
                 self.memory_service._save()
 
         except Exception as e:
-            print("MEMORY CLEANUP FAILED:", e)
+            exec_debug("MEMORY CLEANUP FAILED:", e)
 
 
