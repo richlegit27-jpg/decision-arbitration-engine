@@ -90,19 +90,25 @@ class ChatService:
         except Exception:
             mission_status = ""
 
+        # ===== EXECUTION ACTION ROUTING =====
+
         if text == "test_fail":
             action = "test_fail"
 
-        elif text in {"next", "nex", "continue", "continue on", "keep going", "go", "run next", "next step", "what next", "what now"}:
+        elif text in {
+            "next", "nex", "continue", "continue on",
+            "keep going", "go", "run next",
+            "next step", "what next", "what now"
+        }:
             if status in ("error", "failed") or mission_status in ("error", "failed"):
                 action = "retry_failed"
             else:
                 action = "run_step"
 
         elif text in {"retry", "retry failed", "try again", "rerun failed"}:
-            action = "retry_failed"
+                action = "run_all"
 
-        elif text in {"run_all", "run all", "run it", "execute", "execute all"}:
+        elif text in {"run_all", "run all", "run it", "execute", "execute all", "auto", "auto mode", "autopilot"}:
             action = "run_all"
 
         elif text in {"run_step", "run step"}:
@@ -113,92 +119,34 @@ class ChatService:
 
         try:
             exec_debug("EXECUTION HANDLER ABOUT TO RUN:", action, session_id)
-            exec_debug("EXECUTION HANDLER METHODS:", [x for x in dir(self.execution_handler) if "run" in x or "state" in x or "execute" in x])
+            exec_debug(
+                "EXECUTION HANDLER METHODS:",
+                [x for x in dir(self.execution_handler) if "run" in x or "state" in x or "execute" in x]
+            )
 
-            if action == "test_fail":
-                execution = {
-                    "status": "error",
-                    "steps": [
-                        {"title": "Failed Step 1", "status": "failed"},
-                        {"title": "Failed Step 2", "status": "pending"},
-                    ],
-                    "history": ["test_fail: Failed Step 1"],
-                    "last_action": "test_fail",
-                    "current_step": "Failed Step 1",
-                }
+            result = None
 
-            elif action == "retry_failed":
-                execution = {
-                    "status": "running",
-                    "steps": [
-                        {"title": "Failed Step 1", "status": "running"},
-                        {"title": "Failed Step 2", "status": "pending"},
-                    ],
-                    "history": ["retry_failed: Failed Step 1"],
-                    "last_action": "retry_failed",
-                    "current_step": "Failed Step 1",
-                }
+            if hasattr(self.execution_handler, "run_next_move"):
+                result = self.execution_handler.run_next_move(action, session_id=session_id)
 
-            elif action == "run_step":
-                execution = {
-                    "status": "running",
-                    "steps": [
-                        {"title": "Step 1", "status": "done"},
-                        {"title": "Step 2", "status": "running"},
-                    ],
-                    "history": ["run_step: Step 1"],
-                    "last_action": "run_step",
-                    "current_step": "Step 2",
-                }
+            elif hasattr(self.execution_handler, "run_chain"):
+                result = self.execution_handler.run_chain(action, session_id=session_id)
 
-            elif action == "run_all":
-                execution = {
-                    "status": "running",
-                    "steps": [
-                        {"title": "Run all", "status": "running"},
-                    ],
-                    "history": ["run_all: started"],
-                    "last_action": "run_all",
-                    "current_step": "Run all",
-                }
+            else:
+                exec_debug("NO EXECUTION METHOD FOUND")
 
-            if not hasattr(self.execution_handler, "states"):
-                self.execution_handler.states = {}
+            exec_debug("EXECUTION STATE AFTER RUN:", result)
 
-            self.execution_handler.states[session_id] = execution
-
-            mission = {
-                "current_goal": "execution_flow",
-                "current_step": execution.get("current_step"),
-                "next_action": (
-                    "retry_failed"
-                    if execution.get("status") in ("error", "failed")
-                    else "run_step"
-                ),
-                "last_action": execution.get("last_action"),
-                "status": execution.get("status"),
-            }
-
-            self._save_mission_state(session_id, mission)
-
-            exec_debug("EXECUTION STATE AFTER RUN:", execution)
+            return result
 
         except Exception as e:
-            exec_debug("EXECUTION HANDLER RUN ERROR:", repr(e))
+            exec_debug("EXECUTION RUN ERROR:", e)
+            return {
+                "ok": False,
+                "error": str(e),
+                "action": action
+            }
 
-        return {
-            "ok": True,
-            "assistant_message": self._build_assistant_message(
-                f"Executing: {action}",
-                meta={
-                    "route": "execution",
-                    "execution_mode": True,
-                    "auto_execute": True,
-                    "execution_action": action,
-                },
-            ),
-            "session_id": session_id,
-        }
     def _maybe_lock_execution_flow(self, user_text: str, session_id: str = "") -> bool:
         text = str(user_text or "").lower().strip()
 
