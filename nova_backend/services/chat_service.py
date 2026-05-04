@@ -50,6 +50,31 @@ class ChatService:
     ROUTE_PLANNING = "planning"
     ROUTE_MEMORY_RECALL = "memory_recall"
 
+    def __init__(
+        self,
+        session_service,
+        artifact_service,
+        memory_service,
+        web_service=None,
+        tool_service=None,
+        recon_service=None,
+    ):
+        self.session_service = session_service
+        self.artifact_service = artifact_service
+        self.memory_service = memory_service
+        self.web_service = web_service
+        self.tool_service = tool_service
+        self.recon_service = recon_service
+
+        self.agent_service = AgentService()
+        self.autonomy_service = AutonomyService()
+        self.memory_ranker_service = MemoryRankerService()
+        self.response_rewrite_service = ResponseRewriteService()
+        self.execution_handler = default_executor
+
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.model = os.getenv("OPENAI_MODEL", "gpt-5.4")
+
     def _safe_str(self, value) -> str:
         try:
             if value is None:
@@ -59,6 +84,37 @@ class ChatService:
             return str(value)
         except Exception:
             return ""
+
+    def _store_pending_fix(self, session_id: str, file_path: str, fixed_code: str) -> bool:
+        session_id = str(session_id or "").strip()
+        file_path = str(file_path or "").strip()
+        fixed_code = str(fixed_code or "")
+
+        if not session_id or not file_path or not fixed_code.strip():
+            return False
+
+        try:
+            session = self.session_service.get_session(session_id)
+            if not isinstance(session, dict):
+                return False
+
+            working_state = session.get("working_state")
+            if not isinstance(working_state, dict):
+                working_state = {}
+
+            working_state["pending_fix_file_path"] = file_path
+            working_state["pending_fix_code"] = fixed_code
+            session["working_state"] = working_state
+
+            if hasattr(self.session_service, "update_working_state"):
+                self.session_service.update_working_state(session_id, working_state)
+                return True
+
+            return False
+
+        except Exception as e:
+            exec_debug("STORE PENDING FIX ERROR:", e)
+            return False
 
     def _auto_execute_request(self, user_text: str, session_id: str = "", attachments=None):
         text = str(user_text or "").lower().strip()
@@ -80,7 +136,6 @@ class ChatService:
         exec_debug("EXECUTION STATE LOADED:", execution)
         exec_debug("EXECUTION STATUS LOADED:", status)
 
-        # 🔥 pull mission status (so "next" works after errors)
         mission_status = ""
         try:
             session = self._get_session_payload(session_id)
@@ -90,15 +145,13 @@ class ChatService:
         except Exception:
             mission_status = ""
 
-        # ===== EXECUTION ACTION ROUTING =====
-
         if text == "test_fail":
             action = "test_fail"
 
         elif text in {
             "next", "nex", "continue", "continue on",
             "keep going", "go", "run next",
-            "next step", "what next", "what now"
+            "next step", "what next", "what now",
         }:
             if status in ("error", "failed") or mission_status in ("error", "failed"):
                 action = "retry_failed"
@@ -106,9 +159,12 @@ class ChatService:
                 action = "run_step"
 
         elif text in {"retry", "retry failed", "try again", "rerun failed"}:
-                action = "run_all"
+            action = "retry_failed"
 
-        elif text in {"run_all", "run all", "run it", "execute", "execute all", "auto", "auto mode", "autopilot"}:
+        elif text in {
+            "run_all", "run all", "run it", "execute",
+            "execute all", "auto", "auto mode", "autopilot",
+        }:
             action = "run_all"
 
         elif text in {"run_step", "run step"}:
@@ -121,61 +177,112 @@ class ChatService:
             exec_debug("EXECUTION HANDLER ABOUT TO RUN:", action, session_id)
             exec_debug(
                 "EXECUTION HANDLER METHODS:",
-                [x for x in dir(self.execution_handler) if "run" in x or "state" in x or "execute" in x]
+                [
+                    x
+                    for x in dir(self.execution_handler)
+                    if "run" in x or "state" in x or "execute" in x
+                ],
             )
 
-            result = None
+            move = NextMove(
+                id=f"{session_id}:{action}",
+                type=action,
+                payload={},
+            )
 
             if hasattr(self.execution_handler, "run_next_move"):
-                result = self.execution_handler.run_next_move(action, session_id=session_id)
-
+                result = self.execution_handler.run_next_move(move)
             elif hasattr(self.execution_handler, "run_chain"):
-                result = self.execution_handler.run_chain(action, session_id=session_id)
-
+                chain_results = self.execution_handler.run_chain(move)
+                result = chain_results[-1] if chain_results else None
             else:
                 exec_debug("NO EXECUTION METHOD FOUND")
+                result = None
 
             exec_debug("EXECUTION STATE AFTER RUN:", result)
 
-            return result
+            if getattr(result, "status", "") == "failed":
+                try:
+                    self._update_working_state(
+                        session_id,
+                        {
+                            "last_execution_status": "failed",
+                            "last_execution_error": getattr(result, "error", ""),
+                            "last_error": getattr(result, "error", ""),
+                            "active_task": action,
+                            "next_move": "self_heal_fix_file",
+                        },
+                    )
+
+                    loop_result = self._run_execution_autoloop(session_id)
+
+                    return {
+                        "ok": True,
+                        "result": loop_result,
+                        "action": action,
+                    }
+
+                except Exception as loop_error:
+                    exec_debug("AUTO LOOP ERROR:", loop_error)
+
+            if result:
+                output = result.output if isinstance(result.output, dict) else {}
+
+                message = output.get("message") or "Execution step completed."
+                next_move = output.get("next_move") or ""
+
+                next_moves = []
+                for move_item in result.next_moves or []:
+                    move_type = getattr(move_item, "type", "") or ""
+                    if move_type:
+                        next_moves.append(move_type)
+
+                assistant_text = f"""Execution advanced.
+
+Status: {result.status}
+Message: {message}
+Next move: {next_move}
+
+Available actions:
+{chr(10).join(f"- {move_type}" for move_type in next_moves) if next_moves else "- none"}
+"""
+
+                assistant_msg = self._build_assistant_message(
+                    assistant_text,
+                    meta={
+                        "route": "execution",
+                        "strategy": "auto_execute",
+                        "auto_execute": True,
+                        "execution_result": {
+                            "move_id": result.move_id,
+                            "status": result.status,
+                            "output": result.output,
+                            "error": result.error,
+                            "next_moves": next_moves,
+                        },
+                    },
+                )
+
+                return {
+                    "ok": True,
+                    "assistant_message": assistant_msg,
+                    "session": self._get_session_payload(session_id),
+                }
+
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    "Execution completed with no result."
+                ),
+                "session": self._get_session_payload(session_id),
+            }
 
         except Exception as e:
-            exec_debug("EXECUTION RUN ERROR:", e)
+            exec_debug("EXECUTION ROUTE ERROR:", e)
             return {
                 "ok": False,
                 "error": str(e),
-                "action": action
             }
-
-    def _maybe_lock_execution_flow(self, user_text: str, session_id: str = "") -> bool:
-        text = str(user_text or "").lower().strip()
-
-        execution_words = {
-            "next",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "what next",
-            "what now",
-            "run_all",
-            "run all",
-            "run it",
-            "execute",
-            "execute all",
-            "run_step",
-            "run step",
-            "retry",
-            "retry failed",
-            "try again",
-            "rerun failed",
-            "test_fail",
-	    "nex",
-        }
-
-        return text in execution_words
 
     def _save_mission_state(self, session_id: str, mission: dict) -> None:
         if not session_id or not isinstance(mission, dict):
@@ -3673,9 +3780,12 @@ class ChatService:
         exec_debug("CHAT_SERVICE_HANDLE_HIT:", user_text)
         exec_debug("EXECUTION FLOW CHECK:", user_text, session_id)
 
-        if self._maybe_lock_execution_flow(user_text, session_id):
+        execution_locked = self._maybe_lock_execution_flow(user_text, session_id)
+
+        if execution_locked:
             exec_debug("EXECUTION FLOW ROUTED:", user_text)
-            return self._auto_execute_request(
+
+            return self._advance_execution_request(
                 user_text=user_text,
                 session_id=session_id,
                 attachments=attachments,
@@ -3944,8 +4054,12 @@ class ChatService:
 
         exec_debug("CHAT_SERVICE_HANDLE_HIT:", user_text)
 
-        if self._maybe_lock_execution_flow(user_text, session_id):
-            return self._auto_execute_request(
+        execution_locked = self._maybe_lock_execution_flow(user_text, session_id)
+
+        if execution_locked:
+            exec_debug("EXECUTION FLOW ROUTED:", user_text)
+
+            return self._advance_execution_request(
                 user_text=user_text,
                 session_id=session_id,
                 attachments=attachments,
@@ -4079,6 +4193,39 @@ class ChatService:
                 "use_memory": True,
             },
         )
+
+    def _maybe_lock_execution_flow(self, user_text: str, session_id: str = "") -> bool:
+        try:
+            text = (user_text or "").strip().lower()
+
+            triggers = {
+                "run_step",
+                "run step",
+                "next",
+                "nex",
+                "continue",
+                "continue on",
+                "go",
+                "run_all",
+                "run all",
+                "run it",
+                "execute",
+                "execute all",
+                "retry",
+                "retry_failed",
+                "retry failed",
+                "test_fail",
+            }
+
+            if text in triggers:
+                print("EXECUTION LOCK TRIGGERED:", text)
+                return True
+
+            return False
+
+        except Exception as e:
+            print("EXECUTION LOCK ERROR:", e)
+            return False
 
     def _clean_artifact_text(self, value: str, limit: int = 300) -> str:
         text = re.sub(r"\s+", " ", self._safe_str(value)).strip()
@@ -6274,26 +6421,67 @@ class ChatService:
         if self._safe_str(execution.get("status")).lower() == "complete":
             execution = {}
 
-        if not execution:
+        text = (user_text or "").strip().lower()
+
+        if text == "test_fail":
+            execution = {
+                "status": "error",
+                "steps": [
+                    {
+                        "title": "Failed Step 1",
+                        "status": "failed",
+                        "output": "Forced test failure for self-healing loop.",
+                    },
+                    {
+                        "title": "Failed Step 2",
+                        "status": "pending",
+                        "output": "",
+                    },
+                ],
+                "history": ["test_fail: Failed Step 1"],
+                "last_action": "test_fail",
+                "current_step": "Failed Step 1",
+            }
+
+            self._persist_execution_artifact(session_id=session_id, execution=execution)
+
+            assistant_text = self._build_execution_assistant_text(execution)
+
             assistant_msg = self._build_assistant_message(
-                text="No execution found. Start with a plan first.",
-                attachments=[],
-            )
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision={
+                assistant_text,
+                meta={
                     "route": "execution",
-                    "mode": "execution_progress",
-                    "save_artifact": False,
-                    "save_memory": False,
-                    "use_memory": True,
+                    "strategy": "test_fail",
+                    "execution": execution,
                 },
-                saved_artifact=None,
             )
 
+            return {
+                "ok": True,
+                "assistant_message": assistant_msg,
+                "session": self.sessions.get_session(session_id),
+                "execution": execution,
+            }
+
+        if not execution:
+            execution = {
+                "status": "ready",
+                "steps": [
+                    {"title": "Step 1: Start execution chain", "status": "pending"},
+                    {"title": "Step 2: Advance execution chain", "status": "pending"},
+                    {"title": "Step 3: Complete execution chain", "status": "pending"},
+                ],
+                "history": [],
+                "last_action": "plan_created",
+                "current_step": "",
+            }
+
+            self._update_working_state(
+                session_id,
+                {
+                    "execution": execution,
+                },
+            )
         goal_text = self._safe_str(execution.get("goal")).lower()
         step_index = int(execution.get("current_step_index", 0) or 0)
 
@@ -7462,8 +7650,29 @@ Next action:
                         "last_execution_error": last_result.error,
                     },
                 )
+
             except Exception:
                 pass
+
+            # SELF-HEAL TRIGGER
+            try:
+                state = self._get_working_state(session_id) or {}
+                attempts = int(state.get("self_heal_attempts") or 0)
+            except Exception:
+                attempts = 0
+
+            if attempts < 3:
+                try:
+                    self._update_working_state(
+                        session_id,
+                        {
+                            "self_heal_attempts": attempts + 1,
+                            "next_move": "self_heal_fix_file",
+                            "last_error": last_result.error,
+                        },
+                    )
+                except Exception:
+                    pass
 
             return (
                 f"Continuing: {active_task or 'saved task'}\n"
@@ -7493,44 +7702,53 @@ Next action:
         results_log = []
 
         for step in range(max_steps):
-            result = self._run_execution_next_move(
-                active_task=active_task,
-                next_move=next_move,
-                session_id=session_id,
-            )
+            if next_move == "self_heal_fix_file":
+                error_text = self._safe_str(state.get("last_error"))
 
-            results_log.append(result)
-
-            self._record_execution_history(
-                session_id=session_id,
-                event_type="step_result",
-                details={
-                    "step": step + 1,
-                    "next_move": next_move,
-                    "result": result,
-                },
-            )
-
-            # ?? detect failure
-            if isinstance(result, str) and "Execution failed" in result:
                 fix_result = self._attempt_self_fix(
                     session_id=session_id,
                     active_task=active_task,
-                    error_text=result,
+                    error_text=error_text,
                 )
 
-                results_log.append("AUTO-FIX ATTEMPT:\n" + fix_result)
+                results_log.append("SELF-HEAL ATTEMPT:\n" + fix_result)
 
-                # retry after fix
-                retry_result = self._run_execution_next_move(
+            else:
+                result = self._run_execution_next_move(
                     active_task=active_task,
                     next_move=next_move,
                     session_id=session_id,
                 )
 
-                results_log.append("RETRY RESULT:\n" + retry_result)
+                results_log.append(result)
 
-            # refresh state
+                self._record_execution_history(
+                    session_id=session_id,
+                    event_type="step_result",
+                    details={
+                        "step": step + 1,
+                        "next_move": next_move,
+                        "result": result,
+                    },
+                )
+
+                if isinstance(result, str) and "Execution failed" in result:
+                    fix_result = self._attempt_self_fix(
+                        session_id=session_id,
+                        active_task=active_task,
+                        error_text=result,
+                    )
+
+                    results_log.append("AUTO-FIX ATTEMPT:\n" + fix_result)
+
+                    retry_result = self._run_execution_next_move(
+                        active_task=active_task,
+                        next_move=next_move,
+                        session_id=session_id,
+                    )
+
+                    results_log.append("RETRY RESULT:\n" + retry_result)
+
             state = self._get_working_state(session_id) or {}
             next_move = self._safe_str(state.get("next_move"))
 

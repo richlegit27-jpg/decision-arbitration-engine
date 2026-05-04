@@ -3357,8 +3357,11 @@ if (
   autoExecuteMessage.meta.auto_execute &&
   typeof window.runExecutionAction === "function"
 ) {
-  window.runExecutionAction(autoExecuteMessage.meta.execution_action || "run_all");
+  requestAnimationFrame(() => {
+    window.runExecutionAction(autoExecuteMessage.meta.execution_action || "run_step");
+  });
 }
+
   renderChat();
   renderSessionList();
   renderArtifacts();
@@ -3874,8 +3877,18 @@ async function consumeChatJson(payload) {
       throw new Error(message);
     }
 
-    window.__lastResponse = data;
-    console.log("FULL CHAT RESPONSE:", data);
+window.__lastResponse = data;
+console.log("FULL CHAT RESPONSE:", data);
+
+const pendingAction =
+  data &&
+  data.session &&
+  data.session.meta &&
+  data.session.meta.pending_execution_action;
+
+if (pendingAction && typeof window.runExecutionAction === "function") {
+  window.runExecutionAction(pendingAction);
+}
 
     if (state.stream && state.stream.targetMessageId) {
       removeMessage(state.stream.targetMessageId);
