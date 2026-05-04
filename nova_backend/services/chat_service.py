@@ -47,9 +47,196 @@ class ChatService:
         except Exception:
             return ""
 
+    def _auto_execute_request(self, user_text: str, session_id: str = "", attachments=None):
+        text = str(user_text or "").lower().strip()
+        session_id = str(session_id or "").strip()
+
+        execution = {}
+        try:
+            if hasattr(self, "execution_handler") and hasattr(self.execution_handler, "states"):
+                execution = self.execution_handler.states.get(session_id) or {}
+            elif hasattr(self, "execution_handler") and hasattr(self.execution_handler, "get_state"):
+                execution = self.execution_handler.get_state(session_id) or {}
+        except Exception as e:
+            print("EXECUTION STATE LOAD ERROR:", e)
+            execution = {}
+
+        status = str(execution.get("status") or "").lower()
+
+        print("ACTIVE AUTO EXEC FUNCTION HIT")
+        print("EXECUTION STATE LOADED:", execution)
+        print("EXECUTION STATUS LOADED:", status)
+
+        if text == "test_fail":
+            action = "test_fail"
+
+        elif text in {"next", "nex", "continue", "continue on", "keep going", "go", "run next", "next step", "what next", "what now"}:
+            if status in ("error", "failed"):
+                action = "retry_failed"
+            else:
+                action = "run_step"
+
+        elif text in {"retry", "retry failed", "try again", "rerun failed"}:
+            action = "retry_failed"
+
+        elif text in {"run_all", "run all", "run it", "execute", "execute all"}:
+            action = "run_all"
+
+        elif text in {"run_step", "run step"}:
+            action = "run_step"
+
+        else:
+            action = "run_all"
+
+        try:
+            print("EXECUTION HANDLER ABOUT TO RUN:", action, session_id)
+            print("EXECUTION HANDLER METHODS:", [x for x in dir(self.execution_handler) if "run" in x or "state" in x or "execute" in x])
+
+            if action == "test_fail":
+                execution = {
+                    "status": "error",
+                    "steps": [
+                        {"title": "Failed Step 1", "status": "failed"},
+                        {"title": "Failed Step 2", "status": "pending"},
+                    ],
+                    "history": ["test_fail: Failed Step 1"],
+                    "last_action": "test_fail",
+                    "current_step": "Failed Step 1",
+                }
+
+            elif action == "retry_failed":
+                execution = {
+                    "status": "running",
+                    "steps": [
+                        {"title": "Failed Step 1", "status": "running"},
+                        {"title": "Failed Step 2", "status": "pending"},
+                    ],
+                    "history": ["retry_failed: Failed Step 1"],
+                    "last_action": "retry_failed",
+                    "current_step": "Failed Step 1",
+                }
+
+            elif action == "run_step":
+                execution = {
+                    "status": "running",
+                    "steps": [
+                        {"title": "Step 1", "status": "done"},
+                        {"title": "Step 2", "status": "running"},
+                    ],
+                    "history": ["run_step: Step 1"],
+                    "last_action": "run_step",
+                    "current_step": "Step 2",
+                }
+
+            if not hasattr(self.execution_handler, "states"):
+                self.execution_handler.states = {}
+
+            self.execution_handler.states[session_id] = execution
+
+            print("EXECUTION STATE AFTER RUN:", execution)
+
+        except Exception as e:
+            print("EXECUTION HANDLER RUN ERROR:", repr(e))
+
+        return {
+            "ok": True,
+            "assistant_message": self._build_assistant_message(
+                f"Executing: {action}",
+                meta={
+                    "route": "execution",
+                    "execution_mode": True,
+                    "auto_execute": True,
+                    "execution_action": action,
+                },
+            ),
+            "session_id": session_id,
+        }
+
+    def _maybe_lock_execution_flow(self, user_text: str, session_id: str = "") -> bool:
+        text = str(user_text or "").lower().strip()
+
+        execution_words = {
+            "next",
+            "continue",
+            "continue on",
+            "keep going",
+            "go",
+            "run next",
+            "next step",
+            "what next",
+            "what now",
+            "run_all",
+            "run all",
+            "run it",
+            "execute",
+            "execute all",
+            "run_step",
+            "run step",
+            "retry",
+            "retry failed",
+            "try again",
+            "rerun failed",
+            "test_fail",
+	    "nex",
+        }
+
+        return text in execution_words
+
+    def _get_session_payload(self, session_id: str = "") -> dict:
+        sid = self._ensure_session_id(session_id)
+
+        if hasattr(self.sessions, "get_session"):
+            payload = self.sessions.get_session(sid)
+            if isinstance(payload, dict):
+                return payload
+
+        if hasattr(self.sessions, "get"):
+            payload = self.sessions.get(sid)
+            if isinstance(payload, dict):
+                return payload
+
+        return {
+            "id": sid,
+            "messages": [],
+            "meta": {},
+        }
+
+    def _ensure_session_id(self, session_id: str = "") -> str:
+        sid = str(session_id or "").strip()
+        if sid:
+            return sid
+
+        created = None
+        if hasattr(self.sessions, "create_session"):
+            created = self.sessions.create_session()
+        elif hasattr(self.sessions, "new_session"):
+            created = self.sessions.new_session()
+
+        if isinstance(created, dict):
+            return str(created.get("id") or "").strip()
+
+        import uuid
+        return f"session_{uuid.uuid4().hex}"
+
     def handle(self, user_text, attachments=None, session_id=None, **kwargs):
         session_id = session_id or kwargs.get("session_id") or ""
         attachments = attachments or []
+
+        text = str(user_text or "").lower().strip()
+
+        if text in (
+            "run_all",
+            "run step",
+            "run_step",
+            "retry_failed",
+            "replay_last",
+            "test_fail",
+        ):
+            return self._auto_execute_request(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+            )
 
         return self._execute_web_fetch(
             user_text=user_text,
@@ -3416,43 +3603,16 @@ class ChatService:
         session_id = self._ensure_session_id(session_id)
         user_text = self._safe_str(user_text)
 
+        print("CHAT_SERVICE_HANDLE_HIT:", user_text)
         print("EXECUTION FLOW CHECK:", user_text, session_id)
 
-        # =============================
-        # EXECUTION FLOW (FIXED)
-        # =============================
-        try:
-            execution_flow = self._maybe_lock_execution_flow(user_text, session_id)
-            print("EXECUTION FLOW RESULT:", execution_flow)
-
-            if execution_flow:
-                print("EXECUTION FLOW RETURNING:", execution_flow)
-
-                assistant_message = {
-                    "role": "assistant",
-                    "text": self._safe_str(execution_flow.get("text")),
-                    "attachments": [],
-                    "meta": execution_flow.get("meta") or {},
-                }
-
-                return {
-                    "ok": True,
-                    "assistant_message": assistant_message,
-                    "session": self._call_first(
-                        self.sessions,
-                        ["get_session"],
-                        session_id,
-                        default=None,
-                    ),
-                    "active_session_id": session_id,
-                    "debug": {
-                        "route": "execution_flow",
-                        "execution_flow": execution_flow,
-                    },
-                }
-
-        except Exception as e:
-            print("EXECUTION FLOW ERROR:", e)
+        if self._maybe_lock_execution_flow(user_text, session_id):
+            print("EXECUTION FLOW ROUTED:", user_text)
+            return self._auto_execute_request(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+            )
 
         # =============================
         # FUNCTION-LEVEL AUTO FIX
@@ -3716,6 +3876,13 @@ class ChatService:
         user_lc = user_text.lower().strip()
 
         print("CHAT_SERVICE_HANDLE_HIT:", user_text)
+
+        if self._maybe_lock_execution_flow(user_text, session_id):
+            return self._auto_execute_request(
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+            )
 
         # === LIGHT CONTEXT MEMORY ===
         last_intent = ""
@@ -6422,36 +6589,6 @@ Next action:
 
         return updated, done, total
 
-    def _auto_execute_request(self, user_text: str, session_id: str = "", attachments=None):
-        # ðŸ”’ Execution system disabled during stabilization
-        return self._execute_general_chat(
-            user_text=user_text,
-            session_id=session_id,
-            attachments=attachments,
-            decision={
-                "route": self.ROUTE_GENERAL_CHAT,
-                "intent": "chat",
-                "save_artifact": False,
-                "save_memory": True,
-            },
-        )
-        # ==============================
-        # SESSION HELPERS
-        # ==============================
-
-    def _ensure_session_id(self, session_id: str = "") -> str:
-        sid = self._safe_str(session_id)
-        if sid:
-            return sid
-
-        created = self._call_first(
-            self.sessions,
-            ["create_session", "new_session", "create", "start_session"],
-        )
-        if isinstance(created, dict):
-            return self._safe_str(created.get("id"))
-
-        return f"session_{uuid.uuid4().hex}"
 
     def _persist_message_fallback(self, session_id: str, message: dict) -> None:
         result = self._call_first(
@@ -7106,112 +7243,6 @@ Next action:
             return dict(state)
 
         return {}
-
-
-    def _maybe_lock_execution_flow(self, user_text: str, session_id: str) -> dict | None:
-        user_text_raw = self._safe_str(user_text).strip()
-        user_text_lc = user_text_raw.lower().strip()
-
-        if not session_id:
-            return None
-
-        user_text_lc = self._safe_str(user_text).lower().strip()
-
-        if user_text_lc in ["run it", "run", "execute", "continue"]:
-            state = self._get_working_state(session_id) or {}
-            active_task = self._safe_str(state.get("active_task"))
-
-            if not active_task:
-                return {
-                    "text": "No active task found.",
-                    "meta": {"route": "execution_flow"},
-                }
-
-        return {
-            "text": self._run_execution_next_move(
-                active_task,
-                state.get("next_move") or "build execution loop",
-                session_id,
-            ),
-            "meta": {"route": "execution_flow"},
-        }
-
-        if not user_text_lc:
-            return None
-
-        # -------------------------
-        # PHASE 1: CAPTURE STATE
-        # -------------------------
-        if user_text_lc.startswith("working on ") and "next move is" in user_text_lc:
-            parts = user_text_raw.split("next move is", 1)
-
-            active_task = parts[0].replace("working on", "", 1).strip(" .:-")
-            next_move = parts[1].strip(" .:-") if len(parts) > 1 else ""
-
-            state = self._update_working_state(
-                session_id,
-                {
-                    "active_task": active_task,
-                    "next_move": next_move,
-                    "user_text": user_text_raw,
-                },
-            )
-
-            return {
-                "ok": True,
-                "handled": True,
-                "text": (
-                    f"Task locked: {state.get('active_task') or active_task}\n"
-                    f"Next move: {state.get('next_move') or next_move}\n\n"
-                    f'Ready to execute. Say "next" to proceed.'
-                ),
-                "meta": {
-                    "route": "execution_state_locked",
-                    "working_state": state,
-                },
-            }
-
-        # -------------------------
-        # PHASE 2: EXECUTE
-        # -------------------------
-        if user_text_lc == "next":
-            state = self._get_working_state(session_id) or {}
-
-            active_task = self._safe_str(state.get("active_task")).strip()
-            next_move = self._safe_str(state.get("next_move")).strip()
-
-            if next_move:
-                return {
-                    "ok": True,
-                    "handled": True,
-                    "text": self._run_execution_next_move(
-                        active_task,
-                        next_move,
-                        session_id,
-                    ),
-                    "meta": {
-                        "route": "execution_next",
-                        "working_state": state,
-                        "active_task": active_task,
-                        "next_move": next_move,
-                    },
-                }
-
-            return {
-                "ok": True,
-                "handled": True,
-                "text": (
-                    "No saved next move found.\n\n"
-                    "Set one first like:\n"
-                    "working on Nova execution mode. next move is build execution loop"
-                ),
-                "meta": {
-                    "route": "execution_next_missing_state",
-                    "working_state": state,
-                },
-            }
-
-        return None
 
     def _run_execution_next_move(self, active_task: str, next_move: str, session_id: str) -> str:
         active_task = self._safe_str(active_task).strip()
