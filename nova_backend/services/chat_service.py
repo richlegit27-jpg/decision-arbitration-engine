@@ -80,11 +80,21 @@ class ChatService:
         exec_debug("EXECUTION STATE LOADED:", execution)
         exec_debug("EXECUTION STATUS LOADED:", status)
 
+        # 🔥 pull mission status (so "next" works after errors)
+        mission_status = ""
+        try:
+            session = self._get_session_payload(session_id)
+            working_state = session.get("working_state", {}) if isinstance(session, dict) else {}
+            mission = working_state.get("mission", {}) if isinstance(working_state, dict) else {}
+            mission_status = str(mission.get("status") or "").lower()
+        except Exception:
+            mission_status = ""
+
         if text == "test_fail":
             action = "test_fail"
 
         elif text in {"next", "nex", "continue", "continue on", "keep going", "go", "run next", "next step", "what next", "what now"}:
-            if status in ("error", "failed"):
+            if status in ("error", "failed") or mission_status in ("error", "failed"):
                 action = "retry_failed"
             else:
                 action = "run_step"
@@ -250,7 +260,11 @@ class ChatService:
                 "is_mission": True,
                 "type": "continue",
                 "mission": mission,
-                "next_action": mission.get("next_action") or "run_step",
+                "next_action": (
+                    "retry_failed"
+                    if str(mission.get("status") or "").lower() in ("error", "failed")
+                    else mission.get("next_action") or "run_step"
+                ),
             }
 
         if text in {"run it", "run", "execute", "go"}:
@@ -3703,7 +3717,7 @@ class ChatService:
             exec_debug("MISSION COMMAND:", mission_cmd)
 
             return self._auto_execute_request(
-                user_text=mission_cmd.get("next_action") or user_text,
+                user_text=user_text,
                 session_id=session_id,
                 attachments=attachments,
             )
