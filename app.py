@@ -2,7 +2,11 @@
 
 import os
 import re
+import shutil
+import hashlib
+from datetime import datetime
 from pathlib import Path
+
 
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory
 from flask_cors import CORS
@@ -2120,8 +2124,44 @@ def web_preview():
             "url": url,
         }), 500
 
+def create_startup_backup():
+    root = Path(r"C:\Users\Owner\nova")
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    backup_root = root / "nova_backups"
+    backup_dir = backup_root / f"startup_{stamp}"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    files_to_backup = [
+        root / "app.py",
+        root / "nova_backend" / "services" / "chat_service.py",
+        root / "static" / "js" / "nova-composer-bundle.js",
+        root / "templates" / "index.html",
+        root / "static" / "css" / "nova-main.css",
+    ]
+
+    for file_path in files_to_backup:
+        if file_path.exists():
+            relative_path = file_path.relative_to(root)
+            destination = backup_dir / relative_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(file_path, destination)
+
+    print(f"[NOVA BACKUP] Created: {backup_dir}")
+
+    # 🔥 AUTO CLEANUP (keep last 10 backups)
+    backups = sorted(backup_root.glob("startup_*"), key=lambda p: p.stat().st_mtime, reverse=True)
+
+    for old in backups[10:]:
+        try:
+            shutil.rmtree(old)
+            print(f"[NOVA BACKUP] Removed old: {old}")
+        except Exception as e:
+            print(f"[NOVA BACKUP] Cleanup error: {e}")
+
 # -----------------------
 # MAIN
 # -----------------------
 if __name__ == "__main__":
+    create_startup_backup()
     app.run(debug=True, port=5001)

@@ -5,6 +5,9 @@ import os
 import re
 import uuid
 import logging
+import shutil
+import tempfile
+import py_compile
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -50,6 +53,56 @@ class ChatService:
     ROUTE_PLANNING = "planning"
     ROUTE_MEMORY_RECALL = "memory_recall"
 
+    def _safe_write_file(self, file_path: str, new_code: str) -> dict:
+        try:
+            target = Path(file_path)
+
+            if not target.exists():
+                return {
+                    "ok": False,
+                    "error": "File not found",
+                    "file": str(target),
+                }
+
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = target.with_suffix(target.suffix + f".bak_{stamp}")
+            shutil.copy2(target, backup_path)
+
+            with tempfile.NamedTemporaryFile(
+                delete=False,
+                suffix=target.suffix or ".tmp",
+                mode="w",
+                encoding="utf-8",
+            ) as tmp:
+                tmp.write(new_code)
+                tmp_path = Path(tmp.name)
+
+            if target.suffix.lower() == ".py":
+                try:
+                    py_compile.compile(str(tmp_path), doraise=True)
+                except Exception as e:
+                    return {
+                        "ok": False,
+                        "error": "Compile failed. Original file was not changed.",
+                        "details": self._safe_str(e),
+                        "backup": str(backup_path),
+                        "temp_file": str(tmp_path),
+                    }
+
+            shutil.copy2(tmp_path, target)
+
+            return {
+                "ok": True,
+                "message": "Safe write applied.",
+                "file": str(target),
+                "backup": str(backup_path),
+            }
+
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": self._safe_str(e),
+            }
 
     def _safe_str(self, value) -> str:
         try:
@@ -1854,11 +1907,17 @@ Available actions:
                     flags=re.DOTALL,
                 )
 
-                with open(pending_file_path, "w", encoding="utf-8") as f:
-                    f.write(updated)
+                result = self._safe_write_file(pending_file_path, updated)
+
             else:
-                with open(pending_file_path, "w", encoding="utf-8") as f:
-                    f.write(pending_fix_code)
+                result = self._safe_write_file(pending_file_path, pending_fix_code)
+
+            if not result.get("ok"):
+                return {
+                    "ok": False,
+                    "error": "Auto-fix failed",
+                    "details": result,
+                }
 
             self._set_session_meta(session_id, "pending_fix_file_path", "")
             self._set_session_meta(session_id, "pending_fix_code", "")
