@@ -489,6 +489,82 @@ Available actions:
         import uuid
         return f"session_{uuid.uuid4().hex}"
 
+    def _analyze_execution_state(self, execution_state=None, last_error: str = "") -> dict:
+        execution_state = self._safe_dict(execution_state)
+        last_error = self._safe_str(last_error).strip()
+
+        status = self._safe_str(execution_state.get("status")).lower()
+        current_step = execution_state.get("current_step")
+        steps = execution_state.get("steps") or []
+        history = execution_state.get("history") or []
+
+        failed = status in {"error", "failed", "failure"}
+
+        if last_error:
+            lowered_error = last_error.lower()
+
+            if "syntaxerror" in lowered_error or "indentationerror" in lowered_error or "taberror" in lowered_error:
+                return {
+                    "status": "failed",
+                    "problem_type": "python_compile_error",
+                    "next_action": "fix_code_then_retry",
+                    "message": "Python compile error detected. Fix the file, compile it, then retry execution.",
+                    "needs_file_fix": True,
+                }
+
+            if "attributeerror" in lowered_error:
+                return {
+                    "status": "failed",
+                    "problem_type": "missing_method_or_bad_object",
+                    "next_action": "inspect_missing_attribute",
+                    "message": "Missing attribute detected. Add the missing method or fix the object being used.",
+                    "needs_file_fix": True,
+                }
+
+            if "modulenotfounderror" in lowered_error or "importerror" in lowered_error:
+                return {
+                    "status": "failed",
+                    "problem_type": "import_error",
+                    "next_action": "fix_import_or_dependency",
+                    "message": "Import problem detected. Fix the import path or install the missing dependency.",
+                    "needs_file_fix": True,
+                }
+
+        if failed:
+            return {
+                "status": "failed",
+                "problem_type": "execution_failed",
+                "next_action": "retry_failed",
+                "message": "Execution failed. Inspect the error and retry after fixing.",
+                "needs_file_fix": True,
+            }
+
+        if steps and isinstance(current_step, int) and current_step < len(steps):
+            return {
+                "status": "running",
+                "problem_type": "",
+                "next_action": "run_step",
+                "message": "Execution can continue to the next step.",
+                "needs_file_fix": False,
+            }
+
+        if status in {"complete", "completed", "done"}:
+            return {
+                "status": "complete",
+                "problem_type": "",
+                "next_action": "complete",
+                "message": "Execution is complete.",
+                "needs_file_fix": False,
+            }
+
+        return {
+            "status": status or "unknown",
+            "problem_type": "",
+            "next_action": "inspect_state",
+            "message": "Execution state needs inspection.",
+            "needs_file_fix": False,
+        }
+
     def _handle_execution_control(self, user_text: str, session_id: str):
         text = self._safe_str(user_text).strip().lower()
 
@@ -534,6 +610,37 @@ Available actions:
         else:
             command = "run_step"
 
+        # 🔥 SMART EXECUTION INTELLIGENCE (INSERTED HERE)
+        session = self._get_session_payload(session_id)
+        working_state = session.get("working_state") if isinstance(session, dict) else {}
+        working_state = working_state if isinstance(working_state, dict) else {}
+
+        execution_state = self._safe_dict(
+            working_state.get("execution_state")
+            or working_state.get("execution")
+        )
+
+        last_error = self._safe_str(
+            working_state.get("last_error")
+            or working_state.get("last_execution_error")
+        )
+
+        analysis = self._analyze_execution_state(
+            execution_state=execution_state,
+            last_error=last_error,
+        )
+
+        smart_action = self._safe_str(analysis.get("next_action"))
+
+        if command == "run_step" and smart_action in {
+            "retry_failed",
+            "fix_code_then_retry",
+            "inspect_missing_attribute",
+            "fix_import_or_dependency",
+        }:
+            command = "retry_failed"
+
+        # 🔥 NORMAL FLOW
         if hasattr(self, "_advance_execution_request"):
             return self._advance_execution_request(
                 user_text=command,
