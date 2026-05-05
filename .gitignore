@@ -1,20 +1,28 @@
-# python
+# Python
 __pycache__/
 *.pyc
 *.pyo
 
-# env / secrets
+# Env / secrets
 .env
 *.key
 *.pem
 
-# data backups (optional)
-data/backups/
+# Uploads (generated files)
+uploads/
 
-# temp
+# Runtime data (sessions, artifacts, memory)
+data/
+
+# Optional backups
+data/backups/
+nova_backups/
+full_*/
+
+# Temp / logs
 *.log
 *.tmp
 
-# local backups
-full_*/
-nova_backups/
+# OS junk
+.DS_Store
+Thumbs.db
