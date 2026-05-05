@@ -104,6 +104,9 @@ class ChatService:
                 "error": self._safe_str(e),
             }
 
+    def _safe_dict(self, value) -> dict:
+        return value if isinstance(value, dict) else {}
+
     def _safe_str(self, value) -> str:
         try:
             if value is None:
@@ -1004,6 +1007,32 @@ Available actions:
             "meta": meta,
         }
 
+    def _normalize_assistant_message(self, message):
+        if message is None:
+            return self._build_assistant_message(text="")
+
+        if isinstance(message, dict):
+            text = (
+                message.get("text")
+                or message.get("content")
+                or message.get("assistant_message")
+                or ""
+            )
+
+            meta = message.get("meta")
+            if not isinstance(meta, dict):
+                meta = {}
+
+            message["text"] = text
+            message["content"] = text
+            message["meta"] = meta
+            return message
+
+        return self._build_assistant_message(
+            text=str(message),
+            meta={},
+        )
+
     def _build_assistant_message(
         self,
         text: str,
@@ -1577,8 +1606,8 @@ Available actions:
             exec_debug("FORCING EXECUTION MODE FROM WORKING STATE")
 
         if is_continue:
-            mission = decision.get("mission") if isinstance(decision, dict) else {}
-            mission = mission if isinstance(mission, dict) else {}
+            decision = self._safe_dict(decision)
+            mission = self._safe_dict(decision.get("mission"))
 
             # Disabled: do not rewrite normal chat into execution mode
             pass
@@ -1894,11 +1923,25 @@ Available actions:
             with open(backup_path, "w", encoding="utf-8") as f:
                 f.write(current_content)
 
-            mode = self._get_session_meta(session_id, "pending_fix_mode") or "file"
+            mode = "function"
             func_name = self._get_session_meta(session_id, "pending_fix_func_name") or ""
 
-            if mode == "function" and func_name:
+            if not func_name:
+                return {
+                    "ok": False,
+                    "error": "Function-only mode: no function name provided",
+                }
+
+            if func_name:
                 pattern = rf"(def\s+{re.escape(func_name)}\s*\(.*?\):\n(?:\s+.*\n)*)"
+
+                match = re.search(pattern, current_content, flags=re.DOTALL)
+
+                if not match:
+                    return {
+                        "ok": False,
+                        "error": f"Function '{func_name}' not found in file",
+                    }
 
                 updated = re.sub(
                     pattern,
@@ -1909,15 +1952,12 @@ Available actions:
 
                 result = self._safe_write_file(pending_file_path, updated)
 
-            else:
-                result = self._safe_write_file(pending_file_path, pending_fix_code)
-
-            if not result.get("ok"):
-                return {
-                    "ok": False,
-                    "error": "Auto-fix failed",
-                    "details": result,
-                }
+                if not result.get("ok"):
+                    return {
+                        "ok": False,
+                        "error": "Auto-fix failed",
+                        "details": result,
+                    }
 
             self._set_session_meta(session_id, "pending_fix_file_path", "")
             self._set_session_meta(session_id, "pending_fix_code", "")
@@ -2702,7 +2742,8 @@ Available actions:
             exec_debug("FINAL_CLEAN_ERROR:", e)
 
         # === EXECUTION RENDER HOOK (SAFE) ===
-        mission = decision.get("mission") or {}
+        decision = self._safe_dict(decision)
+        mission = self._safe_dict(decision.get("mission"))
         execution = mission.get("execution")
 
         if isinstance(execution, dict):
@@ -2713,7 +2754,8 @@ Available actions:
 
         # === EXECUTION STEP (SAFE: SINGLE STEP ONLY) ===
         try:
-            mission = decision.get("mission") or {}
+            decision = self._safe_dict(decision)
+            mission = self._safe_dict(decision.get("mission"))
             execution = mission.get("execution")
 
             if isinstance(execution, dict):
@@ -4304,12 +4346,11 @@ Available actions:
             }
 
     def _process_routing(self, user_text: str, session_id: str, attachments=None):
-        decision = {}
-
         try:
-            decision = self._decide(user_text=user_text)
+            decision = self._safe_dict(self._decide(user_text=user_text))
         except Exception as e:
             exec_debug("DECISION_ERROR:", e)
+            decision = {}
 
         route = str(decision.get("route") or "").lower()
         lowered = (user_text or "").lower()
@@ -4319,9 +4360,6 @@ Available actions:
             route = self.ROUTE_WEB_FETCH
 
         try:
-            # -------------------------
-            # WEB FETCH ROUTE
-            # -------------------------
             if route == self.ROUTE_WEB_FETCH:
                 return self._execute_web_fetch(
                     user_text=user_text,
@@ -4330,9 +4368,6 @@ Available actions:
                     decision=decision,
                 )
 
-            # -------------------------
-            # DEFAULT CHAT ROUTE
-            # -------------------------
             return self._execute_general_chat(
                 user_text=user_text,
                 session_id=session_id,
@@ -4345,10 +4380,10 @@ Available actions:
 
             return {
                 "ok": False,
-                "assistant_message": self._normalize_assistant_message(
-                    f"Routing error: {str(e)}"
+                "assistant_message": self._build_assistant_message(
+                    text=f"Routing error: {str(e)}"
                 ),
-                "session": session_id,
+                "session": self._get_session_payload(session_id),
                 "debug": {
                     "route": route,
                     "decision": decision,
