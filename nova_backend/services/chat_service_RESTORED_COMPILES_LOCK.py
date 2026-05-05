@@ -50,6 +50,30 @@ class ChatService:
     ROUTE_PLANNING = "planning"
     ROUTE_MEMORY_RECALL = "memory_recall"
 
+    def __init__(
+        self,
+        session_service,
+        artifact_service,
+        memory_service,
+        web_service=None,
+        tool_service=None,
+        recon_service=None,
+    ):
+        self.session_service = session_service
+        self.artifact_service = artifact_service
+        self.memory_service = memory_service
+        self.web_service = web_service
+        self.tool_service = tool_service
+        self.recon_service = recon_service
+
+        self.agent_service = AgentService()
+        self.autonomy_service = AutonomyService()
+        self.memory_ranker_service = MemoryRankerService()
+        self.response_rewrite_service = ResponseRewriteService()
+        self.execution_handler = default_executor
+
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.model = os.getenv("OPENAI_MODEL", "gpt-5.4")
 
     def _safe_str(self, value) -> str:
         try:
@@ -432,67 +456,6 @@ Available actions:
 
         import uuid
         return f"session_{uuid.uuid4().hex}"
-
-    def _handle_execution_control(self, user_text: str, session_id: str):
-        text = self._safe_str(user_text).strip().lower()
-
-        execution_keywords = {
-            "next",
-            "nex",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "what next",
-            "what now",
-            "run_step",
-            "run step",
-            "run_all",
-            "run all",
-            "run it",
-            "execute",
-            "execute all",
-            "retry",
-            "retry failed",
-            "try again",
-            "rerun failed",
-            "test_fail",
-            "test fail",
-            "stop",
-            "cancel",
-        }
-
-        if text not in execution_keywords:
-            return None
-
-        if text in {"retry", "retry failed", "try again", "rerun failed"}:
-            command = "retry_failed"
-        elif text in {"run_all", "run all", "run it", "execute", "execute all"}:
-            command = "run_all"
-        elif text in {"test_fail", "test fail"}:
-            command = "test_fail"
-        elif text in {"stop", "cancel"}:
-            command = "stop"
-        else:
-            command = "run_step"
-
-        if hasattr(self, "_advance_execution_request"):
-            return self._advance_execution_request(
-                user_text=command,
-                session_id=session_id,
-                attachments=[],
-            )
-
-        if hasattr(self, "_auto_execute_request"):
-            return self._auto_execute_request(
-                user_text=command,
-                session_id=session_id,
-                attachments=[],
-            )
-
-        return None
 
     def handle(self, user_text, attachments=None, session_id=None, **kwargs):
         session_id = session_id or kwargs.get("session_id") or ""
@@ -878,7 +841,6 @@ Available actions:
         cleaned = self._clean_web_results(all_results)
 
         return {"results": cleaned}
-
     def __init__(
         self,
         session_service: SessionService,
@@ -7067,26 +7029,6 @@ Next action:
             "id": session_id,
             "messages": fallback_messages,
         }
-
-    def _get_session_meta(self, session_id: str, key: str, default=None):
-        try:
-            session = self._get_session_payload(session_id)
-            if not isinstance(session, dict):
-                return default
-
-            meta = session.get("meta")
-            if isinstance(meta, dict) and key in meta:
-                return meta.get(key, default)
-
-            working_state = session.get("working_state")
-            if isinstance(working_state, dict) and key in working_state:
-                return working_state.get(key, default)
-
-            return default
-
-        except Exception as e:
-            exec_debug("GET_SESSION_META_ERROR:", e)
-            return default
 
     def _set_session_meta(self, session_id: str, key: str, value):
         try:

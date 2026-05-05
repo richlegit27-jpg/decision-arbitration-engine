@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import os
@@ -50,6 +50,65 @@ class ChatService:
     ROUTE_PLANNING = "planning"
     ROUTE_MEMORY_RECALL = "memory_recall"
 
+    def __init__(
+        self,
+        session_service,
+        artifact_service,
+        memory_service,
+        web_service=None,
+        tool_service=None,
+        recon_service=None,
+    ):
+        self.session_service = session_service
+        self.artifact_service = artifact_service
+        self.memory_service = memory_service
+        self.web_service = web_service
+        self.tool_service = tool_service
+        self.recon_service = recon_service
+
+        # aliases used by older methods
+        self.sessions = session_service
+        self.artifacts = artifact_service
+        self.memory = memory_service
+        self.web = web_service
+        self.tools = tool_service
+        self.recon = recon_service
+
+        # core services
+        self.agent_service = AgentService()
+        self.agent = self.agent_service
+
+        self.autonomy_service = AutonomyService()
+        self.autonomy = self.autonomy_service
+
+        self.memory_ranker_service = MemoryRankerService()
+        self.memory_ranker = self.memory_ranker_service
+
+        self.response_rewrite_service = ResponseRewriteService()
+        self.rewrite_service = self.response_rewrite_service
+
+        self.execution_service = ExecutionService()
+        self.intent_service = IntentService()
+
+        # execution engine
+        self.execution_handler = ExecutionHandler(default_executor)
+
+        # config
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.chat_model = os.getenv("OPENAI_MODEL", "gpt-5.4")
+        self.model = self.chat_model
+        self.image_model = os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1")
+        self.image_size = os.getenv("NOVA_IMAGE_SIZE", "1024x1024")
+        self.memory_limit = int(os.getenv("NOVA_MEMORY_LIMIT", "3"))
+
+        # uploads
+        self.uploads_dir = Path(
+            os.getenv("UPLOADS_DIR", r"C:\Users\Owner\nova\uploads")
+        )
+        self.uploads_dir.mkdir(parents=True, exist_ok=True)
+
+        exec_debug("MODEL CHECK:", hasattr(self, "model"), self.model)
+        exec_debug("CHATSERVICE INIT uploads_dir =", self.uploads_dir)
 
     def _safe_str(self, value) -> str:
         try:
@@ -128,15 +187,22 @@ class ChatService:
         except Exception:
             mission_status = ""
 
-        if text == "test_fail":
+        action = ""
+        text = (user_text or "").strip().lower()
+
+        # =========================
+        # ACTION RESOLUTION (ONE SOURCE)
+        # =========================
+
+        if text in {"test_fail", "test fail"}:
             action = "test_fail"
 
         elif text in {
             "next", "nex", "continue", "continue on",
-            "keep going", "go", "run next",
-            "next step", "what next", "what now",
+            "keep going", "go", "run next", "next step",
+            "what next", "what now"
         }:
-            if status in ("error", "failed") or mission_status in ("error", "failed"):
+            if status in ("error", "failed"):
                 action = "retry_failed"
             else:
                 action = "run_step"
@@ -146,15 +212,25 @@ class ChatService:
 
         elif text in {
             "run_all", "run all", "run it", "execute",
-            "execute all", "auto", "auto mode", "autopilot",
+            "execute all", "auto", "auto mode", "autopilot"
         }:
             action = "run_all"
 
         elif text in {"run_step", "run step"}:
             action = "run_step"
 
-        else:
-            action = "run_all"
+        elif text in {"stop", "cancel"}:
+            action = "stop"
+
+        # ðŸš« NO AUTO DEFAULT
+        if not action:
+            return {
+                "ok": False,
+                "assistant_message": self._normalize_assistant_message(
+                    "Unknown execution command. Try: next, run_all, retry, or stop."
+                ),
+                "session": self._get_session_payload(session_id),
+            }
 
         try:
             exec_debug("EXECUTION HANDLER ABOUT TO RUN:", action, session_id)
@@ -214,7 +290,6 @@ class ChatService:
 
                 file_path = r"C:\Users\Owner\nova\nova_backend\services\chat_service.py"
 
-                heal_result = self._self_heal_python_file(file_path)
 
                 if heal_result.get("ok"):
                     return {
@@ -246,13 +321,18 @@ class ChatService:
                 )
 
                 assistant_msg = self._build_assistant_message(
+
                     text=f"""Execution failed.
 
 Error:
 {error_text}
 
+Self-heal attempted:
+{heal_error}
+
 Next move:
-Self-heal mode is ready. Send the broken file path and error, or trigger retry_failed after applying a fix.""",
+Fix the remaining compile error, then run retry_failed.""",
+
                     attachments=[],
                 )
 
@@ -432,67 +512,6 @@ Available actions:
 
         import uuid
         return f"session_{uuid.uuid4().hex}"
-
-    def _handle_execution_control(self, user_text: str, session_id: str):
-        text = self._safe_str(user_text).strip().lower()
-
-        execution_keywords = {
-            "next",
-            "nex",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "what next",
-            "what now",
-            "run_step",
-            "run step",
-            "run_all",
-            "run all",
-            "run it",
-            "execute",
-            "execute all",
-            "retry",
-            "retry failed",
-            "try again",
-            "rerun failed",
-            "test_fail",
-            "test fail",
-            "stop",
-            "cancel",
-        }
-
-        if text not in execution_keywords:
-            return None
-
-        if text in {"retry", "retry failed", "try again", "rerun failed"}:
-            command = "retry_failed"
-        elif text in {"run_all", "run all", "run it", "execute", "execute all"}:
-            command = "run_all"
-        elif text in {"test_fail", "test fail"}:
-            command = "test_fail"
-        elif text in {"stop", "cancel"}:
-            command = "stop"
-        else:
-            command = "run_step"
-
-        if hasattr(self, "_advance_execution_request"):
-            return self._advance_execution_request(
-                user_text=command,
-                session_id=session_id,
-                attachments=[],
-            )
-
-        if hasattr(self, "_auto_execute_request"):
-            return self._auto_execute_request(
-                user_text=command,
-                session_id=session_id,
-                attachments=[],
-            )
-
-        return None
 
     def handle(self, user_text, attachments=None, session_id=None, **kwargs):
         session_id = session_id or kwargs.get("session_id") or ""
@@ -879,68 +898,6 @@ Available actions:
 
         return {"results": cleaned}
 
-    def __init__(
-        self,
-        session_service: SessionService,
-        memory_service: MemoryService,
-        artifact_service: ArtifactService,
-        web_service: WebService,
-        recon_service: ReconService,
-    ):
-        self.session_service = session_service
-        self.memory_service = memory_service
-        self.artifact_service = artifact_service
-        self.web_service = web_service
-        self.recon_service = recon_service
-        self.rewrite_service = ResponseRewriteService()
-
-        # execution engine
-        self.execution_handler = ExecutionHandler(default_executor)
-
-        # existing aliases (DO NOT REMOVE)
-        self.sessions = session_service
-        self.memory = memory_service
-        self.artifacts = artifact_service
-        self.web = web_service
-        self.recon = recon_service
-
-        # config
-        self.image_model = os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1")
-        self.image_size = os.getenv("NOVA_IMAGE_SIZE", "1024x1024")
-        self.chat_model = os.getenv("OPENAI_MODEL", "gpt-5.4")
-        self.model = self.chat_model
-        exec_debug("MODEL CHECK:", hasattr(self, "model"), self.model)
-
-        self.memory_limit = int(os.getenv("NOVA_MEMORY_LIMIT", "3"))
-
-        # services
-        self.execution_service = ExecutionService()
-        self.intent_service = IntentService()
-
-        # uploads
-        self.uploads_dir = Path(
-            os.getenv("UPLOADS_DIR", r"C:\Users\Owner\nova\uploads")
-        )
-        self.uploads_dir.mkdir(parents=True, exist_ok=True)
-        exec_debug("CHATSERVICE INIT uploads_dir =", self.uploads_dir)
-
-        # core clients
-        self.client = OpenAI()
-        self.agent = AgentService()
-        self.memory_ranker = MemoryRankerService()
-        self.tools = ToolService(base_dir=os.getcwd())
-
-        # autonomy
-        self.autonomy = AutonomyService(
-            web_service=self.web,
-            recon_service=self.recon,
-            memory_service=self.memory,
-            artifact_service=self.artifacts,
-            max_steps=5,
-            max_deep_js=5,
-            max_follow_links=5,
-        )
-
     def _build_user_message(self, text: str, attachments=None, meta=None) -> dict:
         attachments = attachments or []
         meta = meta or {}
@@ -950,6 +907,33 @@ Available actions:
             "attachments": attachments,
             "meta": meta,
         }
+
+    def _normalize_assistant_message(self, message):
+        if message is None:
+            message = {}
+
+        if isinstance(message, dict):
+            text = (
+                message.get("text")
+                or message.get("content")
+                or message.get("assistant_message")
+                or ""
+            )
+
+            meta = message.get("meta")
+            if not isinstance(meta, dict):
+                meta = {}
+
+            message["text"] = text
+            message["content"] = text
+            message["meta"] = meta
+
+            return message
+
+        return self._build_assistant_message(
+            text=str(message),
+            meta={},
+        )
 
     def _build_assistant_message(
         self,
@@ -1071,38 +1055,89 @@ Available actions:
         ]
 
     def _execute_tool(self, step: dict):
-        action = step.get("action")
-        input_data = step.get("input")
+        if not isinstance(step, dict):
+            return {
+                "ok": False,
+                "status": "failed",
+                "error": "Invalid execution step.",
+            }
 
-        if action == "analyze":
-            return f"analyzed: {input_data}"
+        action = self._safe_str(step.get("action")).strip().lower()
+        input_data = self._safe_str(step.get("input")).strip()
 
-        if action == "fix":
-            return f"fixed: {input_data}"
+        if action in {"analyze", "inspect"}:
+            return {
+                "ok": True,
+                "status": "success",
+                "message": f"Analyzed: {input_data}",
+                "next_move": "continue",
+            }
 
-        if action == "validate":
-            return f"validated: {input_data}"
+        if action in {"fix", "repair"}:
+            return {
+                "ok": False,
+                "status": "failed",
+                "error": "Fix step requires a target file path and error context.",
+                "next_move": "self_heal_fix_file",
+            }
 
-        if action == "web_search":
-            return f"web result for: {input_data}"
+        if action in {"validate", "test"}:
+            return {
+                "ok": True,
+                "status": "success",
+                "message": f"Validated: {input_data}",
+                "next_move": "continue",
+            }
 
-        if action == "design":
-            return f"designed: {input_data}"
+        if action in {"design", "plan"}:
+            return {
+                "ok": True,
+                "status": "success",
+                "message": f"Designed: {input_data}",
+                "next_move": "continue",
+            }
 
-        if action == "implement":
-            return f"implemented: {input_data}"
-
-        if action == "test":
-            return f"tested: {input_data}"
+        if action in {"implement", "build", "create"}:
+            return {
+                "ok": False,
+                "status": "failed",
+                "error": "Implementation step requires a real file target before writing.",
+                "next_move": "request_target_file",
+            }
 
         if action == "respond":
-            return f"response: {input_data}"
+            return {
+                "ok": True,
+                "status": "success",
+                "message": f"Response ready: {input_data}",
+                "next_move": "complete",
+            }
 
-        return f"unknown action: {action}"
+        return {
+            "ok": False,
+            "status": "failed",
+            "error": f"Unknown execution action: {action}",
+            "next_move": "inspect_step",
+        }
 
     def _run_next_step(self, execution_state: dict):
+        if not isinstance(execution_state, dict):
+            return {
+                "status": "failed",
+                "error": "Invalid execution state.",
+                "steps": [],
+                "current_step": 0,
+                "history": [],
+            }
+
         steps = execution_state.get("steps", [])
         current = execution_state.get("current_step", 0)
+
+        if not isinstance(steps, list):
+            steps = []
+
+        if not isinstance(current, int):
+            current = 0
 
         if current >= len(steps):
             execution_state["status"] = "complete"
@@ -1112,15 +1147,42 @@ Available actions:
 
         result = self._execute_tool(step)
 
+        if not isinstance(result, dict):
+            result = {
+                "ok": True,
+                "status": "success",
+                "message": self._safe_str(result),
+            }
+
         step["result"] = result
 
-        execution_state["history"].append(step)
-        execution_state["current_step"] += 1
+        history = execution_state.get("history")
+        if not isinstance(history, list):
+            history = []
 
-        if execution_state["current_step"] < len(steps):
-            execution_state["status"] = "running"
-        else:
+        history.append(step)
+        execution_state["history"] = history
+
+        result_status = self._safe_str(result.get("status")).lower()
+        result_ok = bool(result.get("ok"))
+
+        if not result_ok or result_status in {"failed", "error"}:
+            execution_state["status"] = "failed"
+            execution_state["last_error"] = (
+                result.get("error")
+                or result.get("message")
+                or "Execution step failed."
+            )
+            execution_state["next_move"] = result.get("next_move") or "self_heal_fix_file"
+            return execution_state
+
+        execution_state["current_step"] = current + 1
+        execution_state["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        if execution_state["current_step"] >= len(steps):
             execution_state["status"] = "complete"
+        else:
+            execution_state["status"] = "running"
 
         return execution_state
 
@@ -1493,6 +1555,14 @@ Available actions:
         working_state=None,
     ) -> dict:
 
+        mission = {}
+
+        if isinstance(working_state, dict):
+            mission = working_state.get("mission") or {}
+
+        if not isinstance(mission, dict):
+            mission = {}
+
         decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
 
@@ -1571,6 +1641,9 @@ Available actions:
                 }
 
         mission = decision.get("mission") if isinstance(decision, dict) else {}
+        if not isinstance(mission, dict):
+            mission = {}
+
         mission_mode = str(mission.get("mode") or "").lower()
 
         if is_continue and mission_mode == "debugging":
@@ -1765,7 +1838,7 @@ Available actions:
 
         user_text_lc = str(user_text or "").lower().strip()
 
-        # ðŸ”¥ 1. HARD USER OVERRIDE (strongest)
+        # Ã°Å¸â€Â¥ 1. HARD USER OVERRIDE (strongest)
         if any(p in user_text_lc for p in [
             "don't give short",
             "dont give short",
@@ -1786,7 +1859,7 @@ Available actions:
         ]):
             return "short"
 
-        # ðŸ”¥ 2. MEMORY (most recent wins)
+        # Ã°Å¸â€Â¥ 2. MEMORY (most recent wins)
         for m in reversed(memory_items or []):
             if not isinstance(m, dict):
                 continue
@@ -1799,7 +1872,7 @@ Available actions:
             if "short answers" in text:
                 return "short"
 
-        # ðŸ”¥ 3. DEFAULT
+        # Ã°Å¸â€Â¥ 3. DEFAULT
         return "normal"
 
     def _apply_pending_fix(self, session_id: str) -> dict:
@@ -2095,7 +2168,7 @@ Available actions:
             "send the code",
             "send one of these",
             "send the code and",
-            "whatâ€™s the symptom",
+            "whatÃ¢â‚¬â„¢s the symptom",
             "what's the symptom",
             "tell me what you need",
             "i can help",
@@ -2488,7 +2561,7 @@ Available actions:
                 "SMFF mode:\n"
                 "- Send full file path.\n"
                 "- Send the full broken function or file.\n"
-                "- I’ll return the full replacement, cleanly indented."
+                "- Iâ€™ll return the full replacement, cleanly indented."
             ).strip()
 
         stuck_exact = {
@@ -2530,7 +2603,7 @@ Available actions:
             return {
                 "assistant_text": (
                     "Send the full function and file path.\n"
-                    "I’ll return the full replacement block, cleanly indented."
+                    "Iâ€™ll return the full replacement block, cleanly indented."
                 ),
                 "intelligence": {
                     "strategy": "smff_bug_intake",
@@ -2546,7 +2619,7 @@ Available actions:
             return {
                 "assistant_text": (
                     "Paste the error, file path, or failing behavior.\n"
-                    "I’ll help patch it."
+                    "Iâ€™ll help patch it."
                 ),
                 "intelligence": {
                     "strategy": "bug_intake",
@@ -2563,7 +2636,7 @@ Available actions:
             return {
                 "assistant_text": (
                     "Paste the text, code, error, screenshot, or link.\n"
-                    "I’ll break it down clearly."
+                    "Iâ€™ll break it down clearly."
                 ),
                 "intelligence": {
                     "strategy": "clarify_missing_subject",
@@ -2582,7 +2655,7 @@ Available actions:
         hard_override_applied = False
 
         if not assistant_text:
-            assistant_text = "I couldn’t generate a useful answer from that. Send the exact thing you want handled."
+            assistant_text = "I couldnâ€™t generate a useful answer from that. Send the exact thing you want handled."
 
         try:
             intelligence = self._fuse_response_intelligence(
@@ -2755,18 +2828,18 @@ Available actions:
         if smff_active and code_intent and not asks_alternatives:
             return (
                 "Send full file path + full broken code.\n"
-                "I’ll return the full replacement, cleanly indented.\n\n"
+                "Iâ€™ll return the full replacement, cleanly indented.\n\n"
                 "PowerShell test:\n"
                 "python -m py_compile <file_path>"
             )
 
         if smff_active and code_intent and asks_alternatives:
             return (
-                "Option A — safest:\n"
-                "Send the full file path + full broken file. I’ll return the full-file replacement.\n\n"
-                "Option B — faster:\n"
-                "Send the full function only. I’ll return the full function replacement.\n\n"
-                "Option C — debug-only:\n"
+                "Option A â€” safest:\n"
+                "Send the full file path + full broken file. Iâ€™ll return the full-file replacement.\n\n"
+                "Option B â€” faster:\n"
+                "Send the full function only. Iâ€™ll return the full function replacement.\n\n"
+                "Option C â€” debug-only:\n"
                 "Run this and send the exact error:\n"
                 "python -m py_compile <file_path>"
             )
@@ -2781,7 +2854,7 @@ Available actions:
         ):
             return (
                 "Send the full function and file path.\n"
-                "I’ll return the full replacement block, cleanly indented."
+                "Iâ€™ll return the full replacement block, cleanly indented."
             )
 
         kill_phrases = [
@@ -2812,7 +2885,7 @@ Available actions:
 
         bad_endings = [
             "Example:",
-            "Here’s how:",
+            "Hereâ€™s how:",
             "Here's how:",
             "This prints:",
             "That prints:",
@@ -2833,7 +2906,7 @@ Available actions:
             if (
                 last.endswith(":")
                 or last.endswith("-")
-                or last_lc in {"example", "output", "result", "here’s how", "here's how"}
+                or last_lc in {"example", "output", "result", "hereâ€™s how", "here's how"}
             ):
                 lines.pop()
                 continue
@@ -3267,7 +3340,7 @@ Available actions:
 
         clean_query = re.sub(r"\s+", " ", clean_query).strip()
 
-        # 🔥 empty → global news
+        # ðŸ”¥ empty â†’ global news
         if not clean_query:
             return [
                 "world news",
@@ -3605,14 +3678,14 @@ Available actions:
 
         if sources:
             assistant_text = assistant_text.strip()
-            assistant_text += "\n\n— Top sources —\n"
+            assistant_text += "\n\nâ€” Top sources â€”\n"
 
             for index, item in enumerate(sources[:5], start=1):
                 title = self._safe_str(item.get("title")).strip()
                 source = self._safe_str(item.get("source")).strip()
                 url = self._safe_str(item.get("url")).strip()
 
-                line = f"{index}. {source} — {title}" if source and title else f"{index}. {title or source or url}"
+                line = f"{index}. {source} â€” {title}" if source and title else f"{index}. {title or source or url}"
                 assistant_text += line + "\n"
 
                 if url and "news.google.com" not in url.lower():
@@ -3783,6 +3856,22 @@ Available actions:
                 "needs_full_file": False,
             })
             return mission
+
+    def _guess_function_from_text(self, text: str = "") -> str:
+        text = self._safe_str(text)
+
+        patterns = [
+            r"function\s+([A-Za-z_][A-Za-z0-9_]*)",
+            r"def\s+([A-Za-z_][A-Za-z0-9_]*)",
+            r"_([A-Za-z0-9_]+)",
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if match:
+                return match.group(1).strip()
+
+        return ""
 
     def _guess_path_from_text(self, text: str) -> str:
         text = self._safe_str(text)
@@ -4048,10 +4137,164 @@ Available actions:
                 "ok": True,
             }
 
+    def _handle_execution_control(self, user_text: str, session_id: str):
+        raw_text = (user_text or "").strip().lower()
+        text = raw_text.replace("_", " ")
+
+        execution_keywords = {
+            "next",
+            "nex",
+            "continue",
+            "continue on",
+            "keep going",
+            "go",
+            "run next",
+            "next step",
+            "what next",
+            "what now",
+            "run step",
+            "run all",
+            "run it",
+            "execute",
+            "execute all",
+            "retry",
+            "retry failed",
+            "try again",
+            "rerun failed",
+            "test fail",
+            "stop",
+            "cancel",
+        }
+
+        if text not in execution_keywords:
+            return None
+
+        execution_state = self._get_session_meta(session_id, "execution_state", {}) or {}
+
+        if not isinstance(execution_state, dict):
+            execution_state = {}
+
+        status = str(execution_state.get("status") or "").lower()
+        print("DEBUG EXEC CONTROL:", text, status)
+
+        if status == "complete" and text in {
+            "next",
+            "nex",
+            "continue",
+            "continue on",
+            "keep going",
+            "go",
+            "run next",
+            "next step",
+            "what next",
+            "what now",
+        }:
+            return self._build_assistant_message(
+                text=(
+                    "Execution is complete.\n\n"
+                    "Next move:\n"
+                    "- Give me a new goal to build an execution plan\n"
+                    "- Or say `test_fail` to test the failure loop again"
+                ),
+                meta={
+                    "execution_control": True,
+                    "execution_status": "complete",
+                    "pending_execution_action": "",
+                    "auto_loop": False,
+                },
+            )
+
+        action = ""
+
+        if text in {"test fail"}:
+            action = "test_fail"
+
+        elif text in {
+            "next",
+            "nex",
+            "continue",
+            "continue on",
+            "keep going",
+            "go",
+            "run next",
+            "next step",
+            "what next",
+            "what now",
+        }:
+            if status in {"error", "failed"}:
+                action = "retry_failed"
+            else:
+                action = "run_step"
+
+        elif text in {"retry", "retry failed", "try again", "rerun failed"}:
+            action = "retry_failed"
+
+        elif text in {"run all", "run it", "execute", "execute all"}:
+            action = "run_all"
+
+        elif text == "run step":
+            action = "run_step"
+
+        elif text in {"stop", "cancel"}:
+            action = "stop"
+
+        if not action:
+            return None
+
+        self._set_session_meta(session_id, "pending_execution_action", action)
+
+        return self._build_assistant_message(
+            text=(
+                "Execution command received.\n\n"
+                f"Action: `{action}`\n"
+                "Next: running execution bridge."
+            ),
+            meta={
+                "execution_action": action,
+                "pending_execution_action": action,
+                "execution_control": True,
+                "auto_loop": action == "run_all",
+            },
+        )
+
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         exec_debug("HANDLE IS BEING CALLED")
         attachments = attachments or []
 
+        execution_control = self._handle_execution_control(user_text, session_id)
+
+        if execution_control:
+            return {
+                "ok": True,
+                "assistant_message": execution_control,
+                "session": {
+                    "id": session_id,
+                    "meta": {
+                        "pending_execution_action": execution_control.get("meta", {}).get("pending_execution_action")
+                    },
+                },
+                "debug": {
+                    "route": "execution_control",
+                },
+            }
+
+        try:
+            session = None
+
+            if hasattr(self, "sessions") and isinstance(self.sessions, dict):
+                session = self.sessions.get(session_id)
+
+            if not session and hasattr(self, "session_service"):
+                session = self.session_service.get_session(session_id)
+
+            if not isinstance(session, dict):
+                session = {}
+
+            if not isinstance(session.get("meta"), dict):
+                session["meta"] = {}
+
+        except Exception:
+            pass
         # =========================
         # SESSION LOCK
         # =========================
@@ -4079,11 +4322,14 @@ Available actions:
         # =========================
         # LOAD STATE
         # =========================
-        execution_state = self._get_session_meta(session_id, "execution_state") or {}
+        execution_state = self._get_session_meta(session_id, "execution_state", {}) or {}
 
+        if not isinstance(execution_state, dict):
+            execution_state = {}
         # =========================
         # RESUME EXISTING STATE
         # =========================
+
         if execution_state and execution_state.get("status") not in ("complete", "cancelled"):
             exec_debug("RESUMING EXISTING EXECUTION STATE")
 
@@ -4093,14 +4339,21 @@ Available actions:
             execution_state = self._process_execution(execution_state, session_id)
             self._set_session_meta(session_id, "execution_state", execution_state)
 
-            return {
-                "ok": True,
-                "assistant_message": self._normalize_assistant_message(
-                    f"Execution advanced.\n\nStatus: {execution_state.get('status')}\nCurrent step: {execution_state.get('current_step')}"
-                ),
-                "session": self._get_session_payload(session_id),
+            msg = self._normalize_assistant_message(
+                f"Execution advanced.\n\nStatus: {execution_state.get('status')}\nCurrent step: {execution_state.get('current_step')}"
+            )
+
+            msg["meta"] = {
+                "execution_control": True,
+                "pending_execution_action": "run_step",
+                "auto_loop": execution_state.get("status") != "complete",
             }
 
+            return {
+                "ok": True,
+                "assistant_message": msg,
+                "session": self._get_session_payload(session_id),
+            }
         # =========================
         # PLAN ONLY IF NO ACTIVE STATE
         # =========================
@@ -4114,76 +4367,247 @@ Available actions:
         # =========================
         max_steps = 5
 
+        # =========================
+        # AUTO EXECUTION LOOP
+        # =========================
+        max_steps = 3
+
         for _ in range(max_steps):
             if not execution_state:
                 break
 
-            if execution_state.get("status") in ("complete", "cancelled"):
+            status = str(execution_state.get("status") or "").lower()
+
+            if status in ("complete", "cancelled"):
                 break
 
             if execution_state.get("waiting"):
                 break
 
+            prev_step = execution_state.get("current_step")
+
             execution_state = self._process_execution(execution_state, session_id)
             self._set_session_meta(session_id, "execution_state", execution_state)
 
-        # =========================
-        # ROUTE OUTPUT
-        # =========================
-        return self._process_routing(user_text, session_id, attachments)    
+            # prevent infinite loop (no progress)
+            if execution_state.get("current_step") == prev_step:
+                exec_debug("EXECUTION STALLED - BREAKING LOOP")
+                break
 
-    def _process_goal_and_plan(self, user_text: str, session_id: str):
-        goal = self._build_goal(user_text)
-        plan = self._build_plan(goal)
+        if isinstance(execution_state, dict):
+            status = str(execution_state.get("status") or "").lower()
+            text = (user_text or "").strip().lower().replace("_", " ")
+
+            if status == "complete" and text in {
+                "next",
+                "nex",
+                "continue",
+                "continue on",
+                "keep going",
+                "go",
+                "run next",
+                "next step",
+                "what next",
+                "what now",
+                "run it",
+                "runit",
+            }:
+                return {
+                    "ok": True,
+                    "assistant_message": self._normalize_assistant_message(
+                        "Execution is complete.\n\nNext move:\n- Give me a new goal\n- Or say `test_fail` to test the failure loop again"
+                    ),
+                    "session": self._get_session_payload(session_id),
+                }
+
+        # =========================
+        # INTELLIGENCE: AUTO-PLAN
+        # =========================
+        text = (user_text or "").strip().lower()
+
+        auto_plan_triggers = {
+            "build",
+            "create",
+            "make",
+            "add",
+            "implement",
+            "fix",
+            "repair",
+            "upgrade",
+            "improve",
+            "wire",
+            "lock",
+            "setup",
+            "set up",
+        }
+
+        should_auto_plan = any(
+            text.startswith(trigger + " ") or text == trigger
+            for trigger in auto_plan_triggers
+        )
+
+        if should_auto_plan:
+            execution_state = self._process_goal_and_plan(user_text, session_id)
+
+            # ðŸ” FULL AUTO LOOP + SELF-HEAL HOOK
+            max_loops = 10
+            loops = 0
+
+            while (
+                isinstance(execution_state, dict)
+                and execution_state.get("status") not in ("complete", "cancelled")
+                and loops < max_loops
+            ):
+
+                execution_state = self._process_execution(execution_state, session_id)
+                loops += 1
+
+                status = str(execution_state.get("status") or "").lower()
+
+                if status in {"failed", "error"}:
+                    last_error = (
+                        execution_state.get("last_error")
+                        or execution_state.get("error")
+                        or "Execution failed."
+                    )
+
+                    self._update_working_state(
+                        session_id,
+                        {
+                            "last_execution_status": "failed",
+                            "last_execution_error": str(last_error),
+                            "last_error": str(last_error),
+                            "active_task": user_text,
+                            "next_move": "self_heal_retry",
+                            "pending_execution_action": "retry_failed",
+                        },
+                    )
+
+
+                    try:
+                        file_path = self._guess_path_from_text(user_text)
+
+                        if not file_path:
+                            file_path = r"C:\Users\Owner\nova\nova_backend\services\chat_service.py"
+
+                        func_name = (
+                            execution_state.get("function")
+                            or execution_state.get("target_function")
+                            or self._guess_function_from_text(user_text)
+                        )
+
+                        if func_name and hasattr(self, "_self_heal_python_function"):
+                            heal_result = self._self_heal_python_function(file_path, func_name)
+                        else:
+                            heal_result = self._self_heal_python_file(file_path)
+
+                        if isinstance(heal_result, dict) and heal_result.get("ok"):
+                            execution_state["status"] = "running"
+                            execution_state["last_error"] = ""
+                            self._set_session_meta(session_id, "execution_state", execution_state)
+                            continue
+
+                    except Exception as heal_error:
+                        exec_debug("AUTO SELF-HEAL ERROR:", heal_error)              
+
+                    execution_state["status"] = "self_heal_ready"
+                    execution_state["last_error"] = str(last_error)
+                    break
+
+            self._set_session_meta(session_id, "execution_state", execution_state)
+
+            final_status = str(execution_state.get("status") or "").lower()
+
+            if final_status == "complete":
+                message = "Execution plan created and completed automatically."
+
+            elif final_status == "self_heal_ready":
+                message = (
+                    "Execution hit a failure.\n\n"
+                    "Self-heal state saved.\n"
+                    "Nova will retry automatically after an auto-fix is applied."
+                )
+
+            else:
+                last_error = (
+                    execution_state.get("last_error")
+                    or execution_state.get("error")
+                    or execution_state.get("next_move")
+                    or "Execution stopped before completion."
+                )
+
+                message = (
+                    "Execution plan created and partially executed.\n\n"
+                    f"Reason:\n{last_error}"
+                )
+
+            return {
+                "ok": True,
+                "assistant_message": self._normalize_assistant_message(message),
+                "session": self._get_session_payload(session_id),
+            }
+
+        return self._process_routing(user_text, session_id, attachments)
+
+    def _process_goal_and_plan(self, user_text: str, session_id: str = "") -> dict:
+        goal_obj = self._build_goal(user_text)
+        steps = self._build_plan(goal_obj)
 
         execution_state = {
             "status": "running",
-            "steps": plan,
+            "goal": goal_obj,
+            "steps": steps,
             "current_step": 0,
             "history": [],
+            "waiting": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
         self._set_session_meta(session_id, "execution_state", execution_state)
         return execution_state
-
-    def _process_execution(self, execution_state: dict, session_id: str):
-        if not execution_state:
-            return execution_state
-
-        # prevent overflow / duplicate execution
-        if execution_state.get("status") == "complete":
-            execution_state["waiting"] = False
-            self._set_session_meta(session_id, "execution_state", execution_state)
-            return execution_state
-
-        # run next step
-        execution_state = self._run_next_step(execution_state)
-
-        current = execution_state.get("current_step", 0)
-        total = len(execution_state.get("steps", []))
-
-        # =========================
-        # COMPLETION CHECK
-        # =========================
-        if current >= total:
-            execution_state["status"] = "complete"
-            execution_state["waiting"] = False
-            execution_state["complete"] = True
-        else:
-            # =========================
-            # PERSISTENT LOOP FLAG
-            # =========================
-            execution_state["status"] = "running"
-            execution_state["waiting"] = True
-            execution_state["complete"] = False
-
-        # save state
-        self._set_session_meta(session_id, "execution_state", execution_state)
-
         return execution_state
 
     def _process_auto_fix(self, user_text: str, session_id: str, attachments=None):
-        lowered = (user_text or "").lower()
+        text = self._safe_str(user_text).strip()
+        lowered = text.lower()
+
+        function_match = re.search(
+            r"fix\s+function\s+([A-Za-z_][A-Za-z0-9_]*)",
+            text,
+            re.IGNORECASE,
+        )
+
+        if function_match:
+            func_name = function_match.group(1).strip()
+            file_path = self._guess_path_from_text(text)
+
+            if not file_path:
+                return {
+                    "ok": True,
+                    "assistant_message": self._build_assistant_message(
+                        "Function auto-fix needs a file path."
+                    ),
+                    "session": self._get_session_payload(session_id),
+                    "debug": {"route": "function_auto_fix_missing_path"},
+                }
+
+            result = self._self_heal_python_function(file_path, func_name)
+
+            message = (
+                "Function auto-fix applied."
+                if result.get("ok")
+                else "Function auto-fix failed."
+            )
+
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    f"{message}\n\nFile:\n{file_path}\n\nFunction:\n{func_name}\n\nResult:\n{result}"
+                ),
+                "session": self._get_session_payload(session_id),
+                "debug": {"route": "function_auto_fix"},
+            }
 
         if "fix this" in lowered and "error" not in lowered:
             return {
@@ -4195,7 +4619,7 @@ Available actions:
                 "debug": {"route": "bug_intake_guard"},
             }
 
-        path = self._guess_path_from_text(user_text)
+        path = self._guess_path_from_text(text)
 
         if path and any(x in lowered for x in ["fix", "bug", "error", "debug"]):
             return self._execute_auto_fix_file(
@@ -4204,6 +4628,107 @@ Available actions:
             )
 
         return None
+
+    def _self_heal_python_function(self, file_path: str, func_name: str) -> dict:
+        import re
+        import time
+        import shutil
+        import py_compile
+        import traceback
+
+        file_path = self._safe_str(file_path).strip()
+        func_name = self._safe_str(func_name).strip()
+
+        if not file_path or not func_name:
+            return {
+                "ok": False,
+                "error": "Missing file path or function name.",
+            }
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            pattern = rf"(?ms)^    def {re.escape(func_name)}\(.*?\):\n(?:^        .*\n|^\s*$)*"
+            match = re.search(pattern, content)
+
+            if not match:
+                return {
+                    "ok": False,
+                    "error": f"Function not found: {func_name}",
+                }
+
+            original_func = match.group(0)
+
+            prompt = (
+                "Fix this Python class method.\n"
+                "Return ONLY the corrected function.\n"
+                "No markdown. No explanation.\n\n"
+                f"FILE PATH:\n{file_path}\n\n"
+                f"FUNCTION NAME:\n{func_name}\n\n"
+                f"CURRENT FUNCTION:\n{original_func}"
+            )
+
+            response = self.client.responses.create(
+                model=self.model,
+                input=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You repair Python functions safely. "
+                            "Return only the full corrected function with correct indentation."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    },
+                ],
+            )
+
+            fixed_func = self._safe_str(response.output_text).strip()
+
+            fixed_func = re.sub(
+                r"^```(?:python|py)?\s*",
+                "",
+                fixed_func,
+                flags=re.IGNORECASE,
+            )
+            fixed_func = re.sub(r"\s*```$", "", fixed_func).rstrip() + "\n\n"
+
+            backup_path = f"{file_path}.function_autofix_{int(time.time())}.bak"
+            shutil.copy2(file_path, backup_path)
+
+            updated = content[:match.start()] + fixed_func + content[match.end():]
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(updated)
+
+            try:
+                py_compile.compile(file_path, doraise=True)
+            except Exception:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(content)
+
+                return {
+                    "ok": False,
+                    "error": "Function fix failed compile. Original file restored.",
+                    "compile_error": traceback.format_exc(),
+                    "backup": backup_path,
+                }
+
+            return {
+                "ok": True,
+                "file_path": file_path,
+                "function": func_name,
+                "backup": backup_path,
+            }
+
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": f"{type(e).__name__}: {self._safe_str(e)}",
+            }
 
     def _self_heal_python_file(self, file_path: str):
         if not file_path:
@@ -4243,6 +4768,27 @@ Available actions:
                 "ok": False,
                 "error": repr(exc),
             }
+
+    def _process_execution(self, execution_state: dict, session_id: str):
+        if not isinstance(execution_state, dict) or not execution_state:
+            return execution_state or {}
+
+        status = str(execution_state.get("status") or "").lower().strip()
+
+        if status in {"complete", "cancelled", "done"}:
+            return execution_state
+
+        if hasattr(self, "_run_next_step"):
+            execution_state = self._run_next_step(execution_state)
+
+        steps = execution_state.get("steps") or []
+        current_step = execution_state.get("current_step", 0)
+
+        if isinstance(current_step, int) and steps and current_step >= len(steps):
+            execution_state["status"] = "complete"
+
+        self._set_session_meta(session_id, "execution_state", execution_state)
+        return execution_state
 
     def _process_routing(self, user_text: str, session_id: str, attachments=None):
         decision = {}
@@ -4284,15 +4830,19 @@ Available actions:
         except Exception as e:
             exec_debug("ROUTING_ERROR:", e)
 
+            import traceback
+            traceback.print_exc()
+
             return {
                 "ok": False,
-                "assistant_message": self._normalize_assistant_message(
-                    f"Routing error: {str(e)}"
+                "assistant_message": self._build_assistant_message(
+                    text=f"Routing error: {str(e)}",
+                    meta={},
                 ),
                 "session": session_id,
                 "debug": {
-                    "route": route,
-                    "decision": decision,
+                    "route": route if 'route' in locals() else None,
+                    "decision": decision if 'decision' in locals() else None,
                 },
             }
 
@@ -4909,7 +5459,7 @@ Available actions:
         # Step 1: try relevant memory
         relevant_items = self._select_relevant_memory(user_text, limit=memory_limit)
 
-        # Step 2: fallback Ã¢â€ â€™ recent memory
+        # Step 2: fallback ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ recent memory
         if not relevant_items:
             try:
                 if hasattr(self, "memory") and self.memory:
@@ -5008,7 +5558,7 @@ Available actions:
         if not lines:
             return "I do not have any saved memory yet."
 
-        return "HereÃ¢â‚¬â„¢s what I remember:\n" + "\n".join(lines)
+        return "HereÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s what I remember:\n" + "\n".join(lines)
 
 
     def answer_from_web_results(self, query: str, results: list[dict] | None = None) -> str:
@@ -5043,7 +5593,7 @@ Available actions:
             )
 
         if not cleaned:
-            return f'I couldnâ€™t find strong live results for "{query}".'
+            return f'I couldnÃ¢â‚¬â„¢t find strong live results for "{query}".'
 
         context_blocks: list[str] = []
         for idx, item in enumerate(cleaned, start=1):
@@ -5095,7 +5645,7 @@ Available actions:
             if text:
                 import re
 
-                text = re.split(r"[-–—]\s*Top sources\s*[-–—]", text, flags=re.IGNORECASE)[0].strip()
+                text = re.split(r"[-â€“â€”]\s*Top sources\s*[-â€“â€”]", text, flags=re.IGNORECASE)[0].strip()
                 text = re.split(r"\bTop sources\b", text, flags=re.IGNORECASE)[0].strip()
 
                 sources_block = ""
@@ -5139,7 +5689,7 @@ Available actions:
                         ).strip()
 
                         lines.append(f"{idx}source")
-                        lines.append(f"{domain} — {title}")
+                        lines.append(f"{domain} â€” {title}")
 
                         if url and "news.google.com" not in url.lower():
                             lines.append(url)
@@ -5150,9 +5700,9 @@ Available actions:
 
             import re
 
-            # ?? HARD CLEAN — remove ANY sources text
+            # ?? HARD CLEAN â€” remove ANY sources text
             clean_text = re.split(
-                r"[-–—]\s*Top sources\s*[-–—]",
+                r"[-â€“â€”]\s*Top sources\s*[-â€“â€”]",
                 text,
                 flags=re.IGNORECASE
             )[0]
@@ -5180,7 +5730,7 @@ Available actions:
         if top.get("url"):
             fallback_parts.append(str(top["url"]))
 
-        return "\n".join(fallback_parts).strip() or f'Here’s what I found for "{query}".'
+        return "\n".join(fallback_parts).strip() or f'Hereâ€™s what I found for "{query}".'
 
     # =========================
     # EXECUTION GUARD HELPERS (STEP TRUTH ENFORCEMENT)
@@ -5760,7 +6310,7 @@ Available actions:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "IÃ¢â‚¬â„¢m here, but the model returned an empty response."
+        return "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -5968,11 +6518,11 @@ Available actions:
             return False
 
 
-        # ðŸ”¥ PLAN CREATION
+        # Ã°Å¸â€Â¥ PLAN CREATION
         if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
             return True
 
-        # ðŸ”¥ FALLBACK: coding / structured intent
+        # Ã°Å¸â€Â¥ FALLBACK: coding / structured intent
         if decision and decision.get("mode") in {"coding", "analysis"}:
             return True
 
@@ -6968,7 +7518,7 @@ Next action:
         current_index = -1
 
         for i, line in enumerate(lines):
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"]):
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"]):
                 step_indexes.append(i)
 
             if "[>]" in line:
@@ -6979,8 +7529,8 @@ Next action:
     def _refresh_execution_header(self, body: str):
         lines = self._safe_str(body).splitlines()
 
-        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"]))
-        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "âœ”", "Ã¢Å“â€"]))
+        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"]))
+        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"]))
 
         updated = "\n".join(lines)
         updated = re.sub(
@@ -6997,8 +7547,8 @@ Next action:
                     .replace("[ ]", "")
                     .replace("[x]", "")
                     .replace("[X]", "")
-                    .replace("âœ”", "")
                     .replace("Ã¢Å“â€", "")
+                    .replace("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â", "")
                     .strip(" -")
                     .strip()
                 )
@@ -7069,24 +7619,33 @@ Next action:
         }
 
     def _get_session_meta(self, session_id: str, key: str, default=None):
-        try:
-            session = self._get_session_payload(session_id)
-            if not isinstance(session, dict):
-                return default
-
-            meta = session.get("meta")
-            if isinstance(meta, dict) and key in meta:
-                return meta.get(key, default)
-
-            working_state = session.get("working_state")
-            if isinstance(working_state, dict) and key in working_state:
-                return working_state.get(key, default)
-
+        if not session_id:
             return default
 
-        except Exception as e:
-            exec_debug("GET_SESSION_META_ERROR:", e)
+        session = None
+
+        # try direct sessions dict
+        if hasattr(self, "sessions") and isinstance(self.sessions, dict):
+            session = self.sessions.get(session_id)
+
+        # fallback to session_service
+        if not session and hasattr(self, "session_service"):
+            try:
+                session = self.session_service.get_session(session_id)
+            except Exception:
+                session = None
+
+        # HARD GUARD
+        if not isinstance(session, dict):
             return default
+
+        meta = session.get("meta")
+
+        # HARD GUARD AGAIN
+        if not isinstance(meta, dict):
+            return default
+
+        return meta.get(key, default)
 
     def _set_session_meta(self, session_id: str, key: str, value):
         try:
@@ -7336,7 +7895,7 @@ Next action:
                 ]
             ):
                 if current_file:
-                    return f"WeÃ¢â‚¬â„¢re in `{current_file}`."
+                    return f"WeÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢re in `{current_file}`."
                 return "I do not have the current file locked in yet."
 
             if any(
@@ -7415,7 +7974,7 @@ Next action:
 
             if active_task and next_move:
                 return (
-                    f"WeÃ¢â‚¬â„¢re {active_task}. "
+                    f"WeÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢re {active_task}. "
                     f"Next: {next_move}"
                     + (f" Current file: `{current_file}`." if current_file else "")
                     + (f" Current bug: {current_bug}." if current_bug else "")
@@ -7540,7 +8099,7 @@ Next action:
 
         def _clean_value(value: str) -> str:
             value = self._safe_str(value).strip()
-            value = value.strip("+    â† (FOUR SPACES â€” press space 4 times)\r\n-:;,.")
+            value = value.strip("+    Ã¢â€ Â (FOUR SPACES Ã¢â‚¬â€ press space 4 times)\r\n-:;,.")
             return value
 
         def _set_if_present(field_name: str, value: str):
@@ -8384,7 +8943,7 @@ Next action:
             return 9.0
 
         if k in {"style"}:
-            return 8.0   # ðŸ”¥ NEW â€” how you want responses
+            return 8.0   # Ã°Å¸â€Â¥ NEW Ã¢â‚¬â€ how you want responses
 
         if k in {"preference"}:
             return 7.0
@@ -8440,7 +8999,7 @@ Next action:
         item_session = self._safe_str(item.get("session_id"))
 
         if current_session and item_session and current_session == item_session:
-            return 0.75   # â†“ reduced from 1.5
+            return 0.75   # Ã¢â€ â€œ reduced from 1.5
 
         return 0.0
 
@@ -8547,7 +9106,7 @@ Next action:
             "image", "picture", "photo", "art", "scene", "visual"
         ]
 
-        # ðŸ”¥ detect intent: action + image concept
+        # Ã°Å¸â€Â¥ detect intent: action + image concept
         if any(k in text for k in keywords) and any(i in text for i in image_words):
             return True
 
@@ -8875,10 +9434,10 @@ Next action:
                 assistant_text = self._extract_response_text(response)
 
             except Exception:
-                assistant_text = "I couldnâ€™t analyze that image."
+                assistant_text = "I couldnÃ¢â‚¬â„¢t analyze that image."
 
         else:
-            assistant_text = "I couldnâ€™t find an image attachment to analyze."
+            assistant_text = "I couldnÃ¢â‚¬â„¢t find an image attachment to analyze."
 
         return {
             "ok": True,
@@ -8910,7 +9469,7 @@ Next action:
             return ""
 
         return (
-            "\n\nRESPONSE POLICY — HIGH PRIORITY:\n"
+            "\n\nRESPONSE POLICY â€” HIGH PRIORITY:\n"
             f"- Mode: {mode or 'normal'}\n"
             f"- Answer length: {answer_length or 'normal'}\n"
             f"- Tone: {tone or 'direct'}\n"
@@ -9692,12 +10251,15 @@ def _build_chat_input(
             seen = set()
 
             for memory in memories:
+                if not isinstance(memory, dict):
+                    continue
+
                 text = self._safe_str(memory.get("text")).strip().lower()
 
                 if not text or len(text) < 4:
                     continue
 
-                if text in ["ok","hi","yo","test","next","go"]:
+                if text in ["ok", "hi", "yo", "test", "next", "go"]:
                     continue
 
                 if text in seen:
@@ -9713,5 +10275,3 @@ def _build_chat_input(
 
         except Exception as e:
             exec_debug("MEMORY CLEANUP FAILED:", e)
-
-
