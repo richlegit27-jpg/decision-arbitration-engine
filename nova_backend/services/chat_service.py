@@ -1652,7 +1652,8 @@ Available actions:
                     },
                 }
 
-        mission = decision.get("mission") if isinstance(decision, dict) else {}
+        decision = self._safe_dict(decision)
+        mission = self._safe_dict(decision.get("mission"))
         mission_mode = str(mission.get("mode") or "").lower()
 
         if is_continue and mission_mode == "debugging":
@@ -1883,6 +1884,28 @@ Available actions:
 
         # ðŸ”¥ 3. DEFAULT
         return "normal"
+
+    def _build_diff_preview(self, old: str, new: str, file_path: str) -> str:
+        try:
+            old_lines = (old or "").splitlines(keepends=True)
+            new_lines = (new or "").splitlines(keepends=True)
+
+            diff = difflib.unified_diff(
+                old_lines,
+                new_lines,
+                fromfile=f"{file_path} (current)",
+                tofile=f"{file_path} (proposed)",
+                lineterm=""
+            )
+
+            preview = "".join(diff)
+            if not preview.strip():
+                return "No changes detected."
+
+            # limit size
+            return preview[:4000]
+        except Exception as e:
+            return f"Diff preview failed: {self._safe_str(e)}"
 
     def _apply_pending_fix(self, session_id: str) -> dict:
         session = self._get_session_payload(session_id)
@@ -2675,7 +2698,8 @@ Available actions:
                 "hard_override_applied": True,
             }
 
-        mission = decision.get("mission") if isinstance(decision.get("mission"), dict) else {}
+        decision = self._safe_dict(decision)
+        mission = self._safe_dict(decision.get("mission"))
         mission_mode = str(mission.get("mode") or "").lower().strip()
 
         hard_override_applied = False
