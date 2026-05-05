@@ -10277,3 +10277,55 @@ body.is-rail-open [data-rail-panel="execution"].is-active [data-execution-panel]
   min-height: 300px !important;
   width: 100% !important;
 }
+
+.nova-rail.is-collapsed {
+  pointer-events: none;
+}
+
+.nova-composer {
+  position: relative;
+  z-index: 10;
+}
+
+/* FORCE FIX: prevent overlays from blocking input */
+[data-rail-panel],
+.nova-rail,
+.nova-overlay,
+.nova-panel {
+  pointer-events: none !important;
+}
+
+/* Allow actual visible rail to still work */
+[data-rail-panel].is-active,
+.nova-rail.is-active {
+  pointer-events: auto !important;
+}
+
+/* Ensure input is always clickable */
+.nova-composer,
+.nova-composer * {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 9999;
+}
+
+
+/* ENDGAME FIX: keep composer clickable without breaking rail buttons */
+.nova-composer,
+.nova-composer * {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 9999;
+}
+
+.nova-rail.is-collapsed,
+[data-rail-panel]:not(.is-active) {
+  pointer-events: none !important;
+}
+
+.nova-rail:not(.is-collapsed),
+.nova-rail:not(.is-collapsed) *,
+[data-rail-panel].is-active,
+[data-rail-panel].is-active * {
+  pointer-events: auto !important;
+}

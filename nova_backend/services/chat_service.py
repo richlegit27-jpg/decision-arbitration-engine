@@ -152,15 +152,22 @@ class ChatService:
         except Exception:
             mission_status = ""
 
-        if text == "test_fail":
+        action = ""
+        text = (user_text or "").strip().lower()
+
+        # =========================
+        # ACTION RESOLUTION (ONE SOURCE)
+        # =========================
+
+        if text in {"test_fail", "test fail"}:
             action = "test_fail"
 
         elif text in {
             "next", "nex", "continue", "continue on",
-            "keep going", "go", "run next",
-            "next step", "what next", "what now",
+            "keep going", "go", "run next", "next step",
+            "what next", "what now"
         }:
-            if status in ("error", "failed") or mission_status in ("error", "failed"):
+            if status in ("error", "failed"):
                 action = "retry_failed"
             else:
                 action = "run_step"
@@ -170,15 +177,25 @@ class ChatService:
 
         elif text in {
             "run_all", "run all", "run it", "execute",
-            "execute all", "auto", "auto mode", "autopilot",
+            "execute all", "auto", "auto mode", "autopilot"
         }:
             action = "run_all"
 
         elif text in {"run_step", "run step"}:
             action = "run_step"
 
-        else:
-            action = "run_all"
+        elif text in {"stop", "cancel"}:
+            action = "stop"
+
+        # 🚫 NO AUTO DEFAULT
+        if not action:
+            return {
+                "ok": False,
+                "assistant_message": self._normalize_assistant_message(
+                    "Unknown execution command. Try: next, run_all, retry, or stop."
+                ),
+                "session": self._get_session_payload(session_id),
+            }
 
         try:
             exec_debug("EXECUTION HANDLER ABOUT TO RUN:", action, session_id)
@@ -270,13 +287,18 @@ class ChatService:
                 )
 
                 assistant_msg = self._build_assistant_message(
+
                     text=f"""Execution failed.
 
 Error:
 {error_text}
 
+Self-heal attempted:
+{heal_error}
+
 Next move:
-Self-heal mode is ready. Send the broken file path and error, or trigger retry_failed after applying a fix.""",
+Fix the remaining compile error, then run retry_failed.""",
+
                     attachments=[],
                 )
 
@@ -913,6 +935,33 @@ Available actions:
             "meta": meta,
         }
 
+    def _normalize_assistant_message(self, message):
+        if message is None:
+            message = {}
+
+        if isinstance(message, dict):
+            text = (
+                message.get("text")
+                or message.get("content")
+                or message.get("assistant_message")
+                or ""
+            )
+
+            meta = message.get("meta")
+            if not isinstance(meta, dict):
+                meta = {}
+
+            message["text"] = text
+            message["content"] = text
+            message["meta"] = meta
+
+            return message
+
+        return self._build_assistant_message(
+            text=str(message),
+            meta={},
+        )
+
     def _build_assistant_message(
         self,
         text: str,
@@ -1455,6 +1504,14 @@ Available actions:
         working_state=None,
     ) -> dict:
 
+        mission = {}
+
+        if isinstance(working_state, dict):
+            mission = working_state.get("mission") or {}
+
+        if not isinstance(mission, dict):
+            mission = {}
+
         decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
 
@@ -1533,6 +1590,9 @@ Available actions:
                 }
 
         mission = decision.get("mission") if isinstance(decision, dict) else {}
+        if not isinstance(mission, dict):
+            mission = {}
+
         mission_mode = str(mission.get("mode") or "").lower()
 
         if is_continue and mission_mode == "debugging":
@@ -4010,10 +4070,164 @@ Available actions:
                 "ok": True,
             }
 
+    def _handle_execution_control(self, user_text: str, session_id: str):
+        raw_text = (user_text or "").strip().lower()
+        text = raw_text.replace("_", " ")
+
+        execution_keywords = {
+            "next",
+            "nex",
+            "continue",
+            "continue on",
+            "keep going",
+            "go",
+            "run next",
+            "next step",
+            "what next",
+            "what now",
+            "run step",
+            "run all",
+            "run it",
+            "execute",
+            "execute all",
+            "retry",
+            "retry failed",
+            "try again",
+            "rerun failed",
+            "test fail",
+            "stop",
+            "cancel",
+        }
+
+        if text not in execution_keywords:
+            return None
+
+        execution_state = self._get_session_meta(session_id, "execution_state", {}) or {}
+
+        if not isinstance(execution_state, dict):
+            execution_state = {}
+
+        status = str(execution_state.get("status") or "").lower()
+        print("DEBUG EXEC CONTROL:", text, status)
+
+        if status == "complete" and text in {
+            "next",
+            "nex",
+            "continue",
+            "continue on",
+            "keep going",
+            "go",
+            "run next",
+            "next step",
+            "what next",
+            "what now",
+        }:
+            return self._build_assistant_message(
+                text=(
+                    "Execution is complete.\n\n"
+                    "Next move:\n"
+                    "- Give me a new goal to build an execution plan\n"
+                    "- Or say `test_fail` to test the failure loop again"
+                ),
+                meta={
+                    "execution_control": True,
+                    "execution_status": "complete",
+                    "pending_execution_action": "",
+                    "auto_loop": False,
+                },
+            )
+
+        action = ""
+
+        if text in {"test fail"}:
+            action = "test_fail"
+
+        elif text in {
+            "next",
+            "nex",
+            "continue",
+            "continue on",
+            "keep going",
+            "go",
+            "run next",
+            "next step",
+            "what next",
+            "what now",
+        }:
+            if status in {"error", "failed"}:
+                action = "retry_failed"
+            else:
+                action = "run_step"
+
+        elif text in {"retry", "retry failed", "try again", "rerun failed"}:
+            action = "retry_failed"
+
+        elif text in {"run all", "run it", "execute", "execute all"}:
+            action = "run_all"
+
+        elif text == "run step":
+            action = "run_step"
+
+        elif text in {"stop", "cancel"}:
+            action = "stop"
+
+        if not action:
+            return None
+
+        self._set_session_meta(session_id, "pending_execution_action", action)
+
+        return self._build_assistant_message(
+            text=(
+                "Execution command received.\n\n"
+                f"Action: `{action}`\n"
+                "Next: running execution bridge."
+            ),
+            meta={
+                "execution_action": action,
+                "pending_execution_action": action,
+                "execution_control": True,
+                "auto_loop": action == "run_all",
+            },
+        )
+
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         exec_debug("HANDLE IS BEING CALLED")
         attachments = attachments or []
 
+        execution_control = self._handle_execution_control(user_text, session_id)
+
+        if execution_control:
+            return {
+                "ok": True,
+                "assistant_message": execution_control,
+                "session": {
+                    "id": session_id,
+                    "meta": {
+                        "pending_execution_action": execution_control.get("meta", {}).get("pending_execution_action")
+                    },
+                },
+                "debug": {
+                    "route": "execution_control",
+                },
+            }
+
+        try:
+            session = None
+
+            if hasattr(self, "sessions") and isinstance(self.sessions, dict):
+                session = self.sessions.get(session_id)
+
+            if not session and hasattr(self, "session_service"):
+                session = self.session_service.get_session(session_id)
+
+            if not isinstance(session, dict):
+                session = {}
+
+            if not isinstance(session.get("meta"), dict):
+                session["meta"] = {}
+
+        except Exception:
+            pass
         # =========================
         # SESSION LOCK
         # =========================
@@ -4041,8 +4255,13 @@ Available actions:
         # =========================
         # LOAD STATE
         # =========================
-        execution_state = self._get_session_meta(session_id, "execution_state") or {}
+        execution_state = self._get_session_meta(session_id, "execution_state", {}) or {}
 
+        if not isinstance(execution_state, dict):
+            execution_state = {}
+        # =========================
+        # RESUME EXISTING STATE
+        # =========================
         # =========================
         # RESUME EXISTING STATE
         # =========================
@@ -4055,14 +4274,21 @@ Available actions:
             execution_state = self._process_execution(execution_state, session_id)
             self._set_session_meta(session_id, "execution_state", execution_state)
 
-            return {
-                "ok": True,
-                "assistant_message": self._normalize_assistant_message(
-                    f"Execution advanced.\n\nStatus: {execution_state.get('status')}\nCurrent step: {execution_state.get('current_step')}"
-                ),
-                "session": self._get_session_payload(session_id),
+            msg = self._normalize_assistant_message(
+                f"Execution advanced.\n\nStatus: {execution_state.get('status')}\nCurrent step: {execution_state.get('current_step')}"
+            )
+
+            msg["meta"] = {
+                "execution_control": True,
+                "pending_execution_action": "run_step",
+                "auto_loop": execution_state.get("status") != "complete",
             }
 
+            return {
+                "ok": True,
+                "assistant_message": msg,
+                "session": self._get_session_payload(session_id),
+            }
         # =========================
         # PLAN ONLY IF NO ACTIVE STATE
         # =========================
@@ -4088,6 +4314,73 @@ Available actions:
 
             execution_state = self._process_execution(execution_state, session_id)
             self._set_session_meta(session_id, "execution_state", execution_state)
+
+        # =========================
+        # BLOCK COMPLETED EXECUTION FALLBACK
+        # =========================
+        execution_state = self._get_session_meta(session_id, "execution_state", {}) or {}
+
+        if isinstance(execution_state, dict):
+            status = str(execution_state.get("status") or "").lower()
+            text = (user_text or "").strip().lower().replace("_", " ")
+
+            if status == "complete" and text in {
+                "next",
+                "nex",
+                "continue",
+                "continue on",
+                "keep going",
+                "go",
+                "run next",
+                "next step",
+                "what next",
+                "what now",
+                "run it",
+                "runit",
+            }:
+                return {
+                    "ok": True,
+                    "assistant_message": self._normalize_assistant_message(
+                        "Execution is complete.\n\nNext move:\n- Give me a new goal\n- Or say `test_fail` to test the failure loop again"
+                    ),
+                    "session": self._get_session_payload(session_id),
+                }
+
+        # =========================
+        # INTELLIGENCE: AUTO-PLAN
+        # =========================
+        text = (user_text or "").strip().lower()
+
+        auto_plan_triggers = {
+            "build",
+            "create",
+            "make",
+            "add",
+            "implement",
+            "fix",
+            "repair",
+            "upgrade",
+            "improve",
+            "wire",
+            "lock",
+        }
+
+        should_auto_plan = any(
+            text.startswith(trigger + " ") or text == trigger
+            for trigger in auto_plan_triggers
+        )
+
+        if should_auto_plan:
+            execution_state = self._process_goal_and_plan(user_text, session_id)
+            self._set_session_meta(session_id, "execution_state", execution_state)
+
+            return {
+                "ok": True,
+                "assistant_message": self._normalize_assistant_message(
+                    "Execution plan created.\n\nSend `next` to run the first step, or `run all` for auto mode."
+                ),
+                "session": self._get_session_payload(session_id),
+            }
 
         # =========================
         # ROUTE OUTPUT
@@ -4246,15 +4539,19 @@ Available actions:
         except Exception as e:
             exec_debug("ROUTING_ERROR:", e)
 
+            import traceback
+            traceback.print_exc()
+
             return {
                 "ok": False,
-                "assistant_message": self._normalize_assistant_message(
-                    f"Routing error: {str(e)}"
+                "assistant_message": self._build_assistant_message(
+                    text=f"Routing error: {str(e)}",
+                    meta={},
                 ),
                 "session": session_id,
                 "debug": {
-                    "route": route,
-                    "decision": decision,
+                    "route": route if 'route' in locals() else None,
+                    "decision": decision if 'decision' in locals() else None,
                 },
             }
 
@@ -7029,6 +7326,35 @@ Next action:
             "id": session_id,
             "messages": fallback_messages,
         }
+
+    def _get_session_meta(self, session_id: str, key: str, default=None):
+        if not session_id:
+            return default
+
+        session = None
+
+        # try direct sessions dict
+        if hasattr(self, "sessions") and isinstance(self.sessions, dict):
+            session = self.sessions.get(session_id)
+
+        # fallback to session_service
+        if not session and hasattr(self, "session_service"):
+            try:
+                session = self.session_service.get_session(session_id)
+            except Exception:
+                session = None
+
+        # HARD GUARD
+        if not isinstance(session, dict):
+            return default
+
+        meta = session.get("meta")
+
+        # HARD GUARD AGAIN
+        if not isinstance(meta, dict):
+            return default
+
+        return meta.get(key, default)
 
     def _set_session_meta(self, session_id: str, key: str, value):
         try:

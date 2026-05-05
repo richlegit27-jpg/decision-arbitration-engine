@@ -10,6 +10,19 @@
   }
 
   if (window.NovaComposerBundle) return;
+window.setChatEmptyVisible = window.setChatEmptyVisible || function (isVisible) {
+  const el = document.querySelector("[data-chat-empty]");
+  if (!el) return;
+  el.hidden = !isVisible;
+};
+
+window.finishStreamUi = window.finishStreamUi || function () {
+  try {
+    if (window.NovaComposerState && window.NovaComposerState.stream) {
+      window.NovaComposerState.stream.running = false;
+    }
+  } catch (_) {}
+};
 
   function log() {
     try {
@@ -176,31 +189,38 @@ function resolveUploadUrl(url) {
     return host;
   }
 
-  function showToast(message, kind) {
+function showToast(message, kind) {
+  try {
     const text = String(message || "").trim();
     if (!text) return;
 
-    const host = ensureToastHost();
+    console.log("[Toast]", kind || "info", text);
+
+    // OPTIONAL: minimal visual (no render calls)
+    const host = document.querySelector("[data-toast-host]") || document.body;
     const toast = document.createElement("div");
-    toast.className = "nova-toast" + (kind ? " is-" + String(kind) : "");
     toast.textContent = text;
+    toast.style.position = "fixed";
+    toast.style.bottom = "20px";
+    toast.style.right = "20px";
+    toast.style.background = "#111";
+    toast.style.color = "#fff";
+    toast.style.padding = "8px 12px";
+    toast.style.borderRadius = "6px";
+    toast.style.zIndex = "9999";
 
     host.appendChild(toast);
 
-    requestAnimationFrame(function () {
-      toast.classList.add("is-visible");
-    });
+    setTimeout(() => {
+      try {
+        toast.remove();
+      } catch (_) {}
+    }, 2000);
 
-    window.setTimeout(function () {
-      toast.classList.remove("is-visible");
-      toast.classList.add("is-leaving");
-      window.setTimeout(function () {
-        try {
-          toast.remove();
-        } catch (_) {}
-      }, 220);
-    }, 2200);
+  } catch (err) {
+    console.warn("showToast failed safely", err);
   }
+}
 
   function warn() {
     try {
@@ -596,6 +616,8 @@ tts: {
     artifactFilter: "all",
   },
 };
+
+window.NovaComposerState = state;
 
 function updateTtsToggleUi() {
   if (!els.ttsToggleButton) return;
@@ -1086,6 +1108,7 @@ function setRailTab(tabName) {
     tabEl.setAttribute("aria-hidden", "false");
     tabEl.classList.toggle("is-active", active);
     tabEl.setAttribute("aria-selected", active ? "true" : "false");
+    tabEl.setAttribute("aria-pressed", active ? "true" : "false");
   });
 
   qsa("[data-rail-panel]").forEach(function (panelEl) {
@@ -1117,17 +1140,14 @@ function setRailTab(tabName) {
   } else if (nextTab === "web") {
     if (typeof renderWeb === "function") renderWeb();
   } else if (nextTab === "execution") {
-    requestAnimationFrame(function () {
-      if (typeof renderExecution === "function") {
-        renderExecution();
-      }
+    const el = document.getElementById("nova-exec-state");
+    if (el && window.NovaExecutionState) {
+      el.textContent = JSON.stringify(window.NovaExecutionState, null, 2);
+    }
 
-      setTimeout(function () {
-        if (typeof window.renderExecution === "function") {
-          window.renderExecution();
-        }
-      }, 0);
-    });
+    if (typeof window.renderExecution === "function") {
+      window.renderExecution();
+    }
   } else {
     if (typeof renderArtifacts === "function") renderArtifacts();
   }
@@ -1259,75 +1279,46 @@ if (els.chatInput) {
     }
   }
 
-  function setChatEmptyVisible(isVisible) {
-    if (!els.chatEmpty) return;
-    els.chatEmpty.hidden = !isVisible;
-  }
-
-  function activeSession() {
-    return state.sessions.find(function (session) {
-      return String(session.id) === String(state.activeSessionId);
+function updateTopbarFromState() {
+  const session =
+    (state.sessions || []).find(function (item) {
+      return String(item && item.id) === String(state.activeSessionId);
     }) || null;
-  }
 
-  function finishStreamUi(options) {
-    const opts = options && typeof options === "object" ? options : {};
-    const statusState = String(opts.statusState || "idle");
-    const statusText = String(
-      opts.statusText || (statusState === "error" ? "Error" : "Ready")
-    );
+  const title = session && session.title ? session.title : "Nova";
 
-    state.stream.running = false;
-    state.stream.controller = null;
-    state.stream.messageId = "";
-    state.stream.placeholderId = "";
-    state.stream.buffer = "";
+  const count = Number(
+    session && (session.message_count || safeArray(session.messages).length || 0)
+  );
 
-    setBusyUi(false);
+  const subtitle = count > 0 ? count + " messages" : "Fast local AI workspace";
 
-    const session = activeSession();
-    const title = session && session.title ? session.title : "Nova";
-    const subtitle =
-      session && Number(session.message_count || safeArray(session.messages).length || 0) > 0
-        ? Number(session.message_count || safeArray(session.messages).length || 0) + " messages"
-        : "Fast local AI workspace";
+  let statusText = "Ready";
+  let statusState = "idle";
 
-    setTopbar(title, subtitle, statusText, statusState);
-  }
-
-  function updateTopbarFromState() {
-    const session = activeSession();
-    const title = session && session.title ? session.title : "Nova";
-    const subtitle =
-      session && Number(session.message_count || safeArray(session.messages).length || 0) > 0
-        ? Number(session.message_count || safeArray(session.messages).length || 0) + " messages"
-        : "Fast local AI workspace";
-
-    let statusText = "Ready";
-    let statusState = "idle";
-
-    if (state.stream.running) {
-      statusText = "Generating";
-      statusState = "busy";
-    } else {
-      const lastAssistant = state.messages
+  if (state.stream && state.stream.running) {
+    statusText = "Generating";
+    statusState = "busy";
+  } else {
+    const lastAssistant =
+      (state.messages || [])
         .slice()
         .reverse()
         .find(function (msg) {
-          return String(msg.role || "") === "assistant";
+          return String((msg && msg.role) || "") === "assistant";
         }) || null;
 
-      if (lastAssistant && lastAssistant.error) {
-        statusText = "Error";
-        statusState = "error";
-      } else if (lastAssistant && lastAssistant.stopped) {
-        statusText = "Stopped";
-        statusState = "idle";
-      }
+    if (lastAssistant && lastAssistant.error) {
+      statusText = "Error";
+      statusState = "error";
+    } else if (lastAssistant && lastAssistant.stopped) {
+      statusText = "Stopped";
+      statusState = "idle";
     }
-
-    setTopbar(title, subtitle, statusText, statusState);
   }
+
+  setTopbar(title, subtitle, statusText, statusState);
+}
 
   function findMessageById(messageId) {
     return state.messages.find(function (item) {
@@ -1592,50 +1583,15 @@ document.addEventListener("click", async function (event) {
 
 viewer.innerHTML = `
   <div class="nova-viewer-shell">
-
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-      ${
-        favicon
-          ? `<img src="${escapeHtml(favicon)}" style="width:22px;height:22px;border-radius:6px;">`
-          : `<div style="width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,0.12);"></div>`
-      }
-
-      <div style="min-width:0;">
-        <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${escapeHtml(domain)}
-        </div>
-
-        <div style="font-size:11px;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${escapeHtml(safeUrl)}
-        </div>
-      </div>
-    </div>
-
-    <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);margin-bottom:12px;">
-      <div style="font-size:14px;font-weight:700;line-height:1.35;margin-bottom:6px;">
-        ${escapeHtml(title)}
+    <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);">
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px;">
+        Memory Viewer
       </div>
 
-      <div style="font-size:12px;opacity:.7;line-height:1.4;">
-        ${escapeHtml(preview || "Click below to open the full article.")}
+      <div style="font-size:12px;opacity:.7;white-space:pre-wrap;">
+        ${escapeHtml(JSON.stringify(items, null, 2))}
       </div>
     </div>
-
-    <div style="display:flex;gap:8px;">
-      <a href="${escapeHtml(safeUrl)}"
-         target="_blank"
-         rel="noopener noreferrer"
-         data-no-chat-action="1"
-         style="padding:8px 12px;border-radius:10px;background:#fff;color:#000;text-decoration:none;font-size:13px;font-weight:700;">
-        Open article
-      </a>
-
-      <button data-copy-url="${escapeHtml(safeUrl)}"
-        style="padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.12);font-size:13px;">
-        Copy link
-      </button>
-    </div>
-
   </div>
 `;
 
@@ -2425,7 +2381,7 @@ function renderChat() {
     return 0;
   });
 
-  setChatEmptyVisible(state.messages.length === 0);
+window.setChatEmptyVisible(state.messages.length === 0);
 
   const workingContextHtml = "";
   const messagesHtml = state.messages.map(renderMessageCard).join("");
@@ -2977,7 +2933,8 @@ if (id) {
     });
   }
 }
-    finishStreamUi({
+
+    window.finishStreamUi({
       statusState: opts.statusState,
       statusText: opts.statusText,
     });
@@ -3208,6 +3165,32 @@ function handleStreamEvent(event) {
 
     clearTokenRenderState();
 
+function setChatEmptyVisible(isVisible) {
+  if (!els.chatEmpty) return;
+  els.chatEmpty.hidden = !isVisible;
+}
+
+window.setChatEmptyVisible = setChatEmptyVisible;
+
+function activeSession() {
+  return (state.sessions || []).find(function (session) {
+    return String(session && session.id) === String(state.activeSessionId);
+  }) || null;
+}
+
+window.activeSession = activeSession;
+
+  function finishStreamUi(options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const statusState = String(opts.statusState || "idle");
+    const statusText = String(
+      opts.statusText || (statusState === "error" ? "Error" : "Ready")
+    );
+
+window.finishStreamUi = finishStreamUi;
+
+    clearTokenRenderState();
+
     state.stream.running = false;
     state.stream.controller = null;
     state.stream.targetMessageId = "";
@@ -3215,6 +3198,24 @@ function handleStreamEvent(event) {
     state.stream.startedAt = 0;
     state.stream.messageId = "";
     state.stream.placeholderId = "";
+
+    if (state.execution) {
+      state.execution.running = false;
+      state.execution.lastAction = null;
+    }
+
+
+    setBusyUi(false);
+
+    const session = activeSession();
+    const title = session && session.title ? session.title : "Nova";
+    const subtitle =
+      session && Number(session.message_count || safeArray(session.messages).length || 0) > 0
+        ? Number(session.message_count || safeArray(session.messages).length || 0) + " messages"
+        : "Fast local AI workspace";
+
+    setTopbar(title, subtitle, statusText, statusState);
+  }
 
     renderChat();
     scrollChatToBottom(true);
@@ -3857,7 +3858,7 @@ async function consumeChatJson(payload) {
     throw new Error("A generation is already running.");
   }
 
-  setBusyUi(true);
+setBusyUi(false);
   state.stream.running = true;
   updateTopbarFromState();
 
@@ -3885,31 +3886,101 @@ async function consumeChatJson(payload) {
       throw new Error("Chat returned invalid JSON.");
     }
 
-    if (!response.ok || data.ok === false) {
-      const message = String(data.error || "Chat failed.");
-      showToast(message, "error");
-      throw new Error(message);
-    }
+if (!response.ok || data.ok === false) {
+  const message = String(data.error || "Chat failed.");
+  showToast(message, "error");
+  throw new Error(message);
+}
 
 window.__lastResponse = data;
 console.log("FULL CHAT RESPONSE:", data);
 
 const pendingAction =
   data &&
-  data.session &&
-  data.session.meta &&
-  data.session.meta.pending_execution_action;
+  data.assistant_message &&
+  data.assistant_message.meta &&
+  data.assistant_message.meta.pending_execution_action;
+
+const autoLoop =
+  data &&
+  data.assistant_message &&
+  data.assistant_message.meta &&
+  data.assistant_message.meta.auto_loop === true;
 
 if (pendingAction && typeof window.runExecutionAction === "function") {
-  window.runExecutionAction(pendingAction);
+  if (data.session && data.session.meta) {
+    data.session.meta.pending_execution_action = "";
+  }
+
+  if (state.session && state.session.meta) {
+    state.session.meta.pending_execution_action = "";
+  }
+
+  // remove execution-control chat bubble if it already got inserted
+  state.messages = (state.messages || []).filter(function (msg) {
+    const text = String((msg && msg.text) || "");
+    const meta = (msg && msg.meta) || {};
+
+    return !(
+      meta.execution_control === true ||
+      text.includes("Execution started:")
+    );
+  });
+
+
+requestAnimationFrame(function () {
+  try {
+    const result = window.runExecutionAction(pendingAction);
+
+    Promise.resolve(result)
+      .catch(function (err) {
+        console.error("Execution action failed:", err);
+      })
+      .finally(function () {
+
+// 🔁 AUTO EXEC LOOP
+if (
+  autoLoop &&
+  window.NovaExecutionState &&
+  window.NovaExecutionState.done === false
+) {
+  setTimeout(function () {
+    window.runExecutionAction("run_step");
+  }, 300);
 }
 
-    if (state.stream && state.stream.targetMessageId) {
-      removeMessage(state.stream.targetMessageId);
+// 🔥 HARD UNLOCK
+state.stream.running = false;
+state.stream.controller = null;
+
+if (state.execution) {
+  state.execution.running = false;
+  state.execution.lastAction = null;
+}
+
+setBusyUi(false);
+updateTopbarFromState();
+
+if (state.rail && state.rail.tab === "execution" && typeof renderExecution === "function") {
+  renderExecution();
+}
+      });
+
+  } catch (err) {
+    console.error("Execution trigger crash:", err);
+
+    // 🔥 FAILSAFE UNLOCK
+    state.stream.running = false;
+
+    if (state.execution) {
+      state.execution.running = false;
     }
 
-    // Load backend state if present.
-    applyStatePayload(data || {});
+    setBusyUi(false);
+  }
+});
+  return data;
+}
 
 const assistantMsg =
   data && data.assistant_message
@@ -3921,21 +3992,28 @@ const assistantMsg =
     : null;
 
 if (assistantMsg?.text?.trim()) {
-      const assistantText = String(assistantMsg.text || "").trim();
+  const assistantText = String(assistantMsg.text || "").trim();
+  const assistantMeta = (assistantMsg && assistantMsg.meta) || {};
 
-      const exists = (state.messages || []).some(function (msg) {
-        return (
-          msg &&
-          String(msg.role || "") === "assistant" &&
-          String(msg.text || "").trim() === assistantText
-        );
-      });
+  if (
+    assistantMeta.execution_control === true ||
+    assistantText.includes("Execution command received.")
+  ) {
+    return data;
+  }
 
-      if (!exists) {
-        upsertMessage(assistantMsg);
-      }
-    }
+  const exists = (state.messages || []).some(function (msg) {
+    return (
+      msg &&
+      String(msg.role || "") === "assistant" &&
+      String(msg.text || "").trim() === assistantText
+    );
+  });
 
+  if (!exists) {
+    upsertMessage(assistantMsg);
+  }
+}
     if (data && data.saved_artifact && data.saved_artifact.id) {
       openArtifactFromStateOrBackend(data.saved_artifact.id);
     }
@@ -4234,26 +4312,16 @@ function stopGeneration() {
   finishStreamUi();
 }
 
-async function createNewChat() {
-  if (state.stream.running) {
-    stopGeneration();
-  }
-  await apiPost("/api/sessions/new", {});
-  clearPendingUploads();
-
-  if (els.chatInput) {
-    els.chatInput.value = "";
-    autoResizeTextarea();
-  }
-}
-
 async function copyMessage(messageId) {
   const message = findMessageById(messageId);
   if (!message) return;
+
   try {
     await navigator.clipboard.writeText(message.text || "");
+    showToast("Copied.", "success");
   } catch (error) {
     warn("copy failed", error);
+    showToast("Copy failed.", "error");
   }
 }
 
@@ -5976,9 +6044,15 @@ async function consumeChatStreamStable(payload) {
     } catch (_) {}
   }
 
-  state.stream.controller = new AbortController();
-  state.stream.running = true;
-  state.stream.startedAt = Date.now();
+state.stream.running = false;
+state.stream.startedAt = 0;
+
+state.execution = state.execution || {};
+state.execution.running = true;
+state.execution.lastAction = action || null;
+
+setBusyUi(false);
+updateTopbarFromState();
 
   try {
     const response = await fetch("/api/chat", {
@@ -6443,56 +6517,34 @@ window.setRailTab = function (tabName) {
   }
 };
 
-window.runExecutionAction = async function (action, button, extra = {}) {
-  const state = window.NovaComposerState || {};
+window.runExecutionAction = async function (action, extra) {
+  const button =
+    document.querySelector("[data-execution-run]") ||
+    document.querySelector("[data-run-execution]");
 
-// 🔥 force execution panel open immediately
-if (typeof window.setRailTab === "function") {
-  window.setRailTab("execution");
-}
-
-const rail = document.querySelector("[data-right-rail]");
-if (rail) {
-  rail.classList.add("is-open");
-  document.body.classList.add("is-rail-open");
-}
-
-  let sessionId =
+  const sessionId =
+    window.__activeSessionId ||
+    window.activeSessionId ||
     state.activeSessionId ||
-    (state.session && state.session.id) ||
+    state.sessionId ||
     "";
-
-  if (!sessionId) {
-    const res = await fetch("/api/state");
-    const data = await res.json();
-
-    sessionId =
-      (data.session && data.session.id) ||
-      data.active_session_id ||
-      data.activeSessionId ||
-      "";
-
-    if (sessionId && window.NovaComposerState) {
-      window.NovaComposerState.activeSessionId = sessionId;
-    }
-  }
-
-  if (!sessionId || !action) {
-    console.warn("[EXECUTION] missing session/action", { sessionId, action });
-    return;
-  }
 
   if (button) {
     button.disabled = true;
   }
 
-  // 🔥 immediate UI feedback (instant step start feel)
   window.NovaExecutionState = window.NovaExecutionState || {};
   window.NovaExecutionState.status = "running";
   window.NovaExecutionState.current_step = "Starting...";
   window.NovaExecutionState.steps = window.NovaExecutionState.steps || [];
 
-  if (typeof window.renderExecution === "function") {
+  if (typeof window.setRailTab === "function") {
+    window.setRailTab("execution");
+  }
+
+  if (typeof window.renderExecutionPanel === "function") {
+    window.renderExecutionPanel();
+  } else if (typeof window.renderExecution === "function") {
     window.renderExecution();
   }
 
@@ -6500,13 +6552,14 @@ if (rail) {
     const response = await fetch("/api/execution/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-body: JSON.stringify({
-  session_id: sessionId,
-  action: action,
-  step_index: extra && extra.step_index != null
-    ? Number(extra.step_index)
-    : null
-}),
+      body: JSON.stringify({
+        session_id: sessionId,
+        action: action,
+        step_index:
+          extra && extra.step_index != null
+            ? Number(extra.step_index)
+            : null,
+      }),
     });
 
     if (!response.ok || !response.body) {
@@ -6519,7 +6572,10 @@ body: JSON.stringify({
 
     while (true) {
       const { value, done } = await reader.read();
-      if (done) break;
+
+      if (done) {
+        break;
+      }
 
       buffer += decoder.decode(value, { stream: true });
 
@@ -6527,8 +6583,6 @@ body: JSON.stringify({
       buffer = events.pop() || "";
 
       events.forEach(function (rawEvent) {
-        if (!rawEvent || !rawEvent.trim()) return;
-
         const lines = rawEvent.split("\n");
         let eventName = "";
         let data = "";
@@ -6541,9 +6595,12 @@ body: JSON.stringify({
           }
         });
 
-        if (!data) return;
+        if (!data) {
+          return;
+        }
 
         let payload;
+
         try {
           payload = JSON.parse(data);
         } catch (err) {
@@ -6553,26 +6610,54 @@ body: JSON.stringify({
 
         console.log("[EXECUTION STREAM]", eventName, payload);
 
-if (payload.execution_state) {
-  window.NovaExecutionState = payload.execution_state;
-  window.NovaComposerState = window.NovaComposerState || {};
-  window.NovaComposerState.execution = payload.execution_state;
+        if (eventName === "start" && typeof addMessage === "function") {
+          addMessage({
+            role: "assistant",
+            text: "Execution started.",
+          });
+        }
 
-  if (typeof window.setRailTab === "function") {
-    window.setRailTab("execution");
-  }
+        if (eventName === "step_done" && typeof addMessage === "function") {
+          addMessage({
+            role: "assistant",
+            text: "Step complete.",
+          });
+        }
 
-  if (typeof window.renderExecutionPanel === "function") {
-    window.renderExecutionPanel();
-  } else if (typeof window.renderExecution === "function") {
-    window.renderExecution();
-  }
-}
+        if (eventName === "done" && typeof addMessage === "function") {
+          addMessage({
+            role: "assistant",
+            text: "Execution complete.",
+          });
+        }
+
+        if (payload.execution_state) {
+          window.NovaExecutionState = payload.execution_state;
+
+          window.NovaComposerState = window.NovaComposerState || {};
+          window.NovaComposerState.execution = payload.execution_state;
+
+          if (typeof window.setRailTab === "function") {
+            window.setRailTab("execution");
+          }
+
+          if (typeof window.renderExecutionPanel === "function") {
+            window.renderExecutionPanel();
+          } else if (typeof window.renderExecution === "function") {
+            window.renderExecution();
+          }
+        }
       });
     }
-
   } catch (err) {
     console.error("[EXECUTION STREAM ERROR]", err);
+
+    if (typeof addMessage === "function") {
+      addMessage({
+        role: "assistant",
+        text: "Execution stream failed: " + String(err),
+      });
+    }
   } finally {
     if (button) {
       button.disabled = false;
@@ -6592,5 +6677,15 @@ if (!document.getElementById("nova-exec-anim")) {
   `;
   document.head.appendChild(style);
 }
+
+function runExec(action) {
+  if (typeof window.runExecutionAction === "function") {
+    return window.runExecutionAction(action || "run_step");
+  }
+
+  console.error("window.runExecutionAction is not available.");
+}
+
+window.runExec = runExec;
 
 })();

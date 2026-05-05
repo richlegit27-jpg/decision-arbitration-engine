@@ -647,22 +647,26 @@ def api_chat():
                 "session_id": session_id,
             }
 
-        if not isinstance(result, dict):
-            result = {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": str(result),
-                },
-                "session_id": session_id,
-            }
+        try:
+            if isinstance(result, dict):
+                session = result.get("session") or {}
+                meta = session.get("meta") or {}
 
-        assistant_message = result.get("assistant_message")
-        if not isinstance(assistant_message, dict):
-            assistant_message = {
-                "role": "assistant",
-                "text": "Something went wrong generating the reply.",
-            }
+                if meta.get("pending_execution_action"):
+                    meta["pending_execution_action"] = ""
+
+                assistant_message = result.get("assistant_message") or {}
+                assistant_meta = assistant_message.get("meta") or {}
+
+                if assistant_meta.get("pending_execution_action"):
+                    assistant_meta["pending_execution_action"] = ""
+        except Exception as cleanup_error:
+            print("PENDING EXECUTION CLEANUP FAILED:", cleanup_error)  
+
+        assistant_message = result.get("assistant_message") or {
+            "role": "assistant",
+            "text": "",
+        }
 
         payload = {
             "ok": True,
@@ -1606,6 +1610,95 @@ def execution_stream():
             yield send_event("done", {
                 "ok": ok,
                 "execution_state": execution,
+                "done": True,
+            })
+            return
+
+        if action == "run_step":
+            steps = execution.get("steps", [])
+
+            if not steps:
+                execution["status"] = "complete"
+                execution["current_step"] = "No steps to run"
+                execution["last_action"] = action
+                save_execution(execution)
+
+                yield send_event("done", {
+                    "ok": True,
+                    "execution_state": execution,
+                    "done": True,
+                })
+                return
+
+            current_index = int(execution.get("current_index") or 0)
+
+            if current_index >= len(steps):
+                execution["status"] = "complete"
+                execution["current_step"] = "All steps completed"
+                execution["last_action"] = action
+                save_execution(execution)
+
+                yield send_event("done", {
+                    "ok": True,
+                    "execution_state": execution,
+                    "done": True,
+                })
+                return
+
+            step = steps[current_index]
+            step["status"] = "done"
+
+            execution["status"] = "running"
+            execution["current_step"] = step.get("title") or f"Step {current_index + 1}"
+            execution["current_index"] = current_index + 1
+            execution["last_action"] = action
+            execution.setdefault("history", []).append(
+                f"run_step: {execution['current_step']}"
+            )
+            save_execution(execution)
+
+            yield send_event("step_done", {
+                "ok": True,
+                "step": step,
+                "execution_state": execution,
+                "done": False,
+            })
+
+            if execution["current_index"] >= len(steps):
+                execution["status"] = "complete"
+                save_execution(execution)
+
+            yield send_event("done", {
+                "ok": True,
+                "execution_state": execution,
+                "done": True,
+            })
+            return
+
+            step = steps[current_index]
+            step["status"] = "complete"
+
+            execution_state["status"] = "running"
+            execution_state["current_step"] = step.get("title") or f"Step {current_index + 1}"
+            execution_state["current_index"] = current_index + 1
+            execution_state["last_action"] = action
+            execution_state.setdefault("history", []).append(
+                f"run_step: {execution_state['current_step']}"
+            )
+
+            yield sse("step_done", {
+                "ok": True,
+                "step": step,
+                "execution_state": execution_state,
+                "done": False,
+            })
+
+            if execution_state["current_index"] >= len(steps):
+                execution_state["status"] = "complete"
+
+            yield sse("done", {
+                "ok": True,
+                "execution_state": execution_state,
                 "done": True,
             })
             return

@@ -216,16 +216,33 @@
   </button>
 </div>
 
-      <div class="nova-rail-panel is-active" data-rail-panel="artifacts">
-        <div class="nova-rail-empty" data-artifact-empty>
-          <div class="nova-rail-empty-title">No artifacts yet</div>
-          <div class="nova-rail-empty-copy">
-            Saved outputs, image generations, and web results will show here.
-          </div>
-        </div>
+<div class="nova-rail-panel is-active" data-rail-panel="artifacts">
+  <div class="nova-rail-empty" data-artifact-empty>
+    <div class="nova-rail-empty-title">No artifacts yet</div>
+    <div class="nova-rail-empty-copy">
+      Saved outputs, image generations, and web results will show here.
+    </div>
+  </div>
 
-        <div class="nova-artifact-list" data-artifact-list></div>
-      </div>
+  <div class="nova-artifact-list" data-artifact-list></div>
+</div>
+
+<!-- ✅ EXECUTION PANEL (OUTSIDE artifacts) -->
+<div class="nova-rail-panel" data-rail-panel="execution">
+  <div class="nova-rail-header">Execution</div>
+
+  <div style="padding:10px; display:flex; gap:8px; flex-wrap:wrap;">
+    <button onclick="runExec('run_step')">Run Step</button>
+    <button onclick="runExec('run_all')">Run All</button>
+    <button onclick="runExec('pause')">Pause</button>
+    <button onclick="runExec('resume')">Resume</button>
+    <button onclick="runExec('reset')">Reset</button>
+  </div>
+
+  <pre id="nova-exec-state" style="padding:10px; font-size:12px; white-space:pre-wrap;"></pre>
+</div>
+
+<!-- MEMORY PANEL -->
 <div id="memory-panel" class="nova-rail-panel" data-rail-panel="memory" data-memory-panel hidden>
   <div class="rail-panel__header">
     <div>

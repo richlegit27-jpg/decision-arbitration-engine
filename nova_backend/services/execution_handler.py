@@ -32,40 +32,78 @@ class ExecutionHandler:
     def __init__(self, executor: MoveExecutor):
         self.executor = executor
 
-    def run_next_move(
-        self,
-        next_move: NextMove,
-        max_retries: int = 3,
-        delay_ms: int = 500,
-    ) -> ExecutionResult:
-        attempt = 0
+def run_next_move(self, action: str, execution_state: dict):
+    # 🔥 normalize incoming actions
+    if action in {"run_step", "next", "continue", "go"}:
+        action = "next"
 
-        while attempt <= max_retries:
-            try:
-                result = self.executor(next_move)
+    if action in {"retry", "retry_failed", "try_again"}:
+        action = "retry_failed"
 
-                if result.status == "success":
-                    return result
+    if action in {"run_all", "execute", "execute_all"}:
+        action = "run_all"
 
-                if result.status != "retry":
-                    return result
+    if not execution_state:
+        return {
+            "status": "error",
+            "current_step": "No execution state",
+            "steps": [],
+            "history": [],
+            "last_action": action,
+        }
 
-            except Exception as e:
-                if attempt >= max_retries:
-                    return ExecutionResult(
-                        move_id=next_move.id,
-                        status="failed",
-                        error=str(e),
-                    )
+    steps = execution_state.get("steps", [])
+    current_index = execution_state.get("current_index", 0)
+    history = execution_state.get("history", [])
 
-            attempt += 1
-            time.sleep(delay_ms / 1000)
+    if action == "next":
+        if current_index >= len(steps):
+            return {
+                "status": "complete",
+                "current_step": "All steps completed",
+                "steps": steps,
+                "history": history,
+                "last_action": action,
+            }
 
-        return ExecutionResult(
-            move_id=next_move.id,
-            status="failed",
-            error="Max retries exceeded.",
-        )
+        step = steps[current_index]
+        step["status"] = "completed"
+        history.append(f"completed: {step.get('title', 'step')}")
+
+        execution_state["current_index"] = current_index + 1
+        execution_state["last_action"] = action
+
+        return execution_state
+
+    elif action == "retry_failed":
+        for i, step in enumerate(steps):
+            if step.get("status") == "failed":
+                step["status"] = "completed"
+                history.append(f"retried: {step.get('title', 'step')}")
+                execution_state["current_index"] = i + 1
+                execution_state["last_action"] = action
+                return execution_state
+
+        return execution_state
+
+    elif action == "run_all":
+        for step in steps:
+            step["status"] = "completed"
+            history.append(f"completed: {step.get('title', 'step')}")
+
+        execution_state["current_index"] = len(steps)
+        execution_state["status"] = "complete"
+        execution_state["last_action"] = action
+
+        return execution_state
+
+    return {
+        "status": "error",
+        "current_step": "Unknown action",
+        "steps": steps,
+        "history": history,
+        "last_action": action,
+    }
 
     def run_chain(
         self,
