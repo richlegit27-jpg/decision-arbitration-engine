@@ -61,7 +61,13 @@ class ExecutionHandler:
             result_lines.append("Result: Created a design pass for the requested task.")
 
         elif action == "implement":
-            result_lines.append("Result: Prepared implementation step for the requested task.")
+            result_lines.append(
+                "Result: Implementation action recognized. Real file-write execution is not wired yet."
+            )
+
+            result_lines.append(
+                "Next: connect implement steps to a safe file operation handler."
+            )
 
         elif action == "test":
             result_lines.append("Result: Prepared validation step for the requested task.")
@@ -227,12 +233,23 @@ class ExecutionHandler:
             execution_state["steps"] = steps
             execution_state["history"] = history
 
+            summary_lines = [
+                "Execution complete.",
+                "",
+                "Completed work:",
+            ]
+
+            for step in steps:
+                summary_lines.append(
+                    f"- {step.get('title', 'step')}: {step.get('status', 'unknown')}"
+                )
+
+            summary_lines.append("")
+            summary_lines.append("Next: connect implement steps to real file-write execution.")
+
             return {
                 "status": "complete",
-                "message": (
-                    "Run all completed.\n\n"
-                    f"Completed steps: {', '.join(completed)}"
-                ),
+                "message": "\n".join(summary_lines),
                 "execution_state": execution_state,
             }
 
