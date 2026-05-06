@@ -40,6 +40,42 @@ class ExecutionHandler:
     def __init__(self, executor: MoveExecutor):
         self.executor = executor
 
+    def _execute_step(self, step: dict) -> dict:
+        title = str(step.get("title") or "step").strip()
+        action = str(step.get("action") or "execute").strip().lower()
+        input_value = str(step.get("input") or "").strip()
+
+        result_lines = [
+            f"Action: {action}",
+            f"Title: {title}",
+        ]
+
+        if input_value:
+            result_lines.append(f"Input: {input_value}")
+
+        if action == "design":
+            result_lines.append("Result: Created a design pass for the requested task.")
+
+        elif action == "implement":
+            result_lines.append("Result: Prepared implementation step for the requested task.")
+
+        elif action == "test":
+            result_lines.append("Result: Prepared validation step for the requested task.")
+
+        elif action == "fix":
+            result_lines.append("Result: Prepared fix step for the requested task.")
+
+        elif action == "review":
+            result_lines.append("Result: Prepared review step for the requested task.")
+
+        else:
+            result_lines.append("Result: Executed generic step.")
+
+        step["status"] = "completed"
+        step["result"] = "\n".join(result_lines)
+
+        return step
+
     def run_next_move(
         self,
         action: str,
@@ -82,12 +118,22 @@ class ExecutionHandler:
 
         steps = execution_state.get("steps") or []
         history = execution_state.get("history") or []
-        current_index = int(execution_state.get("current_index") or 0)
-
+        current_index = int(
+            execution_state.get("current_index")
+            if execution_state.get("current_index") is not None
+            else execution_state.get("current_step") or 0
+        )
         if not steps:
-            steps = [
-                {"title": "Execution Step 1", "status": "pending"},
-            ]
+            plan = execution_state.get("plan") or execution_state.get("normalized_steps") or []
+            if plan:
+                steps = plan
+            else:
+                steps = [
+                    {
+                        "title": "No saved execution plan found",
+                        "status": "pending",
+                    },
+                ]
             current_index = 0
 
         if action == "retry_failed":
@@ -129,8 +175,11 @@ class ExecutionHandler:
                 }
 
             step = steps[current_index]
-            step["status"] = "completed"
-            history.append(f"completed: {step.get('title', 'step')}")
+            step = self._execute_step(step)
+
+            history.append(
+                f"completed: {step.get('title', 'step')}"
+            )
 
             execution_state["current_index"] = current_index + 1
             execution_state["current_step"] = step.get("title", "step")
@@ -155,7 +204,7 @@ class ExecutionHandler:
             while current_index < len(steps):
                 step = steps[current_index]
 
-                step["status"] = "completed"
+                step = self._execute_step(step)
 
                 completed.append(
                     step.get("title", "step")

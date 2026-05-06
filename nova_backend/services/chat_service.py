@@ -793,7 +793,14 @@ Available actions:
 
         return reward
 
-    def _process_execution_command(self, command: str, session_id: str):
+        return reward
+
+    def _process_execution_command(
+        self,
+        command: str,
+        session_id: str,
+        execution_state=None,
+    ):
         command = self._safe_str(command).strip().lower()
 
         print("PROCESS_EXECUTION_COMMAND:", repr(command))
@@ -864,6 +871,8 @@ Available actions:
                 },
             }
 
+
+
         # =========================
         # APPLY AUTO FIX
         # =========================
@@ -893,10 +902,22 @@ Available actions:
                 attachments=None,
             )
 
-        execution_state = (
-            self._get_session_meta(session_id, "execution_state")
-            or {}
-        )
+        active_execution = self._get_session_meta(session_id, "active_execution") or {}
+
+        working_state = self._get_working_state(session_id) or {}
+
+        execution_state = execution_state or {}
+
+        if not execution_state:
+            active_execution = self._get_session_meta(session_id, "active_execution") or {}
+            working_state = self._get_working_state(session_id) or {}
+
+            execution_state = (
+                active_execution
+                or self._get_session_meta(session_id, "execution_state")
+                or working_state.get("execution_state")
+                or {}
+            )
 
         # =========================
         # TEST FAILURE
@@ -1046,6 +1067,17 @@ Available actions:
                 "execution_state",
                 new_state,
             )
+
+            sessions = self.sessions._load_sessions()
+            index = self.sessions._find(sessions, session_id)
+
+            if index is not None:
+                sessions[index]["execution_state"] = new_state
+                sessions[index]["active_execution"] = new_state
+                self.sessions._save_sessions(
+                    sessions,
+                    self.sessions.get_active_session_id(),
+                )
 
         reward = self._record_execution_reward(
             session_id=session_id,
@@ -4774,6 +4806,22 @@ Available actions:
         else:
             return None
 
+        if command in {"run_step", "run_all", "retry_failed"}:
+            session = self.sessions.get_session(session_id) or {}
+            execution_state = (
+                session.get("active_execution")
+                or session.get("execution_state")
+                or self._get_session_meta(session_id, "execution_state")
+                or {}
+            )
+
+            if execution_state:
+                return self._process_execution_command(
+                    command=command,
+                    session_id=session_id,
+                    execution_state=execution_state,
+                )
+
         return self._process_execution_command(
             command=command,
             session_id=session_id,
@@ -4867,9 +4915,39 @@ Available actions:
         if lowered in continue_phrases:
             return self._continue_last_answer(session_id)
 
-        execution_control_result = self._handle_execution_control(user_text, session_id)
+        if lowered.startswith("auto-plan"):
+            execution_state = self._process_goal_and_plan(
+                user_text,
+                session_id,
+            )
+
+            if execution_state:
+                execution_state["waiting"] = True
+
+                self._set_session_meta(
+                    session_id,
+                    "execution_state",
+                    execution_state,
+                )
+
+                return {
+                    "ok": True,
+                    "assistant_message": self._normalize_assistant_message(
+                        "Execution plan created.\n\nSend `next` to run the first step, or `run all` for autonomous execution."
+                    ),
+                    "session": self._get_session_payload(session_id),
+                }
+
+        execution_control_result = self._handle_execution_control(
+            user_text,
+            session_id,
+        )
+
         if execution_control_result:
-            if isinstance(execution_control_result, dict) and execution_control_result.get("ok") is True:
+            if (
+                isinstance(execution_control_result, dict)
+                and execution_control_result.get("ok") is True
+            ):
                 return execution_control_result
 
             return {
@@ -4878,13 +4956,25 @@ Available actions:
                 "session": self._get_session_payload(session_id),
             }
 
-        auto_fix_result = self._process_auto_fix(user_text, session_id, attachments)
+        auto_fix_result = self._process_auto_fix(
+            user_text,
+            session_id,
+            attachments,
+        )
+
         if auto_fix_result:
             return auto_fix_result
 
-        execution_state = self._get_session_meta(session_id, "execution_state") or {}
+        execution_state = (
+            self._get_session_meta(session_id, "execution_state")
+            or {}
+        )
 
-        if execution_state and execution_state.get("status") not in ("complete", "cancelled"):
+        if (
+            execution_state
+            and execution_state.get("status")
+            not in ("complete", "cancelled")
+        ):
             exec_debug("RESUMING EXISTING EXECUTION STATE")
 
             if execution_state.get("waiting"):
@@ -4914,39 +5004,28 @@ Available actions:
                     "session": self._get_session_payload(session_id),
                 }
 
-            execution_state = self._process_execution(execution_state, session_id)
-            self._set_session_meta(session_id, "execution_state", execution_state)
+            execution_state = self._process_execution(
+                execution_state,
+                session_id,
+            )
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
 
             return {
                 "ok": True,
                 "assistant_message": self._normalize_assistant_message(
-                    f"Execution advanced.\n\nStatus: {execution_state.get('status')}\nCurrent step: {execution_state.get('current_step')}"
+                    (
+                        "Execution advanced.\n\n"
+                        f"Status: {execution_state.get('status')}\n"
+                        f"Current step: {execution_state.get('current_step')}"
+                    )
                 ),
                 "session": self._get_session_payload(session_id),
             }
-
-        if lowered.startswith("auto-plan"):
-            execution_state = self._process_goal_and_plan(
-                user_text,
-                session_id,
-            )
-
-            if execution_state:
-                execution_state["waiting"] = True
-
-                self._set_session_meta(
-                    session_id,
-                    "execution_state",
-                    execution_state,
-                )
-
-                return {
-                    "ok": True,
-                    "assistant_message": self._normalize_assistant_message(
-                        "Execution plan created.\n\nSend `next` to run the first step, or `run all` for autonomous execution."
-                    ),
-                    "session": self._get_session_payload(session_id),
-                }
 
         return self._execute_general_chat(
             user_text=user_text,
@@ -4956,17 +5035,92 @@ Available actions:
         )
 
     def _process_goal_and_plan(self, user_text: str, session_id: str):
+        user_text = self._safe_str(user_text).strip()
+
         goal = self._build_goal(user_text)
         plan = self._build_plan(goal)
 
+        normalized_steps = []
+
+        for index, step in enumerate(plan, start=1):
+            if isinstance(step, dict):
+                title = (
+                    step.get("title")
+                    or step.get("action")
+                    or step.get("input")
+                    or f"Execution Step {index}"
+                )
+                action = step.get("action") or "execute"
+                input_value = step.get("input") or user_text
+            else:
+                title = self._safe_str(step) or f"Execution Step {index}"
+                action = "execute"
+                input_value = user_text
+
+            normalized_steps.append(
+                {
+                    "id": f"step_{index}",
+                    "title": title,
+                    "action": action,
+                    "input": input_value,
+                    "status": "pending",
+                    "result": "",
+                }
+            )
+
+        if not normalized_steps:
+            normalized_steps = [
+                {
+                    "id": "step_1",
+                    "title": "Analyze requested goal",
+                    "action": "analyze",
+                    "input": user_text,
+                    "status": "pending",
+                    "result": "",
+                },
+                {
+                    "id": "step_2",
+                    "title": "Build execution plan",
+                    "action": "plan",
+                    "input": user_text,
+                    "status": "pending",
+                    "result": "",
+                },
+                {
+                    "id": "step_3",
+                    "title": "Validate execution result",
+                    "action": "validate",
+                    "input": user_text,
+                    "status": "pending",
+                    "result": "",
+                },
+            ]
+
         execution_state = {
             "status": "running",
-            "steps": plan,
+            "goal": goal,
+            "original_user_text": user_text,
+            "steps": normalized_steps,
+            "plan": normalized_steps,
+            "current_index": 0,
             "current_step": 0,
+            "current_step_title": normalized_steps[0].get("title", "Execution Step 1"),
             "history": [],
+            "last_action": "auto_plan",
+            "waiting": False,
         }
 
-        self._set_session_meta(session_id, "execution_state", execution_state)
+        sessions = self.sessions._load_sessions()
+        index = self.sessions._find(sessions, session_id)
+
+        if index is not None:
+            sessions[index]["active_execution"] = execution_state
+            sessions[index]["execution_state"] = execution_state
+            self.sessions._save_sessions(
+                sessions,
+                self.sessions.get_active_session_id(),
+            )
+
         return execution_state
 
     def _trigger_auto_fix_on_failure(self, session_id: str, error_text: str, action: str = ""):
