@@ -42,7 +42,11 @@ class ExecutionHandler:
 
     def _execute_step(self, step: dict) -> dict:
         title = str(step.get("title") or "step").strip()
-        action = str(step.get("action") or "execute").strip().lower()
+        action = str(
+            step.get("action")
+            or step.get("title")
+            or "execute"
+        ).strip().lower()
         input_value = str(step.get("input") or "").strip()
 
         result_lines = [

@@ -913,12 +913,11 @@ Available actions:
             working_state = self._get_working_state(session_id) or {}
 
             execution_state = (
-                active_execution
-                or self._get_session_meta(session_id, "execution_state")
+                self._get_session_meta(session_id, "execution_state")
+                or active_execution
                 or working_state.get("execution_state")
                 or {}
             )
-
         # =========================
         # TEST FAILURE
         # =========================
