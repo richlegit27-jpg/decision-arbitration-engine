@@ -1535,12 +1535,10 @@ window.NovaSendPayload = async function (payload) {
   throw new Error("consumeChatStreamStable is not available.");
 };
 
-// 👇 PUT IT RIGHT HERE
-window.NovaAnalyzeArtifactImage = async function (imageUrl, artifact) {
-// ðŸ‘‡ PUT IT RIGHT HERE
 window.NovaAnalyzeArtifactImage = async function (imageUrl, artifact) {
   const url = String(imageUrl || "").trim();
-if (!url || url.includes("{preview}")) return;
+
+  if (!url || url.includes("{preview}")) return;
 
   const payload = {
     user_text: "what is in this image",
@@ -1633,14 +1631,11 @@ viewer.innerHTML = `
       attachments: [],
     };
 
-    if (typeof consumeChatStream === "function") {
-      await consumeChatStream(payload);
-    } else if (typeof consumeChatStreamStable === "function") {
-      await consumeChatStreamStable(payload);
-    } else if (typeof consumeChatJson === "function") {
-      await consumeChatJson(payload);
-    }
-
+if (typeof consumeChatStreamStable === "function") {
+  await consumeChatStreamStable(payload);
+} else {
+  throw new Error("consumeChatStreamStable is not available.");
+}
     return;
   }
 
