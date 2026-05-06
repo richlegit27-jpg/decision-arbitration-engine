@@ -1198,17 +1198,20 @@ Available actions:
             assistant_message
         )
 
-        session = self.sessions.get(session_id)
+        try:
+            self.sessions.append_message(
+                session_id,
+                assistant_payload,
+            )
+        except Exception as e:
+            exec_debug(
+                "APPEND ASSISTANT MESSAGE FAILED:",
+                e,
+            )
 
-        if session is not None:
-            messages = session.setdefault("messages", [])
-            messages.append(assistant_payload)
-
-        session_payload = self._get_session_payload(session_id)
-
-        if session_payload is not None:
-            messages = session_payload.setdefault("messages", [])
-            messages.append(assistant_payload)
+        session_payload = self._get_session_payload(
+            session_id
+        )
 
         return {
             "ok": True,
