@@ -1194,12 +1194,26 @@ Available actions:
             or f"Execution command completed: {command}"
         )
 
+        assistant_payload = self._build_assistant_message(
+            assistant_message
+        )
+
+        session = self.sessions.get(session_id)
+
+        if session is not None:
+            messages = session.setdefault("messages", [])
+            messages.append(assistant_payload)
+
+        session_payload = self._get_session_payload(session_id)
+
+        if session_payload is not None:
+            messages = session_payload.setdefault("messages", [])
+            messages.append(assistant_payload)
+
         return {
             "ok": True,
-            "assistant_message": self._build_assistant_message(
-                assistant_message
-            ),
-            "session": self._get_session_payload(session_id),
+            "assistant_message": assistant_payload,
+            "session": session_payload,
             "debug": {
                 "route": "execution_command_complete",
                 "command": command,
@@ -1628,24 +1642,37 @@ Available actions:
         Turns a goal into structured execution steps.
         """
 
-        if goal_obj["type"] == "debug":
+        goal_type = str(goal_obj.get("type") or "").strip().lower()
+
+        if goal_type == "debug":
             return [
                 {"action": "analyze", "input": "find issue"},
                 {"action": "fix", "input": "apply correction"},
                 {"action": "validate", "input": "check result"},
             ]
 
-        if goal_obj["type"] == "analysis":
+        if goal_type == "analysis":
             return [
                 {"action": "analyze", "input": "inspect input"},
                 {"action": "summarize", "input": "generate insights"},
             ]
 
-        if goal_obj["type"] == "build":
+        if goal_type == "build":
             return [
-                {"action": "design", "input": "create structure"},
-                {"action": "implement", "input": "build core logic"},
-                {"action": "test", "input": "validate output"},
+                {
+                    "action": "design",
+                    "input": "create structure",
+                },
+                {
+                    "action": "implement",
+                    "input": "build core logic",
+                    "target_file": r"C:\Users\Owner\nova\nova_backend\services\execution_handler.py",
+                    "target_function": "_execute_step",
+                },
+                {
+                    "action": "test",
+                    "input": "validate output",
+                },
             ]
 
         return [
@@ -4808,9 +4835,9 @@ Available actions:
         if command in {"run_step", "run_all", "retry_failed"}:
             session = self.sessions.get_session(session_id) or {}
             execution_state = (
-                session.get("active_execution")
-                or session.get("execution_state")
+                session.get("execution_state")
                 or self._get_session_meta(session_id, "execution_state")
+                or session.get("active_execution")
                 or {}
             )
 
@@ -5062,6 +5089,8 @@ Available actions:
                     "title": title,
                     "action": action,
                     "input": input_value,
+                    "target_file": step.get("target_file", ""),
+                    "target_function": step.get("target_function", ""),
                     "status": "pending",
                     "result": "",
                 }
@@ -7442,10 +7471,18 @@ Auto-fix result:
             if not title:
                 continue
 
-            clean_steps.append({
-                "title": title,
-                "status": "pending",
-            })
+            clean_steps.append(
+                {
+                    "id": raw.get("id", ""),
+                    "title": title,
+                    "action": raw.get("action", ""),
+                    "input": raw.get("input", ""),
+                    "target_file": raw.get("target_file", ""),
+                    "target_function": raw.get("target_function", ""),
+                    "status": raw.get("status", "pending"),
+                    "result": raw.get("result", ""),
+                }
+            )
 
         step_count = len(clean_steps)
 

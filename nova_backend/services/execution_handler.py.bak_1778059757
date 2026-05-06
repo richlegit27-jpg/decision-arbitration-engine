@@ -74,8 +74,37 @@ class ExecutionHandler:
                         f"Target function: {target_function}"
                     )
 
+                try:
+                    move = make_move(
+                        "apply_function_fix",
+                        {
+                            "file_path": target_file,
+                            "function_name": target_function,
+                            "replacement": (
+                                "def placeholder_function(self):\n"
+                                "    return True\n"
+                            ),
+                        },
+                    )
+
+                    execution_result = self.executor(move)
+
+                    result_lines.append(
+                        f"Mutation status: {execution_result.status}"
+                    )
+
+                    if execution_result.error:
+                        result_lines.append(
+                            f"Mutation error: {execution_result.error}"
+                        )
+
+                except Exception as exc:
+                    result_lines.append(
+                        f"Mutation exception: {repr(exc)}"
+                    )
+
                 result_lines.append(
-                    "Mutation bridge confirmed. Real replacement payload must be generated before apply_function_fix."
+                    "Next: execute safe function replacement pipeline."
                 )
 
             else:

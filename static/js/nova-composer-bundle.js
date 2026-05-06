@@ -115,6 +115,8 @@ state.session.id = resolvedSessionId;
 
       if (!response.ok) throw new Error("switch failed");
 
+
+
       const stateRes = await fetch("/api/state", {
         credentials: "same-origin",
         cache: "no-store",
@@ -1440,12 +1442,14 @@ function applyStatePayload(payload) {
 
   if (nextSessionId) {
     state.activeSessionId = nextSessionId;
+    window.NovaComposerState = window.NovaComposerState || {};
+    window.NovaComposerState.activeSessionId = nextSessionId;
   }
 
   const activeSession =
     (Array.isArray(data.sessions) &&
       data.sessions.find(function (s) {
-        return String(s.id) === String(state.activeSessionId);
+        return String(s && s.id) === String(state.activeSessionId);
       })) ||
     data.session;
 
@@ -1453,14 +1457,34 @@ function applyStatePayload(payload) {
     const incomingMessages = activeSession.messages.map(normalizeMessage);
 
     if (incomingMessages.length > 0) {
-      state.messages = incomingMessages;
+      const currentCount = Array.isArray(state.messages)
+        ? state.messages.length
+        : 0;
+
+      const incomingCount = incomingMessages.length;
+      const incomingLooksStale = incomingCount < currentCount - 2;
+
+      if (!incomingLooksStale) {
+        state.messages = incomingMessages;
+      } else {
+        console.warn("[NovaComposerBundle] blocked stale session overwrite", {
+          incomingCount,
+          currentCount,
+        });
+      }
     } else {
       console.warn("[NovaComposerBundle] BLOCKED empty overwrite");
     }
   }
 
-  state.sessions = Array.isArray(data.sessions) ? data.sessions : state.sessions;
-  state.artifacts = Array.isArray(data.artifacts) ? data.artifacts : state.artifacts;
+  state.sessions = Array.isArray(data.sessions)
+    ? data.sessions
+    : state.sessions;
+
+  state.artifacts = Array.isArray(data.artifacts)
+    ? data.artifacts
+    : state.artifacts;
+
   state.memory = Array.isArray(data.memory)
     ? data.memory.map(normalizeMemoryItem)
     : state.memory;
@@ -1469,18 +1493,7 @@ function applyStatePayload(payload) {
   renderChat();
   renderArtifacts();
   renderMemory();
-  syncRailTruth();
-
-  if (typeof renderWeb === "function") {
-    renderWeb();
-  }
-
-  if (state.stream) {
-    state.stream.placeholderId = "";
-    state.stream.messageId = "";
-    state.stream.targetMessageId = "";
-  }
-
+  renderExecution();
   updateTopbarFromState();
 }
 
@@ -3381,16 +3394,28 @@ if (
     }
   });
 }
-  renderChat();
+
+  state.memory = Array.isArray(data.memory)
+    ? data.memory.map(normalizeMemoryItem)
+    : state.memory;
+
   renderSessionList();
+  renderChat();
   renderArtifacts();
   renderMemory();
+  syncRailTruth();
+
   if (typeof renderWeb === "function") {
     renderWeb();
   }
+
+  if (state.stream) {
+    state.stream.placeholderId = "";
+    state.stream.messageId = "";
+    state.stream.targetMessageId = "";
+  }
+
   updateTopbarFromState();
-  scrollChatToBottom(true);
-  finishStreamUi({ statusState: "idle", statusText: "Ready" });
 }
 
 async function openSession(sessionId) {
@@ -4228,6 +4253,8 @@ async function sendMessage() {
       location: location,
     };
 
+  console.log("[NOVA SEND PAYLOAD]", payload);
+
     if (isImageCommand) {
       await consumeChatJson(payload);
       showToast("Image request sent.", "success");
@@ -4249,6 +4276,8 @@ async function sendMessage() {
 
       state.stream = state.stream || {};
       state.stream.targetMessageId = pendingAssistantId;
+
+console.log("[NOVA BEFORE STREAM]", payload);
 
       await consumeChatStreamStable(payload);
     }
@@ -5911,6 +5940,14 @@ function mergeAssistantReplyIntoState(payload) {
     state.activeSessionId = sessionId;
   }
 
+if (
+  payload &&
+  payload.session &&
+  Array.isArray(payload.session.messages)
+) {
+  state.messages = payload.session.messages.map(normalizeMessage);
+}
+
   if (!Array.isArray(state.sessions)) {
     state.sessions = [];
   }
@@ -6043,32 +6080,55 @@ async function consumeChatStreamStable(payload) {
     };
   }
 
-  if (state.stream.controller) {
-    try {
-      state.stream.controller.abort();
-    } catch (_) {}
-  }
+try {
+  state.stream.controller = new AbortController();
 
-  try {
-    state.stream.controller = new AbortController();
+  console.log("[NOVA CHAT FETCH BEFORE]");
 
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream, application/json",
-      },
-      body: JSON.stringify(payload || {}),
-      signal: state.stream.controller.signal,
-    });
+  const response = await fetch("/api/chat", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream, text/plain, */*",
+    },
+    body: JSON.stringify(payload || {}),
+    signal: state.stream.controller.signal,
+  });
+
+  console.log("[NOVA CHAT FETCH AFTER]");
+
+  console.log(
+    "[NOVA CHAT RESPONSE]",
+    response.status,
+    response.headers.get("content-type")
+  );
 
     const responseContentType = String(
       response.headers.get("content-type") || ""
     ).toLowerCase();
 
     if (responseContentType.includes("application/json")) {
-      const data = await response.json();
+const rawJsonText = await response.text();
+console.log("[NOVA CHAT RAW JSON]", rawJsonText);
+
+const data = rawJsonText ? JSON.parse(rawJsonText) : {};
+console.log("[NOVA CHAT JSON DATA]", data);
+
+if (
+  data &&
+  data.session &&
+  Array.isArray(data.session.messages)
+) {
+  state.messages = data.session.messages.map(normalizeMessage);
+
+  renderChat();
+
+  console.log(
+    "[NOVA FORCE HYDRATE]",
+    state.messages.length
+  );
+}
 
       if (data && data.assistant_message) {
         upsertMessage({
@@ -6432,6 +6492,11 @@ async function loadState() {
 
 boot();
 
+window.NovaComposerBundle = window.NovaComposerBundle || {};
+window.NovaComposerBundle.state = state;
+window.NovaComposerBundle.applyStatePayload = applyStatePayload;
+window.NovaComposerBundle.sendMessage = sendMessage;
+
 if (typeof initShellExtensions === "function") {
   initShellExtensions();
 }
@@ -6589,6 +6654,7 @@ window.runExecutionAction = async function (action, extra) {
             : null,
       }),
     });
+
 
     if (!response.ok || !response.body) {
       throw new Error("Execution stream failed");
