@@ -4253,7 +4253,9 @@ async function sendMessage() {
       location: location,
     };
 
-   if (isImageCommand) {
+  console.log("[NOVA SEND PAYLOAD]", payload);
+
+    if (isImageCommand) {
       await consumeChatJson(payload);
       showToast("Image request sent.", "success");
     } else {
@@ -4272,10 +4274,12 @@ async function sendMessage() {
         meta: {},
       });
 
-state.stream = state.stream || {};
-state.stream.targetMessageId = pendingAssistantId;
+      state.stream = state.stream || {};
+      state.stream.targetMessageId = pendingAssistantId;
 
-await consumeChatStreamStable(payload);
+console.log("[NOVA BEFORE STREAM]", payload);
+
+      await consumeChatStreamStable(payload);
     }
   } catch (error) {
     finishStreamUi({
@@ -6064,7 +6068,6 @@ function clearTokenRenderState() {
 }
 
 async function consumeChatStreamStable(payload) {
-
   if (!state.stream) {
     state.stream = {
       running: false,
@@ -6080,35 +6083,54 @@ async function consumeChatStreamStable(payload) {
 try {
   state.stream.controller = new AbortController();
 
-const response = await fetch("/api/chat", {
-  method: "POST",
-  credentials: "same-origin",
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json, text/event-stream, text/plain, */*",
-  },
-  body: JSON.stringify(payload || {}),
-  signal: state.stream.controller.signal,
-});
+  console.log("[NOVA CHAT FETCH BEFORE]");
+
+  const response = await fetch("/api/chat", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream, text/plain, */*",
+    },
+    body: JSON.stringify(payload || {}),
+    signal: state.stream.controller.signal,
+  });
+
+  console.log("[NOVA CHAT FETCH AFTER]");
+
+  console.log(
+    "[NOVA CHAT RESPONSE]",
+    response.status,
+    response.headers.get("content-type")
+  );
 
     const responseContentType = String(
       response.headers.get("content-type") || ""
     ).toLowerCase();
 
-if (responseContentType.includes("application/json")) {
+    if (responseContentType.includes("application/json")) {
 const rawJsonText = await response.text();
+console.log("[NOVA CHAT RAW JSON]", rawJsonText);
+
 const data = rawJsonText ? JSON.parse(rawJsonText) : {};
+console.log("[NOVA CHAT JSON DATA]", data);
 
-  if (
-    data &&
-    data.session &&
-    Array.isArray(data.session.messages)
-  ) {
-    state.messages = data.session.messages.map(normalizeMessage);
-    renderChat();
-  }
+if (
+  data &&
+  data.session &&
+  Array.isArray(data.session.messages)
+) {
+  state.messages = data.session.messages.map(normalizeMessage);
 
-  if (data && data.assistant_message) {
+  renderChat();
+
+  console.log(
+    "[NOVA FORCE HYDRATE]",
+    state.messages.length
+  );
+}
+
+      if (data && data.assistant_message) {
         upsertMessage({
           id: state.stream.targetMessageId || makeId("assistant"),
           role: "assistant",
@@ -6680,6 +6702,7 @@ window.runExecutionAction = async function (action, extra) {
           return;
         }
 
+        console.log("[EXECUTION STREAM]", eventName, payload);
 
         if (eventName === "start" && typeof addMessage === "function") {
           addMessage({
