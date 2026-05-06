@@ -4780,6 +4780,27 @@ Available actions:
 
         lowered = self._safe_str(user_text).lower().strip()
 
+        if lowered in {
+            "reset",
+            "reset all",
+            "clear context",
+            "clear state",
+            "stop execution",
+            "clear all",
+        }:
+            self._reset_execution_state(session_id)
+
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    text="State cleared. Nova is back to normal."
+                ),
+                "session": self._get_session_payload(session_id),
+                "debug": {
+                    "route": "reset_execution_state",
+                },
+            }
+
         where_are_we_phrases = {
             "where are we",
             "what file are we in",
@@ -8150,6 +8171,39 @@ Next action:
 
         return current_state
 
+    def _replace_working_state(self, session_id: str, new_state: dict):
+        session_id = self._safe_str(session_id).strip()
+
+        if not session_id:
+            return {}
+
+        if not isinstance(new_state, dict):
+            new_state = {}
+
+        from datetime import datetime, timezone
+
+        clean_state = dict(new_state)
+        clean_state["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        self._set_working_state(session_id, clean_state)
+
+        return clean_state
+
+    def _reset_execution_state(self, session_id: str):
+        self._set_session_meta(session_id, "execution_state", {})
+
+        self._replace_working_state(
+            session_id,
+            {
+                "active_task": "",
+                "current_file": "",
+                "current_bug": "",
+                "last_success": "",
+                "next_move": "",
+                "checkpoint": "",
+            },
+        )
+
     def _handle_where_are_we(self, session_id: str, user_text: str = "") -> str:
         state = self._get_working_state(session_id) or {}
 
@@ -8162,16 +8216,30 @@ Next action:
 
         lowered = self._safe_str(user_text).lower().strip()
 
-        if lowered in {"reset", "clear state", "stop execution"}:
-            self._set_session_meta(session_id, "execution_state", {})
-            self._update_working_state(session_id, {})
+        if lowered in {
+            "reset",
+            "reset all",
+            "clear context",
+            "clear state",
+            "stop execution",
+            "clear all",
+        }:
+            self._reset_execution_state(session_id)
+
             return {
                 "ok": True,
                 "assistant_message": self._build_assistant_message(
                     text="State cleared. Nova is back to normal."
                 ),
                 "session": self._get_session_payload(session_id),
+                "debug": {
+                    "route": "reset_execution_state",
+                },
             }
+
+        if lowered in {"reset", "clear state", "stop execution"}:
+            self._reset_execution_state(session_id)
+            return "State cleared. Nova is back to normal."
 
         if not any([active_task, current_file, current_bug, last_success, next_move, checkpoint]):
             return "I do not have a working context locked in yet."
