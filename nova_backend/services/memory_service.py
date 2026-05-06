@@ -275,13 +275,11 @@ class MemoryService:
         ]
 
         MAX_MEMORY_ITEMS = 100
+        memory = self.summarize_memory_list(memory)
         memory = memory[-MAX_MEMORY_ITEMS:]
 
         data["memory"] = memory
         self._write_store(data)
-
-        return item
-
     def save_memory(self, item: Dict[str, Any]) -> Dict[str, Any]:
         data = self._read_store()
         memory = data.get("memory", [])

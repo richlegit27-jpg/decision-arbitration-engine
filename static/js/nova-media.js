@@ -1,4 +1,3 @@
-// notepad C:\Users\Owner\nova\static\js\nova-media.js
 (function () {
   "use strict";
 
@@ -8,6 +7,7 @@
 
   const state = Nova.state;
 
+  // Ensure media state exists
   state.mediaItems = Array.isArray(state.mediaItems) ? state.mediaItems : [];
   state.mediaLoaded = !!state.mediaLoaded;
 
@@ -17,15 +17,22 @@
     delete: (id) => `/api/media/delete/${encodeURIComponent(id)}`,
   };
 
+  // ------------------------------
+  // Sidebar toggle wiring
+  // ------------------------------
   function installPanelToggles() {
     const sidebarBtn = document.getElementById("sidebarToggle");
     if (!sidebarBtn) return;
+
     sidebarBtn.addEventListener("click", () => {
       const sidebar = document.getElementById("novaSidebar");
       sidebar.classList.toggle("collapsed");
     });
   }
 
+  // ------------------------------
+  // Render media list with previews
+  // ------------------------------
   async function loadMedia() {
     try {
       const res = await fetch(API.list);
@@ -39,7 +46,7 @@
         const div = document.createElement("div");
         div.className = "media-card";
 
-        // Card click (except action buttons)
+        // Card click except action buttons
         div.addEventListener("click", (e) => {
           if (!e.target.classList.contains("media-action")) {
             console.log("Media selected:", item);
@@ -93,14 +100,20 @@
     }
   }
 
+  // ------------------------------
+  // Upload handler
+  // ------------------------------
   function initUpload() {
     const input = document.getElementById("novaMediaInput");
     if (!input) return;
+
     input.addEventListener("change", async () => {
       const file = input.files[0];
       if (!file) return;
+
       const formData = new FormData();
       formData.append("file", file);
+
       try {
         await fetch(API.upload, { method: "POST", body: formData });
         loadMedia();
@@ -112,6 +125,9 @@
     });
   }
 
+  // ------------------------------
+  // Bootstrap function
+  // ------------------------------
   function bootstrap() {
     installPanelToggles();
     initUpload();

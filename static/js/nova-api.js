@@ -147,7 +147,8 @@
         "Content-Type": "application/json",
         ...(isObject(options.headers) ? options.headers : {}),
       },
-      body: JSON.stringify(isObject(data) ? data : {}),
+      body: JSON.stringify(isObject(data) ? data : {
+}),
     });
   }
 

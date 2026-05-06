@@ -53,6 +53,98 @@ class ChatService:
     ROUTE_PLANNING = "planning"
     ROUTE_MEMORY_RECALL = "memory_recall"
 
+    def _continue_last_answer(self, session_id: str):
+        last_text = self._get_session_meta(session_id, "last_answer_text") or ""
+
+        if not last_text.strip():
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    "Nothing to continue yet."
+                ),
+                "session": self._get_session_payload(session_id),
+            }
+
+        prompt = f"""Continue this answer:
+
+{last_text}
+
+Rules:
+- Do not restart
+- Continue naturally
+- Add useful depth
+"""
+
+        return self._execute_general_chat(
+            user_text=prompt,
+            session_id=session_id,
+            attachments=[],
+            decision={"route": self.ROUTE_GENERAL_CHAT},
+        )
+
+    def _detect_answer_depth(self, user_text: str) -> str:
+        text = self._safe_str(user_text).lower().strip()
+
+        deep_triggers = (
+            "explain",
+            "why",
+            "how does",
+            "how do",
+            "break down",
+            "walk me through",
+            "teach me",
+            "go deep",
+            "details",
+            "in detail",
+            "full explanation",
+        )
+
+        short_triggers = (
+            "quick",
+            "short",
+            "simple",
+            "tldr",
+            "brief",
+            "one sentence",
+            "summarize",
+        )
+
+        if any(trigger in text for trigger in short_triggers):
+            return "short"
+
+        if any(trigger in text for trigger in deep_triggers):
+            return "deep"
+
+        if len(text) > 180:
+            return "medium"
+
+        return "short"
+
+    def _normalize_python_indentation(self, code: str) -> str:
+        if not code:
+            return code
+
+        # 1. convert tabs → 4 spaces
+        code = code.replace("\t", "    ")
+
+        # 2. normalize line endings
+        lines = code.splitlines()
+
+        fixed_lines = []
+        for line in lines:
+            # strip trailing whitespace
+            line = line.rstrip()
+
+            # prevent weird mixed indentation
+            leading_spaces = len(line) - len(line.lstrip(" "))
+            if leading_spaces % 4 != 0:
+                leading_spaces = (leading_spaces // 4) * 4
+                line = (" " * leading_spaces) + line.lstrip()
+
+            fixed_lines.append(line)
+
+        return "\n".join(fixed_lines) + "\n"
+
     def _safe_write_file(self, file_path: str, new_code: str) -> dict:
         try:
             target = Path(file_path)
@@ -103,6 +195,37 @@ class ChatService:
                 "ok": False,
                 "error": self._safe_str(e),
             }
+
+    def _validate_python_code(self, code: str) -> tuple[bool, str]:
+        import os
+        import py_compile
+        import tempfile
+        import traceback
+
+        tmp_path = ""
+
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                delete=False,
+                suffix=".py",
+                encoding="utf-8",
+            ) as tmp:
+                tmp.write(code or "")
+                tmp_path = tmp.name
+
+            py_compile.compile(tmp_path, doraise=True)
+            return True, ""
+
+        except Exception:
+            return False, traceback.format_exc().strip()
+
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
 
     def _safe_dict(self, value) -> dict:
         return value if isinstance(value, dict) else {}
@@ -267,6 +390,23 @@ class ChatService:
 
             if getattr(result, "status", "") == "failed":
                 error_text = getattr(result, "error", "") or "Unknown execution failure."
+
+                assistant_msg = self._trigger_auto_fix_on_failure(
+                    session_id=session_id,
+                    error_text=error_text,
+                    action=action,
+                )
+
+                return {
+                    "ok": True,
+                    "assistant_message": assistant_msg,
+                    "session": self._get_session_payload(session_id),
+                    "debug": {
+                        "route": "execution_failure_auto_fix_trigger",
+                        "action": action,
+                        "error": error_text,
+                    },
+                }
 
                 file_path = r"C:\Users\Owner\nova\nova_backend\services\chat_service.py"
 
@@ -564,6 +704,324 @@ Available actions:
             "message": "Execution state needs inspection.",
             "needs_file_fix": False,
         }
+    def _choose_execution_recovery_strategy(self, session_id: str, command: str, status: str, error_text: str = ""):
+        working_state = self._get_working_state(session_id) or {}
+
+        failure_count = int(working_state.get("execution_failure_count") or 0)
+        score = int(working_state.get("execution_reward_score") or 0)
+
+        if failure_count <= 0:
+            strategy = "retry_same_step"
+            next_move = "retry_failed"
+        elif failure_count == 1:
+            strategy = "inspect_error_context"
+            next_move = "auto_fix_failure"
+        elif failure_count == 2:
+            strategy = "use_smaller_patch_scope"
+            next_move = "function_scoped_auto_fix"
+        else:
+            strategy = "stop_and_request_traceback"
+            next_move = "request_traceback"
+
+        if score <= -15:
+            strategy = "stop_and_change_plan"
+            next_move = "manual_review_required"
+
+        self._update_working_state(
+            session_id,
+            {
+                "execution_recovery_strategy": strategy,
+                "next_move": next_move,
+                "last_strategy_command": command,
+                "last_strategy_status": status,
+                "last_strategy_error": self._safe_str(error_text),
+            },
+        )
+
+        return strategy
+
+    def _should_stop_execution_loop(self, session_id: str) -> bool:
+        working_state = self._get_working_state(session_id) or {}
+
+        score = int(working_state.get("execution_reward_score") or 0)
+        last_reward = int(working_state.get("last_execution_reward") or 0)
+
+        failure_count = int(working_state.get("execution_failure_count") or 0)
+
+        if last_reward < 0:
+            failure_count += 1
+        else:
+            failure_count = 0
+
+        self._update_working_state(
+            session_id,
+            {
+                "execution_failure_count": failure_count,
+            },
+        )
+
+        return failure_count >= 3 or score <= -15
+
+    def _record_execution_reward(self, session_id: str, command: str, status: str, error_text: str = ""):
+        command = self._safe_str(command).strip().lower()
+        status = self._safe_str(status).strip().lower()
+        error_text = self._safe_str(error_text).strip()
+
+        reward = 0
+
+        if status in {"success", "complete", "completed", "passed"}:
+            reward += 10
+        elif status in {"failed", "error"}:
+            reward -= 5
+        elif status in {"cancelled", "canceled"}:
+            reward -= 1
+
+        working_state = self._get_working_state(session_id) or {}
+        current_score = int(working_state.get("execution_reward_score") or 0)
+        new_score = current_score + reward
+
+        self._update_working_state(
+            session_id,
+            {
+                "execution_reward_score": new_score,
+                "last_execution_reward": reward,
+                "last_reward_command": command,
+                "last_reward_status": status,
+                "last_reward_error": error_text,
+            },
+        )
+
+        return reward
+
+    def _process_execution_command(self, command: str, session_id: str):
+        command = self._safe_str(command).strip().lower()
+        print("PROCESS_EXECUTION_COMMAND:", repr(command))
+
+        if command == "cancel":
+            self._set_session_meta(session_id, "execution_state", {})
+            self._update_working_state(
+                session_id,
+                {
+                    "execution_status": "cancelled",
+                    "pending_execution_action": "",
+                    "next_move": "",
+                },
+            )
+
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    "Execution cancelled."
+                ),
+                "session": self._get_session_payload(session_id),
+                "debug": {"route": "execution_cancelled"},
+            }
+
+        if command == "apply_auto_fix":
+            error_text = (
+                self._get_session_meta(session_id, "pending_fix_error")
+                or self._get_session_meta(session_id, "last_execution_error")
+                or (self._get_working_state(session_id) or {}).get("last_error")
+                or ""
+            )
+
+            if not error_text:
+                return {
+                    "ok": True,
+                    "assistant_message": self._build_assistant_message(
+                        "Auto-fix triggered, but no error context found."
+                    ),
+                    "session": self._get_session_payload(session_id),
+                    "debug": {"route": "apply_auto_fix_no_error"},
+                }
+
+            return self._process_auto_fix(
+                user_text=f"fix this error:\n{error_text}",
+                session_id=session_id,
+                attachments=None,
+            )
+
+        execution_state = self._get_session_meta(session_id, "execution_state") or {}
+
+        # =========================
+        # LOCAL TEST FAILURE
+        # =========================
+        handler = None
+
+        if command in {"test_fail", "test fail"}:
+            result = {
+                "status": "failed",
+                "error": (
+                    "Fake execution failure for auto-fix test. "
+                    "File: C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py. "
+                    "Function: _process_execution_command."
+                ),
+                "execution_state": {
+                    "status": "failed",
+                    "steps": [
+                        {"title": "Failed Step 1", "status": "failed"},
+                        {"title": "Failed Step 2", "status": "pending"},
+                    ],
+                    "history": ["test_fail: Failed Step 1"],
+                    "last_action": "test_fail",
+                    "current_step": "Failed Step 1",
+                },
+            }
+
+        else:
+            if hasattr(self, "_execution_handler") and self._execution_handler:
+                handler = self._execution_handler
+            elif hasattr(self, "execution_handler") and self.execution_handler:
+                handler = self.execution_handler
+
+            if not handler:
+                return {
+                    "ok": True,
+                    "assistant_message": self._build_assistant_message(
+                        "Execution handler is not available."
+                    ),
+                    "session": self._get_session_payload(session_id),
+                    "debug": {"route": "execution_handler_missing", "command": command},
+                }
+
+            if hasattr(handler, "run_next_move"):
+                result = handler.run_next_move(
+                    action=command,
+                    session_id=session_id,
+                    execution_state=execution_state,
+                )
+            elif hasattr(handler, "run_next_step"):
+                result = handler.run_next_step(
+                    action=command,
+                    session_id=session_id,
+                    execution_state=execution_state,
+                )
+            elif hasattr(handler, "run_chain"):
+                result = handler.run_chain(
+                    action=command,
+                    session_id=session_id,
+                    execution_state=execution_state,
+                )
+            else:
+                return {
+                    "ok": True,
+                    "assistant_message": self._build_assistant_message(
+                        "Execution handler has no supported run method."
+                    ),
+                    "session": self._get_session_payload(session_id),
+                    "debug": {
+                        "route": "execution_handler_method_missing",
+                        "command": command,
+                        "methods": [m for m in dir(handler) if m.startswith("run")],
+                    },
+                }
+
+        # =========================
+        # RESULT NORMALIZATION
+        # =========================
+        if isinstance(result, dict):
+            new_state = result.get("execution_state") or result
+            error_text = result.get("error") or result.get("message") or ""
+            status = result.get("status") or new_state.get("status") or ""
+        else:
+            new_state = getattr(result, "execution_state", None) or {}
+            error_text = getattr(result, "error", "") or getattr(result, "message", "") or ""
+            status = getattr(result, "status", "") or new_state.get("status", "")
+
+        if new_state:
+            self._set_session_meta(session_id, "execution_state", new_state)
+
+        reward = self._record_execution_reward(
+            session_id=session_id,
+            command=command,
+            status=status,
+            error_text=error_text,
+        )
+
+        strategy = self._choose_execution_recovery_strategy(
+            session_id=session_id,
+            command=command,
+            status=status,
+            error_text=error_text,
+        )
+
+        if self._should_stop_execution_loop(session_id):
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    "Execution loop stopped after repeated failures. Nova needs a new strategy before retrying."
+                ),
+                "session": self._get_session_payload(session_id),
+                "debug": {
+                    "route": "execution_loop_stopped",
+                    "command": command,
+                    "status": status,
+                    "reward": reward,
+                    "strategy": strategy,
+                },
+            }
+
+        # =========================
+        # FAILURE → AUTO FIX → RETRY LOOP
+        # =========================
+        if status in {"failed", "error"}:
+            error_text = error_text or "Unknown execution failure."
+
+            self._trigger_auto_fix_on_failure(
+                session_id=session_id,
+                error_text=error_text,
+                action=command,
+            )
+
+            auto_fix_result = self._process_auto_fix(
+                user_text=f"fix this error:\n{error_text}\n\nRecovery strategy: {strategy}",
+                session_id=session_id,
+                attachments=None,
+            )
+
+            if isinstance(auto_fix_result, dict):
+                execution_state = self._get_session_meta(session_id, "execution_state") or {}
+
+                retry_count = int(execution_state.get("auto_fix_retry_count") or 0) + 1
+                execution_state["auto_fix_retry_count"] = retry_count
+
+                if retry_count >= 3:
+                    execution_state["status"] = "needs_strategy_change"
+                    execution_state["next_move"] = "review_failure_pattern_before_retry"
+
+                    self._set_session_meta(session_id, "execution_state", execution_state)
+
+                    return {
+                        "ok": True,
+                        "assistant_message": self._build_assistant_message(
+                            "Auto-fix retry cap reached. Strategy change required."
+                        ),
+                        "session": self._get_session_payload(session_id),
+                        "debug": {"route": "auto_fix_retry_cap"},
+                    }
+
+                execution_state["status"] = "retry_ready"
+                execution_state["next_move"] = "run_step"
+
+                self._set_session_meta(session_id, "execution_state", execution_state)
+
+                # 🔥 AUTO RUN STEP IMMEDIATELY
+                execution_state["status"] = "retry_ready"
+                execution_state["next_move"] = "run_step"
+                self._set_session_meta(session_id, "execution_state", execution_state)
+
+                return {
+                    "ok": True,
+                    "assistant_message": self._build_assistant_message(
+                        f"Auto-fix applied. Retry queued. Attempt {retry_count}/3.\n\nNext action: run_step"
+                    ),
+                    "session": self._get_session_payload(session_id),
+                    "debug": {
+                        "route": "auto_fix_retry_ready",
+                        "retry_count": retry_count,
+                        "next_action": "run_step",
+                    },
+                }
 
     def _handle_execution_control(self, user_text: str, session_id: str):
         text = self._safe_str(user_text).strip().lower()
@@ -594,98 +1052,110 @@ Available actions:
             "test fail",
             "stop",
             "cancel",
+
+            # ✅ AUTO FIX TRIGGERS
+            "apply_auto_fix",
+            "apply auto fix",
+            "auto fix",
+            "autofix",
         }
 
         if text not in execution_keywords:
             return None
 
-        if text in {"retry", "retry failed", "try again", "rerun failed"}:
+        # =========================
+        # COMMAND MAPPING
+        # =========================
+        if text in {"apply_auto_fix", "apply auto fix", "auto fix", "autofix"}:
+            command = "apply_auto_fix"
+
+        elif text in {"retry", "retry failed", "try again", "rerun failed"}:
             command = "retry_failed"
+
         elif text in {"run_all", "run all", "run it", "execute", "execute all"}:
             command = "run_all"
+
         elif text in {"test_fail", "test fail"}:
             command = "test_fail"
-        elif text in {"stop", "cancel"}:
-            command = "stop"
-        else:
+
+        elif text in {
+            "next",
+            "nex",
+            "continue",
+            "continue on",
+            "keep going",
+            "go",
+            "run next",
+            "next step",
+            "what next",
+            "what now",
+            "run_step",
+            "run step",
+        }:
             command = "run_step"
 
-        # 🔥 SMART EXECUTION INTELLIGENCE (INSERTED HERE)
-        session = self._get_session_payload(session_id)
-        working_state = session.get("working_state") if isinstance(session, dict) else {}
-        working_state = working_state if isinstance(working_state, dict) else {}
+        elif text in {"stop", "cancel"}:
+            command = "cancel"
 
-        execution_state = self._safe_dict(
-            working_state.get("execution_state")
-            or working_state.get("execution")
-        )
+        else:
+            return None
 
-        last_error = self._safe_str(
-            working_state.get("last_error")
-            or working_state.get("last_execution_error")
-        )
-
-        analysis = self._analyze_execution_state(
-            execution_state=execution_state,
-            last_error=last_error,
-        )
-
-        smart_action = self._safe_str(analysis.get("next_action"))
-
-        if command == "run_step" and smart_action in {
-            "retry_failed",
-            "fix_code_then_retry",
-            "inspect_missing_attribute",
-            "fix_import_or_dependency",
-        }:
-            command = "retry_failed"
-
-        # 🔥 NORMAL FLOW
-        if hasattr(self, "_advance_execution_request"):
-            return self._advance_execution_request(
-                user_text=command,
-                session_id=session_id,
-                attachments=[],
+        # =========================
+        # EXECUTE COMMAND
+        # =========================
+        if command == "apply_auto_fix":
+            error_text = (
+                self._get_session_meta(session_id, "pending_fix_error")
+                or self._get_session_meta(session_id, "last_execution_error")
+                or (self._get_working_state(session_id) or {}).get("last_error")
+                or ""
             )
 
-        if hasattr(self, "_auto_execute_request"):
-            return self._auto_execute_request(
-                user_text=command,
+            if not error_text:
+                return {
+                    "ok": True,
+                    "assistant_message": self._build_assistant_message(
+                        "Auto-fix triggered, but no error context found."
+                    ),
+                    "session": self._get_session_payload(session_id),
+                    "debug": {"route": "apply_auto_fix_no_error"},
+                }
+
+            return self._process_auto_fix(
+                user_text=f"fix this error:\n{error_text}",
                 session_id=session_id,
-                attachments=[],
+                attachments=None,
             )
 
-        return None
-
-    def handle(self, user_text, attachments=None, session_id=None, **kwargs):
-        session_id = session_id or kwargs.get("session_id") or ""
-        attachments = attachments or []
-
-        text = str(user_text or "").lower().strip()
-
-        if text in (
-            "run_all",
-            "run step",
-            "run_step",
-            "retry_failed",
-            "replay_last",
-            "test_fail",
-        ):
-            return self._auto_execute_request(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-            )
-
-        return self._execute_web_fetch(
-            user_text=user_text,
+        return self._process_execution_command(
+            command=command,
             session_id=session_id,
-            attachments=attachments,
-            decision={
-                "route": self.ROUTE_WEB_FETCH,
-                "strategy": "web_fetch",
-                "query": user_text,
-            },
+        )
+
+    def _answer_simple_definition(self, user_text: str) -> str:
+        text = self._safe_str(user_text).strip()
+        lowered = text.lower()
+
+        if "open source ai" in lowered:
+            return (
+                "Open-source AI means AI software, models, or model weights that are publicly available "
+                "so people can inspect, use, modify, or build on them.\n\n"
+                "Simple version:\n"
+                "Open-source AI = the inner parts are shared.\n"
+                "Closed-source AI = the company keeps the inner parts private."
+            )
+
+        if "closed source ai" in lowered or "close source ai" in lowered:
+            return (
+                "Closed-source AI means the company keeps the model, code, training details, or weights private. "
+                "You can usually use it through an app or API, but you cannot fully inspect or modify how it works.\n\n"
+                "Simple version:\n"
+                "Closed-source AI = you can use it, but you cannot see or control the engine underneath."
+            )
+
+        return (
+            f"{text}\n\n"
+            "In simple terms, this is asking for a definition, so Nova should answer directly instead of using web search."
         )
 
     def _source_quality_score(self, url: str = "", title: str = "") -> int:
@@ -1451,6 +1921,16 @@ Available actions:
             )
 
         file_path = path.strip()
+        pending_fix_mode = self._get_session_meta(session_id, "pending_fix_mode") or "file"
+
+        traceback_func_match = re.findall(
+            r'in\s+([A-Za-z_][A-Za-z0-9_]*)',
+            user_text,
+        )
+        traceback_func_name = traceback_func_match[-1] if traceback_func_match else ""
+
+        if pending_fix_mode == "function" and traceback_func_name:
+            self._set_session_meta(session_id, "pending_fix_func_name", traceback_func_name)
 
         if "```" in file_path:
             file_path = file_path.split("```", 1)[0].strip()
@@ -1505,15 +1985,43 @@ Available actions:
                 decision={"route": "auto_fix_too_large"},
             )
 
-        fix_prompt = (
-            "You are fixing a Python file.\n"
-            "Return ONLY the complete corrected Python file.\n"
-            "No markdown. No explanation. No code fences.\n\n"
-            f"USER BUG REQUEST:\n{user_text}\n\n"
-            f"FILE PATH:\n{file_path}\n\n"
-            "CURRENT FILE CONTENT:\n"
-            f"{raw_code}"
-        )
+        if pending_fix_mode == "function":
+            func_name = self._get_session_meta(session_id, "pending_fix_func_name") or ""
+
+            pattern = rf"(def\s+{re.escape(func_name)}\s*\(.*?\):\n(?:\s+.*\n)*)"
+            match = re.search(pattern, raw_code, re.DOTALL)
+            extracted_function = match.group(1) if match else raw_code
+
+            fix_prompt = (
+                "You are fixing a Python function.\n"
+                "Return ONLY the corrected function.\n"
+                "Do NOT return the full file.\n"
+                "No markdown. No explanation.\n\n"
+
+                f"ERROR CONTEXT:\n{user_text}\n\n"
+
+                f"TARGET FUNCTION:\n{func_name}\n\n"
+
+                "FUNCTION CODE:\n"
+                f"{extracted_function}\n\n"
+
+                "Fix the root cause of the error. Do not rewrite unrelated logic."
+            )
+        else:
+            fix_prompt = (
+                "You are fixing a Python file.\n"
+                "Return ONLY the complete corrected Python file.\n"
+                "No markdown. No explanation. No code fences.\n\n"
+
+                f"ERROR CONTEXT:\n{user_text}\n\n"
+
+                f"FILE PATH:\n{file_path}\n\n"
+
+                "CURRENT FILE CONTENT:\n"
+                f"{raw_code}\n\n"
+
+                "Fix the root cause of the error. Preserve architecture."
+            )
 
         try:
             model_response = self.client.responses.create(
@@ -1525,7 +2033,7 @@ Available actions:
                             "You are an expert Python repair engine. "
                             "Preserve existing architecture. "
                             "Fix only what is necessary. "
-                            "Return the full corrected file only."
+                            "Return only the corrected code requested by the user prompt."
                         ),
                     },
                     {
@@ -1569,7 +2077,18 @@ Available actions:
 
         try:
             self._set_session_meta(session_id, "pending_fix_file_path", file_path)
+
+            fixed_code = self._normalize_python_indentation(fixed_code)
+
             self._set_session_meta(session_id, "pending_fix_code", fixed_code)
+            self._set_session_meta(session_id, "pending_fix_mode", pending_fix_mode)
+
+            if pending_fix_mode == "function":
+                self._set_session_meta(
+                    session_id,
+                    "pending_fix_func_name",
+                    self._get_session_meta(session_id, "pending_fix_func_name") or "",
+                )
 
             assistant_text = (
                 "Auto-fix prepared.\n\n"
@@ -1589,7 +2108,10 @@ Available actions:
                 user_text=user_text,
                 user_msg=self._build_user_message(user_text),
                 assistant_msg=assistant_msg,
-                decision={"route": "auto_fix_prepare"},
+                decision={
+                    "route": "auto_fix_prepare",
+                    "pending_fix_mode": pending_fix_mode,
+                },
             )
 
         except Exception as e:
@@ -1727,6 +2249,19 @@ Available actions:
         if not memory_context:
             memory_context = self._build_memory_context_for_chat(user_text, decision)
 
+        answer_depth = self._get_session_meta(session_id, "answer_depth") or "short"
+
+        depth_instruction = {
+            "short": "Answer briefly: 2-6 lines unless more detail is clearly needed.",
+            "medium": "Answer with enough detail to be useful, but avoid long essays.",
+            "deep": "Give a deeper explanation with clear structure and useful detail.",
+        }.get(answer_depth, "Answer briefly unless more detail is needed.")
+
+        if memory_context:
+            memory_context = f"{memory_context}\n\nAnswer depth instruction:\n{depth_instruction}"
+        else:
+            memory_context = f"Answer depth instruction:\n{depth_instruction}"
+
         model_messages = self._compose_model_messages(
             user_text=user_text,
             session=session,
@@ -1763,6 +2298,9 @@ Available actions:
         mission = self._safe_dict(decision.get("mission"))
         mission_mode = str(mission.get("mode") or "").lower()
 
+        assistant_text = self._safe_str(locals().get("assistant_text", ""))
+        assistant_msg = None
+
         if is_continue and mission_mode == "debugging":
             assistant_text = (
                 "Next move:\n\n"
@@ -1775,14 +2313,29 @@ Available actions:
                 meta={"forced": "continue_debug"},
             )
 
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=original_user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision=decision,
-                saved_artifact=None,
+        if not assistant_msg:
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text or "Done.",
+                attachments=[],
+                meta={"route": self.ROUTE_GENERAL_CHAT},
             )
+
+        try:
+            if assistant_text and assistant_text.strip():
+                self._set_session_meta(session_id, "last_answer_text", self._safe_str(assistant_text)[:4000])
+                self._set_session_meta(session_id, "last_answer_topic", self._safe_str(original_user_text)[:300])
+                self._set_session_meta(session_id, "last_answer_mode", self._get_session_meta(session_id, "answer_depth") or "short")
+        except Exception as e:
+            exec_debug("LAST ANSWER SAVE ERROR:", e)
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=original_user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=None,
+        )    
 
         is_memory_request = original_user_text.lower().strip().startswith((
             "remember ",
@@ -2053,10 +2606,10 @@ Available actions:
             with open(backup_path, "w", encoding="utf-8") as f:
                 f.write(current_content)
 
-            mode = "function"
+            mode = self._get_session_meta(session_id, "pending_fix_mode") or "file"
             func_name = self._get_session_meta(session_id, "pending_fix_func_name") or ""
 
-            if not func_name:
+            if mode == "function" and not func_name:
                 return {
                     "ok": False,
                     "error": "Function-only mode: no function name provided",
@@ -2080,7 +2633,8 @@ Available actions:
                     flags=re.DOTALL,
                 )
 
-                result = self._safe_write_file(pending_file_path, updated)
+                pending_fix_code = self._normalize_python_indentation(pending_fix_code)
+                result = self._safe_write_file(pending_file_path, pending_fix_code)
 
                 if not result.get("ok"):
                     return {
@@ -4016,33 +4570,6 @@ Available actions:
             })
             return mission
 
-    def _guess_path_from_text(self, text: str) -> str:
-        text = self._safe_str(text)
-
-        windows_py_match = re.search(r"([A-Za-z]:\\[^\n\r\t\"']+?\.py)\b", text)
-        if windows_py_match:
-            return windows_py_match.group(1).strip().rstrip(".,:;)]}")
-
-        windows_path_match = re.search(r"([A-Za-z]:\\[^\n\r\t\"']+)", text)
-        if windows_path_match:
-            raw = windows_path_match.group(1).strip()
-            raw = re.split(
-                r"\s+error\s*:|\s+traceback\s*:|\s+bug\s*:",
-                raw,
-                maxsplit=1,
-                flags=re.IGNORECASE,
-            )[0].strip()
-            return raw.rstrip(".,:;)]}")
-
-        py_path_match = re.search(r"([A-Za-z0-9_./\\-]+\.py)\b", text)
-        if py_path_match:
-            raw = py_path_match.group(1).strip().rstrip(".,:;)]}")
-            if os.path.isabs(raw):
-                return raw
-            return os.path.abspath(raw)
-
-        return ""
-
     def _extract_function_from_file(self, file_path: str, func_name: str) -> str:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -4290,9 +4817,54 @@ Available actions:
         if not session_id:
             session_id = self._create_session()
 
-        # =========================
-        # EXECUTION CONTROL
-        # =========================
+        answer_depth = self._detect_answer_depth(user_text)
+        self._set_session_meta(session_id, "answer_depth", answer_depth)
+
+        lowered = self._safe_str(user_text).lower().strip()
+
+        where_are_we_phrases = {
+            "where are we",
+            "what file are we in",
+            "which file",
+            "what file",
+            "what broke",
+            "what is broken",
+            "what did we fix",
+            "what worked",
+            "what's next",
+            "whats next",
+            "next move",
+            "next step",
+            "checkpoint",
+            "save point",
+        }
+
+        if lowered in where_are_we_phrases:
+            assistant_text = self._handle_where_are_we(
+                session_id=session_id,
+                user_text=user_text,
+            )
+
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(text=assistant_text),
+                "session": self._get_session_payload(session_id),
+            }
+
+        continue_phrases = {
+            "continue",
+            "keep going",
+            "go on",
+            "more",
+            "tell me more",
+            "go deeper",
+            "expand",
+            "next part",
+        }
+
+        if lowered in continue_phrases:
+            return self._continue_last_answer(session_id)
+
         execution_control_msg = self._handle_execution_control(user_text, session_id)
         if execution_control_msg:
             return {
@@ -4301,26 +4873,29 @@ Available actions:
                 "session": self._get_session_payload(session_id),
             }
 
-        # =========================
-        # AUTO FIX FIRST
-        # =========================
         auto_fix_result = self._process_auto_fix(user_text, session_id, attachments)
         if auto_fix_result:
             return auto_fix_result
 
-        # =========================
-        # LOAD STATE
-        # =========================
         execution_state = self._get_session_meta(session_id, "execution_state") or {}
 
-        # =========================
-        # RESUME EXISTING STATE
-        # =========================
         if execution_state and execution_state.get("status") not in ("complete", "cancelled"):
             exec_debug("RESUMING EXISTING EXECUTION STATE")
 
             if execution_state.get("waiting"):
-                return self._process_routing(user_text, session_id, attachments)
+                return self._execute_general_chat(
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                    decision={"route": self.ROUTE_GENERAL_CHAT},
+                )
+
+                return self._execute_general_chat(
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                    decision={"route": self.ROUTE_GENERAL_CHAT},
+                )
 
             execution_state = self._process_execution(execution_state, session_id)
             self._set_session_meta(session_id, "execution_state", execution_state)
@@ -4333,17 +4908,11 @@ Available actions:
                 "session": self._get_session_payload(session_id),
             }
 
-        # =========================
-        # PLAN ONLY IF NO ACTIVE STATE
-        # =========================
         execution_state = self._process_goal_and_plan(user_text, session_id)
 
         if execution_state:
             self._set_session_meta(session_id, "execution_state", execution_state)
 
-        # =========================
-        # EXECUTE PLAN
-        # =========================
         max_steps = 5
 
         for _ in range(max_steps):
@@ -4359,10 +4928,22 @@ Available actions:
             execution_state = self._process_execution(execution_state, session_id)
             self._set_session_meta(session_id, "execution_state", execution_state)
 
-        # =========================
-        # ROUTE OUTPUT
-        # =========================
-        return self._process_routing(user_text, session_id, attachments)    
+        result = self._execute_general_chat(
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+            decision={"route": self.ROUTE_GENERAL_CHAT},
+        )
+
+        if result:
+            return result
+
+        return self._execute_general_chat(
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+            decision={"route": self.ROUTE_GENERAL_CHAT},
+        )
 
     def _process_goal_and_plan(self, user_text: str, session_id: str):
         goal = self._build_goal(user_text)
@@ -4377,6 +4958,56 @@ Available actions:
 
         self._set_session_meta(session_id, "execution_state", execution_state)
         return execution_state
+
+    def _trigger_auto_fix_on_failure(self, session_id: str, error_text: str, action: str = ""):
+        error_text = self._safe_str(error_text).strip() or "Unknown execution failure."
+        action = self._safe_str(action).strip() or "unknown"
+
+        self._update_working_state(
+            session_id,
+            {
+                "last_execution_status": "failed",
+                "last_execution_error": error_text,
+                "last_error": error_text,
+                "active_task": action,
+                "next_move": "auto_fix_failure",
+                "pending_execution_action": "apply_auto_fix",
+                "auto_fix_triggered": True,
+                "auto_fix_reason": "execution_failure",
+            },
+        )
+
+        self._set_session_meta(session_id, "last_execution_status", "failed")
+        self._set_session_meta(session_id, "last_execution_error", error_text)
+        self._set_session_meta(session_id, "pending_fix_error", error_text)
+        self._set_session_meta(session_id, "pending_fix_source", "execution_failure")
+        self._set_session_meta(session_id, "pending_execution_action", "apply_auto_fix")
+
+        auto_fix_result = None
+
+        try:
+            auto_fix_result = self._process_auto_fix(
+                user_text=f"fix this error:\n{error_text}",
+                session_id=session_id,
+                attachments=None,
+            )
+        except Exception as e:
+            auto_fix_result = {
+                "ok": False,
+                "error": self._safe_str(e),
+            }
+
+        return self._build_assistant_message(
+            text=f"""Execution failed.
+
+Error:
+{error_text}
+
+Auto-fix trigger armed.
+
+Auto-fix result:
+{self._safe_str(auto_fix_result)}"""
+        )
 
     def _process_execution(self, execution_state: dict, session_id: str):
         if not execution_state:
@@ -4414,8 +5045,66 @@ Available actions:
 
         return execution_state
 
+    def _extract_file_path_from_error(self, error_text: str) -> str:
+        text = self._safe_str(error_text)
+
+        match = re.search(r'File "([^"]+)"', text)
+        if match:
+            return match.group(1).strip()
+
+        match = re.search(r"([A-Z]:\\[^\r\n]+?\.(?:py|js|html|css|json))", text, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+
+        return ""
+
+    def _guess_path_from_text(self, text: str) -> str:
+        import re
+
+        text = self._safe_str(text)
+
+        quoted_traceback_match = re.search(
+            r'File\s+"([^"]+?\.py)"',
+            text,
+            re.IGNORECASE,
+        )
+        if quoted_traceback_match:
+            return quoted_traceback_match.group(1).strip().rstrip(".,:;)]}")
+
+        single_quoted_traceback_match = re.search(
+            r"File\s+'([^']+?\.py)'",
+            text,
+            re.IGNORECASE,
+        )
+        if single_quoted_traceback_match:
+            return single_quoted_traceback_match.group(1).strip().rstrip(".,:;)]}")
+
+        windows_py_match = re.search(
+            r"([A-Za-z]:\\[^\n\r\t\"']+?\.py)\b",
+            text,
+        )
+        if windows_py_match:
+            return windows_py_match.group(1).strip().rstrip(".,:;)]}")
+
+        return ""
+
     def _process_auto_fix(self, user_text: str, session_id: str, attachments=None):
         lowered = (user_text or "").lower()
+
+        working_state = {}
+        try:
+            working_state = self._load_working_state(session_id) or {}
+        except Exception:
+            working_state = {}
+
+        strategy = working_state.get("execution_recovery_strategy", "")
+
+        if "function_scoped_auto_fix" in strategy:
+            self._set_session_meta(session_id, "pending_fix_mode", "function")
+        elif "use_smaller_patch_scope" in strategy:
+            self._set_session_meta(session_id, "pending_fix_mode", "function")
+        elif "inspect_error_context" in strategy:
+            self._set_session_meta(session_id, "pending_fix_mode", "file")
 
         if "fix this" in lowered and "error" not in lowered:
             return {
@@ -4424,10 +5113,17 @@ Available actions:
                     "Send file path and error traceback"
                 ),
                 "session": self._get_session_payload(session_id),
-                "debug": {"route": "bug_intake_guard"},
+                "debug": {
+                    "route": "bug_intake_guard",
+                    "recovery_strategy": strategy,
+                    "pending_fix_mode": self._get_session_meta(session_id, "pending_fix_mode"),
+                },
             }
 
         path = self._guess_path_from_text(user_text)
+
+        if not path:
+            path = working_state.get("detected_traceback_file_path", "")
 
         if path and any(x in lowered for x in ["fix", "bug", "error", "debug"]):
             return self._execute_auto_fix_file(
@@ -4474,51 +5170,6 @@ Available actions:
             return {
                 "ok": False,
                 "error": repr(exc),
-            }
-
-    def _process_routing(self, user_text: str, session_id: str, attachments=None):
-        try:
-            decision = self._safe_dict(self._decide(user_text=user_text))
-        except Exception as e:
-            exec_debug("DECISION_ERROR:", e)
-            decision = {}
-
-        route = str(decision.get("route") or "").lower()
-        lowered = (user_text or "").lower()
-
-        # Force web fetch for trending queries
-        if any(x in lowered for x in ["news", "latest", "update", "breaking"]):
-            route = self.ROUTE_WEB_FETCH
-
-        try:
-            if route == self.ROUTE_WEB_FETCH:
-                return self._execute_web_fetch(
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                    decision=decision,
-                )
-
-            return self._execute_general_chat(
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-                decision=decision,
-            )
-
-        except Exception as e:
-            exec_debug("ROUTING_ERROR:", e)
-
-            return {
-                "ok": False,
-                "assistant_message": self._build_assistant_message(
-                    text=f"Routing error: {str(e)}"
-                ),
-                "session": self._get_session_payload(session_id),
-                "debug": {
-                    "route": route,
-                    "decision": decision,
-                },
             }
 
     def _maybe_lock_execution_flow(self, user_text: str, session_id: str = "") -> bool:
@@ -6984,6 +7635,11 @@ Next action:
                     .strip()
                 )
 
+        if assistant_text:
+            self._set_session_meta(session_id, "last_answer_topic", self._safe_str(original_user_text)[:300])
+            self._set_session_meta(session_id, "last_answer_text", self._safe_str(assistant_text)[:4000])
+            self._set_session_meta(session_id, "last_answer_mode", self._get_session_meta(session_id, "answer_depth") or "short")
+
         return self._finalize_response(
             session_id=session_id,
             user_text=user_text,
@@ -7537,116 +8193,62 @@ Next action:
         return current_state
 
     def _handle_where_are_we(self, session_id: str, user_text: str = "") -> str:
-            state = self._get_working_state(session_id) or {}
+        state = self._get_working_state(session_id) or {}
 
-            active_task = self._safe_str(state.get("active_task")).strip()
-            current_file = self._safe_str(state.get("current_file")).strip()
-            current_bug = self._safe_str(state.get("current_bug")).strip()
-            last_success = self._safe_str(state.get("last_success")).strip()
-            next_move = self._safe_str(state.get("next_move")).strip()
-            checkpoint = self._safe_str(state.get("checkpoint")).strip()
+        active_task = self._safe_str(state.get("active_task")).strip()
+        current_file = self._safe_str(state.get("current_file")).strip()
+        current_bug = self._safe_str(state.get("current_bug")).strip()
+        last_success = self._safe_str(state.get("last_success")).strip()
+        next_move = self._safe_str(state.get("next_move")).strip()
+        checkpoint = self._safe_str(state.get("checkpoint")).strip()
 
-            lowered = self._safe_str(user_text).lower().strip()
+        lowered = self._safe_str(user_text).lower().strip()
 
-            if not any([active_task, current_file, current_bug, last_success, next_move, checkpoint]):
-                return "I do not have a working context locked in yet."
+        if lowered in {"reset", "clear state", "stop execution"}:
+            self._set_session_meta(session_id, "execution_state", {})
+            self._update_working_state(session_id, {})
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    text="State cleared. Nova is back to normal."
+                ),
+                "session": self._get_session_payload(session_id),
+            }
 
-            if any(
-                phrase in lowered
-                for phrase in [
-                    "what file are we in",
-                    "current file",
-                    "which file",
-                    "what file",
-                ]
-            ):
-                if current_file:
-                    return f"WeÃ¢â‚¬â„¢re in `{current_file}`."
-                return "I do not have the current file locked in yet."
+        if not any([active_task, current_file, current_bug, last_success, next_move, checkpoint]):
+            return "I do not have a working context locked in yet."
 
-            if any(
-                phrase in lowered
-                for phrase in [
-                    "what broke",
-                    "what is broken",
-                    "current bug",
-                    "bug",
-                    "issue",
-                    "error",
-                ]
-            ):
-                if current_bug:
-                    return f"What broke: {current_bug}"
-                return "I do not have a current bug locked in."
+        if "file" in lowered:
+            return f"We're in `{current_file}`." if current_file else "I do not have the current file locked in yet."
 
-            if any(
-                phrase in lowered
-                for phrase in [
-                    "what did we fix",
-                    "what was fixed",
-                    "last success",
-                    "what worked",
-                    "what is working",
-                ]
-            ):
-                if last_success:
-                    return f"What we fixed: {last_success}"
-                return "I do not have a last success locked in yet."
+        if any(x in lowered for x in ["broke", "broken", "bug", "issue", "error"]):
+            return f"What broke: {current_bug}" if current_bug else "I do not have a current bug locked in."
 
-            if any(
-                phrase in lowered
-                for phrase in [
-                    "what's next",
-                    "whats next",
-                    "what is next",
-                    "next move",
-                    "next step",
-                    "now what",
-                ]
-            ):
-                if next_move:
-                    return f"Next: {next_move}"
-                return "I do not have a next move locked in yet."
+        if any(x in lowered for x in ["fix", "fixed", "worked", "working", "success"]):
+            return f"What we fixed: {last_success}" if last_success else "I do not have a last success locked in yet."
 
-            if any(
-                phrase in lowered
-                for phrase in [
-                    "checkpoint",
-                    "save point",
-                    "phase",
-                ]
-            ):
-                if checkpoint:
-                    return f"Checkpoint: {checkpoint}"
-                return "I do not have a checkpoint locked in yet."
+        if any(x in lowered for x in ["next", "now what"]):
+            return f"Next: {next_move}" if next_move else "I do not have a next move locked in yet."
 
-            lines = []
+        if any(x in lowered for x in ["checkpoint", "save point", "phase"]):
+            return f"Checkpoint: {checkpoint}" if checkpoint else "I do not have a checkpoint locked in yet."
 
-            if active_task:
-                lines.append(f"Active task: {active_task}")
-            if current_bug:
-                lines.append(f"Current bug: {current_bug}")
-            if current_file:
-                lines.append(f"Current file: `{current_file}`")
-            if last_success:
-                lines.append(f"Last success: {last_success}")
-            if next_move:
-                lines.append(f"Next move: {next_move}")
-            if checkpoint:
-                lines.append(f"Checkpoint: {checkpoint}")
+        lines = []
 
-            if not lines:
-                return "I do not have a working context locked in yet."
+        if active_task:
+            lines.append(f"Active task: {active_task}")
+        if current_bug:
+            lines.append(f"Current bug: {current_bug}")
+        if current_file:
+            lines.append(f"Current file: `{current_file}`")
+        if last_success:
+            lines.append(f"Last success: {last_success}")
+        if next_move:
+            lines.append(f"Next move: {next_move}")
+        if checkpoint:
+            lines.append(f"Checkpoint: {checkpoint}")
 
-            if active_task and next_move:
-                return (
-                    f"WeÃ¢â‚¬â„¢re {active_task}. "
-                    f"Next: {next_move}"
-                    + (f" Current file: `{current_file}`." if current_file else "")
-                    + (f" Current bug: {current_bug}." if current_bug else "")
-                )
-
-            return "\n".join(lines)
+        return "\n".join(lines) if lines else "I do not have a working context locked in yet."
 
         # =========================
         # WORKING STATE HELPERS
@@ -9707,8 +10309,27 @@ def _build_chat_input(
             "decision": tool_decision,
             "result": tool_result,
         }
+
     def _guess_path_from_text(self, text: str) -> str:
+        import os
+        import re
+
         text = self._safe_str(text)
+
+        traceback_paths = re.findall(
+            r'File\s+["\']([^"\']+?\.py)["\']',
+            text,
+            re.IGNORECASE,
+        )
+
+        if traceback_paths:
+            project_paths = [
+                p for p in traceback_paths
+                if "\\nova\\" in p.lower() or "/nova/" in p.lower()
+            ]
+
+            chosen_path = project_paths[-1] if project_paths else traceback_paths[-1]
+            return chosen_path.strip().rstrip(".,:;)]}")
 
         windows_py_match = re.search(r"([A-Za-z]:\\[^\n\r\t\"']+?\.py)\b", text)
         if windows_py_match:
@@ -9753,8 +10374,12 @@ def _build_chat_input(
         lowered = user_text.lower()
         execution = execution or {}
 
-        path = self._guess_path_from_text(user_text) or self._guess_path_from_text(
-            self._safe_str(execution.get("goal"))
+        working_state = execution.get("working_state") or {}
+
+        path = (
+            self._guess_path_from_text(user_text)
+            or self._guess_path_from_text(self._safe_str(execution.get("goal")))
+            or working_state.get("detected_traceback_file_path", "")
         )
 
         # read file
@@ -9842,6 +10467,7 @@ def _build_chat_input(
                 "args": {"user_text": user_text},
                 "reason": "fix intent without file path",
             }
+
         return {}
 
     def _run_tool_decision(self, tool_decision: dict) -> dict:

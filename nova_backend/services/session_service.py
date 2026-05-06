@@ -300,7 +300,6 @@ class SessionService:
         cleaned.pop("debug", None)
         cleaned.pop("debug_log", None)
         cleaned.pop("tool_trace", None)
-        cleaned.pop("execution", None)
         cleaned.pop("raw_response", None)
         cleaned.pop("artifacts_full", None)
 

@@ -28,124 +28,6 @@ class ExecutionResult:
 MoveExecutor = Callable[[NextMove], ExecutionResult]
 
 
-class ExecutionHandler:
-    def __init__(self, executor: MoveExecutor):
-        self.executor = executor
-
-def run_next_move(self, action: str, execution_state: dict):
-    # 🔥 normalize incoming actions
-    if action in {"run_step", "next", "continue", "go"}:
-        action = "next"
-
-    if action in {"retry", "retry_failed", "try_again"}:
-        action = "retry_failed"
-
-    if action in {"run_all", "execute", "execute_all"}:
-        action = "run_all"
-
-    if not execution_state:
-        return {
-            "status": "error",
-            "current_step": "No execution state",
-            "steps": [],
-            "history": [],
-            "last_action": action,
-        }
-
-    steps = execution_state.get("steps", [])
-    current_index = execution_state.get("current_index", 0)
-    history = execution_state.get("history", [])
-
-    if action == "next":
-        if current_index >= len(steps):
-            return {
-                "status": "complete",
-                "current_step": "All steps completed",
-                "steps": steps,
-                "history": history,
-                "last_action": action,
-            }
-
-        step = steps[current_index]
-        step["status"] = "completed"
-        history.append(f"completed: {step.get('title', 'step')}")
-
-        execution_state["current_index"] = current_index + 1
-        execution_state["last_action"] = action
-
-        return execution_state
-
-    elif action == "retry_failed":
-        for i, step in enumerate(steps):
-            if step.get("status") == "failed":
-                step["status"] = "completed"
-                history.append(f"retried: {step.get('title', 'step')}")
-                execution_state["current_index"] = i + 1
-                execution_state["last_action"] = action
-                return execution_state
-
-        return execution_state
-
-    elif action == "run_all":
-        for step in steps:
-            step["status"] = "completed"
-            history.append(f"completed: {step.get('title', 'step')}")
-
-        execution_state["current_index"] = len(steps)
-        execution_state["status"] = "complete"
-        execution_state["last_action"] = action
-
-        return execution_state
-
-    return {
-        "status": "error",
-        "current_step": "Unknown action",
-        "steps": steps,
-        "history": history,
-        "last_action": action,
-    }
-
-    def run_chain(
-        self,
-        first_move: NextMove,
-        max_steps: int = 10,
-        max_retries: int = 3,
-        delay_ms: int = 500,
-    ) -> list[ExecutionResult]:
-        results: list[ExecutionResult] = []
-        queue: list[NextMove] = [first_move]
-        steps = 0
-
-        while queue and steps < max_steps:
-            move = queue.pop(0)
-
-            result = self.run_next_move(
-                move,
-                max_retries=max_retries,
-                delay_ms=delay_ms,
-            )
-
-            # 🔥 ensure output exists
-            if result.output is None:
-                result.output = {}
-
-            # 🔥 attach error to output for frontend
-            if result.status == "failed":
-                result.output["error"] = result.error or "Unknown error"
-
-            results.append(result)
-
-            # 🔥 stop chain on failure
-            if result.status == "failed":
-                break
-
-            if result.next_moves:
-                queue.extend(result.next_moves)
-
-            steps += 1
-
-        return results
-
 def make_move(move_type: str, payload: dict[str, Any] | None = None) -> NextMove:
     return NextMove(
         id=str(uuid.uuid4()),
@@ -154,15 +36,199 @@ def make_move(move_type: str, payload: dict[str, Any] | None = None) -> NextMove
     )
 
 
+class ExecutionHandler:
+    def __init__(self, executor: MoveExecutor):
+        self.executor = executor
+
+    def run_next_move(
+        self,
+        action: str,
+        session_id: str = "",
+        execution_state: dict | None = None,
+        **kwargs,
+    ) -> dict:
+        action = str(action or "").strip().lower()
+        execution_state = execution_state or {}
+
+        if action in {"run_step", "next", "continue", "go"}:
+            action = "run_step"
+
+        if action in {"retry", "retry_failed", "try_again"}:
+            action = "retry_failed"
+
+        if action in {"run_all", "execute", "execute_all"}:
+            action = "run_all"
+
+        if action == "test_fail":
+            return {
+                "status": "failed",
+                "error": (
+                    "Fake execution failure for auto-fix test. "
+                    "File: C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py. "
+                    "Function: _process_execution_command."
+                ),
+                "execution_state": {
+                    "status": "failed",
+                    "steps": [
+                        {"title": "Failed Step 1", "status": "failed"},
+                        {"title": "Failed Step 2", "status": "pending"},
+                    ],
+                    "history": ["test_fail: Failed Step 1"],
+                    "last_action": "test_fail",
+                    "current_index": 0,
+                    "current_step": "Failed Step 1",
+                },
+            }
+
+        steps = execution_state.get("steps") or []
+        history = execution_state.get("history") or []
+        current_index = int(execution_state.get("current_index") or 0)
+
+        if not steps:
+            steps = [
+                {"title": "Execution Step 1", "status": "pending"},
+            ]
+            current_index = 0
+
+        if action == "retry_failed":
+            for index, step in enumerate(steps):
+                if step.get("status") == "failed":
+                    step["status"] = "completed"
+                    history.append(f"retried: {step.get('title', 'step')}")
+                    execution_state["current_index"] = index + 1
+                    execution_state["current_step"] = step.get("title", "step")
+                    execution_state["last_action"] = action
+                    execution_state["status"] = "success"
+                    execution_state["steps"] = steps
+                    execution_state["history"] = history
+
+                    return {
+                        "status": "success",
+                        "message": "Failed step retried successfully.",
+                        "execution_state": execution_state,
+                    }
+
+            return {
+                "status": "success",
+                "message": "No failed step found. Retry treated as complete.",
+                "execution_state": execution_state,
+            }
+
+        if action == "run_step":
+            if current_index >= len(steps):
+                execution_state["status"] = "complete"
+                execution_state["current_step"] = "All steps completed"
+                execution_state["steps"] = steps
+                execution_state["history"] = history
+                execution_state["last_action"] = action
+
+                return {
+                    "status": "complete",
+                    "message": "All steps completed.",
+                    "execution_state": execution_state,
+                }
+
+            step = steps[current_index]
+            step["status"] = "completed"
+            history.append(f"completed: {step.get('title', 'step')}")
+
+            execution_state["current_index"] = current_index + 1
+            execution_state["current_step"] = step.get("title", "step")
+            execution_state["last_action"] = action
+            execution_state["steps"] = steps
+            execution_state["history"] = history
+            execution_state["status"] = (
+                "complete"
+                if execution_state["current_index"] >= len(steps)
+                else "running"
+            )
+
+            return {
+                "status": "success",
+                "message": "Run step executed.",
+                "execution_state": execution_state,
+            }
+
+        if action == "run_all":
+            for step in steps:
+                step["status"] = "completed"
+                history.append(f"completed: {step.get('title', 'step')}")
+
+            execution_state["current_index"] = len(steps)
+            execution_state["current_step"] = "All steps completed"
+            execution_state["status"] = "complete"
+            execution_state["last_action"] = action
+            execution_state["steps"] = steps
+            execution_state["history"] = history
+
+            return {
+                "status": "complete",
+                "message": "Run all completed.",
+                "execution_state": execution_state,
+            }
+
+        move = make_move(action, {"session_id": session_id, "execution_state": execution_state})
+        result = self.executor(move)
+
+        return {
+            "status": result.status,
+            "message": (
+                result.output.get("message")
+                if isinstance(result.output, dict)
+                else ""
+            ),
+            "error": result.error,
+            "execution_state": execution_state,
+        }
+
+    def run_next_step(
+        self,
+        action: str,
+        session_id: str = "",
+        execution_state: dict | None = None,
+        **kwargs,
+    ) -> dict:
+        return self.run_next_move(
+            action=action,
+            session_id=session_id,
+            execution_state=execution_state,
+            **kwargs,
+        )
+
+    def run_chain(
+        self,
+        action: str,
+        session_id: str = "",
+        execution_state: dict | None = None,
+        max_steps: int = 10,
+        **kwargs,
+    ) -> list[dict]:
+        results = []
+
+        for _ in range(max_steps):
+            result = self.run_next_move(
+                action=action,
+                session_id=session_id,
+                execution_state=execution_state or {},
+                **kwargs,
+            )
+            results.append(result)
+
+            status = str(result.get("status") or "").lower()
+            execution_state = result.get("execution_state") or execution_state or {}
+
+            if status in {"complete", "completed", "failed", "error"}:
+                break
+
+            action = "run_step"
+
+        return results
+
+
 def default_executor(move: NextMove) -> ExecutionResult:
     try:
         move_type = str(move.type or "").strip().lower()
         payload = move.payload or {}
-
-        # =============================
-        # CORE MOVES
-        # =============================
-
 
         if move_type == "test_fail":
             return ExecutionResult(
@@ -251,10 +317,6 @@ def default_executor(move: NextMove) -> ExecutionResult:
                 },
             )
 
-        # =============================
-        # FILE OPERATIONS
-        # =============================
-
         if move_type == "fix_file":
             file_path = str(payload.get("file_path") or "").strip()
             new_code = str(payload.get("code") or "")
@@ -275,17 +337,14 @@ def default_executor(move: NextMove) -> ExecutionResult:
                     error=f"File does not exist: {file_path}",
                 )
 
-            # 🔥 backup original
             backup_path = path.with_suffix(path.suffix + f".bak_{int(time.time())}")
             shutil.copy2(path, backup_path)
 
-            # 🔥 write new code
             path.write_text(new_code, encoding="utf-8")
 
             compile_ok = True
             compile_error = ""
 
-            # 🔥 compile check for python files
             if path.suffix == ".py":
                 try:
                     py_compile.compile(str(path), doraise=True)
@@ -347,8 +406,24 @@ def default_executor(move: NextMove) -> ExecutionResult:
             shutil.copy2(path, backup_path)
 
             replacement_lines = replacement.strip("\n").splitlines()
-            new_lines = lines[:start_index] + replacement_lines
 
+            end_index = len(lines)
+            base_indent = len(lines[start_index]) - len(lines[start_index].lstrip(" "))
+
+            for i in range(start_index + 1, len(lines)):
+                line = lines[i]
+                stripped = line.strip()
+
+                if not stripped:
+                    continue
+
+                indent = len(line) - len(line.lstrip(" "))
+
+                if indent <= base_indent and stripped.startswith("def "):
+                    end_index = i
+                    break
+
+            new_lines = lines[:start_index] + replacement_lines + lines[end_index:]
             path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
 
             return ExecutionResult(

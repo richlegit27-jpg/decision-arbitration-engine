@@ -1,7 +1,5 @@
 @app.post("/api/chat")
-def api_chat():
-@app.post("/api/chat")
-def api_chat():
+def api_chat()::
     try:
         data = parse_json_body()
         session_id = (data.get("session_id") or get_active_session_id() or "").strip()
@@ -26,7 +24,7 @@ def api_chat():
             "trace": traceback.format_exc(),
             "route_build": ROUTE_BUILD,
         }), 500
-            # ------------------------------
+        # ------------------------------
         # USER MESSAGE
         # ------------------------------
         user_msg = append_message(
