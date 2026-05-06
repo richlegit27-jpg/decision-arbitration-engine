@@ -1220,7 +1220,7 @@ Available actions:
             "debug": {
                 "route": "execution_command_complete",
                 "command": command,
-                "status": status,
+                "status": (execution_state or {}).get("status", status),
                 "reward": reward,
             },
         }

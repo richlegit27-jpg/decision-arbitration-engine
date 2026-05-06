@@ -42,12 +42,10 @@ class ExecutionHandler:
 
     def _execute_step(self, step: dict) -> dict:
         title = str(step.get("title") or "step").strip()
-        action = str(
-            step.get("action")
-            or step.get("title")
-            or "execute"
-        ).strip().lower()
+        action = str(step.get("action") or title or "execute").strip().lower()
         input_value = str(step.get("input") or "").strip()
+        target_file = str(step.get("target_file") or "").strip()
+        target_function = str(step.get("target_function") or "").strip()
 
         result_lines = [
             f"Action: {action}",
@@ -57,48 +55,228 @@ class ExecutionHandler:
         if input_value:
             result_lines.append(f"Input: {input_value}")
 
+        if target_file:
+            result_lines.append(f"Target file: {target_file}")
+
+        if target_function:
+            result_lines.append(f"Target function: {target_function}")
+
         if action == "design":
-            result_lines.append("Result: Created a design pass for the requested task.")
+            result_lines.append("Result: Design step completed.")
 
         elif action == "implement":
-            target_file = step.get("target_file") or ""
-            target_function = step.get("target_function") or ""
-
-            if target_file:
-                result_lines.append(
-                    f"Result: Ready to modify file: {target_file}"
-                )
-
-                if target_function:
-                    result_lines.append(
-                        f"Target function: {target_function}"
-                    )
-
-                result_lines.append(
-                    "Mutation bridge confirmed. Real replacement payload must be generated before apply_function_fix."
-                )
-
+            if not target_file:
+                step["status"] = "failed"
+                step["error"] = "Implement action missing target_file."
+                result_lines.append("Result: Implement action failed: missing target_file.")
             else:
-                result_lines.append(
-                    "Result: Implement action missing target_file."
-                )
-
+                result_lines.append("Result: Implement step prepared for real file-write execution.")
+                if target_function:
+                    result_lines.append("Next: generate function replacement payload and apply safely.")
+                    step["next_action"] = "generate_function_replacement"
+                    step["mutation_ready"] = True
+                    step["mutation_mode"] = "function"
+                else:
+                    result_lines.append("Next: generate file replacement payload and apply safely.")
+                    step["next_action"] = "generate_file_replacement"
+                    step["mutation_ready"] = True
+                    step["mutation_mode"] = "file"
         elif action == "test":
-            result_lines.append("Result: Prepared validation step for the requested task.")
+            result_lines.append("Result: Test step prepared.")
 
         elif action == "fix":
-            result_lines.append("Result: Prepared fix step for the requested task.")
+            result_lines.append("Result: Fix step prepared.")
 
         elif action == "review":
-            result_lines.append("Result: Prepared review step for the requested task.")
+            result_lines.append("Result: Review step prepared.")
 
         else:
-            result_lines.append("Result: Executed generic step.")
+            result_lines.append("Result: Generic execution step completed.")
 
-        step["status"] = "completed"
+        if step.get("status") != "failed":
+            if step.get("next_action"):
+                step["status"] = "waiting_for_payload"
+                step["payload_required"] = True
+            else:
+                step["status"] = "completed"
+
+        if step.get("payload_required"):
+            step["payload_hint"] = {
+                "target_file": target_file,
+                "target_function": target_function,
+                "mutation_mode": step.get("mutation_mode"),
+                "next_action": step.get("next_action"),
+                "input": input_value,
+                "title": title,
+            }
+
+        if step.get("status") == "waiting_for_payload":
+            payload_result = self._build_mutation_payload_from_step(step)
+            step["mutation_payload_result"] = payload_result
+
+            if payload_result.get("ok"):
+                step["mutation_move_type"] = payload_result.get("move_type")
+                step["mutation_payload"] = payload_result.get("payload") or {}
+                result_lines.append(f"Payload: generated {payload_result.get('move_type')}.")
+            else:
+                step["status"] = "failed"
+                step["error"] = payload_result.get("error", "Failed to build mutation payload.")
+                result_lines.append(f"Payload error: {step['error']}")
+
         step["result"] = "\n".join(result_lines)
-
         return step
+
+    def _generate_function_replacement(self, step: dict) -> str:
+        payload_hint = step.get("payload_hint") or {}
+        target_function = str(
+            payload_hint.get("target_function")
+            or step.get("target_function")
+            or ""
+        ).strip()
+
+        if target_function == "_execute_step":
+            return '''    def _execute_step(self, step: dict) -> dict:
+        title = str(step.get("title") or "step").strip()
+        action = str(step.get("action") or title or "execute").strip().lower()
+        input_value = str(step.get("input") or "").strip()
+        target_file = str(step.get("target_file") or "").strip()
+        target_function = str(step.get("target_function") or "").strip()
+
+        result_lines = [
+            f"Action: {action}",
+            f"Title: {title}",
+        ]
+
+        if input_value:
+            result_lines.append(f"Input: {input_value}")
+
+        if target_file:
+            result_lines.append(f"Target file: {target_file}")
+
+        if target_function:
+            result_lines.append(f"Target function: {target_function}")
+
+        if action == "design":
+            result_lines.append("Result: Design step completed.")
+
+        elif action == "implement":
+            if not target_file:
+                step["status"] = "failed"
+                step["error"] = "Implement action missing target_file."
+                result_lines.append("Result: Implement action failed: missing target_file.")
+            else:
+                result_lines.append("Result: Implement step prepared for real file-write execution.")
+
+                if target_function:
+                    result_lines.append("Next: generate function replacement payload and apply safely.")
+                    step["next_action"] = "generate_function_replacement"
+                    step["mutation_ready"] = True
+                    step["mutation_mode"] = "function"
+                else:
+                    result_lines.append("Next: generate file replacement payload and apply safely.")
+                    step["next_action"] = "generate_file_replacement"
+                    step["mutation_ready"] = True
+                    step["mutation_mode"] = "file"
+
+        elif action == "test":
+            result_lines.append("Result: Test step prepared.")
+
+        elif action == "fix":
+            result_lines.append("Result: Fix step prepared.")
+
+        elif action == "review":
+            result_lines.append("Result: Review step prepared.")
+
+        else:
+            result_lines.append("Result: Generic execution step completed.")
+
+        if step.get("status") != "failed":
+            if step.get("next_action"):
+                step["status"] = "waiting_for_payload"
+                step["payload_required"] = True
+            else:
+                step["status"] = "completed"
+
+        if step.get("payload_required"):
+            step["payload_hint"] = {
+                "target_file": target_file,
+                "target_function": target_function,
+                "mutation_mode": step.get("mutation_mode"),
+                "next_action": step.get("next_action"),
+                "input": input_value,
+                "title": title,
+            }
+
+        if step.get("status") == "waiting_for_payload":
+            payload_result = self._build_mutation_payload_from_step(step)
+            step["mutation_payload_result"] = payload_result
+
+            if payload_result.get("ok"):
+                step["mutation_move_type"] = payload_result.get("move_type")
+                step["mutation_payload"] = payload_result.get("payload") or {}
+                result_lines.append(f"Payload: generated {payload_result.get('move_type')}.")
+            else:
+                step["status"] = "failed"
+                step["error"] = payload_result.get("error", "Failed to build mutation payload.")
+                result_lines.append(f"Payload error: {step['error']}")
+
+        step["result"] = "\\n".join(result_lines)
+        return step'''
+
+        return ""
+
+    def _build_mutation_payload_from_step(self, step: dict) -> dict:
+        payload_hint = step.get("payload_hint") or {}
+
+        target_file = str(
+            payload_hint.get("target_file")
+            or step.get("target_file")
+            or ""
+        ).strip()
+
+        target_function = str(
+            payload_hint.get("target_function")
+            or step.get("target_function")
+            or ""
+        ).strip()
+
+        mutation_mode = str(
+            payload_hint.get("mutation_mode")
+            or step.get("mutation_mode")
+            or ""
+        ).strip().lower()
+
+        if not target_file:
+            return {
+                "ok": False,
+                "error": "Missing target_file for mutation payload.",
+            }
+
+        if mutation_mode == "function":
+            if not target_function:
+                return {
+                    "ok": False,
+                    "error": "Missing target_function for function mutation payload.",
+                }
+
+            return {
+                "ok": True,
+                "move_type": "apply_function_fix",
+                "payload": {
+                    "file_path": target_file,
+                    "function_name": target_function,
+                "replacement": self._generate_function_replacement(step),
+                },
+            }
+
+        return {
+            "ok": True,
+            "move_type": "fix_file",
+            "payload": {
+                "file_path": target_file,
+                "code": "",
+            },
+        }
 
     def run_next_move(
         self,
@@ -192,11 +370,11 @@ class ExecutionHandler:
                 execution_state["history"] = history
                 execution_state["last_action"] = action
 
-                return {
-                    "status": "complete",
-                    "message": "All steps completed.",
-                    "execution_state": execution_state,
-                }
+            return {
+                "status": execution_state["status"],
+                "message": "\n".join(summary_lines),
+                "execution_state": execution_state,
+            }
 
             step = steps[current_index]
             step = self._execute_step(step)
@@ -238,11 +416,26 @@ class ExecutionHandler:
                     f"completed: {step.get('title', 'step')}"
                 )
 
+                if step.get("status") in {"waiting_for_payload", "waiting_for_apply", "failed"}:
+                    break
+
                 current_index += 1
 
             execution_state["current_index"] = current_index
-            execution_state["current_step"] = "All steps completed"
-            execution_state["status"] = "complete"
+
+            execution_state["current_step"] = (
+                steps[current_index].get("title", "payload required")
+                if current_index < len(steps)
+                else "All steps completed"
+            )
+
+            execution_state["status"] = (
+                "waiting_for_payload"
+                if current_index < len(steps)
+                and steps[current_index].get("status") == "waiting_for_payload"
+                else "complete"
+            )
+
             execution_state["last_action"] = action
             execution_state["steps"] = steps
             execution_state["history"] = history
