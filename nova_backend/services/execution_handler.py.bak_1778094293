@@ -71,7 +71,6 @@ class ExecutionHandler:
                 result_lines.append("Result: Implement action failed: missing target_file.")
             else:
                 result_lines.append("Result: Implement step prepared for real file-write execution.")
-
                 if target_function:
                     result_lines.append("Next: generate function replacement payload and apply safely.")
                     step["next_action"] = "generate_function_replacement"
@@ -82,7 +81,6 @@ class ExecutionHandler:
                     step["next_action"] = "generate_file_replacement"
                     step["mutation_ready"] = True
                     step["mutation_mode"] = "file"
-
         elif action == "test":
             result_lines.append("Result: Test step prepared.")
 
@@ -120,6 +118,17 @@ class ExecutionHandler:
                 step["mutation_move_type"] = payload_result.get("move_type")
                 step["mutation_payload"] = payload_result.get("payload") or {}
                 result_lines.append(f"Payload: generated {payload_result.get('move_type')}.")
+                apply_result = self._apply_generated_mutation_payload(step)
+                step["mutation_apply_result"] = apply_result
+
+                if apply_result.get("ok"):
+                    step["status"] = "completed"
+                    step["payload_required"] = False
+                    result_lines.append("Apply: generated mutation applied successfully.")
+                else:
+                    step["status"] = "failed"
+                    step["error"] = apply_result.get("error", "Generated mutation apply failed.")
+                    result_lines.append(f"Apply error: {step['error']}")
             else:
                 step["status"] = "failed"
                 step["error"] = payload_result.get("error", "Failed to build mutation payload.")
@@ -127,6 +136,7 @@ class ExecutionHandler:
 
         step["result"] = "\n".join(result_lines)
         return step
+
     def _generate_function_replacement(self, step: dict) -> str:
         payload_hint = step.get("payload_hint") or {}
         target_function = str(
