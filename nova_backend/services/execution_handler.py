@@ -490,15 +490,65 @@ class ExecutionHandler:
                     history.append(
                         f"mutation applied: {step.get('title', 'step')}"
                     )
+
                 else:
-                    step["status"] = "failed"
-                    step["error"] = apply_result.get(
-                        "error",
-                        "Mutation apply failed.",
-                    )
-                    history.append(
-                        f"mutation failed: {step.get('title', 'step')}"
-                    )
+                    retry_count = int(step.get("retry_count") or 0)
+
+                    if retry_count < 1:
+                        step["retry_count"] = retry_count + 1
+
+                        regeneration_result = (
+                            self._build_mutation_payload_from_step(step)
+                        )
+
+                        step["mutation_payload_result"] = regeneration_result
+
+                        if regeneration_result.get("ok"):
+                            step["mutation_move_type"] = (
+                                regeneration_result.get("move_type")
+                            )
+                            step["mutation_payload"] = (
+                                regeneration_result.get("payload") or {}
+                            )
+
+                            second_apply_result = (
+                                self._apply_generated_mutation_payload(step)
+                            )
+
+                            step["second_apply_result"] = second_apply_result
+
+                            if second_apply_result.get("ok"):
+                                step["status"] = "completed"
+                                history.append(
+                                    f"mutation regenerated and applied: {step.get('title', 'step')}"
+                                )
+                            else:
+                                step["status"] = "failed"
+                                step["error"] = second_apply_result.get(
+                                    "error",
+                                    "Mutation retry failed.",
+                                )
+                                history.append(
+                                    f"mutation retry failed: {step.get('title', 'step')}"
+                                )
+                        else:
+                            step["status"] = "failed"
+                            step["error"] = regeneration_result.get(
+                                "error",
+                                "Mutation regeneration failed.",
+                            )
+                            history.append(
+                                f"mutation regeneration failed: {step.get('title', 'step')}"
+                            )
+                    else:
+                        step["status"] = "failed"
+                        step["error"] = apply_result.get(
+                            "error",
+                            "Mutation apply failed.",
+                        )
+                        history.append(
+                            f"mutation failed: {step.get('title', 'step')}"
+                        )
 
             history.append(
                 f"completed: {step.get('title', 'step')}"
@@ -564,7 +614,55 @@ class ExecutionHandler:
                         current_index += 1
                         continue
 
+                    retry_count = int(step.get("retry_count") or 0)
+
+                    if retry_count < 1:
+                        step["retry_count"] = retry_count + 1
+
+                        regeneration_result = (
+                            self._build_mutation_payload_from_step(step)
+                        )
+
+                        step["mutation_payload_result"] = regeneration_result
+
+                        if regeneration_result.get("ok"):
+                            step["mutation_move_type"] = (
+                                regeneration_result.get("move_type")
+                            )
+
+                            step["mutation_payload"] = (
+                                regeneration_result.get("payload") or {}
+                            )
+
+                            second_apply_result = (
+                                self._apply_generated_mutation_payload(step)
+                            )
+
+                            step["second_apply_result"] = second_apply_result
+
+                            if second_apply_result.get("ok"):
+                                step["status"] = "completed"
+                                history.append(
+                                    f"mutation regenerated and applied: {step.get('title', 'step')}"
+                                )
+
+                                current_index += 1
+                                continue
+
+                            step["status"] = "failed"
+                            step["error"] = second_apply_result.get(
+                                "error",
+                                "Mutation retry failed.",
+                            )
+
+                            history.append(
+                                f"mutation retry failed: {step.get('title', 'step')}"
+                            )
+
+                            break
+
                     step["status"] = "failed"
+
                     step["error"] = apply_result.get(
                         "error",
                         "Mutation apply failed.",
@@ -590,10 +688,15 @@ class ExecutionHandler:
             )
 
             execution_state["status"] = (
-                "waiting_for_payload"
+                "failed"
                 if current_index < len(steps)
-                and steps[current_index].get("status") == "waiting_for_payload"
-                else "complete"
+                and steps[current_index].get("status") == "failed"
+                else (
+                    "waiting_for_payload"
+                    if current_index < len(steps)
+                    and steps[current_index].get("status") == "waiting_for_payload"
+                    else "complete"
+                )
             )
 
             execution_state["last_action"] = action
@@ -601,7 +704,11 @@ class ExecutionHandler:
             execution_state["history"] = history
 
             summary_lines = [
-                "Execution complete.",
+                (
+                    "Execution complete."
+                    if execution_state["status"] == "complete"
+                    else "Execution stopped."
+                ),
                 "",
                 "Completed work:",
             ]
@@ -615,7 +722,7 @@ class ExecutionHandler:
             summary_lines.append("Next: connect implement steps to real file-write execution.")
 
             return {
-                "status": "complete",
+                "status": execution_state["status"],
                 "message": "\n".join(summary_lines),
                 "execution_state": execution_state,
             }
