@@ -1527,6 +1527,16 @@ window.NovaSendMessage = async function () {
   }
 };
 
+window.NovaSendPayload = async function (payload) {
+  if (typeof consumeChatStreamStable === "function") {
+    return await consumeChatStreamStable(payload);
+  }
+
+  throw new Error("consumeChatStreamStable is not available.");
+};
+
+// 👇 PUT IT RIGHT HERE
+window.NovaAnalyzeArtifactImage = async function (imageUrl, artifact) {
 // ðŸ‘‡ PUT IT RIGHT HERE
 window.NovaAnalyzeArtifactImage = async function (imageUrl, artifact) {
   const url = String(imageUrl || "").trim();
