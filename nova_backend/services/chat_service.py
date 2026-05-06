@@ -5037,6 +5037,7 @@ Auto-fix result:
         if execution_state.get("status") == "complete":
             execution_state["waiting"] = False
             self._set_session_meta(session_id, "execution_state", execution_state)
+            self._reset_execution_state(session_id)
             return execution_state
 
         # run next step
@@ -5052,13 +5053,16 @@ Auto-fix result:
             execution_state["status"] = "complete"
             execution_state["waiting"] = False
             execution_state["complete"] = True
-        else:
-            # =========================
-            # PERSISTENT LOOP FLAG
-            # =========================
-            execution_state["status"] = "running"
-            execution_state["waiting"] = True
-            execution_state["complete"] = False
+            self._set_session_meta(session_id, "execution_state", execution_state)
+            self._reset_execution_state(session_id)
+            return execution_state
+
+        # =========================
+        # PERSISTENT LOOP FLAG
+        # =========================
+        execution_state["status"] = "running"
+        execution_state["waiting"] = True
+        execution_state["complete"] = False
 
         # save state
         self._set_session_meta(session_id, "execution_state", execution_state)
@@ -8293,8 +8297,6 @@ Next action:
         return clean_state
 
     def _reset_execution_state(self, session_id: str):
-        self._set_session_meta(session_id, "execution_state", {})
-
         self._replace_working_state(
             session_id,
             {
