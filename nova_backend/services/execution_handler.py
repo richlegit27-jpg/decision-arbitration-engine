@@ -150,11 +150,24 @@ class ExecutionHandler:
             }
 
         if action == "run_all":
-            for step in steps:
-                step["status"] = "completed"
-                history.append(f"completed: {step.get('title', 'step')}")
+            completed = []
 
-            execution_state["current_index"] = len(steps)
+            while current_index < len(steps):
+                step = steps[current_index]
+
+                step["status"] = "completed"
+
+                completed.append(
+                    step.get("title", "step")
+                )
+
+                history.append(
+                    f"completed: {step.get('title', 'step')}"
+                )
+
+                current_index += 1
+
+            execution_state["current_index"] = current_index
             execution_state["current_step"] = "All steps completed"
             execution_state["status"] = "complete"
             execution_state["last_action"] = action
@@ -163,7 +176,10 @@ class ExecutionHandler:
 
             return {
                 "status": "complete",
-                "message": "Run all completed.",
+                "message": (
+                    "Run all completed.\n\n"
+                    f"Completed steps: {', '.join(completed)}"
+                ),
                 "execution_state": execution_state,
             }
 

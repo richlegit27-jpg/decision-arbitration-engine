@@ -795,16 +795,61 @@ Available actions:
 
     def _process_execution_command(self, command: str, session_id: str):
         command = self._safe_str(command).strip().lower()
+
         print("PROCESS_EXECUTION_COMMAND:", repr(command))
 
+        # =========================
+        # COMMAND NORMALIZATION
+        # =========================
+        command_aliases = {
+            "next": "run_step",
+            "nex": "run_step",
+            "continue": "run_step",
+            "continue on": "run_step",
+            "go": "run_step",
+            "run next": "run_step",
+            "next step": "run_step",
+
+            "run all": "run_all",
+            "run_all": "run_all",
+            "execute": "run_all",
+            "execute all": "run_all",
+            "run it": "run_all",
+
+            "retry": "retry_failed",
+            "retry failed": "retry_failed",
+            "rerun failed": "retry_failed",
+            "try again": "retry_failed",
+
+            "cancel": "cancel",
+
+            "test_fail": "test_fail",
+            "test fail": "test_fail",
+        }
+
+        command = command_aliases.get(command, command)
+
+        # =========================
+        # CANCEL
+        # =========================
         if command == "cancel":
             self._set_session_meta(session_id, "execution_state", {})
+
             self._update_working_state(
                 session_id,
                 {
                     "execution_status": "cancelled",
                     "pending_execution_action": "",
                     "next_move": "",
+                    "active_task": "",
+                    "current_bug": "",
+                    "current_file": "",
+                    "last_error": "",
+                    "last_execution_error": "",
+                    "pending_fix_error": "",
+                    "pending_fix_file_path": "",
+                    "pending_fix_func_name": "",
+                    "pending_fix_mode": "",
                 },
             )
 
@@ -814,9 +859,14 @@ Available actions:
                     "Execution cancelled."
                 ),
                 "session": self._get_session_payload(session_id),
-                "debug": {"route": "execution_cancelled"},
+                "debug": {
+                    "route": "execution_cancelled",
+                },
             }
 
+        # =========================
+        # APPLY AUTO FIX
+        # =========================
         if command == "apply_auto_fix":
             error_text = (
                 self._get_session_meta(session_id, "pending_fix_error")
@@ -832,7 +882,9 @@ Available actions:
                         "Auto-fix triggered, but no error context found."
                     ),
                     "session": self._get_session_payload(session_id),
-                    "debug": {"route": "apply_auto_fix_no_error"},
+                    "debug": {
+                        "route": "apply_auto_fix_no_error",
+                    },
                 }
 
             return self._process_auto_fix(
@@ -841,34 +893,60 @@ Available actions:
                 attachments=None,
             )
 
-        execution_state = self._get_session_meta(session_id, "execution_state") or {}
+        execution_state = (
+            self._get_session_meta(session_id, "execution_state")
+            or {}
+        )
 
         # =========================
-        # LOCAL TEST FAILURE
+        # TEST FAILURE
         # =========================
-        handler = None
+        if command == "test_fail":
 
-        if command in {"test_fail", "test fail"}:
+            self._set_session_meta(
+                session_id,
+                "pending_fix_mode",
+                "function",
+            )
+            self._set_session_meta(
+                session_id,
+                "pending_fix_func_name",
+                "_process_execution_command",
+            )
+
             result = {
                 "status": "failed",
                 "error": (
                     "Fake execution failure for auto-fix test. "
-                    "File: C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py. "
-                    "Function: _process_execution_command."
+                    "File: C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py "
+                    "Function: _process_execution_command"
                 ),
                 "execution_state": {
                     "status": "failed",
                     "steps": [
-                        {"title": "Failed Step 1", "status": "failed"},
-                        {"title": "Failed Step 2", "status": "pending"},
+                        {
+                            "title": "Failed Step 1",
+                            "status": "failed",
+                        },
+                        {
+                            "title": "Failed Step 2",
+                            "status": "pending",
+                        },
                     ],
-                    "history": ["test_fail: Failed Step 1"],
+                    "history": [
+                        "test_fail: Failed Step 1"
+                    ],
                     "last_action": "test_fail",
-                    "current_step": "Failed Step 1",
+                    "current_step": 0,
                 },
             }
 
         else:
+            # =========================
+            # HANDLER RESOLUTION
+            # =========================
+            handler = None
+
             if hasattr(self, "_execution_handler") and self._execution_handler:
                 handler = self._execution_handler
             elif hasattr(self, "execution_handler") and self.execution_handler:
@@ -876,60 +954,98 @@ Available actions:
 
             if not handler:
                 return {
-                    "ok": True,
+                    "ok": False,
                     "assistant_message": self._build_assistant_message(
-                        "Execution handler is not available."
-                    ),
-                    "session": self._get_session_payload(session_id),
-                    "debug": {"route": "execution_handler_missing", "command": command},
-                }
-
-            if hasattr(handler, "run_next_move"):
-                result = handler.run_next_move(
-                    action=command,
-                    session_id=session_id,
-                    execution_state=execution_state,
-                )
-            elif hasattr(handler, "run_next_step"):
-                result = handler.run_next_step(
-                    action=command,
-                    session_id=session_id,
-                    execution_state=execution_state,
-                )
-            elif hasattr(handler, "run_chain"):
-                result = handler.run_chain(
-                    action=command,
-                    session_id=session_id,
-                    execution_state=execution_state,
-                )
-            else:
-                return {
-                    "ok": True,
-                    "assistant_message": self._build_assistant_message(
-                        "Execution handler has no supported run method."
+                        "Execution handler missing."
                     ),
                     "session": self._get_session_payload(session_id),
                     "debug": {
-                        "route": "execution_handler_method_missing",
+                        "route": "execution_handler_missing",
                         "command": command,
-                        "methods": [m for m in dir(handler) if m.startswith("run")],
+                    },
+                }
+
+            # =========================
+            # EXECUTION ROUTING
+            # =========================
+            try:
+                if hasattr(handler, "run_next_move"):
+                    result = handler.run_next_move(
+                        action=command,
+                        session_id=session_id,
+                        execution_state=execution_state,
+                    )
+
+                elif hasattr(handler, "run_next_step"):
+                    result = handler.run_next_step(
+                        action=command,
+                        session_id=session_id,
+                        execution_state=execution_state,
+                    )
+
+                elif hasattr(handler, "run_chain"):
+                    result = handler.run_chain(
+                        action=command,
+                        session_id=session_id,
+                        execution_state=execution_state,
+                    )
+
+                else:
+                    return {
+                        "ok": False,
+                        "assistant_message": self._build_assistant_message(
+                            "Execution handler has no runnable method."
+                        ),
+                        "session": self._get_session_payload(session_id),
+                        "debug": {
+                            "route": "execution_handler_method_missing",
+                            "command": command,
+                        },
+                    }
+
+            except Exception as exec_error:
+                return {
+                    "ok": False,
+                    "assistant_message": self._build_assistant_message(
+                        f"Execution crashed:\n{repr(exec_error)}"
+                    ),
+                    "session": self._get_session_payload(session_id),
+                    "debug": {
+                        "route": "execution_runtime_crash",
+                        "command": command,
+                        "error": repr(exec_error),
                     },
                 }
 
         # =========================
         # RESULT NORMALIZATION
         # =========================
-        if isinstance(result, dict):
-            new_state = result.get("execution_state") or result
-            error_text = result.get("error") or result.get("message") or ""
-            status = result.get("status") or new_state.get("status") or ""
-        else:
-            new_state = getattr(result, "execution_state", None) or {}
-            error_text = getattr(result, "error", "") or getattr(result, "message", "") or ""
-            status = getattr(result, "status", "") or new_state.get("status", "")
+        if not isinstance(result, dict):
+            result = {
+                "status": "unknown",
+                "message": str(result),
+                "execution_state": execution_state,
+            }
+
+        new_state = result.get("execution_state") or {}
+        status = (
+            result.get("status")
+            or new_state.get("status")
+            or "unknown"
+        )
+
+        error_text = (
+            result.get("error")
+            or result.get("message")
+            or ""
+        )
 
         if new_state:
-            self._set_session_meta(session_id, "execution_state", new_state)
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                new_state,
+            )
 
         reward = self._record_execution_reward(
             session_id=session_id,
@@ -945,24 +1061,25 @@ Available actions:
             error_text=error_text,
         )
 
+        # =========================
+        # FAILURE STOP GUARD
+        # =========================
         if self._should_stop_execution_loop(session_id):
             return {
                 "ok": True,
                 "assistant_message": self._build_assistant_message(
-                    "Execution loop stopped after repeated failures. Nova needs a new strategy before retrying."
+                    "Execution loop stopped after repeated failures."
                 ),
                 "session": self._get_session_payload(session_id),
                 "debug": {
                     "route": "execution_loop_stopped",
-                    "command": command,
-                    "status": status,
                     "reward": reward,
                     "strategy": strategy,
                 },
             }
 
         # =========================
-        # FAILURE → AUTO FIX → RETRY LOOP
+        # AUTO FIX FLOW
         # =========================
         if status in {"failed", "error"}:
             error_text = error_text or "Unknown execution failure."
@@ -974,316 +1091,91 @@ Available actions:
             )
 
             auto_fix_result = self._process_auto_fix(
-                user_text=f"fix this error:\n{error_text}\n\nRecovery strategy: {strategy}",
+                user_text=(
+                    f"fix this error:\n{error_text}\n\n"
+                    f"Recovery strategy: {strategy}"
+                ),
                 session_id=session_id,
                 attachments=None,
             )
 
-            if isinstance(auto_fix_result, dict):
-                execution_state = self._get_session_meta(session_id, "execution_state") or {}
+            execution_state = (
+                self._get_session_meta(session_id, "execution_state")
+                or {}
+            )
 
-                retry_count = int(execution_state.get("auto_fix_retry_count") or 0) + 1
-                execution_state["auto_fix_retry_count"] = retry_count
+            retry_count = int(
+                execution_state.get("auto_fix_retry_count") or 0
+            ) + 1
 
-                if retry_count >= 3:
-                    execution_state["status"] = "needs_strategy_change"
-                    execution_state["next_move"] = "review_failure_pattern_before_retry"
+            execution_state["auto_fix_retry_count"] = retry_count
 
-                    self._set_session_meta(session_id, "execution_state", execution_state)
+            if retry_count >= 3:
+                execution_state["status"] = "needs_strategy_change"
+                execution_state["next_move"] = (
+                    "review_failure_pattern_before_retry"
+                )
 
-                    return {
-                        "ok": True,
-                        "assistant_message": self._build_assistant_message(
-                            "Auto-fix retry cap reached. Strategy change required."
-                        ),
-                        "session": self._get_session_payload(session_id),
-                        "debug": {"route": "auto_fix_retry_cap"},
-                    }
-
-                execution_state["status"] = "retry_ready"
-                execution_state["next_move"] = "run_step"
-
-                self._set_session_meta(session_id, "execution_state", execution_state)
-
-                # 🔥 AUTO RUN STEP IMMEDIATELY
-                execution_state["status"] = "retry_ready"
-                execution_state["next_move"] = "run_step"
-                self._set_session_meta(session_id, "execution_state", execution_state)
+                self._set_session_meta(
+                    session_id,
+                    "execution_state",
+                    execution_state,
+                )
 
                 return {
                     "ok": True,
                     "assistant_message": self._build_assistant_message(
-                        f"Auto-fix applied. Retry queued. Attempt {retry_count}/3.\n\nNext action: run_step"
+                        "Auto-fix retry cap reached."
                     ),
                     "session": self._get_session_payload(session_id),
                     "debug": {
-                        "route": "auto_fix_retry_ready",
-                        "retry_count": retry_count,
-                        "next_action": "run_step",
+                        "route": "auto_fix_retry_cap",
                     },
                 }
 
-    def _handle_execution_control(self, user_text: str, session_id: str):
-        text = self._safe_str(user_text).strip().lower()
+            execution_state["status"] = "retry_ready"
+            execution_state["next_move"] = "run_step"
 
-        execution_keywords = {
-            "next",
-            "nex",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "what next",
-            "what now",
-            "run_step",
-            "run step",
-            "run_all",
-            "run all",
-            "run it",
-            "execute",
-            "execute all",
-            "retry",
-            "retry failed",
-            "try again",
-            "rerun failed",
-            "test_fail",
-            "test fail",
-            "stop",
-            "cancel",
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
 
-            # ✅ AUTO FIX TRIGGERS
-            "apply_auto_fix",
-            "apply auto fix",
-            "auto fix",
-            "autofix",
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    f"Auto-fix applied. Retry queued. Attempt {retry_count}/3."
+                ),
+                "session": self._get_session_payload(session_id),
+                "debug": {
+                    "route": "auto_fix_retry_ready",
+                    "retry_count": retry_count,
+                },
+            }
+
+        # =========================
+        # SUCCESS RETURN
+        # =========================
+        assistant_message = (
+            result.get("assistant_message")
+            or result.get("message")
+            or f"Execution command completed: {command}"
+        )
+
+        return {
+            "ok": True,
+            "assistant_message": self._build_assistant_message(
+                assistant_message
+            ),
+            "session": self._get_session_payload(session_id),
+            "debug": {
+                "route": "execution_command_complete",
+                "command": command,
+                "status": status,
+                "reward": reward,
+            },
         }
-
-        if text not in execution_keywords:
-            return None
-
-        # =========================
-        # COMMAND MAPPING
-        # =========================
-        if text in {"apply_auto_fix", "apply auto fix", "auto fix", "autofix"}:
-            command = "apply_auto_fix"
-
-        elif text in {"retry", "retry failed", "try again", "rerun failed"}:
-            command = "retry_failed"
-
-        elif text in {"run_all", "run all", "run it", "execute", "execute all"}:
-            command = "run_all"
-
-        elif text in {"test_fail", "test fail"}:
-            command = "test_fail"
-
-        elif text in {
-            "next",
-            "nex",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "what next",
-            "what now",
-            "run_step",
-            "run step",
-        }:
-            command = "run_step"
-
-        elif text in {"stop", "cancel"}:
-            command = "cancel"
-
-        else:
-            return None
-
-        # =========================
-        # EXECUTE COMMAND
-        # =========================
-        if command == "apply_auto_fix":
-            error_text = (
-                self._get_session_meta(session_id, "pending_fix_error")
-                or self._get_session_meta(session_id, "last_execution_error")
-                or (self._get_working_state(session_id) or {}).get("last_error")
-                or ""
-            )
-
-            if not error_text:
-                return {
-                    "ok": True,
-                    "assistant_message": self._build_assistant_message(
-                        "Auto-fix triggered, but no error context found."
-                    ),
-                    "session": self._get_session_payload(session_id),
-                    "debug": {"route": "apply_auto_fix_no_error"},
-                }
-
-            return self._process_auto_fix(
-                user_text=f"fix this error:\n{error_text}",
-                session_id=session_id,
-                attachments=None,
-            )
-
-        return self._process_execution_command(
-            command=command,
-            session_id=session_id,
-        )
-
-    def _answer_simple_definition(self, user_text: str) -> str:
-        text = self._safe_str(user_text).strip()
-        lowered = text.lower()
-
-        if "open source ai" in lowered:
-            return (
-                "Open-source AI means AI software, models, or model weights that are publicly available "
-                "so people can inspect, use, modify, or build on them.\n\n"
-                "Simple version:\n"
-                "Open-source AI = the inner parts are shared.\n"
-                "Closed-source AI = the company keeps the inner parts private."
-            )
-
-        if "closed source ai" in lowered or "close source ai" in lowered:
-            return (
-                "Closed-source AI means the company keeps the model, code, training details, or weights private. "
-                "You can usually use it through an app or API, but you cannot fully inspect or modify how it works.\n\n"
-                "Simple version:\n"
-                "Closed-source AI = you can use it, but you cannot see or control the engine underneath."
-            )
-
-        return (
-            f"{text}\n\n"
-            "In simple terms, this is asking for a definition, so Nova should answer directly instead of using web search."
-        )
-
-    def _source_quality_score(self, url: str = "", title: str = "") -> int:
-        text = f"{url} {title}".lower()
-        score = 10
-
-        bad_domains = [
-            "instagram.com",
-            "facebook.com",
-            "tiktok.com",
-            "pinterest.com",
-            "threads.net",
-            "reddit.com",
-            "quora.com",
-        ]
-
-        if any(domain in text for domain in bad_domains):
-            return -999
-
-        official_sources = [
-            "wwe.com",
-            "nba.com",
-            "nfl.com",
-            "nhl.com",
-            "mlb.com",
-            "openai.com",
-            "anthropic.com",
-            "deepmind.com",
-            "microsoft.com",
-            "google.com",
-            "apple.com",
-        ]
-
-        if any(domain in text for domain in official_sources):
-            score += 150
-
-        elite_news_sources = [
-            "reuters.com",
-            "apnews.com",
-            "bbc.com",
-            "bloomberg.com",
-            "cnbc.com",
-            "cbc.ca",
-            "globalnews.ca",
-            "ctvnews.ca",
-        ]
-
-        if any(domain in text for domain in elite_news_sources):
-            score += 130
-
-        strong_news_sources = [
-            "cnn.com",
-            "nytimes.com",
-            "washingtonpost.com",
-            "theguardian.com",
-            "theverge.com",
-            "techcrunch.com",
-            "wired.com",
-            "axios.com",
-            "politico.com",
-        ]
-
-        if any(domain in text for domain in strong_news_sources):
-            score += 100
-
-        sports_sources = [
-            "espn.com",
-            "cbssports.com",
-            "sports.yahoo.com",
-            "si.com",
-            "sportsnet.ca",
-            "tsn.ca",
-            "bleacherreport.com",
-        ]
-
-        if any(domain in text for domain in sports_sources):
-            score += 90
-
-        wrestling_sources = [
-            "pwinsider.com",
-            "fightful.com",
-            "wrestlingobserver.com",
-            "wrestletalk.com",
-            "ewrestling.com",
-            "wrestlinginc.com",
-        ]
-
-        if any(domain in text for domain in wrestling_sources):
-            score += 65
-
-        junk_phrases = [
-            "top 10",
-            "best",
-            "watch",
-            "stream",
-            "how to",
-            "guide",
-            "rumors",
-            "roundup",
-            "reaction",
-            "opinion",
-            "reddit",
-        ]
-
-        if any(phrase in text for phrase in junk_phrases):
-            score -= 40
-
-        fresh_phrases = [
-            "breaking",
-            "latest",
-            "today",
-            "just in",
-            "reported",
-            "announced",
-            "released",
-        ]
-
-        if any(phrase in text for phrase in fresh_phrases):
-            score += 15
-
-        try:
-            query_words = set((self._last_web_query or "").lower().split())
-            title_words = set(title.lower().split())
-            score += len(query_words & title_words) * 8
-        except Exception:
-            pass
-
-        return score
 
     def _clean_web_results(self, results: list) -> list:
         cleaned = []
@@ -1955,6 +1847,19 @@ Available actions:
         file_path = path.strip()
         pending_fix_mode = self._get_session_meta(session_id, "pending_fix_mode") or "file"
 
+        if "_process_execution_command" in user_text:
+            pending_fix_mode = "function"
+            self._set_session_meta(
+                session_id,
+                "pending_fix_mode",
+                "function",
+            )
+            self._set_session_meta(
+                session_id,
+                "pending_fix_func_name",
+                "_process_execution_command",
+            )
+
         traceback_func_match = re.findall(
             r'in\s+([A-Za-z_][A-Za-z0-9_]*)',
             user_text,
@@ -1999,7 +1904,7 @@ Available actions:
                     decision={"route": "auto_fix_read_failed"},
                 )
 
-        if len(raw_code) > 12000:
+        if pending_fix_mode != "function" and len(raw_code) > 12000:
             assistant_text = (
                 "Auto-fix paused.\n\n"
                 f"File:\n{file_path}\n\n"
@@ -4797,6 +4702,83 @@ Available actions:
                 "ok": True,
             }
 
+    def _handle_execution_control(self, user_text: str, session_id: str):
+        text = self._safe_str(user_text).strip().lower()
+
+        execution_keywords = {
+            "next",
+            "nex",
+            "continue",
+            "continue on",
+            "keep going",
+            "go",
+            "run next",
+            "next step",
+            "what next",
+            "what now",
+            "run_step",
+            "run step",
+            "run_all",
+            "run all",
+            "run it",
+            "execute",
+            "execute all",
+            "retry",
+            "retry failed",
+            "try again",
+            "rerun failed",
+            "test_fail",
+            "test fail",
+            "stop",
+            "cancel",
+            "apply_auto_fix",
+            "apply auto fix",
+            "auto fix",
+            "autofix",
+        }
+
+        if text not in execution_keywords:
+            return None
+
+        if text in {"apply_auto_fix", "apply auto fix", "auto fix", "autofix"}:
+            command = "apply_auto_fix"
+
+        elif text in {"retry", "retry failed", "try again", "rerun failed"}:
+            command = "retry_failed"
+
+        elif text in {"run_all", "run all", "run it", "execute", "execute all"}:
+            command = "run_all"
+
+        elif text in {"test_fail", "test fail"}:
+            command = "test_fail"
+
+        elif text in {
+            "next",
+            "nex",
+            "continue",
+            "continue on",
+            "keep going",
+            "go",
+            "run next",
+            "next step",
+            "what next",
+            "what now",
+            "run_step",
+            "run step",
+        }:
+            command = "run_step"
+
+        elif text in {"stop", "cancel"}:
+            command = "cancel"
+
+        else:
+            return None
+
+        return self._process_execution_command(
+            command=command,
+            session_id=session_id,
+        )
+
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         exec_debug("HANDLE IS BEING CALLED")
         attachments = attachments or []
@@ -4885,11 +4867,14 @@ Available actions:
         if lowered in continue_phrases:
             return self._continue_last_answer(session_id)
 
-        execution_control_msg = self._handle_execution_control(user_text, session_id)
-        if execution_control_msg:
+        execution_control_result = self._handle_execution_control(user_text, session_id)
+        if execution_control_result:
+            if isinstance(execution_control_result, dict) and execution_control_result.get("ok") is True:
+                return execution_control_result
+
             return {
                 "ok": True,
-                "assistant_message": execution_control_msg,
+                "assistant_message": execution_control_result,
                 "session": self._get_session_payload(session_id),
             }
 
@@ -4903,19 +4888,31 @@ Available actions:
             exec_debug("RESUMING EXISTING EXECUTION STATE")
 
             if execution_state.get("waiting"):
-                return self._execute_general_chat(
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                    decision={"route": self.ROUTE_GENERAL_CHAT},
+                execution_control_result = self._handle_execution_control(
+                    user_text,
+                    session_id,
                 )
 
-                return self._execute_general_chat(
-                    user_text=user_text,
-                    session_id=session_id,
-                    attachments=attachments,
-                    decision={"route": self.ROUTE_GENERAL_CHAT},
-                )
+                if execution_control_result:
+                    if (
+                        isinstance(execution_control_result, dict)
+                        and execution_control_result.get("ok") is True
+                    ):
+                        return execution_control_result
+
+                    return {
+                        "ok": True,
+                        "assistant_message": execution_control_result,
+                        "session": self._get_session_payload(session_id),
+                    }
+
+                return {
+                    "ok": True,
+                    "assistant_message": self._build_assistant_message(
+                        "Execution is paused.\n\nSend `next` or `run all` to continue."
+                    ),
+                    "session": self._get_session_payload(session_id),
+                }
 
             execution_state = self._process_execution(execution_state, session_id)
             self._set_session_meta(session_id, "execution_state", execution_state)
@@ -4928,35 +4925,28 @@ Available actions:
                 "session": self._get_session_payload(session_id),
             }
 
-        execution_state = self._process_goal_and_plan(user_text, session_id)
+        if lowered.startswith("auto-plan"):
+            execution_state = self._process_goal_and_plan(
+                user_text,
+                session_id,
+            )
 
-        if execution_state:
-            self._set_session_meta(session_id, "execution_state", execution_state)
+            if execution_state:
+                execution_state["waiting"] = True
 
-        max_steps = 5
+                self._set_session_meta(
+                    session_id,
+                    "execution_state",
+                    execution_state,
+                )
 
-        for _ in range(max_steps):
-            if not execution_state:
-                break
-
-            if execution_state.get("status") in ("complete", "cancelled"):
-                break
-
-            if execution_state.get("waiting"):
-                break
-
-            execution_state = self._process_execution(execution_state, session_id)
-            self._set_session_meta(session_id, "execution_state", execution_state)
-
-        result = self._execute_general_chat(
-            user_text=user_text,
-            session_id=session_id,
-            attachments=attachments,
-            decision={"route": self.ROUTE_GENERAL_CHAT},
-        )
-
-        if result:
-            return result
+                return {
+                    "ok": True,
+                    "assistant_message": self._normalize_assistant_message(
+                        "Execution plan created.\n\nSend `next` to run the first step, or `run all` for autonomous execution."
+                    ),
+                    "session": self._get_session_payload(session_id),
+                }
 
         return self._execute_general_chat(
             user_text=user_text,
