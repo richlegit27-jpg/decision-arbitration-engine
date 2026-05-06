@@ -4253,8 +4253,6 @@ async function sendMessage() {
       location: location,
     };
 
-  console.log("[NOVA SEND PAYLOAD]", payload);
-
     if (isImageCommand) {
       await consumeChatJson(payload);
       showToast("Image request sent.", "success");
@@ -4276,8 +4274,6 @@ async function sendMessage() {
 
       state.stream = state.stream || {};
       state.stream.targetMessageId = pendingAssistantId;
-
-console.log("[NOVA BEFORE STREAM]", payload);
 
       await consumeChatStreamStable(payload);
     }
