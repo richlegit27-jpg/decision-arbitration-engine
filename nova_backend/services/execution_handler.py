@@ -303,6 +303,82 @@ class ExecutionHandler:
             },
         }
 
+    def _compile_python_file(self, file_path: str) -> dict:
+        import subprocess
+        import sys
+        import os
+
+        file_path = str(file_path or "").strip()
+
+        if not file_path:
+            return {
+                "ok": False,
+                "error": "No file path provided for compile check.",
+            }
+
+        if not os.path.exists(file_path):
+            return {
+                "ok": False,
+                "error": f"File does not exist: {file_path}",
+            }
+
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "py_compile", file_path],
+                capture_output=True,
+                text=True,
+            )
+
+            return {
+                "ok": result.returncode == 0,
+                "returncode": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+            }
+
+        except Exception as exc:
+            return {
+                "ok": False,
+                "error": repr(exc),
+            }
+
+
+    def _rollback_file(self, file_path: str, backup_path: str) -> dict:
+        import os
+        import shutil
+
+        file_path = str(file_path or "").strip()
+        backup_path = str(backup_path or "").strip()
+
+        if not file_path or not backup_path:
+            return {
+                "ok": False,
+                "error": "Rollback missing file path or backup path.",
+            }
+
+        if not os.path.exists(backup_path):
+            return {
+                "ok": False,
+                "error": f"Backup file does not exist: {backup_path}",
+            }
+
+        try:
+            shutil.copy2(backup_path, file_path)
+
+            return {
+                "ok": True,
+                "file_path": file_path,
+                "backup_path": backup_path,
+            }
+
+        except Exception as exc:
+            return {
+                "ok": False,
+                "error": repr(exc),
+                "file_path": file_path,
+                "backup_path": backup_path,
+            }
+
     def run_next_move(
         self,
         action: str,
@@ -395,23 +471,48 @@ class ExecutionHandler:
                 execution_state["history"] = history
                 execution_state["last_action"] = action
 
-            return {
-                "status": execution_state["status"],
-                "message": "\n".join(summary_lines),
-                "execution_state": execution_state,
-            }
+                return {
+                    "status": "complete",
+                    "message": "All steps completed.",
+                    "execution_state": execution_state,
+                }
 
             step = steps[current_index]
             step = self._execute_step(step)
+
+            if step.get("status") == "waiting_for_payload":
+                apply_result = self._apply_generated_mutation_payload(step)
+
+                step["apply_result"] = apply_result
+
+                if apply_result.get("ok"):
+                    step["status"] = "completed"
+                    history.append(
+                        f"mutation applied: {step.get('title', 'step')}"
+                    )
+                else:
+                    step["status"] = "failed"
+                    step["error"] = apply_result.get(
+                        "error",
+                        "Mutation apply failed.",
+                    )
+                    history.append(
+                        f"mutation failed: {step.get('title', 'step')}"
+                    )
 
             history.append(
                 f"completed: {step.get('title', 'step')}"
             )
 
-            execution_state["current_index"] = current_index + 1
+            execution_state["current_index"] = (
+                current_index + 1
+                if step.get("status") == "completed"
+                else current_index
+            )
+
             execution_state["current_step"] = step.get("title", "step")
             execution_state["last_action"] = action
-            execution_state["steps"] = steps
+            execution_state["steps"] = steps 
             execution_state["history"] = history
             execution_state["status"] = (
                 "complete"
@@ -420,8 +521,16 @@ class ExecutionHandler:
             )
 
             return {
-                "status": "success",
-                "message": "Run step executed.",
+                "status": (
+                    "success"
+                    if step.get("status") == "completed"
+                    else "failed"
+                ),
+                "message": (
+                    "Run step executed."
+                    if step.get("status") == "completed"
+                    else step.get("error", "Run step failed.")
+                ),
                 "execution_state": execution_state,
             }
 
@@ -441,7 +550,33 @@ class ExecutionHandler:
                     f"completed: {step.get('title', 'step')}"
                 )
 
-                if step.get("status") in {"waiting_for_payload", "waiting_for_apply", "failed"}:
+                if step.get("status") == "waiting_for_payload":
+                    apply_result = self._apply_generated_mutation_payload(step)
+
+                    step["apply_result"] = apply_result
+
+                    if apply_result.get("ok"):
+                        step["status"] = "completed"
+                        history.append(
+                            f"mutation applied: {step.get('title', 'step')}"
+                        )
+
+                        current_index += 1
+                        continue
+
+                    step["status"] = "failed"
+                    step["error"] = apply_result.get(
+                        "error",
+                        "Mutation apply failed.",
+                    )
+
+                    history.append(
+                        f"mutation failed: {step.get('title', 'step')}"
+                    )
+
+                    break
+
+                if step.get("status") in {"waiting_for_apply", "failed"}:
                     break
 
                 current_index += 1
@@ -742,7 +877,33 @@ def default_executor(move: NextMove) -> ExecutionResult:
                     break
 
             new_lines = lines[:start_index] + replacement_lines + lines[end_index:]
+
             path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+            compile_ok = True
+            compile_error = ""
+
+            try:
+                py_compile.compile(str(path), doraise=True)
+            except Exception as e:
+                compile_ok = False
+                compile_error = str(e)
+
+            if not compile_ok:
+                shutil.copy2(backup_path, path)
+
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    output={
+                        "file_path": str(path),
+                        "backup": str(backup_path),
+                        "compiled": False,
+                        "rolled_back": True,
+                        "compile_error": compile_error,
+                    },
+                    error=compile_error,
+                )
 
             return ExecutionResult(
                 move_id=move.id,
@@ -750,6 +911,8 @@ def default_executor(move: NextMove) -> ExecutionResult:
                 output={
                     "file_path": str(path),
                     "backup": str(backup_path),
+                    "compiled": True,
+                    "rolled_back": False,
                 },
             )
 
