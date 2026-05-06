@@ -6080,55 +6080,36 @@ async function consumeChatStreamStable(payload) {
     };
   }
 
-try {
-  state.stream.controller = new AbortController();
+  try {
+    state.stream.controller = new AbortController();
 
-  console.log("[NOVA CHAT FETCH BEFORE]");
-
-  const response = await fetch("/api/chat", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json, text/event-stream, text/plain, */*",
-    },
-    body: JSON.stringify(payload || {}),
-    signal: state.stream.controller.signal,
-  });
-
-  console.log("[NOVA CHAT FETCH AFTER]");
-
-  console.log(
-    "[NOVA CHAT RESPONSE]",
-    response.status,
-    response.headers.get("content-type")
-  );
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream, text/plain, */*",
+      },
+      body: JSON.stringify(payload || {}),
+      signal: state.stream.controller.signal,
+    });
 
     const responseContentType = String(
       response.headers.get("content-type") || ""
     ).toLowerCase();
 
     if (responseContentType.includes("application/json")) {
-const rawJsonText = await response.text();
-console.log("[NOVA CHAT RAW JSON]", rawJsonText);
+      const rawJsonText = await response.text();
+      const data = rawJsonText ? JSON.parse(rawJsonText) : {};
 
-const data = rawJsonText ? JSON.parse(rawJsonText) : {};
-console.log("[NOVA CHAT JSON DATA]", data);
-
-if (
-  data &&
-  data.session &&
-  Array.isArray(data.session.messages)
-) {
-  state.messages = data.session.messages.map(normalizeMessage);
-
-  renderChat();
-
-  console.log(
-    "[NOVA FORCE HYDRATE]",
-    state.messages.length
-  );
-}
+      if (
+        data &&
+        data.session &&
+        Array.isArray(data.session.messages)
+      ) {
+        state.messages = data.session.messages.map(normalizeMessage);
+        renderChat();
+      }
 
       if (data && data.assistant_message) {
         upsertMessage({
@@ -6150,7 +6131,8 @@ if (
 
         applyStatePayload(data);
 
-        return data;      }
+        return data;
+      }
     }
 
     const contentType = String(
@@ -6223,7 +6205,6 @@ if (
         try {
           const evt = JSON.parse(jsonStr);
           handleStreamEvent(evt);
-
         } catch (error) {
           console.error("stream event parse failed", jsonStr, error);
         }
@@ -6319,7 +6300,6 @@ if (
     }
   }
 }
-
 
 function consumeChatStream(payload) {
   return consumeChatStreamStable(payload);
