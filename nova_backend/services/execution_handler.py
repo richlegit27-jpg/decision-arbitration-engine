@@ -818,6 +818,8 @@ def default_executor(move: NextMove) -> ExecutionResult:
             )
 
         if move_type == "apply_function_fix":
+            import ast
+
             file_path = str(payload.get("file_path") or "").strip()
             function_name = str(payload.get("function_name") or "").strip()
             replacement = str(payload.get("replacement") or "")
@@ -841,44 +843,67 @@ def default_executor(move: NextMove) -> ExecutionResult:
             original = path.read_text(encoding="utf-8")
             lines = original.splitlines()
 
-            start_index = None
-
-            for i, line in enumerate(lines):
-                if line.lstrip().startswith(f"def {function_name}("):
-                    start_index = i
-                    break
-
-            if start_index is None:
+            try:
+                tree = ast.parse(original)
+            except SyntaxError as e:
                 return ExecutionResult(
                     move_id=move.id,
                     status="failed",
-                    error=f"Function not found: {function_name}",
+                    error=f"Cannot parse target file before mutation: {e}",
                 )
+
+            target_node = None
+
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    if node.name == function_name:
+                        target_node = node
+                        break
+
+            if target_node is None:
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error=f"Function not found by AST: {function_name}",
+                )
+
+            if not hasattr(target_node, "lineno") or not hasattr(target_node, "end_lineno"):
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error=f"AST node missing line boundaries: {function_name}",
+                )
+
+            start_index = int(target_node.lineno) - 1
+            end_index = int(target_node.end_lineno)
 
             backup_path = path.with_suffix(path.suffix + f".bak_{int(time.time())}")
             shutil.copy2(path, backup_path)
 
             replacement_lines = replacement.strip("\n").splitlines()
-
-            end_index = len(lines)
-            base_indent = len(lines[start_index]) - len(lines[start_index].lstrip(" "))
-
-            for i in range(start_index + 1, len(lines)):
-                line = lines[i]
-                stripped = line.strip()
-
-                if not stripped:
-                    continue
-
-                indent = len(line) - len(line.lstrip(" "))
-
-                if indent <= base_indent and stripped.startswith("def "):
-                    end_index = i
-                    break
-
             new_lines = lines[:start_index] + replacement_lines + lines[end_index:]
 
             path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+            mutated_source = path.read_text(encoding="utf-8")
+
+            try:
+                ast.parse(mutated_source)
+            except SyntaxError as e:
+                shutil.copy2(backup_path, path)
+
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    output={
+                        "file_path": str(path),
+                        "backup": str(backup_path),
+                        "ast_valid": False,
+                        "rolled_back": True,
+                        "syntax_error": str(e),
+                    },
+                    error=f"AST validation failed after mutation: {e}",
+                )
 
             compile_ok = True
             compile_error = ""
@@ -898,6 +923,7 @@ def default_executor(move: NextMove) -> ExecutionResult:
                     output={
                         "file_path": str(path),
                         "backup": str(backup_path),
+                        "ast_valid": True,
                         "compiled": False,
                         "rolled_back": True,
                         "compile_error": compile_error,
@@ -911,6 +937,7 @@ def default_executor(move: NextMove) -> ExecutionResult:
                 output={
                     "file_path": str(path),
                     "backup": str(backup_path),
+                    "ast_valid": True,
                     "compiled": True,
                     "rolled_back": False,
                 },
