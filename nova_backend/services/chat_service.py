@@ -2293,49 +2293,7 @@ Available actions:
                         "id": session_id,
                     },
                 }
-
-        decision = self._safe_dict(decision)
-        mission = self._safe_dict(decision.get("mission"))
-        mission_mode = str(mission.get("mode") or "").lower()
-
-        assistant_text = self._safe_str(locals().get("assistant_text", ""))
-        assistant_msg = None
-
-        if is_continue and mission_mode == "debugging":
-            assistant_text = (
-                "Next move:\n\n"
-                "Paste the exact compile error so we can fix it."
-            )
-
-            assistant_msg = self._build_assistant_message(
-                text=assistant_text,
-                attachments=[],
-                meta={"forced": "continue_debug"},
-            )
-
-        if not assistant_msg:
-            assistant_msg = self._build_assistant_message(
-                text=assistant_text or "Done.",
-                attachments=[],
-                meta={"route": self.ROUTE_GENERAL_CHAT},
-            )
-
-        try:
-            if assistant_text and assistant_text.strip():
-                self._set_session_meta(session_id, "last_answer_text", self._safe_str(assistant_text)[:4000])
-                self._set_session_meta(session_id, "last_answer_topic", self._safe_str(original_user_text)[:300])
-                self._set_session_meta(session_id, "last_answer_mode", self._get_session_meta(session_id, "answer_depth") or "short")
-        except Exception as e:
-            exec_debug("LAST ANSWER SAVE ERROR:", e)
-
-        return self._finalize_response(
-            session_id=session_id,
-            user_text=original_user_text,
-            user_msg=user_msg,
-            assistant_msg=assistant_msg,
-            decision=decision,
-            saved_artifact=None,
-        )    
+ 
 
         is_memory_request = original_user_text.lower().strip().startswith((
             "remember ",
