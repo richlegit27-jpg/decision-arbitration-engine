@@ -6049,17 +6049,9 @@ async function consumeChatStreamStable(payload) {
     } catch (_) {}
   }
 
-state.stream.running = false;
-state.stream.startedAt = 0;
-
-state.execution = state.execution || {};
-state.execution.running = true;
-state.execution.lastAction = action || null;
-
-setBusyUi(false);
-updateTopbarFromState();
-
   try {
+    state.stream.controller = new AbortController();
+
     const response = await fetch("/api/chat", {
       method: "POST",
       credentials: "same-origin",
@@ -6070,6 +6062,36 @@ updateTopbarFromState();
       body: JSON.stringify(payload || {}),
       signal: state.stream.controller.signal,
     });
+
+    const responseContentType = String(
+      response.headers.get("content-type") || ""
+    ).toLowerCase();
+
+    if (responseContentType.includes("application/json")) {
+      const data = await response.json();
+
+      if (data && data.assistant_message) {
+        upsertMessage({
+          id: state.stream.targetMessageId || makeId("assistant"),
+          role: "assistant",
+          text: String(data.assistant_message.text || ""),
+          meta: data.assistant_message.meta || {},
+          pending: false,
+          streaming: false,
+        });
+
+        finishStreamUi({
+          statusText: "Complete",
+          statusState: "done",
+        });
+
+        state.stream.running = false;
+        state.stream.targetMessageId = null;
+
+        applyStatePayload(data);
+
+        return data;      }
+    }
 
     const contentType = String(
       response.headers.get("content-type") || ""
@@ -6141,6 +6163,7 @@ updateTopbarFromState();
         try {
           const evt = JSON.parse(jsonStr);
           handleStreamEvent(evt);
+
         } catch (error) {
           console.error("stream event parse failed", jsonStr, error);
         }

@@ -8248,6 +8248,19 @@ Next action:
             if v is not None:
                 current_state[k] = v
 
+        # authoritative clears
+        clearable_keys = {
+            "active_task",
+            "current_file",
+            "current_bug",
+            "last_success",
+            "next_move",
+            "checkpoint",
+        }
+
+        for key in clearable_keys:
+            if key in patch and patch.get(key) == "":
+                current_state[key] = ""
         # -------------------------
         # TIMESTAMP
         # -------------------------
