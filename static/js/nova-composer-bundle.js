@@ -4245,7 +4245,7 @@ async function sendMessage() {
       state.stream = state.stream || {};
       state.stream.targetMessageId = pendingAssistantId;
 
-      await consumeChatJson(payload);
+      await consumeChatStreamStable(payload);
     }
   } catch (error) {
     finishStreamUi({

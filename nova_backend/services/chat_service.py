@@ -1785,7 +1785,7 @@ Available actions:
 
     def _finalize_response(
         self,
-        session_id: str = "", 
+        session_id: str = "",
 
         user_text: str = "",
         user_msg=None,
@@ -1837,6 +1837,7 @@ Available actions:
 
         session = self._get_session_payload(session_id) or {}
         messages = session.get("messages")
+
         if not isinstance(messages, list):
             messages = []
 
@@ -1851,14 +1852,41 @@ Available actions:
 
         try:
             existing = self.sessions.get_session(session_id)
-            existing_messages = existing.get("messages", []) if isinstance(existing, dict) else []
-            existing_count = len(existing_messages) if isinstance(existing_messages, list) else 0
+
+            existing_messages = (
+                existing.get("messages", [])
+                if isinstance(existing, dict)
+                else []
+            )
+
+            existing_count = (
+                len(existing_messages)
+                if isinstance(existing_messages, list)
+                else 0
+            )
 
             for msg in messages[existing_count:]:
                 self.sessions.append_message(session_id, msg)
 
         except Exception as e:
             exec_debug("SESSION SAVE ERROR:", e)
+
+        try:
+            assistant_text_for_tracking = ""
+
+            if isinstance(assistant_msg, dict):
+                assistant_text_for_tracking = self._safe_str(
+                    assistant_msg.get("text")
+                )
+
+            self._auto_track_working_state(
+                session_id=session_id,
+                user_text=user_text,
+                assistant_text=assistant_text_for_tracking,
+            )
+
+        except Exception as e:
+            exec_debug("AUTO_TRACK_WORKING_STATE_ERROR:", e)
 
         return {
             "ok": True,
@@ -1876,7 +1904,11 @@ Available actions:
             "debug": {
                 "decision": decision,
                 "route": "chat_service.handle",
-                "route_taken": decision.get("route") if isinstance(decision, dict) else "",
+                "route_taken": (
+                    decision.get("route")
+                    if isinstance(decision, dict)
+                    else ""
+                ),
             },
         }
 
@@ -4780,6 +4812,15 @@ Available actions:
 
         lowered = self._safe_str(user_text).lower().strip()
 
+        try:
+            self._auto_track_working_state(
+                session_id=session_id,
+                user_text=user_text,
+                assistant_text="",
+            )
+        except Exception as e:
+            exec_debug("EARLY_AUTO_TRACK_ERROR:", e)
+
         if lowered in {
             "reset",
             "reset all",
@@ -5069,6 +5110,19 @@ Auto-fix result:
 
     def _process_auto_fix(self, user_text: str, session_id: str, attachments=None):
         lowered = (user_text or "").lower()
+
+        try:
+            tracked_state = self._auto_track_working_state(
+                session_id=session_id,
+                user_text=user_text,
+                assistant_text="auto_fix_mode",
+            )
+
+            if isinstance(tracked_state, dict) and tracked_state:
+                self._set_working_state(session_id, tracked_state)
+
+        except Exception as e:
+            exec_debug("AUTO_FIX_TRACK_ERROR:", e)
 
         working_state = {}
         try:
@@ -8113,6 +8167,42 @@ Next action:
             exec_debug("SET_WORKING_STATE_DIRECT_CALL_ERROR:", e)
 
         return clean_state
+
+    def _auto_track_working_state(self, session_id: str, user_text: str = "", assistant_text: str = ""):
+        import os
+        import re
+
+        session_id = self._safe_str(session_id).strip()
+        user_text = self._safe_str(user_text)
+        assistant_text = self._safe_str(assistant_text)
+
+        if not session_id:
+            return {}
+
+        combined = f"{user_text}\n{assistant_text}"
+        lowered = combined.lower()
+
+        patch = {}
+
+        windows_path_match = re.search(r"([A-Za-z]:\\[^\n\r\t\"']+)", combined)
+        if windows_path_match:
+            patch["current_file"] = windows_path_match.group(1).strip().rstrip(".,:;)]}")
+
+        if any(x in lowered for x in ["traceback", "syntaxerror", "attributeerror", "typeerror", "nameerror", "unboundlocalerror", "indentationerror"]):
+            patch["current_bug"] = self._safe_str(user_text).strip()[:1000]
+            patch["active_task"] = "debugging runtime error"
+            patch["next_move"] = "fix traceback and retest"
+
+        if any(x in lowered for x in ["compile passed", "py_compile", "runtime stable", "works now", "working now", "fixed", "checkpoint"]):
+            patch["last_success"] = self._safe_str(assistant_text or user_text).strip()[:1000]
+
+        if "next move" in lowered:
+            patch["next_move"] = self._safe_str(assistant_text or user_text).strip()[:500]
+
+        if not patch:
+            return self._get_working_state(session_id) or {}
+
+        return self._update_working_state(session_id, patch)
 
     def _update_working_state(self, session_id: str, patch: dict):
         session_id = self._safe_str(session_id).strip()
