@@ -556,6 +556,37 @@ def {function_name}(self, *args, **kwargs):
             },
         }
 
+    def _verify_step_result(self, step: dict) -> dict:
+        status = str(step.get("status") or "").lower()
+        action = str(step.get("action") or "").lower()
+
+        if status != "completed":
+            return {
+                "ok": False,
+                "reason": "step_not_completed",
+            }
+
+        if action == "implement":
+            apply_result = step.get("apply_result") or {}
+            output = apply_result.get("output") if isinstance(apply_result, dict) else {}
+
+            if not isinstance(output, dict):
+                return {
+                    "ok": False,
+                    "reason": "missing_mutation_output",
+                }
+
+            if not output.get("compiled") or not output.get("ast_valid"):
+                return {
+                    "ok": False,
+                    "reason": "mutation_not_validated",
+                }
+
+        return {
+            "ok": True,
+            "reason": "verified",
+        }
+
     def _compile_python_file(self, file_path: str) -> dict:
         import subprocess
         import sys
@@ -993,8 +1024,16 @@ def {function_name}(self, *args, **kwargs):
                     execution_state=execution_state,
                 )
 
-                completed.append(step.get("title", "step"))
+                verify_result = self._verify_step_result(step)
+                step["verify_result"] = verify_result
 
+                if not verify_result.get("ok"):
+                    step["status"] = "failed"
+                    step["error"] = f"Verification failed: {verify_result.get('reason')}"
+                    history.append(f"verification failed: {step.get('title', 'step')}")
+                    break
+
+                completed.append(step.get("title", "step"))
                 if step.get("status") in {
                     "waiting_for_apply",
                     "waiting_for_payload",
