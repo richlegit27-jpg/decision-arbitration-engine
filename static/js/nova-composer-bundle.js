@@ -423,6 +423,7 @@ function renderSources(assistantText, meta = {}) {
       upload_error: String(raw.upload_error || ""),
     };
   }
+
 function normalizeMessage(raw) {
   if (!raw || typeof raw !== "object") return null;
 
@@ -430,7 +431,50 @@ function normalizeMessage(raw) {
     raw = raw.assistant_message;
   }
 
-  const item = raw;
+  const item = JSON.parse(JSON.stringify(raw || {}));
+
+  if (
+    item &&
+    typeof item === "object" &&
+    item.ok === true &&
+    item.session &&
+    item.assistant_message
+  ) {
+    return normalizeMessage(item.assistant_message);
+  }
+
+if (
+  item &&
+  typeof item.text === "object"
+) {
+  if (
+    item.text &&
+    typeof item.text.text === "string"
+  ) {
+    item.text = item.text.text;
+  } else {
+    item.text = "";
+  }
+}
+
+if (
+  typeof item.text === "string" &&
+  (
+    item.text.includes("'role': 'assistant'") ||
+    item.text.includes('"role": "assistant"') ||
+    item.text.includes("'text':") ||
+    item.text.includes('"text":')
+  )
+) {
+  try {
+    const extracted =
+      item.text.match(/['"]text['"]:\s*['"]([\s\S]*?)['"]/);
+
+    if (extracted && extracted[1]) {
+      item.text = extracted[1];
+    }
+  } catch (_) {}
+}
 
   const role = String(item.role || "assistant");
   const kind = String(item.kind || "");
@@ -3534,9 +3578,11 @@ const autoExecuteMessage =
 if (
   autoExecuteMessage &&
   autoExecuteMessage.meta &&
+
   autoExecuteMessage.meta.auto_execute &&
   typeof window.runExecutionAction === "function"
 ) {
+
   requestAnimationFrame(() => {
     const execResult =
       autoExecuteMessage.meta.execution_result || {};
@@ -4096,14 +4142,21 @@ if (!response.ok || data.ok === false) {
 window.__lastResponse = data;
 console.log("FULL CHAT RESPONSE:", data);
 
-    if (
-      data &&
-      data.session &&
-      Array.isArray(data.session.messages)
-    ) {
-      applyBackendSessionState(data.session);
-      return data;
-    }
+if (
+  data &&
+  data.session &&
+  Array.isArray(data.session.messages)
+) {
+  applyBackendSessionState(data.session);
+
+  const hasAssistantMessage =
+    data.assistant_message &&
+    typeof data.assistant_message === "object";
+
+  if (!hasAssistantMessage) {
+    return data;
+  }
+}
 
 const pendingAction =
   data &&
@@ -4189,6 +4242,23 @@ if (state.rail && state.rail.tab === "execution" && typeof renderExecution === "
     setBusyUi(false);
   }
 });
+  if (!autoLoop) {
+    const assistantMsg =
+      data && data.assistant_message
+        ? normalizeMessage(
+            typeof data.assistant_message === "string"
+              ? { text: data.assistant_message }
+              : data.assistant_message
+          )
+        : null;
+
+    if (assistantMsg?.text?.trim()) {
+      upsertMessage(assistantMsg);
+      renderChat();
+      scrollChatToBottom(true);
+    }
+  }
+
   return data;
 }
 

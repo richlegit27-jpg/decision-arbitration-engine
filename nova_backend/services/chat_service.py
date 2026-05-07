@@ -34,7 +34,7 @@ from nova_backend.services.web_service import WebService
 from nova_backend.services.tool_service import ToolService
 from nova_backend.services.execution_service import ExecutionService
 from nova_backend.services.intent_service import IntentService
-
+from nova_backend.services.execution_loop_service import ExecutionLoopService
 
 logger = logging.getLogger("nova.execution")
 DEBUG_EXECUTION = False
@@ -272,7 +272,6 @@ Rules:
             return False
 
     def _auto_execute_request(self, user_text: str, session_id: str = "", attachments=None):
-        # DISABLE OLD AUTO EXECUTE PATH (route everything to advance_execution)
         return self._advance_execution_request(
             user_text=user_text,
             session_id=session_id,
@@ -374,15 +373,24 @@ Rules:
                             if status in {"complete", "completed", "error", "failed"}:
                                 break
 
-                            result = self.execution_handler.run_next_move(
-                                action="run_step",
+                            result = self.execution_loop.run(
+                                command=command,
                                 session_id=session_id,
                                 execution_state=execution_state,
                             )
 
+                            execution_state = result.get(
+                                "execution_state",
+                                execution_state,
+                            )
+
+                            status = self.execution_loop.get_status(
+                                result,
+                                execution_state,
+                            )
+
                     except Exception:
                         pass
-
             elif hasattr(self.execution_handler, "run_chain"):
                 chain_results = self.execution_handler.run_chain(move)
                 result = chain_results[-1] if chain_results else None
@@ -744,28 +752,6 @@ Available actions:
 
         return strategy
 
-    def _should_stop_execution_loop(self, session_id: str) -> bool:
-        working_state = self._get_working_state(session_id) or {}
-
-        score = int(working_state.get("execution_reward_score") or 0)
-        last_reward = int(working_state.get("last_execution_reward") or 0)
-
-        failure_count = int(working_state.get("execution_failure_count") or 0)
-
-        if last_reward < 0:
-            failure_count += 1
-        else:
-            failure_count = 0
-
-        self._update_working_state(
-            session_id,
-            {
-                "execution_failure_count": failure_count,
-            },
-        )
-
-        return failure_count >= 3 or score <= -15
-
     def _record_execution_reward(self, session_id: str, command: str, status: str, error_text: str = ""):
         command = self._safe_str(command).strip().lower()
         status = self._safe_str(status).strip().lower()
@@ -797,8 +783,6 @@ Available actions:
 
         return reward
 
-        return reward
-
     def _process_execution_command(
         self,
         command: str,
@@ -812,33 +796,9 @@ Available actions:
         # =========================
         # COMMAND NORMALIZATION
         # =========================
-        command_aliases = {
-            "next": "run_step",
-            "nex": "run_step",
-            "continue": "run_step",
-            "continue on": "run_step",
-            "go": "run_step",
-            "run next": "run_step",
-            "next step": "run_step",
-
-            "run all": "run_all",
-            "run_all": "run_all",
-            "execute": "run_all",
-            "execute all": "run_all",
-            "run it": "run_all",
-
-            "retry": "retry_failed",
-            "retry failed": "retry_failed",
-            "rerun failed": "retry_failed",
-            "try again": "retry_failed",
-
-            "cancel": "cancel",
-
-            "test_fail": "test_fail",
-            "test fail": "test_fail",
-        }
-
-        command = command_aliases.get(command, command)
+        command = self.execution_loop.command_alias(
+            command
+        )
 
         # =========================
         # CANCEL
@@ -1051,16 +1011,31 @@ Available actions:
                 "execution_state": execution_state,
             }
 
-        new_state = result.get("execution_state") or {}
-        status = (
-            result.get("status")
-            or new_state.get("status")
-            or "unknown"
+        new_state = self.execution_loop.get_execution_state(
+            result,
+            execution_state,
         )
+
+        status = self.execution_loop.get_status(
+            result,
+            new_state,
+        )
+
+        assistant_message = ""
+
+        if not assistant_message:
+            assistant_message = (
+                result.get("assistant_message")
+                or self.execution_loop.get_message(
+                    result,
+                    default=f"Execution command completed: {command}",
+                )
+            )
+
 
         error_text = (
             result.get("error")
-            or result.get("message")
+            or self.execution_loop.get_message(result)
             or ""
         )
 
@@ -1108,7 +1083,11 @@ Available actions:
         # =========================
         # FAILURE STOP GUARD
         # =========================
-        if self._should_stop_execution_loop(session_id):
+        working_state = self._get_working_state(session_id) or {}
+
+        if self.execution_loop.should_abort_from_failures(
+            working_state
+        ):
             return {
                 "ok": True,
                 "assistant_message": self._build_assistant_message(
@@ -1148,24 +1127,27 @@ Available actions:
                 or {}
             )
 
+            retry_state = (
+                self.execution_loop.handle_auto_fix_retry_state(
+                    execution_state
+                )
+            )
+
+            execution_state = (
+                retry_state.get("execution_state") or {}
+            )
+
             retry_count = int(
-                execution_state.get("auto_fix_retry_count") or 0
-            ) + 1
+                retry_state.get("retry_count") or 0
+            )
 
-            execution_state["auto_fix_retry_count"] = retry_count
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
 
-            if retry_count >= 3:
-                execution_state["status"] = "needs_strategy_change"
-                execution_state["next_move"] = (
-                    "review_failure_pattern_before_retry"
-                )
-
-                self._set_session_meta(
-                    session_id,
-                    "execution_state",
-                    execution_state,
-                )
-
+            if retry_state.get("capped"):
                 return {
                     "ok": True,
                     "assistant_message": self._build_assistant_message(
@@ -1176,15 +1158,6 @@ Available actions:
                         "route": "auto_fix_retry_cap",
                     },
                 }
-
-            execution_state["status"] = "retry_ready"
-            execution_state["next_move"] = "run_step"
-
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                execution_state,
-            )
 
             return {
                 "ok": True,
@@ -1201,10 +1174,12 @@ Available actions:
         # =========================
         # SUCCESS RETURN
         # =========================
-        assistant_message = self._summarize_execution_command_result(
-            command=command,
-            execution_state=execution_state,
-            status=status,
+        assistant_message = (
+            self.execution_loop.summarize_execution(
+                command=command,
+                execution_state=execution_state,
+                status=status,
+            )
         )
 
         if str(status).lower() == "idle":
@@ -1213,8 +1188,10 @@ Available actions:
         if not assistant_message:
             assistant_message = (
                 result.get("assistant_message")
-                or result.get("message")
-                or f"Execution command completed: {command}"
+                or self.execution_loop.get_message(
+                    result,
+                    default=f"Execution command completed: {command}",
+                )
             )
 
         assistant_payload = self._build_assistant_message(
@@ -1238,9 +1215,10 @@ Available actions:
         ).lower()
 
         if final_status in {"complete", "completed", "success"}:
-            self._archive_execution_state(
+            self.execution_loop.archive_execution(
+                archive_callback=self._archive_execution_state,
                 session_id=session_id,
-                execution_state=execution_state or {},
+                execution_state=execution_state,
                 command=command,
             )
 
@@ -1292,75 +1270,6 @@ Available actions:
             },
         }
 
-    def _summarize_execution_command_result(
-        self,
-        command: str,
-        execution_state: dict | None = None,
-        status: str = "",
-    ) -> str:
-        state = execution_state if isinstance(execution_state, dict) else {}
-        steps = state.get("steps") if isinstance(state.get("steps"), list) else []
-        current_index = int(state.get("current_index") or 0)
-        total = len(steps)
-
-        completed = [
-            str(step.get("title") or step.get("action") or "step")
-            for step in steps
-            if isinstance(step, dict)
-            and str(step.get("status") or "").lower() in {"completed", "complete", "success"}
-        ]
-
-        failed = [
-            step
-            for step in steps
-            if isinstance(step, dict)
-            and str(step.get("status") or "").lower() in {"failed", "error"}
-        ]
-
-        if failed:
-            step = failed[-1]
-            title = str(step.get("title") or step.get("action") or "step")
-            error = str(step.get("error") or "Unknown error.")
-            return (
-                f"Step failed: {title}\n"
-                f"Status: failed\n"
-                f"Error: {error}"
-            )
-
-        if total and len(completed) >= total:
-            return (
-                "Execution chain complete.\n"
-                f"Completed steps: {', '.join(completed)}"
-            )
-
-        if total:
-            active_step = None
-            if 0 <= current_index - 1 < total:
-                active_step = steps[current_index - 1]
-
-            if not active_step and completed:
-                active_step = next(
-                    (
-                        step for step in reversed(steps)
-                        if isinstance(step, dict)
-                        and str(step.get("status") or "").lower() in {"completed", "complete", "success"}
-                    ),
-                    None,
-                )
-
-            title = str(
-                (active_step or {}).get("title")
-                or (active_step or {}).get("action")
-                or "step"
-            )
-
-            return (
-                f"Step {min(current_index, total)}/{total} complete: {title}\n"
-                f"Completed so far: {', '.join(completed) if completed else 'none'}\n"
-                f"Next: {steps[current_index].get('title') if current_index < total else 'done'}"
-            )
-
-        return f"Execution command completed: {command}"
 
     def _clean_web_results(self, results: list) -> list:
         cleaned = []
@@ -1607,6 +1516,12 @@ Available actions:
         # execution engine
         self.execution_handler = ExecutionHandler(default_executor)
 
+        self.execution_loop = ExecutionLoopService(
+            execution_handler=self.execution_handler,
+            runtime_service=getattr(self, "runtime", None),
+        )
+
+
         # existing aliases (DO NOT REMOVE)
         self.sessions = session_service
         self.memory = memory_service
@@ -1851,15 +1766,34 @@ Available actions:
         return f"unknown action: {action}"
 
     def _run_next_step(self, execution_state: dict):
+        execution_state = execution_state if isinstance(execution_state, dict) else {}
+
+        steps = execution_state.get("steps")
+        if not isinstance(steps, list):
+            steps = []
+
+        current = int(execution_state.get("current_step") or 0)
+
+        if current >= len(steps):
+            execution_state["status"] = "complete"
+            return execution_state
 
         step = steps[current]
 
         result = self._execute_tool(step)
 
         step["result"] = result
+        step["status"] = "completed"
 
-        execution_state["history"].append(step)
-        execution_state["current_step"] += 1
+        history = execution_state.get("history")
+        if not isinstance(history, list):
+            history = []
+
+        history.append(step)
+
+        execution_state["history"] = history
+        execution_state["current_step"] = current + 1
+        execution_state["current_index"] = current + 1
 
         if execution_state["current_step"] < len(steps):
             execution_state["status"] = "running"
@@ -2183,20 +2117,43 @@ Available actions:
                 raise ValueError("model returned empty fixed code")
 
         except Exception as e:
-            assistant_text = (
-                "Auto-fix failed.\n\n"
-                f"File: {file_path}\n"
-                f"Reason: model fix failed: {type(e).__name__}: {self._safe_str(e)}"
-            )
+            error_text = self._safe_str(e)
+            error_name = type(e).__name__
+            lowered_error = error_text.lower()
 
-            assistant_msg = self._build_assistant_message(text=assistant_text)
+            if (
+                "ratelimiterror" in error_name.lower()
+                or "insufficient_quota" in lowered_error
+                or "exceeded your current quota" in lowered_error
+            ):
+                assistant_text = (
+                    "Auto-fix paused: OpenAI quota unavailable.\n\n"
+                    f"File: {file_path}\n\n"
+                    "Nova kept the failure context safe. "
+                    "Fix generation can resume after API quota is available."
+                )
+
+                route = "auto_fix_quota_paused"
+
+            else:
+                assistant_text = (
+                    "Auto-fix failed.\n\n"
+                    f"File: {file_path}\n"
+                    f"Reason: model fix failed: {error_name}: {error_text}"
+                )
+
+                route = "auto_fix_model_failed"
+
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text
+            )
 
             return self._finalize_response(
                 session_id=session_id,
                 user_text=user_text,
                 user_msg=self._build_user_message(user_text),
                 assistant_msg=assistant_msg,
-                decision={"route": "auto_fix_model_failed"},
+                decision={"route": route},
             )
 
         backup_path = None
@@ -2438,12 +2395,6 @@ Available actions:
             decision=decision,
             memory_context=memory_context,
         )
-
-        if is_execution:
-            return self._process_execution_command(
-                command=text_lc.strip(),
-                session_id=session_id,
-            )
 
         if is_execution:
             return self._process_execution_command(
@@ -8629,43 +8580,90 @@ Next action:
             from datetime import datetime, timezone
 
             execution_state = execution_state or {}
-            steps = execution_state.get("steps") or []
 
-            completed_steps = []
-            failed_steps = []
+            completed_steps = (
+                self.execution_loop.completed_step_titles(
+                    execution_state
+                )
+            )
 
-            for step in steps:
-                if not isinstance(step, dict):
-                    continue
+            failed_steps = (
+                self.execution_loop.failed_step_titles(
+                    execution_state
+                )
+            )
 
-                title = str(step.get("title") or step.get("id") or "step").strip()
-                status = str(step.get("status") or "").strip().lower()
+            if not completed_steps and not failed_steps:
+                return
 
-                if status in {"completed", "complete", "done", "success"}:
-                    completed_steps.append(title)
-                elif status in {"failed", "error"}:
-                    failed_steps.append(title)
+            if completed_steps == [
+                "No saved execution plan found"
+            ]:
+                return
 
             archive_entry = {
-                "status": str(execution_state.get("status") or "").strip(),
-                "command": str(command or "").strip(),
+                "status": str(
+                    execution_state.get("status")
+                    or ""
+                ).strip(),
+                "command": str(
+                    command
+                    or ""
+                ).strip(),
                 "completed_steps": completed_steps,
                 "failed_steps": failed_steps,
-                "last_action": str(execution_state.get("last_action") or "").strip(),
-                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "last_action": str(
+                    execution_state.get("last_action")
+                    or ""
+                ).strip(),
+                "completed_at": datetime.now(
+                    timezone.utc
+                ).isoformat(),
             }
 
             sessions = self.sessions._load_sessions()
-            index = self.sessions._find(sessions, session_id)
+
+            index = self.sessions._find(
+                sessions,
+                session_id,
+            )
 
             if index is None:
                 return
 
-            history = sessions[index].get("execution_history") or []
+            history = (
+                sessions[index].get("execution_history")
+                or []
+            )
+
+            cleaned_history = []
+
+            for item in history:
+                if not isinstance(item, dict):
+                    continue
+
+                completed = item.get("completed_steps") or []
+
+                if completed == [
+                    "No saved execution plan found"
+                ]:
+                    continue
+
+                if (
+                    not completed
+                    and not item.get("failed_steps")
+                ):
+                    continue
+
+                cleaned_history.append(item)
+
+            history = cleaned_history
+
             if not isinstance(history, list):
                 history = []
 
             history.append(archive_entry)
+
             sessions[index]["execution_history"] = history[-25:]
 
             self.sessions._save_sessions(
@@ -8678,7 +8676,6 @@ Next action:
                 "ARCHIVE EXECUTION STATE FAILED:",
                 e,
             )
-
 
     def _reset_execution_state(self, session_id: str):
         self._replace_working_state(
@@ -8761,19 +8758,23 @@ Next action:
             {},
         ) or {}
 
+        pending_action = self._safe_str(
+            state.get("pending_execution_action")
+        ).strip().lower()
+
         if (
             isinstance(execution_state, dict)
             and self._safe_str(
                 execution_state.get("status")
             ).strip().lower()
             in {
-                "failed",
                 "complete",
                 "completed",
                 "cancelled",
             }
+            and pending_action != "retry_failed"
         ):
-            execution_state = {}
+            execution_state = {}  
 
         if (
             not active_task
@@ -9349,7 +9350,8 @@ Next action:
 
                 results_log.append(result)
 
-                self._record_execution_history(
+                self.execution_loop.record_history(
+                    history_callback=self._record_execution_history,
                     session_id=session_id,
                     event_type="step_result",
                     details={

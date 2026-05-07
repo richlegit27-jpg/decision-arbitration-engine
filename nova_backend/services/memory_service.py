@@ -280,6 +280,7 @@ class MemoryService:
 
         data["memory"] = memory
         self._write_store(data)
+
     def save_memory(self, item: Dict[str, Any]) -> Dict[str, Any]:
         data = self._read_store()
         memory = data.get("memory", [])
