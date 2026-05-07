@@ -958,7 +958,12 @@ container.innerHTML = `
           ${
             isRunning
               ? `Running step ${currentIndex + 1} of ${steps.length}`
-              : escapeHtml(mission.current_step || currentStep)
+: escapeHtml(
+    String(mission.current_step || currentStep || "")
+      .replace(/^Next:\s*/i, "")
+      .replace(/^If you want.*$/i, "")
+      .trim() || "-"
+  )
           }
         </div>
         <div><strong>Progress:</strong> ${escapeHtml(String(doneCount))}/${escapeHtml(String(steps.length))} complete</div>
@@ -4200,12 +4205,19 @@ if (assistantMsg?.text?.trim()) {
   const assistantText = String(assistantMsg.text || "").trim();
   const assistantMeta = (assistantMsg && assistantMsg.meta) || {};
 
-  if (
-    assistantMeta.execution_control === true ||
-    assistantText.includes("Execution command received.")
-  ) {
-    return data;
-  }
+if (assistantText === "No active execution plan.") {
+  upsertMessage(assistantMsg);
+  renderChat();
+  scrollChatToBottom(true);
+  return data;
+}
+
+if (
+  assistantText === "Execution command completed." ||
+  assistantText.includes("Execution command received.")
+) {
+  return data;
+}
 
   const exists = (state.messages || []).some(function (msg) {
     return (

@@ -67,7 +67,7 @@ class ExecutionHandler:
             "payload": {
                 "file_path": target_file,
                 "function_name": target_function,
-                "replacement_code": replacement_code,
+                "replacement": replacement_code,
             },
         }
 
@@ -182,7 +182,7 @@ def {function_name}(self, *args, **kwargs):
                         payload=move_payload.get("payload", {}),
                     )
 
-                    apply_result = self.execute_move(move)
+                    apply_result = self.executor(move)
 
                     if apply_result and apply_result.status == "success":
                         compile_output = (
@@ -983,6 +983,22 @@ def {function_name}(self, *args, **kwargs):
                     break
 
                 current_index += 1
+            if (
+                len(steps) == 1
+                and str(steps[0].get("title", "")).strip().lower()
+                == "no saved execution plan found"
+            ):
+                return {
+                    "status": "idle",
+                    "message": "No active execution plan.",
+                    "execution_state": {
+                        "status": "idle",
+                        "steps": [],
+                        "history": history,
+                        "current_index": 0,
+                        "current_step": "",
+                    },
+                }
 
             execution_state["current_index"] = current_index
             execution_state["current_step"] = (

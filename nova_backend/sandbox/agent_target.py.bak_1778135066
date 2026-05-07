@@ -1,0 +1,5 @@
+def placeholder_function():
+    return {
+        "ok": True,
+        "message": "placeholder active",
+    }
