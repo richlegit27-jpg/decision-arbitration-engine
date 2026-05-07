@@ -2609,7 +2609,56 @@ if (!data.ok) {
 }
 
 function renderSessionList() {
-  return;
+  if (!els.sessionList) return;
+
+  const sessions = Array.isArray(state.sessions)
+    ? state.sessions
+    : [];
+
+  els.sessionList.innerHTML = sessions.map(function (session) {
+
+    const id = String(session.id || "").trim();
+    const active = id === String(state.activeSessionId || "").trim();
+
+    const messages = Array.isArray(session.messages)
+      ? session.messages
+      : [];
+
+    const lastRealMessage = messages
+      .slice()
+      .reverse()
+      .find(function (msg) {
+        if (!msg) return false;
+
+        const text = String(msg.text || "").trim();
+
+        if (!text) return false;
+        if (text === "Next:") return false;
+        if (text.startsWith("If you want")) return false;
+
+        return true;
+      });
+
+    const preview = lastRealMessage
+      ? String(lastRealMessage.text || "").trim().slice(0, 80)
+      : "New chat";
+
+    return `
+      <button
+        type="button"
+        class="nova-session-item ${active ? "is-active" : ""}"
+        data-session-id="${escapeHtml(id)}"
+      >
+        <div class="nova-session-title">
+          ${escapeHtml(session.title || "Nova")}
+        </div>
+
+        <div class="nova-session-preview">
+          ${escapeHtml(preview)}
+        </div>
+      </button>
+    `;
+  }).join("");
 }
 
 async function sendExecutionCommand(commandText) {
@@ -5405,7 +5454,11 @@ function renderWorkingContextCard(workingContext) {
     );
   }
 
-  if (wc.state.next_move) {
+if (
+  wc.state.next_move &&
+  wc.state.next_move !== "next" &&
+  wc.state.next_move !== "run_step"
+) {
     items.push(
       `<div class="nova-working-context-row"><span class="nova-working-context-label">Next move</span><span class="nova-working-context-value">${escapeHtml(wc.state.next_move)}</span></div>`
     );
@@ -5783,7 +5836,11 @@ function renderWorkingContextPanel() {
     );
   }
 
-  if (wc.state.next_move) {
+if (
+  wc.state.next_move &&
+  wc.state.next_move !== "next" &&
+  wc.state.next_move !== "run_step"
+) {
     items.push(
       `<div class="nova-working-context-row"><span class="nova-working-context-label">Next move</span><span class="nova-working-context-value">${escapeHtml(wc.state.next_move)}</span></div>`
     );
@@ -6222,6 +6279,7 @@ async function consumeChatStreamStable(payload) {
     const contentType = String(
       response.headers.get("content-type") || ""
     ).toLowerCase();
+
 
     if (!response.ok) {
       let raw = "";
@@ -6692,7 +6750,7 @@ window.runExecutionAction = async function (action, extra) {
 
   window.NovaExecutionState = window.NovaExecutionState || {};
   window.NovaExecutionState.status = "running";
-  window.NovaExecutionState.current_step = "Starting...";
+  window.NovaExecutionState.current_step = "";
   window.NovaExecutionState.steps = window.NovaExecutionState.steps || [];
 
   if (typeof window.setRailTab === "function") {
