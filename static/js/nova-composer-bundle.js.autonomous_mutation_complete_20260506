@@ -58,39 +58,17 @@ function applyBackendSessionState(payload, explicitSessionId) {
     ""
   ).trim();
 
-  if (resolvedSessionId) {
-    state.activeSessionId = resolvedSessionId;
-  }
+if (resolvedSessionId) {
+  state.activeSessionId = resolvedSessionId;
+}
 
-  window.NovaComposerState = window.NovaComposerState || {};
-  window.NovaComposerState.activeSessionId = resolvedSessionId;
-  state.session = state.session || {};
-  state.session.id = resolvedSessionId;
-
-  function dedupeMessages(messages) {
-    const seen = new Set();
-
-    return safeArray(messages)
-      .map(normalizeMessage)
-      .filter(Boolean)
-      .filter(function (msg) {
-        const key = [
-          String(msg.id || "").trim(),
-          String(msg.role || "").trim(),
-          normalizeText(msg.text || "").trim(),
-        ].join("::");
-
-        if (seen.has(key)) {
-          return false;
-        }
-
-        seen.add(key);
-        return true;
-      });
-  }
+window.NovaComposerState = window.NovaComposerState || {};
+window.NovaComposerState.activeSessionId = resolvedSessionId;
+state.session = state.session || {};
+state.session.id = resolvedSessionId;
 
   if (resolvedSession && Array.isArray(resolvedSession.messages)) {
-    const incoming = dedupeMessages(resolvedSession.messages);
+    const incoming = resolvedSession.messages.map(normalizeMessage);
 
     if (incoming.length > 0) {
       state.messages = incoming;
@@ -98,7 +76,7 @@ function applyBackendSessionState(payload, explicitSessionId) {
       console.warn("[NovaComposerBundle] blocked resolvedSession empty overwrite");
     }
   } else if (Array.isArray(data.messages)) {
-    const incoming = dedupeMessages(data.messages);
+    const incoming = data.messages.map(normalizeMessage);
 
     if (incoming.length > 0) {
       state.messages = incoming;
@@ -114,18 +92,6 @@ function applyBackendSessionState(payload, explicitSessionId) {
   if (Array.isArray(data.memory)) {
     state.memory = data.memory;
   }
-
-  console.log("[NOVA SESSION HYDRATE]", {
-    activeSessionId: state.activeSessionId,
-    message_count: Array.isArray(state.messages) ? state.messages.length : -1,
-    messages: (state.messages || []).map(function (msg) {
-      return {
-        id: msg && msg.id,
-        role: msg && msg.role,
-        text: String((msg && msg.text) || "").slice(0, 80),
-      };
-    }),
-  });
 
   renderChat();
   renderArtifacts();
@@ -484,48 +450,6 @@ const meta =
     stopped: Boolean(item.stopped),
   };
 }
-
-function dedupeMessages(messages) {
-  const seen = new Set();
-
-  return (messages || [])
-    .map(normalizeMessage)
-    .filter(Boolean)
-    .filter(function (msg) {
-      const role = String(msg.role || "");
-      const text = String(msg.text || "").trim();
-      const kind = String(msg.kind || "");
-      const stableId = String(msg.id || "").trim();
-
-      let key = [
-        role,
-        kind,
-        text.slice(0, 500),
-      ].join("::");
-
-      if (role === "assistant" && text) {
-        key = [
-          role,
-          kind,
-          text
-            .replace(/\s+/g, " ")
-            .trim()
-            .toLowerCase()
-            .slice(0, 180),
-        ].join("::");
-      }
-
-      if (stableId && !seen.has("id::" + stableId)) {
-        seen.add("id::" + stableId);
-      }
-
-      if (seen.has(key)) return false;
-      seen.add(key);
-
-      return true;
-    });
-}
-
 function buildWorkingContextFromWorkingState(rawState) {
   const state = rawState && typeof rawState === "object" ? rawState : {};
 
@@ -1310,16 +1234,13 @@ function setBusyUi(isBusy) {
   if (els.sendButton) {
     els.sendButton.disabled = Boolean(isBusy);
   }
-
   if (els.stopButton) {
     els.stopButton.hidden = !isBusy;
     els.stopButton.disabled = !isBusy;
   }
-
   if (els.chatInput) {
     els.chatInput.disabled = false;
   }
-
   if (els.attachButton) {
     els.attachButton.disabled = Boolean(isBusy && state.uploadInFlightCount > 0);
   }
@@ -1335,31 +1256,13 @@ if (els.sendButton) {
 
 if (els.chatInput) {
   els.chatInput.addEventListener("input", autoResizeTextarea);
-
-  els.chatInput.addEventListener("keydown", function (event) {
-    if (event.key !== "Enter") return;
-    if (event.shiftKey) return;
-    if (event.repeat) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (
-      els.composerForm &&
-      typeof els.composerForm.requestSubmit === "function"
-    ) {
-      els.composerForm.requestSubmit();
-    }
-  });
 }
 
-function autoResizeTextarea() {
-  if (!els.chatInput) return;
-
-  els.chatInput.style.height = "auto";
-  els.chatInput.style.height =
-    Math.min(els.chatInput.scrollHeight, 280) + "px";
-}
+  function autoResizeTextarea() {
+    if (!els.chatInput) return;
+    els.chatInput.style.height = "auto";
+    els.chatInput.style.height = Math.min(els.chatInput.scrollHeight, 280) + "px";
+  }
 
   function scrollChatToBottom(force) {
     if (!els.chatThread) return;
@@ -1446,38 +1349,13 @@ function upsertMessage(rawMessage) {
   const existingIndex = state.messages.findIndex(function (item) {
     if (!item) return false;
 
-    if (message.id && item.id === message.id) {
-      return true;
-    }
+    if (message.id && item.id === message.id) return true;
 
-    const itemRole = String(item.role || "");
-    const msgRole = String(message.role || "");
-
-    const itemText = String(item.text || "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .toLowerCase();
-
-    const msgText = String(message.text || "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .toLowerCase();
-
-    if (itemRole !== msgRole) {
-      return false;
-    }
-
-    if (
-      itemRole === "assistant" &&
-      itemText &&
-      msgText
-    ) {
-      return (
-        itemText.slice(0, 180) === msgText.slice(0, 180)
-      );
-    }
-
-    return itemText === msgText;
+return (
+  String(item.role || "") === String(message.role || "") &&
+  String(item.text || "").trim() &&
+  String(item.text || "").trim() === String(message.text || "").trim()
+);
   });
 
   if (existingIndex >= 0) {
@@ -2499,8 +2377,6 @@ function renderChat() {
     return !(msg && msg.kind === "working_context");
   });
 
-  state.messages = dedupeMessages(state.messages);
-
   state.messages = (state.messages || []).slice().sort(function (a, b) {
     const at = Date.parse(a && a.created_at ? a.created_at : "") || 0;
     const bt = Date.parse(b && b.created_at ? b.created_at : "") || 0;
@@ -2516,8 +2392,6 @@ function renderChat() {
 
     return 0;
   });
-
-  window.setChatEmptyVisible(state.messages.length === 0);
 
 window.setChatEmptyVisible(state.messages.length === 0);
 
@@ -3168,46 +3042,6 @@ function handleStreamEvent(event) {
     ""
   ).trim().toLowerCase();
 
-  if (!state.stream) {
-    state.stream = {
-      running: false,
-      controller: null,
-      targetMessageId: "",
-      buffer: "",
-      startedAt: 0,
-      messageId: "",
-      placeholderId: "",
-    };
-  }
-
-  if (!state.stream.targetMessageId) {
-    const messageId = String(
-      payload.message_id ||
-      payload.id ||
-      state.stream.messageId ||
-      makeId("assistant")
-    ).trim();
-
-    state.stream.targetMessageId = messageId;
-    state.stream.messageId = messageId;
-    state.stream.placeholderId = messageId;
-
-    upsertMessage({
-      id: messageId,
-      role: "assistant",
-      text: "",
-      streaming: true,
-      pending: true,
-      error: false,
-      stopped: false,
-      attachments: [],
-      meta: {},
-    });
-  }
-
-  const targetId = String(state.stream.targetMessageId || "").trim();
-  if (!targetId) return;
-
   if (payload.execution && Array.isArray(payload.execution.steps)) {
     state.execution.active = true;
     state.execution.steps = payload.execution.steps.map(function (step, index) {
@@ -3223,8 +3057,111 @@ function handleStreamEvent(event) {
     return;
   }
 
+  if (!state.stream) {
+    state.stream = {
+      running: false,
+      controller: null,
+      targetMessageId: "",
+      buffer: "",
+      startedAt: 0,
+      messageId: "",
+      placeholderId: "",
+    };
+  }
+
+  if (type === "token" || type === "delta" || type === "chunk") {
+    const chunkText = String(
+      payload.text ||
+      payload.delta ||
+      payload.token ||
+      payload.text_delta ||
+      payload.chunk ||
+      ""
+    );
+
+    if (state.stream.targetMessageId && chunkText) {
+      queueIncomingTokens(state.stream.targetMessageId, chunkText);
+    }
+
+    return;
+  }
+
+  if (!state.stream.targetMessageId) {
+    const messageId = String(
+      payload.message_id ||
+      payload.id ||
+      ("assistant_" + Date.now())
+    ).trim();
+
+    state.stream.targetMessageId = messageId;
+    state.stream.messageId = messageId;
+    state.stream.placeholderId = messageId;
+
+    upsertMessage({
+      id: messageId,
+      role: "assistant",
+      text: "",
+      streaming: true,
+      pending: false,
+      error: false,
+      stopped: false,
+      attachments: [],
+      meta: {},
+    });
+
+    renderChat();
+    scrollChatToBottom(true);
+  }
+
+  const targetId = String(state.stream.targetMessageId || "").trim();
+  if (!targetId) return;
+
+  const delta =
+    typeof payload.delta === "string" ? payload.delta :
+    typeof payload.token === "string" ? payload.token :
+    typeof payload.text_delta === "string" ? payload.text_delta :
+    typeof payload.chunk === "string" ? payload.chunk :
+    "";
+
+  if (delta) {
+    queueIncomingTokens(targetId, delta);
+    return;
+  }
+
+   if (
+    type === "final" ||
+    type === "done" ||
+    type === "complete" ||
+    payload.done === true ||
+    payload.final === true
+  ) {
+    flushTokensNow();
+
+    state.execution = {
+      active: true,
+      steps: [
+        { text: "Thinking...", status: "done" },
+        { text: "Response ready", status: "done" },
+      ],
+    };
+    renderExecution();
+
+    finalizeStreamMessage(payload);
+    clearTokenRenderState();
+    return;
+  }
+
   if (payload.error) {
     flushTokensNow();
+
+    state.execution = {
+      active: true,
+      steps: [
+        { text: "Thinking...", status: "done" },
+        { text: "Response failed", status: "error" },
+      ],
+    };
+    renderExecution();
 
     upsertMessage({
       id: targetId,
@@ -3239,47 +3176,8 @@ function handleStreamEvent(event) {
     });
 
     clearTokenRenderState();
-    renderChat();
-    scrollChatToBottom(true);
-    return;
-  }
 
-  const delta =
-    typeof payload.text === "string" ? payload.text :
-    typeof payload.delta === "string" ? payload.delta :
-    typeof payload.token === "string" ? payload.token :
-    typeof payload.text_delta === "string" ? payload.text_delta :
-    typeof payload.chunk === "string" ? payload.chunk :
-    "";
-
-  if (
-    (
-      type === "token" ||
-      type === "delta" ||
-      type === "chunk"
-    ) &&
-    delta
-  ) {
-    queueIncomingTokens(targetId, delta);
-    return;
-  }
-
-   if (
-    type === "final" ||
-    type === "done" ||
-    type === "complete" ||
-    payload.done === true ||
-    payload.final === true
-  ) {
-    flushTokensNow();
-    finalizeStreamMessage(payload);
-    clearTokenRenderState();
-    renderChat();
-     setTopbar(title, subtitle, statusText, statusState);
-  }
-
-function finalizeStreamMessage(payload) {
-{
+function setChatEmptyVisible(isVisible) {
   if (!els.chatEmpty) return;
   els.chatEmpty.hidden = !isVisible;
 }
@@ -3430,24 +3328,9 @@ function finalizeStreamMessage(payload) {
 
   const hydratedAssistantMessage = normalizeMessage(assistantSource || {});
 
-if (
-    hydratedAssistantMessage &&
-    hydratedAssistantMessage.id
-) {
-    const alreadyExists = (state.messages || []).some(
-        function (msg) {
-            return (
-                msg &&
-                String(msg.id || "") ===
-                    String(hydratedAssistantMessage.id || "")
-            );
-        }
-    );
-
-    if (!alreadyExists) {
-        upsertMessage(hydratedAssistantMessage);
-    }
-}
+  if (hydratedAssistantMessage && hydratedAssistantMessage.id) {
+    upsertMessage(hydratedAssistantMessage);
+  }
 
   const workingContext = normalizeWorkingContext(
     (data && data.working_context_payload) ||
@@ -3971,20 +3854,7 @@ if (!Array.isArray(state.messages)) {
     console.warn("[NovaComposerBundle] prevented message reset");
     return;
 }
-  console.log("[NOVA USER LOCAL APPEND]", {
-    id: userMessage.id,
-    role: userMessage.role,
-    text: userMessage.text,
-    count_before: state.messages.length,
-  });
-
   state.messages.push(userMessage);
-
-  console.log("[NOVA USER LOCAL APPENDED]", {
-    id: userMessage.id,
-    count_after: state.messages.length,
-  });
-
   renderChat();
   return userMessage;
 }
@@ -4041,15 +3911,6 @@ if (!response.ok || data.ok === false) {
 
 window.__lastResponse = data;
 console.log("FULL CHAT RESPONSE:", data);
-
-    if (
-      data &&
-      data.session &&
-      Array.isArray(data.session.messages)
-    ) {
-      applyBackendSessionState(data.session);
-      return data;
-    }
 
 const pendingAction =
   data &&
@@ -4390,8 +4251,23 @@ async function sendMessage() {
       await consumeChatJson(payload);
       showToast("Image request sent.", "success");
     } else {
+      const pendingAssistantId = makeId("assistant");
+
+      upsertMessage({
+        id: pendingAssistantId,
+        role: "assistant",
+        text: "",
+        created_at: new Date(Date.now() + 1).toISOString(),
+        pending: true,
+        streaming: true,
+        error: false,
+        stopped: false,
+        attachments: [],
+        meta: {},
+      });
+
       state.stream = state.stream || {};
-      state.stream.targetMessageId = "";
+      state.stream.targetMessageId = pendingAssistantId;
 
       await consumeChatStreamStable(payload);
     }
@@ -6109,11 +5985,35 @@ if (
     } else {
       state.messages.push(msgObj);
     }
-} else if (builtText) {
-  // fallback assistant insertion disabled
-  // finalizeStreamMessage now owns final assistant rendering
-}
+  } else if (builtText) {
+    if (!Array.isArray(state.messages)) {
+      state.messages = [];
+    }
 
+    const fallbackMessage = {
+      id: assistantId,
+      role: "assistant",
+      text: builtText,
+      created_at: new Date().toISOString(),
+      attachments: [],
+      artifacts: [],
+      memory_used: payload.memory_used || []
+    };
+
+    const normalizedFallback = typeof normalizeMessage === "function"
+      ? normalizeMessage(fallbackMessage)
+      : fallbackMessage;
+
+    const existingIndex = state.messages.findIndex(function (item) {
+      return String((item && item.id) || "") === assistantId;
+    });
+
+    if (existingIndex >= 0) {
+      state.messages[existingIndex] = Object.assign({}, state.messages[existingIndex], normalizedFallback);
+    } else {
+      state.messages.push(normalizedFallback);
+    }
+  }
 
   if (sessionIndex >= 0) {
     state.sessions[sessionIndex] = Object.assign({}, state.sessions[sessionIndex], {
@@ -6189,7 +6089,6 @@ async function consumeChatStreamStable(payload) {
       response.headers.get("content-type") || ""
     ).toLowerCase();
 
-
     if (responseContentType.includes("application/json")) {
       const rawJsonText = await response.text();
       const data = rawJsonText ? JSON.parse(rawJsonText) : {};
@@ -6199,24 +6098,32 @@ async function consumeChatStreamStable(payload) {
         data.session &&
         Array.isArray(data.session.messages)
       ) {
-        const incoming = dedupeMessages(data.session.messages);
-        const current = Array.isArray(state.messages) ? state.messages : [];
-
-        state.messages = dedupeMessages(current.concat(incoming));
+        state.messages = data.session.messages.map(normalizeMessage);
         renderChat();
-      } else {
-        applyStatePayload(data);
       }
 
-      finishStreamUi({
-        statusText: "Complete",
-        statusState: "done",
-      });
+      if (data && data.assistant_message) {
+        upsertMessage({
+          id: state.stream.targetMessageId || makeId("assistant"),
+          role: "assistant",
+          text: String(data.assistant_message.text || ""),
+          meta: data.assistant_message.meta || {},
+          pending: false,
+          streaming: false,
+        });
 
-      state.stream.running = false;
-      state.stream.targetMessageId = null;
+        finishStreamUi({
+          statusText: "Complete",
+          statusState: "done",
+        });
 
-      return data;
+        state.stream.running = false;
+        state.stream.targetMessageId = null;
+
+        applyStatePayload(data);
+
+        return data;
+      }
     }
 
     const contentType = String(

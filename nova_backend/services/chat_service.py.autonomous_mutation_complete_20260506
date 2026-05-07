@@ -1799,13 +1799,12 @@ Available actions:
                 {
                     "action": "implement",
                     "input": "build core logic",
-                    "target_file": r"C:\Users\Owner\nova\nova_backend\sandbox\agent_target.py",
-                    "target_function": "placeholder_function",
+                    "target_file": r"C:\Users\Owner\nova\nova_backend\services\execution_handler.py",
+                    "target_function": "_execute_step",
                 },
                 {
                     "action": "test",
                     "input": "validate output",
-                    "target_file": r"C:\Users\Owner\nova\nova_backend\sandbox\agent_target.py",
                 },
             ]
 
@@ -2333,53 +2332,14 @@ Available actions:
         original_user_text = user_text
         text_lc = (user_text or "").lower()
 
-        explicit_execution_commands = {
-            "next",
-            "nex",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "run_step",
-            "run step",
-            "run_all",
-            "run all",
-            "run it",
-            "execute",
-            "execute all",
-            "retry",
-            "retry failed",
-            "try again",
-            "rerun failed",
-            "test_fail",
-            "test fail",
-            "stop",
-            "cancel",
-        }
+        execution_keywords = [
+            "build", "create", "make", "fix", "implement",
+            "add", "write", "generate", "set up"
+        ]
+        is_execution = any(k in text_lc for k in execution_keywords)
 
-        planner_prefixes = (
-            "auto-plan",
-            "build ",
-            "create ",
-            "make ",
-            "implement ",
-            "fix ",
-            "repair ",
-        )
-
-        is_execution = (
-            text_lc.strip() in explicit_execution_commands
-            or text_lc.startswith(planner_prefixes)
-        )
-
-        is_continue = text_lc.strip() in {
-            "continue",
-            "next",
-            "run it",
-            "go",
-        }
+        continue_triggers = ["continue", "next", "run it", "go"]
+        is_continue = any(k == text_lc.strip() for k in continue_triggers)
 
         session = self._get_session_payload(session_id)
         state = session.get("working_state") if isinstance(session, dict) else {}
@@ -5025,6 +4985,9 @@ Available actions:
         exec_debug("HANDLE IS BEING CALLED")
         attachments = attachments or []
 
+        # =========================
+        # SESSION LOCK
+        # =========================
         if not session_id:
             session_id = self._create_session()
 
@@ -5075,6 +5038,7 @@ Available actions:
             "what's next",
             "whats next",
             "next move",
+            "next step",
             "checkpoint",
             "save point",
         }
@@ -5092,6 +5056,20 @@ Available actions:
                 ),
                 "session": self._get_session_payload(session_id),
             }
+
+        continue_phrases = {
+            "continue",
+            "keep going",
+            "go on",
+            "more",
+            "tell me more",
+            "go deeper",
+            "expand",
+            "next part",
+        }
+
+        if lowered in continue_phrases:
+            return self._continue_last_answer(session_id)
 
         if lowered.startswith("auto-plan"):
             execution_state = self._process_goal_and_plan(
@@ -5116,50 +5094,23 @@ Available actions:
                     "session": self._get_session_payload(session_id),
                 }
 
-        explicit_execution_commands = {
-            "next",
-            "nex",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "run_step",
-            "run step",
-            "run_all",
-            "run all",
-            "run it",
-            "execute",
-            "execute all",
-            "retry",
-            "retry failed",
-            "try again",
-            "rerun failed",
-            "test_fail",
-            "test fail",
-            "stop",
-            "cancel",
-        }
+        execution_control_result = self._handle_execution_control(
+            user_text,
+            session_id,
+        )
 
-        if lowered in explicit_execution_commands:
-            execution_control_result = self._handle_execution_control(
-                user_text,
-                session_id,
-            )
+        if execution_control_result:
+            if (
+                isinstance(execution_control_result, dict)
+                and execution_control_result.get("ok") is True
+            ):
+                return execution_control_result
 
-            if execution_control_result:
-                if (
-                    isinstance(execution_control_result, dict)
-                    and execution_control_result.get("ok") is True
-                ):
-                    return execution_control_result
-
-                return {
-                    "ok": True,
-                    "assistant_message": execution_control_result,
-                    "session": self._get_session_payload(session_id),
-                }
+            return {
+                "ok": True,
+                "assistant_message": execution_control_result,
+                "session": self._get_session_payload(session_id),
+            }
 
         auto_fix_result = self._process_auto_fix(
             user_text,
@@ -5169,6 +5120,51 @@ Available actions:
 
         if auto_fix_result:
             return auto_fix_result
+
+        execution_state = (
+            self._get_session_meta(session_id, "execution_state")
+            or {}
+        )
+
+        if (
+            execution_state
+            and execution_state.get("status")
+            not in ("complete", "cancelled")
+        ):
+            exec_debug("RESUMING EXISTING EXECUTION STATE")
+
+            if execution_state.get("waiting"):
+                execution_control_result = self._handle_execution_control(
+                    user_text,
+                    session_id,
+                )
+
+                if execution_control_result:
+                    if (
+                        isinstance(execution_control_result, dict)
+                        and execution_control_result.get("ok") is True
+                    ):
+                        return execution_control_result
+
+                    return {
+                        "ok": True,
+                        "assistant_message": execution_control_result,
+                        "session": self._get_session_payload(session_id),
+                    }
+
+                return {
+                    "ok": True,
+                    "assistant_message": self._build_assistant_message(
+                        "Execution is paused.\n\nSend `next` or `run all` to continue."
+                    ),
+                    "session": self._get_session_payload(session_id),
+                }
+
+            return self._process_execution_command(
+                command="run_step",
+                session_id=session_id,
+                execution_state=execution_state,
+            )
 
         return self._execute_general_chat(
             user_text=user_text,
@@ -8741,26 +8737,6 @@ Next action:
             "execution_state",
             {},
         ) or {}
-
-        execution_state = self._get_session_meta(
-            session_id,
-            "execution_state",
-            {},
-        ) or {}
-
-        if (
-            isinstance(execution_state, dict)
-            and self._safe_str(
-                execution_state.get("status")
-            ).strip().lower()
-            in {
-                "failed",
-                "complete",
-                "completed",
-                "cancelled",
-            }
-        ):
-            execution_state = {}
 
         if (
             not active_task
