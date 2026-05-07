@@ -423,7 +423,6 @@ function renderSources(assistantText, meta = {}) {
       upload_error: String(raw.upload_error || ""),
     };
   }
-
 function normalizeMessage(raw) {
   if (!raw || typeof raw !== "object") return null;
 
@@ -431,50 +430,7 @@ function normalizeMessage(raw) {
     raw = raw.assistant_message;
   }
 
-  const item = JSON.parse(JSON.stringify(raw || {}));
-
-  if (
-    item &&
-    typeof item === "object" &&
-    item.ok === true &&
-    item.session &&
-    item.assistant_message
-  ) {
-    return normalizeMessage(item.assistant_message);
-  }
-
-if (
-  item &&
-  typeof item.text === "object"
-) {
-  if (
-    item.text &&
-    typeof item.text.text === "string"
-  ) {
-    item.text = item.text.text;
-  } else {
-    item.text = "";
-  }
-}
-
-if (
-  typeof item.text === "string" &&
-  (
-    item.text.includes("'role': 'assistant'") ||
-    item.text.includes('"role": "assistant"') ||
-    item.text.includes("'text':") ||
-    item.text.includes('"text":')
-  )
-) {
-  try {
-    const extracted =
-      item.text.match(/['"]text['"]:\s*['"]([\s\S]*?)['"]/);
-
-    if (extracted && extracted[1]) {
-      item.text = extracted[1];
-    }
-  } catch (_) {}
-}
+  const item = raw;
 
   const role = String(item.role || "assistant");
   const kind = String(item.kind || "");
@@ -1002,12 +958,7 @@ container.innerHTML = `
           ${
             isRunning
               ? `Running step ${currentIndex + 1} of ${steps.length}`
-: escapeHtml(
-    String(mission.current_step || currentStep || "")
-      .replace(/^Next:\s*/i, "")
-      .replace(/^If you want.*$/i, "")
-      .trim() || "-"
-  )
+              : escapeHtml(mission.current_step || currentStep)
           }
         </div>
         <div><strong>Progress:</strong> ${escapeHtml(String(doneCount))}/${escapeHtml(String(steps.length))} complete</div>
@@ -2658,56 +2609,7 @@ if (!data.ok) {
 }
 
 function renderSessionList() {
-  if (!els.sessionList) return;
-
-  const sessions = Array.isArray(state.sessions)
-    ? state.sessions
-    : [];
-
-  els.sessionList.innerHTML = sessions.map(function (session) {
-
-    const id = String(session.id || "").trim();
-    const active = id === String(state.activeSessionId || "").trim();
-
-    const messages = Array.isArray(session.messages)
-      ? session.messages
-      : [];
-
-    const lastRealMessage = messages
-      .slice()
-      .reverse()
-      .find(function (msg) {
-        if (!msg) return false;
-
-        const text = String(msg.text || "").trim();
-
-        if (!text) return false;
-        if (text === "Next:") return false;
-        if (text.startsWith("If you want")) return false;
-
-        return true;
-      });
-
-    const preview = lastRealMessage
-      ? String(lastRealMessage.text || "").trim().slice(0, 80)
-      : "New chat";
-
-    return `
-      <button
-        type="button"
-        class="nova-session-item ${active ? "is-active" : ""}"
-        data-session-id="${escapeHtml(id)}"
-      >
-        <div class="nova-session-title">
-          ${escapeHtml(session.title || "Nova")}
-        </div>
-
-        <div class="nova-session-preview">
-          ${escapeHtml(preview)}
-        </div>
-      </button>
-    `;
-  }).join("");
+  return;
 }
 
 async function sendExecutionCommand(commandText) {
@@ -3578,11 +3480,9 @@ const autoExecuteMessage =
 if (
   autoExecuteMessage &&
   autoExecuteMessage.meta &&
-
   autoExecuteMessage.meta.auto_execute &&
   typeof window.runExecutionAction === "function"
 ) {
-
   requestAnimationFrame(() => {
     const execResult =
       autoExecuteMessage.meta.execution_result || {};
@@ -4142,21 +4042,14 @@ if (!response.ok || data.ok === false) {
 window.__lastResponse = data;
 console.log("FULL CHAT RESPONSE:", data);
 
-if (
-  data &&
-  data.session &&
-  Array.isArray(data.session.messages)
-) {
-  applyBackendSessionState(data.session);
-
-  const hasAssistantMessage =
-    data.assistant_message &&
-    typeof data.assistant_message === "object";
-
-  if (!hasAssistantMessage) {
-    return data;
-  }
-}
+    if (
+      data &&
+      data.session &&
+      Array.isArray(data.session.messages)
+    ) {
+      applyBackendSessionState(data.session);
+      return data;
+    }
 
 const pendingAction =
   data &&
@@ -4242,23 +4135,6 @@ if (state.rail && state.rail.tab === "execution" && typeof renderExecution === "
     setBusyUi(false);
   }
 });
-  if (!autoLoop) {
-    const assistantMsg =
-      data && data.assistant_message
-        ? normalizeMessage(
-            typeof data.assistant_message === "string"
-              ? { text: data.assistant_message }
-              : data.assistant_message
-          )
-        : null;
-
-    if (assistantMsg?.text?.trim()) {
-      upsertMessage(assistantMsg);
-      renderChat();
-      scrollChatToBottom(true);
-    }
-  }
-
   return data;
 }
 
@@ -4275,19 +4151,12 @@ if (assistantMsg?.text?.trim()) {
   const assistantText = String(assistantMsg.text || "").trim();
   const assistantMeta = (assistantMsg && assistantMsg.meta) || {};
 
-if (assistantText === "No active execution plan.") {
-  upsertMessage(assistantMsg);
-  renderChat();
-  scrollChatToBottom(true);
-  return data;
-}
-
-if (
-  assistantText === "Execution command completed." ||
-  assistantText.includes("Execution command received.")
-) {
-  return data;
-}
+  if (
+    assistantMeta.execution_control === true ||
+    assistantText.includes("Execution command received.")
+  ) {
+    return data;
+  }
 
   const exists = (state.messages || []).some(function (msg) {
     return (
@@ -5536,11 +5405,7 @@ function renderWorkingContextCard(workingContext) {
     );
   }
 
-if (
-  wc.state.next_move &&
-  wc.state.next_move !== "next" &&
-  wc.state.next_move !== "run_step"
-) {
+  if (wc.state.next_move) {
     items.push(
       `<div class="nova-working-context-row"><span class="nova-working-context-label">Next move</span><span class="nova-working-context-value">${escapeHtml(wc.state.next_move)}</span></div>`
     );
@@ -5918,11 +5783,7 @@ function renderWorkingContextPanel() {
     );
   }
 
-if (
-  wc.state.next_move &&
-  wc.state.next_move !== "next" &&
-  wc.state.next_move !== "run_step"
-) {
+  if (wc.state.next_move) {
     items.push(
       `<div class="nova-working-context-row"><span class="nova-working-context-label">Next move</span><span class="nova-working-context-value">${escapeHtml(wc.state.next_move)}</span></div>`
     );
@@ -6361,7 +6222,6 @@ async function consumeChatStreamStable(payload) {
     const contentType = String(
       response.headers.get("content-type") || ""
     ).toLowerCase();
-
 
     if (!response.ok) {
       let raw = "";
@@ -6832,7 +6692,7 @@ window.runExecutionAction = async function (action, extra) {
 
   window.NovaExecutionState = window.NovaExecutionState || {};
   window.NovaExecutionState.status = "running";
-  window.NovaExecutionState.current_step = "";
+  window.NovaExecutionState.current_step = "Starting...";
   window.NovaExecutionState.steps = window.NovaExecutionState.steps || [];
 
   if (typeof window.setRailTab === "function") {
