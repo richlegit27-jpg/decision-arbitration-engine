@@ -39,23 +39,9 @@ from nova_backend.services.chat_service import ChatService
 from nova_backend.services.execution_handler import NextMove, default_executor
 from nova_backend.services.execution_daemon import ExecutionDaemon
 
-NOVA_DEBUG = True
-
-
-def nova_log(label: str, payload=None):
-    if not NOVA_DEBUG:
-        return
-
-    if payload is None:
-        print(f"[NOVA] {label}")
-        return
-
-    print(f"[NOVA] {label}: {payload}")
-
-
 # -----------------------
 # APP SETUP
-# ------------------------
+# -----------------------
 
 app = Flask(
     __name__,
@@ -653,14 +639,7 @@ def api_chat():
             attachments=attachments,
         )
 
-        print(
-            "CHAT RESULT:",
-            {
-                "ok": result.get("ok"),
-                "route": result.get("debug", {}).get("route"),
-                "status": result.get("debug", {}).get("status"),
-            },
-        )
+        print("CHAT RAW RESULT:", result)
 
         if result is None:
             result = {
@@ -2185,8 +2164,4 @@ def create_startup_backup():
 # -----------------------
 if __name__ == "__main__":
     create_startup_backup()
-    app.run(
-        debug=True,
-        port=5001,
-        use_reloader=False,
-    )
+    app.run(debug=True, port=5001)

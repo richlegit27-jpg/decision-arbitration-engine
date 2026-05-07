@@ -2442,8 +2442,32 @@ Available actions:
             assistant_text = self._extract_response_text(response)
 
         except Exception as e:
-            exec_debug("GENERAL CHAT ERROR:", e)
-            assistant_text = "Something went wrong."
+            import traceback
+
+            error_text = "".join(
+                traceback.format_exception(
+                    type(e),
+                    e,
+                    e.__traceback__,
+                )
+            )
+
+            exec_debug(
+                "GENERAL CHAT ERROR:",
+                error_text,
+            )
+
+            if "insufficient_quota" in str(e).lower():
+                assistant_text = (
+                    "OpenAI API quota exhausted.\n\n"
+                    "Nova backend is working, but the configured "
+                    "API key has no remaining quota."
+                )
+            else:
+                assistant_text = (
+                    "General chat failed.\n\n"
+                    f"{type(e).__name__}: {str(e)}"
+                )
 
         if not assistant_text:
             assistant_text = "No response generated."
