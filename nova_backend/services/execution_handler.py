@@ -868,13 +868,21 @@ def {function_name}(self, *args, **kwargs):
             plan = execution_state.get("plan") or execution_state.get("normalized_steps") or []
             if plan:
                 steps = plan
+
             else:
-                steps = [
-                    {
-                        "title": "No saved execution plan found",
-                        "status": "pending",
+                return {
+                    "ok": True,
+                    "status": "idle",
+                    "message": "No active execution plan.",
+                    "execution_state": {
+                        "status": "idle",
+                        "steps": [],
+                        "history": history,
+                        "current_index": 0,
+                        "current_step": "",
                     },
-                ]
+                }
+
             current_index = 0
 
         if action == "retry_failed":
