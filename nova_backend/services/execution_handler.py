@@ -582,6 +582,15 @@ def {function_name}(self, *args, **kwargs):
                     "reason": "mutation_not_validated",
                 }
 
+        if action == "test":
+            result_text = str(step.get("result") or "").lower()
+
+            if "compile status: passed" not in result_text:
+                return {
+                    "ok": False,
+                    "reason": "runtime_test_failed",
+                }
+
         return {
             "ok": True,
             "reason": "verified",
