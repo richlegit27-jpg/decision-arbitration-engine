@@ -2164,4 +2164,8 @@ def create_startup_backup():
 # -----------------------
 if __name__ == "__main__":
     create_startup_backup()
-    app.run(debug=True, port=5001)
+    app.run(
+        debug=True,
+        port=5001,
+        use_reloader=False,
+    )
