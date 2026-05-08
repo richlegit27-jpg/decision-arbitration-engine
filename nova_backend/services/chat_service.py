@@ -8052,6 +8052,7 @@ def _normalize_execution_state(self, execution):
 
     step_count = len(clean_steps)
 
+    if not clean_steps:
         execution = self._finalize_execution_state(
             execution
         )
@@ -8061,6 +8062,7 @@ def _normalize_execution_state(self, execution):
         execution["current_step_index"] = 0
         execution["progress"] = 0
 
+        return execution
         return execution
 
     if current_index < 0:
