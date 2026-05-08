@@ -10777,6 +10777,19 @@ def _build_chat_input(
     user_text = self._safe_str(user_text)
     decision = decision if isinstance(decision, dict) else {}
 
+    route = self._safe_str(
+        decision.get("route")
+    ).lower()
+
+    tool_locked_routes = {
+        self.ROUTE_WEB_FETCH,
+        self.ROUTE_IMAGE_GENERATION,
+    }
+
+    if route in tool_locked_routes:
+        memory_context = ""
+        working_context_block = ""
+
     memory_items = self._rank_memory_context(
         user_text=user_text,
         limit=20,
@@ -10922,7 +10935,7 @@ def _build_chat_input(
             f"{working_context_block}"
         )
 
-    if recent_block:
+    if recent_block and route not in tool_locked_routes:
         sections.append(
             "RECENT CONVERSATION:\n"
             f"{recent_block}"
