@@ -9062,11 +9062,6 @@ Next action:
             {},
         ) or {}
 
-        execution_state = self._get_session_meta(
-            session_id,
-            "execution_state",
-            {},
-        ) or {}
 
         pending_action = self._safe_str(
             state.get("pending_execution_action")
@@ -9149,22 +9144,23 @@ Next action:
         if any(x in lowered for x in ["checkpoint", "save point", "phase"]):
             return f"Checkpoint: {checkpoint}" if checkpoint else "I do not have a checkpoint locked in yet."
 
-        lines = []
+        state_for_summary = dict(state or {})
 
         if active_task:
-            lines.append(f"Active task: {active_task}")
-        if current_bug:
-            lines.append(f"Current bug: {current_bug}")
+            state_for_summary["active_task"] = active_task
         if current_file:
-            lines.append(f"Current file: `{current_file}`")
+            state_for_summary["current_file"] = current_file
+        if current_bug:
+            state_for_summary["current_bug"] = current_bug
         if last_success:
-            lines.append(f"Last success: {last_success}")
+            state_for_summary["last_success"] = last_success
         if next_move:
-            lines.append(f"Next move: {next_move}")
+            state_for_summary["next_move"] = next_move
         if checkpoint:
-            lines.append(f"Checkpoint: {checkpoint}")
+            state_for_summary["checkpoint"] = checkpoint
 
-        return "\n".join(lines) if lines else "I do not have a working context locked in yet."
+        summary = self._build_working_state_summary(state_for_summary)
+        return summary if summary else "I do not have a working context locked in yet."
 
         # =========================
         # WORKING STATE HELPERS
@@ -11462,6 +11458,8 @@ def _build_chat_input(
 
         except Exception as e:
             exec_debug("MEMORY CLEANUP FAILED:", e)
+
+
 
 
 
