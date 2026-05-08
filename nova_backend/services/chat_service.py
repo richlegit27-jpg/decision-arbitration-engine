@@ -5433,10 +5433,11 @@ Available actions:
         }
 
         if lowered in where_are_we_phrases:
-            assistant_text = self._handle_where_are_we(
-                session_id=session_id,
-                user_text=user_text,
-            )
+            state = self._get_working_state(session_id) or {}
+            assistant_text = self._build_working_state_summary(state)
+
+            if not assistant_text:
+                assistant_text = "I do not have a working context locked in yet."
 
             return {
                 "ok": True,
@@ -8875,6 +8876,7 @@ Next action:
 
         return clean_state
 
+
     def _archive_execution_state(
         self,
         session_id: str,
@@ -9013,158 +9015,6 @@ Next action:
                 "RESET EXECUTION SESSION CLEAR FAILED:",
                 e,
             )
-
-    def _handle_where_are_we(self, session_id: str, user_text: str = "") -> str:
-        state = self._get_working_state(session_id) or {}
-
-        active_task = self._safe_str(state.get("active_task")).strip()
-        current_file = self._safe_str(state.get("current_file")).strip()
-        current_bug = self._safe_str(state.get("current_bug")).strip()
-        last_success = self._safe_str(state.get("last_success")).strip()
-        next_move = self._safe_str(state.get("next_move")).strip()
-        checkpoint = self._safe_str(state.get("checkpoint")).strip()
-
-        lowered = self._safe_str(user_text).lower().strip()
-
-        resume = self._resume_execution_if_needed(session_id)
-
-        if resume:
-            return self._continue_execution(session_id, resume)
-
-        if lowered in {
-            "reset",
-            "reset all",
-            "clear context",
-            "clear state",
-            "stop execution",
-            "clear all",
-        }:
-            self._reset_execution_state(session_id)
-
-            return {
-                "ok": True,
-                "assistant_message": self._build_assistant_message(
-                    text="State cleared. Nova is back to normal."
-                ),
-                "session": self._get_session_payload(session_id),
-                "debug": {
-                    "route": "reset_execution_state",
-                },
-            }
-
-        if lowered in {"reset", "clear state", "stop execution"}:
-            self._reset_execution_state(session_id)
-            return "State cleared. Nova is back to normal."
-
-        execution_state = self._get_session_meta(
-            session_id,
-            "execution_state",
-            {},
-        ) or {}
-
-
-        pending_action = self._safe_str(
-            state.get("pending_execution_action")
-        ).strip().lower()
-
-        if (
-            isinstance(execution_state, dict)
-            and self._safe_str(
-                execution_state.get("status")
-            ).strip().lower()
-            in {
-                "complete",
-                "completed",
-                "cancelled",
-            }
-            and pending_action != "retry_failed"
-        ):
-            execution_state = {}  
-
-        if (
-            not active_task
-            and isinstance(execution_state, dict)
-            and execution_state.get("status") == "running"
-        ):
-            current_title = self._safe_str(
-                execution_state.get("current_step_title")
-            ).strip()
-
-            current_index = execution_state.get("current_index", 0)
-
-            steps = execution_state.get("steps") or []
-
-            active_task = current_title or "execution_running"
-
-            if (
-                isinstance(current_index, int)
-                and 0 <= current_index < len(steps)
-            ):
-                current_step = steps[current_index] or {}
-
-                current_file = self._safe_str(
-                    current_step.get("target_file")
-                ).strip()
-
-                current_bug = self._safe_str(
-                    current_step.get("title")
-                ).strip()
-
-        has_execution_context = (
-            isinstance(execution_state, dict)
-            and bool(execution_state)
-            and self._safe_str(
-                execution_state.get("status")
-            ).strip().lower() == "running"
-        )
-
-        if not any([
-            active_task,
-            current_file,
-            current_bug,
-            last_success,
-            next_move,
-            checkpoint,
-            has_execution_context,
-        ]):
-            return "I do not have a working context locked in yet."
-
-        if "file" in lowered:
-            return f"We're in `{current_file}`." if current_file else "I do not have the current file locked in yet."
-
-        if any(x in lowered for x in ["broke", "broken", "bug", "issue", "error"]):
-            return f"What broke: {current_bug}" if current_bug else "I do not have a current bug locked in."
-
-        if any(x in lowered for x in ["fix", "fixed", "worked", "working", "success"]):
-            return f"What we fixed: {last_success}" if last_success else "I do not have a last success locked in yet."
-
-        if any(x in lowered for x in ["next", "now what"]):
-            return f"Next: {next_move}" if next_move else "I do not have a next move locked in yet."
-
-        if any(x in lowered for x in ["checkpoint", "save point", "phase"]):
-            return f"Checkpoint: {checkpoint}" if checkpoint else "I do not have a checkpoint locked in yet."
-
-        state_for_summary = dict(state or {})
-
-        if active_task:
-            state_for_summary["active_task"] = active_task
-        if current_file:
-            state_for_summary["current_file"] = current_file
-        if current_bug:
-            state_for_summary["current_bug"] = current_bug
-        if last_success:
-            state_for_summary["last_success"] = last_success
-        if next_move:
-            state_for_summary["next_move"] = next_move
-        if checkpoint:
-            state_for_summary["checkpoint"] = checkpoint
-
-        summary = self._build_working_state_summary(state_for_summary)
-        return summary if summary else "I do not have a working context locked in yet."
-
-        # =========================
-        # WORKING STATE HELPERS
-        # =========================
 
     def _clean_working_state_value(self, value, limit=120):
             text = self._safe_str(value).strip()
@@ -11458,6 +11308,8 @@ def _build_chat_input(
 
         except Exception as e:
             exec_debug("MEMORY CLEANUP FAILED:", e)
+
+
 
 
 
