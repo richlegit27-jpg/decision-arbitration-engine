@@ -1654,6 +1654,43 @@ Available actions:
             },
         }
 
+    def _source_quality_score(
+        self,
+        url: str = "",
+        text: str = "",
+    ) -> int:
+        try:
+            url = self._safe_str(url).lower()
+            text = self._safe_str(text).lower()
+
+            score = 0
+
+            trusted = [
+                "reuters.com",
+                "apnews.com",
+                "bbc.com",
+                "openai.com",
+                "ft.com",
+                "cnbc.com",
+                "bloomberg.com",
+                "theverge.com",
+                "techcrunch.com",
+            ]
+
+            for domain in trusted:
+                if domain in url:
+                    score += 100
+
+            if "rumor" in text:
+                score -= 25
+
+            if "opinion" in text:
+                score -= 15
+
+            return score
+
+        except Exception:
+            return 0
 
     def _clean_web_results(self, results: list) -> list:
         cleaned = []
@@ -2735,9 +2772,11 @@ Available actions:
             )
 
         if route == self.ROUTE_WEB_FETCH:
-            return self._handle_web_fetch(
-                url=user_text,
+            return self._execute_web_fetch(
+                decision=decision,
+                user_text=user_text,
                 session_id=session_id,
+                attachments=attachments,
             )
 
         original_user_text = user_text
