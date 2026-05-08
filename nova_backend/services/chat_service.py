@@ -2765,20 +2765,6 @@ Available actions:
 
         route = self._safe_str(decision.get("route")).lower()
 
-        if route == self.ROUTE_IMAGE_GENERATION:
-            return self._handle_image_generation(
-                prompt=user_text,
-                session_id=session_id,
-            )
-
-        if route == self.ROUTE_WEB_FETCH:
-            return self._execute_web_fetch(
-                decision=decision,
-                user_text=user_text,
-                session_id=session_id,
-                attachments=attachments,
-            )
-
         original_user_text = user_text
         text_lc = (user_text or "").lower()
 
@@ -2859,6 +2845,32 @@ Available actions:
             # Disabled: do not rewrite normal chat into execution mode
             pass
 
+        route = self._safe_str(
+            decision.get("route")
+        ).lower()
+
+        isolated_routes = {
+            self.ROUTE_WEB_FETCH,
+            self.ROUTE_IMAGE_GENERATION,
+        }
+
+        if route in isolated_routes:
+            memory_context = ""
+
+            if route == self.ROUTE_WEB_FETCH:
+                return self._execute_web_fetch(
+                    decision=decision,
+                    user_text=user_text,
+                    session_id=session_id,
+                    attachments=attachments,
+                )
+
+            if route == self.ROUTE_IMAGE_GENERATION:
+                return self._handle_image_generation(
+                    prompt=user_text,
+                    session_id=session_id,
+                )
+
         user_msg = self._build_user_message(
             original_user_text,
             attachments=attachments,
@@ -2880,12 +2892,28 @@ Available actions:
         else:
             memory_context = f"Answer depth instruction:\n{depth_instruction}"
 
-        model_messages = self._compose_model_messages(
-            user_text=user_text,
-            session=session,
-            decision=decision,
-            memory_context=memory_context,
-        )
+        if route in isolated_routes:
+            model_messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are operating in isolated tool mode. "
+                        "Do not use prior conversation context, "
+                        "memory, execution state, or continuity."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": user_text,
+                },
+            ]
+        else:
+            model_messages = self._compose_model_messages(
+                user_text=user_text,
+                session=session,
+                decision=decision,
+                memory_context=memory_context,
+            )
 
         if False and is_execution:
             return self._process_execution_command(
