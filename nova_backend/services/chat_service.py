@@ -8135,8 +8135,12 @@ def _normalize_execution_state(self, execution):
         execution["current_index"] = next_index
 
         if next_index >= step_count:
-            execution["status"] = "complete"
-            execution["current_step"] = "complete"
+            execution = self._finalize_execution_state(
+                execution
+            )
+
+            execution["current_step_index"] = step_count
+            execution["current_index"] = step_count
             execution["progress"] = step_count
         else:
             execution["status"] = "running"
@@ -11379,7 +11383,6 @@ def _build_chat_input(
 
         except Exception as e:
             exec_debug("MEMORY CLEANUP FAILED:", e)
-
 
 
 
