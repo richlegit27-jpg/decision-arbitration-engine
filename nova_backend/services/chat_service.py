@@ -9388,30 +9388,8 @@ Next action:
     # =========================
 
     def _format_working_state_context(self, session_id: str) -> str:
-            state = self._get_working_state(session_id)
-            if not isinstance(state, dict) or not state:
-                return ""
-
-            lines = []
-
-            if self._safe_str(state.get("active_task")):
-                lines.append(f"- Active task: {self._safe_str(state.get('active_task'))}")
-            if self._safe_str(state.get("current_file")):
-                lines.append(f"- Current file: {self._safe_str(state.get('current_file'))}")
-            if self._safe_str(state.get("current_bug")):
-                lines.append(f"- Current bug: {self._safe_str(state.get('current_bug'))}")
-            if self._safe_str(state.get("last_success")):
-                lines.append(f"- Last success: {self._safe_str(state.get('last_success'))}")
-            if self._safe_str(state.get("next_move")):
-                lines.append(f"- Next move: {self._safe_str(state.get('next_move'))}")
-            if self._safe_str(state.get("checkpoint")):
-                lines.append(f"- Checkpoint: {self._safe_str(state.get('checkpoint'))}")
-
-            if not lines:
-                return ""
-
-            return "Working context:\n" + "\n".join(lines)
-
+        state = self._get_working_state(session_id)
+        return self._build_working_state_summary(state)
 
     def _run_execution_next_move(self, active_task: str, next_move: str, session_id: str) -> str:
         active_task = self._safe_str(active_task).strip()
@@ -11458,6 +11436,7 @@ def _build_chat_input(
 
         except Exception as e:
             exec_debug("MEMORY CLEANUP FAILED:", e)
+
 
 
 
