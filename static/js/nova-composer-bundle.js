@@ -424,9 +424,17 @@ const mainText = text.trim();
 function normalizeMessage(raw) {
   if (!raw || typeof raw !== "object") return null;
 
-  if (raw.ok === true && raw.assistant_message) {
-    raw = raw.assistant_message;
-  }
+if (
+  raw.ok === true &&
+  raw.assistant_message &&
+  typeof raw.assistant_message === "object"
+) {
+  raw = {
+    ...raw,
+    ...raw.assistant_message,
+    assistant_message: raw.assistant_message,
+  };
+}
 
   const item = raw;
 
@@ -1426,8 +1434,16 @@ function upsertMessage(rawMessage) {
 
   let safeRaw = rawMessage;
 
-  if (safeRaw.ok === true && safeRaw.assistant_message) {
-    safeRaw = safeRaw.assistant_message;
+  if (
+    safeRaw.ok === true &&
+    safeRaw.assistant_message &&
+    typeof safeRaw.assistant_message === "object"
+  ) {
+    safeRaw = {
+      ...safeRaw,
+      ...safeRaw.assistant_message,
+      assistant_message: safeRaw.assistant_message,
+    };
   }
 
   if (
@@ -3827,14 +3843,35 @@ if (!response.ok || data.ok === false) {
 window.__lastResponse = data;
 console.log("FULL CHAT RESPONSE:", data);
 
-    if (
-      data &&
-      data.session &&
-      Array.isArray(data.session.messages)
-    ) {
-      applyBackendSessionState(data.session);
-      return data;
-    }
+const hasImageResponse =
+  data &&
+  (
+    data.image_url ||
+    (
+      data.assistant_message &&
+      typeof data.assistant_message === "object" &&
+      (
+        data.assistant_message.image_url ||
+        (
+          data.assistant_message.meta &&
+          data.assistant_message.meta.image_url
+        )
+      )
+    )
+  );
+
+if (
+  data &&
+  data.session &&
+  Array.isArray(data.session.messages)
+) {
+  applyBackendSessionState(data.session);
+
+  // DO NOT EARLY-RETURN IMAGE RESPONSES
+  if (!hasImageResponse) {
+    return data;
+  }
+}
 
 const pendingAction =
   data &&
