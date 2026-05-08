@@ -5715,8 +5715,20 @@ Auto-fix result:
         # prevent overflow / duplicate execution
         if execution_state.get("status") == "complete":
             execution_state["waiting"] = False
-            self._set_session_meta(session_id, "execution_state", execution_state)
+            execution_state["current_step"] = ""
+            execution_state["current_step_title"] = ""
+            execution_state["last_action"] = ""
+            execution_state["active"] = False
+            execution_state["complete"] = True
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+
             self._reset_execution_state(session_id)
+
             return execution_state
 
         # run next step
@@ -8985,17 +8997,59 @@ Next action:
             )
 
     def _reset_execution_state(self, session_id: str):
+        previous_state = self._get_working_state(session_id) or {}
+
+        last_success = self._safe_str(
+            previous_state.get("last_success")
+        ).strip()
+
+        checkpoint = self._safe_str(
+            previous_state.get("checkpoint")
+        ).strip()
+
+        if not last_success:
+            last_success = "execution_complete"
+
+        if not checkpoint:
+            checkpoint = "execution_cycle_complete"
+
         self._replace_working_state(
             session_id,
             {
                 "active_task": "",
                 "current_file": "",
                 "current_bug": "",
-                "last_success": "",
+                "last_success": last_success,
                 "next_move": "",
-                "checkpoint": "",
+                "checkpoint": checkpoint,
             },
         )
+
+        try:
+            sessions = self.sessions._load_sessions()
+            index = self.sessions._find(sessions, session_id)
+
+            if index is not None:
+                sessions[index]["execution_state"] = {}
+                sessions[index]["active_execution"] = {
+                    "id": "",
+                    "goal": "",
+                    "status": "idle",
+                    "current_step_index": 0,
+                    "updated_at": "",
+                    "steps": [],
+                }
+
+                self.sessions._save_sessions(
+                    sessions,
+                    self.sessions.get_active_session_id(),
+                )
+
+        except Exception as e:
+            exec_debug(
+                "RESET EXECUTION SESSION CLEAR FAILED:",
+                e,
+            )
 
         try:
             sessions = self.sessions._load_sessions()
