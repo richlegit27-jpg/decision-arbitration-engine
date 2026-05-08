@@ -8122,11 +8122,14 @@ def _normalize_execution_state(self, execution):
             return execution
 
         if current_index >= step_count:
+            execution = self._finalize_execution_state(
+                execution
+            )
+
             execution["current_step_index"] = step_count
             execution["current_index"] = step_count
             execution["progress"] = step_count
-            execution["current_step"] = "complete"
-            execution["status"] = "complete"
+
             return self._normalize_execution_state(execution)
 
         next_index = current_index + 1
