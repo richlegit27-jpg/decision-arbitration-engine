@@ -9018,8 +9018,6 @@ Next action:
 
         return execution_state
 
-
-
     def _reset_execution_state(self, session_id: str):
         previous_state = self._get_working_state(session_id) or {}
 
@@ -9055,6 +9053,7 @@ Next action:
 
             if index is not None:
                 sessions[index]["execution_state"] = {}
+
                 sessions[index]["active_execution"] = {
                     "id": "",
                     "goal": "",
@@ -9075,50 +9074,33 @@ Next action:
                 e,
             )
 
-        try:
-            sessions = self.sessions._load_sessions()
-            index = self.sessions._find(sessions, session_id)
-
-            if index is not None:
-                sessions[index]["execution_state"] = {}
-                sessions[index]["active_execution"] = {}
-
-                self.sessions._save_sessions(
-                    sessions,
-                    self.sessions.get_active_session_id(),
-                )
-
-        except Exception as e:
-            exec_debug(
-                "RESET EXECUTION SESSION CLEAR FAILED:",
-                e,
-            )
-
     def _clean_working_state_value(self, value, limit=120):
-            text = self._safe_str(value).strip()
-            if not text:
-                return ""
+        text = self._safe_str(value).strip()
 
-            text = text.replace("\r", " ").replace("\n", " ")
-            text = re.sub(r"\s+", " ", text).strip()
+        if not text:
+            return ""
 
-            bad_starts = (
-                "yes",
-                "agreed",
-                "recommended",
-                "in short",
-                "what this means",
-            )
+        text = text.replace("\r", " ").replace("\n", " ")
+        text = re.sub(r"\s+", " ", text).strip()
 
-            lower = text.lower()
-            if any(lower.startswith(x) for x in bad_starts):
-                return ""
+        bad_starts = (
+            "yes",
+            "agreed",
+            "recommended",
+            "in short",
+            "what this means",
+        )
 
-            for splitter in [" and ", " but ", " so "]:
-                if splitter in text:
-                    text = text.split(splitter)[0].strip()
+        lower = text.lower()
 
-            return text[:limit]
+        if any(lower.startswith(x) for x in bad_starts):
+            return ""
+
+        for splitter in [" and ", " but ", " so "]:
+            if splitter in text:
+                text = text.split(splitter)[0].strip()
+
+        return text[:limit]
 
     def _is_valid_state_value(self, value):
             if not value:
