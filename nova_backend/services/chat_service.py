@@ -8113,12 +8113,15 @@ def _normalize_execution_state(self, execution):
         )
 
         if step_count == 0:
-            execution["status"] = "complete"
+            execution = self._finalize_execution_state(
+                execution
+            )
+
             execution["current_step_index"] = 0
             execution["current_index"] = 0
             execution["progress"] = 0
-            execution["current_step"] = "complete"
             execution["steps"] = []
+
             return execution
 
         if current_index >= step_count:
