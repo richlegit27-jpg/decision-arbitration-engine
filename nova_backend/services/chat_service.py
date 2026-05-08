@@ -9008,10 +9008,16 @@ Next action:
     def _finalize_execution_state(self, execution_state: dict | None = None) -> dict:
         execution_state = dict(execution_state or {})
 
-        execution_state["status"] = "complete"
+        execution_state["status"] = "idle"
         execution_state["waiting"] = False
-        execution_state["complete"] = True
+        execution_state["complete"] = False
         execution_state["active"] = False
+
+        execution_state["steps"] = []
+        execution_state["plan"] = []
+        execution_state["current_index"] = 0
+        execution_state["history"] = []
+
         execution_state["current_step"] = ""
         execution_state["current_step_title"] = ""
         execution_state["last_action"] = ""
@@ -11376,7 +11382,19 @@ def _build_chat_input(
         except Exception as e:
             exec_debug("MEMORY CLEANUP FAILED:", e)
 
+def _chatservice_archive_execution_state_patch(
+    self,
+    session_id: str,
+    execution_state: dict | None = None,
+    command: str = "",
+) -> None:
+    try:
+        return None
+    except Exception:
+        return None
 
+
+ChatService._archive_execution_state = _chatservice_archive_execution_state_patch
 
 
 

@@ -106,27 +106,7 @@ def json_ok(**kwargs):
     payload.update(kwargs)
     return jsonify(payload)
 
-def start_execution_daemon(self):
-    import threading
-    import time
 
-    def loop():
-        while True:
-            try:
-                for session_id, session in self.sessions.items():
-                    state = session.get("working_state") or {}
-
-                    if state.get("status") == "running":
-                        resume = self._resume_execution_if_needed(session_id)
-                        if resume:
-                            self._continue_execution(session_id, resume)
-            except Exception as e:
-                exec_debug("DAEMON ERROR:", e)
-
-            time.sleep(3)
-
-    thread = threading.Thread(target=loop, daemon=True)
-    thread.start()
 
 def json_error(message: str, status: int = 400, **kwargs):
     payload = {"ok": False, "error": str(message)}
@@ -2181,4 +2161,9 @@ def create_startup_backup():
 # -----------------------
 if __name__ == "__main__":
     create_startup_backup()
-    app.run(debug=True, port=5001)
+    app.run(
+        host="127.0.0.1",
+        port=5001,
+        debug=True,
+        use_reloader=False,
+    )
