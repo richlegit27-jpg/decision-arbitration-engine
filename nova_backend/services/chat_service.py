@@ -53,6 +53,258 @@ class ChatService:
     ROUTE_PLANNING = "planning"
     ROUTE_MEMORY_RECALL = "memory_recall"
 
+    def _get_working_state(self, session_id: str) -> dict:
+        session_id = self._safe_str(session_id).strip()
+
+        if not session_id:
+            return {}
+
+        try:
+            session = self._get_session_payload(session_id)
+
+            if not isinstance(session, dict):
+                return {}
+
+            state = session.get("working_state")
+
+            if isinstance(state, dict):
+                return state
+
+            return {}
+
+        except Exception as e:
+            exec_debug("GET WORKING STATE FAILED:", e)
+            return {}
+
+    def _update_working_state(self, session_id: str, patch: dict) -> dict:
+        session_id = self._safe_str(session_id).strip()
+
+        if not session_id:
+            return {}
+
+        if not isinstance(patch, dict):
+            patch = {}
+
+        try:
+            current = self._get_working_state(session_id)
+            current = current if isinstance(current, dict) else {}
+
+            current.update(patch)
+
+            if hasattr(self.sessions, "update_working_state"):
+                self.sessions.update_working_state(
+                    session_id,
+                    current,
+                )
+                return current
+
+            sessions = self.sessions._load_sessions()
+            index = self.sessions._find(
+                sessions,
+                session_id,
+            )
+
+            if index is not None:
+                sessions[index]["working_state"] = current
+                self.sessions._save_sessions(
+                    sessions,
+                    self.sessions.get_active_session_id(),
+                )
+
+            return current
+
+        except Exception as e:
+            exec_debug("UPDATE WORKING STATE FAILED:", e)
+            return {}
+
+    def _auto_advance_execution(self, session_id):
+        state = self._get_working_state(session_id)
+        execution = state.get("execution") or {}
+
+        steps = execution.get("steps") or []
+        index = execution.get("step_index", 0)
+
+        # already done
+        if index >= len(steps):
+            execution["status"] = "complete"
+            execution["locked"] = False
+            return
+
+        step = steps[index]
+
+        # simulate execution of step
+        step["status"] = "completed"
+
+        execution["step_index"] = index + 1
+
+        if execution["step_index"] >= len(steps):
+            execution["status"] = "complete"
+            execution["locked"] = False
+
+    def _execute_next_steps(self, session_id, state, steps):
+        max_steps = 10  # safety limit per call
+
+        for _ in range(max_steps):
+            idx = state.get("step_index", 0)
+
+            if idx >= len(steps):
+                state["status"] = "complete"
+                break
+
+            step = steps[idx]
+
+            try:
+                self._execute_step(step, session_id)
+            except Exception as e:
+                state["status"] = "failed"
+                state["last_error"] = str(e)
+                break
+
+            state["step_index"] += 1
+            state["checkpoint"] = f"step_{state['step_index']}"
+
+        self.sessions.save()
+
+    def start_execution_daemon(self):
+        import threading
+        import time
+
+        def loop():
+            while True:
+                try:
+                    for session_id, session in self.sessions.items():
+                        state = session.get("working_state") or {}
+             
+                    execution = state.get("execution") or {}
+
+                    if execution.get("status") != "running":
+                        continue
+
+                    steps = execution.get("steps") or []
+                    index = execution.get("step_index", 0)
+
+                    # completed check
+                    if index >= len(steps):
+                        execution["status"] = "complete"
+                        execution["locked_pending"] = False
+                        continue
+
+                    # prevent duplicate execution of same step in same tick
+                    if execution.get("running_step") == index:
+                        continue
+
+                    execution["running_step"] = index
+
+                    step = steps[index]
+
+                    try:
+                        self._execute_step_logic(session_id, step)
+
+                        step["status"] = "completed"
+                        execution["step_index"] = index + 1
+
+                    except Exception as e:
+                        step["status"] = "failed"
+                        step["error"] = str(e)
+
+                    execution["last_tick"] = time.time()
+                    execution["locked_pending"] = False
+
+                except Exception as e:
+                    exec_debug("DAEMON ERROR:", e)
+
+                time.sleep(3)
+
+        thread = threading.Thread(target=loop, daemon=True)
+        thread.start()
+
+    def _recover_active_executions(self):
+        for session_id, session in self.sessions.items():
+            state = session.get("working_state") or {}
+            execution = state.get("execution") or {}
+
+            if execution.get("status") in {"running", "adapting"}:
+                execution["status"] = "running"
+                execution["locked_pending"] = False
+
+    def _execute_step_logic(self, session_id, step):
+        try:
+            step["status"] = "running"
+
+            # your real execution logic goes here
+            result = "step executed"
+
+            step["result"] = result
+            step["status"] = "completed"
+            step["error"] = None
+
+        except Exception as e:
+            step["status"] = "failed"
+            step["error"] = str(e)
+
+    def _resume_execution_if_needed(self, session_id):
+        session = self.sessions.get(session_id)
+        if not session:
+            return None
+
+        state = session.get("working_state") or {}
+
+        if state.get("status") == "running":
+            return {
+                "resume": True,
+                "step_index": state.get("step_index", 0),
+                "steps": state.get("steps", []),
+            }
+
+        return None
+
+    def _continue_execution(self, session_id, resume_data):
+        state = self._get_working_state(session_id)
+
+        state["status"] = "running"
+        state["step_index"] = resume_data.get("step_index", 0)
+
+        steps = resume_data.get("steps") or []
+
+        if not steps:
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    "No execution steps to resume."
+                ),
+                "session": self._get_session_payload(session_id),
+            }
+
+        # 🔥 RUN MULTIPLE STEPS (AUTO LOOP)
+        self._execute_next_steps(session_id, state, steps)
+
+        current_step = steps[state["step_index"]]
+
+        return {
+            "ok": True,
+            "assistant_message": self._build_assistant_message(
+                f"Executing step {state['step_index'] + 1}: "
+                f"{current_step.get('title', 'step')}"
+            ),
+            "session": self._get_session_payload(session_id),
+        }
+
+    def _resume_execution_if_needed(self, session_id):
+        session = self.sessions.get(session_id)
+        if not session:
+            return None
+
+        state = session.get("working_state") or {}
+
+        if state.get("status") == "running":
+            return {
+                "resume": True,
+                "step_index": state.get("step_index", 0),
+                "steps": state.get("steps", []),
+            }
+
+        return None
+
     def _continue_last_answer(self, session_id: str):
         last_text = self._get_session_meta(session_id, "last_answer_text") or ""
 
@@ -605,6 +857,126 @@ Available actions:
             "next_action": "",
         }
 
+    def _get_session_meta(self, session_id: str, key: str = "", default=None):
+        session_id = self._safe_str(session_id).strip()
+        key = self._safe_str(key).strip()
+
+        if not session_id or not key:
+            return default
+
+        try:
+            session = self._get_session_payload(session_id)
+
+            if not isinstance(session, dict):
+                return default
+
+            meta = session.get("meta")
+
+            if not isinstance(meta, dict):
+                meta = {}
+
+            return meta.get(key, default)
+
+        except Exception as e:
+            exec_debug("GET SESSION META FAILED:", e)
+            return default
+
+    def _set_session_meta(self, session_id: str, key: str, value) -> bool:
+        session_id = self._safe_str(session_id).strip()
+        key = self._safe_str(key).strip()
+
+        if not session_id or not key:
+            return False
+
+        try:
+            sessions = self.sessions._load_sessions()
+            index = self.sessions._find(sessions, session_id)
+
+            if index is None:
+                return False
+
+            meta = sessions[index].get("meta")
+
+            if not isinstance(meta, dict):
+                meta = {}
+
+            meta[key] = value
+            sessions[index]["meta"] = meta
+
+            self.sessions._save_sessions(
+                sessions,
+                self.sessions.get_active_session_id(),
+            )
+
+            return True
+
+        except Exception as e:
+            exec_debug("SET SESSION META FAILED:", e)
+            return False
+
+    def _get_memory_list(self) -> list:
+        try:
+            data = self._call_first(
+                self.memory,
+                ["list_memories", "get_memories", "list", "all_memories"],
+            )
+
+            if isinstance(data, dict) and isinstance(data.get("memory"), list):
+                return data.get("memory")
+
+            if isinstance(data, dict) and isinstance(data.get("memories"), list):
+                return data.get("memories")
+
+            if isinstance(data, list):
+                return data
+
+            return []
+
+        except Exception as e:
+            exec_debug("GET MEMORY LIST FAILED:", e)
+            return []
+
+    def _get_sessions_list(self) -> list:
+        try:
+            data = self._call_first(
+                self.sessions,
+                ["list_sessions", "get_sessions", "list", "all_sessions"],
+            )
+
+            if isinstance(data, dict) and isinstance(data.get("sessions"), list):
+                return data.get("sessions")
+
+            if isinstance(data, dict) and isinstance(data.get("items"), list):
+                return data.get("items")
+
+            if isinstance(data, list):
+                return data
+
+            return []
+
+        except Exception as e:
+            exec_debug("GET SESSIONS LIST FAILED:", e)
+            return []
+
+    def _get_artifacts_list(self) -> list:
+        try:
+            data = self._call_first(
+                self.artifacts,
+                ["list_artifacts", "get_artifacts", "list", "all_artifacts"],
+            )
+
+            if isinstance(data, dict) and isinstance(data.get("artifacts"), list):
+                return data.get("artifacts")
+
+            if isinstance(data, list):
+                return data
+
+            return []
+
+        except Exception as e:
+            exec_debug("GET ARTIFACTS LIST FAILED:", e)
+            return []
+
     def _get_session_payload(self, session_id: str = "") -> dict:
         sid = self._ensure_session_id(session_id)
 
@@ -878,7 +1250,6 @@ Available actions:
 
             execution_state = (
                 self._get_session_meta(session_id, "execution_state")
-                or active_execution
                 or working_state.get("execution_state")
                 or {}
             )
@@ -1045,13 +1416,22 @@ Available actions:
                 "execution_state",
                 new_state,
             )
-
+         
             sessions = self.sessions._load_sessions()
             index = self.sessions._find(sessions, session_id)
 
             if index is not None:
-                sessions[index]["execution_state"] = new_state
-                sessions[index]["active_execution"] = new_state
+                sessions[index]["execution_state"] = dict(new_state)
+
+                sessions[index]["active_execution"] = {
+                    "status": new_state.get("status"),
+                    "current_step": new_state.get("current_step"),
+                    "current_step_index": new_state.get("current_index", 0),
+                    "current_index": new_state.get("current_index", 0),
+                    "progress": new_state.get("progress", 0),
+                    "steps": new_state.get("steps", []),
+                }
+
                 self.sessions._save_sessions(
                     sessions,
                     self.sessions.get_active_session_id(),
@@ -1183,7 +1563,7 @@ Available actions:
         )
 
         if str(status).lower() == "idle":
-            assistant_message = "No active execution plan."
+            assistant_message = ""
 
         if not assistant_message:
             assistant_message = (
@@ -2396,7 +2776,7 @@ Available actions:
             memory_context=memory_context,
         )
 
-        if is_execution:
+        if False and is_execution:
             return self._process_execution_command(
                 command=text_lc.strip(),
                 session_id=session_id,
@@ -4980,7 +5360,6 @@ Available actions:
             execution_state = (
                 session.get("execution_state")
                 or self._get_session_meta(session_id, "execution_state")
-                or session.get("active_execution")
                 or {}
             )
 
@@ -4991,10 +5370,7 @@ Available actions:
                     execution_state=execution_state,
                 )
 
-        return self._process_execution_command(
-            command=command,
-            session_id=session_id,
-        )
+        return None
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         exec_debug("HANDLE IS BEING CALLED")
@@ -5008,12 +5384,14 @@ Available actions:
 
         lowered = self._safe_str(user_text).lower().strip()
 
+
         try:
             self._auto_track_working_state(
                 session_id=session_id,
                 user_text=user_text,
                 assistant_text="",
             )
+
         except Exception as e:
             exec_debug("EARLY_AUTO_TRACK_ERROR:", e)
 
@@ -5075,7 +5453,7 @@ Available actions:
             )
 
             if execution_state:
-                execution_state["waiting"] = True
+                execution_state["status"] = "running"
 
                 self._set_session_meta(
                     session_id,
@@ -5083,10 +5461,33 @@ Available actions:
                     execution_state,
                 )
 
+                session = self.sessions.get(session_id) or {}
+
+                state = session.get("working_state") or {}
+
+                state["execution"] = {
+                    "status": "running",
+                    "step_index": 0,
+                    "steps": execution_state.get("steps", []),
+                    "checkpoint": "auto_plan_created",
+                    "locked": False,
+                    "locked_pending": False,
+                    "running_step": None,
+                }
+
+                state["execution_state"] = execution_state
+
+                session["working_state"] = state
+
+                self._update_working_state(
+                    session_id,
+                    state,
+                )
+
                 return {
                     "ok": True,
                     "assistant_message": self._normalize_assistant_message(
-                        "Execution plan created.\n\nSend `next` to run the first step, or `run all` for autonomous execution."
+                        "Execution plan created and started automatically."
                     ),
                     "session": self._get_session_payload(session_id),
                 }
@@ -5118,6 +5519,19 @@ Available actions:
         }
 
         if lowered in explicit_execution_commands:
+
+            state = self._get_working_state(session_id)
+            execution = state.get("execution", {})
+
+            if execution.get("locked"):
+                return {
+                    "ok": True,
+                    "assistant_message": self._build_assistant_message(
+                        "Execution already running."
+                    ),
+                    "session": self._get_session_payload(session_id),
+                }
+
             execution_control_result = self._handle_execution_control(
                 user_text,
                 session_id,
@@ -7345,23 +7759,30 @@ Auto-fix result:
             and new_steps == old_steps
         )
 
-
     def _get_persisted_execution_artifact(self, session_id: str):
         session_id = self._safe_str(session_id)
+
         if not session_id:
             return None
 
         try:
             sessions = self.session_service.list_sessions()
+
         except Exception as e:
-            exec_debug("GET PERSISTED EXECUTION LOAD SESSIONS FAILED:", e)
+            exec_debug(
+                "GET PERSISTED EXECUTION LOAD SESSIONS FAILED:",
+                e,
+            )
             return None
 
         if isinstance(sessions, dict):
+
             if isinstance(sessions.get("sessions"), list):
                 sessions = sessions.get("sessions") or []
+
             elif isinstance(sessions.get("items"), list):
                 sessions = sessions.get("items") or []
+
             else:
                 sessions = []
 
@@ -7369,22 +7790,26 @@ Auto-fix result:
             return None
 
         for session in sessions:
+
             if not isinstance(session, dict):
                 continue
 
             if self._safe_str(session.get("id")) != session_id:
                 continue
 
-            persisted = session.get("active_execution")
-            if isinstance(persisted, dict):
+            persisted = session.get("execution_state")
+
+            if isinstance(persisted, dict) and persisted:
                 return persisted
 
             persisted = session.get("execution")
-            if isinstance(persisted, dict):
+
+            if isinstance(persisted, dict) and persisted:
                 return persisted
 
             persisted = session.get("working_execution")
-            if isinstance(persisted, dict):
+
+            if isinstance(persisted, dict) and persisted:
                 return persisted
 
             return None
@@ -7558,29 +7983,36 @@ Auto-fix result:
 
         return False
 
-    def _normalize_execution_state(self, execution):
-        if not isinstance(execution, dict):
-            execution = {}
+def _normalize_execution_state(self, execution):
+    if not isinstance(execution, dict):
+        execution = {}
 
-        execution.setdefault("goal", "")
-        execution.setdefault("steps", [])
-        execution.setdefault("current_step_index", 0)
-        execution.setdefault("status", "running")
-        execution.setdefault("progress", 0)
-        execution.setdefault("current_step", "")
+    execution.setdefault("goal", "")
+    execution.setdefault("steps", [])
+    execution.setdefault("status", "running")
+    execution.setdefault("progress", 0)
+    execution.setdefault("current_step", "")
 
-        raw_steps = execution.get("steps") or []
-        clean_steps = []
+    if "current_index" in execution:
+        try:
+            current_index = int(execution.get("current_index", 0) or 0)
+        except Exception:
+            current_index = 0
+    else:
+        try:
+            current_index = int(execution.get("current_step_index", 0) or 0)
+        except Exception:
+            current_index = 0
 
-        for raw in raw_steps:
-            if isinstance(raw, dict):
-                title = str(raw.get("title") or "").strip()
-            else:
-                title = str(raw).strip()
+    execution["current_index"] = current_index
+    execution["current_step_index"] = current_index
 
-            if not title:
-                continue
+    raw_steps = execution.get("steps") or []
+    clean_steps = []
 
+    for raw in raw_steps:
+        if isinstance(raw, dict):
+            title = str(raw.get("title") or "").strip()
             clean_steps.append(
                 {
                     "id": raw.get("id", ""),
@@ -7593,68 +8025,89 @@ Auto-fix result:
                     "result": raw.get("result", ""),
                 }
             )
-
-        step_count = len(clean_steps)
-
-        if step_count == 0:
-            execution["steps"] = []
-            execution["current_step_index"] = 0
-            execution["progress"] = 0
-            execution["current_step"] = "complete" if execution.get("status") == "complete" else ""
-            execution["status"] = "complete"
-            return execution
-
-        try:
-            current_index = int(execution.get("current_step_index", 0) or 0)
-        except Exception:
-            current_index = 0
-
-        if current_index < 0:
-            current_index = 0
-        if current_index > step_count:
-            current_index = step_count
-
-        status = str(execution.get("status") or "running").strip().lower()
-        if status not in ["running", "complete", "blocked"]:
-            status = "running"
-
-        if status == "complete" or current_index >= step_count:
-            current_index = step_count
-            for step in clean_steps:
-                step["status"] = "done"
-            progress = step_count
-            current_step = "complete"
-            status = "complete"
         else:
-            for idx, step in enumerate(clean_steps):
-                if idx < current_index:
-                    step["status"] = "done"
-                elif idx == current_index:
-                    step["status"] = "current"
-                else:
-                    step["status"] = "pending"
+            title = str(raw).strip()
+            clean_steps.append(
+                {
+                    "id": "",
+                    "title": title,
+                    "action": "",
+                    "input": "",
+                    "target_file": "",
+                    "target_function": "",
+                    "status": "pending",
+                    "result": "",
+                }
+            )
 
-            progress = current_index
-            current_step = clean_steps[current_index]["title"]
+    clean_steps = [step for step in clean_steps if step.get("title")]
 
-        execution["steps"] = clean_steps
-        execution["current_step_index"] = current_index
-        execution["progress"] = progress
-        execution["current_step"] = current_step
-        execution["status"] = status
+    step_count = len(clean_steps)
+
+    if step_count == 0:
+        execution["steps"] = []
+        execution["current_index"] = 0
+        execution["current_step_index"] = 0
+        execution["progress"] = 0
+        execution["current_step"] = "complete" if execution.get("status") == "complete" else ""
+        execution["status"] = "complete"
         return execution
 
+    if current_index < 0:
+        current_index = 0
+
+    if current_index > step_count:
+        current_index = step_count
+
+    status = str(execution.get("status") or "running").strip().lower()
+
+    if status not in ["running", "complete", "blocked"]:
+        status = "running"
+
+    if status == "complete" or current_index >= step_count:
+        current_index = step_count
+
+        for step in clean_steps:
+            step["status"] = "done"
+
+        progress = step_count
+        current_step = "complete"
+        status = "complete"
+    else:
+        for idx, step in enumerate(clean_steps):
+            if idx < current_index:
+                step["status"] = "done"
+            elif idx == current_index:
+                step["status"] = "current"
+            else:
+                step["status"] = "pending"
+
+        progress = current_index
+        current_step = clean_steps[current_index]["title"]
+
+    execution["steps"] = clean_steps
+    execution["current_index"] = current_index
+    execution["current_step_index"] = current_index
+    execution["progress"] = progress
+    execution["current_step"] = current_step
+    execution["status"] = status
+
+    return execution
 
     def _advance_execution_one_step(self, execution):
         execution = self._normalize_execution_state(dict(execution or {}))
 
         steps = execution.get("steps") or []
         step_count = len(steps)
-        current_index = int(execution.get("current_step_index", 0) or 0)
+
+        current_index = int(
+            execution.get("current_step_index", 0) or 0
+        )
 
         if step_count == 0:
             execution["status"] = "complete"
             execution["current_step_index"] = 0
+            execution["current_index"] = 0
             execution["progress"] = 0
             execution["current_step"] = "complete"
             execution["steps"] = []
@@ -7662,13 +8115,16 @@ Auto-fix result:
 
         if current_index >= step_count:
             execution["current_step_index"] = step_count
+            execution["current_index"] = step_count
             execution["progress"] = step_count
             execution["current_step"] = "complete"
             execution["status"] = "complete"
             return self._normalize_execution_state(execution)
 
         next_index = current_index + 1
+
         execution["current_step_index"] = next_index
+        execution["current_index"] = next_index
 
         if next_index >= step_count:
             execution["status"] = "complete"
@@ -7681,7 +8137,6 @@ Auto-fix result:
 
         return self._normalize_execution_state(execution)
 
-    def _extract_text_response(self, response) -> str:
         try:
             if hasattr(response, "output_text") and response.output_text:
                 return response.output_text
@@ -8252,83 +8707,6 @@ Next action:
         except Exception as e:
             exec_debug("TURN PERSIST FAILED:", e)
 
-    def _get_session_payload(self, session_id: str, fallback_messages=None) -> dict:
-        fallback_messages = fallback_messages or []
-
-        session_obj = self._call_first(
-            self.sessions,
-            ["get_session", "read_session", "get", "load_session"],
-            session_id,
-        )
-        if isinstance(session_obj, dict):
-            return session_obj
-
-        session_obj = self._call_first(
-            self.sessions,
-            ["get_session", "read_session", "get", "load_session"],
-            session_id=session_id,
-        )
-        if isinstance(session_obj, dict):
-            return session_obj
-
-        return {
-            "id": session_id,
-            "messages": fallback_messages,
-        }
-
-    def _get_session_meta(self, session_id: str, key: str, default=None):
-        try:
-            session = self._get_session_payload(session_id)
-            if not isinstance(session, dict):
-                return default
-
-            meta = session.get("meta")
-            if isinstance(meta, dict) and key in meta:
-                return meta.get(key, default)
-
-            working_state = session.get("working_state")
-            if isinstance(working_state, dict) and key in working_state:
-                return working_state.get(key, default)
-
-            return default
-
-        except Exception as e:
-            exec_debug("GET_SESSION_META_ERROR:", e)
-            return default
-
-    def _set_session_meta(self, session_id: str, key: str, value):
-        try:
-            if hasattr(self.session_service, "update_working_state"):
-                patch = {key: value}
-                self.session_service.update_working_state(session_id, patch)
-                return
-        except Exception as e:
-            exec_debug("SET SESSION META FAILED:", e)
-
-    def _get_sessions_list(self) -> list:
-        data = self._call_first(
-            self.sessions,
-            ["list_sessions", "get_sessions", "list", "all_sessions"],
-        )
-        return data if isinstance(data, list) else []
-
-    def _get_memory_list(self) -> list:
-        data = self._call_first(
-            self.memory,
-            ["list_memory", "get_memory", "list", "all_memory"],
-        )
-        if isinstance(data, dict) and isinstance(data.get("memory"), list):
-            return data.get("memory")
-        return data if isinstance(data, list) else []
-
-    def _get_artifacts_list(self) -> list:
-        data = self._call_first(
-            self.artifacts,
-            ["list_artifacts", "get_artifacts", "list", "all_artifacts"],
-        )
-        if isinstance(data, dict) and isinstance(data.get("artifacts"), list):
-            return data.get("artifacts")
-        return data if isinstance(data, list) else []
 
     def _build_working_state_prompt_block(self, session_id: str) -> str:
         state = self._get_working_state(session_id) or {}
@@ -8415,34 +8793,6 @@ Next action:
         # WORKING STATE (PHASE 3)
         # ==============================
 
-    def _get_working_state(self, session_id: str):
-            state = self._call_first(
-                self.sessions,
-                ["get_working_state"],
-                session_id,
-                default={},
-            )
-
-            if not isinstance(state, dict):
-                state = {}
-
-            cleaned = {}
-            for key in (
-                "active_task",
-                "current_file",
-                "current_bug",
-                "last_success",
-                "next_move",
-                "checkpoint",
-                "updated_at",
-            ):
-                value = state.get(key, "")
-                if key == "updated_at":
-                    cleaned[key] = self._safe_str(value)
-                else:
-                    cleaned[key] = self._clean_working_state_value(value)
-
-            return cleaned
 
 
     def _set_working_state(self, session_id: str, state: dict):
@@ -8506,75 +8856,6 @@ Next action:
 
         return self._update_working_state(session_id, patch)
 
-    def _update_working_state(self, session_id: str, patch: dict):
-        session_id = self._safe_str(session_id).strip()
-        if not session_id:
-            return {}
-
-        if not isinstance(patch, dict):
-            patch = {}
-
-        current_state = self._get_working_state(session_id) or {}
-
-        # -------------------------
-        # AUTO PARSE USER INTENT
-        # -------------------------
-        try:
-            user_text = self._safe_str(patch.get("user_text") or "").lower()
-
-            if user_text:
-                if "next move is" in user_text:
-                    parts = user_text.split("next move is", 1)
-
-                    left = parts[0].replace("working on", "").strip(" .:-")
-                    right = parts[1].strip(" .:-")
-
-                    if left:
-                        current_state["active_task"] = left
-
-                    if right:
-                        current_state["next_move"] = right
-
-                elif "working on" in user_text:
-                    task = user_text.replace("working on", "").strip(" .:-")
-                    if task:
-                        current_state["active_task"] = task
-
-        except Exception as e:
-            exec_debug("WORKING_STATE_PARSE_ERROR:", e)
-
-        # -------------------------
-        # APPLY PATCH
-        # -------------------------
-        for k, v in patch.items():
-            if v is not None:
-                current_state[k] = v
-
-        # authoritative clears
-        clearable_keys = {
-            "active_task",
-            "current_file",
-            "current_bug",
-            "last_success",
-            "next_move",
-            "checkpoint",
-        }
-
-        for key in clearable_keys:
-            if key in patch and patch.get(key) == "":
-                current_state[key] = ""
-        # -------------------------
-        # TIMESTAMP
-        # -------------------------
-        from datetime import datetime, timezone
-        current_state["updated_at"] = datetime.now(timezone.utc).isoformat()
-
-        # -------------------------
-        # SAVE
-        # -------------------------
-        self._set_working_state(session_id, current_state)
-
-        return current_state
 
     def _replace_working_state(self, session_id: str, new_state: dict):
         session_id = self._safe_str(session_id).strip()
@@ -8744,6 +9025,11 @@ Next action:
         checkpoint = self._safe_str(state.get("checkpoint")).strip()
 
         lowered = self._safe_str(user_text).lower().strip()
+
+        resume = self._resume_execution_if_needed(session_id)
+
+        if resume:
+            return self._continue_execution(session_id, resume)
 
         if lowered in {
             "reset",
@@ -9130,26 +9416,6 @@ Next action:
 
             return "Working context:\n" + "\n".join(lines)
 
-    # ===============================
-    # WORKING STATE (PHASE 3)
-    # ===============================
-
-    def _get_working_state(self, session_id: str) -> dict:
-        session_id = self._safe_str(session_id).strip()
-        if not session_id:
-            return {}
-
-        try:
-            session = self.sessions.get_session(session_id) or {}
-        except Exception:
-            session = {}
-
-        state = session.get("working_state")
-
-        if isinstance(state, dict):
-            return dict(state)
-
-        return {}
 
     def _run_execution_next_move(self, active_task: str, next_move: str, session_id: str) -> str:
         active_task = self._safe_str(active_task).strip()
@@ -10889,6 +11155,7 @@ def _build_chat_input(
 
         next_index = current_index + 1
         execution["current_step_index"] = next_index
+        execution["current_index"] = next_index
         execution["progress"] = next_index
 
         if next_index >= len(steps):
@@ -11195,5 +11462,6 @@ def _build_chat_input(
 
         except Exception as e:
             exec_debug("MEMORY CLEANUP FAILED:", e)
+
 
 

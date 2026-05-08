@@ -60,7 +60,6 @@ app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
 # SERVICES
 # -----------------------
 
-session_service = SessionService(SESSIONS_FILE)
 session_service = SessionService(str(SESSIONS_FILE))
 artifact_service = ArtifactService(str(ARTIFACTS_FILE))
 memory_service = MemoryService(str(MEMORY_FILE))
@@ -73,10 +72,10 @@ chat_service = ChatService(
     memory_service=memory_service,
     artifact_service=artifact_service,
     web_service=web_service,
-    recon_service=recon_service,  
+    recon_service=recon_service,
 )
 
-EXECUTION_STATE_CACHE = {}
+chat_service.start_execution_daemon()
 
 print("CHAT SERVICE OBJ =", chat_service)
 print("CHAT SERVICE TYPE =", type(chat_service))
@@ -107,6 +106,27 @@ def json_ok(**kwargs):
     payload.update(kwargs)
     return jsonify(payload)
 
+def start_execution_daemon(self):
+    import threading
+    import time
+
+    def loop():
+        while True:
+            try:
+                for session_id, session in self.sessions.items():
+                    state = session.get("working_state") or {}
+
+                    if state.get("status") == "running":
+                        resume = self._resume_execution_if_needed(session_id)
+                        if resume:
+                            self._continue_execution(session_id, resume)
+            except Exception as e:
+                exec_debug("DAEMON ERROR:", e)
+
+            time.sleep(3)
+
+    thread = threading.Thread(target=loop, daemon=True)
+    thread.start()
 
 def json_error(message: str, status: int = 400, **kwargs):
     payload = {"ok": False, "error": str(message)}
@@ -1444,30 +1464,25 @@ def execution_stream():
         "next step", "what next", "what now"
     }:
         execution_state = {}
+
         try:
-            execution_state = EXECUTION_STATE_CACHE.get(session_id) or {}
+            session = session_service.get_session(session_id) or {}
+
+            execution_state = (
+                session.get("working_state", {})
+                .get("execution", {})
+            )
+
         except Exception:
             execution_state = {}
-
-        status = str(execution_state.get("status") or "").lower()
-
-        if status in ("error", "failed"):
-            action = "retry_failed"
-        else:
             action = "run_step"
-
-    step_index_raw = data.get("step_index", None)
-    try:
-        step_index = int(step_index_raw)
-    except (TypeError, ValueError):
-        step_index = None
 
     def send_event(name, payload):
         import json
         return f"event: {name}\ndata: {json.dumps(payload)}\n\n"
 
     def save_execution(execution):
-        EXECUTION_STATE_CACHE[session_id] = execution
+        session["working_state"]["execution"][session_id] = execution
 
     def replay_existing_step(execution, replay_step, step_title):
         move = replay_step.get("move") if isinstance(replay_step, dict) else None
@@ -1506,7 +1521,7 @@ def execution_stream():
             yield send_event("error", {"ok": False, "error": "missing action", "done": True})
             return
 
-        execution = EXECUTION_STATE_CACHE.get(session_id)
+        execution = (session or {}).get("working_state", {}).get("execution") or {}
         if not isinstance(execution, dict):
             execution = {}
 
@@ -1531,7 +1546,7 @@ def execution_stream():
         })
 
         if action == "fix_file":
-            execution = EXECUTION_STATE_CACHE.get(session_id) or {
+            execution = (session or {}).get("working_state", {}).get("execution") or {} or {
                 "status": "idle",
                 "steps": [],
                 "history": [],
@@ -1975,7 +1990,9 @@ def api_debug_execution():
                 "execution_history": [],
             }), 400
 
-        state = EXECUTION_STATE_CACHE.get(session_id)
+        session = session_service.get_session(session_id) or {}
+        state = session.get("working_state", {}).get("execution", {})
+
         if not isinstance(state, dict):
             state = {}
 

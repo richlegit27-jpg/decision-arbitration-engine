@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import py_compile
 import shutil
@@ -929,7 +929,7 @@ def {function_name}(self, *args, **kwargs):
                 return {
                     "ok": True,
                     "status": "idle",
-                    "message": "No active execution plan.",
+                    "message": "",
                     "execution_state": {
                         "status": "idle",
                         "steps": [],
@@ -1058,7 +1058,7 @@ def {function_name}(self, *args, **kwargs):
             ):
                 return {
                     "status": "idle",
-                    "message": "No active execution plan.",
+                    "message": "",
                     "execution_state": {
                         "status": "idle",
                         "steps": [],

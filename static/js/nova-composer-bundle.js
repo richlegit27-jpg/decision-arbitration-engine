@@ -6202,7 +6202,7 @@ async function consumeChatStreamStable(payload) {
         const incoming = dedupeMessages(data.session.messages);
         const current = Array.isArray(state.messages) ? state.messages : [];
 
-        state.messages = dedupeMessages(current.concat(incoming));
+        state.messages = dedupeMessages(incoming);
         renderChat();
       } else {
         applyStatePayload(data);
