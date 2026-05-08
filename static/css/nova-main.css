@@ -10329,3 +10329,78 @@ body.is-rail-open [data-rail-panel="execution"].is-active [data-execution-panel]
 [data-rail-panel].is-active * {
   pointer-events: auto !important;
 }
+
+.nova-source-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.nova-source-list-title {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.nova-source-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.nova-source-rank {
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 0.7;
+  padding-top: 2px;
+}
+
+.nova-source-body {
+  min-width: 0;
+}
+
+.nova-source-title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.nova-source-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.nova-source-title a:hover {
+  text-decoration: underline;
+}
+
+.nova-source-domain {
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.6;
+  overflow-wrap: anywhere;
+}
+
+.nova-source-snippet {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.78;
+}
+
+.message-image-wrap {
+  margin-top: 12px;
+}
+
+.message-image {
+  width: 100%;
+  max-width: 520px;
+  border-radius: 16px;
+  display: block;
+}

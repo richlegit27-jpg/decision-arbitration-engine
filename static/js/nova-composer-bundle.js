@@ -2355,19 +2355,23 @@ function renderMessageCard(message) {
 
   let rawText = String(message.text || "").trim();
 
-// KEEP sources intact for card parser
-if (role === "assistant") {
-  rawText = String(rawText || "").trim();
-}
+  // KEEP sources intact for card parser
+  if (role === "assistant") {
+    rawText = String(rawText || "").trim();
+  }
+
   const seen = new Set();
 
   rawText = rawText
     .split(/\n+/)
     .filter(function (line) {
       const clean = line.trim();
+
       if (!clean) return false;
       if (seen.has(clean)) return false;
+
       seen.add(clean);
+
       return true;
     })
     .join("\n")
@@ -2379,19 +2383,24 @@ if (role === "assistant") {
     Array.isArray(message.meta.sources) &&
     message.meta.sources.length > 0;
 
-let renderedText =
-  role === "assistant"
-    ? (
-        hasMetaSources
-          ? renderSources(rawText, message.meta || {})
-          : renderMarkdown(rawText)
-      )
-    : renderMarkdown(rawText);
+  const imageUrl = String(
+    message.image_url ||
+    (message.meta && message.meta.image_url) ||
+    ""
+  ).trim();
 
-// Source cards already rendered by renderSources().
+  let renderedText =
+    role === "assistant"
+      ? (
+          hasMetaSources
+            ? renderSources(rawText, message.meta || {})
+            : renderMarkdown(rawText)
+        )
+      : renderMarkdown(rawText);
+
+  // Source cards already rendered by renderSources().
 
   renderedText = String(renderedText || "")
-    .replace(/<img\b[^>]*>/gi, "")
     .replace(/alt="[^"]*"<\/p>/gi, "")
     .replace(/href="\{preview\}"/g, 'href="#"')
     .replace(/src="\{preview\}"/g, "")
@@ -2399,16 +2408,39 @@ let renderedText =
     .replace(/href="[^"]{0,2}"/g, 'href="#"')
     .replace(/href=""/g, 'href="#"');
 
-  const bodyHtml = rawText
-    ? '<div class="message-text-inline">' + renderedText + '</div>'
+  const imageHtml = imageUrl
+    ? `
+      <div class="message-image-wrap">
+        <img
+          class="message-image"
+          src="${imageUrl}"
+          alt="Generated image"
+          loading="lazy"
+        />
+      </div>
+    `
     : "";
+
+  const bodyHtml =
+    rawText || imageHtml
+      ? (
+          '<div class="message-text-inline">' +
+          renderedText +
+          imageHtml +
+          '</div>'
+        )
+      : "";
 
   let memoryBadgeHtml = "";
 
   try {
     const meta = message.meta || {};
-    const used = Array.isArray(meta.used_memory) ? meta.used_memory : [];
-    const count = meta.used_memory_count || used.length;
+    const used = Array.isArray(meta.used_memory)
+      ? meta.used_memory
+      : [];
+
+    const count =
+      meta.used_memory_count || used.length;
 
     if (role !== "user" && count > 0) {
       memoryBadgeHtml =
@@ -2418,7 +2450,8 @@ let renderedText =
     }
   } catch (e) {}
 
-  const polishBadgesHtml = renderChatPolishBadges(message);
+  const polishBadgesHtml =
+    renderChatPolishBadges(message);
 
   return `
     <div class="message-card ${roleClass}">
