@@ -10979,8 +10979,12 @@ def _build_chat_input(
         current_index = self._execution_current_index(execution)
 
         if not steps or current_index >= len(steps):
-            execution["status"] = "complete"
-            execution["current_step"] = "complete"
+            execution = self._finalize_execution_state(
+                execution
+            )
+
+            execution["current_step_index"] = len(steps)
+            execution["current_index"] = len(steps)
             execution["progress"] = len(steps)
             execution.setdefault("step_results", [])
             return {
@@ -11375,6 +11379,7 @@ def _build_chat_input(
 
         except Exception as e:
             exec_debug("MEMORY CLEANUP FAILED:", e)
+
 
 
 
