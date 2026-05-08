@@ -4474,10 +4474,31 @@ Available actions:
             intelligence.get("strategy") or ""
         ).lower().strip()
 
+        route = self._safe_str(
+            intelligence.get("route") or ""
+        ).lower().strip()
+
+        mode = self._safe_str(
+            intelligence.get("mode") or ""
+        ).lower().strip()
+
         if not text:
             return text
 
+        # =====================================
+        # TOOL ROUTE ISOLATION LOCK
+        # =====================================
+
+        isolated_routes = {
+            "image_generation",
+            "web_fetch",
+        }
+
+        if route in isolated_routes or mode in isolated_routes:
+            return text.strip()
+
         # === HARD COMMAND LOCKS ===
+
         if user_lc in ["smff", "snff", "ff"]:
             return (
                 "SMFF mode active.\n\n"
@@ -4486,12 +4507,19 @@ Available actions:
                 "No partial snippets."
             )
 
-        if user_lc in ["next", "continue", "go", "keep going", "next step"]:
+        if user_lc in [
+            "next",
+            "continue",
+            "go",
+            "keep going",
+            "next step",
+        ]:
             if not text.lower().startswith("next"):
                 return "Next move:\n\n" + text
             return text
 
         # === DEBUG LOCK ===
+
         if strategy in ["debug_triage", "debugging"]:
             if "error" not in user_lc:
                 return (
@@ -4504,16 +4532,38 @@ Available actions:
         # =============================
         # EXECUTION DOMINANCE
         # =============================
+
         execution_triggers = [
-            "build", "create", "make", "fix", "implement",
-            "add", "write", "generate", "set up"
+            "build",
+            "create",
+            "make",
+            "fix",
+            "implement",
+            "add",
+            "write",
+            "generate",
+            "set up",
         ]
 
-        is_execution_intent = any(k in user_lc for k in execution_triggers)
+        is_execution_intent = any(
+            k in user_lc for k in execution_triggers
+        )
 
         if is_execution_intent:
-            # If response is explanation-heavy, force actionable output
-            if not any(x in text.lower() for x in ["def ", "class ", "import ", "```", "powershell", "cd "]):
+            # If response is explanation-heavy,
+            # force actionable output
+
+            if not any(
+                x in text.lower()
+                for x in [
+                    "def ",
+                    "class ",
+                    "import ",
+                    "```",
+                    "powershell",
+                    "cd ",
+                ]
+            ):
                 return (
                     "Next move:\n\n"
                     "Start implementation immediately.\n"
@@ -4527,9 +4577,11 @@ Available actions:
             return text
 
         # === PLAN LOCK ===
+
         if strategy in ["planner", "planning", "plan"]:
             if not text.lower().startswith("plan"):
                 return "Plan:\n\n" + text
+
             return text
 
         return text.strip()
@@ -7718,6 +7770,17 @@ Auto-fix result:
             "mlb",
             "ufc",
         )
+
+        if self._is_image_generation_request(user_text):
+            return {
+                "route": self.ROUTE_IMAGE_GENERATION,
+                "mode": "image_generation",
+                "confidence": 1.0,
+                "reasons": ["image_generation_request"],
+                "save_artifact": True,
+                "save_memory": False,
+                "use_memory": False,
+            }
 
         wants_live_web = any(trigger in lower_text for trigger in live_web_triggers)
 
