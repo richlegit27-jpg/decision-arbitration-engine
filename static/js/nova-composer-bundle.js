@@ -281,13 +281,11 @@ function renderSources(assistantText, meta = {}) {
   const text = String(assistantText || "");
   const sourceMeta = Array.isArray(meta.sources) ? meta.sources : [];
 
-  if (!text.includes("â€” Top sources â€”") && sourceMeta.length === 0) {
-    return renderMarkdown(text);
-  }
+if (sourceMeta.length === 0) {
+  return renderMarkdown(text);
+}
 
-  const parts = text.split("â€” Top sources â€”");
-
-  const mainText = parts[0].trim();
+const mainText = text.trim();
 
 // sourceMeta already declared above
 
@@ -2096,86 +2094,6 @@ function normalizeWorkingContext(raw) {
   };
 }
 
-function linkifySourceLines(text) {
-  const raw = String(text || "");
-  if (!raw) return "";
-
-  const markerMatch = raw.match(/(?:â€”|-|â€“)?\s*Top sources\s*(?:â€”|-|â€“)?/i);
-
-  if (!markerMatch) {
-    return escapeHtml(raw).replace(/\n/g, "<br>");
-  }
-
-  const before = raw.slice(0, markerMatch.index).trim();
-  const after = raw.slice(markerMatch.index + markerMatch[0].length).trim();
-
-  const lines = after
-    .split(/\r?\n/)
-    .map(function (line) {
-      return line.trim();
-    })
-    .filter(Boolean);
-
-  const html = [];
-
-  if (before) {
-    html.push(escapeHtml(before).replace(/\n/g, "<br>"));
-  }
-
-  html.push('<div class="nova-source-grid" data-source-grid="1">');
-
-  for (let i = 0; i < lines.length; i++) {
-    const sourceLine = lines[i] || "";
-    const nextLine = lines[i + 1] || "";
-
-    const sourceMatch = sourceLine.match(/^\s*(\d+)\.\s*(.+?)\s*[â€”â€“-]\s*(.+?)\s*$/);
-
-    if (!sourceMatch) {
-      continue;
-    }
-
-    const index = sourceMatch[1];
-    const source = sourceMatch[2].trim();
-    const title = sourceMatch[3].trim();
-
-    let url = "";
-
-    if (/^https?:\/\//i.test(nextLine)) {
-      url = nextLine.trim();
-      i++;
-    }
-
-    html.push(
-      '<button type="button" class="source-row nova-source-card" data-no-chat-action="1" data-url="' +
-        escapeHtml(url) +
-        '" data-title="' +
-        escapeHtml(title) +
-        '" data-preview="' +
-        escapeHtml(source + " â€” " + title) +
-        '">' +
-        '<span class="nova-source-index">' +
-        escapeHtml(index) +
-        "</span>" +
-        '<span class="nova-source-body">' +
-        "<strong>" +
-        escapeHtml(title) +
-        "</strong>" +
-        "<small>" +
-        escapeHtml(source) +
-        "</small>" +
-        "</span>" +
-        "</button>"
-    );
-  }
-
-  html.push("</div>");
-
-  return html.join("");
-} 
-
-function renderSourceList(message) {
-  return "";
-}
 
 function renderQualityBadge(msg) {
   if (!msg || msg.role !== "assistant") return "";
@@ -2441,17 +2359,16 @@ if (role === "assistant") {
     Array.isArray(message.meta.sources) &&
     message.meta.sources.length > 0;
 
-  let renderedText =
-    role === "assistant"
-      ? (
-          linkifySourceLines(rawText) ||
-          (
-            hasMetaSources
-              ? renderSources(rawText, message.meta || {})
-              : renderMarkdown(rawText)
-          )
-        )
-      : renderMarkdown(rawText);
+let renderedText =
+  role === "assistant"
+    ? (
+        hasMetaSources
+          ? renderSources(rawText, message.meta || {})
+          : renderMarkdown(rawText)
+      )
+    : renderMarkdown(rawText);
+
+// Source cards already rendered by renderSources().
 
   renderedText = String(renderedText || "")
     .replace(/<img\b[^>]*>/gi, "")
@@ -5288,7 +5205,7 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
           <div class="nova-viewer-body">
             <p>${escapeHtml(finalPreview).replace(/\n/g, "<br>")}</p>
             <button type="button" data-open-full="${escapeHtml(finalUrl)}">
-              Open full article â†’
+              Open full article →
             </button>
           </div>
         </div>
@@ -5307,6 +5224,23 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
       `;
     });
 };
+
+document.addEventListener("click", function (e) {
+  const sourceCard = e.target.closest(".nova-source-card");
+
+  if (!sourceCard) return;
+
+  e.preventDefault();
+
+  const url = String(sourceCard.dataset.url || "").trim();
+  const title = String(sourceCard.dataset.title || "Source").trim();
+
+  if (!url) return;
+
+  if (typeof window.fetchSourcePreviewIntoRail === "function") {
+    window.fetchSourcePreviewIntoRail(url, title);
+  }
+});
 
 function renderWeb() {
   renderExecution();
@@ -6323,9 +6257,15 @@ async function consumeChatStreamStable(payload) {
     if (state.stream && state.stream.targetMessageId) {
       const targetMessage = findMessageById(state.stream.targetMessageId);
 
-      finalizeStreamMessage({
-        message_id: state.stream.targetMessageId,
-        text: (targetMessage && targetMessage.text) || "",
+finalizeStreamMessage({
+  message_id: state.stream.targetMessageId,
+  text: (targetMessage && targetMessage.text) || "",
+  meta:
+    targetMessage &&
+    targetMessage.meta &&
+    typeof targetMessage.meta === "object"
+      ? targetMessage.meta
+      : {},
         artifacts: Array.isArray(state.artifacts) ? state.artifacts : [],
         memory: Array.isArray(state.memory) ? state.memory : [],
         sessions: Array.isArray(state.sessions) ? state.sessions : [],

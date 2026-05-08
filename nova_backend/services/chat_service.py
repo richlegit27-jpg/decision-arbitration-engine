@@ -2216,6 +2216,53 @@ Available actions:
             meta.setdefault("sources", meta.get("sources", []))
             meta.setdefault("source_urls", meta.get("source_urls", []))
 
+            if not meta.get("sources"):
+                import re
+
+                assistant_text = self._safe_str(
+                    assistant_msg.get("text")
+                    or assistant_msg.get("content")
+                    or ""
+                )
+
+                found_urls = re.findall(r"https?://[^\s\)\]\}<>\"']+", assistant_text)
+
+                parsed_sources = []
+                parsed_urls = []
+
+                for found_url in found_urls[:10]:
+                    clean_url = found_url.rstrip(".,;:")
+                    if not clean_url:
+                        continue
+
+                    domain = clean_url.split("/")[2] if "://" in clean_url else clean_url
+                    slug = clean_url.rstrip("/").split("/")[-1]
+                    clean_title = slug.replace("-", " ").replace("_", " ").strip().title()
+                    clean_domain = domain.replace("www.", "")
+                    clean_homepage = clean_url.rstrip("/").lower()
+
+                    if clean_homepage in {
+                        f"https://{domain}".lower(),
+                        f"http://{domain}".lower(),
+                        f"https://{clean_domain}".lower(),
+                        f"http://{clean_domain}".lower(),
+                    }:
+                        clean_title = clean_domain
+
+                    if not clean_title or clean_title.lower() in {"news", "changelog", "docs"}:
+                        clean_title = clean_domain
+
+                    parsed_sources.append({
+                        "title": clean_title or clean_url,
+                        "url": clean_url,
+                        "source": domain.replace("www.", ""),
+                        "snippet": "",
+                    })
+
+                if parsed_sources:
+                    meta["sources"] = parsed_sources
+                    meta["source_urls"] = parsed_urls
+
             used_memory_items = []
 
             for key in ("memory_used", "used_memory", "memories_used"):
@@ -2676,7 +2723,22 @@ Available actions:
     ) -> dict:
 
         decision = decision if isinstance(decision, dict) else {}
+
         attachments = attachments or []
+
+        route = self._safe_str(decision.get("route")).lower()
+
+        if route == self.ROUTE_IMAGE_GENERATION:
+            return self._handle_image_generation(
+                prompt=user_text,
+                session_id=session_id,
+            )
+
+        if route == self.ROUTE_WEB_FETCH:
+            return self._handle_web_fetch(
+                url=user_text,
+                session_id=session_id,
+            )
 
         original_user_text = user_text
         text_lc = (user_text or "").lower()
@@ -2864,11 +2926,19 @@ Available actions:
             attachments=attachments,
         )
 
-        # lock web fetch output (prevent duplication)
-        if decision.get("route") == "web_fetch":
+        # lock tool outputs (prevent conversational overwrite)
+        if decision.get("route") in {
+            self.ROUTE_WEB_FETCH,
+            self.ROUTE_IMAGE_GENERATION,
+            self.ROUTE_ATTACHMENT_ANALYSIS,
+        }:
             assistant_text = assistant_text
         else:
-            assistant_text = intelligence_result.get("assistant_text", assistant_text)
+            assistant_text = intelligence_result.get(
+                "assistant_text",
+                assistant_text,
+            )
+
         intelligence = intelligence_result.get("intelligence", {})
         self_check = intelligence_result.get("self_check", {})
         hard_override_applied = bool(intelligence_result.get("hard_override_applied"))
@@ -4031,8 +4101,35 @@ Available actions:
                 "python -m py_compile <file_path>"
             )
 
+        filler_phrases = [
+            "if you want",
+            "i can also",
+            "would you like",
+            "i can give you",
+            "i can help with",
+            "more realistic",
+            "more cartoon",
+            "wallpaper format",
+            "transparent background",
+            "transparent background version",
+        ]
+        cleaned_lines = []
+
+        for line in text.splitlines():
+            lowered = line.strip().lower()
+
+            if any(phrase in lowered for phrase in filler_phrases):
+                break
+
+            cleaned_lines.append(line)
+
+        text = "\n".join(cleaned_lines).strip()
+
         if not text:
-            return "Done."
+            return ""
+
+        if "Generated image for:" in text:
+            return text
 
         # === PREVENT DUPLICATE SMFF INTAKE ===
         if (
@@ -4825,9 +4922,13 @@ Available actions:
 
             try:
                 prompt = (
-                    "Give a clear, confident, concise summary of the latest news using ONLY the fetched web text below.\n"
-                    "Prioritize the most recent and relevant items.\n"
-                    "Do not invent facts. Keep it direct and readable.\n\n"
+                    "Return ONLY a tight factual web summary.\n"
+                    "No disclaimers.\n"
+                    "No conversational filler.\n"
+                    "No 'if you want'.\n"
+                    "No follow-up offers.\n"
+                    "No repeated summaries.\n"
+                    "Use short direct paragraphs.\n\n"
                     f"User asked:\n{user_text}\n\n"
                     f"Web results:\n{body}\n"
                 )
@@ -4853,6 +4954,15 @@ Available actions:
                     else ""
                 ).strip()
 
+                for marker in [
+                    "If you want",
+                    "I can also",
+                    "Would you like",
+                    "I can give you",
+                ]:
+                    if marker.lower() in assistant_text.lower():
+                        assistant_text = assistant_text[:assistant_text.lower().find(marker.lower())].strip()
+
             except Exception as exc:
                 exec_debug("WEB_FETCH_SUMMARY_FAILED:", exc)
                 assistant_text = body[:1800].strip()
@@ -4863,21 +4973,9 @@ Available actions:
         exec_debug("WEB_SOURCES_FINAL:", sources)
         exec_debug("WEB_SOURCE_URLS_FINAL:", source_urls)
 
-        if sources:
-            assistant_text = assistant_text.strip()
-            assistant_text += "\n\nâ€” Top sources â€”\n"
 
-            for index, item in enumerate(sources[:5], start=1):
-                title = self._safe_str(item.get("title")).strip()
-                source = self._safe_str(item.get("source")).strip()
-                url = self._safe_str(item.get("url")).strip()
-
-                line = f"{index}. {source} â€” {title}" if source and title else f"{index}. {title or source or url}"
-                assistant_text += line + "\n"
-
-                if url and "news.google.com" not in url.lower():
-                    assistant_text += url + "\n"
-
+        # Source rendering is handled by structured metadata/frontend cards.
+        # Do not append manual Top sources text here.
         assistant_msg = self._build_assistant_message(
             assistant_text,
             meta={
@@ -5564,12 +5662,23 @@ Available actions:
         if auto_fix_result:
             return auto_fix_result
 
-        return self._execute_general_chat(
+        decision = self._decide_route(
+            user_text=user_text,
+            attachments=attachments,
+            session_id=session_id,
+        )
+
+        result = self._execute_general_chat(
+            decision=decision,
             user_text=user_text,
             session_id=session_id,
             attachments=attachments,
-            decision={"route": self.ROUTE_GENERAL_CHAT},
         )
+
+        if isinstance(result, dict) and result.get("skip_rewrite"):
+            return result
+
+        return result
 
     def _process_goal_and_plan(self, user_text: str, session_id: str):
         user_text = self._safe_str(user_text).strip()
@@ -7441,14 +7550,29 @@ Auto-fix result:
     ) -> dict:
 
         user_text = self._safe_str(user_text).strip()
-        lower_text = user_text.lower()
+
+        text = user_text.lower().strip()
+        lower_text = text
 
         attachments = attachments or []
+
+        if lower_text.startswith("generate "):
+            return {
+                "route": self.ROUTE_IMAGE_GENERATION,
+                "mode": "image_generation",
+                "confidence": 1.0,
+                "reasons": ["forced_generate_prefix"],
+                "save_artifact": True,
+                "save_memory": False,
+                "use_memory": False,
+                "prompt": user_text,
+            }
 
         # =========================
         # IMAGE GENERATION (PRIORITY)
         # =========================
         image_triggers = (
+            "generate ",
             "generate an image",
             "make an image",
             "create an image",
@@ -7524,12 +7648,16 @@ Auto-fix result:
 
         wants_live_web = any(trigger in lower_text for trigger in live_web_triggers)
 
-        if has_url or wants_live_web:
+        if (
+            has_url
+            or wants_live_web
+            or user_text.lower().strip().startswith("/web")
+        ):
             return {
                 "route": self.ROUTE_WEB_FETCH,
                 "mode": "web_fetch",
-                "confidence": 0.95 if has_url else 0.9,
-                "reasons": ["web_fetch_lock_auto_detect"],
+                "confidence": 1.0,
+                "reasons": ["forced_web_fetch"],
                 "save_artifact": True,
                 "save_memory": False,
                 "use_memory": False,
@@ -7539,6 +7667,7 @@ Auto-fix result:
         # =========================
         # DEFAULT CHAT
         # =========================
+
         execution_commands = {
             "next",
             "run_step",
@@ -10329,6 +10458,7 @@ Next action:
 
             first = result.data[0] if getattr(result, "data", None) else None
             image_b64 = getattr(first, "b64_json", None) if first else None
+
             if not image_b64:
                 raise ValueError("Image API returned no b64_json")
 
@@ -10357,23 +10487,39 @@ Next action:
 
             return {
                 "ok": True,
-                "text": f"Generated image for: {prompt}",
+                "skip_rewrite": True,
+                "skip_cleanup": True,
+                "skip_post_processing": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": f"Generated image for: {prompt}",
+                    "image_url": image_url,
+                },
                 "image_url": image_url,
                 "prompt": prompt,
                 "revised_prompt": "",
                 "saved_artifact": saved_artifact,
+                "session": self._get_session_payload(session_id),
             }
 
         except Exception as e:
             exec_debug("IMAGE GENERATION FAILED:", e)
+
             return {
                 "ok": False,
-                "text": f"Image generation failed: {e}",
+                "skip_rewrite": True,
+                "skip_cleanup": True,
+                "skip_post_processing": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": f"Image generation failed: {e}",
+                },
                 "error": str(e),
                 "image_url": "",
                 "prompt": prompt,
                 "revised_prompt": "",
                 "saved_artifact": None,
+                "session": self._get_session_payload(session_id),
             }
 
         # ==============================
