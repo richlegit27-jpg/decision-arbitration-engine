@@ -1638,6 +1638,10 @@ Available actions:
             session_id
         )
 
+        if final_status in {"complete", "completed", "success"}:
+            session_payload["active_execution"] = {}
+            session_payload["execution_state"] = {}
+
         return {
             "ok": True,
             "assistant_message": assistant_payload,
@@ -8211,8 +8215,20 @@ def _normalize_execution_state(self, execution):
         if self._safe_str(execution.get("status")).lower() == "complete":
             execution = {}
 
-        if self._safe_str(execution.get("status")).lower() == "complete":
-            execution = {}
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                {},
+            )
+
+            self._update_working_state(
+                session_id,
+                {
+                    "next_move": "",
+                    "pending_execution_action": "",
+                    "active_task": "",
+                },
+            )
 
         text = (user_text or "").strip().lower()
 
@@ -11395,6 +11411,7 @@ def _chatservice_archive_execution_state_patch(
 
 
 ChatService._archive_execution_state = _chatservice_archive_execution_state_patch
+
 
 
 
