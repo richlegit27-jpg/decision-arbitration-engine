@@ -468,19 +468,23 @@ const meta =
     raw.assistant_message.meta) ||
   {};
 
-  return {
-    id: item.id || makeId("msg"),
-    role: role,
-    kind: kind,
-    text: text,
-    attachments: Array.isArray(item.attachments) ? item.attachments : [],
-    meta: meta, // â† FIXED
-    created_at: item.created_at || new Date().toISOString(),
-    pending: Boolean(item.pending),
-    streaming: Boolean(item.streaming),
-    error: Boolean(item.error),
-    stopped: Boolean(item.stopped),
-  };
+return {
+  id: item.id || makeId("msg"),
+  role: role,
+  kind: kind,
+  text: text,
+
+  image_url:
+    item.image_url ||
+    (item.meta && item.meta.image_url) ||
+    "",
+
+  attachments: Array.isArray(item.attachments)
+    ? item.attachments
+    : [],
+
+  meta: meta,
+};
 }
 
 function dedupeMessages(messages) {
@@ -3196,90 +3200,83 @@ function handleStreamEvent(event) {
   }
 
 function finalizeStreamMessage(payload) {
-{
-  if (!els.chatEmpty) return;
-  els.chatEmpty.hidden = !isVisible;
-}
-
-window.setChatEmptyVisible = setChatEmptyVisible;
-
-function activeSession() {
-  return (state.sessions || []).find(function (session) {
-    return String(session && session.id) === String(state.activeSessionId);
-  }) || null;
-}
-
-window.activeSession = activeSession;
-
-  function finishStreamUi(options) {
-    const opts = options && typeof options === "object" ? options : {};
-    const statusState = String(opts.statusState || "idle");
-    const statusText = String(
-      opts.statusText || (statusState === "error" ? "Error" : "Ready")
-    );
-
-window.finishStreamUi = finishStreamUi;
-
-    clearTokenRenderState();
-
-    state.stream.running = false;
-    state.stream.controller = null;
-    state.stream.targetMessageId = "";
-    state.stream.buffer = "";
-    state.stream.startedAt = 0;
-    state.stream.messageId = "";
-    state.stream.placeholderId = "";
-
-    if (state.execution) {
-      state.execution.running = false;
-      state.execution.lastAction = null;
-    }
-
-
-    setBusyUi(false);
-
-    const session = activeSession();
-    const title = session && session.title ? session.title : "Nova";
-    const subtitle =
-      session && Number(session.message_count || safeArray(session.messages).length || 0) > 0
-        ? Number(session.message_count || safeArray(session.messages).length || 0) + " messages"
-        : "Fast local AI workspace";
-
-    setTopbar(title, subtitle, statusText, statusState);
-  }
-
-    renderChat();
-    scrollChatToBottom(true);
-  }
-}
-
-function finalizeStreamMessage(payload) {
   flushTokensNow();
   clearTokenRenderState();
 
-  const data = payload && typeof payload === "object" ? payload : {};
+  const data = payload && typeof payload === "object"
+    ? payload
+    : {};
+
+  const imageAssistant =
+    data.assistant_message &&
+    typeof data.assistant_message === "object"
+      ? data.assistant_message
+      : null;
+
+  const imageUrl =
+    (imageAssistant && imageAssistant.image_url) ||
+    data.image_url ||
+    "";
+
+  if (imageUrl) {
+    const replacementId = String(
+      data.message_id ||
+      data.id ||
+      (state.stream &&
+        (state.stream.targetMessageId ||
+         state.stream.messageId)) ||
+      makeId("assistant")
+    ).trim();
+
+    upsertMessage({
+      id: replacementId,
+      role: "assistant",
+      text: String(
+        (imageAssistant && imageAssistant.text) ||
+        data.text ||
+        "Generated image."
+      ).trim(),
+      image_url: imageUrl,
+      streaming: false,
+      pending: false,
+      stopped: false,
+      error: false,
+      attachments: [],
+      meta: {
+        image_url: imageUrl,
+      },
+    });
+
+    if (state.stream) {
+      state.stream.placeholderId = "";
+      state.stream.messageId = "";
+      state.stream.targetMessageId = "";
+      state.stream.running = false;
+      state.stream.buffer = "";
+      state.stream.startedAt = 0;
+    }
+
+    renderChat();
+    updateTopbarFromState();
+    return;
+  }
+
   const targetId = String(
     data.message_id ||
     data.id ||
-    (state.stream && (state.stream.targetMessageId || state.stream.messageId)) ||
+    (state.stream &&
+      (state.stream.targetMessageId ||
+       state.stream.messageId)) ||
     ("assistant_" + Date.now())
   ).trim();
-
-  const existingIndex = Array.isArray(state.messages)
-    ? state.messages.findIndex(function (msg) {
-        return msg && msg.id === targetId;
-      })
-    : -1;
-
-  const existing = existingIndex >= 0 ? state.messages[existingIndex] : null;
 
   const finalText = String(
     data.text ||
     data.content ||
-    (data.assistant_message && typeof data.assistant_message === "object"
+    (data.assistant_message &&
+     typeof data.assistant_message === "object"
       ? data.assistant_message.text
       : "") ||
-    (existing && existing.text) ||
     ""
   )
     .replaceAll("AUTO_EXECUTE", "")
@@ -3294,182 +3291,53 @@ function finalizeStreamMessage(payload) {
     pending: false,
     error: false,
     stopped: false,
-    attachments: Array.isArray(data.attachments) ? data.attachments : [],
+    attachments: Array.isArray(data.attachments)
+      ? data.attachments
+      : [],
     meta:
-  (data &&
-    data.assistant_message &&
-    typeof data.assistant_message.meta === "object" &&
-    data.assistant_message.meta) ||
-  (data && typeof data.meta === "object" && data.meta) ||
-  {},
-
-    artifact: data.artifact && typeof data.artifact === "object" ? data.artifact : {},
-    viewer: data.viewer && typeof data.viewer === "object" ? data.viewer : {},
+      (data &&
+        data.assistant_message &&
+        typeof data.assistant_message.meta === "object" &&
+        data.assistant_message.meta) ||
+      (data && typeof data.meta === "object" && data.meta) ||
+      {},
+    artifact:
+      data.artifact &&
+      typeof data.artifact === "object"
+        ? data.artifact
+        : {},
+    viewer:
+      data.viewer &&
+      typeof data.viewer === "object"
+        ? data.viewer
+        : {},
     image_url:
       data.image_url ||
-      (data.artifact && data.artifact.image_url) ||
-      (data.viewer && data.viewer.image_url) ||
-      (data.meta && data.meta.image_url) ||
+      (data.artifact &&
+       data.artifact.image_url) ||
+      (data.viewer &&
+       data.viewer.image_url) ||
+      (data.meta &&
+       data.meta.image_url) ||
       "",
   });
 
-
-  if (data.execution && Array.isArray(data.execution.steps)) {
-    state.execution = state.execution || { active: false, steps: [] };
-    state.execution.active = true;
-    state.execution.steps = data.execution.steps.map(function (step, index) {
-      return {
-        id: String(step.id || ("step_" + index)),
-        title: String(step.title || step.text || ""),
-        text: String(step.text || step.title || ""),
-        status: String(step.status || "planned"),
-        notes: String(step.notes || ""),
-      };
-    });
-  } else if (state.execution && state.execution.active) {
-    state.execution = {
-      active: true,
-      steps: [
-        { text: "Thinking...", status: "done" },
-        { text: "Response ready", status: "done" },
-      ],
-    };
-  }
-
-  renderExecution();
-
-  applyStatePayload(data);
-
-  const assistantSource =
-    data && data.assistant_message && typeof data.assistant_message === "object"
-      ? data.assistant_message
-      : finalMessage;
-
-  const hydratedAssistantMessage = normalizeMessage(assistantSource || {});
-
-if (
-    hydratedAssistantMessage &&
-    hydratedAssistantMessage.id
-) {
-    const alreadyExists = (state.messages || []).some(
-        function (msg) {
-            return (
-                msg &&
-                String(msg.id || "") ===
-                    String(hydratedAssistantMessage.id || "")
-            );
-        }
-    );
-
-    if (!alreadyExists) {
-        upsertMessage(hydratedAssistantMessage);
-    }
-}
-
-  const workingContext = normalizeWorkingContext(
-    (data && data.working_context_payload) ||
-      (data && data.working_context) ||
-      emptyWorkingContext()
-  );
-
-  if (workingContext.show) {
-    upsertWorkingContextMessage(
-      workingContext,
-      (hydratedAssistantMessage && hydratedAssistantMessage.id) || finalMessage.id || ""
-    );
+  if (finalMessage && finalMessage.text) {
+    upsertMessage(finalMessage);
   }
 
   if (state.stream) {
-    state.stream.running = false;
-    state.stream.controller = null;
-    state.stream.targetMessageId = "";
     state.stream.buffer = "";
     state.stream.startedAt = 0;
     state.stream.messageId = "";
     state.stream.placeholderId = "";
-  }
-
-const autoExecuteMessage =
-  data.assistant_message && typeof data.assistant_message === "object"
-    ? data.assistant_message
-    : null;
-
-if (
-  autoExecuteMessage &&
-  autoExecuteMessage.meta &&
-  autoExecuteMessage.meta.auto_execute &&
-  typeof window.runExecutionAction === "function"
-) {
-  requestAnimationFrame(() => {
-    const execResult =
-      autoExecuteMessage.meta.execution_result || {};
-
-    const status = String(execResult.status || "").toLowerCase();
-
-    if (status === "failed") {
-      window.runExecutionAction("retry_failed");
-    } else {
-      window.runExecutionAction(
-        autoExecuteMessage.meta.execution_action || "run_step"
-      );
-    }
-  });
-}
-
-  state.memory = Array.isArray(data.memory)
-    ? data.memory.map(normalizeMemoryItem)
-    : state.memory;
-
-  renderSessionList();
-  renderChat();
-  renderArtifacts();
-  renderMemory();
-  syncRailTruth();
-
-  if (typeof renderWeb === "function") {
-    renderWeb();
-  }
-
-  if (state.stream) {
-    state.stream.placeholderId = "";
-    state.stream.messageId = "";
     state.stream.targetMessageId = "";
+    state.stream.running = false;
   }
 
-  updateTopbarFromState();
-}
-
-async function openSession(sessionId) {
-  const id = String(sessionId || "").trim();
-  if (!id) return null;
-
-  await stopStreamBeforeSessionChange();
-
-  const payload = await apiPost("/api/sessions/switch", {
-    session_id: id,
-  });
-
-  applyStatePayload(payload || {});
-  renderSessionList();
   renderChat();
-  renderArtifacts();
-  renderMemory();
   updateTopbarFromState();
-  scrollChatToBottom(true);
-
-  return payload;
 }
-
-function artifactViewerHtml(artifact) {
-  if (!artifact) {
-    return '<div class="nova-viewer-shell"><div class="nova-viewer-empty"><div class="nova-viewer-empty-title">No artifact</div></div></div>';
-  }
-
-  const item = artifact && typeof artifact === "object" ? artifact : {};
-  const viewer = item.viewer && typeof item.viewer === "object" ? item.viewer : {};
-  const meta = item.meta && typeof item.meta === "object" ? item.meta : {};
-
-  const kind = String(viewer.kind || item.kind || "artifact").trim().toLowerCase();
   const title = String(viewer.title || item.title || item.name || "Artifact").trim();
   const body = String(
     viewer.body ||
@@ -4064,6 +3932,52 @@ const assistantMsg =
       )
     : null;
 
+// =====================================
+// IMAGE RESPONSE HARD LOCK
+// =====================================
+if (
+  assistantMsg &&
+  (
+    assistantMsg.image_url ||
+    (assistantMsg.meta && assistantMsg.meta.image_url) ||
+    (data && data.image_url)
+  )
+) {
+  assistantMsg.text =
+    String(
+      assistantMsg.text ||
+      data.text ||
+      "Generated image."
+    ).trim();
+
+  const imageExists = (state.messages || []).some(function (msg) {
+    return (
+      msg &&
+      String(msg.role || "") === "assistant" &&
+      (
+        String(msg.image_url || "").trim() ===
+        String(
+          assistantMsg.image_url ||
+          data.image_url ||
+          ""
+        ).trim()
+      )
+    );
+  });
+
+  if (!imageExists) {
+    upsertMessage({
+      ...assistantMsg,
+      image_url:
+        assistantMsg.image_url ||
+        data.image_url ||
+        "",
+    });
+  }
+
+  return data;
+}
+
 if (assistantMsg?.text?.trim()) {
   const assistantText = String(assistantMsg.text || "").trim();
   const assistantMeta = (assistantMsg && assistantMsg.meta) || {};
@@ -4087,6 +4001,7 @@ if (assistantMsg?.text?.trim()) {
     upsertMessage(assistantMsg);
   }
 }
+
     if (data && data.saved_artifact && data.saved_artifact.id) {
       openArtifactFromStateOrBackend(data.saved_artifact.id);
     }

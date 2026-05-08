@@ -2743,6 +2743,12 @@ Available actions:
         original_user_text = user_text
         text_lc = (user_text or "").lower()
 
+        if self._is_image_generation_request(user_text):
+            return self._handle_image_generation(
+                prompt=user_text,
+                session_id=session_id,
+            )
+
         explicit_execution_commands = {
             "next",
             "nex",
@@ -4266,7 +4272,7 @@ Available actions:
 
         text = "\n".join(strong_lines).strip()
 
-        return text or "Done."
+        return text or ""
 
     def _decide_response_strategy(
         self,
@@ -11558,7 +11564,88 @@ def _chatservice_archive_execution_state_patch(
 
 ChatService._archive_execution_state = _chatservice_archive_execution_state_patch
 
+def _nova_runtime_handle_image_generation(
+    self,
+    prompt: str,
+    session_id: str = "",
+    parent_artifact_id: str = "",
+    source_type: str = "generated",
+) -> dict:
+    try:
+        result = self.client.images.generate(
+            model=self.image_model,
+            prompt=prompt,
+            size=self.image_size,
+        )
 
+        first = result.data[0] if getattr(result, "data", None) else None
+        image_b64 = getattr(first, "b64_json", None) if first else None
+
+        if not image_b64:
+            raise ValueError("Image API returned no b64_json")
+
+        image_bytes = base64.b64decode(image_b64)
+        filename = f"generated_{uuid.uuid4().hex}.png"
+        filepath = self.uploads_dir / filename
+
+        with open(filepath, "wb") as f:
+            f.write(image_bytes)
+
+        image_url = f"/api/uploads/{filename}"
+
+        saved_artifact = None
+        try:
+            saved_artifact = self._persist_image_generation_artifact(
+                session_id=session_id,
+                prompt=prompt,
+                image_url=image_url,
+                revised_prompt="",
+                parent_artifact_id=parent_artifact_id,
+                source_type=source_type,
+                generation_mode="text_to_image",
+            )
+        except Exception as e:
+            exec_debug("IMAGE ARTIFACT SAVE FAILED:", e)
+
+        return {
+            "ok": True,
+            "skip_rewrite": True,
+            "skip_cleanup": True,
+            "skip_post_processing": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": f"Generated image for: {prompt}",
+                "image_url": image_url,
+            },
+            "image_url": image_url,
+            "prompt": prompt,
+            "revised_prompt": "",
+            "saved_artifact": saved_artifact,
+            "session": self._get_session_payload(session_id),
+        }
+
+    except Exception as e:
+        exec_debug("IMAGE GENERATION FAILED:", e)
+
+        return {
+            "ok": False,
+            "skip_rewrite": True,
+            "skip_cleanup": True,
+            "skip_post_processing": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": f"Image generation failed: {e}",
+            },
+            "error": str(e),
+            "image_url": "",
+            "prompt": prompt,
+            "revised_prompt": "",
+            "saved_artifact": None,
+            "session": self._get_session_payload(session_id),
+        }
+
+
+ChatService._handle_image_generation = _nova_runtime_handle_image_generation
 
 
 
