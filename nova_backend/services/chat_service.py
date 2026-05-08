@@ -5712,15 +5712,10 @@ Auto-fix result:
         if not execution_state:
             return execution_state
 
-        # prevent overflow / duplicate execution
         if execution_state.get("status") == "complete":
-            execution_state["waiting"] = False
-            execution_state["current_step"] = ""
-            execution_state["current_step_title"] = ""
-            execution_state["last_action"] = ""
-            execution_state["active"] = False
-            execution_state["complete"] = True
-
+            execution_state = self._finalize_execution_state(
+                execution_state
+            )
             self._set_session_meta(
                 session_id,
                 "execution_state",
@@ -5741,9 +5736,9 @@ Auto-fix result:
         # COMPLETION CHECK
         # =========================
         if current >= total:
-            execution_state["status"] = "complete"
-            execution_state["waiting"] = False
-            execution_state["complete"] = True
+            execution_state = self._finalize_execution_state(
+                execution_state
+            )
             self._set_session_meta(session_id, "execution_state", execution_state)
             self._reset_execution_state(session_id)
             return execution_state
@@ -8996,6 +8991,21 @@ Next action:
                 e,
             )
 
+    def _finalize_execution_state(self, execution_state: dict | None = None) -> dict:
+        execution_state = dict(execution_state or {})
+
+        execution_state["status"] = "complete"
+        execution_state["waiting"] = False
+        execution_state["complete"] = True
+        execution_state["active"] = False
+        execution_state["current_step"] = ""
+        execution_state["current_step_title"] = ""
+        execution_state["last_action"] = ""
+
+        return execution_state
+
+
+
     def _reset_execution_state(self, session_id: str):
         previous_state = self._get_working_state(session_id) or {}
 
@@ -11059,9 +11069,12 @@ def _build_chat_input(
         execution["progress"] = next_index
 
         if next_index >= len(steps):
-            execution["status"] = "complete"
-            execution["current_step"] = "complete"
+            execution = self._finalize_execution_state(
+                execution
+            )
+
             execution["current_step_index"] = len(steps)
+            execution["current_index"] = len(steps)
             execution["progress"] = len(steps)
         else:
             execution["status"] = "in_progress"
