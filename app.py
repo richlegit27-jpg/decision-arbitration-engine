@@ -610,6 +610,8 @@ def api_sessions():
         sessions=session_service.get_all(),
         active_session_id=session_service.active_session_id,
         session=session_service.get_active(),
+        artifacts=artifact_service.build_list_payload(),
+        memory=memory_service.build_list_payload(),
     )
 
 @app.post("/api/chat")
