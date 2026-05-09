@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>NOVA</title>
+
+  <style>
+    :root{
+      --bg:#0b0f14; --panel:#111827; --panel2:#0f172a;
+      --text:#e5e7eb; --muted:#9ca3af; --line:#243244;
+      --accent:#60a5fa; --accent2:#34d399; --danger:#fb7185;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font-family:var(--sans);
+    }
+    .wrap{max-width:1100px; margin:0 auto; padding:14px}
+    .topbar{
+      display:flex; gap:10px; align-items:center; justify-content:space-between;
+      background:linear-gradient(180deg,var(--panel),var(--panel2));
+      border:1px solid var(--line);
+      border-radius:14px; padding:12px 14px;
+      position:sticky; top:10px; z-index:50;
+      box-shadow:0 12px 35px rgba(0,0,0,.35);
+    }
+    .brand{display:flex; align-items:center; gap:10px}
+    .logo{
+      width:34px; height:34px; border-radius:10px;
+      background: radial-gradient(circle at 30% 30%, var(--accent), rgba(96,165,250,0.0) 55%),
+                  radial-gradient(circle at 70% 70%, var(--accent2), rgba(52,211,153,0.0) 55%),
+                  #0a1020;
+      border:1px solid rgba(255,255,255,.10);
+    }
+    .title{font-weight:800; letter-spacing:.3px}
+    .subtitle{font-size:12px; color:var(--muted)}
+    .status{font-family:var(--mono); font-size:12px; color:var(--muted)}
+    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    .btn{
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      padding:8px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:600;
+    }
+    .btn:hover{background:rgba(255,255,255,.10)}
+    .btn.primary{border-color:rgba(96,165,250,.55); background:rgba(96,165,250,.14)}
+    .btn.danger{border-color:rgba(251,113,133,.55); background:rgba(251,113,133,.12)}
+    .pill{
+      padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.06);
+      font-family:var(--mono); font-size:12px; color:var(--muted);
+    }
+    .grid{
+      margin-top:12px;
+      display:grid; grid-template-columns: 1fr 360px; gap:12px;
+    }
+    @media (max-width: 980px){ .grid{grid-template-columns:1fr} }
+    .card{
+      border:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(17,24,39,.92), rgba(15,23,42,.88));
+      border-radius:14px;
+      overflow:hidden;
+      box-shadow:0 14px 40px rgba(0,0,0,.35);
+    }
+    .card h3{
+      margin:0; padding:12px 14px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      font-size:14px; letter-spacing:.2px;
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .tabs{display:flex; gap:8px; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.08)}
+    .tab{
+      padding:8px 10px; border-radius:10px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.05);
+      cursor:pointer; user-select:none;
+      font-weight:700; font-size:13px;
+    }
+    .tab.active{border-color:rgba(96,165,250,.6); background:rgba(96,165,250,.16)}
+    .pane{padding:12px 14px}
+    .composer{
+      display:flex; gap:10px; align-items:flex-end;
+    }
+    textarea{
+      width:100%; min-height:110px; max-height:320px; resize:vertical;
+      background:rgba(0,0,0,.25);
+      border:1px solid rgba(255,255,255,.12);
+      color:var(--text);
+      border-radius:12px;
+      padding:10px 12px;
+      font-family:var(--sans);
+      line-height:1.35;
+    }
+    .hint{font-size:12px; color:var(--muted); margin-top:8px}
+    .out{
+      font-family:var(--mono);
+      background:rgba(0,0,0,.25);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:12px;
+      padding:10px 12px;
+      min-height:260px;
+      white-space:pre-wrap;
+      overflow:auto;
+    }
+    .small{
+      font-size:12px; color:var(--muted); font-family:var(--mono);
+      background:rgba(0,0,0,.18); border:1px solid rgba(255,255,255,.10);
+      border-radius:12px; padding:10px 12px;
+    }
+    .field{display:flex; gap:10px; align-items:center; margin-top:10px}
+    input[type="password"], input[type="text"]{
+      width:100%;
+      background:rgba(0,0,0,.25);
+      border:1px solid rgba(255,255,255,.12);
+      color:var(--text);
+      border-radius:12px;
+      padding:10px 12px;
+      font-family:var(--mono);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <div class="title">NOVA</div>
+          <div class="subtitle">Local UI • API proxy</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="pill" id="pill-status">status: …</div>
+        <button class="btn" id="btn-health">Health</button>
+        <button class="btn primary" id="btn-selftest">Selftest</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>
+          <span>Chat</span>
+          <span class="status" id="api-base">api: …</span>
+        </h3>
+
+        <div class="tabs">
+          <div class="tab active" data-mode="ask">Ask</div>
+          <div class="tab" data-mode="command">Command</div>
+          <div class="tab" data-mode="doctor">Doctor</div>
+        </div>
+
+        <div class="pane">
+          <div class="composer">
+            <textarea id="in" placeholder="Type here… (Enter = send, Shift+Enter = newline)"></textarea>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <button class="btn primary" id="btn-send">Send</button>
+              <button class="btn danger" id="btn-clear">Clear</button>
+            </div>
+          </div>
+          <div class="hint">Tip: set API key in the right panel once, then you can send requests.</div>
+
+          <div style="height:12px"></div>
+          <div class="out" id="out"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>
+          <span>Auth & Tools</span>
+          <span class="status">/__set_key_cookie</span>
+        </h3>
+        <div class="pane">
+          <div class="small">
+            This UI talks to the FastAPI proxy on <span id="ui-origin"></span>.
+            It forwards /api/* to your backend.
+          </div>
+
+          <div class="field">
+            <input id="key" type="password" placeholder="Paste NOVA_API_KEY here (stored as HttpOnly cookie)"/>
+          </div>
+          <div class="field">
+            <button class="btn primary" id="btn-save-key">Save Key Cookie</button>
+          </div>
+
+          <div style="height:10px"></div>
+          <div class="small" id="debug">debug: …</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Marker to prove correct file is served -->
+    <!-- NOVA_UI_REAL 20260226 -->
+  </div>
+
+  <script>
+  (function(){
+    const $ = (id)=>document.getElementById(id);
+
+    const state = {
+      mode: "ask",
+      apiBase: null,
+    };
+
+    function setStatus(ok, msg){
+      pill-status.textContent = "status: " + (ok ? "OK" : "ERR") + " | " + msg;
+      debug.textContent = "debug: " + msg;
+    }
+
+    async function getShim(){
+      try{
+        const r = await fetch("/__ui_shim__?t="+Date.now(), { cache:"no-store" });
+        const j = await r.json();
+        state.apiBase = (j.api_base || "").trim();
+        api-base.textContent = "api: " + (state.apiBase || "(unknown)");
+        ui-origin.textContent = location.origin;
+        return j;
+      }catch(e){
+        api-base.textContent = "api: (shim error)";
+        ui-origin.textContent = location.origin;
+        throw e;
+      }
+    }
+
+    async function postJSON(url, obj){
+      const r = await fetch(url, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify(obj),
+        cache:"no-store",
+      });
+      const txt = await r.text();
+      let j = null;
+      try{ j = JSON.parse(txt); }catch(e){}
+      return { ok:r.ok, status:r.status, text:txt, json:j };
+    }
+
+    async function sendChat(){
+      const text = in.value;
+      if(!text.trim()){
+        setStatus(false, "empty input");
+        return;
+      }
+
+      const payload = { text: text, mode: state.mode };
+
+      setStatus(true, "sending…");
+      const res = await postJSON("/api/chat", payload);
+
+      if(res.ok){
+        const reply =
+          (res.json && (res.json.reply || res.json.text || res.json.output)) ?
+            (res.json.reply || res.json.text || res.json.output) :
+            res.text;
+
+        out.textContent += ( out.textContent ? "\n\n" : "" ) + reply;
+        setStatus(true, "sent");
+      } else {
+        setStatus(false, "chat failed ("+res.status+"): " + res.text.slice(0,200));
+      }
+    }
+
+    function bindTabs(){
+      document.querySelectorAll(".tab").forEach(t=>{
+        t.addEventListener("click", ()=>{
+          document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+          t.classList.add("active");
+          state.mode = t.getAttribute("data-mode") || "ask";
+          setStatus(true, "mode="+state.mode);
+        });
+      });
+    }
+
+    function bindHotkeys(){
+      in.addEventListener("keydown", (e)=>{
+        if(e.key === "Enter" && !e.shiftKey){
+          e.preventDefault();
+          sendChat();
+        }
+      });
+    }
+
+    async function saveKey(){
+      const k = key.value.trim();
+      if(!k){ setStatus(false, "missing key"); return; }
+      setStatus(true, "saving key cookie…");
+      const res = await postJSON("/__set_key_cookie", { key: k });
+      if(res.ok){
+        setStatus(true, "key cookie saved");
+        key.value = "";
+      } else {
+        setStatus(false, "save key failed ("+res.status+"): " + res.text.slice(0,200));
+      }
+    }
+
+    async function health(){
+      try{
+        const r = await fetch("/api/health?t="+Date.now(), { cache:"no-store" });
+        const txt = await r.text();
+        setStatus(r.ok, "health: " + txt.slice(0,120));
+      }catch(e){
+        setStatus(false, "health error: " + e);
+      }
+    }
+
+    async function selftest(){
+      try{
+        const r = await fetch("/api/selftest?t="+Date.now(), { cache:"no-store" });
+        const txt = await r.text();
+        setStatus(r.ok, "selftest: " + txt.slice(0,160));
+      }catch(e){
+        setStatus(false, "selftest error: " + e);
+      }
+    }
+
+    // wire up
+    btn-send.addEventListener("click", sendChat);
+    btn-clear.addEventListener("click", ()=>{ out.textContent=""; setStatus(true,"cleared"); });
+    btn-save-key.addEventListener("click", saveKey);
+    btn-health.addEventListener("click", health);
+    btn-selftest.addEventListener("click", selftest);
+
+    bindTabs();
+    bindHotkeys();
+
+    // init
+    getShim().then(()=>setStatus(true, "ready")).catch(e=>setStatus(false, "shim error: "+e));
+  })();
+  </script>
+
+  <!-- Load your local UI patches (they exist and return 200) -->
+  <script src="/static/js/99.patch.js?v=20260226_035014"></script>
+  <script src="/static/js/100.addons.js?v=20260226_035014"></script>
+  <script src="/static/js/101.ui_polish_v1.js?v=20260226_035014"></script>
+
+</body>
+</html>

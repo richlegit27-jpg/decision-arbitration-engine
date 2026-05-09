@@ -1,0 +1,30 @@
+// C:\Users\Owner\nova\static\js\state.js
+
+(() => {
+"use strict"
+
+function createState(){
+  return {
+    chats: [],
+    messages: [],
+    pendingFiles: [],
+
+    activeChatId: "",
+    chatId: "",
+
+    isLoadingChats: false,
+    isLoadingMessages: false,
+
+    isStreaming: false,
+    streamingMessageId: "",
+    streamAbortController: null,
+
+    isSidebarOpen: false,
+  }
+}
+
+window.NovaState = {
+  createState,
+}
+
+})()

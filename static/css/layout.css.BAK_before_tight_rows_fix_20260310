@@ -1,0 +1,192 @@
+/* C:\Users\Owner\nova\static\css\layout.css */
+
+html,
+body{
+  height:100%;
+  margin:0;
+}
+
+body{
+  min-height:100vh;
+  overflow:hidden;
+}
+
+.app-shell{
+  height:100vh;
+  min-height:100vh;
+  display:grid;
+  grid-template-columns:320px minmax(0,1fr);
+  background:var(--bg);
+  overflow:hidden;
+}
+
+body:not(.sidebar-open) .app-shell{
+  grid-template-columns:0 minmax(0,1fr);
+}
+
+body:not(.sidebar-open) .sidebar{
+  border-right:0;
+  overflow:hidden;
+}
+
+/* ================= SIDEBAR ================= */
+
+.sidebar{
+  position:relative;
+  z-index:40;
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  background:var(--panel);
+  border-right:1px solid var(--border);
+}
+
+.sidebar-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px;
+  border-bottom:1px solid var(--border);
+}
+
+.sidebar-title{
+  font-size:0.95rem;
+  font-weight:700;
+  color:var(--text);
+}
+
+.sidebar-close{
+  display:none;
+}
+
+.sidebar-actions{
+  padding:10px;
+}
+
+.sidebar-btn{
+  width:100%;
+}
+
+.chat-list{
+  flex:1;
+  overflow-y:auto;
+  padding:6px;
+}
+
+.chat-list-empty{
+  color:var(--muted);
+  font-size:0.9rem;
+}
+
+/* ===== CHAT LIST (TIGHT LIKE CHATGPT) ===== */
+
+.chat-list-row{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  margin-bottom:2px;
+}
+
+.chat-list-item{
+  flex:1 1 auto;
+  min-width:0;
+  text-align:left;
+  background:transparent;
+  border:none;
+  color:var(--text);
+  padding:5px 8px;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:13px;
+  line-height:1.3;
+}
+
+.chat-list-item:hover{
+  background:var(--panel-2);
+}
+
+.chat-list-item.is-active{
+  background:var(--accent-soft);
+}
+
+.chat-list-item-title{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.chat-list-actions{
+  display:flex;
+  align-items:center;
+  gap:3px;
+  flex:0 0 auto;
+}
+
+.chat-list-action{
+  background:none;
+  border:none;
+  color:var(--text-soft);
+  cursor:pointer;
+  font-size:12px;
+  padding:3px 5px;
+  border-radius:5px;
+}
+
+.chat-list-action:hover{
+  background:var(--panel-2);
+  color:var(--text);
+}
+
+/* ================= MAIN ================= */
+
+.main{
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  height:100%;
+}
+
+.topbar{
+  height:50px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:0 14px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg-elev);
+}
+
+.topbar-title{
+  font-size:14px;
+  font-weight:600;
+  color:var(--text);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+/* ================= MOBILE ================= */
+
+.mobile-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.4);
+  z-index:30;
+}
+
+@media (max-width:900px){
+
+  .app-shell{
+    grid-template-columns:0 minmax(0,1fr);
+  }
+
+  body.sidebar-open .app-shell{
+    grid-template-columns:280px minmax(0,1fr);
+  }
+
+  .sidebar-close{
+    display:block;
+  }
+
+}

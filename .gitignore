@@ -1,0 +1,15 @@
+﻿__pycache__/
+*.pyc
+
+data/
+uploads/
+nova_backups/
+
+*.bak
+*.BAK
+*BACKUP*
+*BROKEN*
+*WORKING*
+
+templates/templates/
+js_backup*

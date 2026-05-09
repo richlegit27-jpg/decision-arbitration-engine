@@ -1,0 +1,102 @@
+/* ===============================
+   NOVA MICRO INTERACTIONS
+   Hover + click feedback for UI elements
+   =============================== */
+
+/* ---------- MEMORY CARDS ---------- */
+.memory-card {
+  position: relative;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.memory-card:hover {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--panel-2) 90%, transparent);
+  box-shadow: 0 14px 32px rgba(0,0,0,0.12), 0 0 6px rgba(255,255,255,0.02) inset;
+}
+
+.memory-card:active::after {
+  content:"";
+  position:absolute;
+  border-radius:50%;
+  width:12px;
+  height:12px;
+  background: rgba(121,168,255,0.12);
+  pointer-events:none;
+  top:50%;
+  left:50%;
+  transform:translate(-50%, -50%) scale(1);
+  animation:rippleCard 0.4s ease-out;
+}
+
+@keyframes rippleCard {
+  0%{transform:translate(-50%,-50%) scale(1); opacity:0.6}
+  100%{transform:translate(-50%,-50%) scale(20); opacity:0}
+}
+
+/* ---------- CHAT LIST ITEMS ---------- */
+.chat-list-item {
+  position: relative;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.chat-list-item:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--panel-2) 85%, transparent);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+}
+
+.chat-list-item:active::after {
+  content:"";
+  position:absolute;
+  border-radius:50%;
+  width:8px;
+  height:8px;
+  background: rgba(121,168,255,0.1);
+  pointer-events:none;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%) scale(1);
+  animation:rippleItem 0.35s ease-out;
+}
+
+@keyframes rippleItem {
+  0%{transform:translate(-50%,-50%) scale(1); opacity:0.5}
+  100%{transform:translate(-50%,-50%) scale(15); opacity:0}
+}
+
+/* ---------- SIDEBAR BUTTONS ---------- */
+#sidebarToggleBtn,
+#btnNewChat,
+#btnCloseSidebar {
+  transition: transform 150ms ease, background 150ms ease;
+  position: relative;
+}
+
+#sidebarToggleBtn:hover,
+#btnNewChat:hover,
+#btnCloseSidebar:hover {
+  transform: scale(1.04);
+  background: color-mix(in srgb, var(--panel-2) 90%, transparent);
+}
+
+#sidebarToggleBtn:active,
+#btnNewChat:active,
+#btnCloseSidebar:active::after {
+  content:"";
+  position:absolute;
+  border-radius:50%;
+  width:10px;
+  height:10px;
+  background: rgba(121,168,255,0.1);
+  pointer-events:none;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%) scale(1);
+  animation:rippleSidebar 0.4s ease-out;
+}
+
+@keyframes rippleSidebar {
+  0%{transform:translate(-50%,-50%) scale(1); opacity:0.6}
+  100%{transform:translate(-50%,-50%) scale(20); opacity:0}
+}

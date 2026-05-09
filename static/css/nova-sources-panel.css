@@ -1,0 +1,292 @@
+:root {
+  --nova-sources-bg: rgba(16, 22, 38, 0.78);
+  --nova-sources-border: rgba(255, 255, 255, 0.08);
+  --nova-sources-text: #eaf1ff;
+  --nova-sources-muted: #9fb0d0;
+  --nova-sources-accent: #7aa2ff;
+  --nova-sources-accent-strong: #9bb8ff;
+  --nova-sources-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+  --nova-sources-card-bg: rgba(255, 255, 255, 0.04);
+  --nova-sources-card-bg-hover: rgba(255, 255, 255, 0.07);
+}
+
+html[data-theme="light"] {
+  --nova-sources-bg: rgba(255, 255, 255, 0.88);
+  --nova-sources-border: rgba(15, 23, 42, 0.10);
+  --nova-sources-text: #162033;
+  --nova-sources-muted: #586983;
+  --nova-sources-accent: #315fdb;
+  --nova-sources-accent-strong: #234ec4;
+  --nova-sources-shadow: 0 14px 40px rgba(10, 20, 40, 0.10);
+  --nova-sources-card-bg: rgba(20, 35, 70, 0.04);
+  --nova-sources-card-bg-hover: rgba(20, 35, 70, 0.08);
+}
+
+.nova-sources-drawer {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(72vh, 720px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--nova-sources-border);
+  border-radius: 22px;
+  background: var(--nova-sources-bg);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--nova-sources-shadow);
+  overflow: hidden;
+  z-index: 1400;
+  transform: translateY(18px);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 180ms ease,
+    opacity 180ms ease,
+    visibility 180ms ease;
+  visibility: hidden;
+}
+
+.nova-sources-drawer.is-open {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.nova-sources-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--nova-sources-border);
+}
+
+.nova-sources-title-wrap {
+  min-width: 0;
+}
+
+.nova-sources-title {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 800;
+  color: var(--nova-sources-text);
+  letter-spacing: 0.01em;
+}
+
+.nova-sources-subtitle {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--nova-sources-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nova-sources-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nova-sources-icon-btn {
+  appearance: none;
+  border: 1px solid var(--nova-sources-border);
+  background: transparent;
+  color: var(--nova-sources-text);
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.nova-sources-icon-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nova-sources-body {
+  overflow: auto;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.nova-sources-empty {
+  border: 1px dashed var(--nova-sources-border);
+  border-radius: 16px;
+  padding: 18px 16px;
+  color: var(--nova-sources-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.nova-source-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid var(--nova-sources-border);
+  border-radius: 16px;
+  background: var(--nova-sources-card-bg);
+  padding: 12px 12px 10px;
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.nova-source-card:hover {
+  transform: translateY(-1px);
+  background: var(--nova-sources-card-bg-hover);
+  border-color: rgba(122, 162, 255, 0.26);
+}
+
+.nova-source-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.nova-source-title {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 700;
+  color: var(--nova-sources-text);
+  word-break: break-word;
+}
+
+.nova-source-external {
+  flex: 0 0 auto;
+  color: var(--nova-sources-accent);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.nova-source-url {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--nova-sources-accent-strong);
+  word-break: break-all;
+}
+
+.nova-source-snippet {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--nova-sources-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.nova-sources-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 1390;
+  appearance: none;
+  border: 1px solid var(--nova-sources-border);
+  background: rgba(32, 48, 88, 0.94);
+  color: #f3f7ff;
+  padding: 12px 14px;
+  min-height: 46px;
+  border-radius: 999px;
+  box-shadow: var(--nova-sources-shadow);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  transition:
+    transform 140ms ease,
+    opacity 160ms ease,
+    background 140ms ease;
+}
+
+html[data-theme="light"] .nova-sources-fab {
+  background: rgba(49, 95, 219, 0.96);
+  color: #ffffff;
+}
+
+.nova-sources-fab:hover {
+  transform: translateY(-1px);
+}
+
+.nova-sources-fab[hidden] {
+  display: none !important;
+}
+
+.nova-sources-badge {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.nova-sources-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 74px;
+  z-index: 1385;
+  max-width: min(420px, calc(100vw - 24px));
+  background: rgba(20, 28, 48, 0.94);
+  color: #f3f7ff;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 16px;
+  padding: 12px 14px;
+  box-shadow: var(--nova-sources-shadow);
+  font-size: 13px;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.nova-sources-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 860px) {
+  .nova-sources-drawer {
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+    width: auto;
+    max-height: 68vh;
+  }
+
+  .nova-sources-fab {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .nova-sources-toast {
+    right: 12px;
+    left: 12px;
+    bottom: 68px;
+    max-width: none;
+  }
+}

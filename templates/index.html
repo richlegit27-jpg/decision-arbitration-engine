@@ -1,0 +1,335 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nova</title>
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=premium-ui-polish-lock-2026-04-08-001">
+  <link rel="stylesheet" href="/static/css/nova-memory.css?v=memory-fix-2026-04-25-001">
+</head>
+<body>
+  <div class="nova-app-shell" data-app-shell>
+    <aside class="nova-sidebar" data-left-sidebar>
+      <div class="nova-sidebar-top">
+        <button
+          class="nova-icon-btn"
+          type="button"
+          data-sidebar-toggle
+          aria-label="Toggle sidebar"
+          title="Toggle sidebar"
+        >
+          x
+        </button>
+
+        <button
+          class="nova-primary-btn nova-new-chat-btn"
+          type="button"
+          data-new-chat
+        >
+          New Chat
+        </button>
+      </div>
+
+      <div class="nova-sidebar-brand">
+        <div class="nova-sidebar-brand-title">Nova</div>
+        <div class="nova-sidebar-brand-subtitle">Fast local AI workspace</div>
+      </div>
+
+      <div class="nova-session-list" data-session-list></div>
+    </aside>
+
+    <main class="nova-main">
+      <header class="nova-topbar">
+        <div class="nova-topbar-left">
+          <button
+            class="nova-icon-btn"
+            type="button"
+            data-sidebar-toggle
+            aria-label="Toggle sidebar"
+            title="Toggle sidebar"
+          >
+            x
+          </button>
+
+          <div class="nova-topbar-copy">
+            <div class="nova-topbar-title" data-topbar-title>Nova</div>
+            <div class="nova-topbar-subtitle" data-topbar-subtitle>Fast local AI workspace</div>
+          </div>
+        </div>
+
+        <div class="nova-topbar-right">
+          <div class="nova-status-chip" data-topbar-status>Ready</div>
+          <div class="nova-model-chip">gpt-5.4</div>
+        </div>
+      </header>
+
+      <section class="nova-chat-thread" data-chat-thread>
+        <div class="nova-empty-state" data-chat-empty hidden>
+          <div class="nova-empty-state-title">Nova is live</div>
+          <div class="nova-empty-state-copy">
+            Chat is working. Uploads stage before send. Artifacts rail stays available.
+          </div>
+        </div>
+      </section>
+
+      <footer class="nova-composer">
+        <form class="nova-composer-form" data-chat-form>
+          <div class="nova-upload-strip" data-upload-staging hidden></div>
+
+          <input
+            type="file"
+            data-attach-input
+            multiple
+            hidden
+          >
+
+          <div class="nova-composer-row">
+            <div class="nova-composer-actions-left">
+              <button
+                class="nova-composer-btn"
+                type="button"
+                data-attach-button
+                aria-label="Attach"
+                title="Attach"
+              >
+                +
+              </button>
+
+              <button
+                class="nova-composer-btn"
+                type="button"
+                data-action="voice"
+                aria-label="Voice"
+                title="Voice"
+              >
+                🎤
+              </button>
+
+              <button
+                class="nova-composer-btn"
+                type="button"
+                data-action="tts-toggle"
+                aria-label="Toggle voice replies"
+                title="Toggle voice replies"
+              >
+                🔊
+              </button>
+            </div>
+
+            <div class="nova-chat-input-wrap">
+              <textarea
+                class="nova-chat-input"
+                data-chat-input
+                rows="1"
+                placeholder="Message Nova..."
+              ></textarea>
+              <div class="nova-composer-hint">
+                Enter to send · Shift+Enter for newline
+              </div>
+            </div>
+
+            <div class="nova-composer-actions-right">
+              <button
+                class="nova-composer-btn"
+                type="submit"
+                data-send-button
+              >
+                Send
+              </button>
+
+              <button
+                class="nova-composer-btn"
+                type="button"
+                data-stop-button
+                hidden
+              >
+                Stop
+              </button>
+            </div>
+          </div>
+        </form>
+      </footer>
+    </main>
+
+    <aside class="nova-rail" data-right-rail>
+      <div class="nova-rail-top">
+        <div class="nova-rail-copy">
+          <div class="nova-rail-title" data-rail-title>Artifacts</div>
+          <div class="nova-rail-subtitle" data-rail-subtitle>Saved outputs and side panels</div>
+        </div>
+
+        <div class="nova-rail-top-actions">
+          <button
+            class="nova-icon-btn"
+            type="button"
+            data-rail-close
+            aria-label="Close right rail"
+            title="Close right rail"
+          >
+            x
+          </button>
+        </div>
+      </div>
+<div class="nova-rail-tabs" role="tablist" aria-label="Nova right rail tabs">
+  <button
+    class="nova-rail-tab is-active"
+    type="button"
+    role="tab"
+    aria-selected="true"
+    aria-pressed="true"
+    data-rail-tab="artifacts"
+  >
+    Artifacts
+  </button>
+
+  <button
+    class="nova-rail-tab"
+    type="button"
+    role="tab"
+    aria-selected="false"
+    aria-pressed="false"
+    data-rail-tab="memory"
+  >
+    Memory
+  </button>
+
+  <button
+    class="nova-rail-tab"
+    type="button"
+    role="tab"
+    aria-selected="false"
+    aria-pressed="false"
+    data-rail-tab="web"
+  >
+    Web
+  </button>
+
+  <button
+    class="nova-rail-tab"
+    type="button"
+    role="tab"
+    aria-selected="false"
+    aria-pressed="false"
+    data-rail-tab="execution"
+  >
+    Execution
+  </button>
+</div>
+
+<div class="nova-rail-panel is-active" data-rail-panel="artifacts">
+  <div class="nova-rail-empty" data-artifact-empty>
+    <div class="nova-rail-empty-title">No artifacts yet</div>
+    <div class="nova-rail-empty-copy">
+      Saved outputs, image generations, and web results will show here.
+    </div>
+  </div>
+
+  <div class="nova-artifact-list" data-artifact-list></div>
+</div>
+
+<!-- ✅ EXECUTION PANEL (OUTSIDE artifacts) -->
+<div class="nova-rail-panel" data-rail-panel="execution">
+  <div class="nova-rail-header">Execution</div>
+
+  <div style="padding:10px; display:flex; gap:8px; flex-wrap:wrap;">
+    <button onclick="runExec('run_step')">Run Step</button>
+    <button onclick="runExec('run_all')">Run All</button>
+    <button onclick="runExec('pause')">Pause</button>
+    <button onclick="runExec('resume')">Resume</button>
+    <button onclick="runExec('reset')">Reset</button>
+  </div>
+
+  <pre id="nova-exec-state" style="padding:10px; font-size:12px; white-space:pre-wrap;"></pre>
+</div>
+
+<!-- MEMORY PANEL -->
+<div id="memory-panel" class="nova-rail-panel" data-rail-panel="memory" data-memory-panel hidden>
+  <div class="rail-panel__header">
+    <div>
+      <h3 class="rail-panel__title">Memory</h3>
+      <p class="rail-panel__subtitle" id="memory-panel-subtitle">
+        Stored context and preferences
+      </p>
+    </div>
+  </div>
+
+  <textarea
+    data-memory-add-text
+    placeholder="Add a memory..."
+  ></textarea>
+
+  <select data-memory-add-kind>
+    <option value="preference">Preference</option>
+    <option value="fact">Fact</option>
+    <option value="note">Note</option>
+    <option value="project">Project</option>
+  </select>
+
+  <button type="button" data-memory-add-button>
+    Add
+  </button>
+
+  <div id="memory-list" class="memory-list" data-memory-list></div>
+</div>
+
+<div class="nova-rail-panel" data-rail-panel="web" hidden>
+  <div class="nova-rail-empty" data-web-empty>
+    <div class="nova-rail-empty-title">No web results yet</div>
+    <div class="nova-rail-empty-copy">
+      Fetched pages and web summaries will show here.
+    </div>
+  </div>
+
+  <div id="webMount"></div>
+</div>
+
+<div class="nova-rail-panel" data-rail-panel="execution" hidden>
+  <div data-execution-panel style="display:block; min-height:240px; padding:12px;">
+    <div class="nova-panel-shell">
+      <div class="nova-panel-title">Execution</div>
+
+      <div class="nova-panel-card">
+        <button type="button" data-exec-action="run_step">Run Step</button>
+        <button type="button" data-exec-action="run_all">Run All</button>
+        <button type="button" data-exec-action="retry">Retry</button>
+        <button type="button" data-exec-action="stop">Stop</button>
+      </div>
+
+      <div class="nova-panel-card">
+        <div><strong>Status:</strong> idle</div>
+        <div><strong>Steps:</strong> 0</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="nova-viewer" data-rail-viewer hidden>
+  <div class="nova-viewer-shell">
+    <div class="nova-viewer-empty">
+      <div class="nova-viewer-empty-title">Nothing selected</div>
+      <div class="nova-viewer-empty-copy">
+        Select an artifact, memory item, or web result to view details.
+      </div>
+    </div>
+  </div>
+</div>
+</aside>
+</div>
+
+<div class="nova-sidebar-backdrop" data-sidebar-backdrop hidden></div>
+
+<div id="rail-reopen-root">
+  <button
+    id="rail-reopen-btn"
+    type="button"
+    aria-label="Open right panel"
+    onclick="(function(){document.body.classList.add('is-rail-open');var rail=document.querySelector('.nova-rail');if(rail){rail.classList.add('is-open');}})()"
+  >Open</button>
+</div>
+
+<!-- <script src="/static/js/nova-execution-viewer.js"></script> -->
+<script src="/static/js/nova-composer-bundle.js?v=image-hard-exit-001"></script>
+<script src="/static/js/nova-session-rail.js?v=session-rail-fix-2026-04-20-001"></script>
+<script src="/static/js/nova-memory.js?v=memory-panel-2026-04-15-002"></script>
+</body>
+</html>
