@@ -174,8 +174,8 @@ class ChatService:
                 try:
                     for session_id, session in self.sessions.items():
                         state = session.get("working_state") or {}
-             
-                    execution = state.get("execution") or {}
+
+                        execution = state.get("execution") or {}
 
                     if execution.get("status") != "running":
                         continue
@@ -2760,6 +2760,9 @@ Available actions:
     ) -> dict:
 
         decision = decision if isinstance(decision, dict) else {}
+        parent_artifact_id = self._safe_str(
+            decision.get("parent_artifact_id", "")
+        )
 
         attachments = attachments or []
 
@@ -2768,10 +2771,60 @@ Available actions:
         original_user_text = user_text
         text_lc = (user_text or "").lower()
 
+        if text_lc.strip() in {
+            "regen",
+            "regenerate",
+            "redo image",
+            "make another",
+            "another image",
+        }:
+            last_prompt = self._get_session_meta(
+                session_id,
+                "last_image_prompt",
+            ) or "generate an image"
+
+            return self._handle_image_generation(
+                prompt=last_prompt,
+                session_id=session_id,
+                parent_artifact_id="",
+                source_type="regenerated",
+            )
+
+        regen_commands = {
+            "regen",
+            "regenerate",
+            "redo image",
+            "make another",
+            "another image",
+        }
+
+        if text_lc.strip() in regen_commands:
+            last_prompt = self._get_session_meta(
+                session_id,
+                "last_image_prompt",
+            ) or ""
+
+            last_prompt = self._safe_str(last_prompt).strip()
+
+            if not last_prompt or last_prompt in regen_commands:
+                last_prompt = "generate an image"
+
+            return self._handle_image_generation(
+                prompt=last_prompt,
+                session_id=session_id,
+                parent_artifact_id=parent_artifact_id,
+                source_type="regenerated",
+            )
+
         if self._is_image_generation_request(user_text):
             return self._handle_image_generation(
                 prompt=user_text,
                 session_id=session_id,
+                parent_artifact_id=(
+                    parent_artifact_id
+                    if "parent_artifact_id" in locals()
+                    else ""
+                ),
             )
 
         explicit_execution_commands = {
@@ -2865,11 +2918,6 @@ Available actions:
                     attachments=attachments,
                 )
 
-            if route == self.ROUTE_IMAGE_GENERATION:
-                return self._handle_image_generation(
-                    prompt=user_text,
-                    session_id=session_id,
-                )
 
         user_msg = self._build_user_message(
             original_user_text,
@@ -5178,7 +5226,20 @@ Available actions:
         if not text:
             return False
 
-        if text.startswith("/image") or "/image" in text:
+        if text in {
+            "regen",
+            "regenerate",
+            "redo image",
+            "make another",
+            "another image",
+        }:
+            return True
+
+        if (
+            text.startswith("/image")
+            or text.startswith("/iimage")
+            or "/image" in text
+        ):
             return True
 
         keywords = ["generate", "create", "make", "draw", "render", "design"]
@@ -5601,6 +5662,8 @@ Available actions:
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         exec_debug("HANDLE IS BEING CALLED")
+        print("HANDLE HIT USER_TEXT =", repr(user_text))
+
         attachments = attachments or []
 
         if not session_id:
@@ -7678,10 +7741,38 @@ Auto-fix result:
 
         text = user_text.lower().strip()
         lower_text = text
+        print("DECIDE ROUTE TEXT =", repr(lower_text))
+
+        regen_commands = {
+            "regen",
+            "regenerate",
+            "redo image",
+            "make another",
+            "another image",
+        }
+
+        if lower_text.strip() in regen_commands:
+            return {
+                "route": self.ROUTE_IMAGE_GENERATION,
+                "mode": "image_generation",
+                "confidence": 1.0,
+                "reasons": ["regen_command"],
+            }
 
         attachments = attachments or []
 
         if lower_text.startswith("generate "):
+            return {
+                "route": self.ROUTE_IMAGE_GENERATION,
+                "mode": "image_generation",
+                "confidence": 1.0,
+                "reasons": ["forced_generate_prefix"],
+                "save_artifact": True,
+                "save_memory": False,
+                "use_memory": False,
+                "prompt": user_text,
+            }
+
             return {
                 "route": self.ROUTE_IMAGE_GENERATION,
                 "mode": "image_generation",
@@ -10544,15 +10635,26 @@ Next action:
                 },
             }
 
-    def _save_artifact_fallback(self, artifact: dict):
-            if not isinstance(artifact, dict) or not artifact:
-                return None
+def _save_artifact_fallback(self, artifact: dict):
+    if not isinstance(artifact, dict) or not artifact:
+        return None
 
-            try:
-                return self.artifacts.save_artifact(artifact)
-            except Exception as e:
-                exec_debug("ARTIFACT SAVE FAILED:", e)
-                return None
+    try:
+        saved = self.artifacts.save_artifact(artifact)
+
+        if isinstance(saved, dict):
+            return saved
+
+        if saved:
+            return artifact
+
+        return artifact
+
+    except Exception as e:
+        exec_debug("ARTIFACT SAVE FAILED:", e)
+        exec_debug("ARTIFACT PAYLOAD:", artifact)
+
+        return artifact
 
     def _persist_image_generation_artifact(
             self,
@@ -10607,9 +10709,53 @@ Next action:
 
             image_url = f"/api/uploads/{filename}"
 
-            saved_artifact = None
+            exec_debug("IMAGE SAVE META PROMPT:", prompt)
+            exec_debug("IMAGE SAVE META SESSION:", session_id)
+
+            if self._safe_str(prompt).strip().lower() not in {
+                "regen",
+                "regenerate",
+                "redo image",
+                "make another",
+                "another image",
+            }:
+                self._set_session_meta(
+                    session_id,
+                    "last_image_prompt",
+                    prompt,
+                )
+
+            self._set_session_meta(
+                session_id,
+                "last_image_url",
+                image_url,
+            )
+
+            self._set_session_meta(
+                session_id,
+                "last_image_prompt",
+                prompt,
+            )
+
+            self._set_session_meta(
+                session_id,
+                "last_image_url",
+                image_url,
+            )
+
+            saved_artifact = {
+                "id": f"img_{uuid.uuid4().hex}",
+                "kind": "image",
+                "type": "image_generation",
+                "session_id": session_id,
+                "title": "Generated image",
+                "image_url": image_url,
+                "prompt": prompt,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+
             try:
-                saved_artifact = self._persist_image_generation_artifact(
+                persisted = self._persist_image_generation_artifact(
                     session_id=session_id,
                     prompt=prompt,
                     image_url=image_url,
@@ -10618,8 +10764,34 @@ Next action:
                     source_type=source_type,
                     generation_mode="text_to_image",
                 )
+
+                if isinstance(persisted, dict):
+                    saved_artifact = persisted
+
             except Exception as e:
                 exec_debug("IMAGE ARTIFACT SAVE FAILED:", e)
+
+            try:
+                state = self._get_working_state(session_id)
+                if not isinstance(state, dict):
+                    state = {}
+
+                artifacts = state.get("artifacts")
+                if not isinstance(artifacts, list):
+                    artifacts = []
+
+                existing_ids = {
+                    str(a.get("id", "")) for a in artifacts if isinstance(a, dict)
+                }
+
+                if str(saved_artifact.get("id", "")) not in existing_ids:
+                    artifacts.insert(0, saved_artifact)
+
+                state["artifacts"] = artifacts
+                self._update_working_state(session_id, state)
+
+            except Exception as e:
+                exec_debug("FORCED ARTIFACT SYNC FAILED:", e)
 
             return {
                 "ok": True,
@@ -10658,116 +10830,192 @@ Next action:
                 "session": self._get_session_payload(session_id),
             }
 
-        # ==============================
-        # WEB / ATTACHMENT HELPERS
-        # ==============================
-
     def _handle_web_fetch(self, url: str, session_id: str = "") -> dict:
-            raw_url = self._safe_str(url)
-            normalized_url = raw_url
-            if normalized_url and not re.match(r"^https?://", normalized_url, re.IGNORECASE):
-                normalized_url = "https://" + normalized_url
+        raw_url = self._safe_str(url)
+        normalized_url = raw_url
 
-            fetched_at = datetime.now(timezone.utc).isoformat()
+        if normalized_url and not re.match(
+            r"^https?://",
+            normalized_url,
+            re.IGNORECASE,
+        ):
+            normalized_url = "https://" + normalized_url
 
-            try:
-                result = self.web.fetch(normalized_url)
-            except Exception as e:
-                return {
-                    "ok": False,
-                    "error": f"Web fetch failed: {e}",
-                    "url": normalized_url,
-                    "debug": {
-                        "route_taken": "web_fetch",
-                        "error": str(e),
-                    },
-                }
+        fetched_at = datetime.now(timezone.utc).isoformat()
 
-            if not isinstance(result, dict):
-                result = {}
+        try:
+            result = self.web.fetch(normalized_url)
 
-            artifact = {}
-            try:
-                if hasattr(self.web, "build_artifact_payload") and callable(self.web.build_artifact_payload):
-                    artifact = self.web.build_artifact_payload(result) or {}
-            except Exception as e:
-                artifact = {
-                    "kind": "web_result",
-                    "title": self._safe_str(result.get("title")) or normalized_url,
-                    "summary": self._safe_str(result.get("summary")),
-                    "body": self._safe_str(result.get("content")),
-                    "preview": self._safe_str(result.get("preview")),
-                    "source_url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                    "meta": {
-                        "description": self._safe_str(result.get("description")),
-                        "site_name": self._safe_str(result.get("site_name")),
-                        "domain": self._safe_str(result.get("domain")),
-                        "content": self._safe_str(result.get("content")),
-                        "url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                        "status_code": result.get("status_code"),
-                        "ssl_verified": result.get("ssl_verified"),
-                        "artifact_build_error": str(e),
-                    },
-                    "viewer": {
-                        "kind": "web_result",
-                        "title": self._safe_str(result.get("title")) or normalized_url,
-                        "body": self._safe_str(result.get("content")),
-                        "analysis_text": self._safe_str(result.get("summary")),
-                        "bullets": self._safe_list(result.get("bullets")),
-                        "links": self._safe_list(result.get("links")),
-                        "images": self._safe_list(result.get("images")),
-                        "source_url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                    },
-                }
-
-            if isinstance(artifact, dict):
-                artifact["session_id"] = session_id or artifact.get("session_id", "")
-                artifact.setdefault("created_at", fetched_at)
-                artifact["updated_at"] = fetched_at
-
-            artifact = self._upgrade_web_artifact_payload(
-                artifact=artifact,
-                result=result,
-                url=normalized_url,
-            )
-
-            saved_artifact = self._save_artifact_fallback(artifact) if artifact else None
-            final_artifact = self._upgrade_web_artifact_payload(
-                artifact=saved_artifact or artifact,
-                result=result,
-                url=normalized_url,
-            )
-
-            summary = self._safe_str(final_artifact.get("summary")) if isinstance(final_artifact, dict) else ""
-            body = self._safe_str(final_artifact.get("body")) if isinstance(final_artifact, dict) else ""
-            title = self._safe_str(final_artifact.get("title")) if isinstance(final_artifact, dict) else normalized_url
-            viewer = self._safe_dict(final_artifact.get("viewer")) if isinstance(final_artifact, dict) else {}
-            meta = self._safe_dict(final_artifact.get("meta")) if isinstance(final_artifact, dict) else {}
-
-            source_url = self._safe_str(meta.get("source_url")) or self._safe_str(result.get("final_url") or result.get("url") or normalized_url)
-
-            source_urls = []
-            if source_url:
-                source_urls.append(source_url)
-
+        except Exception as e:
             return {
-                "ok": bool(result.get("ok", True)),
-                "text": summary or f"Fetched {title}",
-                "artifact": final_artifact,
-                "viewer": viewer,
-                "url": self._safe_str(result.get("final_url") or result.get("url") or normalized_url),
-                "source_url": source_url,
-                "source_urls": source_urls,
-                "title": title,
-                "summary": summary,
-                "body": body,
-                "meta": meta,
+                "ok": False,
+                "error": f"Web fetch failed: {e}",
+                "url": normalized_url,
                 "debug": {
                     "route_taken": "web_fetch",
-                    "status_code": result.get("status_code"),
-                    "artifact_kind": self._safe_str(final_artifact.get("kind")) if isinstance(final_artifact, dict) else "web_result",
+                    "error": str(e),
                 },
             }
+
+        if not isinstance(result, dict):
+            result = {}
+
+        artifact = {}
+
+        try:
+            if (
+                hasattr(self.web, "build_artifact_payload")
+                and callable(self.web.build_artifact_payload)
+            ):
+                artifact = self.web.build_artifact_payload(result) or {}
+
+        except Exception as e:
+            artifact = {
+                "kind": "web_result",
+                "title": self._safe_str(result.get("title"))
+                or normalized_url,
+                "summary": self._safe_str(result.get("summary")),
+                "body": self._safe_str(result.get("content")),
+                "preview": self._safe_str(result.get("preview")),
+                "source_url": self._safe_str(
+                    result.get("final_url")
+                    or result.get("url")
+                    or normalized_url
+                ),
+                "meta": {
+                    "description": self._safe_str(
+                        result.get("description")
+                    ),
+                    "site_name": self._safe_str(
+                        result.get("site_name")
+                    ),
+                    "domain": self._safe_str(result.get("domain")),
+                    "content": self._safe_str(result.get("content")),
+                    "url": self._safe_str(
+                        result.get("final_url")
+                        or result.get("url")
+                        or normalized_url
+                    ),
+                    "status_code": result.get("status_code"),
+                    "ssl_verified": result.get("ssl_verified"),
+                    "artifact_build_error": str(e),
+                },
+                "viewer": {
+                    "kind": "web_result",
+                    "title": self._safe_str(result.get("title"))
+                    or normalized_url,
+                    "body": self._safe_str(result.get("content")),
+                    "analysis_text": self._safe_str(
+                        result.get("summary")
+                    ),
+                    "bullets": self._safe_list(
+                        result.get("bullets")
+                    ),
+                    "links": self._safe_list(result.get("links")),
+                    "images": self._safe_list(result.get("images")),
+                    "source_url": self._safe_str(
+                        result.get("final_url")
+                        or result.get("url")
+                        or normalized_url
+                    ),
+                },
+            }
+
+        if isinstance(artifact, dict):
+            artifact["session_id"] = (
+                session_id or artifact.get("session_id", "")
+            )
+            artifact.setdefault("created_at", fetched_at)
+            artifact["updated_at"] = fetched_at
+
+        artifact = self._upgrade_web_artifact_payload(
+            artifact=artifact,
+            result=result,
+            url=normalized_url,
+        )
+
+        saved_artifact = (
+            self._save_artifact_fallback(artifact)
+            if artifact
+            else None
+        )
+
+        final_artifact = self._upgrade_web_artifact_payload(
+            artifact=saved_artifact or artifact,
+            result=result,
+            url=normalized_url,
+        )
+
+        summary = (
+            self._safe_str(final_artifact.get("summary"))
+            if isinstance(final_artifact, dict)
+            else ""
+        )
+
+        body = (
+            self._safe_str(final_artifact.get("body"))
+            if isinstance(final_artifact, dict)
+            else ""
+        )
+
+        title = (
+            self._safe_str(final_artifact.get("title"))
+            if isinstance(final_artifact, dict)
+            else normalized_url
+        )
+
+        viewer = (
+            self._safe_dict(final_artifact.get("viewer"))
+            if isinstance(final_artifact, dict)
+            else {}
+        )
+
+        meta = (
+            self._safe_dict(final_artifact.get("meta"))
+            if isinstance(final_artifact, dict)
+            else {}
+        )
+
+        source_url = (
+            self._safe_str(meta.get("source_url"))
+            or self._safe_str(
+                result.get("final_url")
+                or result.get("url")
+                or normalized_url
+            )
+        )
+
+        source_urls = []
+
+        if source_url:
+            source_urls.append(source_url)
+
+        return {
+            "ok": bool(result.get("ok", True)),
+            "text": summary or f"Fetched {title}",
+            "artifact": final_artifact,
+            "viewer": viewer,
+            "url": self._safe_str(
+                result.get("final_url")
+                or result.get("url")
+                or normalized_url
+            ),
+            "source_url": source_url,
+            "source_urls": source_urls,
+            "title": title,
+            "summary": summary,
+            "body": body,
+            "meta": meta,
+            "debug": {
+                "route_taken": "web_fetch",
+                "status_code": result.get("status_code"),
+                "artifact_kind": (
+                    self._safe_str(final_artifact.get("kind"))
+                    if isinstance(final_artifact, dict)
+                    else "web_result"
+                ),
+            },
+        }
 
     def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
         attachments = attachments or []
@@ -10857,14 +11105,15 @@ Next action:
             f"{instruction}\n"
         )
 
-def _build_chat_input(
-    self,
-    user_text: str,
-    decision: dict,
-    session_id: str = "",
-    working_context_block: str = "",
-    memory_context: str = "",
-) -> str:
+    def _build_chat_input(
+        self,
+        user_text: str,
+        decision: dict,
+        session_id: str = "",
+        working_context_block: str = "",
+        memory_context: str = "",
+    ) -> str:
+        user_text = self._safe_str(user_text)
     user_text = self._safe_str(user_text)
     decision = decision if isinstance(decision, dict) else {}
 
@@ -11714,6 +11963,16 @@ def _nova_runtime_handle_image_generation(
     parent_artifact_id: str = "",
     source_type: str = "generated",
 ) -> dict:
+    print("RUNTIME IMAGE HIT PROMPT =", repr(prompt))
+
+    regen_commands = {
+        "regen",
+        "regenerate",
+        "redo image",
+        "make another",
+        "another image",
+    }
+
     try:
         result = self.client.images.generate(
             model=self.image_model,
@@ -11735,6 +11994,21 @@ def _nova_runtime_handle_image_generation(
             f.write(image_bytes)
 
         image_url = f"/api/uploads/{filename}"
+
+        exec_debug("RUNTIME IMAGE PROMPT:", prompt)
+
+        if self._safe_str(prompt).strip().lower() not in regen_commands:
+            self._set_session_meta(
+                session_id,
+                "last_image_prompt",
+                prompt,
+            )
+
+        self._set_session_meta(
+            session_id,
+            "last_image_url",
+            image_url,
+        )
 
         saved_artifact = None
         try:

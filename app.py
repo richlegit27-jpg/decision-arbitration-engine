@@ -617,8 +617,32 @@ def api_chat():
     data = request_json()
 
     user_text = str(data.get("user_text") or "").strip()
+    print("API CHAT USER_TEXT =", repr(user_text))
     session_id = str(data.get("session_id") or "").strip()
     attachments = normalize_attachments(data.get("attachments"))
+
+    regen_commands = {
+        "regen",
+        "regenerate",
+        "redo image",
+        "make another",
+        "another image",
+    }
+
+    if user_text.lower().strip() in regen_commands:
+        last_prompt = chat_service._get_session_meta(
+            session_id,
+            "last_image_prompt",
+        ) or "generate an image"
+
+        result = chat_service._handle_image_generation(
+            prompt=last_prompt,
+            session_id=session_id,
+            parent_artifact_id="",
+            source_type="regenerated",
+        )
+
+        return jsonify(result)
 
     if not session_id:
         active = session_service.get_active()
@@ -1500,6 +1524,8 @@ def execution_stream():
         if not action:
             yield send_event("error", {"ok": False, "error": "missing action", "done": True})
             return
+
+        session = {}
 
         execution = (session or {}).get("working_state", {}).get("execution") or {}
         if not isinstance(execution, dict):

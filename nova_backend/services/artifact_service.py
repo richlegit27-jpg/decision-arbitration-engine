@@ -167,13 +167,44 @@ class ArtifactService:
         data = self._read_store()
         items = data.get("artifacts", [])
 
-        artifact = dict(artifact or {})
-
-        now = iso_now()
-
+        # =========================
+        # ENSURE ARTIFACT ID FIRST
+        # =========================
         if not artifact.get("id"):
             import uuid
             artifact["id"] = f"artifact_{uuid.uuid4().hex}"
+
+        # =========================
+        # VERSIONING CORE
+        # =========================
+        parent_id = artifact.get("parent_id")
+        parent_version = 0
+
+        if parent_id:
+            for existing in items:
+                if existing.get("id") == parent_id:
+                    parent_version = existing.get("version", 0)
+                    break
+
+        artifact["version"] = parent_version + 1
+        artifact["parent_id"] = parent_id
+
+        # =========================
+        # ROOT CHAIN RESOLUTION
+        # =========================
+        root_id = parent_id
+
+        if parent_id:
+            for existing in items:
+                if existing.get("id") == parent_id:
+                    root_id = existing.get("root_id") or parent_id
+                    break
+        else:
+            root_id = artifact["id"]
+
+        artifact["root_id"] = root_id
+
+        now = iso_now()
 
         artifact["updated_at"] = now
         if not artifact.get("created_at"):
@@ -193,8 +224,7 @@ class ArtifactService:
         MAX_ARTIFACTS = 100
         items = items[-MAX_ARTIFACTS:]
 
-        data["artifacts"] = items
-        self._write_store(data)
+        data["artifacts"] = items[-MAX_ARTIFACTS:]
 
         return self._normalize_artifact(artifact)
 

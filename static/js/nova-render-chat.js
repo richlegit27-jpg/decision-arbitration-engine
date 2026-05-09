@@ -633,78 +633,182 @@
     return { event, payload };
   }
 
-  async function readStreamResponse(res) {
-    const reader = res.body?.getReader?.();
-    if (!reader) {
-      const text = await res.text().catch(() => "");
-      return { mode: "text", text };
-    }
+async function readStreamResponse(res) {
+  const reader = res.body?.getReader?.();
 
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-    let assistantText = "";
+  if (!reader) {
+    const text = await res.text().catch(() => "");
+    return { mode: "text", text };
+  }
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
+  const decoder = new TextDecoder("utf-8");
 
-      buffer += decoder.decode(value, { stream: true });
+  let buffer = "";
+  let assistantText = "";
 
-      const parts = buffer.split("\n\n");
-      buffer = parts.pop() || "";
+  while (true) {
+    const { value, done } = await reader.read();
 
-      for (const part of parts) {
-        if (!part.trim()) continue;
+    if (done) break;
 
-        const { event, payload } = parseSSEChunk(part);
+    buffer += decoder.decode(value, { stream: true });
 
-        if (event === "delta") {
-          let delta = "";
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() || "";
 
-          if (typeof payload === "string") {
-            delta = payload;
-          } else if (payload && typeof payload.delta === "string") {
-            delta = payload.delta;
-          } else if (payload && typeof payload.content === "string") {
-            delta = payload.content;
-          }
+    for (const part of parts) {
+      if (!part.trim()) continue;
 
-          if (delta) {
-            assistantText += delta;
-            upsertStreamingAssistant(assistantText);
-          }
-        } else if (event === "done") {
-          let finalText = assistantText;
+      const { event, payload } = parseSSEChunk(part);
 
-          if (payload && typeof payload === "object") {
-            if (typeof payload.content === "string") finalText = payload.content;
-            else if (typeof payload.message === "string") finalText = payload.message;
-            else if (payload.message && typeof payload.message.content === "string") {
-              finalText = payload.message.content;
-            }
-          } else if (typeof payload === "string" && payload.trim()) {
-            finalText = payload;
-          }
+      // =========================
+      // DELTA STREAM
+      // =========================
+      if (event === "delta") {
+        let delta = "";
 
-          finalizeStreamingAssistant(finalText || assistantText);
-          return { mode: "sse", text: finalText || assistantText };
-        } else if (event === "error") {
-          let errorText = "Stream failed.";
-          if (payload && typeof payload.error === "string") errorText = payload.error;
-          else if (typeof payload === "string" && payload) errorText = payload;
-
-          throw new Error(errorText);
+        if (typeof payload === "string") {
+          delta = payload;
+        } else if (
+          payload &&
+          typeof payload.delta === "string"
+        ) {
+          delta = payload.delta;
+        } else if (
+          payload &&
+          typeof payload.content === "string"
+        ) {
+          delta = payload.content;
         }
+
+        if (delta) {
+          assistantText += delta;
+          upsertStreamingAssistant(assistantText);
+        }
+
+        continue;
+      }
+
+      // =========================
+      // DONE EVENT
+      // =========================
+      if (event === "done") {
+        let finalText = assistantText;
+
+        // =========================
+        // OBJECT PAYLOAD
+        // =========================
+        if (payload && typeof payload === "object") {
+
+          // ---------------------------------
+          // IMAGE RESPONSE HARD LOCK
+          // ---------------------------------
+          const imageAssistant =
+            payload.assistant_message ||
+            payload.message ||
+            {};
+
+          const imageUrl =
+            payload.image_url ||
+            imageAssistant.image_url ||
+            "";
+
+          if (imageUrl) {
+            finalText =
+              imageAssistant.text ||
+              payload.content ||
+              payload.text ||
+              "Generated image.";
+
+            finalizeStreamingAssistant(finalText);
+
+            return {
+              mode: "image",
+              text: finalText,
+              image_url: imageUrl,
+            };
+          }
+
+          // ---------------------------------
+          // NORMAL FINALIZATION
+          // ---------------------------------
+          if (typeof payload.content === "string") {
+            finalText = payload.content;
+          } else if (typeof payload.message === "string") {
+            finalText = payload.message;
+          } else if (
+            payload.message &&
+            typeof payload.message.content === "string"
+          ) {
+            finalText = payload.message.content;
+          } else if (
+            payload.assistant_message &&
+            typeof payload.assistant_message.text === "string"
+          ) {
+            finalText = payload.assistant_message.text;
+          }
+        }
+
+        // =========================
+        // STRING PAYLOAD
+        // =========================
+        else if (
+          typeof payload === "string" &&
+          payload.trim()
+        ) {
+          finalText = payload;
+        }
+
+        finalizeStreamingAssistant(
+          finalText || assistantText
+        );
+
+        return {
+          mode: "sse",
+          text: finalText || assistantText,
+        };
+      }
+
+      // =========================
+      // ERROR EVENT
+      // =========================
+      if (event === "error") {
+        let errorText = "Stream failed.";
+
+        if (
+          payload &&
+          typeof payload.error === "string"
+        ) {
+          errorText = payload.error;
+        } else if (
+          typeof payload === "string" &&
+          payload
+        ) {
+          errorText = payload;
+        }
+
+        throw new Error(errorText);
       }
     }
-
-    if (assistantText) {
-      finalizeStreamingAssistant(assistantText);
-      return { mode: "sse", text: assistantText };
-    }
-
-    return { mode: "empty", text: "" };
   }
+
+  // =========================
+  // FINAL FALLBACK
+  // =========================
+  if (assistantText) {
+    finalizeStreamingAssistant(assistantText);
+
+    return {
+      mode: "sse",
+      text: assistantText,
+    };
+  }
+
+  return {
+    mode: "empty",
+    text: "",
+  };
+}
 
   function getAttachmentModule() {
     return Nova.attachments || {};

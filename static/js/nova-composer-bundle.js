@@ -1767,22 +1767,30 @@ viewer.innerHTML = `
     if (!messageId) return;
 
     const userMsg = currentUserMessageForRegenerate(messageId);
-    if (!userMsg) return;
 
+    console.log("IMAGE REGENERATE USER MSG =", userMsg);
+    console.log("IMAGE REGENERATE MESSAGE ID =", messageId);
+    console.log("STATE MESSAGES =", state.messages);
+
+    if (!userMsg) return;
     const prompt = String(userMsg.text || "").trim();
     if (!prompt) return;
 
-    const payload = {
-      user_text: prompt.startsWith("/image") ? prompt : "/image " + prompt,
-      session_id: String(state.activeSessionId || "").trim(),
-      attachments: [],
-    };
+const payload = {
+  user_text: prompt.startsWith("/image") ? prompt : "/image " + prompt,
+  session_id: String(state.activeSessionId || "").trim(),
+  attachments: [],
 
-if (typeof consumeChatStreamStable === "function") {
-  await consumeChatStreamStable(payload);
-} else {
-  throw new Error("consumeChatStreamStable is not available.");
-}
+  // 🔥 CRITICAL FIX FOR ARTIFACT CHAINING
+  parent_artifact_id: messageId
+};
+
+    if (typeof consumeChatStreamStable === "function") {
+      await consumeChatStreamStable(payload);
+    } else {
+      throw new Error("consumeChatStreamStable is not available.");
+    }
+
     return;
   }
 
@@ -2068,20 +2076,40 @@ function renderAttachmentBlock(attachment) {
     const disabled = state.stream.running ? ' aria-disabled="true"' : "";
     const disabledAttr = state.stream.running ? " disabled" : "";
 
+    const isImageMessage =
+      String(message.image_url || "").trim() ||
+      String((message.meta && message.meta.image_url) || "").trim();
+
     return (
       '<div class="nova-message-actions">' +
+
       '<button type="button" class="nova-message-action" data-copy-message="' +
       escapeHtml(message.id) +
       '"' +
       disabled +
       disabledAttr +
       ">Copy</button>" +
+
       '<button type="button" class="nova-message-action" data-regenerate-message="' +
       escapeHtml(message.id) +
       '"' +
       disabled +
       disabledAttr +
       ">Regenerate</button>" +
+
+      (
+        isImageMessage
+          ? (
+              '<button type="button" class="nova-message-action" data-regenerate-image-message="' +
+              escapeHtml(message.id) +
+              '"' +
+              disabled +
+              disabledAttr +
+              ">Regenerate Image</button>"
+            )
+          : ""
+      ) +
+
       "</div>"
     );
   }
@@ -2411,12 +2439,19 @@ function renderMessageCard(message) {
   const imageHtml = imageUrl
     ? `
       <div class="message-image-wrap">
-        <img
-          class="message-image"
-          src="${imageUrl}"
-          alt="Generated image"
-          loading="lazy"
-        />
+        <button
+          type="button"
+          class="message-image-button"
+          onclick="window.openNovaImageModal && window.openNovaImageModal('${imageUrl.replace(/'/g, "\\'")}')"
+          aria-label="Open generated image"
+        >
+          <img
+            class="message-image"
+            src="${imageUrl}"
+            alt="Generated image"
+            loading="lazy"
+          />
+        </button>
       </div>
     `
     : "";
@@ -2456,6 +2491,7 @@ function renderMessageCard(message) {
   return `
     <div class="message-card ${roleClass}">
       ${bodyHtml}
+      ${renderMessageActions(message)}
       ${memoryBadgeHtml}
       ${polishBadgesHtml}
     </div>
@@ -2919,7 +2955,7 @@ function renderArtifacts() {
 
   const grouped = {};
   normalized.forEach(function (entry) {
-    const key = entry.kindBadge || "artifact";
+   const key = entry.parent_id || entry.id;
     if (!grouped[key]) grouped[key] = [];
     grouped[key].push(entry);
   });
@@ -2931,12 +2967,25 @@ function renderArtifacts() {
     .map(function (groupKey) {
       const cards = grouped[groupKey]
         .map(function (entry) {
+          const thumbHtml = entry.thumbUrl
+            ? (
+                '<div class="nova-artifact-thumb-wrap">' +
+                '<img class="nova-artifact-thumb" src="' +
+                escapeHtml(entry.thumbUrl) +
+                '" alt="' +
+                escapeHtml(entry.title) +
+                '">' +
+                '</div>'
+              )
+            : "";
+
           return (
             '<div class="nova-artifact-card" data-artifact-open="' +
             escapeHtml(entry.id) +
             '" data-artifact-id="' +
             escapeHtml(entry.id) +
             '">' +
+            thumbHtml +
             '<div class="nova-artifact-card-title">' +
             escapeHtml(entry.title) +
             "</div>" +
@@ -2964,7 +3013,7 @@ function renderArtifacts() {
   els.artifactList.innerHTML = controlsHtml + html;
 }
 
-  async function apiGet(url) {
+async function apiGet(url) {
     const response = await fetch(url, {
       method: "GET",
       credentials: "same-origin",
@@ -3405,6 +3454,9 @@ function finalizeStreamMessage(payload) {
     ""
   ).trim();
 
+
+
+
   const imageUrl = String(
     viewer.image_url ||
     item.image_url ||
@@ -3476,6 +3528,7 @@ function finalizeStreamMessage(payload) {
   // IMAGE VIEWER
   // ==============================
   if (imageUrl) {
+
     return `
       <div class="nova-viewer-shell">
         <div class="nova-viewer-card">
@@ -3900,8 +3953,20 @@ if (
 ) {
   applyBackendSessionState(data.session);
 
-  // DO NOT EARLY-RETURN IMAGE RESPONSES
-  if (!hasImageResponse) {
+  // =====================================
+  // IMAGE RESPONSE HARD EXIT
+  // =====================================
+  if (hasImageResponse) {
+    finishStreamUi({
+      statusState: "idle",
+      statusText: "Ready",
+    });
+
+    state.stream.running = false;
+    state.stream.targetMessageId = null;
+
+    setBusyUi(false);
+
     return data;
   }
 }
@@ -4072,10 +4137,24 @@ if (assistantMsg?.text?.trim()) {
   }
 }
 
-    if (data && data.saved_artifact && data.saved_artifact.id) {
-      openArtifactFromStateOrBackend(data.saved_artifact.id);
-    }
+if (data && data.saved_artifact && data.saved_artifact.id) {
 
+  state.artifacts = Array.isArray(state.artifacts)
+    ? state.artifacts
+    : [];
+
+  const alreadyExists = state.artifacts.some(function (item) {
+    return String((item && item.id) || "") === String(data.saved_artifact.id);
+  });
+
+  if (!alreadyExists) {
+    state.artifacts.unshift(data.saved_artifact);
+  }
+
+  renderArtifacts();
+
+  openArtifactFromStateOrBackend(data.saved_artifact.id);
+}
     state.messages = (state.messages || []).map(function (msg) {
       if (!msg || String(msg.role || "") !== "assistant") return msg;
 
@@ -4193,8 +4272,16 @@ async function sendMessage() {
   await maybeAutoSaveMemoryFromChatText(text);
 
   // ðŸŽ¨ IMAGE PLACEHOLDER
-  if (/^\/image|generate image|create image|draw/i.test(text)) {
-    const tempId = "gen_" + Date.now();
+if (
+  /^\/image|generate image|create image|draw/i.test(text) ||
+  [
+    "regen",
+    "regenerate",
+    "redo image",
+    "make another",
+    "another image",
+  ].includes(String(text || "").trim().toLowerCase())
+) {    const tempId = "gen_" + Date.now();
 
     upsertMessage({
       id: tempId,
@@ -4288,7 +4375,16 @@ async function sendMessage() {
       location: location,
     };
 
-    if (isImageCommand) {
+if (
+  isImageCommand ||
+  [
+    "regen",
+    "regenerate",
+    "redo image",
+    "make another",
+    "another image",
+  ].includes(String(text || "").trim().toLowerCase())
+) {
       await consumeChatJson(payload);
       showToast("Image request sent.", "success");
     } else {
@@ -5218,6 +5314,7 @@ document.addEventListener("click", function (e) {
   e.preventDefault();
 
   const url = String(sourceCard.dataset.url || "").trim();
+
   const title = String(sourceCard.dataset.title || "Source").trim();
 
   if (!url) return;
@@ -5225,6 +5322,67 @@ document.addEventListener("click", function (e) {
   if (typeof window.fetchSourcePreviewIntoRail === "function") {
     window.fetchSourcePreviewIntoRail(url, title);
   }
+});
+
+document.addEventListener("click", function (event) {
+  const img = event.target.closest(".message-image");
+
+  if (!img) return;
+
+  const existing = document.querySelector(".nova-image-modal");
+
+  if (existing) {
+    existing.remove();
+  }
+
+  const modal = document.createElement("div");
+  modal.className = "nova-image-modal";
+
+  modal.innerHTML = `
+    <div class="nova-image-modal-backdrop"></div>
+
+    <div class="nova-image-modal-card">
+      <button
+        type="button"
+        class="nova-image-modal-close"
+        aria-label="Close image"
+      >
+        ×
+      </button>
+
+      <img
+        class="nova-image-modal-img"
+        src="${img.src}"
+        alt="Expanded image"
+      />
+    </div>
+  `;
+
+  const escHandler = function (e) {
+    if (e.key === "Escape") {
+      modal.remove();
+      document.removeEventListener("keydown", escHandler);
+    }
+  };
+
+  const closeModal = function () {
+    modal.remove();
+    document.removeEventListener("keydown", escHandler);
+  };
+
+  const backdrop = modal.querySelector(".nova-image-modal-backdrop");
+  const closeButton = modal.querySelector(".nova-image-modal-close");
+
+  if (backdrop) {
+    backdrop.addEventListener("click", closeModal);
+  }
+
+  if (closeButton) {
+    closeButton.addEventListener("click", closeModal);
+  }
+
+  document.body.appendChild(modal);
+  document.addEventListener("keydown", escHandler);
 });
 
 function renderWeb() {
@@ -6108,24 +6266,67 @@ async function consumeChatStreamStable(payload) {
       response.headers.get("content-type") || ""
     ).toLowerCase();
 
-
     if (responseContentType.includes("application/json")) {
       const rawJsonText = await response.text();
       const data = rawJsonText ? JSON.parse(rawJsonText) : {};
 
-      if (
+      const hasImageResponse = Boolean(
         data &&
-        data.session &&
-        Array.isArray(data.session.messages)
-      ) {
-        const incoming = dedupeMessages(data.session.messages);
-        const current = Array.isArray(state.messages) ? state.messages : [];
+        data.assistant_message &&
+        typeof data.assistant_message === "object" &&
+        (
+          data.assistant_message.image_url ||
+          (
+            data.assistant_message.meta &&
+            data.assistant_message.meta.image_url
+          )
+        )
+      );
 
-        state.messages = dedupeMessages(incoming);
-        renderChat();
-      } else {
-        applyStatePayload(data);
+      // =====================================
+      // IMAGE RESPONSE HARD EXIT
+      // =====================================
+      if (hasImageResponse) {
+        const imageUrl = String(
+          data.image_url ||
+          data.assistant_message?.image_url ||
+          data.assistant_message?.meta?.image_url ||
+          ""
+        ).trim();
+
+        const imageText = String(
+          data.assistant_message?.text ||
+          data.text ||
+          "Generated image."
+        ).trim();
+
+        if (imageUrl) {
+          upsertMessage({
+            id: makeId("assistant_image"),
+            role: "assistant",
+            text: imageText,
+            image_url: imageUrl,
+            meta: {
+              image_url: imageUrl,
+              prompt: data.prompt || "",
+              revised_prompt: data.revised_prompt || "",
+            },
+          });
+        }
+
+        finishStreamUi({
+          statusText: "Complete",
+          statusState: "done",
+        });
+
+        state.stream.running = false;
+        state.stream.targetMessageId = null;
+        setBusyUi(false);
+
+        return data;
       }
+
+      applyStatePayload(data);
 
       finishStreamUi({
         statusText: "Complete",
@@ -6137,6 +6338,30 @@ async function consumeChatStreamStable(payload) {
 
       return data;
     }
+
+if (
+  !hasImageResponse &&
+  data &&
+  data.session &&
+  Array.isArray(data.session.messages)
+) {
+
+  const incoming = dedupeMessages(data.session.messages);
+  state.messages = dedupeMessages(incoming);
+  renderChat();
+} else {
+  applyStatePayload(data);
+}
+
+finishStreamUi({
+  statusText: "Complete",
+  statusState: "done",
+});
+
+state.stream.running = false;
+state.stream.targetMessageId = null;
+
+return data;
 
     const contentType = String(
       response.headers.get("content-type") || ""
@@ -6242,15 +6467,15 @@ async function consumeChatStreamStable(payload) {
     if (state.stream && state.stream.targetMessageId) {
       const targetMessage = findMessageById(state.stream.targetMessageId);
 
-finalizeStreamMessage({
-  message_id: state.stream.targetMessageId,
-  text: (targetMessage && targetMessage.text) || "",
-  meta:
-    targetMessage &&
-    targetMessage.meta &&
-    typeof targetMessage.meta === "object"
-      ? targetMessage.meta
-      : {},
+      finalizeStreamMessage({
+        message_id: state.stream.targetMessageId,
+        text: (targetMessage && targetMessage.text) || "",
+        meta:
+          targetMessage &&
+          targetMessage.meta &&
+          typeof targetMessage.meta === "object"
+            ? targetMessage.meta
+            : {},
         artifacts: Array.isArray(state.artifacts) ? state.artifacts : [],
         memory: Array.isArray(state.memory) ? state.memory : [],
         sessions: Array.isArray(state.sessions) ? state.sessions : [],

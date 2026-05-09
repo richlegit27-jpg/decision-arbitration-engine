@@ -94,17 +94,23 @@ class SessionService:
     MAX_TEXT_LEN = 20000
     MAX_META_STRING_LEN = 500
     ALLOWED_META_KEYS = {
-        "route",
-        "mode",
-        "has_attachments",
-        "artifact_ids",
-        "artifact_id",
-        "execution_id",
-        "error",
-        "status",
-        "source",
-        "model",
-    }
+    "route",
+    "mode",
+    "has_attachments",
+    "artifact_ids",
+    "artifact_id",
+    "execution_id",
+    "error",
+    "status",
+    "source",
+    "model",
+
+    # web/research persistence
+    "sources",
+    "source_urls",
+    "query",
+    "fresh",
+}
 
     def _safe_str(self, value) -> str:
         if value is None:
@@ -146,6 +152,20 @@ class SessionService:
                 continue
 
             if value is None:
+                continue
+
+            if key in {"sources"}:
+                if isinstance(value, list):
+                    cleaned[key] = value[:10]
+                continue
+
+            if key in {"source_urls"}:
+                if isinstance(value, list):
+                    cleaned[key] = [
+                        self._truncate_text(v, 500)
+                        for v in value
+                        if self._safe_str(v).strip()
+                    ][:20]
                 continue
 
             if isinstance(value, (str, int, float, bool)):

@@ -472,3 +472,34 @@ disables active execution stat
 ✅ scattered completion markers removed
 ⚠ remaining issue: stale running execution objects survive after completion
 🎯 next target: single authoritative execution shutdown path
+
+1 pm 
+
+Hour 1 — Image Generation Lane Stabilization
+Cleaned image generation response flow in:
+C:\Users\Owner\nova\nova_backend\services\chat_service.py
+Removed trailing polluted assistant text behavior (Done. / extra cleanup noise).
+Tightened final image response normalization.
+Confirmed target response format:
+
+2pm Hourly Progress Log — Nova Image Lane Lock
+
+Time: Friday, May 8, 2026 — Vancouver
+Checkpoint: Image generation pipeline stabilization
+
+Completed
+Backend image generation fixed
+_handle_image_generation runtime binding repaired
+OpenAI image API confirmed working
+Image artifacts saving correctly
+/api/uploads/...png generation confirmed
+assistant_message.image_url now preserved
+normalizeMessage() fixed
+duplicate finalizeStreamMessage() removed
+frontend stream placeholder overwrite path isolated
+image assistant replacement logic added
+stale Done. corruption lane identified
+stream state cleanup hardened
+session overwrite path debugged
+major JS syntax corruption repaired
+active frontend bundle confirmed:
