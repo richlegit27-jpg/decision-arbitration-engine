@@ -3345,6 +3345,20 @@ function finalizeStreamMessage(payload) {
       },
     });
 
+if (data.saved_artifact && typeof data.saved_artifact === "object") {
+  const artifactId = String(data.saved_artifact.id || "").trim();
+
+  const exists = (state.artifacts || []).some(function (item) {
+    return String((item && item.id) || "").trim() === artifactId;
+  });
+
+  if (!exists) {
+    state.artifacts = [data.saved_artifact].concat(state.artifacts || []);
+  }
+
+  renderArtifacts();
+}
+
     if (state.stream) {
       state.stream.placeholderId = "";
       state.stream.messageId = "";
@@ -3922,12 +3936,48 @@ setBusyUi(false);
 
 if (!response.ok || data.ok === false) {
   const message = String(data.error || "Chat failed.");
-  showToast(message, "error");
-  throw new Error(message);
+showToast(message, "error");
+
+if (
+  data &&
+  data.assistant_message &&
+  data.assistant_message.image_url
+) {
+  console.warn(
+    "[IMAGE MODE] ignoring generic chat failure"
+  );
+
+  return data;
+}
+
+throw new Error(message);
 }
 
 window.__lastResponse = data;
 console.log("FULL CHAT RESPONSE:", data);
+
+if (data && data.assistant_message && data.assistant_message.image_url) {
+  try {
+    upsertMessage({
+      role: "assistant",
+      text: String(data.assistant_message.text || "Generated image.").trim(),
+      image_url: String(data.assistant_message.image_url || "").trim(),
+      meta: {
+        image_url: String(data.assistant_message.image_url || "").trim(),
+      },
+      attachments: [],
+    });
+  } catch (err) {
+    console.warn("IMAGE UPSERT FAILED:", err);
+  }
+
+  state.stream.running = false;
+  state.stream.controller = null;
+  setBusyUi(false);
+  updateTopbarFromState();
+
+  return data;
+}
 
 const hasImageResponse =
   data &&
@@ -4067,74 +4117,27 @@ const assistantMsg =
       )
     : null;
 
-// =====================================
-// IMAGE RESPONSE HARD LOCK
-// =====================================
-if (
-  assistantMsg &&
-  (
-    assistantMsg.image_url ||
-    (assistantMsg.meta && assistantMsg.meta.image_url) ||
-    (data && data.image_url)
-  )
-) {
-  assistantMsg.text =
-    String(
-      assistantMsg.text ||
-      data.text ||
-      "Generated image."
-    ).trim();
-
-  const imageExists = (state.messages || []).some(function (msg) {
-    return (
-      msg &&
-      String(msg.role || "") === "assistant" &&
-      (
-        String(msg.image_url || "").trim() ===
-        String(
-          assistantMsg.image_url ||
-          data.image_url ||
-          ""
-        ).trim()
-      )
-    );
-  });
-
-  if (!imageExists) {
+if (data && data.assistant_message && data.assistant_message.image_url) {
+  try {
     upsertMessage({
-      ...assistantMsg,
-      image_url:
-        assistantMsg.image_url ||
-        data.image_url ||
-        "",
+      role: "assistant",
+      text: String(data.assistant_message.text || "Generated image.").trim(),
+      image_url: String(data.assistant_message.image_url || "").trim(),
+      meta: {
+        image_url: String(data.assistant_message.image_url || "").trim(),
+      },
+      attachments: [],
     });
+  } catch (err) {
+    console.warn("IMAGE UPSERT FAILED:", err);
   }
+
+  state.stream.running = false;
+  state.stream.controller = null;
+  setBusyUi(false);
+  updateTopbarFromState();
 
   return data;
-}
-
-if (assistantMsg?.text?.trim()) {
-  const assistantText = String(assistantMsg.text || "").trim();
-  const assistantMeta = (assistantMsg && assistantMsg.meta) || {};
-
-  if (
-    assistantMeta.execution_control === true ||
-    assistantText.includes("Execution command received.")
-  ) {
-    return data;
-  }
-
-  const exists = (state.messages || []).some(function (msg) {
-    return (
-      msg &&
-      String(msg.role || "") === "assistant" &&
-      String(msg.text || "").trim() === assistantText
-    );
-  });
-
-  if (!exists) {
-    upsertMessage(assistantMsg);
-  }
 }
 
 if (data && data.saved_artifact && data.saved_artifact.id) {
@@ -4395,6 +4398,28 @@ if (
     }
 
   } catch (error) {
+    const last = window.__lastResponse || {};
+
+    if (
+      last &&
+      last.assistant_message &&
+      last.assistant_message.image_url
+    ) {
+      console.warn(
+        "[IMAGE MODE] swallowed post-image send error:",
+        error
+      );
+
+      state.stream.running = false;
+      state.stream.controller = null;
+      state.isSendingMessage = false;
+
+      setBusyUi(false);
+      updateTopbarFromState();
+
+      return;
+    }
+
     finishStreamUi({
       statusText: "Error",
       statusState: "error",
@@ -4405,7 +4430,7 @@ if (
     upsertMessage({
       id: makeId("assistant_error"),
       role: "assistant",
-      text: "âš ï¸ Something went wrong sending the message.",
+      text: "⚠️ Something went wrong sending the message.",
       error: true,
     });
 
@@ -4466,6 +4491,7 @@ async function copyMessage(messageId) {
   try {
     await navigator.clipboard.writeText(message.text || "");
     showToast("Copied.", "success");
+
   } catch (error) {
     warn("copy failed", error);
     showToast("Copy failed.", "error");

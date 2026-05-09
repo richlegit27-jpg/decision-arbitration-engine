@@ -10701,97 +10701,94 @@ def _save_artifact_fallback(self, artifact: dict):
                 raise ValueError("Image API returned no b64_json")
 
             image_bytes = base64.b64decode(image_b64)
-            filename = f"generated_{uuid.uuid4().hex}.png"
-            filepath = self.uploads_dir / filename
 
-            with open(filepath, "wb") as f:
+            filename = (
+                f"generated_{uuid.uuid4().hex}.png"
+            )
+
+            save_path = os.path.join(
+                self.uploads_dir,
+                filename,
+            )
+
+            with open(save_path, "wb") as f:
                 f.write(image_bytes)
 
             image_url = f"/api/uploads/{filename}"
 
-            exec_debug("IMAGE SAVE META PROMPT:", prompt)
-            exec_debug("IMAGE SAVE META SESSION:", session_id)
-
-            if self._safe_str(prompt).strip().lower() not in {
-                "regen",
-                "regenerate",
-                "redo image",
-                "make another",
-                "another image",
-            }:
-                self._set_session_meta(
-                    session_id,
-                    "last_image_prompt",
-                    prompt,
-                )
-
-            self._set_session_meta(
-                session_id,
-                "last_image_url",
-                image_url,
-            )
-
-            self._set_session_meta(
-                session_id,
-                "last_image_prompt",
-                prompt,
-            )
-
-            self._set_session_meta(
-                session_id,
-                "last_image_url",
-                image_url,
-            )
-
-            saved_artifact = {
-                "id": f"img_{uuid.uuid4().hex}",
-                "kind": "image",
-                "type": "image_generation",
-                "session_id": session_id,
-                "title": "Generated image",
-                "image_url": image_url,
-                "prompt": prompt,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
+            saved_artifact = None
 
             try:
-                persisted = self._persist_image_generation_artifact(
+                saved_artifact = self.artifacts.create_artifact(
+                    kind="image",
+                    type="image_generation",
+                    title="Generated image",
+                    body=prompt,
+                    summary=f"Generated image for: {prompt}",
+                    preview=image_url,
                     session_id=session_id,
-                    prompt=prompt,
+                    source="generated",
                     image_url=image_url,
+                    prompt=prompt,
                     revised_prompt="",
-                    parent_artifact_id=parent_artifact_id,
-                    source_type=source_type,
-                    generation_mode="text_to_image",
+                    parent_id=parent_artifact_id or None,
+                    meta={
+                        "image_url": image_url,
+                        "prompt": prompt,
+                        "generation_mode": "text_to_image",
+                        "source_type": source_type,
+                    },
                 )
-
-                if isinstance(persisted, dict):
-                    saved_artifact = persisted
-
-            except Exception as e:
-                exec_debug("IMAGE ARTIFACT SAVE FAILED:", e)
+            except Exception as exc:
+                exec_debug("IMAGE ARTIFACT FALLBACK SAVE FAILED:", exc)
 
             try:
-                state = self._get_working_state(session_id)
-                if not isinstance(state, dict):
-                    state = {}
-
-                artifacts = state.get("artifacts")
-                if not isinstance(artifacts, list):
-                    artifacts = []
-
-                existing_ids = {
-                    str(a.get("id", "")) for a in artifacts if isinstance(a, dict)
-                }
-
-                if str(saved_artifact.get("id", "")) not in existing_ids:
-                    artifacts.insert(0, saved_artifact)
-
-                state["artifacts"] = artifacts
-                self._update_working_state(session_id, state)
-
+                if (
+                    session_id
+                    and hasattr(self, "artifact_service")
+                    and self.artifact_service
+                ):
+                    self.artifact_service.sync_artifacts_to_session(
+                        session_id
+                    )
             except Exception as e:
                 exec_debug("FORCED ARTIFACT SYNC FAILED:", e)
+            assistant_image_message = {
+                "role": "assistant",
+                "text": f"Generated image for: {prompt}",
+                "attachments": [
+                    {
+                        "id": filename,
+                        "filename": filename,
+                        "stored_name": filename,
+                        "url": image_url,
+                        "mime_type": "image/png",
+                        "size": len(image_bytes),
+                    }
+                ],
+                "meta": {
+                    "source": "image_generation",
+                    "artifact_id": (
+                        saved_artifact.get("id", "")
+                        if isinstance(saved_artifact, dict)
+                        else ""
+                    ),
+                },
+            }
+            try:
+                self.sessions.append_message(
+                    session_id,
+                    assistant_image_message,
+                )
+            except Exception as exc:
+                exec_debug(
+                    "IMAGE SESSION MESSAGE SAVE FAILED:",
+                    exc,
+                )
+
+            refreshed_session = self.sessions.get_session(
+                session_id
+            )
 
             return {
                 "ok": True,
@@ -10807,7 +10804,7 @@ def _save_artifact_fallback(self, artifact: dict):
                 "prompt": prompt,
                 "revised_prompt": "",
                 "saved_artifact": saved_artifact,
-                "session": self._get_session_payload(session_id),
+                "session": refreshed_session,
             }
 
         except Exception as e:
@@ -10827,7 +10824,9 @@ def _save_artifact_fallback(self, artifact: dict):
                 "prompt": prompt,
                 "revised_prompt": "",
                 "saved_artifact": None,
-                "session": self._get_session_payload(session_id),
+                "session": self._get_session_payload(
+                    session_id
+                ),
             }
 
     def _handle_web_fetch(self, url: str, session_id: str = "") -> dict:
@@ -11965,6 +11964,8 @@ def _nova_runtime_handle_image_generation(
 ) -> dict:
     print("RUNTIME IMAGE HIT PROMPT =", repr(prompt))
 
+    saved_artifact = None
+
     regen_commands = {
         "regen",
         "regenerate",
@@ -11995,8 +11996,6 @@ def _nova_runtime_handle_image_generation(
 
         image_url = f"/api/uploads/{filename}"
 
-        exec_debug("RUNTIME IMAGE PROMPT:", prompt)
-
         if self._safe_str(prompt).strip().lower() not in regen_commands:
             self._set_session_meta(
                 session_id,
@@ -12010,17 +12009,34 @@ def _nova_runtime_handle_image_generation(
             image_url,
         )
 
-        saved_artifact = None
         try:
-            saved_artifact = self._persist_image_generation_artifact(
-                session_id=session_id,
-                prompt=prompt,
-                image_url=image_url,
-                revised_prompt="",
-                parent_artifact_id=parent_artifact_id,
-                source_type=source_type,
-                generation_mode="text_to_image",
-            )
+            saved_artifact = self.artifacts.save_artifact({
+                "kind": "image_generation",
+                "type": "image_generation",
+                "title": "Generated image",
+                "body": prompt,
+                "summary": f"Generated image for: {prompt}",
+                "preview": image_url,
+                "session_id": session_id,
+                "source": source_type,
+                "image_url": image_url,
+                "prompt": prompt,
+                "revised_prompt": "",
+                "parent_id": parent_artifact_id or None,
+                "meta": {
+                    "image_url": image_url,
+                    "prompt": prompt,
+                    "generation_mode": "text_to_image",
+                    "source_type": source_type,
+                },
+            })
+
+            exec_debug("IMAGE ARTIFACT RESULT:", saved_artifact)
+
+        except Exception as e:
+            exec_debug("IMAGE ARTIFACT SAVE FAILED:", e)
+            exec_debug("IMAGE ARTIFACT RESULT:", saved_artifact)
+
         except Exception as e:
             exec_debug("IMAGE ARTIFACT SAVE FAILED:", e)
 
@@ -12057,10 +12073,9 @@ def _nova_runtime_handle_image_generation(
             "image_url": "",
             "prompt": prompt,
             "revised_prompt": "",
-            "saved_artifact": None,
+            "saved_artifact": saved_artifact,
             "session": self._get_session_payload(session_id),
         }
-
 
 ChatService._handle_image_generation = _nova_runtime_handle_image_generation
 
