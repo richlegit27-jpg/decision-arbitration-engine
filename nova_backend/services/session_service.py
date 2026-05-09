@@ -592,16 +592,24 @@ class SessionService:
 
     def append_message(self, session_id, message):
         sessions = self._load_sessions()
+
         i = self._find(sessions, session_id)
+
         if i < 0:
             return None
 
-        sessions[i]["messages"].append(_normalize_message(message))
+        normalized = _normalize_message(message)
+
+        sessions[i]["messages"].append(normalized)
+
         sessions[i]["updated_at"] = iso_now()
 
-        self._save_sessions(sessions, self.get_active_session_id())
-        return sessions[i]
+        self._save_sessions(
+            sessions,
+            self.get_active_session_id(),
+        )
 
+        return normalized
     # -----------------------
     # COMPATIBILITY
     # -----------------------

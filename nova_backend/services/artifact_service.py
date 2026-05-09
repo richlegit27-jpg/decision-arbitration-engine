@@ -226,6 +226,8 @@ class ArtifactService:
 
         data["artifacts"] = items[-MAX_ARTIFACTS:]
 
+        self._write_store(data)
+
         return self._normalize_artifact(artifact)
 
     def create(self, artifact: Dict[str, Any]) -> Dict[str, Any]:

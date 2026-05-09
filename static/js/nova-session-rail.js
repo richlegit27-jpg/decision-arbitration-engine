@@ -635,6 +635,14 @@
     applyBackendState,
   };
 
+apiPublic.reloadArtifacts = async function () {
+  try {
+    await reloadFromBackend(state.activeSessionId || "");
+  } catch (err) {
+    console.warn("reloadArtifacts failed", err);
+  }
+};
+
   window.NovaSessionRail = apiPublic;
 
   if (document.readyState === "loading") {
