@@ -256,6 +256,7 @@ class ChatService:
                     ).strip()
 
                     if role and text:
+
                         lines.append(f"{role}: {text[:800]}")
 
         except Exception as e:
@@ -2995,12 +2996,37 @@ Current step:
         # 7. Return final output
 
         attachments = attachments or []
+        if text_lc in {
+            "where are we",
+            "where are we now",
+            "what now",
+            "resume",
+            "continue",
+        }:
+            self._update_working_state(
+                session_id,
+                {
+                    "active_task": (
+                        "continue Nova backend intelligence stabilization"
+                    ),
+                    "checkpoint": (
+                        "working_state_resume_context"
+                    ),
+                    "next_move": (
+                        "continue backend memory and execution stabilization"
+                    ),
+                    "current_file": (
+                        r"C:\Users\Owner\nova\nova_backend\services\chat_service.py"
+                    ),
+                },
+            )
 
         original_user_text = self._safe_str(
             user_text
         )
 
         text_lc = original_user_text.lower().strip()
+
         assistant_text = ""
         assistant_msg = None
 
@@ -6238,10 +6264,47 @@ Current checkpoint:
             assistant_text = self._build_working_state_summary(state)
 
             if not assistant_text:
-                assistant_text = (
-                    "We are in the current Nova chat session. "
-                    "Recent continuity is active, and I should use the latest conversation first."
+                execution = (
+                    self._get_session_meta(
+                        session_id,
+                        "execution_state",
+                    )
+                    or {}
                 )
+
+                goal = self._safe_str(
+                    execution.get("original_user_text")
+                    or execution.get("goal", {}).get("goal", "")
+                )
+
+                current_step = self._safe_str(
+                    execution.get("current_step_title")
+                    or execution.get("current_step", "")
+                )
+
+                status = self._safe_str(
+                    execution.get("status")
+                )
+
+                lines = [
+                    "We are in the current Nova chat session.",
+                ]
+
+                if goal:
+                    lines.append(f"Active goal: {goal}")
+
+                if current_step:
+                    lines.append(f"Current step: {current_step}")
+
+                if status:
+                    lines.append(f"Execution status: {status}")
+
+                if not goal:
+                    lines.append(
+                        "Recent continuity is active, and I should use the latest conversation first."
+                    )
+
+                assistant_text = "\n".join(lines)
 
             return {
                 "ok": True,
@@ -6616,7 +6679,7 @@ Auto-fix result:
             execution_state,
         )
 
-        self._start_execution_worker(session_id)
+        self.start_execution_daemon()
 
         execution_state = (
             self._get_session_meta(
@@ -10069,6 +10132,29 @@ Next action:
             patch["checkpoint"] = "landing_page_work"
             patch["next_move"] = "tighten product messaging and demos"
 
+        if any(
+            x in lowered
+            for x in (
+                "where are we",
+                "resume",
+                "continue",
+                "what now",
+            )
+        ):
+            patch["active_task"] = (
+                "continue Nova backend intelligence stabilization"
+            )
+
+            if not patch.get("checkpoint"):
+                patch["checkpoint"] = (
+                    "working_state_resume_context"
+                )
+
+            if not patch.get("next_move"):
+                patch["next_move"] = (
+                    "continue backend memory and execution stabilization"
+                )
+
         if user_text.strip() and not patch.get("active_task"):
             if any(
                 user_text.lower().strip().startswith(prefix)
@@ -12559,17 +12645,9 @@ def _save_artifact_fallback(self, artifact: dict):
                 session.setdefault("working_state", {})
                 return session
 
-            return {
-                "id": created_id,
-                "messages": [],
-                "working_state": {},
-            }
+            return self._get_session_payload(created_id)
 
-        return {
-            "id": session_id,
-            "messages": [],
-            "working_state": {},
-        }
+        return self._get_session_payload(session_id)
 
     def _execute_current_step(self, execution: dict, user_text: str, session_id: str = "", attachments=None) -> dict:
         attachments = attachments or []
@@ -13134,4 +13212,5 @@ try:
             setattr(ChatService, _name, _obj)
 except Exception:
     pass
+
 
