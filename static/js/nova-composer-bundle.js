@@ -92,19 +92,11 @@ function applyBackendSessionState(payload, explicitSessionId) {
   if (resolvedSession && Array.isArray(resolvedSession.messages)) {
     const incoming = dedupeMessages(resolvedSession.messages);
 
-    if (incoming.length > 0) {
-      state.messages = incoming;
-    } else {
-      console.warn("[NovaComposerBundle] blocked resolvedSession empty overwrite");
-    }
+    state.messages = incoming;
   } else if (Array.isArray(data.messages)) {
     const incoming = dedupeMessages(data.messages);
 
-    if (incoming.length > 0) {
-      state.messages = incoming;
-    } else {
-      console.warn("[NovaComposerBundle] blocked data.messages empty overwrite");
-    }
+    state.messages = incoming;
   }
 
   if (Array.isArray(data.artifacts)) {
