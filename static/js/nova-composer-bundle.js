@@ -1919,28 +1919,16 @@ const payload = {
     return;
   }
 
-  // ðŸ”¥ REGENERATE MESSAGE
+  // 🔥 REGENERATE MESSAGE
   const messageRegenBtn = event.target.closest("[data-regenerate-message]");
   if (messageRegenBtn) {
-    const messageId = String(messageRegenBtn.getAttribute("data-regenerate-message") || "").trim();
+    const messageId = String(
+      messageRegenBtn.getAttribute("data-regenerate-message") || ""
+    ).trim();
+
     if (!messageId) return;
 
-    const userMsg = currentUserMessageForRegenerate(messageId);
-    if (!userMsg) return;
-
-    const payload = {
-      user_text: String(userMsg.text || "").trim(),
-      session_id: String(state.activeSessionId || "").trim(),
-      attachments: Array.isArray(userMsg.attachments) ? userMsg.attachments : [],
-    };
-
-    if (!payload.user_text) return;
-
-    if (typeof consumeChatStream === "function") {
-      await consumeChatStream(payload);
-    } else if (typeof consumeChatStreamStable === "function") {
-      await consumeChatStreamStable(payload);
-    }
+    await regenerateMessage(messageId);
 
     return;
   }
@@ -4543,38 +4531,52 @@ async function sendMessage() {
 }
 
 async function regenerateMessage(targetAssistantId) {
+  if (state.regenerating) {
+    console.warn("[NOVA REGEN BLOCK] already regenerating");
+    return;
+  }
+
   if (state.stream.running) {
     showToast("A generation is already running.", "info");
     return;
   }
 
-  const targetId = String(targetAssistantId || "").trim();
-  if (!targetId) {
-    showToast("Nothing to regenerate.", "error");
-    return;
+  state.regenerating = true;
+
+  try {
+    const targetId = String(targetAssistantId || "").trim();
+
+    if (!targetId) {
+      showToast("Nothing to regenerate.", "error");
+      return;
+    }
+
+    const userMessage = currentUserMessageForRegenerate(targetId);
+
+    if (!userMessage) {
+      showToast("Could not find the user message for regenerate.", "error");
+      return;
+    }
+
+    removeMessageById(targetId);
+
+    const payload = getSendPayload({
+      user_text: String(userMessage.text || ""),
+      regenerate_of: targetId,
+      regenerate: true,
+      attachments: safeArray(userMessage.attachments),
+    });
+
+    console.log("ABOUT TO SEND /api/chat", payload);
+
+    if (typeof consumeChatStreamStable === "function") {
+      await consumeChatStreamStable(payload);
+    } else {
+      await consumeChatStream(payload);
+    }
+  } finally {
+    state.regenerating = false;
   }
-
-  const userMessage = currentUserMessageForRegenerate(targetId);
-  if (!userMessage) {
-    showToast("Could not find the user message for regenerate.", "error");
-    return;
-  }
-
-  removeMessageById(targetId);
-
-  const payload = getSendPayload({
-    user_text: String(userMessage.text || ""),
-    regenerate_of: targetId,
-    attachments: safeArray(userMessage.attachments),
-  });
-
-console.log("ABOUT TO SEND /api/chat", payload);
-
-if (typeof consumeChatStreamStable === "function") {
-  await consumeChatStreamStable(payload);
-} else {
-  await consumeChatStream(payload);
-}
 }
 
 function stopGeneration() {
