@@ -141,8 +141,6 @@ function applyBackendSessionState(payload, explicitSessionId) {
 
       if (!response.ok) throw new Error("switch failed");
 
-
-
       const stateRes = await fetch("/api/state", {
         credentials: "same-origin",
         cache: "no-store",
@@ -5284,30 +5282,32 @@ function bindEvents() {
   }
 
   async function createNewChat() {
-    if (
-      window.NovaSessionRail &&
-      typeof window.NovaSessionRail.createNewChat === "function"
-    ) {
-      return await window.NovaSessionRail.createNewChat();
-    }
-
-    const response = await fetch("/api/sessions", {
+    const response = await fetch("/api/sessions/new", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
+      credentials: "same-origin",
       body: JSON.stringify({
         title: "New Chat",
       }),
     });
 
-    const data = await response.json();
-
-    if (!response.ok || data.ok === false) {
-      throw new Error(data.error || "New chat failed.");
+    if (!response.ok) {
+      throw new Error("new chat failed");
     }
 
-    applyBackendSessionState(data);
+    const data = await response.json();
+
+    if (data && data.active_session_id) {
+      state.activeSessionId = String(data.active_session_id);
+    } else if (data && data.session && data.session.id) {
+      state.activeSessionId = String(data.session.id);
+    }
+
+    applyStatePayload(data);
+    renderChat();
+    renderSessionList();
 
     return data;
   }

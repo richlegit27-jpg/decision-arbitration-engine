@@ -136,9 +136,6 @@ class ChatService:
                 return {}
         return {}
 
-    def _process_auto_fix(self, *args, **kwargs):
-        return {}
-
     def _build_working_state_summary(self, working_state):
         ws = self._normalize_working_state(working_state)
         if not ws:
@@ -163,22 +160,6 @@ class ChatService:
             return ""
 
         return "Working context:\n" + "\n".join(lines)
-
-
-
-    def _normalize_working_state(self, working_state):
-        if isinstance(working_state, dict):
-            return working_state
-        if working_state is None:
-            return {}
-        if isinstance(working_state, str):
-            try:
-                import json
-                parsed = json.loads(working_state)
-                return parsed if isinstance(parsed, dict) else {}
-            except Exception:
-                return {}
-        return {}
 
 
     def _decide_route(self, user_text="", attachments=None, memory_context="", working_context_block="", session_id=""):
@@ -264,36 +245,102 @@ class ChatService:
 
         return "\n".join(lines).strip()
 
-    def _build_system_prompt(self, decision=None):
+    def _build_system_prompt(
+        self,
+        decision=None,
+    ):
+
         parts = []
 
         parts.append(
-            "You are Nova, an intelligent continuity-aware AI workspace assistant. "
-            "Track conversational order carefully and prioritize the latest user corrections and facts. "
-            "Do not contradict recent conversation context. "
-            "Avoid robotic one-word replies unless explicitly requested. "
-            "Respond naturally, directly, and with conversational continuity. "
-            "Preserve the user's momentum and active context."
+            "You are Nova, an intelligent "
+            "continuity-aware AI workspace assistant. "
+            "Track conversational order carefully "
+            "and prioritize the latest user corrections "
+            "and facts. "
+            "Do not contradict recent conversation "
+            "context. "
+            "Avoid robotic one-word replies unless "
+            "explicitly requested. "
+            "Respond naturally, directly, and with "
+            "conversational continuity. "
+            "Preserve the user's momentum and active "
+            "context."
         )
 
-        route = ""
-        if isinstance(decision, dict):
-            route = str(decision.get("route") or decision.get("mode") or "").strip()
+        parts.append(
+            "When coding or project-building, "
+            "be precise and operational. "
+            "Keep outputs structured and grounded "
+            "in the user's active work."
+        )
 
-        if route:
-            parts.append(f"Current route: {route}")
+        parts.append(
+            "Response style rules: "
+            "be concise, confident, and practical. "
+            "Prefer direct answers first. "
+            "Avoid generic assistant filler. "
+            "When relevant, anchor the reply to the "
+            "user's active file, bug, or next move. "
+            "Do not repeat the working context unless "
+            "it improves the reply. "
+            "Use it quietly to stay aligned."
+        )
 
-        return "\n\n".join(part for part in parts if str(part).strip())
+        if (
+            decision
+            and isinstance(decision, dict)
+        ):
 
+            mode = (
+                decision.get("mode")
+                or ""
+            ).strip()
+
+            if mode:
+                parts.append(
+                    f"Current operating mode: "
+                    f"{mode}."
+                )
+
+        intent = self._safe_str(
+            (decision or {}).get("intent")
+        ).lower()
+
+        if intent == "debugging":
+
+            parts.append(
+                "DEBUGGING MODE: "
+                "Do not give generic debugging "
+                "checklists. "
+                "Do not list frameworks. "
+                "Do not say 'check logs' without "
+                "giving the exact command. "
+                "Prefer PowerShell commands, exact "
+                "file paths, search anchors, and "
+                "full-file fixes. "
+                "If the exact file is unknown, ask "
+                "for ONE specific missing item: "
+                "the file path or error log. "
+                "Use the user's style: direct, "
+                "endgame, no filler."
+            )
+
+        return "\n\n".join(
+            [p for p in parts if p]
+        ).strip()
 
     def _auto_advance_execution(self, session_id):
         return None
 
     def _execute_next_steps(self, session_id, state, steps):
-        max_steps = 10  # safety limit per call
+        max_steps = 10
+
+        state = state if isinstance(state, dict) else {}
+        steps = steps if isinstance(steps, list) else []
 
         for _ in range(max_steps):
-            idx = state.get("step_index", 0)
+            idx = int(state.get("step_index", 0) or 0)
 
             if idx >= len(steps):
                 state["status"] = "complete"
@@ -302,64 +349,29 @@ class ChatService:
             step = steps[idx]
 
             try:
-                self._execute_step(step, session_id)
+                self._execute_step_logic(session_id, step)
             except Exception as e:
                 state["status"] = "failed"
                 state["last_error"] = str(e)
                 break
 
-            state["step_index"] += 1
+            state["step_index"] = idx + 1
             state["checkpoint"] = f"step_{state['step_index']}"
 
-        self.sessions.save()
+        if hasattr(self.sessions, "save"):
+            self.sessions.save()
+
+        return state
 
     def start_execution_daemon(self):
-        import threading
-        import time
+        """
+        Disabled legacy daemon.
 
-        def loop():
-            while True:
-                try:
-                    for session_id, session in self.sessions.items():
-                        state = session.get("working_state") or {}
-                        execution = state.get("execution") or {}
-
-                        if execution.get("status") != "running":
-                            continue
-
-                        steps = execution.get("steps") or []
-                        index = execution.get("step_index", 0)
-
-                        if index >= len(steps):
-                            execution["status"] = "complete"
-                            execution["locked_pending"] = False
-                            continue
-
-                        if execution.get("running_step") == index:
-                            continue
-
-                        execution["running_step"] = index
-                        step = steps[index]
-
-                        try:
-                            self._execute_step_logic(session_id, step)
-                            step["status"] = "completed"
-                            execution["step_index"] = index + 1
-
-                        except Exception as e:
-                            step["status"] = "failed"
-                            step["error"] = str(e)
-
-                        execution["last_tick"] = time.time()
-                        execution["locked_pending"] = False
-
-                except Exception as e:
-                    exec_debug("DAEMON ERROR:", e)
-
-                time.sleep(3)
-
-        thread = threading.Thread(target=loop, daemon=True)
-        thread.start()
+        Execution is handled by the manual/session execution lane now.
+        Do not spawn background threads from ChatService.
+        """
+        exec_debug("LEGACY EXECUTION DAEMON DISABLED")
+        return False
 
     def _sync_execution_state(
         self,
@@ -393,7 +405,6 @@ class ChatService:
         try:
             step["status"] = "running"
 
-            # your real execution logic goes here
             result = "step executed"
 
             step["result"] = result
@@ -406,20 +417,21 @@ class ChatService:
 
     def _resume_execution_if_needed(self, session_id):
         session = self.sessions.get(session_id)
+
         if not session:
             return None
 
         state = session.get("working_state") or {}
+        execution = state.get("execution_state") or {}
 
-        if state.get("status") == "running":
+        if execution.get("status") == "running":
             return {
                 "resume": True,
-                "step_index": state.get("step_index", 0),
-                "steps": state.get("steps", []),
+                "step_index": execution.get("current_index", 0),
+                "steps": execution.get("steps", []),
             }
 
         return None
-
     def _continue_execution(self, session_id, resume_data):
         return {
             "ok": False,
@@ -428,22 +440,6 @@ class ChatService:
             ),
             "session": self._get_session_payload(session_id),
         }
-
-    def _resume_execution_if_needed(self, session_id):
-        session = self.sessions.get(session_id)
-        if not session:
-            return None
-
-        state = session.get("working_state") or {}
-
-        if state.get("status") == "running":
-            return {
-                "resume": True,
-                "step_index": state.get("step_index", 0),
-                "steps": state.get("steps", []),
-            }
-
-        return None
 
     def _continue_last_answer(self, session_id: str):
         last_text = self._get_session_meta(session_id, "last_answer_text") or ""
@@ -669,7 +665,6 @@ Rules:
         session_id: str = "",
         attachments=None,
     ):
-
         text = str(user_text or "").lower().strip()
         session_id = str(session_id or "").strip()
 
@@ -680,31 +675,19 @@ Rules:
                 hasattr(self, "execution_handler")
                 and hasattr(self.execution_handler, "states")
             ):
-                execution = (
-                    self.execution_handler.states.get(session_id)
-                    or {}
-                )
+                execution = self.execution_handler.states.get(session_id) or {}
 
             elif (
                 hasattr(self, "execution_handler")
                 and hasattr(self.execution_handler, "get_state")
             ):
-                execution = (
-                    self.execution_handler.get_state(session_id)
-                    or {}
-                )
+                execution = self.execution_handler.get_state(session_id) or {}
 
         except Exception as e:
             exec_debug("EXECUTION STATE LOAD ERROR:", e)
             execution = {}
 
-        status = str(
-            execution.get("status") or ""
-        ).lower()
-
-        exec_debug("ACTIVE AUTO EXEC FUNCTION HIT")
-        exec_debug("EXECUTION STATE LOADED:", execution)
-        exec_debug("EXECUTION STATUS LOADED:", status)
+        status = str(execution.get("status") or "").lower()
 
         mission_status = ""
 
@@ -723,9 +706,7 @@ Rules:
                 else {}
             )
 
-            mission_status = str(
-                mission.get("status") or ""
-            ).lower()
+            mission_status = str(mission.get("status") or "").lower()
 
         except Exception:
             mission_status = ""
@@ -745,11 +726,7 @@ Rules:
             "what next",
             "what now",
         }:
-
-            if (
-                status in ("error", "failed")
-                or mission_status in ("error", "failed")
-            ):
+            if status in ("error", "failed") or mission_status in ("error", "failed"):
                 action = "retry_failed"
             else:
                 action = "run_step"
@@ -791,35 +768,12 @@ Rules:
                 session_id,
             )
 
-            exec_debug(
-                "EXECUTION HANDLER METHODS:",
-                [
-                    x
-                    for x in dir(self.execution_handler)
-                    if (
-                        "run" in x
-                        or "state" in x
-                        or "execute" in x
-                    )
-                ],
-            )
-
-            move = NextMove(
-                id=f"{session_id}:{action}",
-                type=action,
-                payload={},
-            )
-
-            result = None
-
             execution_state = (
                 self._get_session_meta(
                     session_id,
                     "execution_state",
                 )
-                or self._get_working_state(session_id).get(
-                    "execution_state"
-                )
+                or self._get_working_state(session_id).get("execution_state")
                 or {}
             )
 
@@ -846,70 +800,48 @@ Current step:
 {execution_state.get("current_step_title", "")}
 """.strip()
 
-            assistant_msg = (
-                self._build_assistant_message(
-                    text=assistant_text,
-                    attachments=[],
-                    meta={
-                        "route": "execution",
-                        "strategy": "execution_progress",
-                        "execution_state": execution_state,
-                    },
-                )
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text,
+                attachments=[],
+                meta={
+                    "route": "execution",
+                    "strategy": "execution_progress",
+                    "execution_action": action,
+                    "execution_state": execution_state,
+                },
             )
 
             return {
                 "ok": True,
                 "assistant_message": assistant_msg,
-                "session": self._get_session_payload(
-                    session_id
-                ),
+                "session": self._get_session_payload(session_id),
                 "debug": {
                     "route": "execution",
                     "strategy": "execution_progress",
+                    "execution_action": action,
                     "execution_state": execution_state,
                 },
-            }
-
-            assistant_msg = (
-                self._build_assistant_message(
-                    text="Execution completed with no result.",
-                    attachments=[],
-                    meta={
-                        "route": "execution_empty",
-                    },
-                )
-            )
-
-            return {
-                "ok": True,
-                "assistant_message": assistant_msg,
-                "session": self._get_session_payload(
-                    session_id
-                ),
             }
 
         except Exception as e:
             exec_debug("EXECUTION ROUTE ERROR:", e)
 
-            assistant_msg = (
-                self._build_assistant_message(
-                    text=f"Execution route failed:\n\n{e}",
-                    attachments=[],
-                    meta={
-                        "route": "execution_exception",
-                    },
-                )
+            assistant_msg = self._build_assistant_message(
+                text=f"Execution route failed:\n\n{e}",
+                attachments=[],
+                meta={
+                    "route": "execution_exception",
+                    "execution_action": action,
+                },
             )
 
             return {
                 "ok": False,
                 "assistant_message": assistant_msg,
                 "error": str(e),
-                "session": self._get_session_payload(
-                    session_id
-                ),
+                "session": self._get_session_payload(session_id),
             }
+
 
     def _save_mission_state(self, session_id: str, mission: dict) -> None:
         if not session_id or not isinstance(mission, dict):
@@ -1203,6 +1135,7 @@ Current step:
             "message": "Execution state needs inspection.",
             "needs_file_fix": False,
         }
+
     def _choose_execution_recovery_strategy(self, session_id: str, command: str, status: str, error_text: str = ""):
         working_state = self._get_working_state(session_id) or {}
 
@@ -1276,22 +1209,41 @@ Current step:
         session_id: str,
         execution_state=None,
     ):
-        command = self._safe_str(command).strip().lower()
 
-        print("PROCESS_EXECUTION_COMMAND:", repr(command))
+        command = self._safe_str(
+            command
+        ).strip().lower()
 
-        # =========================
-        # COMMAND NORMALIZATION
-        # =========================
+        print(
+            "PROCESS_EXECUTION_COMMAND:",
+            repr(command),
+        )
+
         command = self.execution_loop.command_alias(
             command
         )
+
+        execution_state = (
+            execution_state
+            or self._get_session_meta(
+                session_id,
+                "execution_state",
+            )
+            or {}
+        )
+
+        result = None
 
         # =========================
         # CANCEL
         # =========================
         if command == "cancel":
-            self._set_session_meta(session_id, "execution_state", {})
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                {},
+            )
 
             self._update_working_state(
                 session_id,
@@ -1313,58 +1265,73 @@ Current step:
 
             return {
                 "ok": True,
-                "assistant_message": self._build_assistant_message(
-                    "Execution cancelled."
+                "assistant_message": (
+                    self._build_assistant_message(
+                        "Execution cancelled."
+                    )
                 ),
-                "session": self._get_session_payload(session_id),
+                "session": (
+                    self._get_session_payload(
+                        session_id
+                    )
+                ),
                 "debug": {
                     "route": "execution_cancelled",
                 },
             }
+
         # =========================
         # APPLY AUTO FIX
         # =========================
         if command == "apply_auto_fix":
+
             error_text = (
-                self._get_session_meta(session_id, "pending_fix_error")
-                or self._get_session_meta(session_id, "last_execution_error")
-                or (self._get_working_state(session_id) or {}).get("last_error")
+                self._get_session_meta(
+                    session_id,
+                    "pending_fix_error",
+                )
+                or self._get_session_meta(
+                    session_id,
+                    "last_execution_error",
+                )
+                or (
+                    self._get_working_state(
+                        session_id
+                    )
+                    or {}
+                ).get("last_error")
                 or ""
             )
 
             if not error_text:
                 return {
                     "ok": True,
-                    "assistant_message": self._build_assistant_message(
-                        "Auto-fix triggered, but no error context found."
+                    "assistant_message": (
+                        self._build_assistant_message(
+                            "Auto-fix triggered, "
+                            "but no error context found."
+                        )
                     ),
-                    "session": self._get_session_payload(session_id),
+                    "session": (
+                        self._get_session_payload(
+                            session_id
+                        )
+                    ),
                     "debug": {
-                        "route": "apply_auto_fix_no_error",
+                        "route":
+                            "apply_auto_fix_no_error",
                     },
                 }
 
             return self._process_auto_fix(
-                user_text=f"fix this error:\n{error_text}",
+                user_text=(
+                    f"fix this error:\n"
+                    f"{error_text}"
+                ),
                 session_id=session_id,
                 attachments=None,
             )
 
-        active_execution = self._get_session_meta(session_id, "active_execution") or {}
-
-        working_state = self._get_working_state(session_id) or {}
-
-        execution_state = execution_state or {}
-
-        if not execution_state:
-            active_execution = self._get_session_meta(session_id, "active_execution") or {}
-            working_state = self._get_working_state(session_id) or {}
-
-            execution_state = (
-                self._get_session_meta(session_id, "execution_state")
-                or working_state.get("execution_state")
-                or {}
-            )
         # =========================
         # TEST FAILURE
         # =========================
@@ -1375,6 +1342,7 @@ Current step:
                 "pending_fix_mode",
                 "function",
             )
+
             self._set_session_meta(
                 session_id,
                 "pending_fix_func_name",
@@ -1384,208 +1352,272 @@ Current step:
             result = {
                 "status": "failed",
                 "error": (
-                    "Fake execution failure for auto-fix test. "
-                    "File: C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py "
-                    "Function: _process_execution_command"
+                    "Fake execution failure "
+                    "for auto-fix test. "
+                    "File: "
+                    "C:\\Users\\Owner\\nova\\"
+                    "nova_backend\\services\\"
+                    "chat_service.py "
+                    "Function: "
+                    "_process_execution_command"
                 ),
                 "execution_state": {
                     "status": "failed",
                     "steps": [
                         {
-                            "title": "Failed Step 1",
-                            "status": "failed",
+                            "title":
+                                "Failed Step 1",
+                            "status":
+                                "failed",
                         },
                         {
-                            "title": "Failed Step 2",
-                            "status": "pending",
+                            "title":
+                                "Failed Step 2",
+                            "status":
+                                "pending",
                         },
                     ],
                     "history": [
                         "test_fail: Failed Step 1"
                     ],
-                    "last_action": "test_fail",
-                    "current_step": 0,
+                    "last_action":
+                        "test_fail",
+                    "current_index": 0,
                 },
             }
 
+        # =========================
+        # NORMAL EXECUTION
+        # =========================
         else:
-            # =========================
-            # HANDLER RESOLUTION
-            # =========================
+
             handler = None
 
-            if hasattr(self, "_execution_handler") and self._execution_handler:
-                handler = self._execution_handler
-            elif hasattr(self, "execution_handler") and self.execution_handler:
-                handler = self.execution_handler
+            if (
+                hasattr(
+                    self,
+                    "_execution_handler",
+                )
+                and self._execution_handler
+            ):
+                handler = (
+                    self._execution_handler
+                )
+
+            elif (
+                hasattr(
+                    self,
+                    "execution_handler",
+                )
+                and self.execution_handler
+            ):
+                handler = (
+                    self.execution_handler
+                )
 
             if not handler:
                 return {
                     "ok": False,
-                    "assistant_message": self._build_assistant_message(
-                        "Execution handler missing."
+                    "assistant_message": (
+                        self._build_assistant_message(
+                            "Execution handler "
+                            "missing."
+                        )
                     ),
-                    "session": self._get_session_payload(session_id),
+                    "session": (
+                        self._get_session_payload(
+                            session_id
+                        )
+                    ),
                     "debug": {
-                        "route": "execution_handler_missing",
+                        "route":
+                            "execution_handler_missing",
                         "command": command,
                     },
                 }
 
-            execution_state = self._process_execution(
-                execution_state,
-                session_id,
-            )
-
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                execution_state,
-            )
-
-            sessions = self.sessions._load_sessions()
-            index = self.sessions._find(sessions, session_id)
-
-            if index is not None:
-                sessions[index]["active_execution"] = execution_state
-                sessions[index]["execution_state"] = execution_state
-                self.sessions._save_sessions(
-                    sessions,
-                    self.sessions.get_active_session_id(),
+            execution_state = (
+                self._process_execution(
+                    execution_state,
+                    session_id,
                 )
+            )
 
-            steps = execution_state.get("steps") or []
+            steps = (
+                execution_state.get("steps")
+                or []
+            )
 
-            current = int(
-                execution_state.get("current_step", 0) or 0
+            current_index = int(
+                execution_state.get(
+                    "current_index",
+                    0,
+                ) or 0
             )
 
             total = len(steps)
 
-            assistant_text = f"""Execution advanced.
+            execution_state[
+                "current_step"
+            ] = current_index
 
-Status: {execution_state.get("status")}
+            if current_index < total:
 
-Progress: {current}/{total}
-
-Current step:
-{execution_state.get("current_step_title", "")}
-""".strip()
-
-            assistant_msg = (
-                self._build_assistant_message(
-                    text=assistant_text,
-                    attachments=[],
-                    meta={
-                        "route": "execution",
-                        "strategy": "execution_progress",
-                        "execution_state": execution_state,
-                    },
+                execution_state[
+                    "current_step_title"
+                ] = steps[
+                    current_index
+                ].get(
+                    "title",
+                    "",
                 )
-            )
 
-            return {
-                "ok": True,
-                "assistant_message": assistant_msg,
-                "session": self._get_session_payload(
-                    session_id
+            else:
+
+                execution_state[
+                    "current_step_title"
+                ] = ""
+
+            completed = []
+
+            for step in steps:
+
+                if (
+                    step.get("status")
+                    == "completed"
+                ):
+                    completed.append(
+                        step.get("title")
+                    )
+
+            if completed:
+
+                result_text = (
+                    "Completed steps: "
+                    + ", ".join(completed)
+                )
+
+            elif (
+                execution_state.get("status")
+                == "complete"
+            ):
+
+                result_text = (
+                    "Execution complete."
+                )
+
+            else:
+
+                result_text = (
+                    f"Execution progress: "
+                    f"{current_index}/{total}"
+                )
+
+            result = {
+                "status": (
+                    execution_state.get(
+                        "status",
+                        "running",
+                    )
                 ),
+                "execution_state":
+                    execution_state,
+                "assistant_message":
+                    result_text,
             }
 
         # =========================
         # RESULT NORMALIZATION
         # =========================
         if not isinstance(result, dict):
+
             result = {
                 "status": "unknown",
                 "message": str(result),
-                "execution_state": execution_state,
+                "execution_state":
+                    execution_state,
             }
 
-        new_state = self.execution_loop.get_execution_state(
-            result,
-            execution_state,
+        new_state = (
+            self.execution_loop.get_execution_state(
+                result,
+                execution_state,
+            )
         )
 
-        status = self.execution_loop.get_status(
-            result,
-            new_state,
+        status = (
+            self.execution_loop.get_status(
+                result,
+                new_state,
+            )
         )
-
-        assistant_message = ""
 
         error_text = (
             result.get("error")
-            or self.execution_loop.get_message(result)
+            or self.execution_loop.get_message(
+                result
+            )
             or ""
         )
 
         if new_state:
+
             self._set_session_meta(
                 session_id,
                 "execution_state",
                 new_state,
             )
-         
-            sessions = self.sessions._load_sessions()
-            index = self.sessions._find(sessions, session_id)
 
-            if index is not None:
-                sessions[index]["execution_state"] = dict(new_state)
-
-                sessions[index]["active_execution"] = {
-                    "status": new_state.get("status"),
-                    "current_step": new_state.get("current_step"),
-                    "current_step_index": new_state.get("current_index", 0),
-                    "current_index": new_state.get("current_index", 0),
-                    "progress": new_state.get("progress", 0),
-                    "steps": new_state.get("steps", []),
-                }
-
-                self.sessions._save_sessions(
-                    sessions,
-                    self.sessions.get_active_session_id(),
-                )
-
-        reward = self._record_execution_reward(
-            session_id=session_id,
-            command=command,
-            status=status,
-            error_text=error_text,
+        reward = (
+            self._record_execution_reward(
+                session_id=session_id,
+                command=command,
+                status=status,
+                error_text=error_text,
+            )
         )
 
-        if status not in {"failed", "error"}:
-            self._update_working_state(
-                session_id,
-                {
-                    "next_move": "",
-                    "pending_execution_action": "",
-                },
+        strategy = (
+            self._choose_execution_recovery_strategy(
+                session_id=session_id,
+                command=command,
+                status=status,
+                error_text=error_text,
             )
-
-        strategy = self._choose_execution_recovery_strategy(
-            session_id=session_id,
-            command=command,
-            status=status,
-            error_text=error_text,
         )
 
         # =========================
         # FAILURE STOP GUARD
         # =========================
-        working_state = self._get_working_state(session_id) or {}
+        working_state = (
+            self._get_working_state(
+                session_id
+            )
+            or {}
+        )
 
-        if self.execution_loop.should_abort_from_failures(
-            working_state
+        if (
+            self.execution_loop
+            .should_abort_from_failures(
+                working_state
+            )
         ):
             return {
                 "ok": True,
-                "assistant_message": self._build_assistant_message(
-                    "Execution loop stopped after repeated failures."
+                "assistant_message": (
+                    self._build_assistant_message(
+                        "Execution loop stopped "
+                        "after repeated failures."
+                    )
                 ),
-                "session": self._get_session_payload(session_id),
+                "session": (
+                    self._get_session_payload(
+                        session_id
+                    )
+                ),
                 "debug": {
-                    "route": "execution_loop_stopped",
+                    "route":
+                        "execution_loop_stopped",
                     "reward": reward,
                     "strategy": strategy,
                 },
@@ -1595,7 +1627,11 @@ Current step:
         # AUTO FIX FLOW
         # =========================
         if status in {"failed", "error"}:
-            error_text = error_text or "Unknown execution failure."
+
+            error_text = (
+                error_text
+                or "Unknown execution failure."
+            )
 
             self._trigger_auto_fix_on_failure(
                 session_id=session_id,
@@ -1603,61 +1639,74 @@ Current step:
                 action=command,
             )
 
-            auto_fix_result = self._process_auto_fix(
-                user_text=(
-                    f"fix this error:\n{error_text}\n\n"
-                    f"Recovery strategy: {strategy}"
-                ),
-                session_id=session_id,
-                attachments=None,
-            )
-
-            execution_state = (
-                self._get_session_meta(session_id, "execution_state")
-                or {}
-            )
-
             retry_state = (
-                self.execution_loop.handle_auto_fix_retry_state(
-                    execution_state
+                self.execution_loop
+                .handle_auto_fix_retry_state(
+                    new_state or {}
                 )
             )
 
-            execution_state = (
-                retry_state.get("execution_state") or {}
+            new_state = (
+                retry_state.get(
+                    "execution_state"
+                )
+                or {}
             )
 
             retry_count = int(
-                retry_state.get("retry_count") or 0
+                retry_state.get(
+                    "retry_count"
+                )
+                or 0
             )
 
             self._set_session_meta(
                 session_id,
                 "execution_state",
-                execution_state,
+                new_state,
             )
 
             if retry_state.get("capped"):
+
                 return {
                     "ok": True,
-                    "assistant_message": self._build_assistant_message(
-                        "Auto-fix retry cap reached."
+                    "assistant_message": (
+                        self._build_assistant_message(
+                            "Auto-fix retry cap "
+                            "reached."
+                        )
                     ),
-                    "session": self._get_session_payload(session_id),
+                    "session": (
+                        self._get_session_payload(
+                            session_id
+                        )
+                    ),
                     "debug": {
-                        "route": "auto_fix_retry_cap",
+                        "route":
+                            "auto_fix_retry_cap",
                     },
                 }
 
             return {
                 "ok": True,
-                "assistant_message": self._build_assistant_message(
-                    f"Auto-fix applied. Retry queued. Attempt {retry_count}/3."
+                "assistant_message": (
+                    self._build_assistant_message(
+                        f"Auto-fix applied. "
+                        f"Retry queued. "
+                        f"Attempt "
+                        f"{retry_count}/3."
+                    )
                 ),
-                "session": self._get_session_payload(session_id),
+                "session": (
+                    self._get_session_payload(
+                        session_id
+                    )
+                ),
                 "debug": {
-                    "route": "auto_fix_retry_ready",
-                    "retry_count": retry_count,
+                    "route":
+                        "auto_fix_retry_ready",
+                    "retry_count":
+                        retry_count,
                 },
             }
 
@@ -1665,9 +1714,10 @@ Current step:
         # SUCCESS RETURN
         # =========================
         assistant_message = (
-            self.execution_loop.summarize_execution(
+            self.execution_loop
+            .summarize_execution(
                 command=command,
-                execution_state=execution_state,
+                execution_state=new_state,
                 status=status,
             )
         )
@@ -1676,39 +1726,59 @@ Current step:
             assistant_message = ""
 
         if not assistant_message:
+
             assistant_message = (
-                result.get("assistant_message")
+                result.get(
+                    "assistant_message"
+                )
                 or self.execution_loop.get_message(
                     result,
-                    default=f"Execution command completed: {command}",
+                    default=(
+                        "Execution command "
+                        f"completed: {command}"
+                    ),
                 )
             )
 
-        assistant_payload = self._build_assistant_message(
-            assistant_message
+        assistant_payload = (
+            self._build_assistant_message(
+                assistant_message
+            )
         )
 
         try:
+
             self.sessions.append_message(
                 session_id,
                 assistant_payload,
             )
 
         except Exception as e:
+
             exec_debug(
                 "APPEND ASSISTANT MESSAGE FAILED:",
                 e,
             )
 
         final_status = str(
-            (execution_state or {}).get("status", status)
+            (new_state or {}).get(
+                "status",
+                status,
+            )
         ).lower()
 
-        if final_status in {"complete", "completed", "success"}:
+        if final_status in {
+            "complete",
+            "completed",
+            "success",
+        }:
+
             self.execution_loop.archive_execution(
-                archive_callback=self._archive_execution_state,
+                archive_callback=(
+                    self._archive_execution_state
+                ),
                 session_id=session_id,
-                execution_state=execution_state,
+                execution_state=new_state,
                 command=command,
             )
 
@@ -1718,7 +1788,10 @@ Current step:
                     "next_move": "",
                     "active_task": "",
                     "current_bug": "",
-                    "last_success": "execution_complete",
+                    "last_success":
+                        "execution_complete",
+                    "checkpoint":
+                        "execution_cycle_complete",
                 },
             )
 
@@ -1728,39 +1801,52 @@ Current step:
                 {},
             )
 
-            self._update_working_state(
-                session_id,
-                {
-                    "checkpoint": "execution_cycle_complete",
-                },
-            )
-
         if status not in {"failed", "error"}:
+
             self._update_working_state(
                 session_id,
                 {
                     "next_move": "",
-                    "pending_execution_action": "",
+                    "pending_execution_action":
+                        "",
                 },
             )
 
-        session_payload = self._get_session_payload(
-            session_id
+        session_payload = (
+            self._get_session_payload(
+                session_id
+            )
         )
 
-        if final_status in {"complete", "completed", "success"}:
-            session_payload["active_execution"] = {}
-            session_payload["execution_state"] = {}
+        if final_status in {
+            "complete",
+            "completed",
+            "success",
+        }:
+
+            session_payload[
+                "active_execution"
+            ] = {}
+
+            session_payload[
+                "execution_state"
+            ] = {}
 
         return {
             "ok": True,
-            "assistant_message": assistant_payload,
-            "session": session_payload,
+            "assistant_message":
+                assistant_payload,
+            "session":
+                session_payload,
             "debug": {
-                "route": "execution_command_complete",
-                "command": command,
-                "status": (execution_state or {}).get("status", status),
-                "reward": reward,
+                "route":
+                    "execution_command_complete",
+                "command":
+                    command,
+                "status":
+                    final_status,
+                "reward":
+                    reward,
             },
         }
 
@@ -2177,12 +2263,17 @@ Current step:
 
         assistant_msg = self._finalize_assistant_response(
             assistant_msg,
-            fallback_text=fallback_text
+            fallback_text=fallback_text,
         )
 
-        # Optional: attach meta safely if your system supports it
-        if hasattr(assistant_msg, "meta") and isinstance(meta, dict):
-            assistant_msg.meta.update(meta)
+        if isinstance(assistant_msg, dict) and isinstance(meta, dict):
+            existing_meta = assistant_msg.get("meta")
+
+            if not isinstance(existing_meta, dict):
+                existing_meta = {}
+
+            existing_meta.update(meta)
+            assistant_msg["meta"] = existing_meta
 
         return assistant_msg
 
@@ -6723,945 +6814,1470 @@ Auto-fix result:
 {self._safe_str(auto_fix_result)}"""
         )
 
-    def _process_execution(self, execution_state: dict, session_id: str):
+    def _process_execution(
+        self,
+        execution_state: dict,
+        session_id: str,
+    ):
+
         execution_state = (
             execution_state
             or self._get_session_meta(
                 session_id,
                 "execution_state",
             )
-            or self._get_working_state(session_id).get(
-                "execution_state"
-            )
+            or self._get_working_state(
+                session_id
+            ).get("execution_state")
             or {}
         )
 
         if not execution_state:
-            return execution_state
+            return {}
 
-        if execution_state.get("status") == "complete":
+        steps = execution_state.get("steps") or []
 
+        current_index = int(
+            execution_state.get(
+                "current_index",
+                0,
+            ) or 0
+        )
+
+        total = len(steps)
+
+        # =========================
+        # COMPLETION CHECK
+        # =========================
+        if current_index >= total:
+
+            execution_state["status"] = "complete"
             execution_state["waiting"] = False
             execution_state["complete"] = True
 
-            self._set_session_meta(
+            self._sync_execution_state(
                 session_id,
-                "execution_state",
                 execution_state,
             )
 
-        # run execution worker
+            return execution_state
+
+        # =========================
+        # EXECUTE CURRENT STEP
+        # =========================
+        step = steps[current_index]
+
+        try:
+
+            step["status"] = "running"
+
+            self._execute_step_logic(
+                session_id,
+                step,
+            )
+
+            step["status"] = "completed"
+
+            execution_state["history"] = (
+                execution_state.get("history")
+                or []
+            )
+
+            execution_state["history"].append(
+                f"completed: {step.get('title')}"
+            )
+
+            current_index += 1
+
+            execution_state[
+                "current_index"
+            ] = current_index
+
+            if current_index < total:
+
+                next_step = (
+                    steps[current_index]
+                )
+
+                execution_state[
+                    "current_step_title"
+                ] = next_step.get(
+                    "title",
+                    "",
+                )
+
+            else:
+
+                execution_state[
+                    "current_step_title"
+                ] = ""
+
+        except Exception as e:
+
+            step["status"] = "failed"
+            step["error"] = str(e)
+
+            execution_state["status"] = "failed"
+            execution_state["last_error"] = str(e)
+
+            self._sync_execution_state(
+                session_id,
+                execution_state,
+            )
+
+            return execution_state
+
+        # =========================
+        # FINAL STATUS
+        # =========================
+        if current_index >= total:
+
+            execution_state["status"] = "complete"
+            execution_state["waiting"] = False
+            execution_state["complete"] = True
+
+        else:
+
+            execution_state["status"] = "running"
+
+            if execution_state.get("auto_mode"):
+
+                execution_state["waiting"] = False
+
+                return self._process_execution(
+                    execution_state,
+                    session_id,
+                )
+
+            execution_state["waiting"] = True
+
+        execution_state["current_step"] = (
+            current_index
+        )
+
         self._sync_execution_state(
             session_id,
             execution_state,
         )
 
-        self.start_execution_daemon()
-
-        execution_state = (
-            self._get_session_meta(
-                session_id,
-                "execution_state",
-            )
-            or execution_state
-        )
-
-        current = execution_state.get("current_step", 0)
-        total = len(execution_state.get("steps", []))
-
-        # =========================
-        # COMPLETION CHECK
-        # =========================
-        if current >= total:
-            execution_state["status"] = "complete"
-            execution_state["waiting"] = False
-            execution_state["complete"] = True
-
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                execution_state,
-            )
-
-            return execution_state
-
-        # =========================
-        # PERSISTENT LOOP FLAG
-        # =========================
-        execution_state["status"] = "running"
-
-        if execution_state.get("auto_mode"):
-            execution_state["waiting"] = False
-        else:
-            execution_state["waiting"] = True
-
-        execution_state["complete"] = False
-
-        # save state
-        self._sync_execution_state(session_id, execution_state)
-
         return execution_state
 
-    
-
-        state = self._get_session_meta(session_id, "execution_state") or {}
-
-        if state.get("worker_running"):
+    def _execute_step_chain(self, session_id: str, state: dict):
+        if not state:
             return
 
-        state["worker_running"] = True
+        if state.get("status") != "running":
+            return
+
+        if state.get("complete"):
+            return
+
+        if state.get("execution_lock"):
+            return
+
+        state = self._run_next_step(state)
+
         self._set_session_meta(session_id, "execution_state", state)
 
-        try:
+        # =========================
+        # AUTO CONTINUE EVENT CHAIN
+        # =========================
+        if state.get("auto_mode") and state.get("status") == "running":
             self._execute_step_chain(session_id, state)
-        finally:
-            state = self._get_session_meta(session_id, "execution_state") or {}
-            state["worker_running"] = False
-            self._set_session_meta(session_id, "execution_state", state)
 
+    def _extract_file_path_from_error(self, error_text: str) -> str:
+        text = self._safe_str(error_text)
 
-        def _execute_step_chain(self, session_id: str, state: dict):
-            if not state:
-                return
+        match = re.search(r'File "([^"]+)"', text)
+        if match:
+            return match.group(1).strip()
 
-            if state.get("status") != "running":
-                return
+        match = re.search(
+            r"([A-Z]:\\[^\r\n]+?\.(?:py|js|html|css|json))",
+            text,
+            re.IGNORECASE,
+        )
+        if match:
+            return match.group(1).strip()
 
-            if state.get("complete"):
-                return
+        return ""
 
-            if state.get("execution_lock"):
-                return
+    def _guess_path_from_text(self, text: str) -> str:
+        import re
 
-            state = self._run_next_step(state)
+        text = self._safe_str(text)
 
-            self._set_session_meta(session_id, "execution_state", state)
+        quoted_traceback_match = re.search(
+            r'File\s+"([^"]+?\.py)"',
+            text,
+            re.IGNORECASE,
+        )
+        if quoted_traceback_match:
+            return quoted_traceback_match.group(1).strip().rstrip(".,:;)]}")
 
-            # =========================
-            # AUTO CONTINUE EVENT CHAIN
-            # =========================
-            if state.get("auto_mode") and state.get("status") == "running":
-                self._execute_step_chain(session_id, state)
+        single_quoted_traceback_match = re.search(
+            r"File\s+'([^']+?\.py)'",
+            text,
+            re.IGNORECASE,
+        )
+        if single_quoted_traceback_match:
+            return single_quoted_traceback_match.group(1).strip().rstrip(".,:;)]}")
 
-        def _extract_file_path_from_error(self, error_text: str) -> str:
-            text = self._safe_str(error_text)
+        windows_py_match = re.search(
+            r"([A-Za-z]:\\[^\n\r\t\"']+?\.py)\b",
+            text,
+        )
+        if windows_py_match:
+            return windows_py_match.group(1).strip().rstrip(".,:;)]}")
 
-            match = re.search(r'File "([^"]+)"', text)
-            if match:
-                return match.group(1).strip()
+        return ""
 
-            match = re.search(r"([A-Z]:\\[^\r\n]+?\.(?:py|js|html|css|json))", text, re.IGNORECASE)
-            if match:
-                return match.group(1).strip()
+    def _process_auto_fix(self, user_text: str, session_id: str, attachments=None):
+        lowered = (user_text or "").lower()
 
-            return ""
-
-        def _guess_path_from_text(self, text: str) -> str:
-            import re
-
-            text = self._safe_str(text)
-
-            quoted_traceback_match = re.search(
-                r'File\s+"([^"]+?\.py)"',
-                text,
-                re.IGNORECASE,
+        try:
+            tracked_state = self._auto_track_working_state(
+                session_id=session_id,
+                user_text=user_text,
+                assistant_text="auto_fix_mode",
             )
-            if quoted_traceback_match:
-                return quoted_traceback_match.group(1).strip().rstrip(".,:;)]}")
 
-            single_quoted_traceback_match = re.search(
-                r"File\s+'([^']+?\.py)'",
-                text,
-                re.IGNORECASE,
-            )
-            if single_quoted_traceback_match:
-                return single_quoted_traceback_match.group(1).strip().rstrip(".,:;)]}")
+            if isinstance(tracked_state, dict) and tracked_state:
+                self._set_working_state(session_id, tracked_state)
 
-            windows_py_match = re.search(
-                r"([A-Za-z]:\\[^\n\r\t\"']+?\.py)\b",
-                text,
-            )
-            if windows_py_match:
-                return windows_py_match.group(1).strip().rstrip(".,:;)]}")
+        except Exception as e:
+            exec_debug("AUTO_FIX_TRACK_ERROR:", e)
 
-            return ""
-
-        def _process_auto_fix(self, user_text: str, session_id: str, attachments=None):
-            lowered = (user_text or "").lower()
-
-            try:
-                tracked_state = self._auto_track_working_state(
-                    session_id=session_id,
-                    user_text=user_text,
-                    assistant_text="auto_fix_mode",
-                )
-
-                if isinstance(tracked_state, dict) and tracked_state:
-                    self._set_working_state(session_id, tracked_state)
-
-            except Exception as e:
-                exec_debug("AUTO_FIX_TRACK_ERROR:", e)
-
+        working_state = {}
+        try:
+            working_state = self._load_working_state(session_id) or {}
+        except Exception:
             working_state = {}
-            try:
-                working_state = self._load_working_state(session_id) or {}
-            except Exception:
-                working_state = {}
 
-            strategy = working_state.get("execution_recovery_strategy", "")
+        strategy = working_state.get("execution_recovery_strategy", "")
 
-            if "function_scoped_auto_fix" in strategy:
-                self._set_session_meta(session_id, "pending_fix_mode", "function")
-            elif "use_smaller_patch_scope" in strategy:
-                self._set_session_meta(session_id, "pending_fix_mode", "function")
-            elif "inspect_error_context" in strategy:
-                self._set_session_meta(session_id, "pending_fix_mode", "file")
+        if "function_scoped_auto_fix" in strategy:
+            self._set_session_meta(session_id, "pending_fix_mode", "function")
+        elif "use_smaller_patch_scope" in strategy:
+            self._set_session_meta(session_id, "pending_fix_mode", "function")
+        elif "inspect_error_context" in strategy:
+            self._set_session_meta(session_id, "pending_fix_mode", "file")
 
-            if "fix this" in lowered and "error" not in lowered:
-                return {
-                    "ok": True,
-                    "assistant_message": self._build_assistant_message(
-                        "Send file path and error traceback"
+        if "fix this" in lowered and "error" not in lowered:
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    "Send file path and error traceback"
+                ),
+                "session": self._get_session_payload(session_id),
+                "debug": {
+                    "route": "bug_intake_guard",
+                    "recovery_strategy": strategy,
+                    "pending_fix_mode": self._get_session_meta(
+                        session_id,
+                        "pending_fix_mode",
                     ),
-                    "session": self._get_session_payload(session_id),
-                    "debug": {
-                        "route": "bug_intake_guard",
-                        "recovery_strategy": strategy,
-                        "pending_fix_mode": self._get_session_meta(session_id, "pending_fix_mode"),
-                    },
-                }
-
-            path = self._guess_path_from_text(user_text)
-
-            if not path:
-                path = working_state.get("detected_traceback_file_path", "")
-
-            if path and any(x in lowered for x in ["fix", "bug", "error", "debug"]):
-                return self._execute_auto_fix_file(
-                    user_text=user_text,
-                    session_id=session_id,
-                )
-
-            return None
-
-        def _self_heal_python_file(self, file_path: str):
-            if not file_path:
-                return {
-                    "ok": False,
-                    "error": "No file path provided.",
-                }
-
-            try:
-                import subprocess
-                import sys
-
-                formatter_path = r"C:\Users\Owner\nova\tools\format_python.py"
-
-                format_result = subprocess.run(
-                    [sys.executable, formatter_path, file_path],
-                    capture_output=True,
-                    text=True,
-                )
-
-                compile_result = subprocess.run(
-                    [sys.executable, "-m", "py_compile", file_path],
-                    capture_output=True,
-                    text=True,
-                )
-
-                return {
-                    "ok": compile_result.returncode == 0,
-                    "format_stdout": format_result.stdout,
-                    "format_stderr": format_result.stderr,
-                    "compile_stdout": compile_result.stdout,
-                    "compile_stderr": compile_result.stderr,
-                }
-
-            except Exception as exc:
-                return {
-                    "ok": False,
-                    "error": repr(exc),
-                }
-
-        def _maybe_lock_execution_flow(self, user_text: str, session_id: str = "") -> bool:
-            try:
-                text = (user_text or "").strip().lower()
-
-                triggers = {
-                    "run_step",
-                    "run step",
-                    "next",
-                    "nex",
-                    "continue",
-                    "continue on",
-                    "go",
-                    "run_all",
-                    "run all",
-                    "run it",
-                    "execute",
-                    "execute all",
-                    "retry",
-                    "retry_failed",
-                    "retry failed",
-                    "test_fail",
-                    "auto mode",
-                    "auto",
-                    "autopilot",
-                }
-
-                if text in triggers:
-                    print("EXECUTION LOCK TRIGGERED:", text)
-                    return True
-
-                return False
-
-            except Exception as e:
-                print("EXECUTION LOCK ERROR:", e)
-                return False
-
-        def _clean_artifact_text(self, value: str, limit: int = 300) -> str:
-            text = re.sub(r"\s+", " ", self._safe_str(value)).strip()
-            if not text:
-                return ""
-            return text[:limit].strip()
-
-        def _build_image_artifact_description(
-            self,
-            prompt: str,
-            revised_prompt: str = "",
-            source_type: str = "generated",
-            generation_mode: str = "text_to_image",
-        ) -> dict:
-            prompt_clean = self._clean_artifact_text(prompt, limit=500)
-            revised_clean = self._clean_artifact_text(revised_prompt, limit=500)
-
-            primary = revised_clean or prompt_clean or "Generated image"
-            summary = f"Generated image from prompt: {primary}."
-            if source_type:
-                summary += f" Source type: {self._clean_artifact_text(source_type, limit=80)}."
-            if generation_mode:
-                summary += f" Mode: {self._clean_artifact_text(generation_mode, limit=80)}."
-
-            body_parts = []
-            body_parts.append(f"Prompt: {prompt_clean or 'N/A'}")
-            if revised_clean:
-                body_parts.append(f"Revised prompt: {revised_clean}")
-            if source_type:
-                body_parts.append(f"Source type: {self._clean_artifact_text(source_type, limit=80)}")
-            if generation_mode:
-                body_parts.append(f"Generation mode: {self._clean_artifact_text(generation_mode, limit=80)}")
-
-            body = "\n".join(body_parts).strip()
-            preview = self._clean_artifact_text(summary, limit=140)
-
-            return {
-                "summary": self._clean_artifact_text(summary, limit=400),
-                "preview": preview,
-                "body": body,
+                },
             }
 
-        def _upgrade_image_artifact_payload(
-            self,
-            artifact: dict | None,
-            prompt: str,
-            revised_prompt: str = "",
-            source_type: str = "generated",
-            generation_mode: str = "text_to_image",
-        ) -> dict:
-            artifact = self._safe_dict(artifact)
-            meta = self._safe_dict(artifact.get("meta"))
-            viewer = self._safe_dict(artifact.get("viewer"))
+        path = self._guess_path_from_text(user_text)
 
-            description = self._build_image_artifact_description(
-                prompt=prompt,
-                revised_prompt=revised_prompt,
-                source_type=source_type,
-                generation_mode=generation_mode,
+        if not path:
+            path = working_state.get("detected_traceback_file_path", "")
+
+        if path and any(x in lowered for x in ["fix", "bug", "error", "debug"]):
+            return self._execute_auto_fix_file(
+                user_text=user_text,
+                session_id=session_id,
             )
 
-            image_url = (
-                self._safe_str(artifact.get("image_url"))
-                or self._safe_str(meta.get("image_url"))
-                or self._safe_str(viewer.get("image_url"))
-            )
+        return None
 
-            artifact["kind"] = self._safe_str(artifact.get("kind")) or "image"
-            artifact["group"] = self._safe_str(artifact.get("group")) or "Images"
-            artifact["title"] = self._safe_str(artifact.get("title")) or "Generated image"
-            artifact["summary"] = description["summary"]
-            artifact["preview"] = description["preview"]
-            artifact["image_url"] = image_url or None
-            artifact["source"] = self._safe_str(artifact.get("source")) or "image_generation"
-
-            meta["prompt"] = self._safe_str(meta.get("prompt")) or self._safe_str(prompt)
-            meta["revised_prompt"] = self._safe_str(meta.get("revised_prompt")) or self._safe_str(revised_prompt)
-            meta["source_type"] = self._safe_str(meta.get("source_type")) or self._safe_str(source_type) or "generated"
-            meta["generation_mode"] = self._safe_str(meta.get("generation_mode")) or self._safe_str(generation_mode) or "text_to_image"
-            meta["image_url"] = self._safe_str(meta.get("image_url")) or image_url
-            meta["artifact_description"] = description["summary"]
-
-            viewer["kind"] = self._safe_str(viewer.get("kind")) or "image"
-            viewer["title"] = self._safe_str(viewer.get("title")) or artifact["title"]
-            viewer["body"] = description["body"]
-            viewer["image_url"] = self._safe_str(viewer.get("image_url")) or image_url
-            viewer["source_url"] = self._safe_str(viewer.get("source_url"))
-            viewer["filename"] = self._safe_str(viewer.get("filename"))
-            viewer["image_missing"] = bool(viewer.get("image_missing", False))
-            viewer["media_missing"] = bool(viewer.get("media_missing", False))
-            viewer["audio_missing"] = bool(viewer.get("audio_missing", False))
-            viewer["video_missing"] = bool(viewer.get("video_missing", False))
-
-            artifact["meta"] = meta
-            artifact["viewer"] = viewer
-            return artifact
-
-        def _clean_web_text(self, value: str, limit: int = 4000) -> str:
-            text = re.sub(r"\s+", " ", self._safe_str(value)).strip()
-            if not text:
-                return ""
-            return text[:limit].strip()
-
-        def _truncate_web_text(self, value: str, limit: int = 240) -> str:
-            text = self._clean_web_text(value, limit=max(limit * 3, limit))
-            if not text:
-                return ""
-            if len(text) <= limit:
-                return text
-            return text[: limit - 3].rstrip() + "..."
-
-        def _normalize_web_bullets(self, bullets, content: str = "", summary: str = "") -> list[str]:
-            cleaned = []
-            seen = set()
-
-            if isinstance(bullets, list):
-                for item in bullets:
-                    text = self._truncate_web_text(item, limit=180)
-                    key = text.lower()
-                    if text and key not in seen:
-                        seen.add(key)
-                        cleaned.append(text)
-
-            fallback_pool = []
-            if summary:
-                fallback_pool.append(summary)
-            if content:
-                fallback_pool.extend(re.split(r"(?<=[.!?])\s+", self._clean_web_text(content, limit=3000)))
-
-            for piece in fallback_pool:
-                text = self._truncate_web_text(piece, limit=180)
-                key = text.lower()
-                if text and key not in seen:
-                    seen.add(key)
-                    cleaned.append(text)
-                if len(cleaned) >= 5:
-                    break
-
-            return cleaned[:5]
-
-        def _build_web_artifact_description(
-            self,
-            title: str,
-            summary: str,
-            content: str,
-            url: str,
-            site_name: str = "",
-            domain: str = "",
-            bullets=None,
-        ) -> dict:
-            clean_title = self._clean_web_text(title, limit=200) or "Web result"
-            clean_summary = self._clean_web_text(summary, limit=1200)
-            clean_content = self._clean_web_text(content, limit=6000)
-            clean_url = self._safe_str(url)
-            clean_site = self._clean_web_text(site_name, limit=120)
-            clean_domain = self._clean_web_text(domain, limit=120)
-
-            bullet_list = self._normalize_web_bullets(
-                bullets=bullets,
-                content=clean_content,
-                summary=clean_summary,
-            )
-
-            final_summary = clean_summary
-            if not final_summary:
-                if bullet_list:
-                    final_summary = " ".join(bullet_list[:2]).strip()
-                elif clean_content:
-                    final_summary = self._truncate_web_text(clean_content, limit=260)
-                else:
-                    final_summary = f"Fetched {clean_title}"
-
-            preview = self._truncate_web_text(final_summary, limit=140)
-
-            body_parts = []
-            body_parts.append(f"Title: {clean_title}")
-            if clean_site:
-                body_parts.append(f"Site: {clean_site}")
-            elif clean_domain:
-                body_parts.append(f"Domain: {clean_domain}")
-            if clean_url:
-                body_parts.append(f"URL: {clean_url}")
-            if final_summary:
-                body_parts.append(f"Summary: {final_summary}")
-            if bullet_list:
-                body_parts.append("Key points:")
-                body_parts.extend([f"- {item}" for item in bullet_list])
-            if clean_content:
-                body_parts.append("")
-                body_parts.append("Content:")
-                body_parts.append(clean_content[:4000])
-
+    def _self_heal_python_file(self, file_path: str):
+        if not file_path:
             return {
-                "summary": final_summary,
-                "preview": preview,
-                "body": "\n".join(body_parts).strip(),
-                "bullets": bullet_list,
+                "ok": False,
+                "error": "No file path provided.",
             }
 
-        def _upgrade_web_artifact_payload(
-            self,
-            artifact: dict | None,
-            result: dict | None,
-            url: str = "",
-        ) -> dict:
-            artifact = self._safe_dict(artifact)
-            result = self._safe_dict(result)
-            meta = self._safe_dict(artifact.get("meta"))
-            viewer = self._safe_dict(artifact.get("viewer"))
+        try:
+            import subprocess
+            import sys
 
-            title = (
-                self._safe_str(artifact.get("title"))
-                or self._safe_str(result.get("title"))
-                or self._safe_str(url)
-                or "Web result"
-            )
-            summary = (
-                self._safe_str(artifact.get("summary"))
-                or self._safe_str(result.get("summary"))
-            )
-            content = (
-                self._safe_str(artifact.get("body"))
-                or self._safe_str(result.get("content"))
-            )
-            source_url = (
-                self._safe_str(artifact.get("source_url"))
-                or self._safe_str(meta.get("source_url"))
-                or self._safe_str(result.get("final_url"))
-                or self._safe_str(result.get("url"))
-                or self._safe_str(url)
-            )
-            site_name = self._safe_str(result.get("site_name")) or self._safe_str(meta.get("site_name"))
-            domain = self._safe_str(result.get("domain")) or self._safe_str(meta.get("domain"))
-            links = self._safe_list(result.get("links")) or self._safe_list(viewer.get("links"))
-            images = self._safe_list(result.get("images")) or self._safe_list(viewer.get("images"))
-            bullets = (
-                self._safe_list(result.get("bullets"))
-                or self._safe_list(viewer.get("bullets"))
-                or self._safe_list(meta.get("bullets"))
+            formatter_path = r"C:\Users\Owner\nova\tools\format_python.py"
+
+            format_result = subprocess.run(
+                [sys.executable, formatter_path, file_path],
+                capture_output=True,
+                text=True,
             )
 
-            description = self._build_web_artifact_description(
-                title=title,
-                summary=summary,
-                content=content,
-                url=source_url,
-                site_name=site_name,
-                domain=domain,
-                bullets=bullets,
+            compile_result = subprocess.run(
+                [sys.executable, "-m", "py_compile", file_path],
+                capture_output=True,
+                text=True,
             )
 
-            artifact["kind"] = self._safe_str(artifact.get("kind")) or "web_result"
-            artifact["group"] = self._safe_str(artifact.get("group")) or "Web"
-            artifact["title"] = self._safe_str(title) or "Web result"
-            artifact["summary"] = description["summary"]
-            artifact["preview"] = description["preview"]
-            artifact["body"] = self._safe_str(artifact.get("body")) or self._safe_str(result.get("content")) or ""
-            artifact["source_url"] = source_url
-            artifact["source"] = self._safe_str(artifact.get("source")) or "web_fetch"
+            return {
+                "ok": compile_result.returncode == 0,
+                "format_stdout": format_result.stdout,
+                "format_stderr": format_result.stderr,
+                "compile_stdout": compile_result.stdout,
+                "compile_stderr": compile_result.stderr,
+            }
 
-            meta["source_url"] = source_url
-            meta["url"] = self._safe_str(result.get("url")) or source_url
-            meta["final_url"] = self._safe_str(result.get("final_url")) or source_url
-            meta["site_name"] = site_name
-            meta["domain"] = domain
-            meta["description"] = self._safe_str(result.get("description")) or self._safe_str(meta.get("description"))
-            meta["status_code"] = result.get("status_code", meta.get("status_code"))
-            meta["ssl_verified"] = result.get("ssl_verified", meta.get("ssl_verified"))
-            meta["bullets"] = description["bullets"]
-            meta["artifact_description"] = description["summary"]
+        except Exception as exc:
+            return {
+                "ok": False,
+                "error": repr(exc),
+            }
 
-            viewer["kind"] = "web_result"
-            viewer["title"] = artifact["title"]
-            viewer["body"] = description["body"]
-            viewer["analysis_text"] = description["summary"]
-            viewer["bullets"] = description["bullets"]
-            viewer["links"] = links[:10]
-            viewer["images"] = images[:12]
-            viewer["source_url"] = source_url
+    def _maybe_lock_execution_flow(
+        self,
+        user_text: str,
+        session_id: str = "",
+    ) -> bool:
+        try:
+            text = (user_text or "").strip().lower()
 
-            artifact["meta"] = meta
-            artifact["viewer"] = viewer
-            return artifact
-
-        def _categorize_memory(self, text: str) -> str:
-            t = self._safe_str(text).lower()
-
-            # preference
-            if any(x in t for x in ["i prefer", "i like", "i usually", "i always", "i want"]):
-                return "preference"
-
-            # identity / profile
-            if any(x in t for x in ["my name is", "i am", "i'm", "i was", "i live"]):
-                return "profile"
-
-            # project
-            if any(x in t for x in ["i'm building", "my project", "i'm working on", "app", "nova"]):
-                return "project"
-
-            # goal
-            if any(x in t for x in ["i want to", "my goal", "i plan to"]):
-                return "goal"
-
-            # default
-            return "note"
-
-        def _should_auto_inject_memory(self, user_text: str, decision: dict | None = None) -> bool:
-            text = self._safe_str(user_text).lower()
-            if not text:
-                return False
-
-            if not isinstance(decision, dict):
-                decision = {}
-
-            if not decision.get("use_memory", True):
-                return False
-
-            route = self._safe_str(decision.get("route")).lower()
-            if route in {
-                self._safe_str(getattr(self, "ROUTE_IMAGE_GENERATION", "")).lower(),
-                self._safe_str(getattr(self, "ROUTE_WEB_FETCH", "")).lower(),
-                self._safe_str(getattr(self, "ROUTE_ATTACHMENT_ANALYSIS", "")).lower(),
-            }:
-                return False
-
-            skip_triggers = (
-                "/image",
-                "generate an image",
-                "draw ",
-                "make an image",
-                "fetch ",
-                "http://",
-                "https://",
-            )
-            if any(trigger in text for trigger in skip_triggers):
-                return False
-
-            return True
-
-
-        def _clean_working_state_value(self, value, limit=160):
-            text = self._safe_str(value).strip()
-            if not text:
-                return ""
-
-            text = text.replace("\r", " ").replace("\n", " ")
-            text = re.sub(r"\s+", " ", text).strip()
-
-            bad_starts = (
-                "yes",
-                "agreed",
-                "recommended next step",
-                "current project truth says",
-                "what this means",
-                "in short",
-            )
-            lower = text.lower()
-            if any(lower.startswith(x) for x in bad_starts):
-                return ""
-
-            return text[:limit]
-
-        def _should_inject_working_context(self, decision, user_text, assistant_msg):
-            decision = decision or {}
-            user_text = self._safe_str(user_text).lower()
-
-            user_lc = user_text.lower().strip()
-            assistant_text = self._safe_str((assistant_msg or {}).get("text")).lower()
-
-            route = self._safe_str(decision.get("route")).lower()
-            mode = self._safe_str(decision.get("mode")).lower()
-
-            continuity_triggers = [
-                "what are we doing now",
-                "where are we now",
-                "what's next",
-                "next step",
-                "next move",
-                "current task",
-                "active task",
-                "current bug",
-                "current file",
-                "checkpoint",
-                "pick up where we left off",
+            triggers = {
+                "run_step",
+                "run step",
+                "next",
+                "nex",
                 "continue",
-                "resume",
-                "status",
-                "progress",
-            ]
+                "continue on",
+                "go",
+                "run_all",
+                "run all",
+                "run it",
+                "execute",
+                "execute all",
+                "retry",
+                "retry_failed",
+                "retry failed",
+                "test_fail",
+                "auto mode",
+                "auto",
+                "autopilot",
+            }
 
-            assistant_triggers = [
-                "next step",
-                "next move",
-                "current bug",
-                "current file",
-                "active task",
-                "checkpoint",
-                "working on",
-                "resume",
-                "continue",
-            ]
-
-            if route in {"memory", "planning"}:
-                return True
-
-            if mode in {"planning", "analysis"}:
-                return True
-
-            if any(trigger in user_text for trigger in continuity_triggers):
-                return True
-
-            if any(trigger in assistant_text for trigger in assistant_triggers):
+            if text in triggers:
+                print("EXECUTION LOCK TRIGGERED:", text)
                 return True
 
             return False
 
-        def _build_working_context_block(self, session_id: str):
-            state = self._get_working_state(session_id)
+        except Exception as e:
+            print("EXECUTION LOCK ERROR:", e)
+            return False
 
-            rows = [
-                ("Active task", state.get("active_task", "")),
-                ("Current file", state.get("current_file", "")),
-                ("Current bug", state.get("current_bug", "")),
-                ("Last success", state.get("last_success", "")),
-                ("Next move", state.get("next_move", "")),
-                ("Checkpoint", state.get("checkpoint", "")),
-            ]
+    def _clean_artifact_text(
+        self,
+        value: str,
+        limit: int = 300,
+    ) -> str:
+        text = re.sub(r"\s+", " ", self._safe_str(value)).strip()
 
-            lines = []
-            for label, value in rows:
-                value = self._clean_working_state_value(value)
-                if value:
-                    lines.append(f"{label}: {value}")
+        if not text:
+            return ""
 
-            if not lines:
-                return ""
+        return text[:limit].strip()
 
-            return "Working context:\n" + "\n".join(lines)
+    def _build_image_artifact_description(
+        self,
+        prompt: str,
+        revised_prompt: str = "",
+        source_type: str = "generated",
+        generation_mode: str = "text_to_image",
+    ) -> dict:
 
-        def _build_working_context_payload(self, session_id: str) -> dict:
-            state = self._get_working_state(session_id)
+        prompt_clean = self._clean_artifact_text(
+            prompt,
+            limit=500,
+        )
 
-            if not isinstance(state, dict):
-                state = {}
+        revised_clean = self._clean_artifact_text(
+            revised_prompt,
+            limit=500,
+        )
 
-            cleaned = {
-                "active_task": self._clean_working_state_value(state.get("active_task", "")),
-                "current_file": self._clean_working_state_value(state.get("current_file", "")),
-                "current_bug": self._clean_working_state_value(state.get("current_bug", "")),
-                "last_success": self._clean_working_state_value(state.get("last_success", "")),
-                "next_move": self._clean_working_state_value(state.get("next_move", "")),
-                "checkpoint": self._clean_working_state_value(state.get("checkpoint", "")),
-                "updated_at": self._safe_str(state.get("updated_at", "")),
-            }
+        primary = (
+            revised_clean
+            or prompt_clean
+            or "Generated image"
+        )
 
-            text_lines = []
-            if cleaned["active_task"]:
-                text_lines.append(f"- Active task: {cleaned['active_task']}")
-            if cleaned["current_file"]:
-                text_lines.append(f"- Current file: {cleaned['current_file']}")
-            if cleaned["current_bug"]:
-                text_lines.append(f"- Current bug: {cleaned['current_bug']}")
-            if cleaned["last_success"]:
-                text_lines.append(f"- Last success: {cleaned['last_success']}")
-            if cleaned["next_move"]:
-                text_lines.append(f"- Next move: {cleaned['next_move']}")
-            if cleaned["checkpoint"]:
-                text_lines.append(f"- Checkpoint: {cleaned['checkpoint']}")
+        summary = f"Generated image from prompt: {primary}."
 
-            text = ""
-            if text_lines:
-                text = "Working context:\n" + "\n".join(text_lines)
+        if source_type:
+            summary += (
+                f" Source type: "
+                f"{self._clean_artifact_text(source_type, limit=80)}."
+            )
 
-            return {
-                "show": bool(text_lines),
-                "text": text,
-                "state": cleaned,
-                "collapsed": False,
-            }
+        if generation_mode:
+            summary += (
+                f" Mode: "
+                f"{self._clean_artifact_text(generation_mode, limit=80)}."
+            )
 
-        def _score_memory_for_text(self, memory_item, user_text: str) -> float:
-            user_text = self._safe_str(user_text).strip().lower()
-            if not user_text:
-                return 0.0
+        body_parts = []
 
-            if isinstance(memory_item, dict):
-                text = self._safe_str(memory_item.get("text"))
-                kind = self._safe_str(memory_item.get("kind"))
+        body_parts.append(
+            f"Prompt: {prompt_clean or 'N/A'}"
+        )
+
+        if revised_clean:
+            body_parts.append(
+                f"Revised prompt: {revised_clean}"
+            )
+
+        if source_type:
+            body_parts.append(
+                "Source type: "
+                f"{self._clean_artifact_text(source_type, limit=80)}"
+            )
+
+        if generation_mode:
+            body_parts.append(
+                "Generation mode: "
+                f"{self._clean_artifact_text(generation_mode, limit=80)}"
+            )
+
+        body = "\n".join(body_parts).strip()
+
+        preview = self._clean_artifact_text(
+            summary,
+            limit=140,
+        )
+
+        return {
+            "summary": self._clean_artifact_text(
+                summary,
+                limit=400,
+            ),
+            "preview": preview,
+            "body": body,
+        }
+
+    def _upgrade_image_artifact_payload(
+        self,
+        artifact: dict | None,
+        prompt: str,
+        revised_prompt: str = "",
+        source_type: str = "generated",
+        generation_mode: str = "text_to_image",
+    ) -> dict:
+
+        artifact = self._safe_dict(artifact)
+
+        meta = self._safe_dict(
+            artifact.get("meta")
+        )
+
+        viewer = self._safe_dict(
+            artifact.get("viewer")
+        )
+
+        description = self._build_image_artifact_description(
+            prompt=prompt,
+            revised_prompt=revised_prompt,
+            source_type=source_type,
+            generation_mode=generation_mode,
+        )
+
+        image_url = (
+            self._safe_str(artifact.get("image_url"))
+            or self._safe_str(meta.get("image_url"))
+            or self._safe_str(viewer.get("image_url"))
+        )
+
+        artifact["kind"] = (
+            self._safe_str(artifact.get("kind"))
+            or "image"
+        )
+
+        artifact["group"] = (
+            self._safe_str(artifact.get("group"))
+            or "Images"
+        )
+
+        artifact["title"] = (
+            self._safe_str(artifact.get("title"))
+            or "Generated image"
+        )
+
+        artifact["summary"] = description["summary"]
+        artifact["preview"] = description["preview"]
+        artifact["image_url"] = image_url or None
+
+        artifact["source"] = (
+            self._safe_str(artifact.get("source"))
+            or "image_generation"
+        )
+
+        meta["prompt"] = (
+            self._safe_str(meta.get("prompt"))
+            or self._safe_str(prompt)
+        )
+
+        meta["revised_prompt"] = (
+            self._safe_str(meta.get("revised_prompt"))
+            or self._safe_str(revised_prompt)
+        )
+
+        meta["source_type"] = (
+            self._safe_str(meta.get("source_type"))
+            or self._safe_str(source_type)
+            or "generated"
+        )
+
+        meta["generation_mode"] = (
+            self._safe_str(meta.get("generation_mode"))
+            or self._safe_str(generation_mode)
+            or "text_to_image"
+        )
+
+        meta["image_url"] = (
+            self._safe_str(meta.get("image_url"))
+            or image_url
+        )
+
+        meta["artifact_description"] = description["summary"]
+
+        viewer["kind"] = (
+            self._safe_str(viewer.get("kind"))
+            or "image"
+        )
+
+        viewer["title"] = (
+            self._safe_str(viewer.get("title"))
+            or artifact["title"]
+        )
+
+        viewer["body"] = description["body"]
+
+        viewer["image_url"] = (
+            self._safe_str(viewer.get("image_url"))
+            or image_url
+        )
+
+        viewer["source_url"] = self._safe_str(
+            viewer.get("source_url")
+        )
+
+        viewer["filename"] = self._safe_str(
+            viewer.get("filename")
+        )
+
+        viewer["image_missing"] = bool(
+            viewer.get("image_missing", False)
+        )
+
+        viewer["media_missing"] = bool(
+            viewer.get("media_missing", False)
+        )
+
+        viewer["audio_missing"] = bool(
+            viewer.get("audio_missing", False)
+        )
+
+        viewer["video_missing"] = bool(
+            viewer.get("video_missing", False)
+        )
+
+        artifact["meta"] = meta
+        artifact["viewer"] = viewer
+
+        return artifact
+
+    def _clean_web_text(
+        self,
+        value: str,
+        limit: int = 4000,
+    ) -> str:
+
+        text = re.sub(
+            r"\s+",
+            " ",
+            self._safe_str(value),
+        ).strip()
+
+        if not text:
+            return ""
+
+        return text[:limit].strip()
+
+    def _truncate_web_text(
+        self,
+        value: str,
+        limit: int = 240,
+    ) -> str:
+
+        text = self._clean_web_text(
+            value,
+            limit=max(limit * 3, limit),
+        )
+
+        if not text:
+            return ""
+
+        if len(text) <= limit:
+            return text
+
+        return text[: limit - 3].rstrip() + "..."
+
+    def _normalize_web_bullets(
+        self,
+        bullets,
+        content: str = "",
+        summary: str = "",
+    ) -> list[str]:
+
+        cleaned = []
+        seen = set()
+
+        if isinstance(bullets, list):
+            for item in bullets:
+                text = self._truncate_web_text(
+                    item,
+                    limit=180,
+                )
+
+                key = text.lower()
+
+                if text and key not in seen:
+                    seen.add(key)
+                    cleaned.append(text)
+
+        fallback_pool = []
+
+        if summary:
+            fallback_pool.append(summary)
+
+        if content:
+            fallback_pool.extend(
+                re.split(
+                    r"(?<=[.!?])\s+",
+                    self._clean_web_text(
+                        content,
+                        limit=3000,
+                    ),
+                )
+            )
+
+        for piece in fallback_pool:
+            text = self._truncate_web_text(
+                piece,
+                limit=180,
+            )
+
+            key = text.lower()
+
+            if text and key not in seen:
+                seen.add(key)
+                cleaned.append(text)
+
+            if len(cleaned) >= 5:
+                break
+
+        return cleaned[:5]
+
+    def _build_web_artifact_description(
+        self,
+        title: str,
+        summary: str,
+        content: str,
+        url: str,
+        site_name: str = "",
+        domain: str = "",
+        bullets=None,
+    ) -> dict:
+
+        clean_title = (
+            self._clean_web_text(title, limit=200)
+            or "Web result"
+        )
+
+        clean_summary = self._clean_web_text(
+            summary,
+            limit=1200,
+        )
+
+        clean_content = self._clean_web_text(
+            content,
+            limit=6000,
+        )
+
+        clean_url = self._safe_str(url)
+
+        clean_site = self._clean_web_text(
+            site_name,
+            limit=120,
+        )
+
+        clean_domain = self._clean_web_text(
+            domain,
+            limit=120,
+        )
+
+        bullet_list = self._normalize_web_bullets(
+            bullets=bullets,
+            content=clean_content,
+            summary=clean_summary,
+        )
+
+        final_summary = clean_summary
+
+        if not final_summary:
+            if bullet_list:
+                final_summary = (
+                    " ".join(bullet_list[:2]).strip()
+                )
+
+            elif clean_content:
+                final_summary = self._truncate_web_text(
+                    clean_content,
+                    limit=260,
+                )
+
             else:
-                text = self._safe_str(memory_item)
-                kind = ""
+                final_summary = (
+                    f"Fetched {clean_title}"
+                )
 
-            haystack = f"{kind} {text}".strip().lower()
-            if not haystack:
-                return 0.0
+        preview = self._truncate_web_text(
+            final_summary,
+            limit=140,
+        )
 
-            score = 0.0
+        body_parts = []
 
-            project_query_triggers = [
-                "what am i working on",
-                "what project",
-                "my project",
-                "current project",
-                "what are we building",
-                "what am i building",
+        body_parts.append(
+            f"Title: {clean_title}"
+        )
+
+        if clean_site:
+            body_parts.append(
+                f"Site: {clean_site}"
+            )
+
+        elif clean_domain:
+            body_parts.append(
+                f"Domain: {clean_domain}"
+            )
+
+        if clean_url:
+            body_parts.append(
+                f"URL: {clean_url}"
+            )
+
+        if final_summary:
+            body_parts.append(
+                f"Summary: {final_summary}"
+            )
+
+        if bullet_list:
+            body_parts.append("Key points:")
+
+            body_parts.extend(
+                [f"- {item}" for item in bullet_list]
+            )
+
+        if clean_content:
+            body_parts.append("")
+            body_parts.append("Content:")
+            body_parts.append(clean_content[:4000])
+
+        return {
+            "summary": final_summary,
+            "preview": preview,
+            "body": "\n".join(body_parts).strip(),
+            "bullets": bullet_list,
+        }
+
+    def _upgrade_web_artifact_payload(
+        self,
+        artifact: dict | None,
+        result: dict | None,
+        url: str = "",
+    ) -> dict:
+
+        artifact = self._safe_dict(artifact)
+        result = self._safe_dict(result)
+
+        meta = self._safe_dict(
+            artifact.get("meta")
+        )
+
+        viewer = self._safe_dict(
+            artifact.get("viewer")
+        )
+
+        title = (
+            self._safe_str(artifact.get("title"))
+            or self._safe_str(result.get("title"))
+            or self._safe_str(url)
+            or "Web result"
+        )
+
+        summary = (
+            self._safe_str(artifact.get("summary"))
+            or self._safe_str(result.get("summary"))
+        )
+
+        content = (
+            self._safe_str(artifact.get("body"))
+            or self._safe_str(result.get("content"))
+        )
+
+        source_url = (
+            self._safe_str(artifact.get("source_url"))
+            or self._safe_str(meta.get("source_url"))
+            or self._safe_str(result.get("final_url"))
+            or self._safe_str(result.get("url"))
+            or self._safe_str(url)
+        )
+
+        artifact["kind"] = (
+            self._safe_str(artifact.get("kind"))
+            or "web_result"
+        )
+
+        artifact["group"] = (
+            self._safe_str(artifact.get("group"))
+            or "Web"
+        )
+
+        artifact["title"] = (
+            self._safe_str(title)
+            or "Web result"
+        )
+
+        artifact["summary"] = summary
+        artifact["preview"] = self._truncate_web_text(
+            summary,
+            limit=140,
+        )
+
+        artifact["body"] = (
+            self._safe_str(artifact.get("body"))
+            or self._safe_str(result.get("content"))
+            or ""
+        )
+
+        artifact["source_url"] = source_url
+
+        artifact["source"] = (
+            self._safe_str(artifact.get("source"))
+            or "web_fetch"
+        )
+
+        artifact["meta"] = meta
+        artifact["viewer"] = viewer
+
+        return artifact
+
+    def _categorize_memory(self, text: str) -> str:
+        t = self._safe_str(text).lower()
+
+        # preference
+        if any(
+            x in t
+            for x in [
+                "i prefer",
+                "i like",
+                "i usually",
+                "i always",
+                "i want",
             ]
+        ):
+            return "preference"
 
-            if any(trigger in user_text for trigger in project_query_triggers):
-                if kind.lower() == "project":
-                    score += 100.0
-                if "nova" in haystack:
-                    score += 100.0
+        # identity / profile
+        if any(
+            x in t
+            for x in [
+                "my name is",
+                "i am",
+                "i'm",
+                "i was",
+                "i live",
+            ]
+        ):
+            return "profile"
 
-            user_words = [w for w in re.findall(r"[a-zA-Z0-9_:\\.-]+", user_text) if len(w) > 2]
-            if not user_words:
-                return 0.0
+        # project
+        if any(
+            x in t
+            for x in [
+                "i'm building",
+                "my project",
+                "i'm working on",
+                "app",
+                "nova",
+            ]
+        ):
+            return "project"
 
-            for word in user_words:
-                if word in haystack:
-                    score += 1.0
+        # goal
+        if any(
+            x in t
+            for x in [
+                "i want to",
+                "my goal",
+                "i plan to",
+            ]
+        ):
+            return "goal"
 
-            if user_text in haystack:
-                score += 4.0
+        # default
+        return "note"
 
-            if kind and kind.lower() in user_text:
-                score += 2.0
+    def _should_auto_inject_memory(
+        self,
+        user_text: str,
+        decision: dict | None = None,
+    ) -> bool:
 
-            return score
+        text = self._safe_str(user_text).lower()
 
+        if not text:
+            return False
 
-        def _select_relevant_memory(self, user_text: str, limit: int = 3):
-            all_memory = self._safe_list(self._load_memory())
-            if not all_memory:
-                return []
+        if not isinstance(decision, dict):
+            decision = {}
 
-            ranked = []
-            for item in all_memory:
-                score = self._score_memory_for_text(item, user_text)
-                if score > 0:
-                    ranked.append((score, item))
+        if not decision.get("use_memory", True):
+            return False
 
-            ranked.sort(key=lambda x: x[0], reverse=True)
-            return [item for _, item in ranked[:limit]]
+        route = self._safe_str(
+            decision.get("route")
+        ).lower()
 
+        if route in {
+            self._safe_str(
+                getattr(
+                    self,
+                    "ROUTE_IMAGE_GENERATION",
+                    "",
+                )
+            ).lower(),
+            self._safe_str(
+                getattr(
+                    self,
+                    "ROUTE_WEB_FETCH",
+                    "",
+                )
+            ).lower(),
+            self._safe_str(
+                getattr(
+                    self,
+                    "ROUTE_ATTACHMENT_ANALYSIS",
+                    "",
+                )
+            ).lower(),
+        }:
+            return False
 
-        def _format_memory_context(self, memory_items) -> str:
-            memory_items = memory_items or []
-            lines = []
+        skip_triggers = (
+            "/image",
+            "generate an image",
+            "draw ",
+            "make an image",
+            "fetch ",
+            "http://",
+            "https://",
+        )
 
-            for item in memory_items:
-                if isinstance(item, dict):
-                    kind = self._safe_str(item.get("kind")).strip()
-                    text = self._safe_str(item.get("text")).strip()
-                else:
-                    kind = ""
-                    text = self._safe_str(item).strip()
+        if any(
+            trigger in text
+            for trigger in skip_triggers
+        ):
+            return False
 
-                if not text:
-                    continue
+        return True
 
-                if kind:
-                    lines.append(f"- [{kind}] {text}")
-                else:
-                    lines.append(f"- {text}")
+    def _clean_working_state_value(
+        self,
+        value,
+        limit=160,
+    ):
 
-            return "\n".join(lines).strip()
+        text = self._safe_str(value).strip()
 
-        def _build_memory_context_for_chat(self, user_text: str, decision=None) -> str:
-            decision = decision or {}
-            use_memory = bool(decision.get("use_memory", True))
-            memory_limit = int(decision.get("memory_limit", 3) or 3)
+        if not text:
+            return ""
 
-            if not use_memory:
-                return ""
+        text = (
+            text.replace("\r", " ")
+            .replace("\n", " ")
+        )
 
-            # Step 1: try relevant memory
-            relevant_items = self._select_relevant_memory(user_text, limit=memory_limit)
+        text = re.sub(
+            r"\s+",
+            " ",
+            text,
+        ).strip()
 
-            # Step 2: fallback ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ recent memory
-            if not relevant_items:
-                try:
-                    if hasattr(self, "memory") and self.memory:
-                        if hasattr(self.memory, "all"):
-                            all_items = self.memory.all() or []
-                            relevant_items = all_items[:memory_limit]
-                except Exception:
-                    relevant_items = []
+        bad_starts = (
+            "yes",
+            "agreed",
+            "recommended next step",
+            "current project truth says",
+            "what this means",
+            "in short",
+        )
 
-            if not relevant_items:
-                return ""
+        lower = text.lower()
 
-            return self._format_memory_context(relevant_items)
+        if any(
+            lower.startswith(x)
+            for x in bad_starts
+        ):
+            return ""
 
-        def _build_memory_recall_text(self, session_id: str = "", user_text: str = "", limit: int = 5) -> str:
-            items = []
+        return text[:limit]
 
-            try:
-                if hasattr(self, "memory") and self.memory and hasattr(self.memory, "all"):
-                    items = self.memory.all() or []
-            except Exception:
-                items = []
+    def _should_inject_working_context(
+        self,
+        decision,
+        user_text,
+        assistant_msg,
+    ):
 
-            if not items:
-                return "I do not have any saved memory yet."
+        decision = decision or {}
 
-            ranked = []
-            for item in items:
-                score = self._score_memory_for_text(item, user_text)
+        user_text = self._safe_str(
+            user_text
+        ).lower()
+
+        assistant_text = self._safe_str(
+            (assistant_msg or {}).get("text")
+        ).lower()
+
+        route = self._safe_str(
+            decision.get("route")
+        ).lower()
+
+        mode = self._safe_str(
+            decision.get("mode")
+        ).lower()
+
+        continuity_triggers = [
+            "what are we doing now",
+            "where are we now",
+            "what's next",
+            "next step",
+            "next move",
+            "current task",
+            "active task",
+            "current bug",
+            "current file",
+            "checkpoint",
+            "pick up where we left off",
+            "continue",
+            "resume",
+            "status",
+            "progress",
+        ]
+
+        assistant_triggers = [
+            "next step",
+            "next move",
+            "current bug",
+            "current file",
+            "active task",
+            "checkpoint",
+            "working on",
+            "resume",
+            "continue",
+        ]
+
+        if route in {"memory", "planning"}:
+            return True
+
+        if mode in {"planning", "analysis"}:
+            return True
+
+        if any(
+            trigger in user_text
+            for trigger in continuity_triggers
+        ):
+            return True
+
+        if any(
+            trigger in assistant_text
+            for trigger in assistant_triggers
+        ):
+            return True
+
+        return False
+
+    def _build_working_context_block(
+        self,
+        session_id: str,
+    ):
+
+        state = self._get_working_state(
+            session_id
+        )
+
+        rows = [
+            (
+                "Active task",
+                state.get("active_task", ""),
+            ),
+            (
+                "Current file",
+                state.get("current_file", ""),
+            ),
+            (
+                "Current bug",
+                state.get("current_bug", ""),
+            ),
+            (
+                "Last success",
+                state.get("last_success", ""),
+            ),
+            (
+                "Next move",
+                state.get("next_move", ""),
+            ),
+            (
+                "Checkpoint",
+                state.get("checkpoint", ""),
+            ),
+        ]
+
+        lines = []
+
+        for label, value in rows:
+            value = self._clean_working_state_value(
+                value
+            )
+
+            if value:
+                lines.append(
+                    f"{label}: {value}"
+                )
+
+        if not lines:
+            return ""
+
+        return (
+            "Working context:\n"
+            + "\n".join(lines)
+        )
+
+    def _build_working_context_payload(
+        self,
+        session_id: str,
+    ) -> dict:
+
+        state = self._get_working_state(
+            session_id
+        )
+
+        if not isinstance(state, dict):
+            state = {}
+
+        cleaned = {
+            "active_task":
+                self._clean_working_state_value(
+                    state.get("active_task", "")
+                ),
+
+            "current_file":
+                self._clean_working_state_value(
+                    state.get("current_file", "")
+                ),
+
+            "current_bug":
+                self._clean_working_state_value(
+                    state.get("current_bug", "")
+                ),
+
+            "last_success":
+                self._clean_working_state_value(
+                    state.get("last_success", "")
+                ),
+
+            "next_move":
+                self._clean_working_state_value(
+                    state.get("next_move", "")
+                ),
+
+            "checkpoint":
+                self._clean_working_state_value(
+                    state.get("checkpoint", "")
+                ),
+
+            "updated_at":
+                self._safe_str(
+                    state.get("updated_at", "")
+                ),
+        }
+
+        text_lines = []
+
+        if cleaned["active_task"]:
+            text_lines.append(
+                f"- Active task: "
+                f"{cleaned['active_task']}"
+            )
+
+        if cleaned["current_file"]:
+            text_lines.append(
+                f"- Current file: "
+                f"{cleaned['current_file']}"
+            )
+
+        if cleaned["current_bug"]:
+            text_lines.append(
+                f"- Current bug: "
+                f"{cleaned['current_bug']}"
+            )
+
+        if cleaned["last_success"]:
+            text_lines.append(
+                f"- Last success: "
+                f"{cleaned['last_success']}"
+            )
+
+        if cleaned["next_move"]:
+            text_lines.append(
+                f"- Next move: "
+                f"{cleaned['next_move']}"
+            )
+
+        if cleaned["checkpoint"]:
+            text_lines.append(
+                f"- Checkpoint: "
+                f"{cleaned['checkpoint']}"
+            )
+
+        text = ""
+
+        if text_lines:
+            text = (
+                "Working context:\n"
+                + "\n".join(text_lines)
+            )
+
+        return {
+            "show": bool(text_lines),
+            "text": text,
+            "state": cleaned,
+            "collapsed": False,
+        }
+
+    def _score_memory_for_text(
+        self,
+        memory_item,
+        user_text: str,
+    ) -> float:
+
+        user_text = self._safe_str(
+            user_text
+        ).strip().lower()
+
+        if not user_text:
+            return 0.0
+
+        if isinstance(memory_item, dict):
+            text = self._safe_str(
+                memory_item.get("text")
+            )
+
+            kind = self._safe_str(
+                memory_item.get("kind")
+            )
+
+        else:
+            text = self._safe_str(memory_item)
+            kind = ""
+
+        haystack = (
+            f"{kind} {text}"
+        ).strip().lower()
+
+        if not haystack:
+            return 0.0
+
+        score = 0.0
+
+        project_query_triggers = [
+            "what am i working on",
+            "what project",
+            "my project",
+            "current project",
+            "what are we building",
+            "what am i building",
+        ]
+
+        if any(
+            trigger in user_text
+            for trigger in project_query_triggers
+        ):
+
+            if kind.lower() == "project":
+                score += 100.0
+
+            if "nova" in haystack:
+                score += 100.0
+
+        user_words = [
+            w
+            for w in re.findall(
+                r"[a-zA-Z0-9_:\\.-]+",
+                user_text,
+            )
+            if len(w) > 2
+        ]
+
+        if not user_words:
+            return 0.0
+
+        for word in user_words:
+            if word in haystack:
+                score += 1.0
+
+        if user_text in haystack:
+            score += 4.0
+
+        if kind and kind.lower() in user_text:
+            score += 2.0
+
+        return score
+
+    def _select_relevant_memory(
+        self,
+        user_text: str,
+        limit: int = 3,
+    ):
+
+        all_memory = self._safe_list(
+            self._load_memory()
+        )
+
+        if not all_memory:
+            return []
+
+        ranked = []
+
+        for item in all_memory:
+            score = self._score_memory_for_text(
+                item,
+                user_text,
+            )
+
+            if score > 0:
                 ranked.append((score, item))
 
-            ranked.sort(key=lambda x: x[0], reverse=True)
-            best = [item for score, item in ranked if score > 0][:limit]
+        ranked.sort(
+            key=lambda x: x[0],
+            reverse=True,
+        )
 
-            chosen = best if best else items[:limit]
+        return [
+            item
+            for _, item in ranked[:limit]
+        ]
 
-            lines = []
-            for item in chosen:
-                if not isinstance(item, dict):
-                    text = self._safe_str(item).strip()
-                    if not text:
-                        continue
+    def _format_memory_context(
+        self,
+        memory_items,
+    ) -> str:
 
-                    bad_patterns = [
-                        "wouldn't you want to",
-                        "get laid",
-                        "say hi",
-                        "hello",
-                        "hi",
-                        "thanks",
-                        "thank you",
-                        "lol",
-                        "lmao",
-                        "bro",
-                        "nigga",
-                    ]
-                    if any(p in text.lower() for p in bad_patterns):
-                        continue
+        memory_items = memory_items or []
 
-                    lines.append(f"- {text}")
-                    continue
+        lines = []
 
-                text = self._safe_str(item.get("text")).strip()
-                kind = self._safe_str(item.get("kind")).strip()
-                item_session_id = self._safe_str(item.get("session_id")).strip()
+        for item in memory_items:
+
+            if isinstance(item, dict):
+                kind = self._safe_str(
+                    item.get("kind")
+                ).strip()
+
+                text = self._safe_str(
+                    item.get("text")
+                ).strip()
+
+            else:
+                kind = ""
+                text = self._safe_str(item).strip()
+
+            if not text:
+                continue
+
+            if kind:
+                lines.append(
+                    f"- [{kind}] {text}"
+                )
+
+            else:
+                lines.append(f"- {text}")
+
+        return "\n".join(lines).strip()
+
+
+    def _build_memory_recall_text(
+        self,
+        session_id: str = "",
+        user_text: str = "",
+        limit: int = 5,
+    ) -> str:
+
+        items = []
+
+        try:
+            if (
+                hasattr(self, "memory")
+                and self.memory
+                and hasattr(self.memory, "all")
+            ):
+                items = self.memory.all() or []
+
+        except Exception:
+            items = []
+
+        if not items:
+            return (
+                "I do not have any saved memory yet."
+            )
+
+        ranked = []
+
+        for item in items:
+            score = self._score_memory_for_text(
+                item,
+                user_text,
+            )
+
+            ranked.append((score, item))
+
+        ranked.sort(
+            key=lambda x: x[0],
+            reverse=True,
+        )
+
+        best = [
+            item
+            for score, item in ranked
+            if score > 0
+        ][:limit]
+
+        chosen = best if best else items[:limit]
+
+        lines = []
+
+        for item in chosen:
+
+            if not isinstance(item, dict):
+                text = self._safe_str(item).strip()
 
                 if not text:
                     continue
@@ -7680,501 +8296,754 @@ Auto-fix result:
                     "nigga",
                 ]
 
-                if any(p in text.lower() for p in bad_patterns):
+                if any(
+                    p in text.lower()
+                    for p in bad_patterns
+                ):
                     continue
 
-                prefix = "- "
-                if kind:
-                    prefix = f"- [{kind}] "
+                lines.append(f"- {text}")
+                continue
 
-                if session_id and item_session_id and item_session_id == session_id:
-                    prefix = prefix.rstrip() + " [this session] "
+            text = self._safe_str(
+                item.get("text")
+            ).strip()
 
-                lines.append(f"{prefix}{text}")
+            kind = self._safe_str(
+                item.get("kind")
+            ).strip()
 
-            if not lines:
-                return "I do not have any saved memory yet."
+            item_session_id = self._safe_str(
+                item.get("session_id")
+            ).strip()
 
-            return "HereÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s what I remember:\n" + "\n".join(lines)
+            if not text:
+                continue
 
+            bad_patterns = [
+                "wouldn't you want to",
+                "get laid",
+                "say hi",
+                "hello",
+                "hi",
+                "thanks",
+                "thank you",
+                "lol",
+                "lmao",
+                "bro",
+                "nigga",
+            ]
 
-        def answer_from_web_results(self, query: str, results: list[dict] | None = None) -> str:
-            query = str(query or "").strip()
-            items = results if isinstance(results, list) else []
+            if any(
+                p in text.lower()
+                for p in bad_patterns
+            ):
+                continue
 
-            cleaned: list[dict] = []
-            source_urls: list[str] = []
+            prefix = "- "
 
-            for item in items[:5]:
-                if not isinstance(item, dict):
-                    continue
+            if kind:
+                prefix = f"- [{kind}] "
 
-                title = str(item.get("title") or "").strip()
-                snippet = str(item.get("snippet") or "").strip()
-                url = str(item.get("url") or "").strip()
-                domain = str(item.get("domain") or "").strip()
+            if (
+                session_id
+                and item_session_id
+                and item_session_id == session_id
+            ):
+                prefix = (
+                    prefix.rstrip()
+                    + " [this session] "
+                )
 
-                if not (title or snippet or url):
-                    continue
+            lines.append(f"{prefix}{text}")
 
-                if url:
-                    source_urls.append(url)
+        if not lines:
+            return (
+                "I do not have any saved memory yet."
+            )
 
-                cleaned.append(
+        return (
+            "Here’s what I remember:\n"
+            + "\n".join(lines)
+        )
+
+    def answer_from_web_results(
+        self,
+        query: str,
+        results: list[dict] | None = None,
+    ) -> str:
+
+        query = str(query or "").strip()
+
+        items = (
+            results
+            if isinstance(results, list)
+            else []
+        )
+
+        cleaned: list[dict] = []
+
+        source_urls: list[str] = []
+
+        for item in items[:5]:
+
+            if not isinstance(item, dict):
+                continue
+
+            title = str(
+                item.get("title") or ""
+            ).strip()
+
+            snippet = str(
+                item.get("snippet") or ""
+            ).strip()
+
+            url = str(
+                item.get("url") or ""
+            ).strip()
+
+            domain = str(
+                item.get("domain") or ""
+            ).strip()
+
+            if not (
+                title
+                or snippet
+                or url
+            ):
+                continue
+
+            if url:
+                source_urls.append(url)
+
+            cleaned.append(
+                {
+                    "title": title,
+                    "snippet": snippet,
+                    "url": url,
+                    "domain": domain,
+                }
+            )
+
+        if not cleaned:
+            return (
+                f'I couldn’t find strong '
+                f'live results for "{query}".'
+            )
+
+        context_blocks: list[str] = []
+
+        for idx, item in enumerate(
+            cleaned,
+            start=1,
+        ):
+
+            parts: list[str] = []
+
+            if item["title"]:
+                parts.append(
+                    f"Title: {item['title']}"
+                )
+
+            if item["snippet"]:
+                parts.append(
+                    f"Snippet: {item['snippet']}"
+                )
+
+            if item["domain"]:
+                parts.append(
+                    f"Source: {item['domain']}"
+                )
+
+            if item["url"]:
+                parts.append(
+                    f"URL: {item['url']}"
+                )
+
+            context_blocks.append(
+                f"[Result {idx}]\n"
+                + "\n".join(parts)
+            )
+
+        web_context = "\n\n".join(
+            context_blocks
+        )
+
+        system_prompt = (
+            "You are answering a user's web "
+            "question using retrieved live "
+            "results. Write a direct, useful "
+            "answer in plain language."
+        )
+
+        user_prompt = (
+            f"User question:\n{query}\n\n"
+            f"Live web results:\n"
+            f"{web_context}\n\n"
+            "Write the answer now."
+        )
+
+        try:
+
+            response = self.client.responses.create(
+                model=self.model,
+                input=[
                     {
-                        "title": title,
-                        "snippet": snippet,
-                        "url": url,
-                        "domain": domain,
-                    }
-                )
-
-            if not cleaned:
-                return f'I couldnÃ¢â‚¬â„¢t find strong live results for "{query}".'
-
-            context_blocks: list[str] = []
-            for idx, item in enumerate(cleaned, start=1):
-                parts: list[str] = []
-                if item["title"]:
-                    parts.append(f"Title: {item['title']}")
-                if item["snippet"]:
-                    parts.append(f"Snippet: {item['snippet']}")
-                if item["domain"]:
-                    parts.append(f"Source: {item['domain']}")
-                if item["url"]:
-                    parts.append(f"URL: {item['url']}")
-                context_blocks.append(f"[Result {idx}]\n" + "\n".join(parts))
-
-            web_context = "\n\n".join(context_blocks)
-
-            system_prompt = (
-                "You are answering a user's web question using retrieved live results. "
-                "Write a direct, useful answer in plain language. "
-                "Do not say 'based on the search results' or 'I found'. "
-                "If the results are weak, be honest but still give the best concise answer possible. "
-                "Do not invent facts beyond the provided results. "
-                "Keep it short and natural. "
-                "Do not write a Top sources list yourself. "
-                "The app will add sources separately."
+                        "role": "system",
+                        "content": system_prompt,
+                    },
+                    {
+                        "role": "user",
+                        "content": user_prompt,
+                    },
+                ],
             )
 
-            user_prompt = (
-                f"User question:\n{query}\n\n"
-                f"Live web results:\n{web_context}\n\n"
-                "Write the answer now."
-            )
+            text = ""
 
-            try:
-                response = self.client.responses.create(
-                    model=self.model,
-                    input=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                )
+            if (
+                hasattr(response, "output_text")
+                and response.output_text
+            ):
+                text = str(
+                    response.output_text
+                ).strip()
 
-                text = ""
-                if hasattr(response, "output_text") and response.output_text:
-                    text = str(response.output_text).strip()
-                else:
-                    text = str(response).strip()
+            else:
+                text = str(response).strip()
 
-                if text:
-                    import re
-
-                    text = re.split(r"[-â€“â€”]\s*Top sources\s*[-â€“â€”]", text, flags=re.IGNORECASE)[0].strip()
-                    text = re.split(r"\bTop sources\b", text, flags=re.IGNORECASE)[0].strip()
-
-                    sources_block = ""
-
-                    if cleaned:
-                        lines = []
-                        ranked_sources = []
-
-                        for item in cleaned:
-                            if not isinstance(item, dict):
-                                continue
-
-                            url = str(item.get("url") or "")
-                            title = str(item.get("title") or "")
-                            domain = str(item.get("domain") or "")
-
-                            score = self._source_quality_score(url, title + " " + domain)
-
-                            if score <= -999:
-                                continue
-
-                            item["_quality_score"] = score
-                            ranked_sources.append(item)
-
-                        ranked_sources.sort(
-                            key=lambda x: x.get("_quality_score", 0),
-                            reverse=True,
-                        )
-
-                        cleaned_ranked = ranked_sources[:5]
-
-                        for idx, item in enumerate(cleaned_ranked, start=1):
-                            title = str(item.get("title") or "").strip()
-                            domain = str(item.get("domain") or "").strip()
-                            url = str(
-                                item.get("resolved_url")
-                                or item.get("publisher_url")
-                                or item.get("source_url")
-                                or item.get("url")
-                                or ""
-                            ).strip()
-
-                            lines.append(f"{idx}source")
-                            lines.append(f"{domain} â€” {title}")
-
-                            if url and "news.google.com" not in url.lower():
-                                lines.append(url)
-                                source_urls.append(url)
-
-                        sources_block = ""
-
-
+            if text:
                 import re
 
-                # ?? HARD CLEAN â€” remove ANY sources text
-                clean_text = re.split(
-                    r"[-â€“â€”]\s*Top sources\s*[-â€“â€”]",
+                text = re.split(
+                    r"[-–—]\s*Top sources\s*[-–—]",
                     text,
-                    flags=re.IGNORECASE
-                )[0]
+                    flags=re.IGNORECASE,
+                )[0].strip()
 
-                clean_text = re.split(
+                text = re.split(
                     r"\bTop sources\b",
-                    clean_text,
-                    flags=re.IGNORECASE
-                )[0]
+                    text,
+                    flags=re.IGNORECASE,
+                )[0].strip()
 
-                text = clean_text.strip()
+            clean_text = re.split(
+                r"[-–—]\s*Top sources\s*[-–—]",
+                text,
+                flags=re.IGNORECASE,
+            )[0]
 
-                return text
+            clean_text = re.split(
+                r"\bTop sources\b",
+                clean_text,
+                flags=re.IGNORECASE,
+            )[0]
 
-            except Exception as e:
-                exec_debug("WEB RESPONSE ERROR:", e)
+            text = clean_text.strip()
 
-            top = cleaned[0]
+            return text
 
-            fallback_parts = []
-            if top.get("title"):
-                fallback_parts.append(str(top["title"]))
-            if top.get("snippet"):
-                fallback_parts.append(str(top["snippet"]))
-            if top.get("url"):
-                fallback_parts.append(str(top["url"]))
-
-            return "\n".join(fallback_parts).strip() or f'Hereâ€™s what I found for "{query}".'
-
-        # =========================
-        # EXECUTION GUARD HELPERS (STEP TRUTH ENFORCEMENT)
-        # =========================
-
-        def _text_has_placeholder_debug_content(self, text: str) -> bool:
-            text = self._safe_str(text).strip().lower()
-            if not text:
-                return True
-
-            placeholder_markers = [
-                "paste exact error here",
-                "step 1",
-                "step 2",
-                "step 3",
-                "how to reproduce:",
-            ]
-            return any(marker in text for marker in placeholder_markers)
-
-        def _has_real_debug_context(self, user_text: str, execution: dict, attachments=None) -> bool:
-            attachments = attachments or []
-            text = self._safe_str(user_text)
-            lowered = text.lower()
-
-            if self._text_has_placeholder_debug_content(text):
-                return False
-
-            if attachments:
-                return True
-
-            signals = 0
-
-            if "traceback" in lowered or "error" in lowered:
-                signals += 1
-
-            if "expected:" in lowered and "actual:" in lowered:
-                signals += 1
-
-            if "reproduce" in lowered:
-                signals += 1
-
-            if "def " in text or "class " in text:
-                signals += 1
-
-            if len(text.strip()) >= 120:
-                signals += 1
-
-            return signals >= 2
-
-        def _step_requires_real_change(self, step_title: str) -> bool:
-            return "apply" in self._safe_str(step_title).lower()
-
-        def _step_requires_verification(self, step_title: str) -> bool:
-            return "verify" in self._safe_str(step_title).lower()
-
-        def _step_output_indicates_real_change(self, step_output: str) -> bool:
-            lowered = self._safe_str(step_output).lower()
-            return any(x in lowered for x in ["changed", "updated", "patched", "modified"])
-
-        def _step_output_indicates_real_verification(self, step_output: str) -> bool:
-            lowered = self._safe_str(step_output).lower()
-            return any(x in lowered for x in ["verified", "tested", "confirmed", "passes"])
-
-        def _can_advance_execution_step(self, execution, user_text, step_title, step_output, attachments=None):
-            execution = execution or {}
-            attachments = attachments or []
-
-            goal_text = self._safe_str(execution.get("goal"))
-            current_step_text = self._safe_str(execution.get("current_step"))
-            combined_text = "\n".join(
-                part for part in [
-                    self._safe_str(user_text),
-                    goal_text,
-                    current_step_text,
-                ]
-                if self._safe_str(part).strip()
+        except Exception as e:
+            exec_debug(
+                "WEB RESPONSE ERROR:",
+                e,
             )
 
-            if not self._has_real_debug_context(combined_text, execution, attachments):
-                missing_parts = []
+        top = cleaned[0]
 
-                lowered_text = combined_text.lower()
+        fallback_parts = []
 
-                if len(combined_text.strip()) < 10:
-                    missing_parts.append("clear problem description")
+        if top.get("title"):
+            fallback_parts.append(
+                str(top["title"])
+            )
 
-                if "traceback" not in lowered_text and "error" not in lowered_text and "exception" not in lowered_text and "500" not in lowered_text:
-                    missing_parts.append("exact error or traceback")
+        if top.get("snippet"):
+            fallback_parts.append(
+                str(top["snippet"])
+            )
 
-                if "def " not in combined_text and ".py" not in lowered_text and "line " not in lowered_text and "\\" not in combined_text and "/" not in combined_text:
-                    missing_parts.append("relevant code snippet or file path")
+        if top.get("url"):
+            fallback_parts.append(
+                str(top["url"])
+            )
 
-                instruction_lines = [
-                    "Step blocked.",
-                    "",
-                    "To continue, send:",
-                ]
+        return (
+            "\n".join(fallback_parts).strip()
+            or f'Here’s what I found for "{query}".'
+        )
 
-                for i, part in enumerate(missing_parts, start=1):
-                    instruction_lines.append(f"{i}. {part}")
+    # =========================
+    # EXECUTION GUARD HELPERS
+    # =========================        
 
-                if not missing_parts:
-                    instruction_lines.append("1. more detailed context")
+    def _text_has_placeholder_debug_content(
+        self,
+        text: str,
+    ) -> bool:
 
-                instruction_lines.append("")
-                instruction_lines.append("Example:")
-                instruction_lines.append("Error: ...")
-                instruction_lines.append("Code: ...")
-                instruction_lines.append("Expected: ...")
+        text = self._safe_str(text).strip().lower()
 
-                return False, "\n".join(instruction_lines)
+        if not text:
+            return True
 
-            if self._step_requires_real_change(step_title):
-                if not self._step_output_indicates_real_change(step_output):
-                    return False, "No real code change detected."
+        placeholder_markers = [
+            "paste exact error here",
+            "step 1",
+            "step 2",
+            "step 3",
+            "how to reproduce:",
+        ]
 
-            if self._step_requires_verification(step_title):
-                if not self._step_output_indicates_real_verification(step_output):
-                    return False, "No real verification detected."
+        return any(
+            marker in text
+            for marker in placeholder_markers
+        )
 
-            return True, ""
+    def _has_real_debug_context(
+        self,
+        user_text: str,
+        execution: dict,
+        attachments=None,
+    ) -> bool:
 
-        # =========================
-        # EXECUTION RENDER NORMALIZATION LOCK
-        # =========================
+        attachments = attachments or []
+        text = self._safe_str(user_text)
+        lowered = text.lower()
 
-        def _execution_status_label(self, execution):
-            execution = execution or {}
-            steps = execution.get("steps") or []
+        if self._text_has_placeholder_debug_content(text):
+            return False
 
-            total = len(steps)
-            done = sum(1 for s in steps if (s or {}).get("done"))
+        if attachments:
+            return True
 
-            if total > 0 and done >= total:
-                return "complete"
+        signals = 0
 
-            idx = execution.get("current_step_index", 0) or 0
-            if 0 <= idx < total:
-                title = str((steps[idx] or {}).get("title") or "").strip()
-                if title:
-                    return title
+        if "traceback" in lowered or "error" in lowered:
+            signals += 1
 
-            return "in progress"
+        if "expected:" in lowered and "actual:" in lowered:
+            signals += 1
 
-        def _render_execution(self, execution, include_prefix=False):
-            execution = self._normalize_execution_state(dict(execution or {}))
-            goal = str(execution.get("goal") or "").strip()
-            steps = execution.get("steps") or []
+        if "reproduce" in lowered:
+            signals += 1
 
-            exec_debug("RENDER EXECUTION =", execution)
-            exec_debug("RENDER STEPS =", steps)
+        if "def " in text or "class " in text:
+            signals += 1
 
-            total = len(steps)
-            done = sum(1 for s in steps if (s or {}).get("status") == "done")
+        if len(text.strip()) >= 120:
+            signals += 1
 
-            current_index = int(execution.get("current_step_index", 0) or 0)
-            if 0 <= current_index < total:
-                current_step = str((steps[current_index] or {}).get("title") or "").strip() or "Untitled step"
-            elif total > 0:
-                current_step = "complete"
-            else:
-                current_step = ""
+        return signals >= 2
 
-            lines = []
+    def _step_requires_real_change(
+        self,
+        step_title: str,
+    ) -> bool:
 
-            if include_prefix:
-                prefix = (
-                    "Auto-execution complete."
-                    if total > 0 and done >= total
-                    else "Auto-execution advanced."
+        return (
+            "apply"
+            in self._safe_str(step_title).lower()
+        )
+
+    def _step_requires_verification(
+        self,
+        step_title: str,
+    ) -> bool:
+
+        return (
+            "verify"
+            in self._safe_str(step_title).lower()
+        )
+
+    def _step_output_indicates_real_change(
+        self,
+        step_output: str,
+    ) -> bool:
+
+        lowered = self._safe_str(
+            step_output
+        ).lower()
+
+        return any(
+            x in lowered
+            for x in [
+                "changed",
+                "updated",
+                "patched",
+                "modified",
+            ]
+        )
+
+    def _step_output_indicates_real_verification(
+        self,
+        step_output: str,
+    ) -> bool:
+
+        lowered = self._safe_str(
+            step_output
+        ).lower()
+
+        return any(
+            x in lowered
+            for x in [
+                "verified",
+                "tested",
+                "confirmed",
+                "passes",
+            ]
+        )
+
+    def _can_advance_execution_step(
+        self,
+        execution,
+        user_text,
+        step_title,
+        step_output,
+        attachments=None,
+    ):
+
+        execution = execution or {}
+        attachments = attachments or []
+
+        goal_text = self._safe_str(
+            execution.get("goal")
+        )
+
+        current_step_text = self._safe_str(
+            execution.get("current_step")
+        )
+
+        combined_text = "\n".join(
+            part
+            for part in [
+                self._safe_str(user_text),
+                goal_text,
+                current_step_text,
+            ]
+            if self._safe_str(part).strip()
+        )
+
+        if not self._has_real_debug_context(
+            combined_text,
+            execution,
+            attachments,
+        ):
+            missing_parts = []
+            lowered_text = combined_text.lower()
+
+            if len(combined_text.strip()) < 10:
+                missing_parts.append(
+                    "clear problem description"
                 )
-                lines.append(prefix)
-                lines.append("")
 
-            if goal:
-                lines.append(f"Goal: {goal}")
-                lines.append("")
+            if (
+                "traceback" not in lowered_text
+                and "error" not in lowered_text
+                and "exception" not in lowered_text
+                and "500" not in lowered_text
+            ):
+                missing_parts.append(
+                    "exact error or traceback"
+                )
 
-            lines.append("Steps:")
-            for s in steps:
-                s = s or {}
-                title = str(s.get("title") or "").strip() or "Untitled step"
-                status = str(s.get("status") or "pending").strip().lower()
+            if (
+                "def " not in combined_text
+                and ".py" not in lowered_text
+                and "line " not in lowered_text
+                and "\\" not in combined_text
+                and "/" not in combined_text
+            ):
+                missing_parts.append(
+                    "relevant code snippet or file path"
+                )
 
-                if status == "done":
-                    mark = "[x]"
-                elif status == "current":
-                    mark = "[>]"
-                else:
-                    mark = "[ ]"
+            instruction_lines = [
+                "Step blocked.",
+                "",
+                "To continue, send:",
+            ]
 
-                lines.append(f"{mark} {title}")
+            for i, part in enumerate(
+                missing_parts,
+                start=1,
+            ):
+                instruction_lines.append(
+                    f"{i}. {part}"
+                )
 
+            if not missing_parts:
+                instruction_lines.append(
+                    "1. more detailed context"
+                )
+
+            instruction_lines.append("")
+            instruction_lines.append("Example:")
+            instruction_lines.append("Error: ...")
+            instruction_lines.append("Code: ...")
+            instruction_lines.append("Expected: ...")
+
+            return False, "\n".join(
+                instruction_lines
+            )
+
+        if self._step_requires_real_change(
+            step_title
+        ):
+            if not self._step_output_indicates_real_change(
+                step_output
+            ):
+                return (
+                    False,
+                    "No real code change detected.",
+                )
+
+        if self._step_requires_verification(
+            step_title
+        ):
+            if not self._step_output_indicates_real_verification(
+                step_output
+            ):
+                return (
+                    False,
+                    "No real verification detected.",
+                )
+
+        return True, ""
+
+    # =========================
+    # EXECUTION RENDER NORMALIZATION LOCK
+    # =========================
+
+    def _execution_status_label(
+        self,
+        execution,
+    ):
+
+        execution = execution or {}
+
+        steps = execution.get("steps") or []
+
+        total = len(steps)
+
+        done = sum(
+            1
+            for s in steps
+            if (s or {}).get("done")
+        )
+
+        if total > 0 and done >= total:
+            return "complete"
+
+        idx = (
+            execution.get(
+                "current_step_index",
+                0,
+            )
+            or 0
+        )
+
+        if 0 <= idx < total:
+            title = str(
+                (steps[idx] or {}).get("title")
+                or ""
+            ).strip()
+
+            if title:
+                return title
+
+        return "in progress"
+
+    def _render_execution(
+        self,
+        execution,
+        include_prefix=False,
+    ):
+
+        execution = self._normalize_execution_state(
+            dict(execution or {})
+        )
+
+        goal = str(
+            execution.get("goal")
+            or ""
+        ).strip()
+
+        steps = execution.get("steps") or []
+
+        exec_debug(
+            "RENDER EXECUTION =",
+            execution,
+        )
+
+        exec_debug(
+            "RENDER STEPS =",
+            steps,
+        )
+
+        total = len(steps)
+
+        done = sum(
+            1
+            for s in steps
+            if (s or {}).get("status") == "done"
+        )
+
+        current_index = int(
+            execution.get(
+                "current_step_index",
+                0,
+            )
+            or 0
+        )
+
+        if 0 <= current_index < total:
+
+            current_step = (
+                str(
+                    (steps[current_index] or {}).get(
+                        "title"
+                    )
+                    or ""
+                ).strip()
+                or "Untitled step"
+            )
+
+        elif total > 0:
+            current_step = "complete"
+
+        else:
+            current_step = ""
+
+        lines = []
+
+        if include_prefix:
+
+            prefix = (
+                "Auto-execution complete."
+                if total > 0 and done >= total
+                else "Auto-execution advanced."
+            )
+
+            lines.append(prefix)
             lines.append("")
-            lines.append(f"Progress: {done}/{total} complete")
-            lines.append(f"Current step: {current_step}")
 
-            assistant_text = "\n".join(lines)
+        if goal:
+            lines.append(f"Goal: {goal}")
+            lines.append("")
 
-            assistant_text = (
-                assistant_text
-                .replace("AUTO_EXECUTE", "")
-                .replace("TEST_FAIL", "")
+        lines.append("Steps:")
+
+        for s in steps:
+
+            s = s or {}
+
+            title = (
+                str(s.get("title") or "").strip()
+                or "Untitled step"
+            )
+
+            status = (
+                str(
+                    s.get("status")
+                    or "pending"
+                )
                 .strip()
+                .lower()
             )
 
-            return assistant_text
+            if status == "done":
+                mark = "[x]"
 
-        def _build_execution_assistant_text(self, execution):
-            return self._render_execution(execution, include_prefix=True)
+            elif status == "current":
+                mark = "[>]"
 
-        def _build_execution_artifact_body(self, execution):
-            return self._render_execution(execution, include_prefix=False)
+            else:
+                mark = "[ ]"
 
-        def _normalize_working_state(self, working_state):
-            working_state = working_state or {}
-            keys = [
-                "active_task",
-                "current_file",
-                "current_bug",
-                "last_success",
-                "next_move",
-                "checkpoint",
-            ]
+            lines.append(f"{mark} {title}")
 
-            clean = {}
-            for key in keys:
-                value = working_state.get(key, "")
-                if value is None:
-                    value = ""
-                value = str(value).strip()
-                if value:
-                    clean[key] = value
+        lines.append("")
 
-            return clean
+        lines.append(
+            f"Progress: {done}/{total} complete"
+        )
 
-        def _build_working_state_summary(self, working_state):
-            ws = self._normalize_working_state(working_state)
-            if not ws:
-                return ""
+        lines.append(
+            f"Current step: {current_step}"
+        )
 
-            lines = []
+        assistant_text = "\n".join(lines)
 
-            mapping = [
-                ("active_task", "Active task"),
-                ("current_file", "Current file"),
-                ("current_bug", "Current bug"),
-                ("last_success", "Last success"),
-                ("next_move", "Next move"),
-                ("checkpoint", "Checkpoint"),
-            ]
+        assistant_text = (
+            assistant_text
+            .replace("AUTO_EXECUTE", "")
+            .replace("TEST_FAIL", "")
+            .strip()
+        )
 
-            for key, label in mapping:
-                value = ws.get(key, "").strip()
-                if value:
-                    lines.append(f"{label}: {value}")
+        return assistant_text
 
-            if not lines:
-                return ""
+    def _build_execution_assistant_text(
+        self,
+        execution,
+    ):
 
-            return "Working context:\n" + "\n".join(lines)
+        return self._render_execution(
+            execution,
+            include_prefix=True,
+        )
 
-        def _build_system_prompt(self, decision=None):
-            parts = []
+    def _build_execution_artifact_body(
+        self,
+        execution,
+    ):
 
-            parts.append(
-                "You are Nova, an intelligent continuity-aware AI workspace assistant. "
-                "Track conversational order carefully and prioritize the latest user corrections and facts. "
-                "Do not contradict recent conversation context. "
-                "Avoid robotic one-word replies unless explicitly requested. "
-                "Respond naturally, directly, and with conversational continuity. "
-                "Preserve the user's momentum and active context."
-            )
+        return self._render_execution(
+            execution,
+            include_prefix=False,
+        )
 
-            parts.append(
-                "When coding or project-building, be precise and operational. "
-                "Keep outputs structured and grounded in the user's active work."
-            )
+    def _build_working_state_summary(
+        self,
+        working_state,
+    ):
 
-            parts.append(
-                "Response style rules: "
-                "be concise, confident, and practical. "
-                "Prefer direct answers first. "
-                "Avoid generic assistant filler. "
-                "When relevant, anchor the reply to the user's active file, bug, or next move. "
-                "Do not repeat the working context unless it improves the reply. "
-                "Use it quietly to stay aligned."
-            )
+        ws = self._normalize_working_state(
+            working_state
+        )
 
-            if decision and isinstance(decision, dict):
-                mode = (decision.get("mode") or "").strip()
-                if mode:
-                    parts.append(f"Current operating mode: {mode}.")
+        if not ws:
+            return ""
 
-            intent = self._safe_str((decision or {}).get("intent")).lower()
+        lines = []
 
-            if intent == "debugging":
-                parts.append(
-                    "DEBUGGING MODE: Do not give generic debugging checklists. "
-                    "Do not list frameworks. "
-                    "Do not say 'check logs' without giving the exact command. "
-                    "Prefer PowerShell commands, exact file paths, search anchors, and full-file fixes. "
-                    "If the exact file is unknown, ask for ONE specific missing item: the file path or error log. "
-                    "Use the user's style: direct, endgame, no filler."
+        mapping = [
+            ("active_task", "Active task"),
+            ("current_file", "Current file"),
+            ("current_bug", "Current bug"),
+            ("last_success", "Last success"),
+            ("next_move", "Next move"),
+            ("checkpoint", "Checkpoint"),
+        ]
+
+        for key, label in mapping:
+
+            value = ws.get(key, "").strip()
+
+            if value:
+                lines.append(
+                    f"{label}: {value}"
                 )
 
-            return "\n\n".join([p for p in parts if p]).strip()
+        if not lines:
+            return ""
+
+        return (
+            "Working context:\n"
+            + "\n".join(lines)
+        )
+
 
     def _build_continuity_context(self, session=None):
         session = session or {}
