@@ -2576,6 +2576,15 @@ Current step:
                 else 0
             )
 
+            exec_debug(
+                "FINALIZE SAVE DEBUG:",
+                {
+                    "existing_count": existing_count,
+                    "message_count": len(messages),
+                    "messages": messages,
+                },
+            )
+
             for msg in messages[existing_count:]:
                 self.sessions.append_message(session_id, msg)
 
@@ -2995,7 +3004,15 @@ Current step:
         # 6. Apply UX cleanup
         # 7. Return final output
 
+        decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
+
+        original_user_text = self._safe_str(
+            user_text
+        )
+
+        text_lc = original_user_text.lower().strip()
+
         if text_lc in {
             "where are we",
             "where are we now",
@@ -3020,12 +3037,6 @@ Current step:
                     ),
                 },
             )
-
-        original_user_text = self._safe_str(
-            user_text
-        )
-
-        text_lc = original_user_text.lower().strip()
 
         assistant_text = ""
         assistant_msg = None
@@ -5955,11 +5966,12 @@ Current checkpoint:
             )
             assistant_msg = self._build_assistant_message(text=assistant_text)
 
-            return {
-                "assistant_message": assistant_msg,
-                "session": self._get_session_payload(session_id),
-                "ok": True,
-            }
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=self._build_user_message(user_text),
+            assistant_msg=assistant_msg,
+        )
 
         try:
             import os
