@@ -961,26 +961,63 @@ Current step:
             exec_debug("SET SESSION META FAILED:", e)
             return False
 
-    def _get_memory_list(self) -> list:
+    def _maybe_write_memory(
+        self,
+        decision=None,
+        user_text: str = "",
+        session_id: str = "",
+    ) -> bool:
+        decision = decision if isinstance(decision, dict) else {}
+
+        if decision.get("save_memory") is False:
+            return False
+
+        text = self._safe_str(user_text).strip()
+        if not text:
+            return False
+
+        if not self._should_save_memory_text(text):
+            return False
+
+        payload = {
+            "text": text,
+            "kind": "user_fact",
+            "session_id": session_id,
+        }
+
+        for method_name in (
+            "add_memory",
+            "append_memory",
+            "save_memory",
+            "remember",
+            "add",
+        ):
+            method = getattr(self.memory, method_name, None)
+            if callable(method):
+                method(payload)
+                return True
+
+        exec_debug("MEMORY WRITE FAILED: no supported memory write method")
+        return False
+
+    def _get_memory_list(self):
         try:
-            data = self._call_first(
-                self.memory,
-                ["list_memories", "get_memories", "list", "all_memories"],
-            )
+            if not hasattr(self, "memory") or not self.memory:
+                return []
 
-            if isinstance(data, dict) and isinstance(data.get("memory"), list):
-                return data.get("memory")
+            if hasattr(self.memory, "list_memories"):
+                result = self.memory.list_memories()
+                if isinstance(result, list):
+                    return result
 
-            if isinstance(data, dict) and isinstance(data.get("memories"), list):
-                return data.get("memories")
-
-            if isinstance(data, list):
-                return data
+            if hasattr(self.memory, "_read_store"):
+                data = self.memory._read_store()
+                if isinstance(data, dict):
+                    return data.get("memory", [])
 
             return []
 
-        except Exception as e:
-            exec_debug("GET MEMORY LIST FAILED:", e)
+        except Exception:
             return []
 
     def _get_sessions_list(self) -> list:
@@ -1030,17 +1067,23 @@ Current step:
         if hasattr(self.sessions, "get_session"):
             payload = self.sessions.get_session(sid)
             if isinstance(payload, dict):
+                payload["active_execution"] = {}
+                payload["execution_state"] = {}
                 return payload
 
         if hasattr(self.sessions, "get"):
             payload = self.sessions.get(sid)
             if isinstance(payload, dict):
+                payload["active_execution"] = {}
+                payload["execution_state"] = {}
                 return payload
 
         return {
             "id": sid,
             "messages": [],
             "meta": {},
+            "active_execution": {},
+            "execution_state": {},
         }
 
     def _ensure_session_id(self, session_id: str = "") -> str:
@@ -1110,21 +1153,30 @@ Current step:
                 "needs_file_fix": True,
             }
 
-        if steps and isinstance(current_step, int) and current_step < len(steps):
-            return {
-                "status": "running",
-                "problem_type": "",
-                "next_action": "run_step",
-                "message": "Execution can continue to the next step.",
-                "needs_file_fix": False,
-            }
-
         if status in {"complete", "completed", "done"}:
             return {
                 "status": "complete",
                 "problem_type": "",
                 "next_action": "complete",
                 "message": "Execution is complete.",
+                "needs_file_fix": False,
+            }
+
+        if steps and isinstance(current_step, int) and current_step >= len(steps):
+            return {
+                "status": "complete",
+                "problem_type": "",
+                "next_action": "complete",
+                "message": "Execution is complete.",
+                "needs_file_fix": False,
+            }
+
+        if steps and isinstance(current_step, int) and current_step < len(steps):
+            return {
+                "status": "running",
+                "problem_type": "",
+                "next_action": "run_step",
+                "message": "Execution can continue to the next step.",
                 "needs_file_fix": False,
             }
 
@@ -1448,6 +1500,51 @@ Current step:
                 or []
             )
 
+            try:
+
+                first_target_file = ""
+
+                for step in steps:
+
+                    if not isinstance(step, dict):
+                        continue
+
+                    target_file = str(
+                        step.get("target_file") or ""
+                    ).strip()
+
+                    if target_file:
+                        first_target_file = target_file
+                        break
+
+                if first_target_file:
+
+                    self._update_working_state(
+                        session_id,
+                        {
+                            "current_file":
+                                first_target_file,
+
+                            "active_task":
+                                (
+                                    execution_state.get(
+                                        "original_user_text",
+                                        ""
+                                    )
+                                ),
+
+                            "checkpoint":
+                                "execution_target_tracked",
+                        },
+                    )
+
+            except Exception as e:
+
+                exec_debug(
+                    "EXECUTION_TARGET_TRACK_FAILED:",
+                    e,
+                )
+
             current_index = int(
                 execution_state.get(
                     "current_index",
@@ -1471,6 +1568,32 @@ Current step:
                     "title",
                     "",
                 )
+
+                self._reinforce_memory(
+                    session_id=session_id,
+                    memory_text=(
+                        "Active execution step: "
+                        f"{execution_state.get('current_step_title', '')}"
+                    ),
+                    category="execution",
+                    amount=2,
+                )
+
+                current_target_file = str(
+                    current_step.get("target_file") or ""
+                ).strip()
+
+                if current_target_file:
+
+                    self._reinforce_memory(
+                        session_id=session_id,
+                        memory_text=(
+                            f"Execution target file: "
+                            f"{current_target_file}"
+                        ),
+                        category="operational",
+                        amount=2,
+                    )
 
             else:
 
@@ -1786,10 +1909,12 @@ Current step:
                 session_id,
                 {
                     "next_move": "",
-                    "active_task": "",
+
                     "current_bug": "",
+
                     "last_success":
                         "execution_complete",
+
                     "checkpoint":
                         "execution_cycle_complete",
                 },
@@ -2555,11 +2680,19 @@ Current step:
 
             if not used_memory_items:
                 try:
-                    ranked = self._rank_memory_context(user_text, limit=6)
+                    ranked = self._rank_memory_context(
+                        user_text=user_text,
+                        limit=6,
+                    )
+
                     if isinstance(ranked, list):
                         used_memory_items = ranked
+
                 except Exception as e:
-                    exec_debug("FINALIZE_MEMORY_USED_ERROR:", e)
+                    exec_debug(
+                        "FINALIZE_MEMORY_USED_ERROR:",
+                        e,
+                    )
 
             meta["memory_used"] = used_memory_items
             meta["used_memory"] = used_memory_items
@@ -3058,6 +3191,290 @@ Current step:
 
         text_lc = original_user_text.lower().strip()
 
+        # =====================================
+        # AUTO IDENTITY / PREFERENCE REINFORCEMENT
+        # =====================================
+
+        try:
+
+            identity_patterns = [
+                "my name is ",
+                "i am ",
+                "i'm ",
+            ]
+
+            preference_patterns = [
+                "i prefer ",
+                "remember ",
+                "from now on ",
+                "always ",
+                "never ",
+            ]
+
+            if any(
+                pattern in text_lc
+                for pattern in identity_patterns
+            ):
+
+                self._reinforce_memory(
+                    session_id=session_id,
+                    memory_text=(
+                        f"User identity/context: "
+                        f"{original_user_text}"
+                    ),
+                    category="profile",
+                    amount=3,
+                )
+
+            if any(
+                pattern in text_lc
+                for pattern in preference_patterns
+            ):
+
+                self._reinforce_memory(
+                    session_id=session_id,
+                    memory_text=(
+                        f"User preference/correction: "
+                        f"{original_user_text}"
+                    ),
+                    category="preference",
+                    amount=3,
+                )
+
+        except Exception as e:
+
+            exec_debug(
+                "IDENTITY_PREFERENCE_REINFORCEMENT_FAILED:",
+                e,
+            )
+
+        # =====================================
+        # AUTO FILE DETECTION
+        # =====================================
+
+        try:
+
+            detected_file = ""
+            detected_bug = ""
+
+            file_patterns = [
+                r"[A-Za-z]:\\\\[^\n\r\t\"']+\.py",
+                r"[A-Za-z]:\\\\[^\n\r\t\"']+\.js",
+                r"[A-Za-z]:\\\\[^\n\r\t\"']+\.html",
+                r"[A-Za-z]:\\\\[^\n\r\t\"']+\.css",
+                r"[A-Za-z]:\\\\[^\n\r\t\"']+\.json",
+            ]
+
+            for pattern in file_patterns:
+
+                match = re.search(
+                    pattern,
+                    original_user_text,
+                    re.IGNORECASE,
+                )
+
+                if match:
+
+                    detected_file = (
+                        match.group(0).strip()
+                    )
+
+                    break
+
+            traceback_match = re.search(
+                r'File "([^"]+)"',
+                original_user_text,
+                re.IGNORECASE,
+            )
+
+            if traceback_match:
+
+                detected_file = str(
+                    traceback_match.group(1)
+                ).strip()
+
+            bug_markers = [
+                "traceback",
+                "error",
+                "exception",
+                "syntaxerror",
+                "indentationerror",
+                "nameerror",
+                "typeerror",
+                "attributeerror",
+                "valueerror",
+                "failed",
+            ]
+
+            if any(
+                marker in text_lc
+                for marker in bug_markers
+            ):
+
+                detected_bug = (
+                    original_user_text[:1200]
+                    .strip()
+                )
+
+            if detected_file:
+
+                ws = (
+                    self._get_working_state(
+                        session_id
+                    )
+                    or {}
+                )
+
+                self._update_working_state(
+                    session_id,
+                    {
+                        "current_file":
+                            detected_file,
+
+                        "active_task":
+                            (
+                                ws.get(
+                                    "active_task"
+                                )
+                                or "active debugging"
+                            ),
+
+                        "current_bug":
+                            detected_bug,
+
+                        "checkpoint":
+                            (
+                                "auto_bug_detected"
+                                if detected_bug
+                                else "auto_file_detected"
+                            ),
+                    },
+                )
+
+                self._reinforce_memory(
+                    session_id=session_id,
+                    memory_text=(
+                        f"Current file: "
+                        f"{detected_file}"
+                    ),
+                    category="operational",
+                    amount=2,
+                )
+
+                if detected_bug:
+
+                    self._reinforce_memory(
+                        session_id=session_id,
+                        memory_text=(
+                            f"Current bug: "
+                            f"{detected_bug[:500]}"
+                        ),
+                        category="correction",
+                        amount=2,
+                    )
+
+        except Exception as e:
+
+            exec_debug(
+                "AUTO_FILE_DETECTION_FAILED:",
+                e,
+            )
+
+        # =====================================
+        # OPERATIONAL CONTEXT INTERCEPTS
+        # =====================================
+
+        if text_lc in {
+            "what file are we in",
+            "which file",
+            "current file",
+            "what file",
+        }:
+
+            ws = (
+                self._get_working_state(
+                    session_id
+                )
+                or {}
+            )
+
+            current_file = str(
+                ws.get("current_file") or ""
+            ).strip()
+
+            if not current_file:
+
+                current_file = (
+                    "No active file is currently tracked."
+                )
+
+            assistant_msg = (
+                self._build_assistant_message(
+                    text=(
+                        f"Current file:\n"
+                        f"{current_file}"
+                    )
+                )
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg={
+                    "role": "user",
+                    "text": user_text,
+                    "attachments": [],
+                    "meta": {},
+                },
+                assistant_msg=assistant_msg,
+                saved_artifact=None,
+            )
+
+        if text_lc in {
+            "what is the active task",
+            "active task",
+            "what are we doing",
+        }:
+
+            ws = (
+                self._get_working_state(
+                    session_id
+                )
+                or {}
+            )
+
+            active_task = str(
+                ws.get("active_task") or ""
+            ).strip()
+
+            if not active_task:
+
+                active_task = (
+                    "No active task is currently tracked."
+                )
+
+            assistant_msg = (
+                self._build_assistant_message(
+                    text=(
+                        f"Active task:\n"
+                        f"{active_task}"
+                    )
+                )
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg={
+                    "role": "user",
+                    "text": user_text,
+                    "attachments": [],
+                    "meta": {},
+                },
+                assistant_msg=assistant_msg,
+                saved_artifact=None,
+            )
+
         if text_lc in {
             "what did i just say",
             "what did i say",
@@ -3121,39 +3538,26 @@ Current step:
                 saved_artifact=None,
             )
 
-        if text_lc in {
-            "where are we",
-            "where are we now",
-            "what now",
-            "resume",
-            "continue",
-        }:
-            self._update_working_state(
-                session_id,
-                {
-                    "active_task": (
-                        "continue Nova backend intelligence stabilization"
-                    ),
-                    "checkpoint": (
-                        "working_state_resume_context"
-                    ),
-                    "next_move": (
-                        "continue backend memory and execution stabilization"
-                    ),
-                    "current_file": (
-                        r"C:\Users\Owner\nova\nova_backend\services\chat_service.py"
-                    ),
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg={
+                    "role": "user",
+                    "text": user_text,
+                    "attachments": [],
+                    "meta": {},
                 },
+                assistant_msg=assistant_msg,
+                saved_artifact=None,
             )
 
         assistant_text = ""
         assistant_msg = None
 
-        route = self._safe_str(decision.get("route")).lower()
+        route = self._safe_str(
+            decision.get("route")
+        ).lower()
 
-        # =====================================
-        # NOVA MEMORY PRIORITY LAYER
-        # =====================================
         try:
             ws = self._get_working_state(session_id) or {}
 
@@ -3361,8 +3765,8 @@ Current step:
                         or {}
                     )
 
-                    session_obj["execution_state"] = execution_state
-                    session_obj["active_execution"] = execution_state
+                    session_obj["execution_state"] = {}
+                    session_obj["active_execution"] = {}
 
                     self.sessions.update_session(
                         session_id,
@@ -3421,49 +3825,56 @@ Current step:
         if False:
             exec_debug("FORCING EXECUTION MODE FROM WORKING STATE")
 
-        if is_continue:
-            session = self.sessions.get_session(session_id) or {}
+        operational_queries = {
+            "what file are we in",
+            "which file",
+            "current file",
+            "what file",
+            "what is the active task",
+            "active task",
+            "what are we doing",
+            "where are we",
+            "where are we now",
+        }
 
+        if text_lc in operational_queries:
+            working_state = self._get_working_state(session_id)
             execution_state = (
-                session.get("execution_state")
-                or self._get_session_meta(
-                    session_id,
-                    "execution_state",
-                )
-                or self._get_working_state(session_id).get(
-                    "execution_state"
-                )
+                self._get_session_meta(session_id, "execution_state")
                 or {}
             )
 
-            if execution_state.get("steps"):
-                return self._process_execution_command(
-                    command="run_step",
-                    session_id=session_id,
-                    execution_state=execution_state,
-                )
+            reconciled = self._reconcile_execution_state(
+                session_id=session_id,
+                working_state=working_state,
+                execution_state=execution_state,
+            )
 
-            if active_task or next_step:
+            working_state = reconciled.get("working_state") or {}
+            execution_state = reconciled.get("execution_state") or {}
 
-                assistant_text = f"""
-Continuing active mission.
+            mission_state = self._build_mission_state(
+                working_state=working_state,
+                execution_state=execution_state,
+            )
 
-Active task:
-{active_task or "Unknown"}
+            assistant_text = self._format_mission_state(mission_state)
 
-Next move:
-{next_step or "Determine next implementation step"}
-
-Current checkpoint:
-{self._safe_str(state.get("checkpoint")) or "none"}
-""".strip()
-
-                return self._finalize_response(
-                    session_id=session_id,
-                    assistant_text=assistant_text,
-                    user_text=user_text,
-                    route="working_state_continue",
-                )
+            return self._finalize_response(
+                session_id=session_id,
+                assistant_msg={
+                    "role": "assistant",
+                    "text": assistant_text,
+                    "attachments": [],
+                    "meta": {
+                        "route": "mission_state_continuity",
+                    },
+                },
+                user_text=user_text,
+                decision={
+                    "route": "mission_state_continuity",
+                },
+            )
 
         route = self._safe_str(
             decision.get("route")
@@ -3495,6 +3906,96 @@ Current checkpoint:
                 decision,
                 session_id,
             )
+
+        dominant_memory = []
+        memory_dominance_debug = []
+
+        used_memories = []
+
+        try:
+
+            used_memories = (
+                getattr(
+                    self,
+                    "_last_used_memory_items",
+                    [],
+                )
+                or []
+            )
+
+        except Exception:
+
+            used_memories = []
+
+        working_state = (
+            self._get_working_state(
+                session_id
+            )
+            or {}
+        )
+
+        execution_state = (
+            self._get_session_meta(
+                session_id,
+                "execution_state",
+            )
+            or {}
+        )
+
+        try:
+
+            ranked_memories = self._rank_memory_context(
+                memories=used_memories,
+                user_text=user_text,
+                working_state=working_state,
+                execution_state=execution_state,
+                limit=5,
+            )
+
+            for mem in ranked_memories:
+
+                if isinstance(mem, dict):
+
+                    text = str(
+                        mem.get("content")
+                        or mem.get("text")
+                        or mem.get("memory")
+                        or ""
+                    ).strip()
+
+                else:
+                    text = str(mem).strip()
+
+                if text:
+
+                    dominant_memory.append(
+                        f"- {text}"
+                    )
+
+                    memory_dominance_debug.append(
+                        text[:300]
+                    )
+
+        except Exception as e:
+
+            print(
+                "[MEMORY DOMINANCE ERROR]",
+                e,
+            )
+
+        dominance_block = ""
+
+        if dominant_memory:
+
+            dominance_block = (
+                "\n\n"
+                "HIGH PRIORITY MEMORY:\n"
+                "The following memory MUST dominate continuity, "
+                "identity, operational awareness, and response generation.\n\n"
+                + "\n".join(dominant_memory)
+            )
+
+        memory_context += dominance_block
 
         answer_depth = self._get_session_meta(session_id, "answer_depth") or "short"
 
@@ -3682,11 +4183,6 @@ Current checkpoint:
                     "I do not have your name in this session yet. "
                     "Tell me your name once and I’ll use it for this chat."
                 )
-            elif lowered in where_are_we_phrases:
-                assistant_text = (
-                    "We are in the current Nova chat session. "
-                    "No active project task is locked yet, but recent conversation context is available."
-                )
             else:
                 assistant_text = "I’m here. Send the next instruction."
 
@@ -3784,7 +4280,7 @@ Current checkpoint:
             "memory_dominance": {
                 "enabled": True,
                 "used_count": len(used_memory_full),
-                "top_memory": used_memory_full[:3],
+                "top_memory": memory_dominance_debug[:5],
             },
 
             # === CHAT POLISH: STRATEGY / MISSION FEED ===
@@ -6411,77 +6907,6 @@ Current checkpoint:
                 },
             }
 
-        where_are_we_phrases = {
-            "where are we",
-            "what file are we in",
-            "which file",
-            "what file",
-            "what broke",
-            "what is broken",
-            "what did we fix",
-            "what worked",
-            "what's next",
-            "whats next",
-            "next move",
-            "checkpoint",
-            "save point",
-        }
-
-        if lowered in where_are_we_phrases:
-            state = self._get_working_state(session_id) or {}
-            assistant_text = self._build_working_state_summary(state)
-
-            if not assistant_text:
-                execution = (
-                    self._get_session_meta(
-                        session_id,
-                        "execution_state",
-                    )
-                    or {}
-                )
-
-                goal = self._safe_str(
-                    execution.get("original_user_text")
-                    or execution.get("goal", {}).get("goal", "")
-                )
-
-                current_step = self._safe_str(
-                    execution.get("current_step_title")
-                    or execution.get("current_step", "")
-                )
-
-                status = self._safe_str(
-                    execution.get("status")
-                )
-
-                lines = [
-                    "We are in the current Nova chat session.",
-                ]
-
-                if goal:
-                    lines.append(f"Active goal: {goal}")
-
-                if current_step:
-                    lines.append(f"Current step: {current_step}")
-
-                if status:
-                    lines.append(f"Execution status: {status}")
-
-                if not goal:
-                    lines.append(
-                        "Recent continuity is active, and I should use the latest conversation first."
-                    )
-
-                assistant_text = "\n".join(lines)
-
-            return {
-                "ok": True,
-                "assistant_message": self._build_assistant_message(
-                    text=assistant_text
-                ),
-                "session": self._get_session_payload(session_id),
-            }
-
         planner_prefixes = (
             "auto-plan",
             "build ",
@@ -6732,8 +7157,8 @@ Current checkpoint:
                 or {}
             )
 
-            session_obj["execution_state"] = execution_state
-            session_obj["active_execution"] = execution_state
+            session_obj["execution_state"] = {}
+            session_obj["active_execution"] = {}
 
             self.sessions.update_session(
                 session_id,
@@ -6750,8 +7175,8 @@ Current checkpoint:
         index = self.sessions._find(sessions, session_id)
 
         if index is not None:
-            sessions[index]["active_execution"] = execution_state
-            sessions[index]["execution_state"] = execution_state
+            sessions[index]["active_execution"] = {}
+            sessions[index]["execution_state"] = {}
             self.sessions._save_sessions(
                 sessions,
                 self.sessions.get_active_session_id(),
@@ -6905,6 +7330,56 @@ Auto-fix result:
                     "title",
                     "",
                 )
+
+                try:
+
+                    current_step = steps[
+                        current_index
+                    ]
+
+                    current_file = str(
+                        current_step.get(
+                            "target_file"
+                        ) or ""
+                    ).strip()
+
+                    current_bug = str(
+                        current_step.get(
+                            "error"
+                        ) or ""
+                    ).strip()
+
+                    self._update_working_state(
+                        session_id,
+                        {
+                            "current_file":
+                                current_file,
+                            "current_bug":
+                                current_bug,
+                            "active_task": (
+                                execution_state.get(
+                                    "original_user_text",
+                                    ""
+                                )
+                            ),
+                            "next_move": (
+                                current_step.get(
+                                    "title"
+                                )
+                                or current_step.get(
+                                    "action"
+                                )
+                                or "continue"
+                            ),
+                        },
+                    )
+
+                except Exception as e:
+
+                    exec_debug(
+                        "EXECUTION_STEP_SYNC_FAILED:",
+                        e,
+                    )
 
             else:
 
@@ -9160,19 +9635,26 @@ Auto-fix result:
         Real memory loader wired to Nova MemoryService.
         """
         try:
-            if hasattr(self, "memory") and self.memory:
-                if hasattr(self.memory, "all"):
-                    result = self.memory.all()
-                    if isinstance(result, list):
-                        return result
+            if not hasattr(self, "memory") or not self.memory:
+                return []
 
+            # 1. correct API (if it exists)
+            if hasattr(self.memory, "list_memories"):
+                result = self.memory.list_memories()
+                if isinstance(result, list):
+                    return result
+
+            # 2. correct fallback (your actual storage layer)
+            if hasattr(self.memory, "_read_store"):
+                data = self.memory._read_store()
+                if isinstance(data, dict):
+                    return data.get("memory", [])
+
+            # 3. last fallback (safe empty)
             return []
 
         except Exception:
             return []
-    # ==============================
-    # CORE TIME / TEXT HELPERS
-    # ==============================
 
     def _iso_now(self) -> str:
         return datetime.now(timezone.utc).isoformat()
@@ -9288,11 +9770,24 @@ Auto-fix result:
     def _call_first(self, obj: Any, method_names: list[str], *args, **kwargs):
         for name in method_names:
             method = getattr(obj, name, None)
+
             if callable(method):
                 try:
                     return method(*args, **kwargs)
+
                 except TypeError:
-                    continue
+                    # HARD FILTER: strip known bad kwargs
+                    filtered_kwargs = {
+                        k: v for k, v in kwargs.items()
+                        if k not in {"route"}
+                    }
+
+                    try:
+                        return method(*args, **filtered_kwargs)
+
+                    except TypeError:
+                        continue
+
         return None
 
     def _extract_response_text(self, resp) -> str:
@@ -9760,6 +10255,64 @@ Auto-fix result:
         execution["updated_at"] = self._iso_now()
         return execution
 
+    def _reconcile_execution_state(
+        self,
+        session_id: str,
+        working_state=None,
+        execution_state=None,
+    ) -> dict:
+        working_state = working_state if isinstance(working_state, dict) else {}
+        execution_state = execution_state if isinstance(execution_state, dict) else {}
+
+        active_execution = self._get_session_meta(session_id, "active_execution") or {}
+
+        active_status = self._safe_str(active_execution.get("status")).strip().lower()
+        execution_status = self._safe_str(execution_state.get("status")).strip().lower()
+
+        active_complete = (
+            active_status in {"complete", "completed"}
+            or active_execution.get("complete") is True
+        )
+
+        execution_complete = (
+            execution_status in {"complete", "completed"}
+            or execution_state.get("complete") is True
+        )
+
+        if active_complete or execution_complete:
+            execution_state["status"] = "complete"
+            execution_state["complete"] = True
+            execution_state["waiting"] = False
+            execution_state["current_step_title"] = ""
+
+            active_execution["status"] = "complete"
+            active_execution["complete"] = True
+            active_execution["waiting"] = False
+
+            if working_state.get("next_move") == "retry_failed":
+                working_state["next_move"] = "await_new_mission"
+
+            if not working_state.get("last_success"):
+                working_state["last_success"] = "execution_complete"
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                active_execution,
+            )
+            self._update_working_state(session_id, working_state)
+
+        return {
+            "working_state": working_state,
+            "execution_state": execution_state,
+            "active_execution": active_execution,
+        }
+
     def _execution_mark_completed(
         self,
         execution: dict | None,
@@ -10064,121 +10617,130 @@ Auto-fix result:
 
         return False
 
-def _normalize_execution_state(self, execution):
-    if not isinstance(execution, dict):
-        execution = {}
+    def _normalize_execution_state(self, execution):
+        if not isinstance(execution, dict):
+            execution = {}
 
-    execution.setdefault("goal", "")
-    execution.setdefault("steps", [])
-    execution.setdefault("status", "running")
-    execution.setdefault("progress", 0)
-    execution.setdefault("current_step", "")
+        execution.setdefault("goal", "")
+        execution.setdefault("steps", [])
+        execution.setdefault("status", "idle")
+        execution.setdefault("progress", 0)
+        execution.setdefault("current_step", "")
 
-    if "current_index" in execution:
-        try:
-            current_index = int(execution.get("current_index", 0) or 0)
-        except Exception:
-            current_index = 0
-    else:
-        try:
-            current_index = int(execution.get("current_step_index", 0) or 0)
-        except Exception:
-            current_index = 0
-
-    execution["current_index"] = current_index
-    execution["current_step_index"] = current_index
-
-    raw_steps = execution.get("steps") or []
-    clean_steps = []
-
-    for raw in raw_steps:
-        if isinstance(raw, dict):
-            title = str(raw.get("title") or "").strip()
-            clean_steps.append(
-                {
-                    "id": raw.get("id", ""),
-                    "title": title,
-                    "action": raw.get("action", ""),
-                    "input": raw.get("input", ""),
-                    "target_file": raw.get("target_file", ""),
-                    "target_function": raw.get("target_function", ""),
-                    "status": raw.get("status", "pending"),
-                    "result": raw.get("result", ""),
-                }
-            )
+        if "current_index" in execution:
+            try:
+                current_index = int(execution.get("current_index", 0) or 0)
+            except Exception:
+                current_index = 0
         else:
-            title = str(raw).strip()
-            clean_steps.append(
-                {
-                    "id": "",
-                    "title": title,
-                    "action": "",
-                    "input": "",
-                    "target_file": "",
-                    "target_function": "",
-                    "status": "pending",
-                    "result": "",
-                }
+            try:
+                current_index = int(execution.get("current_step_index", 0) or 0)
+            except Exception:
+                current_index = 0
+
+        execution["current_index"] = current_index
+        execution["current_step_index"] = current_index
+
+        raw_steps = execution.get("steps") or []
+        clean_steps = []
+
+        for raw in raw_steps:
+            if isinstance(raw, dict):
+                title = str(raw.get("title") or "").strip()
+                clean_steps.append(
+                    {
+                        "id": raw.get("id", ""),
+                        "title": title,
+                        "action": raw.get("action", ""),
+                        "input": raw.get("input", ""),
+                        "target_file": raw.get("target_file", ""),
+                        "target_function": raw.get("target_function", ""),
+                        "status": raw.get("status", "pending"),
+                        "result": raw.get("result", ""),
+                    }
+                )
+            else:
+                title = str(raw).strip()
+                clean_steps.append(
+                    {
+                        "id": "",
+                        "title": title,
+                        "action": "",
+                        "input": "",
+                        "target_file": "",
+                        "target_function": "",
+                        "status": "pending",
+                        "result": "",
+                    }
+                )
+
+        clean_steps = [step for step in clean_steps if step.get("title")]
+
+        step_count = len(clean_steps)
+
+        if not clean_steps:
+            execution = self._finalize_execution_state(
+                execution
             )
 
-    clean_steps = [step for step in clean_steps if step.get("title")]
+            execution["steps"] = []
+            execution["current_index"] = 0
+            execution["current_step_index"] = 0
+            execution["progress"] = 0
 
-    step_count = len(clean_steps)
+            return execution
 
-    if not clean_steps:
-        execution = self._finalize_execution_state(
-            execution
-        )
+        if current_index < 0:
+            current_index = 0
 
-        execution["steps"] = []
-        execution["current_index"] = 0
-        execution["current_step_index"] = 0
-        execution["progress"] = 0
+        if current_index > step_count:
+            current_index = step_count
 
-        return execution
-        return execution
+        status = str(
+            execution.get("status") or "idle"
+        ).strip().lower()
 
-    if current_index < 0:
-        current_index = 0
+        if status not in [
+            "running",
+            "complete",
+            "blocked",
+            "idle",
+        ]:
+            status = "idle"
 
-    if current_index > step_count:
-        current_index = step_count
+        if status == "complete" or current_index >= step_count:
+            current_index = step_count
 
-    status = str(execution.get("status") or "running").strip().lower()
-
-    if status not in ["running", "complete", "blocked"]:
-        status = "running"
-
-    if status == "complete" or current_index >= step_count:
-        current_index = step_count
-
-        for step in clean_steps:
-            step["status"] = "done"
-
-        progress = step_count
-        current_step = "complete"
-        status = "complete"
-    else:
-        for idx, step in enumerate(clean_steps):
-            if idx < current_index:
+            for step in clean_steps:
                 step["status"] = "done"
-            elif idx == current_index:
-                step["status"] = "current"
-            else:
-                step["status"] = "pending"
 
-        progress = current_index
-        current_step = clean_steps[current_index]["title"]
+            progress = step_count
+            current_step = "complete"
+            status = "complete"
 
-    execution["steps"] = clean_steps
-    execution["current_index"] = current_index
-    execution["current_step_index"] = current_index
-    execution["progress"] = progress
-    execution["current_step"] = current_step
-    execution["status"] = status
+        else:
+            for idx, step in enumerate(clean_steps):
+                if idx < current_index:
+                    step["status"] = "done"
 
-    return execution
+                elif idx == current_index:
+                    step["status"] = "current"
 
+                else:
+                    step["status"] = "pending"
+
+            progress = current_index
+            current_step = clean_steps[current_index]["title"]
+
+        execution["steps"] = clean_steps
+        execution["current_index"] = current_index
+        execution["current_step_index"] = current_index
+        execution["progress"] = progress
+        execution["current_step"] = current_step
+        execution["status"] = status
+
+        return execution
+  
     def _advance_execution_one_step(self, execution):
         execution = self._normalize_execution_state(dict(execution or {}))
 
@@ -11286,10 +11848,10 @@ Next action:
         ).strip()
 
         if not last_success:
-            last_success = "execution_complete"
+            last_success = "continuity_working"
 
         if not checkpoint:
-            checkpoint = "execution_cycle_complete"
+            checkpoint = "intelligence_polish_ready"
 
         self._replace_working_state(
             session_id,
@@ -11310,14 +11872,7 @@ Next action:
             if index is not None:
                 sessions[index]["execution_state"] = {}
 
-                sessions[index]["active_execution"] = {
-                    "id": "",
-                    "goal": "",
-                    "status": "idle",
-                    "current_step_index": 0,
-                    "updated_at": "",
-                    "steps": [],
-                }
+                sessions[index]["active_execution"] = {}
 
                 self.sessions._save_sessions(
                     sessions,
@@ -11555,29 +12110,179 @@ Next action:
 
     def _format_working_state_context(self, session_id: str) -> str:
             state = self._get_working_state(session_id)
+
             if not isinstance(state, dict) or not state:
                 return ""
 
             lines = []
 
+            friendly_state_map = {
+                "execution_cycle_complete": "continuity stabilization",
+                "execution_complete": "execution pipeline stabilized",
+                "retry_failed": "execution recovery and polish",
+                "run_step": "step-by-step execution flow",
+                "run_all": "autonomous execution mode",
+            }
+
+            def friendly(value):
+                value = self._safe_str(value).strip()
+                return friendly_state_map.get(value, value)
+
             if self._safe_str(state.get("active_task")):
-                lines.append(f"- Active task: {self._safe_str(state.get('active_task'))}")
+                lines.append(
+                    f"- Active task: {self._safe_str(state.get('active_task'))}"
+                )
+
             if self._safe_str(state.get("current_file")):
-                lines.append(f"- Current file: {self._safe_str(state.get('current_file'))}")
+                lines.append(
+                    f"- Current file: {self._safe_str(state.get('current_file'))}"
+                )
+
             if self._safe_str(state.get("current_bug")):
-                lines.append(f"- Current bug: {self._safe_str(state.get('current_bug'))}")
+                lines.append(
+                    f"- Current bug: {self._safe_str(state.get('current_bug'))}"
+                )
+
             if self._safe_str(state.get("last_success")):
-                lines.append(f"- Last success: {self._safe_str(state.get('last_success'))}")
+                lines.append(
+                    f"- Last success: {friendly(state.get('last_success'))}"
+                )
+
             if self._safe_str(state.get("next_move")):
-                lines.append(f"- Next move: {self._safe_str(state.get('next_move'))}")
+                lines.append(
+                    f"- Next move: {friendly(state.get('next_move'))}"
+                )
+
             if self._safe_str(state.get("checkpoint")):
-                lines.append(f"- Checkpoint: {self._safe_str(state.get('checkpoint'))}")
+                lines.append(
+                    f"- Checkpoint: {friendly(state.get('checkpoint'))}"
+                )
 
             if not lines:
                 return ""
 
             return "Working context:\n" + "\n".join(lines)
 
+    def _build_mission_state(
+        self,
+        working_state=None,
+        execution_state=None,
+    ) -> dict:
+        working_state = working_state if isinstance(working_state, dict) else {}
+        execution_state = execution_state if isinstance(execution_state, dict) else {}
+
+        active_task = self._safe_str(working_state.get("active_task")).strip()
+        current_file = self._safe_str(working_state.get("current_file")).strip()
+        current_bug = self._safe_str(working_state.get("current_bug")).strip()
+        last_success = self._safe_str(working_state.get("last_success")).strip()
+        next_move = self._safe_str(working_state.get("next_move")).strip()
+        checkpoint = self._safe_str(working_state.get("checkpoint")).strip()
+
+        execution_status = self._safe_str(execution_state.get("status")).strip()
+        execution_goal = self._safe_str(execution_state.get("goal")).strip()
+
+        blockers = []
+        priorities = []
+
+        mission = "Stabilize Nova intelligence and autonomous execution."
+
+        execution_is_complete = (
+            execution_status in {"complete", "completed"}
+            or execution_state.get("complete") is True
+            or last_success == "execution_complete"
+            or checkpoint == "execution_cycle_complete"
+        )
+
+        if "retry_failed" in next_move and execution_is_complete:
+            next_move = "await_new_mission"
+            priorities.append("Execution is complete. Await a new mission instead of retrying stale state.")
+
+        elif "retry_failed" in next_move:
+            blockers.append("Execution recovery is still leaking retry state.")
+            priorities.append("Inspect failed execution steps before retry logic runs.")
+
+        if "execution_cycle_complete" in checkpoint:
+            priorities.append("Convert raw execution checkpoints into mission-aware summaries.")
+
+        if "execution_complete" in last_success:
+            priorities.append("Lock completed execution state so it does not resurrect as running.")
+
+        if current_bug:
+            blockers.append(current_bug)
+
+        if current_file:
+            priorities.append(f"Continue safely inside {current_file}.")
+
+        if active_task:
+            mission = active_task
+
+        if not priorities:
+            priorities.extend(
+                [
+                    "Improve continuity answers.",
+                    "Restore memory dominance cleanly.",
+                    "Strengthen autonomous planning and recovery.",
+                ]
+            )
+
+        recommended_next_move = (
+            next_move
+            if next_move and next_move != "retry_failed"
+            else priorities[0] if priorities else "Continue Nova intelligence polish."
+        )
+        return {
+            "mission": mission,
+            "priorities": priorities[:5],
+            "blockers": blockers[:5],
+            "recommended_next_move": recommended_next_move,
+            "checkpoint": checkpoint,
+            "last_success": last_success,
+            "execution_status": execution_status,
+            "execution_goal": execution_goal,
+        }
+
+    def _format_mission_state(
+        self,
+        mission_state=None,
+    ) -> str:
+        mission_state = mission_state if isinstance(mission_state, dict) else {}
+
+        mission = self._safe_str(mission_state.get("mission")).strip()
+        recommended_next_move = self._safe_str(
+            mission_state.get("recommended_next_move")
+        ).strip()
+
+        priorities = mission_state.get("priorities")
+        blockers = mission_state.get("blockers")
+
+        priorities = priorities if isinstance(priorities, list) else []
+        blockers = blockers if isinstance(blockers, list) else []
+
+        lines = []
+
+        if mission:
+            lines.append(f"Mission: {mission}")
+
+        if recommended_next_move:
+            lines.append(f"Next move: {recommended_next_move}")
+
+        if priorities:
+            lines.append("")
+            lines.append("Priorities:")
+            for item in priorities[:5]:
+                item = self._safe_str(item).strip()
+                if item:
+                    lines.append(f"- {item}")
+
+        if blockers:
+            lines.append("")
+            lines.append("Blockers:")
+            for item in blockers[:5]:
+                item = self._safe_str(item).strip()
+                if item:
+                    lines.append(f"- {item}")
+
+        return "\n".join(lines).strip()
 
     def _run_execution_next_move(self, active_task: str, next_move: str, session_id: str) -> str:
         active_task = self._safe_str(active_task).strip()
@@ -12012,448 +12717,345 @@ Next action:
                 f"File exception:\n{str(e)}"
             )
 
-    def _rank_memory_context(
+    def _reinforce_memory(
         self,
-        user_text: str = "",
-        limit: int = 6,
-        session_id: str = "",
+        session_id: str,
+        memory_text: str,
+        category: str = "operational",
+        amount: int = 1,
     ):
-        memories = self._get_memory_list()
-        if not isinstance(memories, list):
-            memories = []
 
-        query = self._safe_str(user_text).strip()
-        operational_memory = []
+        memory_text = str(memory_text or "").strip()
 
-        try:
-            working_state = {}
+        if not memory_text:
+            return
 
-            if session_id:
-                working_state = self._get_working_state(session_id) or {}
+        memories = self.memory.get_memories() or []
+        matched = False
 
-            if isinstance(working_state, dict):
-                for key in (
-                    "active_task",
-                    "current_file",
-                    "current_bug",
-                    "next_move",
-                    "checkpoint",
-                    "last_error",
-                    "last_execution_error",
-                    "last_success",
-                ):
-                    value = self._safe_str(
-                        working_state.get(key)
-                    ).strip()
+        for mem in memories:
+            if not isinstance(mem, dict):
+                continue
 
-                    if value:
-                        operational_memory.append(
-                            {
-                                "kind": key,
-                                "text": value,
-                                "source": "working_state",
-                                "weight": 10,
-                                "pinned": False,
-                            }
-                        )
+            existing = str(
+                mem.get("content")
+                or mem.get("text")
+                or ""
+            ).strip()
 
-                execution = working_state.get("execution")
+            if existing.lower() == memory_text.lower():
+                current_weight = float(mem.get("weight") or 1)
+                mem["weight"] = current_weight + amount
+                matched = True
+                break
 
-                if isinstance(execution, dict):
-                    execution_summary = " ".join(
-                        [
-                            self._safe_str(
-                                execution.get("status")
-                            ),
-                            self._safe_str(
-                                execution.get("checkpoint")
-                            ),
-                            self._safe_str(
-                                execution.get("running_step")
-                            ),
-                            self._safe_str(
-                                execution.get("step_index")
-                            ),
-                        ]
-                    ).strip()
-
-                    if execution_summary:
-                        operational_memory.append(
-                            {
-                                "kind": "execution",
-                                "text": execution_summary,
-                                "source": "working_state",
-                                "weight": 10,
-                                "pinned": False,
-                            }
-                        )
-
-                mission = working_state.get("mission")
-
-                if isinstance(mission, dict):
-                    mission_summary = " ".join(
-                        [
-                            self._safe_str(
-                                mission.get("status")
-                            ),
-                            self._safe_str(
-                                mission.get("goal")
-                            ),
-                            self._safe_str(
-                                mission.get("next_action")
-                            ),
-                        ]
-                    ).strip()
-
-                    if mission_summary:
-                        operational_memory.append(
-                            {
-                                "kind": "execution",
-                                "text": mission_summary,
-                                "source": "working_state",
-                                "weight": 10,
-                                "pinned": False,
-                            }
-                        )
-
-        except Exception as e:
-            exec_debug(
-                "RANK_MEMORY_WORKING_STATE_ERROR:",
-                e,
+        if not matched:
+            self.memory.add_memory(
+                {
+                    "content": memory_text,
+                    "category": category,
+                    "weight": amount,
+                }
             )
 
-        memory_items = operational_memory + memories
+    def _rank_memory_context(
+        self,
+        memories=None,
+        user_text: str = "",
+        working_state=None,
+        execution_state=None,
+        limit: int = 12,
+        session_id: str = "",
+    ):
+        memories = memories or self._get_memory_list()
+        working_state = working_state or {}
+        execution_state = execution_state or {}
 
-        if hasattr(self, "memory_ranker") and self.memory_ranker:
+        text_lc = str(user_text or "").lower().strip()
+
+        priority_terms = [
+            str(working_state.get("active_task") or "").lower(),
+            str(working_state.get("current_file") or "").lower(),
+            str(working_state.get("current_bug") or "").lower(),
+            str(working_state.get("next_move") or "").lower(),
+            str(working_state.get("checkpoint") or "").lower(),
+            str(execution_state.get("status") or "").lower(),
+            str(execution_state.get("goal") or "").lower(),
+            str(
+                execution_state.get("current_step_title")
+                or execution_state.get("current_step")
+                or ""
+            ).lower(),
+        ]
+
+        priority_terms = [term for term in priority_terms if term]
+        ranked = []
+
+        for index, memory in enumerate(memories):
+            if isinstance(memory, dict):
+                content = str(
+                    memory.get("content")
+                    or memory.get("text")
+                    or memory.get("memory")
+                    or memory.get("summary")
+                    or ""
+                ).strip()
+
+                category = str(
+                    memory.get("category")
+                    or memory.get("type")
+                    or memory.get("kind")
+                    or ""
+                ).lower()
+
+                created_at = str(memory.get("created_at") or "").lower()
+                updated_at = str(memory.get("updated_at") or "").lower()
+                raw_weight = memory.get("weight", 1)
+            else:
+                content = str(memory or "").strip()
+                category = ""
+                created_at = ""
+                updated_at = ""
+                raw_weight = 1
+
+            if not content:
+                continue
+
+            content_lc = content.lower()
+
             try:
-                ranked = self.memory_ranker.rank_memories(
-                    user_text=query,
-                    memory_items=memory_items,
-                    max_items=max(
-                        1,
-                        int(limit or 6),
-                    ),
-                )
+                score = float(raw_weight)
+            except Exception:
+                score = 1.0
 
-                if isinstance(ranked, list):
-                    return ranked
+            for word in text_lc.split():
+                if len(word) >= 4 and word in content_lc:
+                    score += 2.0
 
-            except Exception as e:
-                exec_debug(
-                    "MEMORY_RANKER_SERVICE_ERROR:",
-                    e,
-                )
+            if "operational" in category:
+                score += 15.0
 
-        query_lower = query.lower()
+            if "working" in category or "state" in category:
+                score += 14.0
 
-        query_words = set(
-            query_lower.replace("?", " ")
-            .replace(".", " ")
-            .split()
+            if "execution" in category:
+                score += 13.0
+
+            if "correction" in category or "fix" in category:
+                score += 12.0
+
+            if (
+                "profile" in category
+                or "identity" in category
+                or "preference" in category
+            ):
+                score += 10.0
+
+            if "project" in category or "nova" in content_lc:
+                score += 9.0
+
+            for term in priority_terms:
+                if term and term in content_lc:
+                    score += 20.0
+
+            if (
+                "name is" in content_lc
+                or "user's name" in content_lc
+                or "user is" in content_lc
+            ):
+                score += 18.0
+
+            if (
+                "prefers" in content_lc
+                or "from now on" in content_lc
+                or "always" in content_lc
+            ):
+                score += 12.0
+
+            if (
+                "correction" in content_lc
+                or "fixed" in content_lc
+                or "do not" in content_lc
+            ):
+                score += 8.0
+
+            stale_markers = [
+                "outdated",
+                "deprecated",
+                "old approach",
+                "no longer",
+                "wrong",
+                "contradicted",
+                "ignore this",
+                "do not use",
+            ]
+
+            if any(marker in content_lc for marker in stale_markers):
+                score -= 20.0
+
+            if updated_at or created_at:
+                score += 1.0
+
+            ranked.append(
+                {
+                    "score": score,
+                    "index": index,
+                    "content": content,
+                    "memory": memory,
+                }
+            )
+
+        ranked.sort(
+            key=lambda item: (
+                item["score"],
+                -item["index"],
+            ),
+            reverse=True,
         )
 
-        scored = []
+        try:
+            print(
+                "[MEMORY DOMINANCE TOP]",
+                [
+                    {
+                        "score": item.get("score"),
+                        "content": str(item.get("content") or "")[:120],
+                    }
+                    for item in ranked[:5]
+                ],
+            )
+        except Exception as e:
+            exec_debug("MEMORY_DOMINANCE_AUDIT_FAILED:", e)
 
-        for item in memory_items:
+        top = ranked[: max(1, int(limit or 12))]
+
+        return [item["memory"] for item in top]
+
+    def _format_memory_context(
+        self,
+        memory_items: list[dict],
+    ) -> str:
+
+        if not isinstance(memory_items, list) or not memory_items:
+            return ""
+
+        lines = []
+
+        for item in memory_items[: self.memory_limit]:
             if not isinstance(item, dict):
                 continue
 
             text = self._safe_str(
                 item.get("text")
                 or item.get("content")
-            ).strip()
+                or item.get("memory")
+                or item.get("summary")
+            )
+            kind = self._safe_str(
+                item.get("kind")
+                or item.get("category")
+                or item.get("type")
+            )
 
             if not text:
                 continue
 
-            kind = self._safe_str(
-                item.get("kind")
-            ).lower()
+            if kind:
+                lines.append(f"- [{kind}] {text}")
+            else:
+                lines.append(f"- {text}")
 
-            source = self._safe_str(
-                item.get("source")
-            ).lower()
+        return "\n".join(lines).strip()
 
-            pinned = bool(item.get("pinned"))
+    def _memory_text_tokens(
+        self,
+        value: str,
+    ) -> set[str]:
 
-            weight = int(item.get("weight") or 0)
-
-            lower = text.lower()
-            score = 0
-
-            if pinned:
-                score += 100
-
-            score += weight * 5
-
-            if kind in {
-                "active_task",
-                "current_file",
-                "current_bug",
-                "next_move",
-                "checkpoint",
-                "execution",
-            }:
-                score += 90
-
-            if kind == "preference":
-                score += 35
-
-            elif kind == "profile":
-                score += 25
-
-            elif kind == "project":
-                score += 20
-
-            elif kind == "goal":
-                score += 15
-
-            if (
-                "code" in query_lower
-                and (
-                    "code" in lower
-                    or "smff" in lower
-                    or "full-file" in lower
-                    or "full file" in lower
-                )
-            ):
-                score += 80
-
-            if (
-                "remember" in query_lower
-                or "how i like" in query_lower
-                or "prefer" in query_lower
-            ):
-                score += 50
-
-            if any(
-                marker in query_lower
-                for marker in (
-                    "next",
-                    "continue",
-                    "resume",
-                    "where are we",
-                    "what now",
-                    "fix",
-                    "run",
-                    "endgame",
-                    "smff",
-                )
-            ):
-                if source == "working_state":
-                    score += 75
-
-            for word in query_words:
-                if len(word) >= 4 and word in lower:
-                    score += 8
-
-            if source.startswith("manual"):
-                score += 8
-
-            scored.append((score, item))
-
-        scored.sort(
-            key=lambda pair: pair[0],
-            reverse=True,
-        )
-
-        return [
-            item
-            for score, item in scored[
-                : max(1, int(limit or 6))
-            ]
-        ]
-
-    def _format_memory_context(self, memory_items: list[dict]) -> str:
-            if not isinstance(memory_items, list) or not memory_items:
-                return ""
-
-            lines = []
-            for item in memory_items[: self.memory_limit]:
-                if not isinstance(item, dict):
-                    continue
-
-                text = self._safe_str(item.get("text"))
-                kind = self._safe_str(item.get("kind"))
-                if not text:
-                    continue
-
-                if kind:
-                    lines.append(f"- [{kind}] {text}")
-                else:
-                    lines.append(f"- {text}")
-
-            return "\n".join(lines).strip()
-
-    def _shape_assistant_response(self, assistant_text: str, user_text: str = "") -> str:
-        return self._safe_str(assistant_text).strip()
-
-    def _maybe_write_memory(self, decision: dict, user_text: str, session_id: str) -> None:
-        exec_debug("MAYBE_WRITE_MEMORY_HIT:", user_text)
-        text = self._normalize_memory_text_for_save(user_text)
-        lowered = text.lower().strip()
+        text = self._safe_str(value).lower()
 
         if not text:
-            return
+            return set()
 
-        should_save = False
-        kind = "note"
+        stop_words = {
+            "the", "a", "an", "and", "or", "but", "if", "then", "than",
+            "to", "of", "for", "in", "on", "at", "by", "with", "from",
+            "is", "are", "was", "were", "be", "been", "being",
+            "it", "this", "that", "these", "those",
+            "i", "me", "my", "you", "your", "we", "our",
+            "do", "does", "did", "have", "has", "had",
+            "what", "when", "where", "why", "how",
+            "can", "could", "should", "would", "will",
+            "about", "into", "over", "under", "again", "right", "now",
+        }
 
-        # ===== HARD SAVE MEMORY COMMANDS =====
+        tokens = set(re.findall(r"[a-z0-9_]{2,}", text))
 
-        hard_memory_prefixes = (
-            "remember ",
-            "remember:",
-            "remember that ",
-            "remember this ",
-            "save this ",
-            "store this ",
-            "note that ",
-        )
-        if lowered.startswith(hard_memory_prefixes):
-            try:
-                self.memory.add_memory({
-                    "text": text,
-                    "kind": "preference",
-                    "source": "manual",
-                    "session_id": session_id,
-                })
-                exec_debug("FORCED MEMORY SAVE:", text)
-            except Exception as e:
-                exec_debug("FORCED MEMORY SAVE FAILED:", e)
-            return
+        return {
+            token
+            for token in tokens
+            if token not in stop_words
+        }
 
-            kind = "preference" if any(x in lowered for x in [
-                "i like",
-                "i prefer",
-                "smff",
-                "full-file",
-                "full file",
-                "powershell",
-                "direct answers",
-                "no partial snippets",
-                "clean indentation",
-            ]) else "note"
+    def _format_memory_context(
+        self,
+        memory_items: list[dict],
+    ) -> str:
 
-        # ===== MEMORY CLASSIFICATION =====
+        if not isinstance(memory_items, list) or not memory_items:
+            return ""
 
-        elif any(x in lowered for x in [
-            "my name is",
-            "call me",
-            "prefers to be called",
-        ]):
-            should_save = True
-            kind = "profile"
+        lines = []
 
-        elif any(x in lowered for x in [
-            "answer me",
-            "talk to me",
-            "respond with",
-            "be direct",
-            "no fluff",
-            "tldr",
-            "smff",
-            "i prefer",
-            "i like",
-            "from now on",
-            "going forward",
-            "full-file",
-            "full file",
-            "powershell",
-            "no partial snippets",
-            "clean indentation",
-        ]):
-            should_save = True
-            kind = "preference"
+        for item in memory_items[: self.memory_limit]:
 
-        elif any(x in lowered for x in [
-            "my project",
-            "i'm building",
-            "i am building",
-            "i'm working on",
-            "i am working on",
-            "my app",
-            "my system",
-        ]):
-            should_save = True
-            kind = "project"
+            if not isinstance(item, dict):
+                continue
 
-        elif any(x in lowered for x in [
-            "my goal",
-            "i want to",
-            "i need to",
-            "i plan to",
-        ]):
-            should_save = True
-            kind = "goal"
+            text = self._safe_str(item.get("text"))
+            kind = self._safe_str(item.get("kind"))
 
-        # ===== FILTER =====
-
-        if len(text.split()) < 4:
-            should_save = False
-
-        if lowered in (
-            "hello", "hi", "ok", "okay", "thanks", "lol", "next", "go", "test"
-        ):
-            should_save = False
-
-        if not should_save:
-            return
-
-        if not self._should_save_memory_text(text, kind=kind):
-            return
-
-        # ===== DUPLICATE PREVENTION =====
-
-        try:
-            existing_items = []
-            if hasattr(self, "memory") and self.memory and hasattr(self.memory, "all"):
-                existing_items = self.memory.all() or []
-
-            for item in existing_items:
-                if not isinstance(item, dict):
-                    continue
-
-                existing_text = self._normalize_memory_text_for_save(item.get("text", ""))
-                existing_kind = self._safe_str(item.get("kind")).lower().strip()
-
-                if existing_text and existing_text.lower() == text.lower() and existing_kind == kind:
-                    return
-
-        except Exception:
-            pass
-
-        # ===== SAVE =====
-
-        try:
-            self.memory.add_memory({
-                "text": text,
-                "kind": kind,
-                "source": "auto",
-                "session_id": session_id,
-            })
-        except Exception as e:
-            exec_debug("MEMORY WRITE FAILED:", e)
-
-    def _memory_text_tokens(self, value: str) -> set[str]:
-            text = self._safe_str(value).lower()
             if not text:
-                return set()
+                continue
 
-            stop_words = {
-                "the", "a", "an", "and", "or", "but", "if", "then", "than",
-                "to", "of", "for", "in", "on", "at", "by", "with", "from",
-                "is", "are", "was", "were", "be", "been", "being",
-                "it", "this", "that", "these", "those",
-                "i", "me", "my", "you", "your", "we", "our",
-                "do", "does", "did", "have", "has", "had",
-                "what", "when", "where", "why", "how",
-                "can", "could", "should", "would", "will",
-                "about", "into", "over", "under", "again", "right", "now",
-            }
+            if kind:
+                lines.append(f"- [{kind}] {text}")
+            else:
+                lines.append(f"- {text}")
 
-            tokens = set(re.findall(r"[a-z0-9_]{2,}", text))
-            return {token for token in tokens if token not in stop_words}
+        return "\n".join(lines).strip()
+
+    def _memory_text_tokens(
+        self,
+        value: str,
+    ) -> set[str]:
+
+        text = self._safe_str(value).lower()
+
+        if not text:
+            return set()
+
+        stop_words = {
+            "the", "a", "an", "and", "or", "but", "if", "then", "than",
+            "to", "of", "for", "in", "on", "at", "by", "with", "from",
+            "is", "are", "was", "were", "be", "been", "being",
+            "it", "this", "that", "these", "those",
+            "i", "me", "my", "you", "your", "we", "our",
+            "do", "does", "did", "have", "has", "had",
+            "what", "when", "where", "why", "how",
+            "can", "could", "should", "would", "will",
+            "about", "into", "over", "under", "again", "right", "now",
+        }
+
+        tokens = set(
+            re.findall(r"[a-z0-9_]{2,}", text)
+        )
+
+        return {
+            token
+            for token in tokens
+            if token not in stop_words
+        }
 
 
     def _memory_kind_weight(self, kind: str) -> float:
@@ -13184,195 +13786,150 @@ def _save_artifact_fallback(self, artifact: dict):
         memory_context: str = "",
     ) -> str:
         user_text = self._safe_str(user_text)
-    user_text = self._safe_str(user_text)
-    decision = decision if isinstance(decision, dict) else {}
+        decision = decision if isinstance(decision, dict) else {}
 
-    route = self._safe_str(
-        decision.get("route")
-    ).lower()
+        route = self._safe_str(
+            decision.get("route")
+        ).lower()
 
-    tool_locked_routes = {
-        self.ROUTE_WEB_FETCH,
-        self.ROUTE_IMAGE_GENERATION,
-    }
+        tool_locked_routes = {
+            self.ROUTE_WEB_FETCH,
+            self.ROUTE_IMAGE_GENERATION,
+        }
 
-    if route in tool_locked_routes:
-        memory_context = ""
-        working_context_block = ""
+        if route in tool_locked_routes:
+            memory_context = ""
+            working_context_block = ""
 
-    memory_items = self._rank_memory_context(
-        user_text=user_text,
-        limit=20,
-        session_id=session_id,
-    )
+        memory_items = self._rank_memory_context(
+            user_text=user_text,
+            limit=20,
+            session_id=session_id,
+        )
 
-    selected_memory = []
-    seen = set()
+        selected_memory = []
+        seen = set()
 
-    def add_memory_item(item):
-        if not isinstance(item, dict):
-            return
+        def add_memory_item(item):
+            if not isinstance(item, dict):
+                return
 
-        text = self._safe_str(item.get("text"))
-        key = text.lower().strip()
-
-        if not key or key in seen:
-            return
-
-        seen.add(key)
-        selected_memory.append(item)
-
-    # 1. Pinned memories always win.
-    for item in memory_items:
-        if isinstance(item, dict) and item.get("pinned"):
-            add_memory_item(item)
-
-    # 2. High-value memory types come next.
-    for item in memory_items:
-        if not isinstance(item, dict):
-            continue
-
-        if item.get("pinned"):
-            continue
-
-        kind = self._safe_str(item.get("kind")).lower()
-        if kind in ["preference", "goal", "project", "profile"]:
-            add_memory_item(item)
-
-    # 3. Heavy weighted memories next.
-    for item in memory_items:
-        if not isinstance(item, dict):
-            continue
-
-        if item in selected_memory:
-            continue
-
-        try:
-            weight_num = float(item.get("weight", 1))
-        except Exception:
-            weight_num = 1.0
-
-        if weight_num >= 2:
-            add_memory_item(item)
-
-    # 4. Fill the rest with normal ranked memories.
-    for item in memory_items:
-        if len(selected_memory) >= 10:
-            break
-
-        add_memory_item(item)
-
-    selected_memory = selected_memory[:10]
-
-    memory_block = self._format_memory_context(selected_memory)
-    self._last_used_memory_items = selected_memory
-
-    if memory_context:
-        memory_block = self._safe_str(memory_context)
-
-    session = self._get_session_payload(session_id)
-    messages = session.get("messages", []) if isinstance(session, dict) else []
-
-    recent_lines = []
-    for msg in messages[-8:]:
-        if not isinstance(msg, dict):
-            continue
-
-        role = self._safe_str(msg.get("role"))
-        text = self._safe_str(msg.get("text"))
-
-        if not role or not text:
-            continue
-
-        recent_lines.append(f"{role}: {text}")
-
-    recent_block = "\n".join(recent_lines)
-
-    # === MEMORY STYLE INJECTION ===
-    memory_style_block = ""
-    try:
-        memory_text = (
-    str(memory_block or "") + " " +
-    str(memory_context or "")
-).lower()
-
-        if (
-            "smff" in memory_text
-            or "full-file" in memory_text
-            or "full file" in memory_text
-            or "powershell" in memory_text
-            or "direct answers" in memory_text
-        ):
-            memory_style_block = (
-                "USER STYLE OVERRIDE FROM MEMORY:\n"
-                "- When helping with code, respond in SMFF style.\n"
-                "- Give full-file or full-block replacements instead of tiny snippets.\n"
-                "- Include exact file paths when useful.\n"
-                "- Use PowerShell commands for Windows steps.\n"
-                "- Be direct, practical, and avoid unnecessary back-and-forth."
+            text = self._safe_str(
+                item.get("text") or item.get("content")
             )
+            key = text.lower().strip()
 
-    except Exception as e:
-        exec_debug("MEMORY_STYLE_INJECTION_ERROR:", e)
+            if not key or key in seen:
+                return
 
-    # ==============================
-    # RESPONSE POLICY INJECTION
-    # ==============================
+            seen.add(key)
+            selected_memory.append(item)
 
-    response_policy = self._build_response_policy(
-        user_text=user_text,
-        decision=decision,
-    )
+        for item in memory_items:
+            if isinstance(item, dict) and item.get("pinned"):
+                add_memory_item(item)
 
-    response_policy_block = self._format_response_policy_for_prompt(response_policy)
+        for item in memory_items:
+            if not isinstance(item, dict):
+                continue
 
-    sections = []
+            if item.get("pinned"):
+                continue
 
-    if memory_style_block:
-        sections.append(memory_style_block)
+            kind = self._safe_str(item.get("kind")).lower()
+            if kind in ["preference", "goal", "project", "profile"]:
+                add_memory_item(item)
 
-    if memory_block:
-        sections.append(
-            "IMPORTANT USER MEMORY:\n"
-            "Use this memory as active instruction context. "
-            "Prefer it over generic assistant behavior when relevant.\n"
-            f"{memory_block}"
-        )
+        for item in memory_items:
+            if not isinstance(item, dict):
+                continue
 
-    if working_context_block:
-        sections.append(
-            "CURRENT WORKING CONTEXT:\n"
-            f"{working_context_block}"
-        )
+            if item in selected_memory:
+                continue
 
-    if recent_block and route not in tool_locked_routes:
-        sections.append(
-            "RECENT CONVERSATION:\n"
-            f"{recent_block}"
-        )
+            try:
+                weight_num = float(item.get("weight", 1))
+            except Exception:
+                weight_num = 1.0
 
-    sections.append(
-        "USER MESSAGE:\n"
-        f"{user_text}"
-    )
+            if weight_num >= 2:
+                add_memory_item(item)
 
-    sections.append(
-        "RESPONSE RULES:\n"
-        "- Be direct.\n"
-        "- Use the user's saved preferences when relevant.\n"
-        "- For code help, prefer full-file or exact replacement blocks.\n"
-        "- Include file paths when discussing project files.\n"
-        "- Do not give generic chatbot filler."
-        + response_policy_block
-    )
+        for item in memory_items:
+            if len(selected_memory) >= 10:
+                break
 
-    final_chat_input = "\n\n".join(sections).strip()
+            add_memory_item(item)
 
-    exec_debug("MEMORY_DOMINANCE_USED_COUNT:", len(selected_memory))
-    exec_debug("MEMORY_DOMINANCE_BLOCK_PRESENT:", bool(memory_block))
-    exec_debug("MEMORY_STYLE_BLOCK_PRESENT:", bool(memory_style_block))
+        selected_memory = selected_memory[:10]
 
-    return final_chat_input
+        memory_block = self._format_memory_context(selected_memory)
+        self._last_used_memory_items = selected_memory
+
+        if memory_context:
+            memory_block = self._safe_str(memory_context)
+
+        session = self._get_session_payload(session_id)
+        messages = session.get("messages", []) if isinstance(session, dict) else []
+
+        recent_lines = []
+        for msg in messages[-8:]:
+            if not isinstance(msg, dict):
+                continue
+
+            role = self._safe_str(msg.get("role"))
+            text = self._safe_str(msg.get("text"))
+
+            if not role or not text:
+                continue
+
+            recent_lines.append(f"{role}: {text}")
+
+        recent_block = "\n".join(recent_lines)
+
+        memory_style_block = ""
+        try:
+            memory_text = (
+                str(memory_block or "") + " " +
+                str(memory_context or "")
+            ).lower()
+
+            if (
+                "smff" in memory_text
+                or "full-file" in memory_text
+                or "full file" in memory_text
+                or "powershell" in memory_text
+                or "direct answers" in memory_text
+            ):
+                memory_style_block = (
+                    "USER STYLE OVERRIDE FROM MEMORY:\n"
+                    "- When helping with code, respond in SMFF style.\n"
+                    "- Give full-file or full-block replacements instead of tiny snippets.\n"
+                    "- Include exact file paths when useful.\n"
+                    "- Use PowerShell commands for Windows steps.\n"
+                    "- Be direct, practical, and avoid unnecessary back-and-forth."
+                )
+
+        except Exception as e:
+            exec_debug("MEMORY_STYLE_INJECTION_ERROR:", e)
+
+        parts = []
+
+        if memory_block:
+            parts.append("MEMORY CONTEXT:\n" + memory_block)
+
+        if working_context_block:
+            parts.append("WORKING CONTEXT:\n" + working_context_block)
+
+        if recent_block:
+            parts.append("RECENT CONVERSATION:\n" + recent_block)
+
+        if memory_style_block:
+            parts.append(memory_style_block)
+
+        parts.append("USER MESSAGE:\n" + user_text)
+
+        return "\n\n".join(parts).strip()
 
     def _build_common_state_payload(self, session_id: str = "") -> dict:
         session = self._get_session_payload(session_id)
@@ -13391,7 +13948,6 @@ def _save_artifact_fallback(self, artifact: dict):
         # ==============================
         # RESPONSE BUILDERS
         # ==============================
-
 
     def _execute_memory_recall(
             self,
@@ -14146,17 +14702,14 @@ ChatService._handle_image_generation = _nova_runtime_handle_image_generation
 # CHAT SERVICE METHOD BRIDGE
 # Repairs methods that were accidentally defined outside class.
 # ============================================================
-try:
-    for _name, _obj in list(globals().items()):
-        if (
-            callable(_obj)
-            and isinstance(_name, str)
-            and _name.startswith("_")
-            and not _name.startswith("__")
-            and not hasattr(ChatService, _name)
-        ):
-            setattr(ChatService, _name, _obj)
-except Exception:
-    pass
+# SAFE STATIC METHOD REGISTRY ONLY
+CHAT_SERVICE_METHODS = [
+    "_handle_image_generation",
+]
 
-
+for name in CHAT_SERVICE_METHODS:
+    if hasattr(ChatService, name):
+        continue
+    obj = globals().get(name)
+    if callable(obj):
+        setattr(ChatService, name, obj)
