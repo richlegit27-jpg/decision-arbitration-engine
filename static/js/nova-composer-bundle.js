@@ -4569,7 +4569,12 @@ async function regenerateMessage(targetAssistantId) {
   });
 
 console.log("ABOUT TO SEND /api/chat", payload);
+
+if (typeof consumeChatStreamStable === "function") {
+  await consumeChatStreamStable(payload);
+} else {
   await consumeChatStream(payload);
+}
 }
 
 function stopGeneration() {
