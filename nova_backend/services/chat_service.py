@@ -3020,6 +3020,69 @@ Current step:
         text_lc = original_user_text.lower().strip()
 
         if text_lc in {
+            "what did i just say",
+            "what did i say",
+            "what was my last message",
+        }:
+
+            print("RECALL INTERCEPT HIT")
+
+            all_sessions = self.sessions.list_sessions()
+
+            session_messages = []
+
+            for s in all_sessions:
+                if (
+                    isinstance(s, dict)
+                    and str(s.get("id")) == str(session_id)
+                ):
+                    session_messages = s.get(
+                        "messages",
+                        []
+                    )
+                    break
+
+            previous_user = ""
+
+            user_messages = [
+                m for m in session_messages
+                if isinstance(m, dict)
+                and m.get("role") == "user"
+            ]
+
+            if len(user_messages) >= 2:
+                previous_user = str(
+                    user_messages[-2].get("text", "")
+                ).strip()
+
+            if not previous_user:
+                previous_user = (
+                    "I could not find a previous message."
+                )
+
+            assistant_msg = (
+                self._build_assistant_message(
+                    text=(
+                        f'Your previous message was: '
+                        f'"{previous_user}"'
+                    )
+                )
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg={
+                    "role": "user",
+                    "text": user_text,
+                    "attachments": [],
+                    "meta": {},
+                },
+                assistant_msg=assistant_msg,
+                saved_artifact=None,
+            )
+
+        if text_lc in {
             "where are we",
             "where are we now",
             "what now",
@@ -3428,6 +3491,54 @@ Current checkpoint:
                 session=session,
                 decision=decision,
                 memory_context=memory_context,
+            )
+
+        recall_text = original_user_text.lower().strip()
+
+        if recall_text in {
+            "what did i just say",
+            "what did i say",
+            "what was my last message",
+        }:
+
+            session_messages = (
+                session.get("messages", [])
+                if isinstance(session, dict)
+                else []
+            )
+
+            previous_user = ""
+
+            user_messages = [
+                m for m in session_messages
+                if isinstance(m, dict)
+                and m.get("role") == "user"
+            ]
+
+            if len(user_messages) >= 2:
+                previous_user = str(
+                    user_messages[-2].get("text", "")
+                ).strip()
+
+            if not previous_user:
+                previous_user = (
+                    "I could not find a previous user message."
+                )
+
+            assistant_text = (
+                f'Your previous message was: "{previous_user}"'
+            )
+
+            assistant_msg = self._build_assistant_message(
+                text=assistant_text
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=user_msg,
+                assistant_msg=assistant_msg,
+                saved_artifact=None,
             )
 
         is_memory_request = original_user_text.lower().strip().startswith((
