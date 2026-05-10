@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import os
@@ -193,14 +193,51 @@ class ChatService:
         }
 
 
-    def _build_memory_context_for_chat(self, user_text="", decision=None):
+    def _build_memory_context_for_chat(self, user_text="", decision=None, session_id=""):
+        lines = []
+
+        try:
+            session = self._get_session_payload(session_id) if session_id else {}
+            messages = session.get("messages", []) if isinstance(session, dict) else []
+
+            if isinstance(messages, list) and messages:
+                recent = messages[-12:]
+                lines.append("[RECENT SESSION CONTEXT]")
+                for msg in recent:
+                    if not isinstance(msg, dict):
+                        continue
+
+                    role = self._safe_str(msg.get("role") or "user").strip()
+                    text = self._safe_str(
+                        msg.get("text")
+                        or msg.get("content")
+                        or msg.get("message")
+                        or ""
+                    ).strip()
+
+                    if text:
+                        lines.append(f"{role}: {text[:1200]}")
+        except Exception as e:
+            exec_debug("BUILD_RECENT_SESSION_CONTEXT_FAILED:", e)
+
+        try:
+            state = self._get_working_state(session_id) if session_id else {}
+            working_context = self._build_working_state_summary(state)
+            if working_context:
+                lines.append("\n[WORKING STATE]")
+                lines.append(working_context)
+        except Exception as e:
+            exec_debug("BUILD_WORKING_CONTEXT_FAILED:", e)
+
         try:
             memory_context = getattr(self, "memory_context", "")
             if memory_context:
-                return str(memory_context)
-        except Exception:
-            pass
-        return ""
+                lines.append("\n[LONG TERM MEMORY]")
+                lines.append(str(memory_context))
+        except Exception as e:
+            exec_debug("BUILD_LONG_TERM_MEMORY_CONTEXT_FAILED:", e)
+
+        return "\n".join(lines).strip()
 
     def _build_system_prompt(self, decision=None):
         parts = []
@@ -3263,9 +3300,12 @@ Current checkpoint:
             original_user_text,
             attachments=attachments,
         )
-
         if not memory_context:
-            memory_context = self._build_memory_context_for_chat(user_text, decision)
+            memory_context = self._build_memory_context_for_chat(
+                user_text,
+                decision,
+                session_id,
+            )
 
         answer_depth = self._get_session_meta(session_id, "answer_depth") or "short"
 
@@ -6551,7 +6591,8 @@ Auto-fix result:
 
         return execution_state
 
-    def _start_execution_worker(self, session_id: str):
+    
+
         state = self._get_session_meta(session_id, "execution_state") or {}
 
         if state.get("worker_running"):
