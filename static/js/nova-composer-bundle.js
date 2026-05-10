@@ -499,11 +499,15 @@ function dedupeMessages(messages) {
       const kind = String(msg.kind || "");
       const stableId = String(msg.id || "").trim();
 
-      let key = [
-        role,
-        kind,
-        text.slice(0, 500),
-      ].join("::");
+      let key = stableId;
+
+      if (!key) {
+        key = [
+          role,
+          kind,
+          text,
+        ].join("::");
+      }
 
       if (role === "assistant" && text) {
         key = [
@@ -1323,15 +1327,21 @@ function setBusyUi(isBusy) {
   }
 
   if (els.attachButton) {
-    els.attachButton.disabled = Boolean(isBusy && state.uploadInFlightCount > 0);
+    els.attachButton.disabled = Boolean(
+      isBusy && state.uploadInFlightCount > 0
+    );
   }
 }
 
 if (els.sendButton) {
   els.sendButton.onclick = function (event) {
-    event.preventDefault();
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
     console.log("SEND BUTTON CLICKED");
-    sendMessage();
+    handleComposerSubmit(null);
   };
 }
 
@@ -1346,13 +1356,19 @@ if (els.chatInput) {
     event.preventDefault();
     event.stopPropagation();
 
-    if (
-      els.composerForm &&
-      typeof els.composerForm.requestSubmit === "function"
-    ) {
-      els.composerForm.requestSubmit();
-    }
+    handleComposerSubmit(null);
   });
+}
+
+if (els.sendButton) {
+  els.sendButton.onclick = function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    console.log("SEND BUTTON CLICKED");
+
+    handleComposerSubmit(event);
+  };
 }
 
 function autoResizeTextarea() {
@@ -1582,7 +1598,24 @@ function applyStatePayload(payload) {
   if (activeSession && Array.isArray(activeSession.messages)) {
     const incomingMessages = activeSession.messages.map(normalizeMessage);
 
-    if (incomingMessages.length > 0) {
+if (incomingMessages.length > 0) {
+  const hasPendingAssistant = (state.messages || []).some(function (msg) {
+    return (
+      msg &&
+      String(msg.role || "") === "assistant" &&
+      (
+        msg.streaming ||
+        msg.pending
+      )
+    );
+  });
+
+  if (hasPendingAssistant) {
+    console.warn(
+      "[NOVA STATE BLOCK] prevented stale payload overwrite during active stream"
+    );
+    return;
+  }
       const currentCount = Array.isArray(state.messages)
         ? state.messages.length
         : 0;
@@ -1603,17 +1636,29 @@ function applyStatePayload(payload) {
           ...(state.messages || [])
         ];
 
-        incomingMessages.forEach(function (msg) {
-          const id = String((msg && msg.id) || "").trim();
+incomingMessages.forEach(function (msg) {
+  const id = String((msg && msg.id) || "").trim();
 
-          if (!id || !existingIds.has(id)) {
+  if (String((msg && msg.role) || "") === "user") {
+    return;
+  }
+  const duplicateByText = mergedMessages.some(function (existing) {
+            return (
+              existing &&
+              String(existing.role || "") === String(msg.role || "") &&
+              String(existing.kind || "") === String(msg.kind || "") &&
+              String(existing.text || "").trim() === String(msg.text || "").trim()
+            );
+          });
+
+          if (!duplicateByText && (!id || !existingIds.has(id))) {
             mergedMessages.push(msg);
           }
         });
 
-        state.messages = mergedMessages
-          .filter(Boolean)
-          .sort(function (a, b) {
+state.messages = dedupeMessages(mergedMessages)
+  .filter(Boolean)
+  .sort(function (a, b) {
             const aTime = new Date(
               a.created_at || a.updated_at || 0
             ).getTime();
@@ -1764,6 +1809,7 @@ document.addEventListener("click", async function (event) {
   // ðŸ”¥ MEMORY BADGE CLICK
   const memoryBadge = event.target.closest("[data-memory-used]");
   if (memoryBadge) {
+
     event.preventDefault();
     event.stopPropagation();
 
@@ -2550,25 +2596,7 @@ function renderChat() {
 
   state.messages = dedupeMessages(state.messages);
 
-  state.messages = (state.messages || []).slice().sort(function (a, b) {
-    const at = Date.parse(a && a.created_at ? a.created_at : "") || 0;
-    const bt = Date.parse(b && b.created_at ? b.created_at : "") || 0;
-
-    if (at !== bt) return at - bt;
-
-    const aRole = String((a && a.role) || "");
-    const bRole = String((b && b.role) || "");
-
-    if (aRole === bRole) return 0;
-    if (aRole === "user" && bRole === "assistant") return -1;
-    if (aRole === "assistant" && bRole === "user") return 1;
-
-    return 0;
-  });
-
   window.setChatEmptyVisible(state.messages.length === 0);
-
-window.setChatEmptyVisible(state.messages.length === 0);
 
   const workingContextHtml = "";
   const messagesHtml = state.messages.map(renderMessageCard).join("");
@@ -3870,6 +3898,20 @@ if (!(error instanceof TypeError)) {
 }
 
 function appendUserMessageLocal(text, attachments) {
+  const cleanText = String(text || "").trim();
+
+  const duplicateUserMessage = (state.messages || []).some(function (msg) {
+    return (
+      msg &&
+      String(msg.role || "") === "user" &&
+      String(msg.text || "").trim() === cleanText
+    );
+  });
+
+  if (duplicateUserMessage) {
+    console.warn("[NOVA USER DEDUPE] blocked duplicate local user message", cleanText);
+    return;
+  }
   const messageId = makeId("user");
 
   const normalizedAttachments = Array.isArray(attachments)
@@ -4271,6 +4313,12 @@ async function sendMessage() {
   }
 
   state.isSendingMessage = true;
+  setBusyUi(true);
+
+  function unlockSendState() {
+    state.isSendingMessage = false;
+    setBusyUi(false);
+  }
 
   const inputEl =
     els.chatInput ||
@@ -4284,13 +4332,14 @@ async function sendMessage() {
 
   let text = String(rawValue || "").trim();
 
-  // ðŸ”’ BLOCK UI / DEBUG JUNK INPUT
+  // 🔒 BLOCK UI / DEBUG JUNK INPUT
   if (
     !inputEl ||
     inputEl !== els.chatInput ||
     text.length > 5000
   ) {
     console.warn("[Nova] blocked invalid input:", text);
+    unlockSendState();
     return;
   }
 
@@ -4307,6 +4356,8 @@ async function sendMessage() {
       inputEl.value = "";
       autoResizeTextarea();
     }
+
+    unlockSendState();
     return;
   }
 
@@ -4317,22 +4368,23 @@ async function sendMessage() {
 
   await maybeAutoSaveMemoryFromChatText(text);
 
-  // ðŸŽ¨ IMAGE PLACEHOLDER
-if (
-  /^\/image|generate image|create image|draw/i.test(text) ||
-  [
-    "regen",
-    "regenerate",
-    "redo image",
-    "make another",
-    "another image",
-  ].includes(String(text || "").trim().toLowerCase())
-) {    const tempId = "gen_" + Date.now();
+  // 🎨 IMAGE PLACEHOLDER
+  if (
+    /^\/image|generate image|create image|draw/i.test(text) ||
+    [
+      "regen",
+      "regenerate",
+      "redo image",
+      "make another",
+      "another image",
+    ].includes(String(text || "").trim().toLowerCase())
+  ) {
+    const tempId = "gen_" + Date.now();
 
     upsertMessage({
       id: tempId,
       role: "assistant",
-      text: "ðŸŽ¨ Generating image...",
+      text: "🎨 Generating image...",
       pending: true,
       streaming: false,
       error: false,
@@ -4343,7 +4395,7 @@ if (
     state.imageGenPlaceholderId = tempId;
   }
 
-  // ðŸ“Ž ATTACHMENTS
+  // 📎 ATTACHMENTS
   const attachments = (state.pendingUploads || [])
     .filter(function (item) {
       return (
@@ -4373,6 +4425,7 @@ if (
 
   if (!text && !attachments.length) {
     showToast("Type a message first.", "info");
+    unlockSendState();
     return;
   }
 
@@ -4390,7 +4443,7 @@ if (
     }
   }
 
-  // ðŸš« PREVENT DUPLICATE USER MESSAGE
+  // 🚫 PREVENT DUPLICATE USER MESSAGE
   const alreadyExists = (state.messages || []).some(function (msg) {
     return (
       msg &&
@@ -4421,16 +4474,16 @@ if (
       location: location,
     };
 
-if (
-  isImageCommand ||
-  [
-    "regen",
-    "regenerate",
-    "redo image",
-    "make another",
-    "another image",
-  ].includes(String(text || "").trim().toLowerCase())
-) {
+    if (
+      isImageCommand ||
+      [
+        "regen",
+        "regenerate",
+        "redo image",
+        "make another",
+        "another image",
+      ].includes(String(text || "").trim().toLowerCase())
+    ) {
       await consumeChatJson(payload);
       showToast("Image request sent.", "success");
     } else {
@@ -4455,9 +4508,10 @@ if (
 
       state.stream.running = false;
       state.stream.controller = null;
-      state.isSendingMessage = false;
 
+      state.isSendingMessage = false;
       setBusyUi(false);
+
       updateTopbarFromState();
 
       return;
@@ -4481,8 +4535,10 @@ if (
       removeMessage(state.imageGenPlaceholderId);
       state.imageGenPlaceholderId = null;
     }
+
   } finally {
     state.isSendingMessage = false;
+    setBusyUi(false);
   }
 }
 
@@ -4549,11 +4605,37 @@ function openAttachPicker() {
 function handleComposerSubmit(event) {
   if (event) {
     event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
   }
+
+  const now = Date.now();
+
+  if (
+    state.lastSubmitAt &&
+    now - Number(state.lastSubmitAt) < 1200
+  ) {
+    console.warn("[NOVA SUBMIT BLOCK] debounce duplicate submit");
+    return false;
+  }
+
+  state.lastSubmitAt = now;
+
   sendMessage().catch(function (error) {
     warn("send failed", error);
-    showToast(error && error.message ? error.message : "Send failed.", "error");
+
+    state.isSendingMessage = false;
+    setBusyUi(false);
+
+    showToast(
+      error && error.message
+        ? error.message
+        : "Send failed.",
+      "error"
+    );
   });
+
+  return false;
 }
 
 async function renameSession(sessionId) {
@@ -5065,22 +5147,17 @@ async function autoPlayTtsForAssistantMessage(message) {
 }
 
 function bindEvents() {
-  // ðŸ”¥ FIXED composer submit (with debug + safety)
+  // 🔥 FIXED composer submit (disabled duplicate submit listener)
 
   if (els.composerForm && !els.composerForm.__novaSubmitBound) {
     els.composerForm.__novaSubmitBound = true;
 
     els.composerForm.addEventListener("submit", function (event) {
-      console.log("COMPOSER SUBMIT FIRED");
-
       event.preventDefault();
       event.stopPropagation();
 
-      if (typeof handleComposerSubmit === "function") {
-        return handleComposerSubmit(event);
-      }
-
-      console.warn("handleComposerSubmit is missing or not a function");
+      console.warn("[NOVA SUBMIT LISTENER DISABLED]");
+      return;
     });
   }
 
@@ -5098,12 +5175,22 @@ function bindEvents() {
       handleMicClick().catch(function (error) {
         warn("voice failed", error);
         showToast(
-          error && error.message ? error.message : "Voice failed.",
+          error && error.message
+            ? error.message
+            : "Voice failed.",
           "error"
         );
       });
     });
   }
+
+  if (els.attachButton) {
+    els.attachButton.addEventListener("click", function (event) {
+      event.preventDefault();
+      openAttachPicker();
+    });
+  }
+
 
   if (els.attachButton) {
     els.attachButton.addEventListener("click", function (event) {
