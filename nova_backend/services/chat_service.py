@@ -1064,27 +1064,42 @@ Current step:
     def _get_session_payload(self, session_id: str = "") -> dict:
         sid = self._ensure_session_id(session_id)
 
+        payload = {}
+
         if hasattr(self.sessions, "get_session"):
-            payload = self.sessions.get_session(sid)
-            if isinstance(payload, dict):
-                payload["active_execution"] = {}
-                payload["execution_state"] = {}
-                return payload
+            found = self.sessions.get_session(sid)
+            if isinstance(found, dict):
+                payload = found
 
-        if hasattr(self.sessions, "get"):
-            payload = self.sessions.get(sid)
-            if isinstance(payload, dict):
-                payload["active_execution"] = {}
-                payload["execution_state"] = {}
-                return payload
+        if not payload and hasattr(self.sessions, "get"):
+            found = self.sessions.get(sid)
+            if isinstance(found, dict):
+                payload = found
 
-        return {
-            "id": sid,
-            "messages": [],
-            "meta": {},
-            "active_execution": {},
-            "execution_state": {},
-        }
+        if not payload:
+            payload = {
+                "id": sid,
+                "messages": [],
+                "meta": {},
+            }
+
+        meta = payload.get("meta")
+        if not isinstance(meta, dict):
+            meta = {}
+            payload["meta"] = meta
+
+        live_execution = (
+            meta.get("active_execution")
+            or meta.get("execution_state")
+            or payload.get("active_execution")
+            or payload.get("execution_state")
+            or {}
+        )
+
+        payload["active_execution"] = live_execution
+        payload["execution_state"] = live_execution
+
+        return payload
 
     def _ensure_session_id(self, session_id: str = "") -> str:
         sid = str(session_id or "").strip()
@@ -1579,6 +1594,15 @@ Current step:
                     amount=2,
                 )
 
+                steps = execution_state.get("steps") or []
+                current_index = int(
+                    execution_state.get("current_index") or 0
+                )
+
+                current_step = {}
+                if 0 <= current_index < len(steps):
+                    current_step = steps[current_index]
+
                 current_target_file = str(
                     current_step.get("target_file") or ""
                 ).strip()
@@ -1688,6 +1712,12 @@ Current step:
             self._set_session_meta(
                 session_id,
                 "execution_state",
+                new_state,
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
                 new_state,
             )
 
@@ -3765,8 +3795,8 @@ Current step:
                         or {}
                     )
 
-                    session_obj["execution_state"] = {}
-                    session_obj["active_execution"] = {}
+                    session_obj["execution_state"] = execution_state
+                    session_obj["active_execution"] = execution_state
 
                     self.sessions.update_session(
                         session_id,
@@ -7151,14 +7181,20 @@ Current step:
             execution_state,
         )
 
+        self._set_session_meta(
+            session_id,
+            "active_execution",
+            execution_state,
+        )
+
         try:
             session_obj = (
                 self.sessions.get_session(session_id)
                 or {}
             )
 
-            session_obj["execution_state"] = {}
-            session_obj["active_execution"] = {}
+            session_obj["execution_state"] = execution_state
+            session_obj["active_execution"] = execution_state
 
             self.sessions.update_session(
                 session_id,
@@ -7175,8 +7211,9 @@ Current step:
         index = self.sessions._find(sessions, session_id)
 
         if index is not None:
-            sessions[index]["active_execution"] = {}
-            sessions[index]["execution_state"] = {}
+            sessions[index]["active_execution"] = execution_state
+            sessions[index]["execution_state"] = execution_state
+
             self.sessions._save_sessions(
                 sessions,
                 self.sessions.get_active_session_id(),
@@ -12730,7 +12767,7 @@ Next action:
         if not memory_text:
             return
 
-        memories = self.memory.get_memories() or []
+        memories = self._get_memory_list() or []
         matched = False
 
         for mem in memories:
