@@ -1623,6 +1623,25 @@ function applyStatePayload(payload) {
     ? data.memory.map(normalizeMemoryItem)
     : state.memory;
 
+  // =====================================
+  // EXECUTION STATE SYNC
+  // =====================================
+  if (activeSession && typeof activeSession === "object") {
+    state.execution =
+      activeSession.execution_state ||
+      state.execution ||
+      {};
+
+    state.working_state =
+      activeSession.working_state ||
+      state.working_state ||
+      {};
+
+    window.NovaExecutionState =
+      state.execution || {};
+  }
+
+  renderSessionList();
   renderSessionList();
   renderChat();
   renderArtifacts();
@@ -5023,11 +5042,15 @@ async function autoPlayTtsForAssistantMessage(message) {
 
 function bindEvents() {
   // ðŸ”¥ FIXED composer submit (with debug + safety)
-  if (els.composerForm) {
+
+  if (els.composerForm && !els.composerForm.__novaSubmitBound) {
+    els.composerForm.__novaSubmitBound = true;
+
     els.composerForm.addEventListener("submit", function (event) {
       console.log("COMPOSER SUBMIT FIRED");
 
       event.preventDefault();
+      event.stopPropagation();
 
       if (typeof handleComposerSubmit === "function") {
         return handleComposerSubmit(event);
