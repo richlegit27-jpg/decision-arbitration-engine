@@ -361,7 +361,6 @@ class ChatService:
         thread = threading.Thread(target=loop, daemon=True)
         thread.start()
 
-
     def _sync_execution_state(
         self,
         session_id: str,
@@ -379,58 +378,7 @@ class ChatService:
             execution_state,
         )
 
-        self._set_session_meta(
-            session_id,
-            "active_execution",
-            execution_state,
-        )
-
-        import threading
-        import time
-
-        def loop():
-            while True:
-                try:
-                    for session_id, session in self.sessions.items():
-                        state = session.get("working_state") or {}
-                        execution = state.get("execution") or {}
-
-                        if execution.get("status") != "running":
-                            continue
-
-                        steps = execution.get("steps") or []
-                        index = execution.get("step_index", 0)
-
-                        if index >= len(steps):
-                            execution["status"] = "complete"
-                            execution["locked_pending"] = False
-                            continue
-
-                        if execution.get("running_step") == index:
-                            continue
-
-                        execution["running_step"] = index
-                        step = steps[index]
-
-                        try:
-                            self._execute_step_logic(session_id, step)
-                            step["status"] = "completed"
-                            execution["step_index"] = index + 1
-
-                        except Exception as e:
-                            step["status"] = "failed"
-                            step["error"] = str(e)
-
-                        execution["last_tick"] = time.time()
-                        execution["locked_pending"] = False
-
-                except Exception as e:
-                    exec_debug("DAEMON ERROR:", e)
-
-                time.sleep(3)
-
-        thread = threading.Thread(target=loop, daemon=True)
-        thread.start()
+        return execution_state
 
     def _recover_active_executions(self):
         for session_id, session in self.sessions.items():
