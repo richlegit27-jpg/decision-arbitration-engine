@@ -651,6 +651,106 @@
       "root_id": "artifact_0691aa536b094d91beac25d971fa8c7b",
       "updated_at": "2026-05-09T23:59:10.410475+00:00",
       "created_at": "2026-05-09T23:59:10.410475+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "type": "image_generation",
+      "title": "Generated image",
+      "body": "/image car",
+      "summary": "Generated image for: /image car",
+      "preview": "/api/uploads/generated_9fb36dc52a414e3397dc60cc35350807.png",
+      "session_id": "session_6808d87f019542cb848482abd11aaabf",
+      "source": "generated",
+      "image_url": "/api/uploads/generated_9fb36dc52a414e3397dc60cc35350807.png",
+      "prompt": "/image car",
+      "revised_prompt": "",
+      "parent_id": null,
+      "meta": {
+        "image_url": "/api/uploads/generated_9fb36dc52a414e3397dc60cc35350807.png",
+        "prompt": "/image car",
+        "generation_mode": "text_to_image",
+        "source_type": "generated"
+      },
+      "id": "artifact_53a7efbb46164c60abafb54a38a841f3",
+      "version": 1,
+      "root_id": "artifact_53a7efbb46164c60abafb54a38a841f3",
+      "updated_at": "2026-05-10T03:53:35.895361+00:00",
+      "created_at": "2026-05-10T03:53:35.895361+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "type": "image_generation",
+      "title": "Generated image",
+      "body": "generate an ice dragon\nregen\nregen again",
+      "summary": "Generated image for: generate an ice dragon\nregen\nregen again",
+      "preview": "/api/uploads/generated_584c7681194e4c368af2b97c80bf4b45.png",
+      "session_id": "session_6808d87f019542cb848482abd11aaabf",
+      "source": "generated",
+      "image_url": "/api/uploads/generated_584c7681194e4c368af2b97c80bf4b45.png",
+      "prompt": "generate an ice dragon\nregen\nregen again",
+      "revised_prompt": "",
+      "parent_id": null,
+      "meta": {
+        "image_url": "/api/uploads/generated_584c7681194e4c368af2b97c80bf4b45.png",
+        "prompt": "generate an ice dragon\nregen\nregen again",
+        "generation_mode": "text_to_image",
+        "source_type": "generated"
+      },
+      "id": "artifact_23aa9336f2ec45239be3271204a86f6d",
+      "version": 1,
+      "root_id": "artifact_23aa9336f2ec45239be3271204a86f6d",
+      "updated_at": "2026-05-10T04:05:00.039371+00:00",
+      "created_at": "2026-05-10T04:05:00.039371+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "type": "image_generation",
+      "title": "Generated image",
+      "body": "/image generate an ice dragon\nregen\nregen again",
+      "summary": "Generated image for: /image generate an ice dragon\nregen\nregen again",
+      "preview": "/api/uploads/generated_b6e7b477c3cb4743b66179c44d1f4377.png",
+      "session_id": "session_6808d87f019542cb848482abd11aaabf",
+      "source": "generated",
+      "image_url": "/api/uploads/generated_b6e7b477c3cb4743b66179c44d1f4377.png",
+      "prompt": "/image generate an ice dragon\nregen\nregen again",
+      "revised_prompt": "",
+      "parent_id": null,
+      "meta": {
+        "image_url": "/api/uploads/generated_b6e7b477c3cb4743b66179c44d1f4377.png",
+        "prompt": "/image generate an ice dragon\nregen\nregen again",
+        "generation_mode": "text_to_image",
+        "source_type": "generated"
+      },
+      "id": "artifact_ca9ce110e9d842e68a71440ad35be623",
+      "version": 1,
+      "root_id": "artifact_ca9ce110e9d842e68a71440ad35be623",
+      "updated_at": "2026-05-10T04:05:27.120720+00:00",
+      "created_at": "2026-05-10T04:05:27.120720+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "type": "image_generation",
+      "title": "Generated image",
+      "body": "/image generate an ice dragon\nregen\nregen again",
+      "summary": "Generated image for: /image generate an ice dragon\nregen\nregen again",
+      "preview": "/api/uploads/generated_1b6ea897826141688207f685567703c4.png",
+      "session_id": "session_6808d87f019542cb848482abd11aaabf",
+      "source": "generated",
+      "image_url": "/api/uploads/generated_1b6ea897826141688207f685567703c4.png",
+      "prompt": "/image generate an ice dragon\nregen\nregen again",
+      "revised_prompt": "",
+      "parent_id": null,
+      "meta": {
+        "image_url": "/api/uploads/generated_1b6ea897826141688207f685567703c4.png",
+        "prompt": "/image generate an ice dragon\nregen\nregen again",
+        "generation_mode": "text_to_image",
+        "source_type": "generated"
+      },
+      "id": "artifact_b9e4ab2d50064f8989585fa024de1c49",
+      "version": 1,
+      "root_id": "artifact_b9e4ab2d50064f8989585fa024de1c49",
+      "updated_at": "2026-05-10T04:05:52.031403+00:00",
+      "created_at": "2026-05-10T04:05:52.031403+00:00"
     }
   ]
 }

@@ -1599,7 +1599,39 @@ function applyStatePayload(payload) {
       const incomingLooksStale = incomingCount < currentCount - 2;
 
       if (!incomingLooksStale) {
-        state.messages = incomingMessages;
+        const existingIds = new Set(
+          (state.messages || [])
+            .map(function (m) {
+              return String((m && m.id) || "").trim();
+            })
+            .filter(Boolean)
+        );
+
+        const mergedMessages = [
+          ...(state.messages || [])
+        ];
+
+        incomingMessages.forEach(function (msg) {
+          const id = String((msg && msg.id) || "").trim();
+
+          if (!id || !existingIds.has(id)) {
+            mergedMessages.push(msg);
+          }
+        });
+
+        state.messages = mergedMessages
+          .filter(Boolean)
+          .sort(function (a, b) {
+            const aTime = new Date(
+              a.created_at || a.updated_at || 0
+            ).getTime();
+
+            const bTime = new Date(
+              b.created_at || b.updated_at || 0
+            ).getTime();
+
+            return aTime - bTime;
+          });
       } else {
         console.warn("[NovaComposerBundle] blocked stale session overwrite", {
           incomingCount,
