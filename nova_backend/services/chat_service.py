@@ -243,11 +243,12 @@ class ChatService:
         parts = []
 
         parts.append(
-            "You are Nova, a focused AI workspace assistant. "
-            "Be clear, direct, continuity-aware, and useful. "
-            "Prefer action over explanation. "
-            "Do not ramble. "
-            "Preserve the user's momentum."
+            "You are Nova, an intelligent continuity-aware AI workspace assistant. "
+            "Track conversational order carefully and prioritize the latest user corrections and facts. "
+            "Do not contradict recent conversation context. "
+            "Avoid robotic one-word replies unless explicitly requested. "
+            "Respond naturally, directly, and with conversational continuity. "
+            "Preserve the user's momentum and active context."
         )
 
         route = ""
@@ -2509,10 +2510,28 @@ Current step:
             messages = []
 
         if isinstance(user_msg, dict):
-            messages.append(user_msg)
+            user_id = str(user_msg.get("id", "")).strip()
+
+            already_has_user = any(
+                isinstance(m, dict) and
+                str(m.get("id", "")).strip() == user_id
+                for m in messages
+            )
+
+            if not already_has_user:
+                messages.append(user_msg)
 
         if isinstance(assistant_msg, dict):
-            messages.append(assistant_msg)
+            assistant_id = str(assistant_msg.get("id", "")).strip()
+
+            already_has_assistant = any(
+                isinstance(m, dict) and
+                str(m.get("id", "")).strip() == assistant_id
+                for m in messages
+            )
+
+            if not already_has_assistant:
+                messages.append(assistant_msg)
 
         session["id"] = session_id
         session["messages"] = messages
@@ -2556,6 +2575,7 @@ Current step:
             exec_debug("AUTO_TRACK_WORKING_STATE_ERROR:", e)
 
         return {
+
             "ok": True,
             "assistant_message": assistant_msg,
             "session": {
@@ -3394,19 +3414,14 @@ Current checkpoint:
 
         ws = self._get_working_state(session_id) or {}
 
-        if ws.get("active_task") and ws.get("next_move"):
+        if (
+            ws.get("active_task")
+            and ws.get("next_move")
+            and assistant_text
+        ):
             assistant_text = (
                 assistant_text.strip()
                 + "\n\n(I’m tracking this and continuing in the background.)"
-            )
-
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=original_user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision=decision,
-                saved_artifact=None,
             )
 
         try:
@@ -3445,7 +3460,18 @@ Current checkpoint:
                 )
 
         if not assistant_text:
-            assistant_text = "No response generated."
+            if "name" in text_lc:
+                assistant_text = (
+                    "I do not have your name in this session yet. "
+                    "Tell me your name once and I’ll use it for this chat."
+                )
+            elif lowered in where_are_we_phrases:
+                assistant_text = (
+                    "We are in the current Nova chat session. "
+                    "No active project task is locked yet, but recent conversation context is available."
+                )
+            else:
+                assistant_text = "I’m here. Send the next instruction."
 
         intelligence_result = self._apply_response_intelligence(
             user_text=user_text,
@@ -3463,10 +3489,23 @@ Current checkpoint:
         }:
             assistant_text = assistant_text
         else:
-            assistant_text = intelligence_result.get(
-                "assistant_text",
-                assistant_text,
-            )
+            rewritten_text = self._safe_str(
+                intelligence_result.get(
+                    "assistant_text",
+                    "",
+                )
+            ).strip()
+
+            if (
+                rewritten_text
+                and len(rewritten_text.split()) >= 3
+                and rewritten_text.lower() not in {
+                    "richard",
+                    "richard.",
+                    "your name is richard.",
+                }
+            ):
+                assistant_text = rewritten_text
 
         intelligence = intelligence_result.get("intelligence", {})
         self_check = intelligence_result.get("self_check", {})
@@ -3498,7 +3537,12 @@ Current checkpoint:
         ]).lower()
 
         if "name is richard" in memory_text:
-            if "your name is" in (assistant_text or "").lower():
+            text_lc = (assistant_text or "").lower()
+
+            if "you haven" in text_lc and "told me" in text_lc:
+                assistant_text = "Your name is Richard."
+
+            elif text_lc.strip() in {"richard.", "richard"}:
                 assistant_text = "Your name is Richard."
 
         try:
@@ -6170,7 +6214,10 @@ Current checkpoint:
             assistant_text = self._build_working_state_summary(state)
 
             if not assistant_text:
-                assistant_text = "I do not have a working context locked in yet."
+                assistant_text = (
+                    "We are in the current Nova chat session. "
+                    "Recent continuity is active, and I should use the latest conversation first."
+                )
 
             return {
                 "ok": True,
@@ -7923,11 +7970,12 @@ Auto-fix result:
             parts = []
 
             parts.append(
-                "You are Nova, a focused AI workspace assistant. "
-                "Be clear, direct, continuity-aware, and useful. "
-                "Prefer action over explanation. "
-                "Do not ramble. "
-                "Preserve the user's momentum."
+                "You are Nova, an intelligent continuity-aware AI workspace assistant. "
+                "Track conversational order carefully and prioritize the latest user corrections and facts. "
+                "Do not contradict recent conversation context. "
+                "Avoid robotic one-word replies unless explicitly requested. "
+                "Respond naturally, directly, and with conversational continuity. "
+                "Preserve the user's momentum and active context."
             )
 
             parts.append(
@@ -7963,7 +8011,6 @@ Auto-fix result:
                 )
 
             return "\n\n".join([p for p in parts if p]).strip()
-
 
     def _build_continuity_context(self, session=None):
         session = session or {}
