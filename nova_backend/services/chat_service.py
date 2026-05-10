@@ -192,22 +192,62 @@ class ChatService:
             "use_memory": True,
         }
 
-
     def _build_memory_context_for_chat(self, user_text="", decision=None, session_id=""):
+        decision = decision if isinstance(decision, dict) else {}
+
+        if decision.get("use_memory") is False:
+            return ""
+
+        memory_limit = int(decision.get("memory_limit") or self.memory_limit or 6)
+        memory_limit = max(1, min(memory_limit, 12))
+
         lines = []
+
+        try:
+            ranked_items = self._rank_memory_context(
+                user_text=user_text,
+                limit=memory_limit,
+                session_id=session_id,
+            )
+
+            if isinstance(ranked_items, list) and ranked_items:
+                lines.append("[RANKED MEMORY + WORKING STATE]")
+                for item in ranked_items:
+                    if not isinstance(item, dict):
+                        continue
+
+                    kind = self._safe_str(item.get("kind") or "memory").strip()
+                    source = self._safe_str(item.get("source") or "").strip()
+                    text = self._safe_str(
+                        item.get("text")
+                        or item.get("content")
+                        or ""
+                    ).strip()
+
+                    if not text:
+                        continue
+
+                    label = kind
+                    if source:
+                        label = f"{kind} / {source}"
+
+                    lines.append(f"- {label}: {text[:1000]}")
+
+        except Exception as e:
+            exec_debug("BUILD_RANKED_MEMORY_CONTEXT_FAILED:", e)
 
         try:
             session = self._get_session_payload(session_id) if session_id else {}
             messages = session.get("messages", []) if isinstance(session, dict) else []
 
             if isinstance(messages, list) and messages:
-                recent = messages[-12:]
-                lines.append("[RECENT SESSION CONTEXT]")
+                recent = messages[-8:]
+                lines.append("\n[RECENT SESSION CONTEXT]")
                 for msg in recent:
                     if not isinstance(msg, dict):
                         continue
 
-                    role = self._safe_str(msg.get("role") or "user").strip()
+                    role = self._safe_str(msg.get("role") or "").strip()
                     text = self._safe_str(
                         msg.get("text")
                         or msg.get("content")
@@ -215,27 +255,11 @@ class ChatService:
                         or ""
                     ).strip()
 
-                    if text:
-                        lines.append(f"{role}: {text[:1200]}")
+                    if role and text:
+                        lines.append(f"{role}: {text[:800]}")
+
         except Exception as e:
             exec_debug("BUILD_RECENT_SESSION_CONTEXT_FAILED:", e)
-
-        try:
-            state = self._get_working_state(session_id) if session_id else {}
-            working_context = self._build_working_state_summary(state)
-            if working_context:
-                lines.append("\n[WORKING STATE]")
-                lines.append(working_context)
-        except Exception as e:
-            exec_debug("BUILD_WORKING_CONTEXT_FAILED:", e)
-
-        try:
-            memory_context = getattr(self, "memory_context", "")
-            if memory_context:
-                lines.append("\n[LONG TERM MEMORY]")
-                lines.append(str(memory_context))
-        except Exception as e:
-            exec_debug("BUILD_LONG_TERM_MEMORY_CONTEXT_FAILED:", e)
 
         return "\n".join(lines).strip()
 

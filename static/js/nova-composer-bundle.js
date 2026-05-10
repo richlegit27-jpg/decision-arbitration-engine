@@ -1846,52 +1846,76 @@ viewer.innerHTML = `
     return;
   }
 
-  // ðŸ”¥ IMAGE REGENERATE (message-based)
+  // 🔥 IMAGE REGENERATE (message-based)
   const imageRegenBtn = event.target.closest("[data-regenerate-image-message]");
   if (imageRegenBtn) {
     event.preventDefault();
     event.stopPropagation();
 
-    const messageId = String(imageRegenBtn.getAttribute("data-regenerate-image-message") || "").trim();
+    if (state.regenerating || (state.stream && state.stream.running)) {
+      console.warn("[NOVA IMAGE REGEN BLOCK] already regenerating");
+      return;
+    }
+
+    const messageId = String(
+      imageRegenBtn.getAttribute("data-regenerate-image-message") || ""
+    ).trim();
+
     if (!messageId) return;
 
     const userMsg = currentUserMessageForRegenerate(messageId);
-
-    console.log("IMAGE REGENERATE USER MSG =", userMsg);
-    console.log("IMAGE REGENERATE MESSAGE ID =", messageId);
-    console.log("STATE MESSAGES =", state.messages);
-
     if (!userMsg) return;
+
     const prompt = String(userMsg.text || "").trim();
     if (!prompt) return;
 
-const payload = {
-  user_text: prompt.startsWith("/image") ? prompt : "/image " + prompt,
-  session_id: String(state.activeSessionId || "").trim(),
-  attachments: [],
+    state.regenerating = true;
 
-  // 🔥 CRITICAL FIX FOR ARTIFACT CHAINING
-  parent_artifact_id: messageId
-};
+    try {
+      const payload = {
+        user_text: prompt.startsWith("/image") ? prompt : "/image " + prompt,
+        session_id: String(state.activeSessionId || "").trim(),
+        attachments: [],
+        parent_artifact_id: messageId,
+        regenerate: true,
+        regenerate_of: messageId,
+      };
 
-    if (typeof consumeChatStreamStable === "function") {
-      await consumeChatStreamStable(payload);
-    } else {
-      throw new Error("consumeChatStreamStable is not available.");
+      if (typeof consumeChatStreamStable === "function") {
+        await consumeChatStreamStable(payload);
+      } else {
+        throw new Error("consumeChatStreamStable is not available.");
+      }
+    } finally {
+      state.regenerating = false;
     }
 
     return;
   }
 
-  // ?? IMAGE REGENERATE (simple)
+  // 🔥 IMAGE REGENERATE (simple)
   const imageRegenSimple = event.target.closest("[data-regenerate-image]");
   if (imageRegenSimple) {
     event.preventDefault();
+    event.stopPropagation();
 
-    const prompt = String(imageRegenSimple.getAttribute("data-regenerate-image") || "").trim();
-    if (prompt) {
-      sendMessage("/image " + prompt);
+    if (state.regenerating || (state.stream && state.stream.running)) {
+      console.warn("[NOVA IMAGE REGEN BLOCK] already regenerating");
+      return;
     }
+
+    const prompt = String(
+      imageRegenSimple.getAttribute("data-regenerate-image") || ""
+    ).trim();
+
+    if (!prompt) return;
+
+    if (els.chatInput) {
+      els.chatInput.value = "/image " + prompt;
+      autoResizeTextarea();
+    }
+
+    await handleComposerSubmit(null);
 
     return;
   }
@@ -2584,8 +2608,11 @@ function renderChat() {
 
   state.messages = dedupeMessages(state.messages);
 
-  window.setChatEmptyVisible(state.messages.length === 0);
-
+  if (typeof window.setChatEmptyVisible === "function") {
+    window.setChatEmptyVisible(state.messages.length === 0);
+  } else if (els.chatEmpty) {
+    els.chatEmpty.hidden = state.messages.length !== 0;
+  }
   const workingContextHtml = "";
   const messagesHtml = state.messages.map(renderMessageCard).join("");
   let nextHtml = workingContextHtml + messagesHtml;
@@ -5254,6 +5281,35 @@ function bindEvents() {
       event.preventDefault();
       sendExecutionCommand("show plan");
     });
+  }
+
+  async function createNewChat() {
+    if (
+      window.NovaSessionRail &&
+      typeof window.NovaSessionRail.createNewChat === "function"
+    ) {
+      return await window.NovaSessionRail.createNewChat();
+    }
+
+    const response = await fetch("/api/sessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: "New Chat",
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || "New chat failed.");
+    }
+
+    applyBackendSessionState(data);
+
+    return data;
   }
 
   if (els.newChatButton) {
