@@ -219,9 +219,15 @@ class SessionService:
             or ""
         ).strip()
 
+        message_id = self._safe_str(
+            message.get("id")
+        ).strip()
+
+        if not message_id:
+            message_id = f"msg_{uuid.uuid4().hex}"
+
         sanitized = {
-            "id": self._truncate_text(message.get("id", ""), 128),
-            "role": role,
+            "id": self._truncate_text(message_id, 128),            "role": role,
             "text": self._truncate_text(text, self.MAX_TEXT_LEN),
             "created_at": self._safe_str(message.get("created_at")).strip(),
             "updated_at": self._safe_str(message.get("updated_at")).strip(),

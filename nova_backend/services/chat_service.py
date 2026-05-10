@@ -2547,7 +2547,13 @@ Current step:
                 messages.append(user_msg)
 
         if isinstance(assistant_msg, dict):
-            assistant_id = str(assistant_msg.get("id", "")).strip()
+
+            assistant_id = str(
+                assistant_msg.get("id")
+                or f"msg_{uuid.uuid4().hex}"
+            ).strip()
+
+            assistant_msg["id"] = assistant_id
 
             already_has_assistant = any(
                 isinstance(m, dict) and
