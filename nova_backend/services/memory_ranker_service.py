@@ -15,6 +15,7 @@ class MemoryRankerService:
     - resolve conflicts between competing memories
     - distinguish short-term vs long-term memory value
     - decay stale weak memories
+    - prioritize active working-state context
     """
 
     STOP_WORDS = {
@@ -25,9 +26,37 @@ class MemoryRankerService:
     }
 
     PREFERENCE_KINDS = {"preference", "instruction", "style"}
-    PROJECT_KINDS = {"project", "work", "goal", "checkpoint"}
-    SHORT_TERM_KINDS = {"recent", "temp", "session", "context"}
-    LONG_TERM_KINDS = {"preference", "instruction", "style", "project", "goal"}
+
+    PROJECT_KINDS = {
+        "project",
+        "work",
+        "goal",
+        "checkpoint",
+    }
+
+    SHORT_TERM_KINDS = {
+        "recent",
+        "temp",
+        "session",
+        "context",
+    }
+
+    LONG_TERM_KINDS = {
+        "preference",
+        "instruction",
+        "style",
+        "project",
+        "goal",
+    }
+
+    WORKING_STATE_KINDS = {
+        "active_task",
+        "current_file",
+        "current_bug",
+        "next_move",
+        "checkpoint",
+        "execution",
+    }
 
     WEAK_MEMORY_TEXTS = {
         "ok", "okay", "thanks", "thank you", "cool", "nice", "yes", "no",
@@ -40,6 +69,39 @@ class MemoryRankerService:
 
     POSITIVE_PREFERENCE_MARKERS = {
         "prefer", "always", "use", "keep", "want", "likes", "love"
+    }
+
+    ACTIVE_NOVA_MARKERS = {
+        "nova",
+        "execution",
+        "memory",
+        "stream",
+        "frontend",
+        "backend",
+        "image",
+        "artifact",
+        "session",
+        "checkpoint",
+        "autofix",
+        "auto-fix",
+        "web fetch",
+        "composer",
+        "rail",
+        "chat_service",
+    }
+
+    CONTINUITY_REQUEST_MARKERS = {
+        "continue",
+        "next",
+        "fix",
+        "resume",
+        "run",
+        "where are we",
+        "what now",
+        "keep going",
+        "go",
+        "endgame",
+        "smff",
     }
 
     def rank_memories(
@@ -72,6 +134,7 @@ class MemoryRankerService:
             key=lambda entry: (
                 float(entry.get("score", 0.0)),
                 int(bool(entry.get("instruction_lock"))),
+                int(bool(entry.get("working_state"))),
                 int(bool(entry.get("long_term"))),
                 self._safe_text(entry.get("updated_at") or entry.get("created_at")),
                 self._safe_text(entry.get("text") or entry.get("content") or ""),
@@ -135,6 +198,18 @@ class MemoryRankerService:
             score += 0.35
             reasons.append("short-term memory boost")
 
+        if kind in self.WORKING_STATE_KINDS:
+            score += 4.5
+            reasons.append("working-state dominance")
+
+            if any(marker in text_clean for marker in self.ACTIVE_NOVA_MARKERS):
+                score += 2.5
+                reasons.append("active nova system focus")
+
+            if any(marker in user_text for marker in self.CONTINUITY_REQUEST_MARKERS):
+                score += 2.0
+                reasons.append("execution continuity request")
+
         if self._looks_like_preference(text_clean):
             score += 1.5
             reasons.append("durable instruction pattern")
@@ -146,6 +221,7 @@ class MemoryRankerService:
         if self._looks_like_instruction_lock(text_clean, user_text):
             score += 3.0
             reasons.append("instruction lock")
+
         recency_bonus = self._recency_bonus(item, kind=kind)
         if recency_bonus > 0:
             score += recency_bonus
@@ -175,6 +251,7 @@ class MemoryRankerService:
         instruction_lock = self._looks_like_instruction_lock(text_clean, user_text)
         long_term = kind in self.LONG_TERM_KINDS or self._looks_like_preference(text_clean)
         short_term = kind in self.SHORT_TERM_KINDS
+        working_state = kind in self.WORKING_STATE_KINDS
 
         score = round(max(score, 0.0), 4)
 
@@ -185,6 +262,7 @@ class MemoryRankerService:
         enriched["instruction_lock"] = instruction_lock
         enriched["long_term"] = long_term
         enriched["short_term"] = short_term
+        enriched["working_state"] = working_state
         enriched["memory_text"] = text
         return enriched
 
@@ -219,6 +297,7 @@ class MemoryRankerService:
             group.sort(
                 key=lambda entry: (
                     int(bool(entry.get("instruction_lock"))),
+                    int(bool(entry.get("working_state"))),
                     int(bool(entry.get("long_term"))),
                     float(entry.get("score", 0.0)),
                     self._safe_text(entry.get("updated_at") or entry.get("created_at")),
@@ -273,7 +352,20 @@ class MemoryRankerService:
         if overlapping:
             return " ".join(overlapping[:2]).strip()
 
-        for marker in ("prefer", "always", "never", "nova", "project", "style", "backend", "frontend", "memory"):
+        for marker in (
+            "prefer",
+            "always",
+            "never",
+            "nova",
+            "project",
+            "style",
+            "backend",
+            "frontend",
+            "memory",
+            "execution",
+            "checkpoint",
+            "session",
+        ):
             if marker in tokens:
                 return marker
 
@@ -336,6 +428,12 @@ class MemoryRankerService:
             "current state",
             "backend",
             "frontend",
+            "execution",
+            "memory",
+            "session",
+            "artifact",
+            "web fetch",
+            "image generation",
         )
         return any(marker in text for marker in markers)
 
@@ -343,10 +441,34 @@ class MemoryRankerService:
         if not text:
             return False
 
-        if any(marker in text for marker in ("always", "never", "do not", "don't", "dont", "from now on", "going forward")):
+        if any(
+            marker in text
+            for marker in (
+                "always",
+                "never",
+                "do not",
+                "don't",
+                "dont",
+                "from now on",
+                "going forward",
+            )
+        ):
             return True
 
-        request_markers = ("how", "what", "continue", "fix", "update", "change", "edit", "build", "wire")
+        request_markers = (
+            "how",
+            "what",
+            "continue",
+            "fix",
+            "update",
+            "change",
+            "edit",
+            "build",
+            "wire",
+            "next",
+            "smff",
+            "endgame",
+        )
         return any(marker in user_text for marker in request_markers) and self._looks_like_preference(text)
 
     def _recency_bonus(self, item: Dict[str, Any], *, kind: str) -> float:
@@ -356,6 +478,17 @@ class MemoryRankerService:
 
         now = datetime.now(timezone.utc)
         age_days = max((now - dt).total_seconds() / 86400.0, 0.0)
+
+        if kind in self.WORKING_STATE_KINDS:
+            if age_days <= 1:
+                return 2.0
+            if age_days <= 7:
+                return 1.35
+            if age_days <= 30:
+                return 0.85
+            if age_days <= 90:
+                return 0.35
+            return 0.0
 
         if kind in self.LONG_TERM_KINDS:
             if age_days <= 7:
@@ -377,7 +510,7 @@ class MemoryRankerService:
         return 0.0
 
     def _decay_penalty(self, item: Dict[str, Any], *, kind: str, text_clean: str) -> float:
-        if kind in self.LONG_TERM_KINDS:
+        if kind in self.LONG_TERM_KINDS or kind in self.WORKING_STATE_KINDS:
             return 0.0
 
         dt = self._parse_dt(item.get("updated_at") or item.get("created_at"))
@@ -432,6 +565,7 @@ class MemoryRankerService:
 
         deduped: List[str] = []
         seen = set()
+
         for phrase in phrases:
             if phrase not in seen:
                 seen.add(phrase)
@@ -447,9 +581,12 @@ class MemoryRankerService:
         try:
             if text.endswith("Z"):
                 text = text[:-1] + "+00:00"
+
             dt = datetime.fromisoformat(text)
+
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
+
             return dt.astimezone(timezone.utc)
         except Exception:
             return None
@@ -457,4 +594,5 @@ class MemoryRankerService:
     def _safe_text(self, value: Any) -> str:
         if value is None:
             return ""
+
         return str(value).replace("\r\n", "\n").replace("\r", "\n").strip()

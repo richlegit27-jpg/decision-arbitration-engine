@@ -601,6 +601,56 @@
       "root_id": "artifact_d0657f5921f543bf9735273ff294f765",
       "updated_at": "2026-05-09T07:14:39.102523+00:00",
       "created_at": "2026-05-09T07:14:39.102523+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "type": "image_generation",
+      "title": "Generated image",
+      "body": "/image neon tiger",
+      "summary": "Generated image for: /image neon tiger",
+      "preview": "/api/uploads/generated_566d5757f87143c79ef5d897b5ec6172.png",
+      "session_id": "session_96dfad638a444704a864340623359aea",
+      "source": "generated",
+      "image_url": "/api/uploads/generated_566d5757f87143c79ef5d897b5ec6172.png",
+      "prompt": "/image neon tiger",
+      "revised_prompt": "",
+      "parent_id": null,
+      "meta": {
+        "image_url": "/api/uploads/generated_566d5757f87143c79ef5d897b5ec6172.png",
+        "prompt": "/image neon tiger",
+        "generation_mode": "text_to_image",
+        "source_type": "generated"
+      },
+      "id": "artifact_7ac04a40cb8840e4b56332884eac2e19",
+      "version": 1,
+      "root_id": "artifact_7ac04a40cb8840e4b56332884eac2e19",
+      "updated_at": "2026-05-09T07:41:38.324041+00:00",
+      "created_at": "2026-05-09T07:41:38.324041+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "type": "image_generation",
+      "title": "Generated image",
+      "body": "[NOVA ACTIVE CONTEXT]\nTask: upgrade Nova memory and working-state intelligence\nCheckpoint: memory_working_state_upgrade\nNext: verify working_state auto-populates from real work\n\n[USER MESSAGE]\n/image car",
+      "summary": "Generated image for: [NOVA ACTIVE CONTEXT]\nTask: upgrade Nova memory and working-state intelligence\nCheckpoint: memory_working_state_upgrade\nNext: verify working_state auto-populates from real work\n\n[USER MESSAGE]\n/image car",
+      "preview": "/api/uploads/generated_5bb40eef10e547eaae84988b9de9ba2c.png",
+      "session_id": "session_33fd13a4ded64708b2fc456ad3ca7d8f",
+      "source": "generated",
+      "image_url": "/api/uploads/generated_5bb40eef10e547eaae84988b9de9ba2c.png",
+      "prompt": "[NOVA ACTIVE CONTEXT]\nTask: upgrade Nova memory and working-state intelligence\nCheckpoint: memory_working_state_upgrade\nNext: verify working_state auto-populates from real work\n\n[USER MESSAGE]\n/image car",
+      "revised_prompt": "",
+      "parent_id": null,
+      "meta": {
+        "image_url": "/api/uploads/generated_5bb40eef10e547eaae84988b9de9ba2c.png",
+        "prompt": "[NOVA ACTIVE CONTEXT]\nTask: upgrade Nova memory and working-state intelligence\nCheckpoint: memory_working_state_upgrade\nNext: verify working_state auto-populates from real work\n\n[USER MESSAGE]\n/image car",
+        "generation_mode": "text_to_image",
+        "source_type": "generated"
+      },
+      "id": "artifact_0691aa536b094d91beac25d971fa8c7b",
+      "version": 1,
+      "root_id": "artifact_0691aa536b094d91beac25d971fa8c7b",
+      "updated_at": "2026-05-09T23:59:10.410475+00:00",
+      "created_at": "2026-05-09T23:59:10.410475+00:00"
     }
   ]
 }
