@@ -1338,8 +1338,11 @@ Current step:
         if steps and current_index >= len(steps):
 
             execution_state["status"] = "complete"
+            execution_state["next_moves"] = []
             execution_state["current_index"] = len(steps)
             execution_state["lock"] = False
+            execution_state["current_step"] = ""
+            execution_state["current_step_title"] = ""
 
             self._set_session_meta(
                 session_id,
@@ -1424,10 +1427,13 @@ Current step:
                     or 0
                 )
 
-                if current_index >= len(steps):
+                if execution_state["current_index"] >= len(steps):
                     execution_state["status"] = "complete"
+                    execution_state["next_moves"] = []
                     execution_state["waiting"] = False
                     execution_state["complete"] = True
+                    execution_state["current_step"] = ""
+                    execution_state["current_step_title"] = ""
                     break
 
                 step = steps[current_index]
@@ -1477,6 +1483,7 @@ Current step:
 
                 if execution_state["current_index"] >= len(steps):
                     execution_state["status"] = "complete"
+                    execution_state["next_moves"] = []
                     execution_state["waiting"] = False
                     execution_state["complete"] = True
                     break
@@ -2147,6 +2154,7 @@ Current step:
         # =========================
         if current >= len(steps):
             execution_state["status"] = "complete"
+            execution_state["next_moves"] = []
             execution_state["waiting"] = False
             execution_state["complete"] = True
             return execution_state
@@ -2211,6 +2219,7 @@ Current step:
             execution_state["current_step_title"] = "complete"
 
             execution_state["status"] = "complete"
+            execution_state["next_moves"] = []
             execution_state["waiting"] = False
             execution_state["complete"] = True
 
@@ -6483,6 +6492,7 @@ Current step:
             if steps and current_index >= len(steps):
 
                 execution_state["status"] = "complete"
+                execution_state["next_moves"] = []
                 execution_state["current_index"] = len(steps)
                 execution_state["lock"] = False
 
@@ -6516,6 +6526,7 @@ Current step:
             "retry_failed",
             "cancel",
         }:
+
             self._set_session_meta(
                 session_id,
                 "execution_state",
@@ -7096,6 +7107,7 @@ Auto-fix result:
         if current_index >= total:
 
             execution_state["status"] = "complete"
+            execution_state["next_moves"] = []
             execution_state["waiting"] = False
             execution_state["complete"] = True
 
@@ -7196,9 +7208,9 @@ Auto-fix result:
                         "step_index": next_index,
                     }
                 ]
-            else:
-                execution_state["next_moves"] = []
+            else:             
                 execution_state["status"] = "complete"
+                execution_state["next_moves"] = []
                 execution_state["current_step_title"] = ""
                 execution_state["waiting"] = False
                 execution_state["complete"] = True
@@ -7331,6 +7343,7 @@ Auto-fix result:
         if current_index >= total:
 
             execution_state["status"] = "complete"
+            execution_state["next_moves"] = []
             execution_state["waiting"] = False
             execution_state["complete"] = True
 
@@ -10362,6 +10375,7 @@ Auto-fix result:
 
         if active_complete or execution_complete:
             execution_state["status"] = "complete"
+            execution_state["next_moves"] = []
             execution_state["complete"] = True
             execution_state["waiting"] = False
             execution_state["current_step_title"] = ""
