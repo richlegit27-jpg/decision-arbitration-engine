@@ -1514,6 +1514,11 @@ Current step:
         # =========================
         if command == "retry_failed":
 
+            execution_state["failure_count"] = int(
+                execution_state.get("failure_count")
+                or 0
+            ) + 1
+
             failed_index = None
 
             for idx, step in enumerate(steps):
@@ -1540,6 +1545,31 @@ Current step:
             execution_state["current_index"] = (
                 failed_index
             )
+
+            failure_count = int(
+                execution_state.get("failure_count")
+                or 0
+            )
+
+            if failure_count == 1:
+                execution_state["retry_strategy"] = (
+                    "retry_step"
+                )
+
+            elif failure_count == 2:
+                execution_state["retry_strategy"] = (
+                    "retry_with_smaller_scope"
+                )
+
+            elif failure_count == 3:
+                execution_state["retry_strategy"] = (
+                    "retry_with_file_scope"
+                )
+
+            else:
+                execution_state["retry_strategy"] = (
+                    "change_strategy"
+                )
 
             self._set_session_meta(
                 session_id,
@@ -9854,6 +9884,37 @@ Auto-fix result:
             or {}
         )
 
+        failed_steps = []
+        if isinstance(execution_state, dict):
+            for step in execution_state.get("steps") or []:
+                if (
+                    isinstance(step, dict)
+                    and self._safe_str(step.get("status")).lower() == "failed"
+                ):
+                    failed_steps.append(step)
+
+        has_failed_steps = len(failed_steps) > 0
+
+        failure_count = 0
+        if isinstance(execution_state, dict):
+            failure_count = int(
+                execution_state.get("failure_count")
+                or execution_state.get("retry_count")
+                or 0
+            )
+
+        retry_strategy = "none"
+
+        if has_failed_steps:
+            if failure_count <= 0:
+                retry_strategy = "retry_step"
+            elif failure_count == 1:
+                retry_strategy = "retry_with_smaller_scope"
+            elif failure_count == 2:
+                retry_strategy = "retry_with_file_scope"
+            else:
+                retry_strategy = "change_strategy"
+
         has_active_execution = (
             isinstance(execution_state, dict)
             and execution_state
@@ -9903,6 +9964,9 @@ Auto-fix result:
 
             elif text_lc in {"stop", "cancel"}:
                 intent = "cancel_execution"
+
+            elif has_failed_steps:
+                intent = "retry_failed_step"
 
             elif execution_state.get("waiting"):
                 intent = "continue_waiting_execution"
@@ -9963,6 +10027,10 @@ Auto-fix result:
                 "checkpoint": working_state.get("checkpoint", ""),
             },
             "execution": execution_state,
+            "failed_steps": failed_steps,
+            "has_failed_steps": has_failed_steps,
+            "failure_count": failure_count,
+            "retry_strategy": retry_strategy,
             "has_active_execution": has_active_execution,
             "should_execute": intent == "execution_command",
             "should_plan": intent == "planning",
