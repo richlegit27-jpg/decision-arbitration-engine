@@ -1272,136 +1272,322 @@ Current step:
 
     def _process_execution_command(
         self,
-        command: str,
-        session_id: str,
+        command="",
+        session_id="",
         execution_state=None,
     ):
+
+        execution_state = execution_state or {}
+
         command = self._safe_str(command).strip().lower()
 
-        if command in {"next", "nex", "continue", "run_step"}:
+        intelligence_intent = self._safe_str(
+            execution_state.get("intent")
+            or execution_state.get("mode")
+            or ""
+        ).strip().lower()
+
+        if intelligence_intent in {
+            "resume_execution",
+            "continue_waiting_execution",
+        }:
             command = "run_step"
 
-        if command in {"run all", "run_all", "execute all"}:
+        elif intelligence_intent == "run_all_steps":
             command = "run_all"
+
+        elif intelligence_intent == "retry_failed_step":
+            command = "retry_failed"
+
+        elif intelligence_intent == "cancel_execution":
+            command = "cancel"
 
         execution_state = (
             execution_state
-            or self._get_session_meta(session_id, "execution_state")
-            or self._get_session_meta(session_id, "active_execution")
+            or self._get_session_meta(
+                session_id,
+                "execution_state",
+            )
             or {}
         )
 
-        if not isinstance(execution_state, dict) or not execution_state:
+        steps = execution_state.get("steps") or []
+
+        current_index = int(
+            execution_state.get(
+                "current_index",
+                0,
+            )
+            or 0
+        )
+
+        print(
+            "EXECUTION DEBUG BEFORE COMPLETE CHECK =",
+            {
+                "command": command,
+                "current_index": current_index,
+                "steps_len": len(steps),
+                "status": execution_state.get("status"),
+                "current_step": execution_state.get("current_step"),
+            },
+        )
+
+        # =========================
+        # EXECUTION COMPLETE
+        # =========================
+        if steps and current_index >= len(steps):
+
+            execution_state["status"] = "complete"
+            execution_state["current_index"] = len(steps)
+            execution_state["lock"] = False
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                {},
+            )
+
             return {
                 "ok": True,
                 "assistant_message": {
                     "role": "assistant",
-                    "text": "No active execution plan found. Run `auto-plan ...` first.",
-                    "attachments": [],
-                    "meta": {},
-                    "memory_used": [],
+                    "text": (
+                        "Execution complete. "
+                        "Type 'next' to restart "
+                        "or 'auto-plan <task>'."
+                    ),
                 },
-                "session": self._get_session_payload(session_id),
-                "debug": {
-                    "route": "execution_command_no_state",
-                    "command": command,
-                },
+                "execution": execution_state,
             }
 
+        # =========================
+        # NEXT AFTER COMPLETION
+        # =========================
+        if command in {
+            "next",
+            "continue",
+            "run next",
+        }:
+
+            execution_state["current_index"] = 0
+            execution_state["status"] = "running"
+            execution_state["lock"] = False
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+
+            return {
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": (
+                        "Execution reset. "
+                        "Use 'run step' to continue."
+                    ),
+                },
+                "execution": execution_state,
+            }
+
+        # =========================
+        # RUN ALL
+        # =========================
         if command == "run_all":
-            execution_state["auto_mode"] = True
-            execution_state["waiting"] = False
-        else:
-            execution_state["auto_mode"] = False
-            execution_state["waiting"] = True
 
-        new_state = self._process_execution(
-            execution_state,
-            session_id,
-        )
+            outputs = []
+            loop_guard = 0
 
-        execution_state = new_state if isinstance(new_state, dict) else execution_state
+            while True:
 
-        self._set_session_meta(
-            session_id,
-            "execution_state",
-            execution_state,
-        )
+                loop_guard += 1
 
-        self._set_session_meta(
-            session_id,
-            "active_execution",
-            {},
-        )
+                if loop_guard > 100:
+                    return {
+                        "ok": False,
+                        "assistant_message": {
+                            "role": "assistant",
+                            "text": "Execution stopped: loop guard triggered.",
+                        },
+                        "execution": execution_state,
+                    }
 
-        try:
-            session_obj = self.sessions.get_session(session_id) or {}
-            session_obj["execution_state"] = execution_state
-            session_obj["active_execution"] = {}
-            self.sessions.update_session(session_id, session_obj)
-        except Exception as e:
-            exec_debug("EXECUTION_SESSION_SYNC_FAILED:", e)
+                current_index = int(
+                    execution_state.get("current_index", 0)
+                    or 0
+                )
 
-        steps = execution_state.get("steps") or []
-        completed = []
+                if current_index >= len(steps):
+                    execution_state["status"] = "complete"
+                    execution_state["waiting"] = False
+                    execution_state["complete"] = True
+                    break
 
-        for step in steps:
-            if isinstance(step, dict) and step.get("status") == "completed":
-                title = step.get("title") or step.get("action") or "step"
-                completed.append(str(title))
+                step = steps[current_index]
+                step["status"] = "running"
 
-        status = self._safe_str(
-            execution_state.get("status") or "running"
-        ).strip().lower()
+                execution_state["status"] = "running"
+                execution_state["current_step"] = step.get("title") or ""
+                execution_state["current_step_title"] = step.get("title") or ""
 
-        if completed:
-            result_text = "Completed steps: " + ", ".join(completed)
-        elif status == "complete":
-            result_text = "Execution complete."
-        else:
-            current_index = int(execution_state.get("current_index") or 0)
-            total = len(steps)
-            result_text = f"Execution progress: {current_index}/{total}"
+                self._set_session_meta(
+                    session_id,
+                    "execution_state",
+                    execution_state,
+                )
 
-        if status == "complete":
-            assistant_text = (
-                "Execution chain complete.\n"
-                f"{result_text}\n"
-                f"Last command: {command}"
+                self._set_session_meta(
+                    session_id,
+                    "active_execution",
+                    execution_state,
+                )
+
+                result = self._execute_step_logic(
+                    session_id=session_id,
+                    step=step,
+                )
+
+                step["status"] = "completed"
+                step["result"] = "step executed"
+                step["error"] = None
+
+                execution_state["history"] = (
+                    execution_state.get("history")
+                    or []
+                )
+
+                execution_state["history"].append(
+                    f"completed: {step.get('title')}"
+                )
+
+                execution_state["current_index"] = current_index + 1
+                execution_state["current_step_index"] = current_index
+                execution_state["progress"] = current_index
+
+                outputs.append(
+                    f"Completed step: {step.get('title')}"
+                )
+
+                if execution_state["current_index"] >= len(steps):
+                    execution_state["status"] = "complete"
+                    execution_state["waiting"] = False
+                    execution_state["complete"] = True
+                    break
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
             )
-        else:
-            assistant_text = (
-                "Execution chain running.\n"
-                f"{result_text}\n"
-                f"Last command: {command}"
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                execution_state,
             )
 
-        try:
-            reward = self._record_execution_reward(
+            return {
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": "\n".join(outputs),
+                },
+                "execution": execution_state,
+            }
+
+        # =========================
+        # RETRY FAILED
+        # =========================
+        if command == "retry_failed":
+
+            failed_index = None
+
+            for idx, step in enumerate(steps):
+
+                if (
+                    step.get("status")
+                    == "failed"
+                ):
+                    failed_index = idx
+                    break
+
+            if failed_index is None:
+                return {
+                    "ok": False,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            "No failed steps found."
+                        ),
+                    },
+                    "execution": execution_state,
+                }
+
+            execution_state["current_index"] = (
+                failed_index
+            )
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+
+            return self._process_execution_command(
+                command="run_step",
                 session_id=session_id,
-                command=command,
-                status=status,
-                error_text=self._safe_str(execution_state.get("last_error") or ""),
+                execution_state=execution_state,
             )
-        except Exception:
-            reward = 0
+
+        # =========================
+        # CANCEL
+        # =========================
+        if command == "cancel":
+
+            execution_state["status"] = "cancelled"
+            execution_state["waiting"] = False
+            execution_state["lock"] = False
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                {},
+            )
+
+            return {
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": (
+                        "Execution cancelled."
+                    ),
+                },
+                "execution": execution_state,
+            }
 
         return {
-            "ok": True,
+            "ok": False,
             "assistant_message": {
                 "role": "assistant",
-                "text": assistant_text,
-                "attachments": [],
-                "meta": {},
-                "memory_used": [],
+                "text": (
+                    f"Unknown execution command: "
+                    f"{command}"
+                ),
             },
-            "session": self._get_session_payload(session_id),
-            "debug": {
-                "route": "execution_command_complete",
-                "command": command,
-                "status": status,
-                "reward": reward,
-            },
+            "execution": execution_state,
         }
 
     def _source_quality_score(
@@ -3224,21 +3410,26 @@ Current step:
                     execution_state,
                 )
 
-                self._update_working_state(
-                    session_id,
-                    {
-                        "active_task": user_text,
-                        "next_move": "run_step",
-                        "checkpoint": "execution_plan_created",
-                        "execution_status": "running",
-                    },
-                )
+            self._update_working_state(
+                session_id,
+                {
+                    "active_task": user_text,
+                    "next_move": "run_step",
+                    "checkpoint": "execution_plan_created",
+                    "execution_status": "running",
+                },
+            )
 
-                return self._process_execution_command(
-                    command="run_step",
-                    session_id=session_id,
-                    execution_state=execution_state,
-                )
+            print(
+                "EXECUTION RETURNING PROCESS COMMAND",
+                command,
+            )
+
+            return self._process_execution_command(
+                command="run_step",
+                session_id=session_id,
+                execution_state=execution_state,
+            )
 
         is_continue = text_lc.strip() in {
             "continue",
@@ -6169,52 +6360,31 @@ Current step:
     def _handle_execution_control(self, user_text: str, session_id: str, attachments=None):
         text = self._safe_str(user_text).strip().lower()
 
+        execution_state = self._get_session_meta(session_id, "execution_state") or {}
+
+        # =========================
+        # ONLY EXECUTION COMMANDS
+        # =========================
         execution_keywords = {
-            "next",
-            "nex",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "what next",
-            "what now",
-            "run_step",
-            "run step",
-            "run_all",
-            "run all",
-            "run it",
-            "execute",
-            "execute all",
-            "retry",
-            "retry_failed",
-            "retry failed",
-            "try again",
-            "rerun failed",
-            "test_fail",
-            "test fail",
-            "stop",
-            "cancel",
-            "apply_auto_fix",
-            "apply auto fix",
-            "auto fix",
-            "autofix",
+            "next", "nex", "continue", "run next", "next step",
+            "run_step", "run step",
+            "run_all", "run all",
+            "execute", "execute all",
+            "retry", "retry_failed", "retry failed",
+            "stop", "cancel",
         }
 
+        # ignore non-execution input
         if text not in execution_keywords:
             return None
 
+        # =========================
+        # COMMAND ROUTING
+        # =========================
         if text in {"apply_auto_fix", "apply auto fix", "auto fix", "autofix"}:
             command = "apply_auto_fix"
 
-        elif text in {
-            "retry",
-            "retry_failed",
-            "retry failed",
-            "try again",
-            "rerun failed",
-        }:
+        elif text in {"retry", "retry_failed", "retry failed", "try again", "rerun failed"}:
             command = "retry_failed"
 
         elif text in {"run_all", "run all", "run it", "execute", "execute all"}:
@@ -6224,171 +6394,97 @@ Current step:
             command = "test_fail"
 
         elif text in {
-            "next",
-            "nex",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "what next",
-            "what now",
-            "run_step",
-            "run step",
+            "next", "nex", "continue", "continue on", "keep going", "go",
+            "run next", "next step", "what next", "what now",
+            "run_step", "run step",
         }:
             command = "run_step"
 
         elif text in {"stop", "cancel"}:
             command = "cancel"
 
-        else:
-            return None
+        # =========================
+        # UNLOCK EXECUTION STATE
+        # =========================
+        if execution_state:
+            execution_state["lock"] = False
 
-        if command in {"run_step", "run_all", "retry_failed"}:
-            session = self.sessions.get_session(session_id) or {}
-
-            execution_state = (
-                self._get_session_meta(session_id, "execution_state")
-                or session.get("execution_state")
-           
-     or {}
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
             )
 
-            if command == "run_all":
-                execution_state["auto_mode"] = True
-                execution_state["waiting"] = False
+        # =========================
+        # EXECUTION STATE HANDLING
+        # =========================
+        if execution_state:
 
-            elif command == "run_step":
-                execution_state["auto_mode"] = False
-                execution_state["waiting"] = True
+            steps = execution_state.get("steps") or []
 
-            if execution_state:
-                steps = execution_state.get("steps") or []
+            current_index = int(
+                execution_state.get("current_index", 0) or 0
+            )
 
-                current_index = int(
-                    execution_state.get("current_index", 0) or 0
+            if not isinstance(steps, list):
+                steps = []
+
+            if current_index < 0:
+                current_index = 0
+
+            # prevent out-of-bounds
+            if current_index >= len(steps):
+                current_index = len(steps)
+
+            print(
+                "EXECUTION DEBUG BEFORE COMPLETE CHECK =",
+                {
+                    "command": command,
+                    "current_index": current_index,
+                    "steps_len": len(steps),
+                    "status": execution_state.get("status"),
+                    "current_step": execution_state.get("current_step"),
+                },
+            )
+
+            print(
+                "EXECUTION ABOUT TO PROCESS COMMAND",
+                command,
+            )
+
+            if not steps:
+                execution_state["status"] = "idle"
+                execution_state["current_step"] = ""
+                execution_state["progress"] = 0
+
+                self._set_session_meta(
+                    session_id,
+                    "active_execution",
+                    {},
                 )
 
-                if not isinstance(steps, list):
-                    steps = []
-
-                if current_index < 0:
-                    current_index = 0
-
-                if current_index > len(steps):
-                    current_index = len(steps)
-
-                print(
-                    "EXECUTION DEBUG BEFORE COMPLETE CHECK =",
-                    {
-                        "command": command,
-                        "current_index": current_index,
-                        "steps_len": len(steps),
-                        "status": execution_state.get("status"),
-                        "current_step": execution_state.get("current_step"),
-                    },
+                self._set_session_meta(
+                    session_id,
+                    "execution_state",
+                    execution_state,
                 )
 
-                if not steps:
-                    execution_state["status"] = "idle"
-                    execution_state["current_step"] = ""
-                    execution_state["progress"] = 0
-
-                    self._set_session_meta(
-                        session_id,
-                        "active_execution",
-                        {},
-                    )
-
-                    self._set_session_meta(
-                        session_id,
-                        "execution_state",
-                        execution_state,
-                    )
-
-                    return {
-                        "ok": True,
-                        "assistant_message": {
-                            "role": "assistant",
-                            "text": (
-                                "Execution plan is empty. "
-                                "Create a new plan first."
-                            ),
-                        },
-                    }
-
-                if steps and current_index >= len(steps):
-
-                    execution_state["status"] = "completed"
-
-                    self._set_session_meta(
-                        session_id,
-                        "active_execution",
-                        {},
-                    )
-
-                    self._set_session_meta(
-                        session_id,
-                        "execution_state",
-                        execution_state,
-                    )
-
-                    return {
-                        "ok": True,
-                        "assistant_message": {
-                            "role": "assistant",
-                            "text": "Execution already completed.",
-                        },
-                    }
-
-                execution_state = self._sync_execution_state(
-                    execution=execution_state,
-                    current_index=current_index,
-                    current_step=(
-                        steps[current_index].get("title", "")
-                        if isinstance(steps, list)
-                        and isinstance(current_index, int)
-                        and 0 <= current_index < len(steps)
-                        and isinstance(steps[current_index], dict)
-                        else ""
-                    ),
-                    progress=current_index,
-                )
-
-                synced_index = self._execution_current_index(
-                    execution_state
-                )
-
-                if synced_index < len(steps):
-                    synced_step = steps[synced_index] or {}
-
-                    execution_state = self._sync_execution_state(
-                        execution=execution_state,
-                        current_index=synced_index,
-                        current_step=synced_step.get(
-                            "title",
-                            "",
+                return {
+                    "ok": True,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            "Execution plan is empty. "
+                            "Create a new plan first."
                         ),
-                        progress=synced_index,
-                    )
+                    },
+                }
 
-                    execution_state["next_moves"] = [
-                        {
-                            "type": synced_step.get(
-                                "action",
-                                "execute",
-                            ),
-                            "title": synced_step.get(
-                                "title",
-                                "",
-                            ),
-                            "step_index": synced_index,
-                        }
-                    ]
+            if steps and current_index >= len(steps):
 
-                else:
-                    execution_state["next_moves"] = []
+                execution_state["status"] = "complete"
+                execution_state["current_index"] = len(steps)
+                execution_state["lock"] = False
 
                 self._set_session_meta(
                     session_id,
@@ -6402,11 +6498,132 @@ Current step:
                     {},
                 )
 
-                return self._process_execution_command(
-                    command=command,
-                    session_id=session_id,
-                    execution_state=execution_state,
+                return {
+                    "ok": True,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": "Execution complete. Type 'next' to restart or 'auto-plan <task>'.",
+                    },
+                    "execution": execution_state,
+                }
+
+        # =========================
+        # NEXT AFTER COMPLETION HANDLING
+        # =========================
+        if command in {
+            "run_step",
+            "run_all",
+            "retry_failed",
+            "cancel",
+        }:
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+
+            # =========================
+            # SYNC STATE
+            # =========================
+            execution_state = self._sync_execution_state(
+                execution=execution_state,
+                current_index=execution_state.get("current_index", 0),
+                current_step=(
+                    steps[0].get("title", "")
+                    if isinstance(steps, list)
+                    and len(steps) > 0
+                    and isinstance(steps[0], dict)
+                    else ""
+                ),
+                progress=0,
+            )
+
+            synced_index = self._execution_current_index(
+                execution_state
+            )
+
+            if synced_index < len(steps):
+
+                synced_step = steps[synced_index] or {}
+
+                execution_state = self._sync_execution_state(
+                    execution=execution_state,
+                    current_index=synced_index,
+                    current_step=synced_step.get(
+                        "title",
+                        "",
+                    ),
+                    progress=synced_index,
                 )
+
+                execution_state["next_moves"] = [
+                    {
+                        "type": synced_step.get(
+                            "action",
+                            "execute",
+                        ),
+                        "title": synced_step.get(
+                            "title",
+                            "",
+                        ),
+                        "step_index": synced_index,
+                    }
+                ]
+
+            else:
+
+                execution_state["next_moves"] = []
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                execution_state,
+            )
+
+            print(
+                "EXECUTION RETURNING PROCESS COMMAND =",
+                command,
+            )
+
+            result = self._process_execution_command(
+                command=command,
+                session_id=session_id,
+                execution_state=execution_state,
+            )
+
+            print(
+                "EXECUTION PROCESS RESULT =",
+                result,
+            )
+
+            if isinstance(result, dict):
+                return result
+
+            return {
+                "ok": False,
+                "assistant_message": self._build_assistant_message(
+                    "Execution returned no result."
+                ),
+                "session": self._get_session_payload(
+                    session_id
+                ),
+            }
+
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    "Execution command processed."
+                ),
+                "session": self._get_session_payload(
+                    session_id
+                ),
+            }
 
         return None
 
@@ -6512,7 +6729,7 @@ Current step:
 
                 if isinstance(session_payload, dict):
                     session_payload["execution_state"] = execution_state
-                    session_payload["active_execution"] = {}
+                    session_payload["active_execution"] = execution_state
 
                 return {
                     "ok": True,
@@ -6588,7 +6805,7 @@ Current step:
                 session_id,
             )
 
-            if execution_control_result:
+            if execution_control_result is not None:
                 if (
                     isinstance(execution_control_result, dict)
                     and execution_control_result.get("ok") is True
@@ -6614,7 +6831,7 @@ Current step:
             attachments,
         )
 
-        if auto_fix_result:
+        if auto_fix_result is not None:
             return auto_fix_result
 
         decision = self._decide_route(
@@ -6897,11 +7114,51 @@ Auto-fix result:
             return execution_state
 
         # =========================
-        # EXECUTE CURRENT STEP
+        # LOCK GUARD (STOP DOUBLE NEXT)
         # =========================
-        step = steps[current_index]
+
+        if execution_state.get("lock"):
+            execution_state["lock"] = False
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                execution_state,
+            )
 
         try:
+            step = steps[current_index]
+
+            if self._safe_str(step.get("status")).lower() == "completed":
+                next_index = current_index + 1
+                next_index = max(0, min(next_index, len(steps)))
+
+                execution_state = self._sync_execution_state(
+                    execution=execution_state,
+                    current_index=next_index,
+                    status="running" if next_index < len(steps) else "complete",
+                    current_step=(
+                        self._safe_str(steps[next_index].get("title"))
+                        if next_index < len(steps)
+                        else "complete"
+                    ),
+                    progress=next_index,
+                )
+
+            print(
+                "EXECUTION REAL STEP RUNNING =",
+                {
+                    "index": current_index,
+                    "title": step.get("title"),
+                    "status_before": step.get("status"),
+                },
+            )
 
             step["status"] = "running"
 
@@ -6911,6 +7168,56 @@ Auto-fix result:
             )
 
             step["status"] = "completed"
+
+            execution_state["current_index"] = (
+                current_index + 1
+            )
+
+            next_index = execution_state["current_index"]
+
+            if next_index < len(steps):
+                next_step = steps[next_index]
+
+                execution_state["current_step"] = next_index
+                execution_state["current_step_title"] = self._safe_str(
+                    next_step.get("title")
+                )
+
+                execution_state["next_moves"] = [
+                    {
+                        "type": next_step.get(
+                            "action",
+                            "execute",
+                        ),
+                        "title": next_step.get(
+                            "title",
+                            "",
+                        ),
+                        "step_index": next_index,
+                    }
+                ]
+            else:
+                execution_state["next_moves"] = []
+                execution_state["status"] = "complete"
+                execution_state["current_step_title"] = ""
+                execution_state["waiting"] = False
+                execution_state["complete"] = True
+
+            if self._safe_str(step.get("status")).lower() == "completed":
+
+                next_index = current_index + 1
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                execution_state,
+            )
 
             execution_state["history"] = (
                 execution_state.get("history")
@@ -9516,6 +9823,142 @@ Auto-fix result:
             session_id=session_id,
         )
 
+    def _build_intelligence_state(
+        self,
+        user_text: str = "",
+        session_id: str = "",
+        attachments=None,
+    ) -> dict:
+        attachments = attachments or []
+        text = self._safe_str(user_text).strip()
+        text_lc = text.lower()
+
+        working_state = self._get_working_state(session_id) or {}
+
+        execution_state = (
+            self._get_session_meta(session_id, "execution_state")
+            or self._get_session_meta(session_id, "active_execution")
+            or {}
+        )
+
+        has_active_execution = (
+            isinstance(execution_state, dict)
+            and execution_state
+            and self._safe_str(execution_state.get("status")).lower()
+            not in {"complete", "completed", "done", "cancelled", "canceled"}
+        )
+
+        intent = "chat"
+        route = self.ROUTE_GENERAL_CHAT
+        strategy = "direct_answer"
+        priority = "normal"
+        confidence = 0.65
+        reasons = []
+
+        execution_commands = {
+            "next",
+            "nex",
+            "continue",
+            "continue on",
+            "keep going",
+            "go",
+            "run next",
+            "next step",
+            "what next",
+            "what now",
+            "run_step",
+            "run step",
+            "run all",
+            "run_all",
+            "run it",
+            "execute",
+            "execute all",
+            "retry",
+            "retry failed",
+            "try again",
+            "stop",
+            "cancel",
+        }
+
+        if text_lc in execution_commands:
+
+            if "retry" in text_lc:
+                intent = "retry_failed_step"
+
+            elif "run all" in text_lc or text_lc == "execute all":
+                intent = "run_all_steps"
+
+            elif text_lc in {"stop", "cancel"}:
+                intent = "cancel_execution"
+
+            elif execution_state.get("waiting"):
+                intent = "continue_waiting_execution"
+
+            else:
+                intent = "resume_execution"
+
+            route = "execution_command"
+            strategy = "execute"
+            priority = "high"
+            confidence = 1.0
+            reasons.append("execution_command")
+
+        elif text_lc.startswith("auto-plan "):
+            intent = "planning"
+            route = "execution_plan"
+            strategy = "plan"
+            priority = "high"
+            confidence = 0.95
+            reasons.append("auto_plan_command")
+
+        elif any(x in text_lc for x in ["traceback", "syntaxerror", "indentationerror", "nameerror", "typeerror"]):
+            intent = "debugging"
+            route = "auto_fix_or_debug"
+            strategy = "diagnose_fix"
+            priority = "high"
+            confidence = 0.9
+            reasons.append("error_signal")
+
+        elif "smff" in text_lc or "full file" in text_lc or "full code" in text_lc:
+            intent = "full_file_code"
+            route = "code_full_file"
+            strategy = "provide_full_file"
+            priority = "high"
+            confidence = 0.9
+            reasons.append("full_file_request")
+
+        elif text_lc in {"where are we", "where are we now", "what are we doing", "what now", "status", "recap"}:
+            intent = "continuity"
+            route = "continuity"
+            strategy = "summarize_state"
+            priority = "high"
+            confidence = 0.9
+            reasons.append("continuity_query")
+
+        return {
+            "route": route,
+            "intent": intent,
+            "mode": intent,
+            "strategy": strategy,
+            "priority": priority,
+            "confidence": confidence,
+            "reasons": reasons or ["default_intelligence_state"],
+            "mission": {
+                "active_task": working_state.get("active_task", ""),
+                "current_file": working_state.get("current_file", ""),
+                "next_move": working_state.get("next_move", ""),
+                "checkpoint": working_state.get("checkpoint", ""),
+            },
+            "execution": execution_state,
+            "has_active_execution": has_active_execution,
+            "should_execute": intent == "execution_command",
+            "should_plan": intent == "planning",
+            "should_ask": False,
+            "save_artifact": False,
+            "save_memory": intent not in {"execution_command"},
+            "use_memory": intent not in {"execution_command"},
+        }
+
     def _decide_route(
         self,
         user_text: str,
@@ -9528,6 +9971,18 @@ Auto-fix result:
         text = user_text.lower().strip()
         lower_text = text
         print("DECIDE ROUTE TEXT =", repr(lower_text))
+
+        intelligence_state = self._build_intelligence_state(
+            user_text=user_text,
+            session_id=session_id,
+            attachments=attachments,
+        )
+
+        if (
+            isinstance(intelligence_state, dict)
+            and intelligence_state.get("route") != self.ROUTE_GENERAL_CHAT
+        ):
+            return intelligence_state
 
         regen_commands = {
             "regen",
@@ -13896,6 +14351,7 @@ def _save_artifact_fallback(self, artifact: dict):
         if not step_output:
             step_output = f"Completed step: {step_title}"
 
+
         step_result = {
             "step_index": current_index,
             "step_title": step_title,
@@ -13945,6 +14401,12 @@ def _save_artifact_fallback(self, artifact: dict):
                 "current_step": self._safe_str(execution.get("current_step")),
             },
         }
+
+        # =========================
+        # UNLOCK EXECUTION (FIXED INDENT)
+        # =========================
+        execution_state["lock"] = False
+        self._set_session_meta(session_id, "execution_state", execution_state)
 
         return {
             "execution": execution,
