@@ -700,8 +700,9 @@ def api_chat():
         }
 
         payload = {
-            "ok": True,
+            "ok": result.get("ok", True),
             "assistant_message": assistant_message,
+
             "active_session_id": result.get("active_session_id") or result.get("session_id") or session_id,
             "session": result.get("session") or session_service.get_session(session_id),
             "sessions": result.get("sessions") or session_service.get_all(),

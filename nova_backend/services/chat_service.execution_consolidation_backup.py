@@ -373,6 +373,25 @@ class ChatService:
         exec_debug("LEGACY EXECUTION DAEMON DISABLED")
         return False
 
+    def _sync_execution_state(
+        self,
+        session_id: str,
+        execution_state: dict,
+    ):
+        self._set_session_meta(
+            session_id,
+            "execution_state",
+            execution_state,
+        )
+
+        self._set_session_meta(
+            session_id,
+            "active_execution",
+            {},
+        )
+
+        return execution_state
+
     def _mark_execution_failed(
         self,
         execution_state,
@@ -1371,9 +1390,69 @@ Current step:
             },
         )
 
+        if command in {"test_fail", "retry_failed"}:
+
+            execution_state = dict(execution_state or {})
+
+            steps = execution_state.get("steps") or []
+
+            if not steps:
+                steps = [
+                    {
+                        "title": "test",
+                        "status": "failed",
+                        "error": "Simulated execution failure",
+                    }
+                ]
+                execution_state["steps"] = steps
+
+            failed_index = max(0, len(steps) - 1)
+
+            failed_step = steps[failed_index]
+
+            if isinstance(failed_step, dict):
+                failed_step["status"] = "failed"
+                failed_step["error"] = "Simulated execution failure"
+
+            execution_state["status"] = "failed"
+            execution_state["complete"] = False
+            execution_state["waiting"] = False
+            execution_state["lock"] = False
+
+            execution_state["current_index"] = failed_index
+            execution_state["current_step_index"] = failed_index
+
+            execution_state["current_step"] = (
+                failed_step.get("title") or "test"
+            )
+
+            execution_state["next_moves"] = [
+                {
+                    "type": "retry_failed",
+                    "title": "Retry failed step",
+                    "step_index": failed_index,
+                }
+            ]
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+
+            return {
+                "ok": False,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": "Execution step failed.",
+                },
+                "execution": execution_state,
+            }
+
         # =========================
         # NEXT AFTER COMPLETION
         # =========================
+
         if command in {
             "next",
             "continue",
@@ -1383,11 +1462,23 @@ Current step:
             execution_state["current_index"] = 0
             execution_state["status"] = "running"
             execution_state["lock"] = False
+            execution_state["waiting"] = False
             execution_state["complete"] = False
+
+            for step in steps:
+                if isinstance(step, dict):
+                    step["status"] = "planned"
+                    step["error"] = None
 
             self._set_session_meta(
                 session_id,
                 "execution_state",
+                execution_state,
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
                 execution_state,
             )
 
@@ -1402,6 +1493,140 @@ Current step:
                 },
                 "execution": execution_state,
             }
+
+
+        # =========================
+        # RUN ALL
+        # =========================
+        if command in {
+            "run_all",
+            "run all",
+        }:
+
+            final_result = None
+
+            while True:
+
+                current_index = int(
+                    execution_state.get(
+                        "current_index",
+                        0,
+                    ) or 0
+                )
+
+                if current_index >= len(steps):
+                    break
+
+                final_result = self._process_execution_command(
+                    command="run_step",
+                    session_id=session_id,
+                    execution_state=execution_state,
+                )
+
+                if not isinstance(final_result, dict):
+                    break
+
+                execution_state = (
+                    final_result.get("execution")
+                    or execution_state
+                )
+
+                if execution_state.get("status") == "complete":
+                    break
+
+                if execution_state.get("status") == "failed":
+
+                    final_result = (
+                        self._process_execution_command(
+                            command="retry_failed",
+                            session_id=session_id,
+                            execution_state=execution_state,
+                        )
+                    )
+
+                    if isinstance(final_result, dict):
+
+                        execution_state = (
+                            final_result.get("execution")
+                            or execution_state
+                        )
+
+                    continue
+
+                    continue
+
+                if not final_result.get("ok", False):
+                    break
+
+            return {
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": (
+                        "Run all completed."
+                    ),
+                },
+                "execution": execution_state,
+                "step_output": (
+                    final_result.get("step_output")
+                    if isinstance(final_result, dict)
+                    else None
+                ),
+            }
+
+        # =========================
+        # RETRY FAILED
+        # =========================
+        if command in {
+            "retry_failed",
+            "retry failed",
+            "retry",
+        }:
+
+            failed_index = None
+
+            for idx, step in enumerate(steps):
+                if isinstance(step, dict) and step.get("status") == "failed":
+                    failed_index = idx
+                    break
+
+            if failed_index is None:
+                failed_index = 0
+
+            execution_state["current_index"] = failed_index
+            execution_state["status"] = "running"
+            execution_state["lock"] = False
+            execution_state["waiting"] = False
+            execution_state["complete"] = False
+
+            for idx, step in enumerate(steps):
+                if not isinstance(step, dict):
+                    continue
+
+                if idx < failed_index:
+                    step["status"] = "completed"
+                else:
+                    step["status"] = "planned"
+
+                step["error"] = None
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                execution_state,
+            )
+
+            return self._process_execution_command(
+                command="run_step",
+                session_id=session_id,
+                execution_state=execution_state,
+            )
 
         # =========================
         # RUN STEP
@@ -1421,15 +1646,21 @@ Current step:
                     "execution": execution_state,
                 }
 
+            current_index = int(
+                execution_state.get("current_index", 0)
+                or 0
+            )
+
             if current_index >= len(steps):
+
                 execution_state["status"] = "complete"
                 execution_state["next_moves"] = []
-                execution_state["current_index"] = len(steps)
-                execution_state["lock"] = False
                 execution_state["waiting"] = False
                 execution_state["complete"] = True
                 execution_state["current_step"] = ""
                 execution_state["current_step_title"] = ""
+                execution_state["current_step_index"] = len(steps)
+                execution_state["progress"] = len(steps)
 
                 self._set_session_meta(
                     session_id,
@@ -1449,8 +1680,7 @@ Current step:
                         "role": "assistant",
                         "text": (
                             "Execution complete. "
-                            "Type 'next' to restart "
-                            "or 'auto-plan <task>'."
+                            "Use 'next' or 'retry'."
                         ),
                     },
                     "execution": execution_state,
@@ -1458,52 +1688,18 @@ Current step:
 
             step = steps[current_index]
 
-            if step.get("status") == "completed":
-                current_index += 1
-                execution_state["current_index"] = current_index
-
-                self._set_session_meta(
-                    session_id,
-                    "execution_state",
-                    execution_state,
-                )
-
-                if current_index >= len(steps):
-                    execution_state["status"] = "complete"
-                    execution_state["next_moves"] = []
-                    execution_state["waiting"] = False
-                    execution_state["complete"] = True
-                    execution_state["current_step"] = ""
-                    execution_state["current_step_title"] = ""
-
-                    self._set_session_meta(
-                        session_id,
-                        "execution_state",
-                        execution_state,
-                    )
-
-                    self._set_session_meta(
-                        session_id,
-                        "active_execution",
-                        {},
-                    )
-
-                    return {
-                        "ok": True,
-                        "assistant_message": {
-                            "role": "assistant",
-                            "text": "All execution steps completed.",
-                        },
-                        "execution": execution_state,
-                    }
-
-                step = steps[current_index]
-
             step["status"] = "running"
 
             execution_state["status"] = "running"
-            execution_state["current_step"] = step.get("title") or ""
-            execution_state["current_step_title"] = step.get("title") or ""
+            execution_state["current_step"] = (
+                step.get("title") or ""
+            )
+            execution_state["current_step_title"] = (
+                step.get("title") or ""
+            )
+            execution_state["current_step_index"] = current_index
+            execution_state["progress"] = current_index
+            execution_state["next_moves"] = []
 
             self._set_session_meta(
                 session_id,
@@ -1535,18 +1731,50 @@ Current step:
                 f"completed: {step.get('title')}"
             )
 
-            execution_state["current_index"] = current_index + 1
-            execution_state["current_step_index"] = current_index
-            execution_state["progress"] = current_index
-            execution_state["waiting"] = True
+            next_index = current_index + 1
 
-            if execution_state["current_index"] >= len(steps):
+            execution_state["current_index"] = next_index
+            execution_state["current_step_index"] = next_index
+            execution_state["progress"] = next_index
+            execution_state["waiting"] = True
+            execution_state["lock"] = False
+
+            if next_index < len(steps):
+
+                next_step = steps[next_index]
+
+                execution_state["status"] = "running"
+                execution_state["complete"] = False
+                execution_state["current_step"] = (
+                    next_step.get("title") or ""
+                )
+                execution_state["current_step_title"] = (
+                    next_step.get("title") or ""
+                )
+                execution_state["next_moves"] = [
+                    {
+                        "type": (
+                            next_step.get("action")
+                            or "execute"
+                        ),
+                        "title": (
+                            next_step.get("title")
+                            or ""
+                        ),
+                        "step_index": next_index,
+                    }
+                ]
+
+            else:
+
                 execution_state["status"] = "complete"
                 execution_state["next_moves"] = []
                 execution_state["waiting"] = False
                 execution_state["complete"] = True
                 execution_state["current_step"] = ""
                 execution_state["current_step_title"] = ""
+                execution_state["current_step_index"] = len(steps)
+                execution_state["progress"] = len(steps)
 
             self._set_session_meta(
                 session_id,
@@ -1574,218 +1802,14 @@ Current step:
             }
 
         # =========================
-        # RUN ALL
-        # =========================
-        if command == "run_all":
-
-            outputs = []
-            loop_guard = 0
-
-            while True:
-
-                loop_guard += 1
-
-                if loop_guard > 100:
-                    return {
-                        "ok": False,
-                        "assistant_message": {
-                            "role": "assistant",
-                            "text": (
-                                "Execution stopped: "
-                                "loop guard triggered."
-                            ),
-                        },
-                        "execution": execution_state,
-                    }
-
-                current_index = int(
-                    execution_state.get("current_index", 0)
-                    or 0
-                )
-
-                if current_index >= len(steps):
-                    execution_state["status"] = "complete"
-                    execution_state["next_moves"] = []
-                    execution_state["waiting"] = False
-                    execution_state["complete"] = True
-                    execution_state["current_step"] = ""
-                    execution_state["current_step_title"] = ""
-                    break
-
-                step = steps[current_index]
-                step["status"] = "running"
-
-                execution_state["status"] = "running"
-                execution_state["current_step"] = step.get("title") or ""
-                execution_state["current_step_title"] = step.get("title") or ""
-
-                self._set_session_meta(
-                    session_id,
-                    "execution_state",
-                    execution_state,
-                )
-
-                self._set_session_meta(
-                    session_id,
-                    "active_execution",
-                    execution_state,
-                )
-
-                result = self._execute_step_logic(
-                    session_id=session_id,
-                    step=step,
-                )
-
-                step["status"] = "completed"
-                step["result"] = "step executed"
-                step["error"] = None
-
-                execution_state["history"] = (
-                    execution_state.get("history")
-                    or []
-                )
-
-                execution_state["history"].append(
-                    f"completed: {step.get('title')}"
-                )
-
-                execution_state["current_index"] = current_index + 1
-                execution_state["current_step_index"] = current_index
-                execution_state["progress"] = current_index
-
-                outputs.append(
-                    f"Completed step: {step.get('title')}"
-                )
-
-                if execution_state["current_index"] >= len(steps):
-                    execution_state["status"] = "complete"
-                    execution_state["next_moves"] = []
-                    execution_state["waiting"] = False
-                    execution_state["complete"] = True
-                    execution_state["current_step"] = ""
-                    execution_state["current_step_title"] = ""
-                    break
-
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                execution_state,
-            )
-
-            self._set_session_meta(
-                session_id,
-                "active_execution",
-                execution_state,
-            )
-
-            return {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": "\n".join(outputs),
-                },
-                "execution": execution_state,
-            }
-
-        # =========================
-        # RETRY FAILED
-        # =========================
-        if command == "retry_failed":
-
-            execution_state["failure_count"] = int(
-                execution_state.get("failure_count")
-                or 0
-            ) + 1
-
-            failed_index = None
-
-            for idx, step in enumerate(steps):
-                if step.get("status") == "failed":
-                    failed_index = idx
-                    break
-
-            if failed_index is None:
-                return {
-                    "ok": False,
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": "No failed execution step found to retry.",
-                    },
-                    "execution": execution_state,
-                }
-
-            execution_state["current_index"] = failed_index
-
-            failure_count = int(
-                execution_state.get("failure_count")
-                or 0
-            )
-
-            if failure_count == 1:
-                execution_state["retry_strategy"] = "retry_step"
-
-            elif failure_count == 2:
-                execution_state["retry_strategy"] = (
-                    "retry_with_smaller_scope"
-                )
-
-            elif failure_count == 3:
-                execution_state["retry_strategy"] = (
-                    "retry_with_file_scope"
-                )
-
-            else:
-                execution_state["retry_strategy"] = "change_strategy"
-
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                execution_state,
-            )
-
-            return self._process_execution_command(
-                command="run_step",
-                session_id=session_id,
-                execution_state=execution_state,
-            )
-
-        # =========================
-        # CANCEL
-        # =========================
-        if command == "cancel":
-
-            execution_state["status"] = "cancelled"
-            execution_state["waiting"] = False
-            execution_state["lock"] = False
-            execution_state["next_moves"] = []
-            execution_state["current_step"] = ""
-            execution_state["current_step_title"] = ""
-
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                execution_state,
-            )
-
-            self._set_session_meta(
-                session_id,
-                "active_execution",
-                {},
-            )
-
-            return {
-                "ok": True,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": "Execution cancelled.",
-                },
-                "execution": execution_state,
-            }
-
-        # =========================
         # EXECUTION COMPLETE FALLBACK
         # =========================
-        if steps and current_index >= len(steps):
+
+        if (
+            steps
+            and current_index >= len(steps)
+            and execution_state.get("status") != "failed"
+        ):
 
             execution_state["status"] = "complete"
             execution_state["next_moves"] = []
@@ -2389,12 +2413,10 @@ Current step:
         # BOUNDS CHECK
         # =========================
         if current >= len(steps):
-            execution_state = (
-                self._mark_execution_complete(
-                    execution_state,
-                )
-            )
-
+            execution_state["status"] = "complete"
+            execution_state["next_moves"] = []
+            execution_state["waiting"] = False
+            execution_state["complete"] = True
             return execution_state
 
         step = steps[current]
@@ -2444,31 +2466,22 @@ Current step:
                 "current_step",
                 "",
             )
-            execution_state = (
-                self._mark_execution_running(
-                    execution_state,
-                    step_index=current,
-                    current_step=(
-                        execution_state.get(
-                            "current_step",
-                            "",
-                        )
-                    ),
-                    waiting=(
-                        not execution_state.get(
-                            "auto_mode"
-                        )
-                    ),
-                )
-            )
+            execution_state["status"] = "running"
+
+            if execution_state.get("auto_mode"):
+                execution_state["waiting"] = False
+            else:
+                execution_state["waiting"] = True
+
+            execution_state["complete"] = False
 
         else:
+            execution_state["current_step_title"] = "complete"
 
-            execution_state = (
-                self._mark_execution_complete(
-                    execution_state,
-                )
-            )
+            execution_state["status"] = "complete"
+            execution_state["next_moves"] = []
+            execution_state["waiting"] = False
+            execution_state["complete"] = True
 
         return execution_state
 
@@ -6656,100 +6669,14 @@ Current step:
         # ONLY EXECUTION COMMANDS
         # =========================
         execution_keywords = {
-            "next",
-            "nex",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "what next",
-            "what now",
-            "run_step",
-            "run step",
-            "run_all",
-            "run all",
-            "run it",
-            "execute",
-            "execute all",
-            "retry",
-            "retry_failed",
-            "retry failed",
-            "try again",
-            "rerun failed",
-            "apply_auto_fix",
-            "apply auto fix",
-            "auto fix",
-            "autofix",
-            "stop",
-            "cancel",
+            "next", "nex", "continue", "run next", "next step",
+            "run_step", "run step",
+            "run_all", "run all",
+            "execute", "execute all",
+            "retry", "retry_failed", "retry failed",
+            "test_fail", "test fail",
+            "stop", "cancel",
         }
-
-        # ignore non-execution input
-        if text not in execution_keywords:
-            return None
-
-        # =========================
-        # COMMAND ROUTING
-        # =========================
-        if text in {
-            "apply_auto_fix",
-            "apply auto fix",
-            "auto fix",
-            "autofix",
-        }:
-            command = "apply_auto_fix"
-
-        elif text in {
-            "retry",
-            "retry_failed",
-            "retry failed",
-            "try again",
-            "rerun failed",
-        }:
-            command = "retry_failed"
-
-        elif text in {
-            "run_all",
-            "run all",
-            "run it",
-            "execute",
-            "execute all",
-        }:
-            command = "run_all"
-
-        elif text in {
-            "next",
-            "nex",
-            "continue",
-            "continue on",
-            "keep going",
-            "go",
-            "run next",
-            "next step",
-            "what next",
-            "what now",
-            "run_step",
-            "run step",
-        }:
-            if execution_state.get("status") == "failed":
-                command = "retry_failed"
-            else:
-                command = "run_step"
-
-        elif text in {
-            "stop",
-            "cancel",
-        }:
-            command = "cancel"
-
-        else:
-            return None
-
-        # =========================
-        # UNLOCK EXECUTION STATE
-        # =========================
 
         # ignore non-execution input
         if text not in execution_keywords:
@@ -6896,12 +6823,8 @@ Current step:
                 and execution_state.get("status") != "failed"
             ):
 
-                execution_state = (
-                    self._mark_execution_complete(
-                        execution_state,
-                    )
-                )
-
+                execution_state["status"] = "complete"
+                execution_state["next_moves"] = []
                 execution_state["current_index"] = len(steps)
                 execution_state["lock"] = False
 
@@ -7154,29 +7077,8 @@ Current step:
             )
 
             if execution_state:
-                execution_state = (
-                    self._mark_execution_running(
-                        execution_state,
-                        step_index=(
-                            execution_state.get(
-                                "current_index",
-                                0,
-                            )
-                        ),
-                        current_step=(
-                            execution_state.get(
-                                "current_step",
-                                "",
-                            )
-                        ),
-                        waiting=(
-                            execution_state.get(
-                                "waiting",
-                                False,
-                            )
-                        ),
-                    )
-                )
+                execution_state["status"] = "running"
+
                 self._set_session_meta(
                     session_id,
                     "execution_state",
@@ -7557,11 +7459,10 @@ Auto-fix result:
         # =========================
         if current_index >= total:
 
-            execution_state = (
-                self._mark_execution_complete(
-                    execution_state,
-                )
-            )
+            execution_state["status"] = "complete"
+            execution_state["next_moves"] = []
+            execution_state["waiting"] = False
+            execution_state["complete"] = True
 
             self._set_session_meta(
                 session_id,
@@ -7660,13 +7561,12 @@ Auto-fix result:
                         "step_index": next_index,
                     }
                 ]
-            else:  
-           
-                execution_state = (
-                    self._mark_execution_complete(
-                        execution_state,
-                    )
-                )
+            else:             
+                execution_state["status"] = "complete"
+                execution_state["next_moves"] = []
+                execution_state["current_step_title"] = ""
+                execution_state["waiting"] = False
+                execution_state["complete"] = True
 
             if self._safe_str(step.get("status")).lower() == "completed":
 
@@ -7770,12 +7670,10 @@ Auto-fix result:
 
         except Exception as e:
 
-            execution_state = self._mark_execution_failed(
-                execution_state,
-                step_index=current_index,
-                error=str(e),
-            )
+            step["status"] = "failed"
+            step["error"] = str(e)
 
+            execution_state["status"] = "failed"
             execution_state["last_error"] = str(e)
 
             self._set_session_meta(
@@ -7797,38 +7695,25 @@ Auto-fix result:
         # =========================
         if current_index >= total:
 
-            execution_state = (
-                self._mark_execution_complete(
-                    execution_state,
-                )
-            )
+            execution_state["status"] = "complete"
+            execution_state["next_moves"] = []
+            execution_state["waiting"] = False
+            execution_state["complete"] = True
 
         else:
 
-            execution_state = (
-                self._mark_execution_running(
-                    execution_state,
-                    step_index=current_index,
-                    current_step=(
-                        execution_state.get(
-                            "current_step",
-                            "",
-                        )
-                    ),
-                    waiting=(
-                        not execution_state.get(
-                            "auto_mode"
-                        )
-                    ),
-                )
-            )
+            execution_state["status"] = "running"
 
             if execution_state.get("auto_mode"):
+
+                execution_state["waiting"] = False
 
                 return self._process_execution(
                     execution_state,
                     session_id,
                 )
+
+            execution_state["waiting"] = True
 
         execution_state["current_step"] = (
             current_index
@@ -10880,11 +10765,11 @@ Auto-fix result:
         )
 
         if active_complete or execution_complete:
-            execution_state = (
-                self._mark_execution_complete(
-                    execution_state,
-                )
-            )
+            execution_state["status"] = "complete"
+            execution_state["next_moves"] = []
+            execution_state["complete"] = True
+            execution_state["waiting"] = False
+            execution_state["current_step_title"] = ""
 
             active_execution["status"] = "complete"
             active_execution["complete"] = True
@@ -10947,24 +10832,15 @@ Auto-fix result:
             return execution
 
         steps = execution.get("steps")
-
-        failed_index = 0
-
         if isinstance(steps, list):
-            for index, step in enumerate(steps):
+            for step in steps:
                 if isinstance(step, dict) and step.get("status") == "running":
-                    failed_index = index
-                    break
+                    step["status"] = "failed"
+                    if error_text:
+                        step["notes"] = str(error_text)[:200]
 
-        execution = self._mark_execution_failed(
-            execution,
-            step_index=failed_index,
-            error=str(error_text or "Execution failed."),
-        )
-
-        execution["summary"] = str(
-            error_text or execution.get("summary") or ""
-        )[:200]
+        execution["status"] = "failed"
+        execution["summary"] = str(error_text or execution.get("summary") or "")[:200]
         execution["updated_at"] = self._iso_now()
         return execution
 
@@ -11473,53 +11349,16 @@ Auto-fix result:
 
         if text == "test_fail":
 
-            print("TEST_FAIL HARD OVERRIDE HIT")
-
-            live_execution = (
-                self._get_session_meta(
-                    session_id,
-                    "execution_state",
-                )
-                or {}
-            )
-
-            live_execution = self._mark_execution_failed(
-                execution_state=live_execution,
-                step_index=max(
-                    0,
-                    min(
-                        len(
-                            live_execution.get("steps") or []
-                        ) - 1,
-                        int(
-                            live_execution.get(
-                                "current_step_index",
-                                live_execution.get(
-                                    "current_index",
-                                    0,
-                                ),
-                            )
-                            or 0
-                        ) - 1,
-                    ),
-                ),
-                error="Execution step failed.",
-            )
-
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                live_execution,
-            )
-
-            return {
-                "ok": False,
-                "assistant_message": {
-                    "role": "assistant",
-                    "text": "Execution step failed.",
+            return self._process_execution_command(
+                command="test_fail",
+                session_id=session_id,
+                execution_state={
+                    "status": "failed",
+                    "current_step": "test",
+                    "lock": False,
+                    "waiting": False,
                 },
-                "execution": live_execution,
-            }
+            )
 
         if not execution:
             execution = {
@@ -11772,71 +11611,6 @@ Next action:
         if value > step_count:
             return step_count
         return value
-
-    def _mark_execution_running(
-        self,
-        execution_state,
-        step_index=0,
-        current_step="",
-        waiting=False,
-    ):
-
-        execution_state = dict(
-            execution_state or {}
-        )
-
-        execution_state["status"] = "running"
-        execution_state["complete"] = False
-        execution_state["waiting"] = bool(waiting)
-        execution_state["lock"] = False
-
-        execution_state["current_index"] = step_index
-        execution_state["current_step_index"] = step_index
-        execution_state["current_step"] = current_step or ""
-        execution_state["current_step_title"] = current_step or ""
-
-        return execution_state
-
-    def _mark_execution_complete(
-        self,
-        execution_state,
-    ):
-
-        execution_state = dict(
-            execution_state or {}
-        )
-
-        steps = (
-            execution_state.get("steps")
-            or []
-        )
-
-        execution_state["status"] = (
-            "complete"
-        )
-
-        execution_state["complete"] = True
-        execution_state["waiting"] = False
-        execution_state["lock"] = False
-
-        execution_state["next_moves"] = []
-
-        execution_state["current_index"] = (
-            len(steps)
-        )
-
-        execution_state["current_step_index"] = (
-            len(steps)
-        )
-
-        execution_state["current_step"] = ""
-        execution_state["current_step_title"] = ""
-
-        execution_state["progress"] = (
-            len(steps)
-        )
-
-        return execution_state
 
     def _sync_execution_state(
         self,
