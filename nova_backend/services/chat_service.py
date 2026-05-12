@@ -445,8 +445,14 @@ class ChatService:
 
     def _recover_active_executions(self):
         for session_id, session in self.sessions.items():
-            state = session.get("working_state") or {}
-            execution = state.get("execution_state") or {}
+            if not isinstance(session, dict):
+                continue
+
+            execution = (
+                session.get("execution_state")
+                or session.get("active_execution")
+                or {}
+            )
 
             if execution.get("status") in {"running", "adapting"}:
                 execution["status"] = "running"
