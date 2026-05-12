@@ -13164,6 +13164,15 @@ Next action:
 
                 sessions[index]["mission"] = {}
 
+                if not isinstance(sessions[index].get("meta"), dict):
+                    sessions[index]["meta"] = {}
+
+                sessions[index]["meta"]["execution_state"] = {}
+
+                sessions[index]["meta"]["active_execution"] = {}
+
+                sessions[index]["meta"]["mission"] = {}
+
                 self.sessions._save_sessions(
                     sessions,
                     self.sessions.get_active_session_id(),
