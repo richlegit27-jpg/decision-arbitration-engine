@@ -12880,16 +12880,17 @@ Next action:
             patch["checkpoint"] = "landing_page_work"
             patch["next_move"] = "tighten product messaging and demos"
 
-        if any(
-            x in lowered
-            for x in (
-                "where are we",
-                "resume",
-                "continue",
-                "what now",
-            )
-        ):
+        continuity_commands = {
+            "where are we",
+            "resume",
+            "continue",
+            "what now",
+            "what's next",
+        }
 
+        normalized_text = lowered.strip()
+
+        if normalized_text in continuity_commands:
             execution_state = (
                 self._get_session_meta(
                     session_id,
