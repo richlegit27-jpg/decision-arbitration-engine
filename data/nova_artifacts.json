@@ -751,6 +751,106 @@
       "root_id": "artifact_b9e4ab2d50064f8989585fa024de1c49",
       "updated_at": "2026-05-10T04:05:52.031403+00:00",
       "created_at": "2026-05-10T04:05:52.031403+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "type": "image_generation",
+      "title": "Generated image",
+      "body": "[NOVA ACTIVE CONTEXT]\nTask: debugging runtime error\nFile: C:\\Users\\Owner\\nova\\nova_backend\\sandbox\\agent_target.py`\nBug: hi\nCheckpoint: runtime_error_detected\nNext: fix error and retest\nLast success: continuity_working\n\n[USER MESSAGE]\n/image car",
+      "summary": "Generated image for: [NOVA ACTIVE CONTEXT]\nTask: debugging runtime error\nFile: C:\\Users\\Owner\\nova\\nova_backend\\sandbox\\agent_target.py`\nBug: hi\nCheckpoint: runtime_error_detected\nNext: fix error and retest\nLast success: continuity_working\n\n[USER MESSAGE]\n/image car",
+      "preview": "/api/uploads/generated_0f75ac25b8fc4cbca06d740026793af0.png",
+      "session_id": "session_99f091b9973042e997c0b8cc5eef2b2e",
+      "source": "generated",
+      "image_url": "/api/uploads/generated_0f75ac25b8fc4cbca06d740026793af0.png",
+      "prompt": "[NOVA ACTIVE CONTEXT]\nTask: debugging runtime error\nFile: C:\\Users\\Owner\\nova\\nova_backend\\sandbox\\agent_target.py`\nBug: hi\nCheckpoint: runtime_error_detected\nNext: fix error and retest\nLast success: continuity_working\n\n[USER MESSAGE]\n/image car",
+      "revised_prompt": "",
+      "parent_id": null,
+      "meta": {
+        "image_url": "/api/uploads/generated_0f75ac25b8fc4cbca06d740026793af0.png",
+        "prompt": "[NOVA ACTIVE CONTEXT]\nTask: debugging runtime error\nFile: C:\\Users\\Owner\\nova\\nova_backend\\sandbox\\agent_target.py`\nBug: hi\nCheckpoint: runtime_error_detected\nNext: fix error and retest\nLast success: continuity_working\n\n[USER MESSAGE]\n/image car",
+        "generation_mode": "text_to_image",
+        "source_type": "generated"
+      },
+      "id": "artifact_5be58378c2d544c684b762b3c91a020d",
+      "version": 1,
+      "root_id": "artifact_5be58378c2d544c684b762b3c91a020d",
+      "updated_at": "2026-05-12T01:09:02.815279+00:00",
+      "created_at": "2026-05-12T01:09:02.815279+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "type": "image_generation",
+      "title": "Generated image",
+      "body": "/image car",
+      "summary": "Generated image for: /image car",
+      "preview": "/api/uploads/generated_94208e0631ec450fb0743f739c41493c.png",
+      "session_id": "session_99f091b9973042e997c0b8cc5eef2b2e",
+      "source": "generated",
+      "image_url": "/api/uploads/generated_94208e0631ec450fb0743f739c41493c.png",
+      "prompt": "/image car",
+      "revised_prompt": "",
+      "parent_id": null,
+      "meta": {
+        "image_url": "/api/uploads/generated_94208e0631ec450fb0743f739c41493c.png",
+        "prompt": "/image car",
+        "generation_mode": "text_to_image",
+        "source_type": "generated"
+      },
+      "id": "artifact_0dc6dbe1976a4e239f733ce4dd88aad1",
+      "version": 1,
+      "root_id": "artifact_0dc6dbe1976a4e239f733ce4dd88aad1",
+      "updated_at": "2026-05-12T02:59:49.751253+00:00",
+      "created_at": "2026-05-12T02:59:49.751253+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "type": "image_generation",
+      "title": "Generated image",
+      "body": "/image futuristic car",
+      "summary": "Generated image for: /image futuristic car",
+      "preview": "/api/uploads/generated_09f55c2dc7d440e2bb1222aceb5d1b71.png",
+      "session_id": "session_99f091b9973042e997c0b8cc5eef2b2e",
+      "source": "generated",
+      "image_url": "/api/uploads/generated_09f55c2dc7d440e2bb1222aceb5d1b71.png",
+      "prompt": "/image futuristic car",
+      "revised_prompt": "",
+      "parent_id": null,
+      "meta": {
+        "image_url": "/api/uploads/generated_09f55c2dc7d440e2bb1222aceb5d1b71.png",
+        "prompt": "/image futuristic car",
+        "generation_mode": "text_to_image",
+        "source_type": "generated"
+      },
+      "id": "artifact_cabfff33ff5a48928cba8962fdc74179",
+      "version": 1,
+      "root_id": "artifact_cabfff33ff5a48928cba8962fdc74179",
+      "updated_at": "2026-05-12T03:02:59.155075+00:00",
+      "created_at": "2026-05-12T03:02:59.155075+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "type": "image_generation",
+      "title": "Generated image",
+      "body": "/image futuristic car",
+      "summary": "Generated image for: /image futuristic car",
+      "preview": "/api/uploads/generated_b0c7dcc7f9dd40bb938ad4824d4bbe45.png",
+      "session_id": "session_99f091b9973042e997c0b8cc5eef2b2e",
+      "source": "generated",
+      "image_url": "/api/uploads/generated_b0c7dcc7f9dd40bb938ad4824d4bbe45.png",
+      "prompt": "/image futuristic car",
+      "revised_prompt": "",
+      "parent_id": null,
+      "meta": {
+        "image_url": "/api/uploads/generated_b0c7dcc7f9dd40bb938ad4824d4bbe45.png",
+        "prompt": "/image futuristic car",
+        "generation_mode": "text_to_image",
+        "source_type": "generated"
+      },
+      "id": "artifact_1a4ff707a8574d86b5636fd60b0f7738",
+      "version": 1,
+      "root_id": "artifact_1a4ff707a8574d86b5636fd60b0f7738",
+      "updated_at": "2026-05-12T03:23:11.990996+00:00",
+      "created_at": "2026-05-12T03:23:11.990996+00:00"
     }
   ]
 }

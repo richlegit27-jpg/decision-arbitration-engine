@@ -35,6 +35,10 @@ from nova_backend.services.tool_service import ToolService
 from nova_backend.services.execution_service import ExecutionService
 from nova_backend.services.intent_service import IntentService
 from nova_backend.services.execution_loop_service import ExecutionLoopService
+from nova_backend.services.brain.brain_core import BrainCore
+from nova_backend.services.brain.strategy import StrategyEngine
+from nova_backend.services.memory.memory_core import MemoryCore
+from nova_backend.services.execution.executor import Executor
 
 logger = logging.getLogger("nova.execution")
 DEBUG_EXECUTION = False
@@ -90,8 +94,16 @@ class ChatService:
             current = current if isinstance(current, dict) else {}
 
             for key, value in patch.items():
-                if value not in [None, "", [], {}]:
-                    current[key] = value
+
+                # allow explicit clearing
+                if value in [None, "", [], {}]:
+
+                    if key in current:
+                        del current[key]
+
+                    continue
+
+                current[key] = value
 
             if hasattr(self.sessions, "update_working_state"):
                 self.sessions.update_working_state(
@@ -434,7 +446,7 @@ class ChatService:
     def _recover_active_executions(self):
         for session_id, session in self.sessions.items():
             state = session.get("working_state") or {}
-            execution = state.get("execution") or {}
+            execution = state.get("execution_state") or {}
 
             if execution.get("status") in {"running", "adapting"}:
                 execution["status"] = "running"
@@ -453,6 +465,43 @@ class ChatService:
         except Exception as e:
             step["status"] = "failed"
             step["error"] = str(e)
+
+
+    def _save_active_execution(
+        self,
+        session_id,
+        execution_state,
+    ):
+
+        execution_state = (
+            execution_state
+            if isinstance(execution_state, dict)
+            else {}
+        )
+
+        status = str(
+            execution_state.get("status") or ""
+        ).lower()
+
+        if status in {
+            "complete",
+            "completed",
+            "idle",
+            "stopped",
+        }:
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                {},
+            )
+
+            return
+
+        self._save_active_execution(
+            session_id,
+            execution_state,
+        )
 
     def _resume_execution_if_needed(self, session_id):
         session = self.sessions.get(session_id)
@@ -1135,6 +1184,24 @@ Current step:
             or {}
         )
 
+        execution_status = self._safe_str(
+            live_execution.get("status")
+        ).lower()
+
+        execution_complete = (
+            execution_status in {
+                "complete",
+                "completed",
+                "done",
+                "cancelled",
+                "canceled",
+            }
+            or live_execution.get("complete") is True
+        )
+
+        if execution_complete:
+            live_execution = {}
+
         payload["active_execution"] = live_execution
         payload["execution_state"] = live_execution
 
@@ -1511,9 +1578,8 @@ Current step:
                 execution_state,
             )
 
-            self._set_session_meta(
+            self._save_active_execution(
                 session_id,
-                "active_execution",
                 execution_state,
             )
 
@@ -1554,9 +1620,8 @@ Current step:
                 execution_state,
             )
 
-            self._set_session_meta(
+            self._save_active_execution(
                 session_id,
-                "active_execution",
                 execution_state,
             )
 
@@ -1625,9 +1690,8 @@ Current step:
                     execution_state,
                 )
 
-                self._set_session_meta(
+                self._save_active_execution(
                     session_id,
-                    "active_execution",
                     execution_state,
                 )
 
@@ -1672,9 +1736,8 @@ Current step:
                 execution_state,
             )
 
-            self._set_session_meta(
+            self._save_active_execution(
                 session_id,
-                "active_execution",
                 execution_state,
             )
 
@@ -1832,6 +1895,197 @@ Current step:
             },
             "execution": execution_state,
         }
+
+    def _build_brain_state(self, execution_state, working_state, session, user_text):
+
+        memory = self._get_session_meta(session, "memory") or []
+
+        return {
+            "input": user_text,
+
+            "execution": execution_state or {},
+            "working": working_state or {},
+            "session_id": session,
+
+            "memory": memory[-10:],
+            "memory_size": len(memory),
+
+            "signals": {
+                "has_memory": len(memory) > 0,
+                "is_continuation": user_text.lower() in {
+                    "next", "continue", "keep going", "run next",
+                    "what next", "what now"
+                },
+                "is_failure_state": (execution_state or {}).get("status") == "failed",
+            },
+
+            "tool_state": {
+                "strategy": "default",
+                "available_tools": [
+                    "run_step",
+                    "run_all",
+                    "retry_failed",
+                    "apply_auto_fix"
+                ]
+            }
+        }
+
+    def _select_strategy(self, brain_state):
+
+        text = (brain_state.get("input") or "").lower()
+
+        if brain_state["signals"]["is_failure_state"]:
+            return "repair"
+
+        if "build" in text:
+            return "build"
+
+        if brain_state["signals"]["is_continuation"]:
+            return "continue"
+
+        return "default"
+
+    def _agent_context(self, brain_state):
+
+        return {
+            "goal": brain_state.get("goal_state", {}).get("active_goal"),
+            "step": brain_state.get("current_step"),
+            "status": brain_state.get("status"),
+            "decision": brain_state.get("decision"),
+        }
+
+    def _decide_brain_action(self, brain_state):
+
+        strategy = self._select_strategy(brain_state)
+        text = brain_state.get("input", "").lower()
+
+        # -------------------------
+        # STRATEGY LAYER (PRIMARY)
+        # -------------------------
+        if strategy == "repair":
+            return "retry_failed"
+
+        if strategy == "build":
+            return "run_all"
+
+        if strategy == "continue":
+            return "run_step"
+
+        # -------------------------
+        # DIRECT COMMAND OVERRIDES
+        # -------------------------
+        if text in {"stop", "cancel"}:
+            return "cancel"
+
+        if text in {"apply_auto_fix", "autofix"}:
+            return "apply_auto_fix"
+
+        return "chat"
+
+
+    def _reflect(self, brain_state, execution_result):
+
+        reflection = {
+            "action": brain_state.get("decision"),
+            "input": brain_state.get("input"),
+            "status": execution_result.get("status"),
+            "success": execution_result.get("status") == "complete",
+            "failed": execution_result.get("status") == "failed",
+            "lesson_weight": 0
+        }
+
+        # -------------------------
+        # LEARNING SIGNALS
+        # -------------------------
+        if reflection["success"]:
+            reflection["lesson_weight"] = 1
+
+        if reflection["failed"]:
+            reflection["lesson_weight"] = -1
+
+        # -------------------------
+        # PERSIST MEMORY
+        # -------------------------
+        session = brain_state.get("session_id")
+        memory = self._get_session_meta(session, "memory") or []
+
+        memory.append(reflection)
+
+        # keep memory bounded
+        memory = memory[-200:]
+
+        self._set_session_meta(session, "memory", memory)
+
+        return reflection
+
+    def _get_relevant_memory(self, memory, action):
+
+        relevant = []
+
+        for m in memory[-50:]:
+            if m.get("action") == action:
+                relevant.append(m)
+
+        return relevant[-10:]
+
+    def _mutate_plan(self, brain_state, execution_state):
+
+        plan = execution_state.get("plan") or []
+        status = execution_state.get("status")
+        current_index = execution_state.get("current_index", 0)
+
+        # -------------------------
+        # FAILURE RECOVERY MUTATION
+        # -------------------------
+        if status == "failed":
+
+            # insert recovery step right after failed point
+            plan.insert(current_index + 1, {
+                "step": "auto-retry failed step with correction"
+            })
+
+        # -------------------------
+        # COMPLETION EXPANSION
+        # -------------------------
+        if status == "complete" and current_index >= len(plan):
+            return plan
+
+        return plan
+
+    def _memory_score(self, memory, action):
+
+        score = 0
+
+        for m in memory[-20:]:
+            if m.get("action") == action:
+                score += m.get("lesson_weight", 0)
+
+        return score
+
+    def _build_plan(self, brain_state):
+
+        text = brain_state["input"].lower()
+
+        existing_plan = brain_state.get("plan") or []
+
+        if "login" in text:
+            return [
+                {"step": "design login flow"},
+                {"step": "implement authentication"},
+                {"step": "test login system"}
+            ]
+
+        if "build" in text:
+            return [
+                {"step": "design structure"},
+                {"step": "implement core logic"},
+                {"step": "test system"}
+            ]
+
+        if existing_plan:
+            return existing_plan
+
+        return []
 
     def _source_quality_score(
         self,
@@ -2165,6 +2419,95 @@ Current step:
             max_deep_js=5,
             max_follow_links=5,
         )
+
+        # =========================
+        # AGENT CORE (NEW ARCHITECTURE)
+        # =========================
+        self.brain = BrainCore()
+        self.strategy = StrategyEngine()
+        self.memory_core = MemoryCore()
+        self.executor = Executor()
+
+    # =========================
+    # DEBUG / TEST HARNESS LAYER
+    # =========================
+
+    def _debug(self, *args):
+        exec_debug(*args)
+
+    def _run_test_harness(self, session_id):
+
+        tests = [
+            "run step",
+            "next",
+            "next",
+            "run all",
+            "apply_auto_fix",
+            "next",
+        ]
+
+        results = []
+
+        for t in tests:
+
+            result = self.handle(
+                user_text=t,
+                session_id=session_id
+            )
+
+            results.append({
+                "input": t,
+                "output": result.get("debug", {}),
+                "status": result.get("execution", {}).get("status"),
+            })
+
+            exec_debug("TEST RUN:", t, "→", result.get("execution", {}).get("status"))
+
+        return {
+            "ok": True,
+            "results": results
+        }
+
+    def _auto_diagnose(self, user_text, brain_state, execution_state, error=None):
+
+        diagnosis = {
+            "input": user_text,
+            "status": execution_state.get("status"),
+            "step": execution_state.get("current_index"),
+            "decision": brain_state.get("decision"),
+            "error": str(error) if error else None,
+            "root_cause": None,
+            "fix_suggestion": None
+        }
+
+        # -------------------------
+        # FAILURE CASE
+        # -------------------------
+        if execution_state.get("status") == "failed":
+
+            diagnosis["root_cause"] = "execution step failed during runtime"
+
+            if execution_state.get("current_index") is not None:
+                diagnosis["root_cause"] += f" at step {execution_state.get('current_index')}"
+
+            diagnosis["fix_suggestion"] = "retry step or adjust plan mutation logic"
+
+        # -------------------------
+        # STALL CASE
+        # -------------------------
+        elif execution_state.get("status") is None:
+
+            diagnosis["root_cause"] = "execution state not updated (possible routing issue)"
+            diagnosis["fix_suggestion"] = "check decision → executor wiring"
+
+        # -------------------------
+        # DEFAULT CASE
+        # -------------------------
+        else:
+            diagnosis["root_cause"] = "system behaving normally"
+            diagnosis["fix_suggestion"] = "no action required"
+
+        return diagnosis
 
     def _build_user_message(self, text: str, attachments=None, meta=None) -> dict:
         attachments = attachments or []
@@ -3458,7 +3801,27 @@ Current step:
                         f"{label}: {value}"
                     )
 
-            if memory_brain:
+            execution_keywords = {
+                "next",
+                "continue",
+                "run step",
+                "run all",
+                "execute",
+                "retry",
+                "test fail",
+                "fix",
+                "debug",
+                "traceback",
+                "error",
+                "bug",
+            }
+
+            should_attach_operational_context = any(
+                x in text_lc
+                for x in execution_keywords
+            )
+
+            if memory_brain and should_attach_operational_context:
                 brain_context = "\n".join(memory_brain)
 
                 user_text = (
@@ -3994,7 +4357,26 @@ Current step:
 
         ws = self._get_working_state(session_id) or {}
 
-        is_working = bool(ws.get("active_task") and ws.get("next_move"))
+        execution_state = (
+            self._get_session_meta(
+                session_id,
+                "execution_state",
+            )
+            or {}
+        )
+
+        is_working = bool(
+            ws.get("active_task")
+            and ws.get("next_move")
+            and execution_state
+            and execution_state.get("status") not in {
+                "complete",
+                "completed",
+                "idle",
+                "cancelled",
+                "stopped",
+            }
+        )
 
         if is_working:
             assistant_text = (
@@ -4078,6 +4460,12 @@ Current step:
             attachments=attachments,
         )
 
+        intelligence_result = (
+            intelligence_result
+            if isinstance(intelligence_result, dict)
+            else {}
+        )
+
         # lock tool outputs (prevent conversational overwrite)
         if decision.get("route") in {
             self.ROUTE_WEB_FETCH,
@@ -4148,6 +4536,27 @@ Current step:
         except Exception as e:
             exec_debug("STYLE CLAMP ERROR:", e)
 
+        if decision.get("route") == self.ROUTE_GENERAL_CHAT:
+
+            working_state = (
+                self._get_working_state(session_id)
+                or {}
+            )
+
+            if (
+                working_state.get("checkpoint")
+                == "runtime_error_detected"
+            ):
+                working_state["active_task"] = ""
+                working_state["current_bug"] = ""
+                working_state["next_move"] = ""
+                working_state["checkpoint"] = ""
+
+                self._update_working_state(
+                    session_id,
+                    working_state,
+                )
+
         used_memory_full = [
             {
                 "id": self._safe_str(m.get("id")),
@@ -4186,6 +4595,7 @@ Current step:
 
             "next_step": next_step_out,
         }
+
 
         # === BUILD FINAL MESSAGE ===
         if assistant_text:
@@ -4885,15 +5295,28 @@ Current step:
             "failed",
         ])
 
-        if any(x in user_text_lc for x in [
-            "fix this",
-            "fix it",
-            "error",
-            "bug",
-            "not working",
-            "broken",
-            "stuck",
-        ]):
+        debugging_request = any(
+            x in user_text_lc
+            for x in [
+                "fix this",
+                "fix it",
+                "error",
+                "bug",
+                "not working",
+                "broken",
+                "stuck",
+                "traceback",
+                "exception",
+                "failed",
+                "test fail",
+            ]
+        )
+
+        if not debugging_request:
+            return None
+
+        if debugging_request:
+
             if has_file_path and has_error:
                 return {
                     "assistant_text": (
@@ -4927,6 +5350,23 @@ Current step:
                     "assistant_text": "Execution step failed.",
                     "hard_override_applied": True,
                 }
+
+            debugging_request = any(
+                x in user_text_lc
+                for x in [
+                    "fix",
+                    "bug",
+                    "error",
+                    "traceback",
+                    "exception",
+                    "failed",
+                    "debug",
+                    "test fail",
+                ]
+            )
+
+            if not debugging_request:
+                has_file_path = False
 
             if has_file_path:
                 return {
@@ -5203,20 +5643,35 @@ Current step:
                     )
 
                     if isinstance(exec_result, dict):
-                        execution = exec_result.get("execution") or execution
+                        execution = (
+                            exec_result.get("execution")
+                            or execution
+                        )
 
-                        # persist it
+                        self._set_session_meta(
+                            session_id,
+                            "execution_state",
+                            execution,
+                        )
+
+                        self._save_active_execution(
+                            session_id,
+                            execution,
+                        )
+
                         try:
-                            self._persist_execution_artifact(session_id, execution)
+                            self._persist_execution_artifact(
+                                session_id,
+                                execution,
+                            )
                         except Exception as e:
                             exec_debug("EXECUTION_SAVE_ERROR:", e)
 
-                        # update mission
                         decision["mission"] = decision.get("mission") or {}
                         decision["mission"]["execution"] = execution
 
         except Exception as e:
-            exec_debug("EXECUTION_STEP_ERROR:", e)
+            exec_debug("EXECUTION_STEP_ERROR:", e)  
 
         return {
             "assistant_text": assistant_text,
@@ -6686,9 +7141,39 @@ Current step:
             "cancel",
         }
 
-        # ignore non-execution input
-        if text not in execution_keywords:
-            return None
+        # =========================
+        # BRAIN CONTROL GATE
+        # =========================
+        brain_state = self._build_brain_state(
+            execution_state=execution_state,
+            working_state=self._get_session_meta(session_id, "working_state"),
+            session=session_id,
+            user_text=text
+        )
+
+        action = self._decide_brain_action(brain_state)
+        brain_state["decision"] = action
+
+        print(
+            "BRAIN ACTION =",
+            action,
+        )
+
+        print(
+            "ACTION VALUE =",
+            repr(action),
+        )
+
+        # CHAT EXIT PATH
+        if action == "chat":
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    self._execute_general_chat(user_text, session_id)
+                ),
+                "execution": None,
+                "brain_action": "chat"
+            }
 
         # =========================
         # COMMAND ROUTING
@@ -7025,9 +7510,8 @@ Current step:
                 execution_state,
             )
 
-            self._set_session_meta(
+            self._save_active_execution(
                 session_id,
-                "active_execution",
                 execution_state,
             )
 
@@ -7070,7 +7554,13 @@ Current step:
                 ),
             }
 
-        return None
+        if not result:
+            result = {
+                "ok": False,
+                "assistant_message": self._build_assistant_message(
+                    "Execution command failed to produce output."
+                )
+            }
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         exec_debug("HANDLE IS BEING CALLED")
@@ -7271,6 +7761,11 @@ Current step:
                 session_id,
             )
 
+            exec_debug(
+                "EXEC CONTROL RESULT =",
+                execution_control_result,
+            )
+
             if execution_control_result is not None:
                 if (
                     isinstance(execution_control_result, dict)
@@ -7311,6 +7806,17 @@ Current step:
 
         if isinstance(result, dict) and result.get("skip_rewrite"):
             return result
+
+        if result is None:
+            return {
+                "ok": False,
+                "assistant_message": self._build_assistant_message(
+                    "No response generated (null pipeline result)."
+                ),
+                "debug": {
+                    "error": "null_result"
+                }
+            }
 
         return result
 
@@ -7569,9 +8075,8 @@ Auto-fix result:
                 execution_state,
             )
 
-            self._set_session_meta(
+            self._save_active_execution(
                 session_id,
-                "active_execution",
                 execution_state,
             )
 
@@ -7590,9 +8095,8 @@ Auto-fix result:
                 execution_state,
             )
 
-            self._set_session_meta(
+            self._save_active_execution(
                 session_id,
-                "active_execution",
                 execution_state,
             )
 
@@ -7678,9 +8182,8 @@ Auto-fix result:
                 execution_state,
             )
 
-            self._set_session_meta(
+            self._save_active_execution(
                 session_id,
-                "active_execution",
                 execution_state,
             )
 
@@ -7778,15 +8281,9 @@ Auto-fix result:
 
             execution_state["last_error"] = str(e)
 
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                execution_state,
-            )
 
-            self._set_session_meta(
+            self._save_active_execution(
                 session_id,
-                "active_execution",
                 execution_state,
             )
 
@@ -7840,9 +8337,8 @@ Auto-fix result:
             execution_state,
         )
 
-        self._set_session_meta(
+        self._save_active_execution(
             session_id,
-            "active_execution",
             execution_state,
         )
 
@@ -10901,12 +11397,16 @@ Auto-fix result:
                 "execution_state",
                 execution_state,
             )
-            self._set_session_meta(
+
+            self._save_active_execution(
                 session_id,
-                "active_execution",
                 active_execution,
             )
-            self._update_working_state(session_id, working_state)
+
+            self._update_working_state(
+                session_id,
+                working_state,
+            )
 
         return {
             "working_state": working_state,
@@ -11046,7 +11546,10 @@ Auto-fix result:
             if isinstance(persisted, dict) and persisted:
                 return persisted
 
-            persisted = session.get("execution")
+            persisted = (
+                session.get("execution_state")
+                or {}
+            )
 
             if isinstance(persisted, dict) and persisted:
                 return persisted
@@ -11344,7 +11847,9 @@ Auto-fix result:
         )
   
     def _advance_execution_one_step(self, execution):
-        execution = self._normalize_execution_state(dict(execution or {}))
+        execution = self._normalize_execution_state(
+            execution or {}
+        )
 
         steps = execution.get("steps") or []
         step_count = len(steps)
@@ -12224,24 +12729,48 @@ Next action:
                 .rstrip(".,:;)]}")
             )
 
-        if any(
+        runtime_failure_detected = any(
             x in lowered
             for x in (
                 "traceback",
+                "exception",
                 "syntaxerror",
-                "attributeerror",
-                "typeerror",
                 "nameerror",
+                "typeerror",
+                "valueerror",
+                "indexerror",
+                "keyerror",
+                "attributeerror",
+                "runtimeerror",
                 "unboundlocalerror",
                 "indentationerror",
                 "taberror",
-                "exception",
-                "500",
-                "crash",
-                "failed",
-                "error",
+                "compile failed",
+                "test fail",
+                "server crash",
+                "500 internal",
             )
-        ):
+        )
+
+        explicit_debug_request = any(
+            x in lowered
+            for x in (
+                "fix this",
+                "debug",
+                "traceback",
+                "stack trace",
+                "exception",
+                "error:",
+            )
+        )
+
+        runtime_failure_detected = (
+            runtime_failure_detected
+            and explicit_debug_request
+        )
+
+        if runtime_failure_detected:
+
             patch["current_bug"] = user_text.strip()[:1000]
             patch["active_task"] = "debugging runtime error"
             patch["next_move"] = "fix error and retest"
@@ -12354,19 +12883,38 @@ Next action:
                 "what now",
             )
         ):
-            patch["active_task"] = (
-                "continue Nova backend intelligence stabilization"
+
+            execution_state = (
+                self._get_session_meta(
+                    session_id,
+                    "execution_state",
+                )
+                or {}
             )
 
-            if not patch.get("checkpoint"):
-                patch["checkpoint"] = (
-                    "working_state_resume_context"
+            if (
+                execution_state.get("status") == "running"
+                and (
+                    execution_state.get("current_index", 0)
+                    < len(execution_state.get("steps") or [])
+                )
+            ):
+
+                patch["active_task"] = (
+                    "continue Nova backend intelligence stabilization"
                 )
 
-            if not patch.get("next_move"):
-                patch["next_move"] = (
-                    "continue backend memory and execution stabilization"
-                )
+                if not patch.get("checkpoint"):
+                    patch["checkpoint"] = (
+                        "working_state_resume_context"
+                    )
+
+                if not patch.get("next_move"):
+                    patch["next_move"] = (
+                        "continue backend memory and execution stabilization"
+                    )
+
+
 
         if user_text.strip() and not patch.get("active_task"):
             if any(
@@ -12570,14 +13118,51 @@ Next action:
             },
         )
 
+        self._set_session_meta(
+            session_id,
+            "execution_state",
+            {},
+        )
+
+        self._set_session_meta(
+            session_id,
+            "active_execution",
+            {},
+        )
+
+        self._set_session_meta(
+            session_id,
+            "mission",
+            {},
+        )
+
+        self._update_working_state(
+            session_id,
+            {
+                "active_task": "",
+                "current_file": "",
+                "current_bug": "",
+                "next_move": "",
+                "checkpoint": "",
+                "execution_status": "",
+            },
+        )
+
         try:
             sessions = self.sessions._load_sessions()
-            index = self.sessions._find(sessions, session_id)
+
+            index = self.sessions._find(
+                sessions,
+                session_id,
+            )
 
             if index is not None:
+
                 sessions[index]["execution_state"] = {}
 
                 sessions[index]["active_execution"] = {}
+
+                sessions[index]["mission"] = {}
 
                 self.sessions._save_sessions(
                     sessions,
@@ -13478,20 +14063,43 @@ Next action:
 
         text_lc = str(user_text or "").lower().strip()
 
-        priority_terms = [
-            str(working_state.get("active_task") or "").lower(),
-            str(working_state.get("current_file") or "").lower(),
-            str(working_state.get("current_bug") or "").lower(),
-            str(working_state.get("next_move") or "").lower(),
-            str(working_state.get("checkpoint") or "").lower(),
-            str(execution_state.get("status") or "").lower(),
-            str(execution_state.get("goal") or "").lower(),
-            str(
-                execution_state.get("current_step_title")
-                or execution_state.get("current_step")
-                or ""
-            ).lower(),
-        ]
+        is_execution_chat = any(
+            x in text_lc
+            for x in (
+                "run",
+                "execute",
+                "next",
+                "continue",
+                "retry",
+                "auto fix",
+                "autofix",
+                "run_step",
+                "run_all",
+                "execution",
+            )
+        )
+
+        priority_terms = []
+
+        if is_execution_chat:
+
+            priority_terms.extend([
+                str(working_state.get("active_task") or "").lower(),
+                str(working_state.get("current_file") or "").lower(),
+                str(working_state.get("current_bug") or "").lower(),
+                str(working_state.get("next_move") or "").lower(),
+                str(working_state.get("checkpoint") or "").lower(),
+            ])
+
+            priority_terms.extend([
+                str(execution_state.get("status") or "").lower(),
+                str(execution_state.get("goal") or "").lower(),
+                str(
+                    execution_state.get("current_step_title")
+                    or execution_state.get("current_step")
+                    or ""
+                ).lower(),
+            ])
 
         priority_terms = [term for term in priority_terms if term]
         ranked = []
@@ -13537,16 +14145,16 @@ Next action:
                 if len(word) >= 4 and word in content_lc:
                     score += 2.0
 
-            if "operational" in category:
+            if is_execution_chat and "operational" in category:
                 score += 15.0
 
-            if "working" in category or "state" in category:
+            if is_execution_chat and ("working" in category or "state" in category):
                 score += 14.0
 
-            if "execution" in category:
+            if is_execution_chat and "execution" in category:
                 score += 13.0
 
-            if "correction" in category or "fix" in category:
+            if is_execution_chat and ("correction" in category or "fix" in category):
                 score += 12.0
 
             if (
@@ -13556,7 +14164,7 @@ Next action:
             ):
                 score += 10.0
 
-            if "project" in category or "nova" in content_lc:
+            if is_execution_chat and ("project" in category or "nova" in content_lc):
                 score += 9.0
 
             for term in priority_terms:
@@ -14858,8 +15466,9 @@ def _save_artifact_fallback(self, artifact: dict):
 
     def _execute_current_step(self, execution: dict, user_text: str, session_id: str = "", attachments=None) -> dict:
         attachments = attachments or []
-        execution = self._normalize_execution_state(dict(execution or {}))
-
+        execution = self._normalize_execution_state(
+            execution or {}
+        )
         steps = execution.get("steps") or []
         current_index = self._execution_current_index(execution)
 
@@ -14882,6 +15491,35 @@ def _save_artifact_fallback(self, artifact: dict):
             )
 
             execution.setdefault("step_results", [])
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                {},
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                {},
+            )
+
+            self._update_working_state(
+                session_id,
+                {
+                    "next_move": "",
+                    "active_task": "",
+                    "current_file": "",
+                    "current_bug": "",
+                    "checkpoint": "execution_complete",
+                    "last_success": (
+                        self._safe_str(execution.get("goal"))
+                        or "execution_complete"
+                    ),
+                    "execution_status": "complete",
+                },
+            )
+
             return {
                 "execution": execution,
                 "step_output": "No remaining execution step.",
@@ -15016,9 +15654,8 @@ def _save_artifact_fallback(self, artifact: dict):
             execution,
         )
 
-        self._set_session_meta(
+        self._save_active_execution(
             session_id,
-            "active_execution",
             execution,
         )
 
