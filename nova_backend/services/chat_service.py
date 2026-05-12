@@ -12787,9 +12787,27 @@ Next action:
             "2+2",
             "what is dns",
             "tell me a joke",
+            "who is austin rivers",
+            "who is jj redick",
         }
 
-        if lowered.strip() in generic_chat_inputs:
+        if (
+            lowered.strip() in generic_chat_inputs
+            or not any(
+                lowered.startswith(prefix)
+                for prefix in (
+                    "fix ",
+                    "build ",
+                    "create ",
+                    "make ",
+                    "implement ",
+                    "upgrade ",
+                    "wire ",
+                    "add ",
+                    "repair ",
+                )
+            )
+        ):
 
             patch["active_task"] = ""
             patch["next_move"] = ""
