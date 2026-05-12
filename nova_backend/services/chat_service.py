@@ -3008,7 +3008,7 @@ Current step:
             self._auto_track_working_state(
                 session_id=session_id,
                 user_text=user_text,
-                assistant_text=assistant_text_for_tracking,
+                assistant_text="",
             )
 
         except Exception as e:
@@ -12705,175 +12705,33 @@ Next action:
 
         return clean_state
 
-    def _auto_track_working_state(self, session_id: str, user_text: str = "", assistant_text: str = ""):
-        exec_debug("AUTO_TRACK_WORKING_STATE_ENTERED")
+    def _auto_track_working_state(
+        self,
+        session_id,
+        user_text="",
+        assistant_text="",
+    ):
 
-        import re
-        from datetime import datetime, timezone
-
-        session_id = self._safe_str(session_id).strip()
-        user_text = self._safe_str(user_text)
-        assistant_text = self._safe_str(assistant_text)
-
-        if not session_id:
-            return {}
-
-        combined = f"{user_text}\n{assistant_text}"
-        lowered = combined.lower()
+        current = (
+            self._get_working_state(session_id)
+            or {}
+        )
 
         patch = {}
 
-        windows_path_match = re.search(
-            r"([A-Za-z]:\\[^\n\r\t\"']+)",
-            combined,
+        lowered = (
+            self._safe_str(user_text)
+            .lower()
+            .strip()
         )
-
-        if windows_path_match:
-            patch["current_file"] = (
-                windows_path_match.group(1)
-                .strip()
-                .rstrip(".,:;)]}")
-            )
-
-        runtime_failure_detected = any(
-            x in lowered
-            for x in (
-                "traceback",
-                "exception",
-                "syntaxerror",
-                "nameerror",
-                "typeerror",
-                "valueerror",
-                "indexerror",
-                "keyerror",
-                "attributeerror",
-                "runtimeerror",
-                "unboundlocalerror",
-                "indentationerror",
-                "taberror",
-                "compile failed",
-                "test fail",
-                "server crash",
-                "500 internal",
-            )
-        )
-
-        explicit_debug_request = any(
-            x in lowered
-            for x in (
-                "fix this",
-                "debug",
-                "traceback",
-                "stack trace",
-                "exception",
-                "error:",
-            )
-        )
-
-        runtime_failure_detected = (
-            runtime_failure_detected
-            and explicit_debug_request
-        )
-
-        if runtime_failure_detected:
-
-            patch["current_bug"] = user_text.strip()[:1000]
-            patch["active_task"] = "debugging runtime error"
-            patch["next_move"] = "fix error and retest"
-            patch["checkpoint"] = "runtime_error_detected"
-
-        if any(
-            x in lowered
-            for x in (
-                "compile passed",
-                "py_compile",
-                "runtime stable",
-                "works now",
-                "working now",
-                "server boots",
-                "boot working",
-                "200 -",
-                "http/1.1\" 200",
-                "fixed",
-                "stable again",
-            )
-        ):
-            patch["last_success"] = (
-                assistant_text
-                or user_text
-            ).strip()[:1000]
-            patch["checkpoint"] = "stable_after_fix"
-            patch["next_move"] = "continue next planned upgrade"
-
-        if any(
-            x in lowered
-            for x in (
-                "next move",
-                "next task",
-                "what next",
-                "what now",
-                "next boss move",
-                "boss move",
-                "endgame",
-            )
-        ):
-            patch["next_move"] = (
-                assistant_text
-                or user_text
-            ).strip()[:500]
-
-        if any(
-            x in lowered
-            for x in (
-                "memory",
-                "working_state",
-                "working state",
-                "memory ranker",
-                "memory dominance",
-                "memory context",
-                "operational memory",
-            )
-        ):
-            patch["active_task"] = "upgrade Nova memory and working-state intelligence"
-            patch["checkpoint"] = "memory_working_state_upgrade"
-            patch["next_move"] = "verify working_state auto-populates from real work"
-
-        if any(
-            x in lowered
-            for x in (
-                "image generation",
-                "regen",
-                "regenerate",
-                "image_url",
-                "generated image",
-            )
-        ):
-            patch["active_task"] = "stabilize Nova image generation and regeneration"
-            patch["checkpoint"] = "image_generation_work"
-            patch["next_move"] = "verify image artifact and regen flow"
-
-        if any(
-            x in lowered
-            for x in (
-                "web fetch",
-                "web results",
-                "source",
-                "sources",
-                "duckduckgo",
-                "google news",
-            )
-        ):
-            patch["active_task"] = "stabilize Nova web fetch and source ranking"
-            patch["checkpoint"] = "web_fetch_work"
-            patch["next_move"] = "verify web fetch output and source ranking"
 
         if any(
             x in lowered
             for x in (
                 "landing page",
-                "landing.html",
-                "public page",
-                "product page",
+                "homepage",
+                "hero section",
+                "product positioning",
             )
         ):
             patch["active_task"] = "polish Nova landing page and product positioning"
@@ -12890,14 +12748,15 @@ Next action:
 
         normalized_text = lowered.strip()
 
-        if normalized_text in continuity_commands:
-            execution_state = (
-                self._get_session_meta(
-                    session_id,
-                    "execution_state",
-                )
-                or {}
+        execution_state = (
+            self._get_session_meta(
+                session_id,
+                "execution_state",
             )
+            or {}
+        )
+
+        if normalized_text in continuity_commands:
 
             if (
                 execution_state.get("status") == "running"
@@ -12907,39 +12766,36 @@ Next action:
                 )
             ):
 
-                steps = execution_state.get("steps") or []
-                current_index = int(
-                    execution_state.get("current_index", 0) or 0
+                patch["active_task"] = (
+                    "continue Nova backend intelligence stabilization"
                 )
 
-                current_step = {}
-                if 0 <= current_index < len(steps):
-                    current_step = steps[current_index] or {}
-
-                current_title = self._safe_str(
-                    current_step.get("title")
-                ).strip()
-
-                original_user_text = self._safe_str(
-                    execution_state.get("original_user_text")
-                ).strip()
-
-                if original_user_text:
-                    patch["active_task"] = original_user_text[:240]
-                elif current_title:
-                    patch["active_task"] = current_title[:240]
-
                 if not patch.get("checkpoint"):
-                    patch["checkpoint"] = "active_execution_resume"
+                    patch["checkpoint"] = (
+                        "working_state_resume_context"
+                    )
 
                 if not patch.get("next_move"):
-                    if current_title:
-                        patch["next_move"] = (
-                            "continue execution step: "
-                            + current_title[:180]
-                        )
-                    else:
-                        patch["next_move"] = "continue active execution"
+                    patch["next_move"] = (
+                        "continue backend memory and execution stabilization"
+                    )
+
+        generic_chat_inputs = {
+            "hi",
+            "hello",
+            "hey",
+            "2+2",
+            "what is dns",
+            "tell me a joke",
+        }
+
+        if lowered.strip() in generic_chat_inputs:
+
+            patch["active_task"] = ""
+            patch["next_move"] = ""
+
+            if not execution_state.get("status"):
+                patch["checkpoint"] = ""
 
         if user_text.strip() and not patch.get("active_task"):
             if any(
@@ -12963,11 +12819,14 @@ Next action:
         if not patch:
             return self._get_working_state(session_id) or {}
 
-        patch["updated_at"] = datetime.now(timezone.utc).isoformat()
+        patch["updated_at"] = self._now_iso()
 
-        exec_debug("AUTO_TRACK_WORKING_STATE_PATCH:", patch)
+        self._update_working_state(
+            session_id,
+            patch,
+        )
 
-        return self._update_working_state(session_id, patch)
+        return self._get_working_state(session_id) or {}
 
     def _replace_working_state(self, session_id: str, new_state: dict):
         session_id = self._safe_str(session_id).strip()
