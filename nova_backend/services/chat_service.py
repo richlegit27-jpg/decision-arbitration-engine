@@ -12900,21 +12900,39 @@ Next action:
                 )
             ):
 
-                patch["active_task"] = (
-                    "continue Nova backend intelligence stabilization"
+                steps = execution_state.get("steps") or []
+                current_index = int(
+                    execution_state.get("current_index", 0) or 0
                 )
 
+                current_step = {}
+                if 0 <= current_index < len(steps):
+                    current_step = steps[current_index] or {}
+
+                current_title = self._safe_str(
+                    current_step.get("title")
+                ).strip()
+
+                original_user_text = self._safe_str(
+                    execution_state.get("original_user_text")
+                ).strip()
+
+                if original_user_text:
+                    patch["active_task"] = original_user_text[:240]
+                elif current_title:
+                    patch["active_task"] = current_title[:240]
+
                 if not patch.get("checkpoint"):
-                    patch["checkpoint"] = (
-                        "working_state_resume_context"
-                    )
+                    patch["checkpoint"] = "active_execution_resume"
 
                 if not patch.get("next_move"):
-                    patch["next_move"] = (
-                        "continue backend memory and execution stabilization"
-                    )
-
-
+                    if current_title:
+                        patch["next_move"] = (
+                            "continue execution step: "
+                            + current_title[:180]
+                        )
+                    else:
+                        patch["next_move"] = "continue active execution"
 
         if user_text.strip() and not patch.get("active_task"):
             if any(
@@ -13161,6 +13179,7 @@ Next action:
                 sessions[index]["execution_state"] = {}
 
                 sessions[index]["active_execution"] = {}
+
                 sessions[index]["working_state"] = {
                     "active_task": "",
                     "current_file": "",
