@@ -116,8 +116,15 @@ class ChatService:
 
                 # allow explicit clearing
                 if value in [None, "", [], {}]:
+
                     if key in current:
                         del current[key]
+
+                    continue
+
+                # preserve structured state dictionaries
+                if isinstance(value, dict):
+                    current[key] = value
                     continue
 
                 normalized_value = self._safe_str(value).lower().strip()
@@ -1018,6 +1025,10 @@ Current step:
                 session_id,
                 "execution_state",
             )
+            or session.get("execution_state")
+            or session.get("active_execution")
+            or session.get("meta", {}).get("execution_state")
+            or session.get("meta", {}).get("active_execution")
             or {}
         )
 
@@ -1365,6 +1376,42 @@ Current step:
             or {}
         )
 
+        # =========================
+        # INVALID EXECUTION SANITIZER
+        # =========================
+
+        goal_text = self._safe_str(
+            live_execution.get("goal")
+        ).lower().strip()
+
+        invalid_goal = (
+            "respond normally" in goal_text
+            or (
+                isinstance(live_execution.get("goal"), dict)
+                and self._safe_str(
+                    live_execution["goal"].get("goal")
+                ).lower().strip() == "respond normally"
+            )
+        )
+
+        invalid_general_execution = (
+            invalid_goal
+            or self._safe_str(
+                live_execution.get("original_user_text")
+            ).lower().strip() == "run_step"
+        )
+
+        if invalid_general_execution:
+
+            print(
+                "SANITIZER CLEARED INVALID EXECUTION"
+            )
+
+            live_execution = {}
+
+            meta["active_execution"] = {}
+            meta["execution_state"] = {}
+
         execution_status = self._safe_str(
             live_execution.get("status")
         ).lower()
@@ -1508,26 +1555,148 @@ Current step:
             "needs_file_fix": False,
         }
 
+    def _reflect_on_execution_state(
+        self,
+        session_id: str = "",
+        execution_state=None,
+        user_text: str = "",
+        last_error: str = "",
+    ) -> dict:
+        session_id = self._safe_str(session_id).strip()
+        user_text = self._safe_str(user_text).strip()
+        last_error = self._safe_str(last_error).strip()
+
+        execution_state = (
+            execution_state
+            if isinstance(execution_state, dict)
+            else {}
+        )
+
+        status = self._safe_str(
+            execution_state.get("status")
+        ).lower().strip()
+
+        steps = execution_state.get("steps") or []
+        current_index = int(
+            execution_state.get("current_index")
+            or execution_state.get("current_step_index")
+            or 0
+        )
+
+        failed_steps = [
+            step
+            for step in steps
+            if isinstance(step, dict)
+            and self._safe_str(step.get("status")).lower().strip()
+            in {"failed", "error"}
+        ]
+
+        reflection = {
+            "status": status,
+            "has_error": bool(last_error),
+            "failed_step_count": len(failed_steps),
+            "current_index": current_index,
+            "risk": "low",
+            "recommended_action": "continue",
+            "reason": "Execution appears stable.",
+        }
+
+        if status in {"failed", "error"} or failed_steps:
+            reflection["risk"] = "high"
+            reflection["recommended_action"] = "recover"
+            reflection["reason"] = (
+                "Execution failure detected. Inspect failed step before retry."
+            )
+
+        elif status in {"complete", "completed"}:
+            reflection["risk"] = "low"
+            reflection["recommended_action"] = "stop"
+            reflection["reason"] = (
+                "Execution is already complete. Do not resurrect stale state."
+            )
+
+        elif not steps and user_text.lower() in {"next", "continue", "resume"}:
+            reflection["risk"] = "medium"
+            reflection["recommended_action"] = "empty_guard"
+            reflection["reason"] = (
+                "Continuation requested without active execution steps."
+            )
+
+        self._update_working_state(
+            session_id,
+            {
+                "last_reflection_action": reflection.get(
+                    "recommended_action"
+                ),
+                "last_reflection_reason": reflection.get("reason"),
+                "last_reflection_risk": reflection.get("risk"),
+            },
+        )
+
+        return reflection
     def _choose_execution_recovery_strategy(self, session_id: str, command: str, status: str, error_text: str = ""):
+        session_id = self._safe_str(session_id).strip()
+        command = self._safe_str(command).strip().lower()
+        status = self._safe_str(status).strip().lower()
+        error_text = self._safe_str(error_text).strip()
+
         working_state = self._get_working_state(session_id) or {}
 
-        failure_count = int(working_state.get("execution_failure_count") or 0)
-        score = int(working_state.get("execution_reward_score") or 0)
+        reflection = self._reflect_on_execution_state(
+            session_id=session_id,
+            execution_state=(
+                self._get_session_meta(
+                    session_id,
+                    "execution_state",
+                )
+                or {}
+            ),
+            user_text=command,
+            last_error=error_text,
+        )
 
-        if failure_count <= 0:
+        failure_count = int(
+            working_state.get("execution_failure_count")
+            or 0
+        )
+
+        score = int(
+            working_state.get("execution_reward_score")
+            or 0
+        )
+
+        if reflection.get("recommended_action") == "stop":
+            strategy = "stop_completed_execution"
+            next_move = "await_new_mission"
+
+        elif reflection.get("recommended_action") == "empty_guard":
+            strategy = "block_empty_continuation"
+            next_move = "await_new_mission"
+
+        elif reflection.get("recommended_action") == "recover":
+            strategy = "inspect_failed_execution"
+            next_move = "inspect_error_context"
+
+        elif failure_count <= 0:
             strategy = "retry_same_step"
             next_move = "retry_failed"
+
         elif failure_count == 1:
             strategy = "inspect_error_context"
             next_move = "auto_fix_failure"
+
         elif failure_count == 2:
             strategy = "use_smaller_patch_scope"
             next_move = "function_scoped_auto_fix"
+
         else:
             strategy = "stop_and_request_traceback"
             next_move = "request_traceback"
 
-        if score <= -15:
+        if score <= -15 and strategy not in {
+            "stop_completed_execution",
+            "block_empty_continuation",
+        }:
             strategy = "stop_and_change_plan"
             next_move = "manual_review_required"
 
@@ -1538,13 +1707,19 @@ Current step:
                 "next_move": next_move,
                 "last_strategy_command": command,
                 "last_strategy_status": status,
-                "last_strategy_error": self._safe_str(error_text),
+                "last_strategy_error": error_text,
+                "last_reflection_action": reflection.get(
+                    "recommended_action"
+                ),
+                "last_reflection_reason": reflection.get("reason"),
+                "last_reflection_risk": reflection.get("risk"),
             },
         )
 
         return strategy
 
     def _record_execution_reward(self, session_id: str, command: str, status: str, error_text: str = ""):
+        session_id = self._safe_str(session_id).strip()
         command = self._safe_str(command).strip().lower()
         status = self._safe_str(status).strip().lower()
         error_text = self._safe_str(error_text).strip()
@@ -1553,13 +1728,20 @@ Current step:
 
         if status in {"success", "complete", "completed", "passed"}:
             reward += 10
+
         elif status in {"failed", "error"}:
             reward -= 5
+
         elif status in {"cancelled", "canceled"}:
             reward -= 1
 
         working_state = self._get_working_state(session_id) or {}
-        current_score = int(working_state.get("execution_reward_score") or 0)
+
+        current_score = int(
+            working_state.get("execution_reward_score")
+            or 0
+        )
+
         new_score = current_score + reward
 
         self._update_working_state(
@@ -4240,9 +4422,20 @@ Current step:
                     execution_state,
                 )
 
+            working_state = (
+                self._get_working_state(session_id)
+                or {}
+            )
+
+            mission_state = self._build_mission_state(
+                working_state=working_state,
+                execution_state=execution_state,
+            )
+
             self._update_working_state(
                 session_id,
                 {
+                    "mission": mission_state,
                     "active_task": user_text,
                     "next_move": "run_step",
                     "checkpoint": "execution_plan_created",
@@ -7488,24 +7681,17 @@ Current step:
             )
             return mission_result
 
-        if mission_result is not None:
-            return mission_result
-
-        brain_state = self._build_brain_state(
-            execution_state=execution_state,
-            working_state=self._get_session_meta(session_id, "working_state"),
-            session=session_id,
-            user_text=text
-        )
-
         # =========================
         # BRAIN CONTROL GATE
         # =========================
         brain_state = self._build_brain_state(
             execution_state=execution_state,
-            working_state=self._get_session_meta(session_id, "working_state"),
+            working_state=self._get_session_meta(
+                session_id,
+                "working_state",
+            ),
             session=session_id,
-            user_text=text
+            user_text=text,
         )
 
         action = self._decide_brain_action(brain_state)
@@ -7525,21 +7711,12 @@ Current step:
         if action == "chat":
 
             chat_result = self._execute_general_chat(
-                user_text,
-                session_id,
+                user_text=user_text,
+                session_id=session_id,
             )
 
             if isinstance(chat_result, dict):
                 return chat_result
-
-            return {
-                "ok": True,
-                "assistant_message": self._build_assistant_message(
-                    chat_result
-                ),
-                "execution": None,
-                "brain_action": "chat",
-            }
 
             return {
                 "ok": True,
@@ -8104,7 +8281,16 @@ Current step:
         if lowered in explicit_execution_commands:
             ws = self._get_working_state(session_id) or {}
 
-            execution = ws.get("execution_state", {})
+            execution = (
+                self._get_session_meta(
+                    session_id,
+                    "execution_state",
+                )
+                or session.get("execution_state")
+                or session.get("active_execution")
+                or ws.get("execution_state")
+                or {}
+            )
 
             if lowered == "resume" and not any([
                 ws.get("active_task"),
@@ -8243,10 +8429,40 @@ Current step:
 
         return result
 
+        # =========================
+        # BLOCK GENERAL CHAT FAKE EXECUTION
+        # =========================
+
     def _process_goal_and_plan(self, user_text: str, session_id: str):
         user_text = self._safe_str(user_text).strip()
 
         goal = self._build_goal(user_text)
+
+
+        if (
+            isinstance(goal, dict)
+            and str(goal.get("type") or "").strip().lower() == "general"
+            and str(goal.get("goal") or "").strip().lower() == "respond normally"
+        ):
+
+            exec_debug(
+                "BLOCKED GENERAL CHAT EXECUTION PLAN"
+            )
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                {},
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                {},
+            )
+
+            return None
+
         plan = self._build_plan(goal)
 
         normalized_steps = []
@@ -13973,6 +14189,29 @@ Next action:
 
         execution_status = self._safe_str(execution_state.get("status")).strip()
         execution_goal = self._safe_str(execution_state.get("goal")).strip()
+
+        invalid_execution_goal = (
+            "respond normally" in execution_goal.lower()
+        )
+
+        if invalid_execution_goal:
+
+            execution_status = ""
+            execution_goal = ""
+
+            execution_state = {}
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                {},
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                {},
+            )
 
         blockers = []
         priorities = []
