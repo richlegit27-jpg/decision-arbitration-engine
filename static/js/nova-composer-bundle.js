@@ -1569,22 +1569,29 @@ function removeMessage(messageId) {
 function applyStatePayload(payload) {
   const data = payload && typeof payload === "object" ? payload : {};
 
-  let nextSessionId = state.activeSessionId;
-
-  if (!nextSessionId) {
-    nextSessionId = String(
-      data.active_session_id ||
-      data.session_id ||
-      (data.session && data.session.id) ||
-      ""
-    ).trim();
-  }
+let nextSessionId = String(
+  data.active_session_id ||
+  data.session_id ||
+  (data.session && data.session.id) ||
+  state.activeSessionId ||
+  ""
+).trim();
 
   if (nextSessionId) {
     state.activeSessionId = nextSessionId;
     window.NovaComposerState = window.NovaComposerState || {};
     window.NovaComposerState.activeSessionId = nextSessionId;
   }
+
+console.warn(
+  "[SESSION SYNC]",
+  {
+    nextSessionId,
+    previous: state.activeSessionId,
+    payload_session_id: data.session_id,
+    payload_active_session_id: data.active_session_id,
+  }
+);
 
   const activeSession =
     (Array.isArray(data.sessions) &&

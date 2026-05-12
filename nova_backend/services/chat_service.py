@@ -4727,22 +4727,13 @@ Current step:
                     assistant_msg=assistant_msg,
                 )
 
-                return self._finalize_response(
-                    session_id=session_id,
-                    user_text=user_text,
-                    user_msg={
-                        "role": "user",
-                        "text": user_text,
-                        "attachments": [],
-                        "meta": {},
-                    },
-                    assistant_msg=assistant_msg,
-                    saved_artifact=None,
-                )
-
             working_state = self._get_working_state(session_id)
+
             execution_state = (
-                self._get_session_meta(session_id, "execution_state")
+                self._get_session_meta(
+                    session_id,
+                    "execution_state",
+                )
                 or {}
             )
 
@@ -4752,35 +4743,43 @@ Current step:
                 execution_state=execution_state,
             )
 
-            working_state = reconciled.get("working_state") or {}
-            execution_state = reconciled.get("execution_state") or {}
+            working_state = (
+                reconciled.get("working_state")
+                or {}
+            )
+
+            execution_state = (
+                reconciled.get("execution_state")
+                or {}
+            )
 
             mission_state = self._build_mission_state(
                 working_state=working_state,
                 execution_state=execution_state,
             )
 
-            assistant_text = self._format_mission_state(mission_state)
+            assistant_text = self._format_mission_state(
+                mission_state
+            )
 
-            return self._finalize_response(
-                session_id=session_id,
-                assistant_msg={
-                    "role": "assistant",
-                    "text": assistant_text,
-                    "attachments": [],
-                    "meta": {
-                        "route": "mission_state_continuity",
-                    },
-                },
-                user_text=user_text,
-                decision={
-                    "route": (
-                        "mission_state_continuity"
-                        if has_real_state
-                        else self.ROUTE_GENERAL_CHAT
+            return {
+                "ok": True,
+                "assistant_message": (
+                    self._build_assistant_message(
+                        "No active working state is currently tracked."
+                    )
+                ),
+                "session": self._get_session_payload(
+                    session_id
+                ),
+                "saved_artifact": None,
+                "artifacts": [],
+                "debug": {
+                    "route_taken": (
+                        "mission_state_continuity_suppressed"
                     ),
                 },
-            )
+            }
 
         route = self._safe_str(
             decision.get("route")
@@ -4883,7 +4882,7 @@ Current step:
             ])
 
             if (
-                not has_real_working_state
+                not has_real_state
                 and not has_real_execution
             ):
                 used_memories = []
