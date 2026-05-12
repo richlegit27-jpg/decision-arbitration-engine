@@ -12779,6 +12779,19 @@ Next action:
 
         if stale_state:
 
+            self._replace_working_state(
+                session_id,
+                {
+                    "active_task": "",
+                    "current_file": "",
+                    "current_bug": "",
+                    "last_success": "",
+                    "next_move": "",
+                    "checkpoint": "",
+                    "updated_at": "",
+                },
+            )
+
             current = {
                 "active_task": "",
                 "current_file": "",
@@ -12828,20 +12841,14 @@ Next action:
             or {}
         )
 
-        if normalized_text in continuity_commands:
+        if (
+            normalized_text in continuity_commands
+            and execution_state.get("status") == "running"
+        ):
 
             if (
-                execution_state.get("status") == "running"
-                and (
-                    execution_state.get(
-                        "current_index",
-                        0,
-                    )
-                    < len(
-                        execution_state.get("steps")
-                        or []
-                    )
-                )
+                execution_state.get("current_index", 0)
+                < len(execution_state.get("steps") or [])
             ):
 
                 patch["active_task"] = (
