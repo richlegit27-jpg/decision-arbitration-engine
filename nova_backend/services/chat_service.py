@@ -89,18 +89,42 @@ class ChatService:
         if not isinstance(patch, dict):
             patch = {}
 
+        blocked_state_values = {
+            "",
+            "continuity_working",
+            "working_state_resume_context",
+            "no active work to resume.",
+        }
+
+        protected_keys = {
+            "last_success",
+            "checkpoint",
+            "next_move",
+            "active_task",
+            "current_bug",
+        }
+
         try:
             current = self._get_working_state(session_id)
             current = current if isinstance(current, dict) else {}
 
             for key, value in patch.items():
+                key = self._safe_str(key).strip()
+
+                if not key:
+                    continue
 
                 # allow explicit clearing
                 if value in [None, "", [], {}]:
-
                     if key in current:
                         del current[key]
+                    continue
 
+                normalized_value = self._safe_str(value).lower().strip()
+
+                if key in protected_keys and normalized_value in blocked_state_values:
+                    if key in current:
+                        del current[key]
                     continue
 
                 current[key] = value
@@ -948,8 +972,19 @@ Current step:
             if not isinstance(working_state, dict):
                 working_state = {}
 
-            working_state["mission"] = mission
+            has_real_execution = any([
+                working_state.get("active_task"),
+                working_state.get("current_file"),
+                working_state.get("current_bug"),
+                working_state.get("next_move"),
+                working_state.get("checkpoint"),
+            ])
 
+            if has_real_execution:
+                working_state["mission"] = mission
+
+            else:
+                working_state.pop("mission", None)
             if hasattr(self.sessions, "update_working_state"):
                 self.sessions.update_working_state(session_id, working_state)
 
@@ -957,46 +992,186 @@ Current step:
             logger.error(f"[mission] failed to save mission state: {e}")
 
     def _resolve_mission_command(self, user_text: str, session_id: str = "") -> dict:
-        text = str(user_text or "").lower().strip()
+        text = self._safe_str(user_text).lower().strip()
 
         session = self._get_session_payload(session_id)
-        working_state = session.get("working_state", {}) if isinstance(session, dict) else {}
-        mission = working_state.get("mission", {}) if isinstance(working_state, dict) else {}
+        working_state = (
+            session.get("working_state", {})
+            if isinstance(session, dict)
+            else {}
+        )
+
+        if not isinstance(working_state, dict):
+            working_state = {}
+
+        mission = (
+            working_state.get("mission", {})
+            if isinstance(working_state, dict)
+            else {}
+        )
+
+        if not isinstance(mission, dict):
+            mission = {}
+
+        execution_state = (
+            self._get_session_meta(
+                session_id,
+                "execution_state",
+            )
+            or {}
+        )
+
+        if not isinstance(execution_state, dict):
+            execution_state = {}
 
         if text in {"next", "nex", "continue", "resume"}:
+
+            has_real_state = any(
+                [
+                    working_state.get("active_task"),
+                    working_state.get("current_file"),
+                    working_state.get("current_bug"),
+                    working_state.get("next_move"),
+                    working_state.get("checkpoint"),
+                ]
+            )
+
+            has_real_execution = any(
+                [
+                    bool(execution_state.get("steps")),
+                    execution_state.get("current_step"),
+                    self._safe_str(
+                        execution_state.get("status")
+                    ).lower().strip()
+                    == "running",
+                ]
+            )
+
+            if not has_real_state and not has_real_execution:
+                message = (
+                    "No active work to resume."
+                    if text == "resume"
+                    else "No active execution to continue."
+                )
+
+                return {
+                    "ok": True,
+                    "is_mission": True,
+                    "type": "empty_next_guard",
+                    "next_action": "none",
+                    "mission": {},
+                    "assistant_message": self._build_assistant_message(
+                        message
+                    ),
+                    "execution": execution_state,
+                }
+
             return {
+                "ok": True,
                 "is_mission": True,
                 "type": "continue",
                 "mission": mission,
                 "next_action": (
                     "retry_failed"
-                    if str(mission.get("status") or "").lower() in ("error", "failed")
+                    if self._safe_str(
+                        mission.get("status")
+                    ).lower().strip()
+                    in {"error", "failed"}
                     else mission.get("next_action") or "run_step"
                 ),
+                "execution": execution_state,
             }
 
         if text in {"run it", "run", "execute", "go"}:
             return {
+                "ok": True,
                 "is_mission": True,
                 "type": "execute",
                 "mission": mission,
                 "next_action": mission.get("next_action") or "run_execution",
+                "execution": execution_state,
             }
 
         if text in {"what next", "what now"}:
             return {
+                "ok": True,
                 "is_mission": True,
                 "type": "inspect",
                 "mission": mission,
                 "next_action": mission.get("next_action") or "inspect_state",
+                "execution": execution_state,
             }
 
         return {
+            "ok": True,
             "is_mission": False,
             "type": "",
             "mission": mission,
             "next_action": "",
+            "execution": execution_state,
         }
+
+    def _handle_mission_command_result(
+        self,
+        mission_command=None,
+        session_id: str = "",
+    ):
+        if not isinstance(mission_command, dict):
+            return None
+
+        mission_type = self._safe_str(
+            mission_command.get("type")
+        ).lower().strip()
+
+        if mission_type == "empty_next_guard":
+            return {
+                "ok": True,
+                "assistant_message": (
+                    mission_command.get("assistant_message")
+                    or self._build_assistant_message(
+                        "No active execution to continue."
+                    )
+                ),
+                "execution": mission_command.get("execution") or {},
+                "session": self._get_session_payload(session_id),
+                "debug": {
+                    "route_taken": "empty_next_guard",
+                },
+            }
+
+        if mission_command.get("is_mission") is not True:
+            return None
+
+        next_action = self._safe_str(
+            mission_command.get("next_action")
+        ).lower().strip()
+
+        execution_state = mission_command.get("execution") or {}
+
+        if mission_type in {"continue", "execute"}:
+            return self._process_execution_command(
+                command=next_action or "run_step",
+                session_id=session_id,
+                execution_state=execution_state,
+            )
+
+        if mission_type == "inspect":
+            mission = mission_command.get("mission") or {}
+
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    mission.get("recommended_next_move")
+                    or "Inspect current mission state."
+                ),
+                "execution": execution_state,
+                "session": self._get_session_payload(session_id),
+                "debug": {
+                    "route_taken": "mission_inspect",
+                },
+            }
+
+        return None
 
     def _get_session_meta(self, session_id: str, key: str = "", default=None):
         session_id = self._safe_str(session_id).strip()
@@ -1214,20 +1389,38 @@ Current step:
         return payload
 
     def _ensure_session_id(self, session_id: str = "") -> str:
-        sid = str(session_id or "").strip()
-        if sid:
+        sid = self._safe_str(session_id).strip()
+
+        if (
+            sid.startswith("session_")
+            and " " not in sid
+            and len(sid) >= 20
+        ):
             return sid
 
         created = None
+
         if hasattr(self.sessions, "create_session"):
             created = self.sessions.create_session()
+
         elif hasattr(self.sessions, "new_session"):
             created = self.sessions.new_session()
 
         if isinstance(created, dict):
-            return str(created.get("id") or "").strip()
+
+            created_id = self._safe_str(
+                created.get("id")
+            ).strip()
+
+            if (
+                created_id.startswith("session_")
+                and " " not in created_id
+                and len(created_id) >= 20
+            ):
+                return created_id
 
         import uuid
+
         return f"session_{uuid.uuid4().hex}"
 
     def _analyze_execution_state(self, execution_state=None, last_error: str = "") -> dict:
@@ -2907,14 +3100,26 @@ Current step:
                     break
 
             if not used_memory_items:
+
                 try:
-                    ranked = self._rank_memory_context(
-                        user_text=user_text,
-                        limit=6,
+
+                    used_memory_items = (
+                        getattr(
+                            self,
+                            "_last_used_memory_items",
+                            [],
+                        )
+                        or []
                     )
 
-                    if isinstance(ranked, list):
-                        used_memory_items = ranked
+                except Exception as e:
+
+                    exec_debug(
+                        "FINALIZE_MEMORY_USED_ERROR:",
+                        e,
+                    )
+
+                    used_memory_items = []
 
                 except Exception as e:
                     exec_debug(
@@ -4086,11 +4291,52 @@ Current step:
             "what is the active task",
             "active task",
             "what are we doing",
-            "where are we",
+            "resume mission",
+            "resume task",
+            "show mission",
+            "show working state",
+            "show execution",
             "where are we now",
         }
 
         if text_lc in operational_queries:
+
+            working_state = (
+                self._get_working_state(session_id)
+                or {}
+            )
+
+            has_real_state = any([
+                working_state.get("active_task"),
+                working_state.get("current_file"),
+                working_state.get("current_bug"),
+                working_state.get("next_move"),
+                working_state.get("checkpoint"),
+            ])
+
+            if not has_real_state:
+
+                assistant_msg = (
+                    self._build_assistant_message(
+                        text=(
+                            "No active working state is currently tracked."
+                        )
+                    )
+                )
+
+                return self._finalize_response(
+                    session_id=session_id,
+                    user_text=user_text,
+                    user_msg={
+                        "role": "user",
+                        "text": user_text,
+                        "attachments": [],
+                        "meta": {},
+                    },
+                    assistant_msg=assistant_msg,
+                    saved_artifact=None,
+                )
+
             working_state = self._get_working_state(session_id)
             execution_state = (
                 self._get_session_meta(session_id, "execution_state")
@@ -4125,7 +4371,11 @@ Current step:
                 },
                 user_text=user_text,
                 decision={
-                    "route": "mission_state_continuity",
+                    "route": (
+                        "mission_state_continuity"
+                        if has_real_state
+                        else self.ROUTE_GENERAL_CHAT
+                    ),
                 },
             )
 
@@ -4197,13 +4447,37 @@ Current step:
 
         try:
 
-            ranked_memories = self._rank_memory_context(
-                memories=used_memories,
-                user_text=user_text,
-                working_state=working_state,
-                execution_state=execution_state,
-                limit=5,
-            )
+            has_real_working_state = any([
+                working_state.get("active_task"),
+                working_state.get("current_file"),
+                working_state.get("current_bug"),
+                working_state.get("next_move"),
+                working_state.get("checkpoint"),
+            ])
+
+            has_real_execution = any([
+                execution_state.get("steps"),
+                execution_state.get("current_step"),
+                execution_state.get("status") == "running",
+            ])
+
+            if (
+                not has_real_working_state
+                and not has_real_execution
+            ):
+                used_memories = []
+                dominant_memory = []
+                memory_dominance_debug = []
+                ranked_memories = []
+
+            else:
+                ranked_memories = self._rank_memory_context(
+                    memories=used_memories,
+                    user_text=user_text,
+                    working_state=working_state,
+                    execution_state=execution_state,
+                    limit=5,
+                )
 
             for mem in ranked_memories:
 
@@ -4238,8 +4512,26 @@ Current step:
 
         dominance_block = ""
 
-        if dominant_memory:
+        continuity_queries = [
+            "continue",
+            "resume",
+            "what's next",
+            "next step",
+            "next move",
+            "active task",
+            "current file",
+            "show working state",
+            "show mission",
+            "execution",
+            "checkpoint",
+        ]
 
+        should_apply_dominance = any(
+            q in text_lc
+            for q in continuity_queries
+        )
+
+        if dominant_memory and should_apply_dominance:
             dominance_block = (
                 "\n\n"
                 "HIGH PRIORITY MEMORY:\n"
@@ -4301,6 +4593,35 @@ Current step:
             )
 
             previous_user = ""
+
+            for msg in reversed(session_messages):
+
+                if not isinstance(msg, dict):
+                    continue
+
+                role = self._safe_str(msg.get("role"))
+                text = self._safe_str(msg.get("text")).strip()
+
+                if role != "user":
+                    continue
+
+                # block corrupted context leaks
+                lowered = text.lower()
+
+                blocked = [
+                    "mission:",
+                    "working state:",
+                    "next move:",
+                    "target file:",
+                    "resumed context",
+                    "we're still lined up",
+                ]
+
+                if any(b in lowered for b in blocked):
+                    continue
+
+                previous_user = text
+                break
 
             user_messages = [
                 m for m in session_messages
@@ -7148,6 +7469,36 @@ Current step:
         }
 
         # =========================
+        # MISSION COMMAND GATE
+        # =========================
+        mission_command = self._resolve_mission_command(
+            user_text=text,
+            session_id=session_id,
+        )
+
+        mission_result = self._handle_mission_command_result(
+            mission_command=mission_command,
+            session_id=session_id,
+        )
+
+        if mission_result is not None:
+            exec_debug(
+                "MISSION GATE RETURN:",
+                mission_command.get("type"),
+            )
+            return mission_result
+
+        if mission_result is not None:
+            return mission_result
+
+        brain_state = self._build_brain_state(
+            execution_state=execution_state,
+            working_state=self._get_session_meta(session_id, "working_state"),
+            session=session_id,
+            user_text=text
+        )
+
+        # =========================
         # BRAIN CONTROL GATE
         # =========================
         brain_state = self._build_brain_state(
@@ -7172,6 +7523,24 @@ Current step:
 
         # CHAT EXIT PATH
         if action == "chat":
+
+            chat_result = self._execute_general_chat(
+                user_text,
+                session_id,
+            )
+
+            if isinstance(chat_result, dict):
+                return chat_result
+
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    chat_result
+                ),
+                "execution": None,
+                "brain_action": "chat",
+            }
+
             return {
                 "ok": True,
                 "assistant_message": self._build_assistant_message(
@@ -7709,6 +8078,7 @@ Current step:
             "next",
             "nex",
             "continue",
+            "resume",
             "continue on",
             "keep going",
             "go",
@@ -7736,10 +8106,40 @@ Current step:
 
             execution = ws.get("execution_state", {})
 
-            # =========================
+            if lowered == "resume" and not any([
+                ws.get("active_task"),
+                ws.get("current_file"),
+                ws.get("current_bug"),
+                ws.get("next_move"),
+                ws.get("checkpoint"),
+                execution.get("steps"),
+                execution.get("current_step"),
+                execution.get("status") == "running",
+            ]):
+                return {
+                    "ok": True,
+                    "assistant_message": self._build_assistant_message(
+                        "No active work to resume."
+                    ),
+                    "skip_rewrite": True,
+                    "session": self._get_session_payload(session_id),
+                    "debug": {
+                        "route_taken": "resume_empty_state_guard",
+                    },
+                }
+
+            # ==========================
             # FORCE SINGLE EXECUTION PIPELINE
-            # =========================
-            if lowered in {"next", "nex", "continue", "continue on", "keep going", "go"}:
+            # ==========================
+            if lowered in {
+                "next",
+                "nex",
+                "continue",
+                "resume",
+                "continue on",
+                "keep going",
+                "go",
+            }:
                 return self._handle_execution_control(
                     user_text="run_step",
                     session_id=session_id,
@@ -7752,6 +8152,7 @@ Current step:
                     session_id=session_id,
                     attachments=attachments,
                 )
+
 
             if execution.get("locked"):
                 return {
@@ -7802,6 +8203,22 @@ Current step:
             attachments=attachments,
             session_id=session_id,
         )
+
+        if (
+            isinstance(decision, dict)
+            and decision.get("route") == "resume_empty_state_guard"
+        ):
+
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(
+                    "No active work to resume."
+                ),
+                "skip_rewrite": True,
+                "debug": {
+                    "route_taken": "resume_empty_state_guard",
+                },
+            }
 
         result = self._execute_general_chat(
             decision=decision,
@@ -10952,6 +11369,27 @@ Auto-fix result:
             confidence = 0.9
             reasons.append("continuity_query")
 
+        mission_state = self._build_mission_state(
+            working_state=working_state,
+            execution_state=execution_state,
+        )
+
+        autonomous_direction = ""
+
+        if has_failed_steps:
+            autonomous_direction = retry_strategy
+
+        elif has_active_execution:
+            autonomous_direction = "continue_execution"
+
+        elif mission_state.get("recommended_next_move"):
+            autonomous_direction = (
+                mission_state.get("recommended_next_move")
+            )
+
+        else:
+            autonomous_direction = "await_user_input"
+
         return {
             "route": route,
             "intent": intent,
@@ -10960,12 +11398,10 @@ Auto-fix result:
             "priority": priority,
             "confidence": confidence,
             "reasons": reasons or ["default_intelligence_state"],
-            "mission": {
-                "active_task": working_state.get("active_task", ""),
-                "current_file": working_state.get("current_file", ""),
-                "next_move": working_state.get("next_move", ""),
-                "checkpoint": working_state.get("checkpoint", ""),
-            },
+
+            "mission": mission_state,
+            "autonomous_direction": autonomous_direction,
+
             "execution": execution_state,
             "failed_steps": failed_steps,
             "has_failed_steps": has_failed_steps,
@@ -11213,6 +11649,39 @@ Auto-fix result:
         }
 
         if text in execution_commands:
+            print("EXECUTION COMMAND TEXT =", repr(text))
+            print("HAS WORKING MISSION =", has_working_mission)
+            print("HAS ACTIVE EXECUTION =", has_active_execution)
+
+            if (
+                text == "resume"
+                and not has_working_mission
+                and not has_active_execution
+            ):
+                return {
+                    "route": "resume_empty_state_guard",
+                    "mode": "system",
+                    "confidence": 1.0,
+                    "reasons": ["empty_resume_guard"],
+                    "save_artifact": False,
+                    "save_memory": False,
+                    "use_memory": False,
+                }
+
+            if (
+                text == "resume"
+                and not has_working_mission
+                and not has_active_execution
+            ):
+                return {
+                    "route": "resume_empty_state_guard",
+                    "mode": "system",
+                    "confidence": 1.0,
+                    "reasons": ["empty_resume_guard"],
+                    "save_artifact": False,
+                    "save_memory": False,
+                    "use_memory": False,
+                }
 
             if text in continue_commands and has_working_mission:
 
@@ -13118,11 +13587,8 @@ Next action:
             previous_state.get("checkpoint")
         ).strip()
 
-        if not last_success:
-            last_success = "continuity_working"
-
-        if not checkpoint:
-            checkpoint = "intelligence_polish_ready"
+        last_success = ""
+        checkpoint = ""
 
         self._replace_working_state(
             session_id,
@@ -13510,6 +13976,25 @@ Next action:
 
         blockers = []
         priorities = []
+
+        blocked_state_values = {
+            "",
+            "continuity_working",
+            "working_state_resume_context",
+            "no active work to resume.",
+        }
+
+        if last_success.lower() in blocked_state_values:
+            last_success = ""
+
+        if next_move.lower() in blocked_state_values:
+            next_move = ""
+
+        if checkpoint.lower() in blocked_state_values:
+            checkpoint = ""
+
+        if active_task.lower() in blocked_state_values:
+            active_task = ""
 
         mission = "Stabilize Nova intelligence and autonomous execution."
 
@@ -14182,6 +14667,51 @@ Next action:
                 if len(word) >= 4 and word in content_lc:
                     score += 2.0
 
+            casual_query = any(
+                x in text_lc
+                for x in [
+                    "hi",
+                    "hello",
+                    "hey",
+                    "yo",
+                    "sup",
+                    "what is",
+                    "who is",
+                    "tell me",
+                    "joke",
+                    "2+2",
+                    "how are you",
+                ]
+            )
+
+            operational_query = any(
+                x in text_lc
+                for x in [
+                    "continue",
+                    "resume",
+                    "next",
+                    "what next",
+                    "active task",
+                    "where are we",
+                    "current file",
+                    "fix",
+                    "execution",
+                    "run step",
+                    "run all",
+                ]
+            )
+
+            if (
+                casual_query
+                and not operational_query
+                and (
+                    "operational" in category
+                    or "execution" in category
+                    or "working" in category
+                )
+            ):
+                score -= 25.0
+
             if is_execution_chat and "operational" in category:
                 score += 15.0
 
@@ -14203,6 +14733,37 @@ Next action:
 
             if is_execution_chat and ("project" in category or "nova" in content_lc):
                 score += 9.0
+
+            has_real_state = any([
+                working_state.get("active_task"),
+                working_state.get("current_file"),
+                working_state.get("current_bug"),
+                working_state.get("next_move"),
+                working_state.get("checkpoint"),
+                execution_state.get("steps"),
+                execution_state.get("current_step"),
+                execution_state.get("status") == "running",
+            ])
+
+            if not has_real_state:
+
+                blocked_categories = {
+                    "operational",
+                    "execution",
+                    "working",
+                }
+
+                blocked_kinds = {
+                    "goal",
+                    "task",
+                    "mission",
+                }
+
+                if (
+                    category in blocked_categories
+                    or kind in blocked_kinds
+                ):
+                    score -= 100.0
 
             for term in priority_terms:
                 if term and term in content_lc:
@@ -14264,16 +14825,36 @@ Next action:
         )
 
         try:
-            print(
-                "[MEMORY DOMINANCE TOP]",
-                [
-                    {
-                        "score": item.get("score"),
-                        "content": str(item.get("content") or "")[:120],
+            should_debug_memory_dominance = any(
+                (
+                    isinstance(item, dict)
+                    and isinstance(item.get("memory"), dict)
+                    and self._safe_str(
+                        item.get("memory", {}).get("category")
+                    ).lower()
+                    in {
+                        "operational",
+                        "execution",
+                        "working",
                     }
-                    for item in ranked[:5]
-                ],
+                )
+                for item in ranked[:5]
             )
+
+            if should_debug_memory_dominance:
+                print(
+                    "[MEMORY DOMINANCE TOP]",
+                    [
+                        {
+                            "score": item.get("score"),
+                            "content": str(
+                                item.get("content") or ""
+                            )[:120],
+                        }
+                        for item in ranked[:5]
+                    ],
+                )
+
         except Exception as e:
             exec_debug("MEMORY_DOMINANCE_AUDIT_FAILED:", e)
 
@@ -14552,6 +15133,10 @@ Next action:
             kind = self._safe_str(item.get("kind")).lower()
             if kind in {"project", "preference", "profile", "goal"}:
                 return True
+
+
+
+
 
             return False
 
@@ -15151,6 +15736,30 @@ def _save_artifact_fallback(self, artifact: dict):
             memory_context = ""
             working_context_block = ""
 
+        working_state = (
+            self._get_working_state(session_id)
+            or {}
+        )
+
+        execution_state = (
+            self._get_session_meta(
+                session_id,
+                "execution_state",
+            )
+            or {}
+        )
+
+        has_real_state = any([
+            working_state.get("active_task"),
+            working_state.get("current_file"),
+            working_state.get("current_bug"),
+            working_state.get("next_move"),
+            working_state.get("checkpoint"),
+            execution_state.get("steps"),
+            execution_state.get("current_step"),
+            execution_state.get("status") == "running",
+        ])
+
         memory_items = self._rank_memory_context(
             user_text=user_text,
             limit=20,
@@ -15167,7 +15776,18 @@ def _save_artifact_fallback(self, artifact: dict):
             text = self._safe_str(
                 item.get("text") or item.get("content")
             )
+
             key = text.lower().strip()
+
+            blocked_memory_values = {
+                "",
+                "continuity_working",
+                "working_state_resume_context",
+                "no active work to resume.",
+            }
+
+            if key in blocked_memory_values:
+                return
 
             if not key or key in seen:
                 return
@@ -15175,57 +15795,258 @@ def _save_artifact_fallback(self, artifact: dict):
             seen.add(key)
             selected_memory.append(item)
 
-        for item in memory_items:
-            if isinstance(item, dict) and item.get("pinned"):
-                add_memory_item(item)
+        # =========================
+        # PINNED MEMORY FIRST
+        # =========================
 
         for item in memory_items:
+
+            if not isinstance(item, dict):
+                continue
+
+            if not item.get("pinned"):
+                continue
+
+            category = self._safe_str(
+                item.get("category")
+            ).lower()
+
+            kind = self._safe_str(
+                item.get("kind")
+            ).lower()
+
+            if not has_real_state:
+
+                blocked_categories = {
+                    "operational",
+                    "execution",
+                    "working",
+                }
+
+                blocked_kinds = {
+                    "goal",
+                    "task",
+                    "mission",
+                }
+
+                if (
+                    category in blocked_categories
+                    or kind in blocked_kinds
+                ):
+                    continue
+
+            add_memory_item(item)
+
+        # =========================
+        # IMPORTANT MEMORY TYPES
+        # =========================
+
+        for item in memory_items:
+
             if not isinstance(item, dict):
                 continue
 
             if item.get("pinned"):
                 continue
 
-            kind = self._safe_str(item.get("kind")).lower()
-            if kind in ["preference", "goal", "project", "profile"]:
+            kind = self._safe_str(
+                item.get("kind")
+            ).lower()
+
+            if not has_real_state and kind in {
+                "goal",
+                "task",
+                "mission",
+            }:
+                continue
+
+            if kind in [
+                "preference",
+                "goal",
+                "project",
+                "profile",
+            ]:
                 add_memory_item(item)
 
+        # =========================
+        # HIGH WEIGHT MEMORIES
+        # =========================
+
         for item in memory_items:
+
             if not isinstance(item, dict):
                 continue
 
             if item in selected_memory:
                 continue
 
+            category = self._safe_str(
+                item.get("category")
+            ).lower()
+
+            kind = self._safe_str(
+                item.get("kind")
+            ).lower()
+
+            if not has_real_state:
+
+                blocked_categories = {
+                    "operational",
+                    "execution",
+                    "working",
+                }
+
+                blocked_kinds = {
+                    "goal",
+                    "task",
+                    "mission",
+                }
+
+                if (
+                    category in blocked_categories
+                    or kind in blocked_kinds
+                ):
+                    continue
+
             try:
-                weight_num = float(item.get("weight", 1))
+                weight_num = float(
+                    item.get("weight", 1)
+                )
+
             except Exception:
                 weight_num = 1.0
 
             if weight_num >= 2:
                 add_memory_item(item)
 
+        # =========================
+        # FILL REMAINING SLOTS
+        # =========================
+
         for item in memory_items:
+
             if len(selected_memory) >= 10:
                 break
 
+            category = self._safe_str(
+                item.get("category")
+            ).lower()
+
+            kind = self._safe_str(
+                item.get("kind")
+            ).lower()
+
+            if not has_real_state:
+
+                blocked_categories = {
+                    "operational",
+                    "execution",
+                    "working",
+                }
+
+                blocked_kinds = {
+                    "goal",
+                    "task",
+                    "mission",
+                }
+
+                if (
+                    category in blocked_categories
+                    or kind in blocked_kinds
+                ):
+                    continue
+
             add_memory_item(item)
 
-        selected_memory = selected_memory[:10]
-
         memory_block = self._format_memory_context(selected_memory)
+
+        if not has_real_state:
+
+            cleaned_memory = []
+
+            blocked_categories = {
+                "operational",
+                "execution",
+                "working",
+            }
+
+            blocked_kinds = {
+                "goal",
+                "task",
+                "mission",
+            }
+
+            for item in selected_memory:
+
+                if not isinstance(item, dict):
+                    continue
+
+                category = self._safe_str(
+                    item.get("category")
+                ).lower()
+
+                kind = self._safe_str(
+                    item.get("kind")
+                ).lower()
+
+                if (
+                    category in blocked_categories
+                    or kind in blocked_kinds
+                ):
+                    continue
+
+                cleaned_memory.append(item)
+
+            selected_memory = cleaned_memory
+
         self._last_used_memory_items = selected_memory
 
         if memory_context:
             memory_block = self._safe_str(memory_context)
 
         session = self._get_session_payload(session_id)
-        messages = session.get("messages", []) if isinstance(session, dict) else []
+        messages = (
+            session.get("messages", [])
+            if isinstance(session, dict)
+            else []
+        )
 
-        recent_lines = []
+        cleaned_messages = []
+
         for msg in messages[-8:]:
+
             if not isinstance(msg, dict):
                 continue
+
+            role = self._safe_str(msg.get("role"))
+            text = self._safe_str(msg.get("text"))
+
+            if not role or not text:
+                continue
+
+            lowered = text.lower()
+
+            if role == "assistant":
+
+                blocked_patterns = [
+                    "mission:",
+                    "working state:",
+                    "next move:",
+                    "target file:",
+                    "resumed context",
+                    "we're still lined up",
+                    "focus:",
+                    "priorities:",
+                ]
+
+                if any(p in lowered for p in blocked_patterns):
+                    continue
+
+            cleaned_messages.append(msg)
+
+        recent_lines = []
+
+        for msg in cleaned_messages:
 
             role = self._safe_str(msg.get("role"))
             text = self._safe_str(msg.get("text"))
@@ -15240,8 +16061,9 @@ def _save_artifact_fallback(self, artifact: dict):
         memory_style_block = ""
         try:
             memory_text = (
-                str(memory_block or "") + " " +
-                str(memory_context or "")
+                str(memory_block or "")
+                + " "
+                + str(memory_context or "")
             ).lower()
 
             if (
