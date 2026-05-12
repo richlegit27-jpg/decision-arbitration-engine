@@ -80,6 +80,37 @@ class ChatService:
             exec_debug("GET WORKING STATE FAILED:", e)
             return {}
 
+    def _is_control_command_value(self, value):
+
+        text = self._safe_str(
+            value
+        ).strip().lower()
+
+        blocked = {
+            "run_step",
+            "run step",
+            "run_all",
+            "run all",
+            "run it",
+            "execute",
+            "execute all",
+            "continue",
+            "resume",
+            "next",
+            "nex",
+            "what now",
+            "what next",
+            "retry",
+            "retry_failed",
+            "retry failed",
+            "try again",
+            "stop",
+            "cancel",
+            "go",
+        }
+
+        return text in blocked
+
     def _update_working_state(self, session_id: str, patch: dict) -> dict:
         session_id = self._safe_str(session_id).strip()
 
@@ -111,6 +142,15 @@ class ChatService:
             for key, value in patch.items():
                 key = self._safe_str(key).strip()
 
+                if key in {
+                    "active_task",
+                    "next_move",
+                    "mission",
+                }:
+
+                    if self._is_control_command_value(value):
+                        continue
+
                 if not key:
                     continue
 
@@ -128,6 +168,27 @@ class ChatService:
                     continue
 
                 normalized_value = self._safe_str(value).lower().strip()
+
+                if (
+                    key == "checkpoint"
+                    and normalized_value == "execution_plan_created"
+                ):
+
+                    execution_state = (
+                        self._get_session_meta(
+                            session_id,
+                            "execution_state",
+                        )
+                        or {}
+                    )
+
+                    steps = (
+                        execution_state.get("steps")
+                        or []
+                    )
+
+                    if not steps:
+                        continue
 
                 if key in protected_keys and normalized_value in blocked_state_values:
                     if key in current:
@@ -485,8 +546,35 @@ class ChatService:
                 or {}
             )
 
-            if execution.get("status") in {"running", "adapting"}:
+            steps = (
+                execution.get("steps")
+                or []
+            )
+
+            has_real_pending = any(
+                isinstance(step, dict)
+                and self._safe_str(
+                    step.get("status")
+                ).lower()
+                not in {
+                    "completed",
+                    "complete",
+                    "failed",
+                }
+                for step in steps
+            )
+
+            if (
+                execution.get("status")
+                in {"running", "adapting"}
+                and has_real_pending
+            ):
                 execution["status"] = "running"
+                execution["locked_pending"] = False
+
+            else:
+                execution["status"] = "complete"
+                execution["complete"] = True
                 execution["locked_pending"] = False
 
     def _execute_step_logic(self, session_id, step):
@@ -1371,10 +1459,12 @@ Current step:
         live_execution = (
             meta.get("active_execution")
             or meta.get("execution_state")
-            or payload.get("active_execution")
-            or payload.get("execution_state")
             or {}
         )
+
+        # HARD BLOCK RESURRECTION FROM PAYLOAD
+        payload["active_execution"] = {}
+        payload["execution_state"] = {}
 
         # =========================
         # INVALID EXECUTION SANITIZER
@@ -2921,6 +3011,14 @@ Current step:
             message["meta"] = meta
             return message
 
+        try:
+            self._reflect(
+                brain_state=getattr(self, "_last_intelligence_state", {}) or {},
+                execution_result={}
+            )
+        except Exception:
+            pass
+
         return self._build_assistant_message(
             text=str(message),
             meta={},
@@ -4438,18 +4536,22 @@ Current step:
                     "mission": mission_state,
                     "active_task": user_text,
                     "next_move": "run_step",
-                    "checkpoint": "execution_plan_created",
+                    "checkpoint": (
+                        "execution_plan_created"
+                        if execution_state.get("steps")
+                        else ""
+                    ),
                     "execution_status": "running",
                 },
             )
 
             print(
                 "EXECUTION RETURNING PROCESS COMMAND",
-                command,
+                "run_step",
             )
 
             return self._process_execution_command(
-                command=command,
+                command="run_step",
                 session_id=session_id,
                 execution_state=execution_state,
             )
@@ -4509,12 +4611,112 @@ Current step:
 
             if not has_real_state:
 
+                mission = (
+                    self._get_session_meta(
+                        session_id,
+                        "mission",
+                    )
+                    or {}
+                )
+
+                dominant_memory = (
+                    self._rank_memory_context(
+                        user_text=user_text,
+                        memory_items=(
+                            self.memories.get_memories()
+                            or []
+                        ),
+                        working_state=working_state,
+                        execution_state={},
+                        limit=5,
+                    )
+                    or []
+                )
+
+                memory_lines = []
+
+                for item in dominant_memory:
+
+                    if not isinstance(item, dict):
+                        continue
+
+                    text = self._safe_str(
+                        item.get("text")
+                        or item.get("content")
+                    ).strip()
+
+                    if not text:
+                        continue
+
+                    memory_lines.append(
+                        f"- {text}"
+                    )
+
+                fallback_lines = []
+
+                mission_name = self._safe_str(
+                    mission.get("mission")
+                ).strip()
+
+                if mission_name:
+                    fallback_lines.append(
+                        "Last known mission:"
+                    )
+                    fallback_lines.append(
+                        f"- {mission_name}"
+                    )
+
+                priorities = (
+                    mission.get("priorities")
+                    or []
+                )
+
+                for priority in priorities[:3]:
+
+                    priority = self._safe_str(
+                        priority
+                    ).strip()
+
+                    if priority:
+                        fallback_lines.append(
+                            f"- {priority}"
+                        )
+
+                if memory_lines:
+
+                    fallback_lines.append("")
+                    fallback_lines.append(
+                        "Recovered operational context:"
+                    )
+
+                    fallback_lines.extend(
+                        memory_lines[:5]
+                    )
+
+                if not fallback_lines:
+
+                    fallback_lines.append(
+                        "No active working state is currently tracked."
+                    )
+
                 assistant_msg = (
                     self._build_assistant_message(
-                        text=(
-                            "No active working state is currently tracked."
+                        text="\n".join(
+                            fallback_lines
                         )
                     )
+                )
+
+                return self._finalize_response(
+                    session_id=session_id,
+                    user_text=user_text,
+                    user_msg={
+                        "role": "user",
+                        "text": user_text,
+                        "attachments": [],
+                        "meta": {},
+                    },
+                    assistant_msg=assistant_msg,
                 )
 
                 return self._finalize_response(
@@ -5051,8 +5253,17 @@ Current step:
                 assistant_text = "Your name is Richard."
 
         try:
-            if any(x in memory_text for x in ["prefer direct", "be direct", "no fluff", "keep answers short"]):
+            if any(
+                x in memory_text
+                for x in [
+                    "prefer direct",
+                    "be direct",
+                    "no fluff",
+                    "keep answers short",
+                ]
+            ):
                 assistant_text = (assistant_text or "").strip()
+
         except Exception as e:
             exec_debug("STYLE CLAMP ERROR:", e)
 
@@ -5077,6 +5288,34 @@ Current step:
                     working_state,
                 )
 
+            for key in [
+                "active_task",
+                "next_move",
+                "mission",
+            ]:
+
+                value = self._safe_str(
+                    working_state.get(key)
+                ).strip()
+
+                if self._is_control_command_value(value):
+                    working_state[key] = ""
+
+            if self._is_control_command_value(
+                working_state.get("active_task")
+            ):
+                working_state["active_task"] = ""
+
+            if self._is_control_command_value(
+                working_state.get("next_move")
+            ):
+                working_state["next_move"] = ""
+
+            self._update_working_state(
+                session_id,
+                working_state,
+            )
+
         used_memory_full = [
             {
                 "id": self._safe_str(m.get("id")),
@@ -5089,6 +5328,32 @@ Current step:
             if isinstance(m, dict) and self._safe_str(m.get("text"))
         ]
 
+        decision_mission = (
+            decision.get("mission", {})
+            if isinstance(decision, dict)
+            else {}
+        )
+
+        if isinstance(decision_mission, dict):
+
+            sanitized_mission = {}
+
+            for k, v in decision_mission.items():
+
+                key = self._safe_str(k)
+                value = self._safe_str(v).strip()
+
+                if self._is_control_command_value(value):
+                    sanitized_mission[key] = ""
+                    continue
+
+                sanitized_mission[key] = v
+
+            decision_mission = sanitized_mission
+
+        else:
+            decision_mission = {}     
+
         meta_payload = {
             "memory_dominance": {
                 "enabled": True,
@@ -5097,8 +5362,18 @@ Current step:
             },
 
             # === CHAT POLISH: STRATEGY / MISSION FEED ===
-            "mission": decision.get("mission", {}) if isinstance(decision, dict) else {},
-            "strategy": decision.get("strategy", "") if isinstance(decision, dict) else "",
+            "mission": (
+                decision_mission
+                if not self._is_control_command_value(
+                    decision_mission.get("mission")
+                )
+                else {}
+            ),
+            "strategy": (
+                decision.get("strategy", "")
+                if isinstance(decision, dict)
+                else ""
+            ),
 
             # === MEMORY ===
             "used_memory": used_memory_full,
@@ -5110,12 +5385,12 @@ Current step:
             "active_task": (
                 original_user_text
                 if is_execution
+                and not self._is_control_command_value(original_user_text)
                 else ""
             ),
 
             "next_step": next_step_out,
         }
-
 
         # === BUILD FINAL MESSAGE ===
         if assistant_text:
@@ -8237,7 +8512,22 @@ Current step:
 
                 if isinstance(session_payload, dict):
                     session_payload["execution_state"] = execution_state
-                    session_payload["active_execution"] = execution_state
+                session_payload["active_execution"] = (
+                    execution_state
+                    if (
+                        execution_state.get("steps")
+                        and self._safe_str(
+                            execution_state.get("status")
+                        ).lower()
+                        not in {
+                            "complete",
+                            "completed",
+                            "failed",
+                            "cancelled",
+                        }
+                    )
+                    else {}
+                )
 
                 return {
                     "ok": True,
@@ -8286,8 +8576,10 @@ Current step:
                     session_id,
                     "execution_state",
                 )
-                or session.get("execution_state")
-                or session.get("active_execution")
+                or self._get_session_meta(
+                    session_id,
+                    "active_execution",
+                )
                 or ws.get("execution_state")
                 or {}
             )
@@ -8523,6 +8815,34 @@ Current step:
                 },
             ]
 
+        goal_text = self._safe_str(goal).lower().strip()
+
+        invalid_general_goal = (
+            "respond normally" in goal_text
+            or (
+                isinstance(goal, dict)
+                and self._safe_str(
+                    goal.get("goal")
+                ).lower().strip() == "respond normally"
+            )
+        )
+
+        if invalid_general_goal:
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                {},
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                {},
+            )
+
+            return None
+
         execution_state = {
             "status": "running",
             "goal": goal,
@@ -8576,7 +8896,22 @@ Current step:
         index = self.sessions._find(sessions, session_id)
 
         if index is not None:
-            sessions[index]["active_execution"] = execution_state
+            sessions[index]["active_execution"] = (
+                execution_state
+                if (
+                    execution_state.get("steps")
+                    and self._safe_str(
+                        execution_state.get("status")
+                    ).lower()
+                    not in {
+                        "complete",
+                        "completed",
+                        "failed",
+                        "cancelled",
+                    }
+                )
+                else {}
+            )
             sessions[index]["execution_state"] = execution_state
 
             self.sessions._save_sessions(
@@ -8928,6 +9263,7 @@ Auto-fix result:
 
             return execution_state
 
+
         # =========================
         # FINAL STATUS
         # =========================
@@ -8970,6 +9306,28 @@ Auto-fix result:
             current_index
         )
 
+        goal_text = self._safe_str(
+            execution_state.get("goal")
+        ).lower().strip()
+
+        if "respond normally" in goal_text:
+
+            execution_state = {}
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                {},
+            )
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                {},
+            )
+
+            return execution_state
+
         self._set_session_meta(
             session_id,
             "execution_state",
@@ -8998,7 +9356,31 @@ Auto-fix result:
 
         state = self._run_next_step(state)
 
-        self._set_session_meta(session_id, "execution_state", state)
+        goal_text = self._safe_str(
+            state.get("goal")
+        ).lower().strip()
+
+        if "respond normally" in goal_text:
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                {},
+            )
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                {},
+            )
+
+            return
+
+        self._set_session_meta(
+            session_id,
+            "execution_state",
+            state,
+        )
 
         # =========================
         # AUTO CONTINUE EVENT CHAIN
@@ -14276,11 +14658,27 @@ Next action:
                 ]
             )
 
+        mission = self._safe_str(
+            mission
+        ).strip()
+
+        if self._is_control_command_value(mission):
+            mission = ""
+
+        if self._is_control_command_value(next_move):
+            next_move = ""
+
         recommended_next_move = (
             next_move
-            if next_move and next_move != "retry_failed"
-            else priorities[0] if priorities else "Continue Nova intelligence polish."
+            if next_move
+            and next_move != "retry_failed"
+            else (
+                priorities[0]
+                if priorities
+                else "Continue Nova intelligence polish."
+            )
         )
+
         return {
             "mission": mission,
             "priorities": priorities[:5],
