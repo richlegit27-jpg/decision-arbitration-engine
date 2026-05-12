@@ -13161,6 +13161,15 @@ Next action:
                 sessions[index]["execution_state"] = {}
 
                 sessions[index]["active_execution"] = {}
+                sessions[index]["working_state"] = {
+                    "active_task": "",
+                    "current_file": "",
+                    "current_bug": "",
+                    "last_success": last_success,
+                    "next_move": "",
+                    "checkpoint": "",
+                    "updated_at": "",
+                }
 
                 sessions[index]["mission"] = {}
 
