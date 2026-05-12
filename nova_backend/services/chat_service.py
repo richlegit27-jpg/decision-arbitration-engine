@@ -11172,10 +11172,35 @@ Auto-fix result:
 
         ws = self._get_working_state(session_id) or {}
 
-        has_working_mission = bool(
-            ws.get("active_task")
-            and ws.get("next_move")
-        )
+        updated_at = self._safe_str(
+            ws.get("updated_at")
+        ).strip()
+
+        has_working_mission = False
+
+        if updated_at:
+
+            try:
+                updated_dt = datetime.fromisoformat(
+                    updated_at.replace("Z", "+00:00")
+                )
+
+                now_dt = datetime.now(
+                    updated_dt.tzinfo
+                )
+
+                age_seconds = (
+                    now_dt - updated_dt
+                ).total_seconds()
+
+                if age_seconds <= 600:
+                    has_working_mission = bool(
+                        ws.get("active_task")
+                        and ws.get("next_move")
+                    )
+
+            except Exception:
+                has_working_mission = False
 
         continue_commands = {
             "next",
@@ -12725,6 +12750,45 @@ Next action:
             .strip()
         )
 
+        current_updated_at = self._safe_str(
+            current.get("updated_at")
+        ).strip()
+
+        stale_state = False
+
+        if current_updated_at:
+
+            try:
+                updated_dt = datetime.fromisoformat(
+                    current_updated_at.replace("Z", "+00:00")
+                )
+
+                now_dt = datetime.now(
+                    updated_dt.tzinfo
+                )
+
+                age_seconds = (
+                    now_dt - updated_dt
+                ).total_seconds()
+
+                if age_seconds > 600:
+                    stale_state = True
+
+            except Exception:
+                stale_state = False
+
+        if stale_state:
+
+            current = {
+                "active_task": "",
+                "current_file": "",
+                "current_bug": "",
+                "last_success": "",
+                "next_move": "",
+                "checkpoint": "",
+                "updated_at": "",
+            }
+
         if any(
             x in lowered
             for x in (
@@ -12734,9 +12798,17 @@ Next action:
                 "product positioning",
             )
         ):
-            patch["active_task"] = "polish Nova landing page and product positioning"
-            patch["checkpoint"] = "landing_page_work"
-            patch["next_move"] = "tighten product messaging and demos"
+            patch["active_task"] = (
+                "polish Nova landing page and product positioning"
+            )
+
+            patch["checkpoint"] = (
+                "landing_page_work"
+            )
+
+            patch["next_move"] = (
+                "tighten product messaging and demos"
+            )
 
         continuity_commands = {
             "where are we",
@@ -12761,8 +12833,14 @@ Next action:
             if (
                 execution_state.get("status") == "running"
                 and (
-                    execution_state.get("current_index", 0)
-                    < len(execution_state.get("steps") or [])
+                    execution_state.get(
+                        "current_index",
+                        0,
+                    )
+                    < len(
+                        execution_state.get("steps")
+                        or []
+                    )
                 )
             ):
 
@@ -12771,11 +12849,13 @@ Next action:
                 )
 
                 if not patch.get("checkpoint"):
+
                     patch["checkpoint"] = (
                         "working_state_resume_context"
                     )
 
                 if not patch.get("next_move"):
+
                     patch["next_move"] = (
                         "continue backend memory and execution stabilization"
                     )
@@ -12813,6 +12893,7 @@ Next action:
             patch["next_move"] = ""
 
             if not execution_state.get("status"):
+
                 patch["checkpoint"] = ""
 
         if (
@@ -12822,7 +12903,9 @@ Next action:
         ):
 
             if any(
-                user_text.lower().strip().startswith(prefix)
+                user_text.lower()
+                .strip()
+                .startswith(prefix)
                 for prefix in (
                     "fix ",
                     "build ",
@@ -12835,21 +12918,42 @@ Next action:
                     "repair ",
                 )
             ):
-                patch["active_task"] = user_text.strip()[:240]
-                patch["checkpoint"] = "task_detected"
-                patch["next_move"] = "continue task implementation"
+
+                patch["active_task"] = (
+                    user_text.strip()[:240]
+                )
+
+                patch["checkpoint"] = (
+                    "task_detected"
+                )
+
+                patch["next_move"] = (
+                    "continue task implementation"
+                )
 
         if not patch:
-            return self._get_working_state(session_id) or {}
+            return (
+                self._get_working_state(session_id)
+                or {}
+            )
 
-        patch["updated_at"] = self._now_iso()
+        if (
+            patch.get("active_task")
+            or patch.get("current_file")
+            or patch.get("checkpoint")
+            or patch.get("next_move")
+        ):
+            patch["updated_at"] = self._now_iso()
 
         self._update_working_state(
             session_id,
             patch,
         )
 
-        return self._get_working_state(session_id) or {}
+        return (
+            self._get_working_state(session_id)
+            or {}
+        )
 
     def _replace_working_state(self, session_id: str, new_state: dict):
         session_id = self._safe_str(session_id).strip()
