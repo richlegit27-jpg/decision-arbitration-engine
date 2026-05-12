@@ -4530,20 +4530,34 @@ Current step:
                 execution_state=execution_state,
             )
 
-            self._update_working_state(
-                session_id,
-                {
-                    "mission": mission_state,
-                    "active_task": user_text,
-                    "next_move": "run_step",
-                    "checkpoint": (
-                        "execution_plan_created"
-                        if execution_state.get("steps")
-                        else ""
-                    ),
-                    "execution_status": "running",
-                },
-            )
+            if (
+                execution_state.get("steps")
+                and self._safe_str(
+                    execution_state.get("status")
+                ).lower()
+                in {
+                    "running",
+                    "adapting",
+                    "waiting",
+                }
+            ):
+
+                self._update_working_state(
+                    session_id,
+                    {
+                        "mission": mission_state,
+
+                        "active_task": user_text,
+
+                        "next_move": "run_step",
+
+                        "checkpoint": (
+                            "execution_plan_created"
+                        ),
+
+                        "execution_status": "running",
+                    },
+                )
 
             print(
                 "EXECUTION RETURNING PROCESS COMMAND",
@@ -4611,13 +4625,7 @@ Current step:
 
             if not has_real_state:
 
-                mission = (
-                    self._get_session_meta(
-                        session_id,
-                        "mission",
-                    )
-                    or {}
-                )
+                mission = {}
 
                 dominant_memory = (
                     self._rank_memory_context(
@@ -4842,12 +4850,30 @@ Current step:
 
         try:
 
-            has_real_working_state = any([
-                working_state.get("active_task"),
+            has_real_state = any([
+                (
+                    working_state.get("active_task")
+                    and not self._is_control_command_value(
+                        working_state.get("active_task")
+                    )
+                ),
+
                 working_state.get("current_file"),
+
                 working_state.get("current_bug"),
-                working_state.get("next_move"),
-                working_state.get("checkpoint"),
+
+                (
+                    working_state.get("next_move")
+                    and not self._is_control_command_value(
+                        working_state.get("next_move")
+                    )
+                ),
+
+                (
+                    working_state.get("checkpoint")
+                    and working_state.get("checkpoint")
+                    != "execution_plan_created"
+                ),
             ])
 
             has_real_execution = any([
@@ -11967,6 +11993,15 @@ Auto-fix result:
             confidence = 0.9
             reasons.append("continuity_query")
 
+            self._update_working_state(
+                session_id,
+                {
+                    "active_task": "",
+                    "next_move": "",
+                    "checkpoint": "",
+                },
+            )
+
         mission_state = self._build_mission_state(
             working_state=working_state,
             execution_state=execution_state,
@@ -14670,13 +14705,17 @@ Next action:
 
         recommended_next_move = (
             next_move
-            if next_move
-            and next_move != "retry_failed"
-            else (
-                priorities[0]
-                if priorities
-                else "Continue Nova intelligence polish."
+            if (
+                next_move
+                and next_move != "retry_failed"
+                and execution_status
+                in {
+                    "running",
+                    "adapting",
+                    "waiting",
+                }
             )
+            else ""
         )
 
         return {
