@@ -12797,7 +12797,12 @@ Next action:
             if not execution_state.get("status"):
                 patch["checkpoint"] = ""
 
-        if user_text.strip() and not patch.get("active_task"):
+        if (
+            user_text.strip()
+            and not patch.get("active_task")
+            and normalized_text not in generic_chat_inputs
+        ):
+
             if any(
                 user_text.lower().strip().startswith(prefix)
                 for prefix in (
