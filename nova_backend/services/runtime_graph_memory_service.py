@@ -146,6 +146,10 @@ class RuntimeGraphMemoryService:
             "arbitrated",
         )
 
+        self.storage.save_snapshot(
+            self.snapshot()
+        )
+
         return {
             "ok": True,
             "nodes": len(self.nodes),
@@ -164,3 +168,83 @@ class RuntimeGraphMemoryService:
             "nodes": self.nodes,
             "edges": self.edges,
         }
+
+    def record_event(
+        self,
+        event=None,
+    ):
+
+        event = self._safe_dict(event)
+
+        if not event:
+            return {
+                "ok": False,
+                "reason": "empty_event",
+            }
+
+        if hasattr(
+            self,
+            "add_event",
+        ):
+
+            return self.add_event(event)
+
+        if hasattr(
+            self,
+            "remember",
+        ):
+
+            return self.remember(event)
+
+        if not hasattr(
+            self,
+            "events",
+        ):
+
+            self.events = []
+
+        self.events.append(event)
+
+        return {
+            "ok": True,
+            "event": event,
+            "event_count": len(self.events),
+        }
+
+    def record_runtime_cycle(
+        self,
+        execution_state=None,
+        execution_summary=None,
+        world_state=None,
+        scheduler_state=None,
+        cycle_count=0,
+    ):
+
+        event = {
+            "type": "runtime_cycle",
+            "cycle_count": cycle_count,
+            "execution_state": self._safe_dict(execution_state),
+            "execution_summary": self._safe_dict(execution_summary),
+            "world_state": self._safe_dict(world_state),
+            "scheduler_state": self._safe_dict(scheduler_state),
+        }
+
+        return self.record_event(event)
+
+    def record_runtime_outcome(
+        self,
+        execution_state=None,
+        control=None,
+        world_state=None,
+        scheduler_state=None,
+    ):
+
+        event = {
+            "type": "runtime_outcome",
+            "execution_state": self._safe_dict(execution_state),
+            "control": self._safe_dict(control),
+            "world_state": self._safe_dict(world_state),
+            "scheduler_state": self._safe_dict(scheduler_state),
+        }
+
+        return self.record_event(event)

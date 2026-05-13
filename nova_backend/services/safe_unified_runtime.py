@@ -21,7 +21,9 @@ from nova_backend.services.runtime_self_healing_service import (
 from nova_backend.services.runtime_orchestrator_service import (
     RuntimeOrchestratorService,
 )
-
+from nova_backend.services.runtime_graph_query_service import (
+    RuntimeGraphQueryService,
+)
 
 class SafeUnifiedRuntime:
     def __init__(
@@ -46,6 +48,11 @@ class SafeUnifiedRuntime:
 
         self.runtime_graph_memory = (
             RuntimeGraphMemoryService()
+        )
+        self.runtime_graph_query = (
+            RuntimeGraphQueryService(
+                graph_memory=self.runtime_graph_memory
+            )
         )
 
         self.observability = (
@@ -634,8 +641,26 @@ class SafeUnifiedRuntime:
 
         result = {
             "ok": True,
-            "runtime": (
-                "safe_unified_runtime"
+            "runtime_graph_memory": (
+                self.runtime_graph_memory.export_memory()
+                if hasattr(
+                    self.runtime_graph_memory,
+                    "export_memory",
+                )
+                else {
+                    "events": getattr(
+                        self.runtime_graph_memory,
+                        "events",
+                        [],
+                    ),
+                    "event_count": len(
+                        getattr(
+                            self.runtime_graph_memory,
+                            "events",
+                            [],
+                        )
+                    ),
+                }
             ),
             "cycle": (
                 "observe_reflect_"
@@ -733,6 +758,15 @@ class SafeUnifiedRuntime:
             self.debug_runtime_result(
                 result
             )
+        )
+        result["runtime_graph_query"] = (
+            self.runtime_graph_query
+            .recommend_runtime_actions()
+        )
+
+        result["runtime_graph_patterns"] = (
+            self.runtime_graph_query
+            .summarize_patterns()
         )
 
         healing_plan = (
