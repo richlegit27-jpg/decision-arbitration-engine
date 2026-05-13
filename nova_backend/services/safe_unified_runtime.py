@@ -53,6 +53,24 @@ from nova_backend.services.runtime_planning_service import (
 from nova_backend.services.runtime_world_model_service import (
     RuntimeWorldModelService,
 )
+from nova_backend.services.runtime_snapshot_service import (
+    RuntimeSnapshotService,
+)
+
+from nova_backend.services.runtime_signal_pruning_service import (
+    RuntimeSignalPruningService,
+)
+from nova_backend.services.runtime_drift_memory_service import (
+    RuntimeDriftMemoryService,
+)
+
+from nova_backend.services.runtime_auto_recovery_service import (
+    RuntimeAutoRecoveryService,
+)
+from nova_backend.services.runtime_persistence_service import (
+    RuntimePersistenceService,
+)
+
 class SafeUnifiedRuntime:
     def __init__(
         self,
@@ -95,10 +113,11 @@ class SafeUnifiedRuntime:
             RuntimeGoalPersistenceService()
         )
         self.runtime_planning = (
-        RuntimePlanningService()
+            RuntimePlanningService()
         )
+
         self.runtime_world_model = (
-        RuntimeWorldModelService()
+            RuntimeWorldModelService()
         )
         self.observability = observability or ObservabilityService()
         self.graph_runtime = graph_runtime or GraphRuntimeService()
@@ -116,7 +135,45 @@ class SafeUnifiedRuntime:
             RuntimeCompressionService()
         )
 
+        self.runtime_signal_pruning = (
+            RuntimeSignalPruningService()
+        )
+
         self.last_compressed_runtime = {}
+
+        self.runtime_snapshot = (
+            RuntimeSnapshotService()
+        )
+        self.runtime_drift_memory = (
+            RuntimeDriftMemoryService()
+        )
+        self.runtime_auto_recovery = (
+            RuntimeAutoRecoveryService()
+        )
+        self.runtime_persistence = (
+            RuntimePersistenceService()
+        )
+
+        persisted_runtime = (
+            self.runtime_persistence.load()
+        )
+
+        if persisted_runtime:
+
+            self.last_compressed_runtime = (
+                persisted_runtime.get(
+                    "compressed_runtime",
+                    {},
+                )
+            )
+
+            self.restored_runtime_state = (
+                persisted_runtime
+            )
+
+        else:
+
+            self.restored_runtime_state = {}
 
     def debug_runtime_result(
         self,
@@ -691,6 +748,47 @@ class SafeUnifiedRuntime:
 
         self.last_compressed_runtime = (
             result.get("compressed_runtime")
+        )
+
+        result["pruned_runtime_signals"] = (
+            self.runtime_signal_pruning.prune(
+                result
+            )
+        )
+
+        result["runtime_drift_memory"] = (
+            self.runtime_drift_memory.record(
+                runtime_prediction=(
+                    result.get(
+                        "runtime_prediction"
+                    )
+                ),
+                runtime_policy=(
+                    adaptive_policy
+                ),
+                runtime_signal=(
+                    execution_state.get(
+                        "runtime_signal"
+                    )
+                ),
+            )
+        )
+        result["runtime_auto_recovery"] = (
+            self.runtime_auto_recovery.recover(
+                runtime_result=result,
+                execution_state=execution_state,
+            )
+        )
+
+        result["runtime_snapshot"] = (
+            self.runtime_snapshot.save_snapshot(
+                result
+            )
+        )
+        result["runtime_persistence"] = (
+            self.runtime_persistence.save(
+                result
+            )
         )
 
         return result
