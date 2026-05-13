@@ -4525,6 +4525,12 @@ Current step:
                 or {}
             )
 
+            execution_state = (
+                execution_state
+                if isinstance(execution_state, dict)
+                else {}
+            )
+
             mission_state = self._build_mission_state(
                 working_state=working_state,
                 execution_state=execution_state,
@@ -14616,18 +14622,6 @@ Next action:
             execution_goal = ""
 
             execution_state = {}
-
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                {},
-            )
-
-            self._set_session_meta(
-                session_id,
-                "active_execution",
-                {},
-            )
 
         blockers = []
         priorities = []
