@@ -591,7 +591,6 @@ class ChatService:
             step["status"] = "failed"
             step["error"] = str(e)
 
-
     def _save_active_execution(
         self,
         session_id,
@@ -608,11 +607,19 @@ class ChatService:
             execution_state.get("status") or ""
         ).lower()
 
+        self._set_session_meta(
+            session_id,
+            "execution_state",
+            execution_state,
+        )
+
         if status in {
             "complete",
             "completed",
             "idle",
             "stopped",
+            "failed",
+            "cancelled",
         }:
 
             self._set_session_meta(
@@ -623,8 +630,9 @@ class ChatService:
 
             return
 
-        self._save_active_execution(
+        self._set_session_meta(
             session_id,
+            "active_execution",
             execution_state,
         )
 
@@ -7939,8 +7947,17 @@ Current step:
     def _handle_execution_control(self, user_text: str, session_id: str, attachments=None):
         text = self._safe_str(user_text).strip().lower()
 
-        execution_state = self._get_session_meta(session_id, "execution_state") or {}
-
+        execution_state = (
+            self._get_session_meta(
+                session_id,
+                "execution_state",
+            )
+            or self._get_session_meta(
+                session_id,
+                "active_execution",
+            )
+            or {}
+        )
         # =========================
         # ONLY EXECUTION COMMANDS
         # =========================
@@ -8011,6 +8028,10 @@ Current step:
         action = self._decide_brain_action(brain_state)
         brain_state["decision"] = action
 
+        if text in execution_keywords:
+            action = "execute"
+            brain_state["decision"] = action
+
         print(
             "BRAIN ACTION =",
             action,
@@ -8022,7 +8043,7 @@ Current step:
         )
 
         # CHAT EXIT PATH
-        if action == "chat":
+        if action == "chat" and text not in execution_keywords:
 
             chat_result = self._execute_general_chat(
                 user_text=user_text,
@@ -13508,32 +13529,93 @@ Next action:
 
     def _sync_execution_state(
         self,
-        execution: dict,
-        current_index: int,
-        status: str | None = None,
-        current_step: str | None = None,
-        progress: int | None = None,
-    ) -> dict:
+        execution=None,
+        current_index=None,
+        status=None,
+        current_step=None,
+        progress=None,
+        waiting=None,
+    ):
 
-        if not isinstance(execution, dict):
-            execution = {}
+        execution = (
+            execution
+            if isinstance(execution, dict)
+            else {}
+        )
 
-        execution = dict(execution)
-        current_index = max(0, int(current_index or 0))
+        execution = self._normalize_execution_state(
+            execution
+        )
 
-        execution["current_index"] = current_index
-        execution["current_step_index"] = current_index
+        if current_index is not None:
 
-        if progress is None:
-            progress = current_index
+            current_index = max(
+                0,
+                int(current_index),
+            )
 
-        execution["progress"] = progress
+            execution["current_index"] = (
+                current_index
+            )
+
+            if (
+                execution.get("status")
+                == "complete"
+                or status == "complete"
+            ):
+
+                execution["current_step_index"] = (
+                    current_index
+                )
+
+            else:
+
+                execution["current_step_index"] = (
+                    max(
+                        0,
+                        current_index - 1,
+                    )
+                )
 
         if status is not None:
-            execution["status"] = status
+
+            execution["status"] = (
+                self._safe_str(status)
+                or execution.get("status")
+                or "idle"
+            )
 
         if current_step is not None:
-            execution["current_step"] = current_step
+
+            execution["current_step"] = (
+                current_step
+            )
+
+            execution["current_step_title"] = (
+                current_step
+            )
+
+        if progress is not None:
+
+            execution["progress"] = max(
+                0,
+                int(progress),
+            )
+
+        if waiting is not None:
+
+            execution["waiting"] = bool(
+                waiting
+            )
+
+        execution["lock"] = bool(
+            execution.get("lock", False)
+        )
+
+        execution["complete"] = bool(
+            execution.get("status")
+            == "complete"
+        )
 
         return execution
 
@@ -17017,23 +17099,35 @@ def _save_artifact_fallback(self, artifact: dict):
 
         return self._get_session_payload(session_id)
 
-    def _execute_current_step(self, execution: dict, user_text: str, session_id: str = "", attachments=None) -> dict:
+    def _execute_current_step(
+        self,
+        execution: dict,
+        user_text: str,
+        session_id: str = "",
+        attachments=None,
+    ) -> dict:
+
         attachments = attachments or []
+
         execution = self._normalize_execution_state(
             execution or {}
         )
+
         steps = execution.get("steps") or []
-        current_index = self._execution_current_index(execution)
+
+        current_index = self._execution_current_index(
+            execution
+        )
+
+        # =========================
+        # EXECUTION COMPLETE
+        # =========================
 
         if (
             steps
             and current_index >= len(steps)
             and execution.get("status") != "failed"
         ):
-
-            execution = self._finalize_execution_state(
-                execution
-            )
 
             execution = self._sync_execution_state(
                 execution=execution,
@@ -17043,7 +17137,20 @@ def _save_artifact_fallback(self, artifact: dict):
                 progress=len(steps),
             )
 
-            execution.setdefault("step_results", [])
+            execution["current_step_index"] = (
+                len(steps)
+            )
+
+            execution["current_step_title"] = (
+                "complete"
+            )
+
+            execution["complete"] = True
+
+            execution.setdefault(
+                "step_results",
+                [],
+            )
 
             self._set_session_meta(
                 session_id,
@@ -17064,87 +17171,214 @@ def _save_artifact_fallback(self, artifact: dict):
                     "active_task": "",
                     "current_file": "",
                     "current_bug": "",
-                    "checkpoint": "execution_complete",
+                    "checkpoint": (
+                        "execution_complete"
+                    ),
                     "last_success": (
-                        self._safe_str(execution.get("goal"))
+                        self._safe_str(
+                            execution.get("goal")
+                        )
                         or "execution_complete"
                     ),
-                    "execution_status": "complete",
+                    "execution_status": (
+                        "complete"
+                    ),
                 },
             )
 
             return {
                 "execution": execution,
-                "step_output": "No remaining execution step.",
+                "step_output": (
+                    "No remaining execution step."
+                ),
                 "saved_artifact": {
                     "kind": "execution",
-                    "title": self._safe_str(execution.get("goal")) or "Execution",
-                    "body": self._render_execution(execution),
+                    "title": (
+                        self._safe_str(
+                            execution.get("goal")
+                        )
+                        or "Execution"
+                    ),
+                    "body": self._render_execution(
+                        execution
+                    ),
                     "execution": execution,
                     "meta": {
                         "execution": execution,
-                        "execution_id": self._safe_str(execution.get("id")),
-                        "status": self._safe_str(execution.get("status")) or "complete",
-                        "progress": execution.get("progress", len(steps)),
-                        "current_step": self._safe_str(execution.get("current_step")) or "complete",
-                        "goal": self._safe_str(execution.get("goal")),
+                        "execution_id": (
+                            self._safe_str(
+                                execution.get("id")
+                            )
+                        ),
+                        "status": (
+                            self._safe_str(
+                                execution.get(
+                                    "status"
+                                )
+                            )
+                            or "complete"
+                        ),
+                        "progress": execution.get(
+                            "progress",
+                            len(steps),
+                        ),
+                        "current_step": (
+                            self._safe_str(
+                                execution.get(
+                                    "current_step"
+                                )
+                            )
+                            or "complete"
+                        ),
+                        "goal": self._safe_str(
+                            execution.get("goal")
+                        ),
                     },
                 },
             }
 
-        current_step = steps[current_index] or {}
-        step_title = self._safe_str(current_step.get("title")) or f"Step {current_index + 1}"
-        goal = self._safe_str(execution.get("goal"))
-        execution.setdefault("step_results", [])
+        # =========================
+        # CURRENT STEP
+        # =========================
+
+        current_step = (
+            steps[current_index] or {}
+        )
+
+        step_title = (
+            self._safe_str(
+                current_step.get("title")
+            )
+            or f"Step {current_index + 1}"
+        )
+
+        goal = self._safe_str(
+            execution.get("goal")
+        )
+
+        execution.setdefault(
+            "step_results",
+            [],
+        )
 
         system_prompt = (
-            "You are executing one step in Nova's task engine. "
-            "Be concrete, operational, and brief. "
-            "Return useful progress for the current step only."
+            "You are executing one step in "
+            "Nova's task engine. "
+            "Be concrete, operational, "
+            "and brief. "
+            "Return useful progress for "
+            "the current step only."
         )
 
         user_prompt_parts = [
             f"Goal: {goal}",
-            f"Current step ({current_index + 1}/{len(steps)}): {step_title}",
+            (
+                f"Current step "
+                f"({current_index + 1}/{len(steps)}): "
+                f"{step_title}"
+            ),
         ]
 
         if user_text.strip():
-            user_prompt_parts.append(f"Latest user input: {user_text}")
+
+            user_prompt_parts.append(
+                f"Latest user input: {user_text}"
+            )
 
         if attachments:
+
             attachment_lines = []
+
             for item in attachments:
+
                 if not isinstance(item, dict):
                     continue
-                name = self._safe_str(item.get("filename") or item.get("name") or item.get("stored_name"))
-                url = self._safe_str(item.get("url"))
-                mime_type = self._safe_str(item.get("mime_type") or item.get("mime"))
-                bits = [bit for bit in [name, mime_type, url] if bit]
-                if bits:
-                    attachment_lines.append(" - " + " | ".join(bits))
-            if attachment_lines:
-                user_prompt_parts.append("Attachments:\n" + "\n".join(attachment_lines))
 
-        user_prompt = "\n\n".join(part for part in user_prompt_parts if part)
+                name = self._safe_str(
+                    item.get("filename")
+                    or item.get("name")
+                    or item.get("stored_name")
+                )
+
+                url = self._safe_str(
+                    item.get("url")
+                )
+
+                mime_type = self._safe_str(
+                    item.get("mime_type")
+                    or item.get("mime")
+                )
+
+                bits = [
+                    bit
+                    for bit in [
+                        name,
+                        mime_type,
+                        url,
+                    ]
+                    if bit
+                ]
+
+                if bits:
+
+                    attachment_lines.append(
+                        " - " + " | ".join(bits)
+                    )
+
+            if attachment_lines:
+
+                user_prompt_parts.append(
+                    "Attachments:\n"
+                    + "\n".join(
+                        attachment_lines
+                    )
+                )
+
+        user_prompt = "\n\n".join(
+            part
+            for part in user_prompt_parts
+            if part
+        )
 
         step_output = ""
+
         tool_bundle = {}
 
         try:
-            response = self.client.responses.create(
-                model=self.chat_model,
-                input=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
+
+            response = (
+                self.client.responses.create(
+                    model=self.chat_model,
+                    input=[
+                        {
+                            "role": "system",
+                            "content": system_prompt,
+                        },
+                        {
+                            "role": "user",
+                            "content": user_prompt,
+                        },
+                    ],
+                )
             )
-            step_output = self._extract_text_response(response).strip()
+
+            step_output = (
+                self._extract_text_response(
+                    response
+                ).strip()
+            )
+
         except Exception as exc:
-            step_output = f"Step execution failed: {exc}"
+
+            step_output = (
+                f"Step execution failed: {exc}"
+            )
 
         if not step_output:
-            step_output = f"Completed step: {step_title}"
 
+            step_output = (
+                f"Completed step: {step_title}"
+            )
 
         step_result = {
             "step_index": current_index,
@@ -17152,11 +17386,25 @@ def _save_artifact_fallback(self, artifact: dict):
             "output": step_output,
             "completed_at": self._iso_now(),
         }
-        execution["step_results"].append(step_result)
 
-        next_index = max(0, min(next_index, len(steps)))
+        execution["step_results"].append(
+            step_result
+        )
+
+        next_index = max(
+            0,
+            min(
+                current_index + 1,
+                len(steps),
+            ),
+        )
+
+        # =========================
+        # COMPLETE VS NEXT STEP
+        # =========================
 
         if next_index >= len(steps):
+
             execution = self._sync_execution_state(
                 execution=execution,
                 current_index=len(steps),
@@ -17164,41 +17412,103 @@ def _save_artifact_fallback(self, artifact: dict):
                 current_step="complete",
                 progress=len(steps),
             )
+
+            execution["current_step_index"] = (
+                len(steps)
+            )
+
+            execution["current_step_title"] = (
+                "complete"
+            )
+
+            execution["complete"] = True
+
         else:
-            next_step = steps[next_index] or {}
+
+            next_step = (
+                steps[next_index] or {}
+            )
 
             execution = self._sync_execution_state(
                 execution=execution,
                 current_index=next_index,
                 status="running",
                 current_step=(
-                    self._safe_str(next_step.get("title"))
-                    or f"Step {next_index + 1}"
+                    self._safe_str(
+                        next_step.get("title")
+                    )
+                    or (
+                        f"Step "
+                        f"{next_index + 1}"
+                    )
                 ),
-                progress=next_index,
+                progress=max(
+                    0,
+                    next_index,
+                ),
+            )
+
+            next_step_title = (
+                self._safe_str(
+                    next_step.get("title")
+                )
+                or (
+                    f"Step "
+                    f"{next_index + 1}"
+                )
+            )
+
+            execution["current_step"] = (
+                next_step_title
+            )
+
+            execution["current_step_title"] = (
+                next_step_title
             )
 
         artifact_payload = {
             "kind": "execution",
-            "title": goal or "Execution",
-            "body": self._render_execution(execution),
+            "title": (
+                goal or "Execution"
+            ),
+            "body": self._render_execution(
+                execution
+            ),
             "execution": execution,
             "meta": {
                 "execution": execution,
                 "goal": goal,
                 "step_index": current_index,
                 "step_title": step_title,
-                "execution_id": self._safe_str(execution.get("id")),
-                "tool_bundle": tool_bundle or {},
-                "status": self._safe_str(execution.get("status")),
-                "progress": execution.get("progress", 0),
-                "current_step": self._safe_str(execution.get("current_step")),
+                "execution_id": (
+                    self._safe_str(
+                        execution.get("id")
+                    )
+                ),
+                "tool_bundle": (
+                    tool_bundle or {}
+                ),
+                "status": self._safe_str(
+                    execution.get("status")
+                ),
+                "progress": execution.get(
+                    "progress",
+                    0,
+                ),
+                "current_step": (
+                    self._safe_str(
+                        execution.get(
+                            "current_step"
+                        )
+                    )
+                ),
             },
         }
 
         # =========================
-        # UNLOCK EXECUTION (FIXED INDENT)
+        # UNLOCK EXECUTION
         # =========================
+
         execution["lock"] = False
 
         self._set_session_meta(
@@ -17217,8 +17527,6 @@ def _save_artifact_fallback(self, artifact: dict):
             "step_output": step_output,
             "saved_artifact": artifact_payload,
         }
-
-
 
     def _maybe_execute_tool(self, step_title: str, user_text: str, execution: dict | None = None) -> dict:
         tool_decision = self._decide_tool_for_step(
