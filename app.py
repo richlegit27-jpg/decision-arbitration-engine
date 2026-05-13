@@ -867,6 +867,7 @@ def api_chat():
             "artifacts": result.get("artifacts") or artifact_service.build_list_payload(),
             "memory": result.get("memory") or memory_service.build_list_payload(),
             "saved_artifact": result.get("saved_artifact"),
+            "runtime": result.get("runtime") or {},
             "debug": result.get("debug") or {},
         }
 
