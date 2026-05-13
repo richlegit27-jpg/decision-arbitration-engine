@@ -15,6 +15,10 @@ from nova_backend.services.runtime_debugger_service import (
     RuntimeDebuggerService,
 )
 
+from nova_backend.services.runtime_self_healing_service import (
+    RuntimeSelfHealingService,
+)
+
 class SafeUnifiedRuntime:
     def __init__(
         self,
@@ -25,6 +29,7 @@ class SafeUnifiedRuntime:
         learning=None,
         replay=None,
         debugger=None,
+        self_healing=None,
     ):
         self.chat_service = chat_service
 
@@ -63,6 +68,11 @@ class SafeUnifiedRuntime:
         self.debugger = (
             debugger
             or RuntimeDebuggerService()
+        )
+
+        self.self_healing = (
+            self_healing
+            or RuntimeSelfHealingService()
         )
 
     def debug_runtime_result(
@@ -705,6 +715,27 @@ class SafeUnifiedRuntime:
         result["debug_report"] = (
             debug_report
         )
+
+        healing_plan = (
+            self.self_healing.build_healing_plan(
+                debug_report=debug_report,
+                runtime_result=result,
+                runtime_history=self.runtime_history,
+            )
+        )
+
+        healing_report = (
+            self.self_healing.apply_healing_plan(
+                execution_state=execution_state,
+                control=control,
+                governor_policy=policy,
+                healing_plan=healing_plan,
+            )
+        )
+
+        result["healing_plan"] = healing_plan
+        result["healing_report"] = healing_report
+
 
         return result
 
