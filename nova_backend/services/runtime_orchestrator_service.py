@@ -1,6 +1,8 @@
 import time
 import uuid
 
+from nova_backend.services.runtime_failure_intelligence_service import RuntimeFailureIntelligenceService
+from nova_backend.services.runtime_brain_store_service import RuntimeBrainStoreService
 from nova_backend.services.runtime_engine_factory import RuntimeEngineFactory
 from nova_backend.services.runtime_engine_fusion_service import (
     RuntimeEngineFusionService,
@@ -17,6 +19,10 @@ class RuntimeOrchestratorService:
         self.engine_factory = RuntimeEngineFactory()
         self.fusion = RuntimeEngineFusionService()
         self.register_default_engines()
+        self.runtime_brain_store = RuntimeBrainStoreService()
+        self.runtime_failure_intelligence = (
+            RuntimeFailureIntelligenceService()
+        )
 
     def register_default_engines(self):
         engines = self.engine_factory.build_default_engines()
@@ -116,6 +122,9 @@ class RuntimeOrchestratorService:
             "reason": reason,
         }
 
+
+
+
     def enable_engine(
         self,
         name,
@@ -198,6 +207,90 @@ class RuntimeOrchestratorService:
             ),
         }
 
+    def _apply_preventive_runtime_actions(
+        self,
+        engine_scores,
+        runtime_failure_intelligence,
+    ):
+
+        engine_scores = self._safe_dict(
+            engine_scores
+        )
+
+        runtime_failure_intelligence = (
+            self._safe_dict(
+                runtime_failure_intelligence
+            )
+        )
+
+        preventive_actions = (
+            runtime_failure_intelligence.get(
+                "preventive_actions"
+            )
+            or []
+        )
+
+        if not isinstance(
+            preventive_actions,
+            list,
+        ):
+
+            preventive_actions = []
+
+        for action in preventive_actions:
+
+            action = str(
+                action or ""
+            ).strip().lower()
+
+            for engine_name in engine_scores:
+
+                if (
+                    action
+                    == "increase_repair_bias"
+                    and "repair"
+                    in engine_name
+                ):
+
+                    engine_scores[
+                        engine_name
+                    ] += 5
+
+                if (
+                    action
+                    == "increase_debug_bias"
+                    and "debug"
+                    in engine_name
+                ):
+
+                    engine_scores[
+                        engine_name
+                    ] += 5
+
+                if (
+                    action
+                    == "reduce_parallelism"
+                    and "scheduler"
+                    in engine_name
+                ):
+
+                    engine_scores[
+                        engine_name
+                    ] -= 2
+
+                if (
+                    action
+                    == "stabilize_context"
+                    and "memory"
+                    in engine_name
+                ):
+
+                    engine_scores[
+                        engine_name
+                    ] += 4
+
+        return engine_scores
+
     def choose_engines(
         self,
         context=None,
@@ -225,6 +318,16 @@ class RuntimeOrchestratorService:
 
         priority_weights = self._safe_dict(
             last_fusion.get("priority_weights")
+        )
+
+        runtime_brain = (
+            self.runtime_brain_store.snapshot()
+        )
+
+        runtime_failure_intelligence = (
+            self.runtime_failure_intelligence.analyze(
+                runtime_brain
+            )
         )
 
         for name, config in self.engine_registry.items():
@@ -268,6 +371,22 @@ class RuntimeOrchestratorService:
                         )
                         * 10
                     )
+
+            score_map = {
+                name: score
+            }
+
+            score_map = (
+                self._apply_preventive_runtime_actions(
+                    score_map,
+                    runtime_failure_intelligence,
+                )
+            )
+
+            score = score_map.get(
+                name,
+                score,
+            )
 
             selected.append(
                 {
