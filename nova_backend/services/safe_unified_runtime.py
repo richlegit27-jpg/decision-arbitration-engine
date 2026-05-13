@@ -11,7 +11,9 @@ from nova_backend.services.runtime_learning_service import (
 from nova_backend.services.runtime_replay_service import (
     RuntimeReplayService,
 )
-
+from nova_backend.services.runtime_debugger_service import (
+    RuntimeDebuggerService,
+)
 
 class SafeUnifiedRuntime:
     def __init__(
@@ -22,6 +24,7 @@ class SafeUnifiedRuntime:
         governor=None,
         learning=None,
         replay=None,
+        debugger=None,
     ):
         self.chat_service = chat_service
 
@@ -55,6 +58,22 @@ class SafeUnifiedRuntime:
         self.replay = (
             replay
             or RuntimeReplayService()
+        )
+
+        self.debugger = (
+            debugger
+            or RuntimeDebuggerService()
+        )
+
+    def debug_runtime_result(
+        self,
+        runtime_result=None,
+    ):
+        return (
+            self.debugger
+            .inspect_runtime_result(
+                runtime_result or {},
+            )
         )
 
     def _safe_dict(self, value):
@@ -661,6 +680,30 @@ class SafeUnifiedRuntime:
             runtime_replay.get(
                 "replay_id"
             )
+        )
+
+        replay_explanation = (
+            self.explain_replay(
+                replay_id=result.get(
+                    "replay_id"
+                ),
+            )
+        )
+
+        debug_report = (
+            self.debugger.suggest_repairs(
+                runtime_result=result,
+                replay_explanation=(
+                    replay_explanation
+                ),
+                runtime_history=(
+                    self.runtime_history
+                ),
+            )
+        )
+
+        result["debug_report"] = (
+            debug_report
         )
 
         return result
