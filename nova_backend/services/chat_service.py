@@ -39,6 +39,7 @@ from nova_backend.services.brain.brain_core import BrainCore
 from nova_backend.services.brain.strategy import StrategyEngine
 from nova_backend.services.memory.memory_core import MemoryCore
 from nova_backend.services.execution.executor import Executor
+from nova_backend.services.python_runner_service import PythonRunnerService
 
 logger = logging.getLogger("nova.execution")
 DEBUG_EXECUTION = False
@@ -581,11 +582,67 @@ class ChatService:
         try:
             step["status"] = "running"
 
-            result = "step executed"
+            step_action = self._safe_str(
+                step.get("action")
+            ).lower()
 
-            step["result"] = result
+            target_file = self._safe_str(
+                step.get("target_file")
+            )
+
+            python_result = None
+
+            if (
+                step_action in {
+                    "implement",
+                    "test",
+                    "run",
+                    "execute",
+                }
+                and target_file
+                and hasattr(self, "python_runner")
+            ):
+
+                python_result = (
+                    self.python_runner.run_code(
+                        '''
+def placeholder_function():
+    return True
+
+print("Nova Python execution bridge is working.")
+''',
+                        filename=(
+                            "agent_runtime_test.py"
+                        ),
+                    )
+                )
+
+                result = (
+                    f"STDOUT="
+                    f"{python_result.get('stdout')} | "
+                    f"STDERR="
+                    f"{python_result.get('stderr')} | "
+                    f"ERROR="
+                    f"{python_result.get('error')}"
+                )
+
+                step["result"] = result
+
+                step["error"] = (
+                    None
+                    if python_result.get("ok")
+                    else result
+                )
+
+            else:
+
+                step["result"] = (
+                    "step executed"
+                )
+
+                step["error"] = None
+
             step["status"] = "completed"
-            step["error"] = None
 
         except Exception as e:
             step["status"] = "failed"
@@ -2075,10 +2132,6 @@ Current step:
                 step=step,
             )
 
-            step["status"] = "completed"
-            step["result"] = "step executed"
-            step["error"] = None
-
             execution_state["history"] = (
                 execution_state.get("history")
                 or []
@@ -2187,25 +2240,82 @@ Current step:
                     step=step,
                 )
 
-                step["status"] = "completed"
-                step["result"] = "step executed"
-                step["error"] = None
 
                 execution_state["history"] = (
                     execution_state.get("history")
                     or []
                 )
 
-                execution_state["history"].append(
-                    f"completed: {step.get('title')}"
+                step_title = self._safe_str(
+                    step.get("title")
                 )
 
-                execution_state["current_index"] = current_index + 1
-                execution_state["current_step_index"] = current_index
-                execution_state["progress"] = current_index
+                step_action = self._safe_str(
+                    step.get("action")
+                ).lower()
+
+                target_file = self._safe_str(
+                    step.get("target_file")
+                )
+
+                python_result = None
+
+                if (
+                    step_action in {
+                        "implement",
+                        "test",
+                        "run",
+                        "execute",
+                    }
+                    and target_file
+                    and hasattr(self, "python_runner")
+                ):
+
+                    python_result = (
+                        self.python_runner.run_file(
+                            target_file
+                        )
+                    )
+
+                    step["result"] = (
+                        python_result.get("stdout")
+                        or python_result.get("stderr")
+                        or python_result.get("error")
+                        or "python executed"
+                    )
+
+                    step["error"] = (
+                        None
+                        if python_result.get("ok")
+                        else step["result"]
+                    )
+
+                else:
+
+                    step["result"] = (
+                        "step executed"
+                    )
+
+                    step["error"] = None
+
+                execution_state["history"].append(
+                    f"completed: {step_title}"
+                )
+
+                execution_state["current_index"] = (
+                    current_index + 1
+                )
+
+                execution_state["current_step_index"] = (
+                    current_index
+                )
+
+                execution_state["progress"] = (
+                    current_index
+                )
 
                 outputs.append(
-                    f"Completed step: {step.get('title')}"
+                    f"Completed step: {step_title}"
                 )
 
                 if execution_state["current_index"] >= len(steps):
@@ -2853,6 +2963,7 @@ Current step:
         self.web_service = web_service
         self.recon_service = recon_service
         self.rewrite_service = ResponseRewriteService()
+        self.python_runner = PythonRunnerService()
 
         # execution engine
         self.execution_handler = ExecutionHandler(default_executor)
@@ -8304,6 +8415,33 @@ Current step:
                     "active_execution",
                     {},
                 )
+                steps = (
+                    execution_state.get("steps")
+                    or []
+                )
+
+                execution_state["current_index"] = (
+                    len(steps)
+                )
+
+                execution_state["current_step_index"] = (
+                    len(steps)
+                )
+
+                execution_state["progress"] = (
+                    len(steps)
+                )
+
+                execution_state["current_step"] = (
+                    "complete"
+                )
+
+                execution_state["current_step_title"] = (
+                    "complete"
+                )
+
+                execution_state["complete"] = True
+
 
                 return {
                     "ok": True,
