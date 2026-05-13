@@ -14,6 +14,7 @@ from nova_backend.services.runtime_graph_memory_service import RuntimeGraphMemor
 from nova_backend.services.runtime_graph_query_service import RuntimeGraphQueryService
 from nova_backend.services.runtime_graph_evolution_service import RuntimeGraphEvolutionService
 from nova_backend.services.runtime_prediction_service import RuntimePredictionService
+from nova_backend.services.runtime_prediction_history_service import RuntimePredictionHistoryService
 
 class RuntimeOrchestratorService:
     def __init__(self):
@@ -58,6 +59,10 @@ class RuntimeOrchestratorService:
             RuntimePredictionService(
                 self.runtime_graph_evolution
             )
+        )
+
+        self.runtime_prediction_history = (
+            RuntimePredictionHistoryService()
         )
 
     def register_default_engines(self):
@@ -534,6 +539,16 @@ class RuntimeOrchestratorService:
             self.runtime_prediction.predict_runtime_state()
         )
 
+        runtime_prediction_history = (
+            self.runtime_prediction_history.record_prediction(
+                runtime_prediction
+            )
+        )
+
+        runtime_prediction_history_summary = (
+            self.runtime_prediction_history.summarize_history()
+        )
+
         predicted_state = str(
             runtime_prediction.get(
                 "predicted_state",
@@ -831,7 +846,16 @@ class RuntimeOrchestratorService:
             runtime_prediction
         )
 
+        self.last_runtime_prediction_history = (
+            runtime_prediction_history
+        )
+
+        self.last_runtime_prediction_history_summary = (
+            runtime_prediction_history_summary
+        )
+
         return {
+
             "runtime_prediction": runtime_prediction,
             "selected_engines": selected,
             "runtime_graph_memory": runtime_graph_memory,
@@ -842,6 +866,10 @@ class RuntimeOrchestratorService:
             ),
             "runtime_graph_evolution": (
                 runtime_graph_evolution
+            ),
+            "runtime_prediction_history": runtime_prediction_history,
+            "runtime_prediction_history_summary": (
+                runtime_prediction_history_summary
             ),
         }
 
@@ -1333,6 +1361,22 @@ class RuntimeOrchestratorService:
                 getattr(
                     self,
                     "last_runtime_prediction",
+                    {},
+                )
+            ),
+
+            "runtime_prediction_history": (
+                getattr(
+                    self,
+                    "last_runtime_prediction_history",
+                    {},
+                )
+            ),
+
+            "runtime_prediction_history_summary": (
+                getattr(
+                    self,
+                    "last_runtime_prediction_history_summary",
                     {},
                 )
             ),
