@@ -120,6 +120,39 @@ for index, scenario in enumerate(scenarios, start=1):
             "runtime_signal": mutated.get(
                 "runtime_signal"
             ),
+            "runtime_route": mutated.get(
+                "runtime_route"
+            ),
+            "runtime_stabilization_mode": mutated.get(
+                "runtime_stabilization_mode"
+            ),
+            "runtime_cooldown_count": mutated.get(
+                "runtime_cooldown_count"
+            ),
+            "runtime_cooldown_active": mutated.get(
+                "runtime_cooldown_active"
+            ),
+            "runtime_action_rewritten": mutated.get(
+                "runtime_action_rewritten"
+            ),
+            "runtime_policy_enforcement": result.get(
+                "runtime_policy_enforcement"
+            ),
+            "runtime_route": mutated.get(
+                "runtime_route"
+            ),
+            "runtime_stabilization_mode": mutated.get(
+                "runtime_stabilization_mode"
+            ),
+            "runtime_cooldown_count": mutated.get(
+                "runtime_cooldown_count"
+            ),
+            "runtime_cooldown_active": mutated.get(
+                "runtime_cooldown_active"
+            ),
+            "runtime_action_rewritten": mutated.get(
+                "runtime_action_rewritten"
+            ),
             "graph_scores": graph_memory.get(
                 "graph_scores"
             ),
@@ -131,6 +164,29 @@ for index, scenario in enumerate(scenarios, start=1):
             ),
             "runtime_graph_patterns": result.get(
                 "runtime_graph_patterns"
+            ),
+
+            "runtime_trend_analysis": result.get(
+                "runtime_trend_analysis"
+            ),
+            "runtime_adaptive_policy": result.get(
+                "runtime_adaptive_policy"
+            ),
+            "runtime_adaptive_policy": result.get(
+                "runtime_adaptive_policy"
+            ),
+
+            "runtime_governor": result.get(
+                "runtime_governor"
+            ),
+
+            "memory_event_count": (
+                result.get(
+                    "runtime_graph_memory",
+                    {},
+                ).get(
+                    "event_count"
+                )
             ),
             "memory_event_count": (
                 result.get(
