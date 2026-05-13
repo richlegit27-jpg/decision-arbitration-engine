@@ -12,6 +12,7 @@ from flask import Flask, Response, jsonify, render_template, request, send_from_
 from flask_cors import CORS
 from bs4 import BeautifulSoup
 import uuid
+from nova_backend.services.runtime_bootstrap import RuntimeBootstrap
 from werkzeug.utils import secure_filename
 from nova_backend.routes.memory_panel_routes import register_memory_panel_routes
 from nova_backend.utils.api_response import ok_response, error_response
@@ -75,7 +76,8 @@ chat_service = ChatService(
     recon_service=recon_service,
 )
 
-chat_service.start_execution_daemon()
+if hasattr(chat_service, "start_execution_daemon"):
+    chat_service.start_execution_daemon()
 
 print("CHAT SERVICE OBJ =", chat_service)
 print("CHAT SERVICE TYPE =", type(chat_service))
@@ -367,7 +369,7 @@ def find_best_name_memory(session_id: str) -> dict | None:
         {
             "assistant_message": {
                 "role": "assistant",
-                "text": "I don’t know your name yet. Tell me with “my name is …” and I’ll remember it.",
+                "text": 'I do not know your name yet. Tell me with "my name is ..." and I will remember it.',
             },
             "debug": {
                 "decision": decision,
@@ -588,6 +590,34 @@ def api_state():
 # -----------------------
 # CHAT
 # -----------------------
+
+@app.route("/api/runtime/summary", methods=["GET"])
+def api_runtime_summary():
+    try:
+        runtime = RuntimeBootstrap.build(
+            chat_service=chat_service,
+        )
+
+        summary = getattr(
+            runtime,
+            "last_compressed_runtime",
+            {},
+        )
+
+        return jsonify(
+            {
+                "ok": True,
+                "runtime": summary,
+            }
+        )
+
+    except Exception as e:
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(e),
+            }
+        ), 500
 
 @app.post("/api/fetch")
 def api_fetch():
@@ -2176,7 +2206,7 @@ def create_startup_backup():
 
     print(f"[NOVA BACKUP] Created: {backup_dir}")
 
-    # 🔥 AUTO CLEANUP (keep last 10 backups)
+    # ?? AUTO CLEANUP (keep last 10 backups)
     backups = sorted(backup_root.glob("startup_*"), key=lambda p: p.stat().st_mtime, reverse=True)
 
     for old in backups[10:]:
@@ -2197,3 +2227,5 @@ if __name__ == "__main__":
         debug=True,
         use_reloader=False,
     )
+
+
