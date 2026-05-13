@@ -1,4 +1,5 @@
 from nova_backend.services.governor_service import GovernorService
+from nova_backend.services.runtime_output_compression_service import RuntimeOutputCompressionService
 from nova_backend.services.runtime_graph_memory_service import RuntimeGraphMemoryService
 from nova_backend.services.graph_runtime_service import (
     GraphRuntimeService,
@@ -65,7 +66,7 @@ class SafeUnifiedRuntime:
         self.last_reflection = {}
         self.last_decision = {}
         self.runtime_history = []
-
+        self.runtime_output_compression = RuntimeOutputCompressionService()
         self.runtime_graph_memory = RuntimeGraphMemoryService()
 
         self.runtime_graph_query = RuntimeGraphQueryService(
@@ -672,6 +673,12 @@ class SafeUnifiedRuntime:
         )
 
         result["orchestration_report"] = orchestration_report
+
+        result["compressed_runtime"] = (
+            self.runtime_output_compression.compress_cycle_result(
+                result
+            )
+        )
 
         return result
 
