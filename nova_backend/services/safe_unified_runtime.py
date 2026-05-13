@@ -4,6 +4,10 @@ from nova_backend.services.runtime_graph_memory_service import RuntimeGraphMemor
 from nova_backend.services.graph_runtime_service import (
     GraphRuntimeService,
 )
+
+from nova_backend.services.runtime_compression_service import (
+    RuntimeCompressionService,
+)
 from nova_backend.services.observability_service import (
     ObservabilityService,
 )
@@ -108,6 +112,11 @@ class SafeUnifiedRuntime:
 
         self.self_healing = self_healing or RuntimeSelfHealingService()
         self.runtime_orchestrator = RuntimeOrchestratorService()
+        self.runtime_compressor = (
+            RuntimeCompressionService()
+        )
+
+        self.last_compressed_runtime = {}
 
     def debug_runtime_result(
         self,
