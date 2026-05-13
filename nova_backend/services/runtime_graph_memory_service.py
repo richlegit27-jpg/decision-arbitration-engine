@@ -2,6 +2,9 @@ import time
 import uuid
 
 from nova_backend.services.runtime_graph_storage_service import RuntimeGraphStorageService
+from nova_backend.services.runtime_graph_store_service import (
+    RuntimeGraphStoreService,
+)
 
 class RuntimeGraphMemoryService:
 
@@ -23,6 +26,22 @@ class RuntimeGraphMemoryService:
         self.edges = self._safe_list(
             snapshot.get("edges")
         )
+        self.store = (
+            RuntimeGraphStoreService()
+        )
+
+        loaded = self.store.load()
+
+        self.events = (
+            loaded.get("events")
+            if isinstance(
+                loaded.get("events"),
+                list,
+            )
+            else []
+        )
+
+
     def _now(self):
 
         return time.time()
@@ -204,6 +223,14 @@ class RuntimeGraphMemoryService:
             self.events = []
 
         self.events.append(event)
+
+        self.events = self.events[-250:]
+
+        self.store.save(
+            {
+                "events": self.events,
+            }
+        )
 
         return {
             "ok": True,
