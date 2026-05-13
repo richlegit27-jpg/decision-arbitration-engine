@@ -1,4 +1,5 @@
 from nova_backend.services.governor_service import GovernorService
+from nova_backend.services.runtime_graph_memory_service import RuntimeGraphMemoryService
 from nova_backend.services.graph_runtime_service import (
     GraphRuntimeService,
 )
@@ -14,10 +15,13 @@ from nova_backend.services.runtime_replay_service import (
 from nova_backend.services.runtime_debugger_service import (
     RuntimeDebuggerService,
 )
-
 from nova_backend.services.runtime_self_healing_service import (
     RuntimeSelfHealingService,
 )
+from nova_backend.services.runtime_orchestrator_service import (
+    RuntimeOrchestratorService,
+)
+
 
 class SafeUnifiedRuntime:
     def __init__(
@@ -39,6 +43,10 @@ class SafeUnifiedRuntime:
         self.last_decision = {}
 
         self.runtime_history = []
+
+        self.runtime_graph_memory = (
+            RuntimeGraphMemoryService()
+        )
 
         self.observability = (
             observability
@@ -67,12 +75,18 @@ class SafeUnifiedRuntime:
 
         self.debugger = (
             debugger
-            or RuntimeDebuggerService()
+            or RuntimeDebuggerService(
+                graph_memory=self.runtime_graph_memory
+            )
         )
 
         self.self_healing = (
             self_healing
             or RuntimeSelfHealingService()
+        )
+
+        self.runtime_orchestrator = (
+            RuntimeOrchestratorService()
         )
 
     def debug_runtime_result(
@@ -86,7 +100,10 @@ class SafeUnifiedRuntime:
             )
         )
 
-    def _safe_dict(self, value):
+    def _safe_dict(
+        self,
+        value,
+    ):
         return (
             value
             if isinstance(value, dict)
@@ -223,39 +240,24 @@ class SafeUnifiedRuntime:
             "action"
         )
 
-        if (
-            action
-            == "inspect_failed_step"
-        ):
-            execution_state[
-                "runtime_signal"
-            ] = (
-                "runtime_requested_"
-                "failure_inspection"
+        if action == "inspect_failed_step":
+            execution_state["runtime_signal"] = (
+                "runtime_requested_failure_inspection"
             )
 
-        elif (
-            action
-            == "preserve_success_state"
-        ):
-            execution_state[
-                "runtime_signal"
-            ] = (
-                "runtime_stabilized_"
-                "success"
+        elif action == "preserve_success_state":
+            execution_state["runtime_signal"] = (
+                "runtime_stabilized_success"
             )
 
-        elif (
-            action
-            == "wait_for_task"
-        ):
-            execution_state[
-                "runtime_signal"
-            ] = "runtime_idle"
+        elif action == "wait_for_task":
+            execution_state["runtime_signal"] = (
+                "runtime_idle"
+            )
 
-        execution_state[
-            "last_runtime_action"
-        ] = action
+        execution_state["last_runtime_action"] = (
+            action
+        )
 
         return execution_state
 
@@ -366,6 +368,19 @@ class SafeUnifiedRuntime:
             )
         )
 
+        if hasattr(
+            self,
+            "runtime_graph_memory",
+        ):
+
+            self.runtime_graph_memory.record_runtime_cycle(
+                execution_state=execution_state,
+                execution_summary=execution_summary,
+                world_state=world_state,
+                scheduler_state=scheduler_state,
+                cycle_count=self.cycle_count,
+            )
+
         control = self._meta_control(
             execution_summary
         )
@@ -392,9 +407,7 @@ class SafeUnifiedRuntime:
 
         execution_state = (
             self._apply_decision_to_state(
-                execution_state=(
-                    execution_state
-                ),
+                execution_state=execution_state,
                 decision=decision,
             )
         )
@@ -716,6 +729,12 @@ class SafeUnifiedRuntime:
             debug_report
         )
 
+        result["runtime_graph_report"] = (
+            self.debug_runtime_result(
+                result
+            )
+        )
+
         healing_plan = (
             self.self_healing.build_healing_plan(
                 debug_report=debug_report,
@@ -736,6 +755,27 @@ class SafeUnifiedRuntime:
         result["healing_plan"] = healing_plan
         result["healing_report"] = healing_report
 
+        orchestration_report = (
+            self.runtime_orchestrator.orchestrate(
+                runtime_result={
+                    "ok": True,
+                    "cycle": self.cycle_count,
+                    "final_action": final_action,
+                    "execution": execution_state,
+                    "trace_id": trace_id,
+                    "replay_id": result.get(
+                        "replay_id"
+                    ),
+                },
+                execution_state=execution_state,
+                debug_report=debug_report,
+                healing_report=healing_report,
+            )
+        )
+
+        result["orchestration_report"] = (
+            orchestration_report
+        )
 
         return result
 
@@ -820,5 +860,5 @@ class RuntimeBootstrap:
         chat_service=None,
     ):
         return SafeUnifiedRuntime(
-            chat_service=chat_service
+            chat_service=chat_service,
         )
