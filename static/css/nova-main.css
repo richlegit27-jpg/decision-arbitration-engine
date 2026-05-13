@@ -10599,3 +10599,15 @@ body.is-rail-open [data-rail-panel="execution"].is-active [data-execution-panel]
   margin-bottom: 6px;
   font-weight: 700;
 }
+
+#nova-runtime-panel.is-collapsed div:not(#nova-runtime-panel-title) {
+  display: none;
+}
+
+#nova-runtime-panel-title {
+  all: unset;
+  cursor: pointer;
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 700;
+}

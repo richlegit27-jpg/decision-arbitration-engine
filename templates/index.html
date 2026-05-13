@@ -9,7 +9,9 @@
 </head>
 <body>
   <div id="nova-runtime-panel">
-    <div id="nova-runtime-panel-title">Runtime Brain</div>
+    <button id="nova-runtime-panel-title" type="button" onclick="document.getElementById('nova-runtime-panel').classList.toggle('is-collapsed')">
+  Runtime Brain
+</button>
     <div>Health: <span id="nova-runtime-health">waiting</span></div>
     <div>Route: <span id="nova-runtime-route">waiting</span></div>
     <div>Signal: <span id="nova-runtime-signal">waiting</span></div>
