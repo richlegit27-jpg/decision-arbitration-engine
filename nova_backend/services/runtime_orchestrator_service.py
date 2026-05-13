@@ -360,6 +360,89 @@ class RuntimeOrchestratorService:
             ),
         )
 
+    def _apply_self_healing_orchestration_mode(
+        self,
+        selected,
+        runtime_governor,
+    ):
+
+        selected = (
+            selected
+            if isinstance(
+                selected,
+                list,
+            )
+            else []
+        )
+
+        runtime_governor = self._safe_dict(
+            runtime_governor
+        )
+
+        if runtime_governor.get("mode") != "stabilization":
+
+            return selected
+
+        for item in selected:
+
+            if not isinstance(
+                item,
+                dict,
+            ):
+                continue
+
+            name = str(
+                item.get("name")
+                or ""
+            ).lower()
+
+            tags = self._safe_list(
+                item.get("tags")
+            )
+
+            if (
+                "repair" in name
+                or "repair" in tags
+            ):
+
+                item["score"] = (
+                    item.get("score", 0)
+                    + 50
+                )
+
+                item["self_healing_boost"] = True
+
+            if (
+                "debug" in name
+                or "debug" in tags
+            ):
+
+                item["score"] = (
+                    item.get("score", 0)
+                    + 35
+                )
+
+                item["self_healing_boost"] = True
+
+            if (
+                "healing" in name
+                or "healing" in tags
+            ):
+
+                item["score"] = (
+                    item.get("score", 0)
+                    + 40
+                )
+
+                item["self_healing_boost"] = True
+
+        selected.sort(
+            key=lambda item: item.get("score", 0),
+            reverse=True,
+        )
+
+        return selected
+
     def choose_engines(
         self,
         context=None,
@@ -511,11 +594,31 @@ class RuntimeOrchestratorService:
             reverse=True,
         )
 
+        runtime_governor = (
+            self.runtime_governor.govern(
+                runtime_failure_intelligence,
+                selected,
+                runtime_brain,
+            )
+        )
+
+        selected = (
+            self._apply_self_healing_orchestration_mode(
+                selected,
+                runtime_governor,
+            )
+        )
+
+        self.last_runtime_governor = (
+            runtime_governor
+        )
+
         self.last_suppression_report = (
             suppression_report
         )
 
         return selected
+
 
     def build_plan(
         self,
