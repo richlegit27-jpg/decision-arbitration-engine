@@ -13,6 +13,7 @@ from nova_backend.services.runtime_engine_fusion_service import (
 from nova_backend.services.runtime_graph_memory_service import RuntimeGraphMemoryService
 from nova_backend.services.runtime_graph_query_service import RuntimeGraphQueryService
 from nova_backend.services.runtime_graph_evolution_service import RuntimeGraphEvolutionService
+from nova_backend.services.runtime_prediction_service import RuntimePredictionService
 
 class RuntimeOrchestratorService:
     def __init__(self):
@@ -50,6 +51,12 @@ class RuntimeOrchestratorService:
         self.runtime_graph_evolution = (
             RuntimeGraphEvolutionService(
                 self.runtime_graph_memory
+            )
+        )
+
+        self.runtime_prediction = (
+            RuntimePredictionService(
+                self.runtime_graph_evolution
             )
         )
 
@@ -523,6 +530,24 @@ class RuntimeOrchestratorService:
             self.runtime_graph_evolution.recommend_evolution()
         )
 
+        runtime_prediction = (
+            self.runtime_prediction.predict_runtime_state()
+        )
+
+        predicted_state = str(
+            runtime_prediction.get(
+                "predicted_state",
+                "",
+            )
+        ).lower()
+
+        risk_forecast = str(
+            runtime_prediction.get(
+                "risk_forecast",
+                "",
+            )
+        ).lower()
+
         evolution_text = " ".join(
             self._safe_list(
                 runtime_graph_evolution.get(
@@ -631,6 +656,40 @@ class RuntimeOrchestratorService:
             ):
 
                 score += 10
+
+            if (
+                predicted_state == "unstable"
+                and (
+                    "repair" in tags
+                    or "debug" in tags
+                )
+            ):
+
+                score += 20
+
+            if (
+                predicted_state == "adaptive"
+                and "planning" in tags
+            ):
+
+                score += 10
+
+            if (
+                predicted_state == "stable"
+                and (
+                    "reflection" in tags
+                    or "scheduler" in tags
+                )
+            ):
+
+                score += 12
+
+            if (
+                risk_forecast == "high"
+                and "healing" in tags
+            ):
+
+                score += 15
 
             if "debug" in tags and debug_issues:
                 score += 30
@@ -768,7 +827,12 @@ class RuntimeOrchestratorService:
             runtime_graph_evolution
         )
 
+        self.last_runtime_prediction = (
+            runtime_prediction
+        )
+
         return {
+            "runtime_prediction": runtime_prediction,
             "selected_engines": selected,
             "runtime_graph_memory": runtime_graph_memory,
             "runtime_graph_patterns": runtime_graph_patterns,
@@ -1261,6 +1325,14 @@ class RuntimeOrchestratorService:
                 getattr(
                     self,
                     "last_runtime_graph_evolution",
+                    {},
+                )
+            ),
+
+            "runtime_prediction": (
+                getattr(
+                    self,
+                    "last_runtime_prediction",
                     {},
                 )
             ),

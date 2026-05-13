@@ -121,6 +121,34 @@ def main():
         second_top,
     )
 
+    print("HAS GRAPH MEMORY =", "runtime_graph_memory" in result_2)
+    print("HAS GRAPH PATTERNS =", "runtime_graph_patterns" in result_2)
+    print("HAS GRAPH SUMMARY =", "runtime_graph_summary" in result_2)
+    print("HAS GRAPH RECOMMENDATIONS =", "runtime_graph_recommendations" in result_2)
+    print("HAS GRAPH EVOLUTION =", "runtime_graph_evolution" in result_2)
+    print("HAS RUNTIME PREDICTION =", "runtime_prediction" in result_2)
+    print(
+        "PREDICTED STATE =",
+        result_2.get(
+            "runtime_prediction",
+            {},
+        ).get("predicted_state"),
+    )
+    print(
+        "RISK FORECAST =",
+        result_2.get(
+            "runtime_prediction",
+            {},
+        ).get("risk_forecast"),
+    )
+    print(
+        "PREDICTION REASON =",
+        result_2.get(
+            "runtime_prediction",
+            {},
+        ).get("prediction_reason"),
+    )
+
 
 if __name__ == "__main__":
     main()
