@@ -5311,6 +5311,16 @@ console.log(
     data.runtime
 );
 
+if (data.runtime && typeof data.runtime === "object") {
+    window.NovaLastRuntime = data.runtime;
+
+    window.dispatchEvent(
+        new CustomEvent("nova:runtime:update", {
+            detail: data.runtime,
+        })
+    );
+}
+
     if (data && data.active_session_id) {
       state.activeSessionId = String(data.active_session_id);
     } else if (data && data.session && data.session.id) {
