@@ -88,113 +88,16 @@ for index, scenario in enumerate(scenarios, start=1):
         },
     )
 
-    mutated = result.get(
-        "mutated_execution_state",
-        {},
+    print(
+        "\n=== ADAPTATION CYCLE",
+        index,
+        scenario["label"],
+        "===\n",
     )
-
-    graph_memory = mutated.get(
-        "graph_memory",
-        {},
-    )
-
-    print("\n=== ADAPTATION CYCLE", index, scenario["label"], "===\n")
 
     pprint(
-        {
-            "cycle_count": result.get(
-                "cycle_count"
-            ),
-            "final_action": result.get(
-                "final_action"
-            ),
-            "reflection": result.get(
-                "reflection"
-            ),
-            "healing_mode": mutated.get(
-                "healing_mode"
-            ),
-            "healing_action_cooldown": mutated.get(
-                "healing_action_cooldown"
-            ),
-            "runtime_signal": mutated.get(
-                "runtime_signal"
-            ),
-            "runtime_route": mutated.get(
-                "runtime_route"
-            ),
-            "runtime_stabilization_mode": mutated.get(
-                "runtime_stabilization_mode"
-            ),
-            "runtime_cooldown_count": mutated.get(
-                "runtime_cooldown_count"
-            ),
-            "runtime_cooldown_active": mutated.get(
-                "runtime_cooldown_active"
-            ),
-            "runtime_action_rewritten": mutated.get(
-                "runtime_action_rewritten"
-            ),
-            "runtime_policy_enforcement": result.get(
-                "runtime_policy_enforcement"
-            ),
-            "runtime_route": mutated.get(
-                "runtime_route"
-            ),
-            "runtime_stabilization_mode": mutated.get(
-                "runtime_stabilization_mode"
-            ),
-            "runtime_cooldown_count": mutated.get(
-                "runtime_cooldown_count"
-            ),
-            "runtime_cooldown_active": mutated.get(
-                "runtime_cooldown_active"
-            ),
-            "runtime_action_rewritten": mutated.get(
-                "runtime_action_rewritten"
-            ),
-            "graph_scores": graph_memory.get(
-                "graph_scores"
-            ),
-            "graph_usage": graph_memory.get(
-                "graph_usage"
-            ),
-            "runtime_graph_query": result.get(
-                "runtime_graph_query"
-            ),
-            "runtime_graph_patterns": result.get(
-                "runtime_graph_patterns"
-            ),
-
-            "runtime_trend_analysis": result.get(
-                "runtime_trend_analysis"
-            ),
-            "runtime_adaptive_policy": result.get(
-                "runtime_adaptive_policy"
-            ),
-            "runtime_adaptive_policy": result.get(
-                "runtime_adaptive_policy"
-            ),
-
-            "runtime_governor": result.get(
-                "runtime_governor"
-            ),
-
-            "memory_event_count": (
-                result.get(
-                    "runtime_graph_memory",
-                    {},
-                ).get(
-                    "event_count"
-                )
-            ),
-            "memory_event_count": (
-                result.get(
-                    "runtime_graph_memory",
-                    {},
-                ).get(
-                    "event_count"
-                )
-            ),
-        }
+        result.get(
+            "compressed_runtime",
+            result,
+        )
     )
