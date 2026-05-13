@@ -1,6 +1,7 @@
 import time
 import uuid
 
+from nova_backend.services.runtime_engine_suppression_service import RuntimeEngineSuppressionService
 from nova_backend.services.runtime_failure_intelligence_service import RuntimeFailureIntelligenceService
 from nova_backend.services.runtime_brain_store_service import RuntimeBrainStoreService
 from nova_backend.services.runtime_engine_factory import RuntimeEngineFactory
@@ -22,6 +23,9 @@ class RuntimeOrchestratorService:
         self.runtime_brain_store = RuntimeBrainStoreService()
         self.runtime_failure_intelligence = (
             RuntimeFailureIntelligenceService()
+        )
+        self.runtime_engine_suppression = (
+            RuntimeEngineSuppressionService()
         )
 
     def register_default_engines(self):
@@ -295,6 +299,7 @@ class RuntimeOrchestratorService:
         self,
         context=None,
     ):
+
         context = self._safe_dict(context)
 
         selected = []
@@ -329,9 +334,30 @@ class RuntimeOrchestratorService:
                 runtime_brain
             )
         )
+        suppression_report = {}
 
         for name, config in self.engine_registry.items():
             if not self.engine_available(name):
+                continue
+
+            suppression = (
+                self.runtime_engine_suppression.evaluate(
+                    name,
+                    self.engine_states.get(
+                        name,
+                        {},
+                    ),
+                    runtime_failure_intelligence,
+                )
+            )
+
+            suppression_report[
+                name
+            ] = suppression
+
+            if suppression.get(
+                "suppressed"
+            ):
                 continue
 
             tags = self._safe_list(
@@ -400,6 +426,10 @@ class RuntimeOrchestratorService:
         selected.sort(
             key=lambda item: item.get("score", 0),
             reverse=True,
+        )
+
+        self.last_suppression_report = (
+            suppression_report
         )
 
         return selected
