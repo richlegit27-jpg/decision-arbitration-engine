@@ -331,5 +331,11 @@
 <script src="/static/js/nova-composer-bundle.js?v=image-hard-exit-001"></script>
 <script src="/static/js/nova-session-rail.js?v=session-rail-fix-2026-04-20-001"></script>
 <script src="/static/js/nova-memory.js?v=memory-panel-2026-04-15-002"></script>
+<script>
+    window.addEventListener("nova:runtime:update", function (event) {
+        const runtime = event.detail || {};
+        console.log("[NOVA RUNTIME UI UPDATE]", runtime);
+    });
+</script>
 </body>
 </html>
