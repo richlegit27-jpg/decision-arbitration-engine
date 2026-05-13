@@ -127,6 +127,23 @@ def main():
     print("HAS GRAPH RECOMMENDATIONS =", "runtime_graph_recommendations" in result_2)
     print("HAS GRAPH EVOLUTION =", "runtime_graph_evolution" in result_2)
     print("HAS RUNTIME PREDICTION =", "runtime_prediction" in result_2)
+    print("HAS PREDICTION HISTORY =", "runtime_prediction_history" in result_2)
+    print("HAS PREDICTION HISTORY SUMMARY =", "runtime_prediction_history_summary" in result_2)
+    print("HAS PREDICTION DRIFT =", "runtime_prediction_drift" in result_2)
+    print(
+        "PREDICTION DRIFT STATE =",
+        result_2.get(
+            "runtime_prediction_drift",
+            {},
+        ).get("drift_state"),
+    )
+    print(
+        "PREDICTION HISTORY COUNT =",
+        result_2.get(
+            "runtime_prediction_history_summary",
+            {},
+        ).get("history_count"),
+    )
     print(
         "PREDICTED STATE =",
         result_2.get(

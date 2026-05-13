@@ -15,6 +15,7 @@ from nova_backend.services.runtime_graph_query_service import RuntimeGraphQueryS
 from nova_backend.services.runtime_graph_evolution_service import RuntimeGraphEvolutionService
 from nova_backend.services.runtime_prediction_service import RuntimePredictionService
 from nova_backend.services.runtime_prediction_history_service import RuntimePredictionHistoryService
+from nova_backend.services.runtime_prediction_drift_service import RuntimePredictionDriftService
 
 class RuntimeOrchestratorService:
     def __init__(self):
@@ -63,6 +64,12 @@ class RuntimeOrchestratorService:
 
         self.runtime_prediction_history = (
             RuntimePredictionHistoryService()
+        )
+
+        self.runtime_prediction_drift = (
+            RuntimePredictionDriftService(
+                self.runtime_prediction_history
+            )
         )
 
     def register_default_engines(self):
@@ -549,6 +556,18 @@ class RuntimeOrchestratorService:
             self.runtime_prediction_history.summarize_history()
         )
 
+        runtime_prediction_drift = (
+            self.runtime_prediction_drift.recommend_drift_response()
+        )
+
+        drift_text = " ".join(
+            self._safe_list(
+                runtime_prediction_drift.get(
+                    "recommendations"
+                )
+            )
+        ).lower()
+
         predicted_state = str(
             runtime_prediction.get(
                 "predicted_state",
@@ -706,6 +725,23 @@ class RuntimeOrchestratorService:
 
                 score += 15
 
+            if (
+                "repair and debugging" in drift_text
+                and (
+                    "repair" in tags
+                    or "debug" in tags
+                )
+            ):
+
+                score += 15
+
+            if (
+                "adaptive orchestration" in drift_text
+                and "planning" in tags
+            ):
+
+                score += 8
+
             if "debug" in tags and debug_issues:
                 score += 30
 
@@ -854,8 +890,12 @@ class RuntimeOrchestratorService:
             runtime_prediction_history_summary
         )
 
-        return {
+        self.last_runtime_prediction_drift = (
+            runtime_prediction_drift
+        )
 
+        return {
+            "runtime_prediction_drift": runtime_prediction_drift,
             "runtime_prediction": runtime_prediction,
             "selected_engines": selected,
             "runtime_graph_memory": runtime_graph_memory,
@@ -1377,6 +1417,14 @@ class RuntimeOrchestratorService:
                 getattr(
                     self,
                     "last_runtime_prediction_history_summary",
+                    {},
+                )
+            ),
+
+            "runtime_prediction_drift": (
+                getattr(
+                    self,
+                    "last_runtime_prediction_drift",
                     {},
                 )
             ),
