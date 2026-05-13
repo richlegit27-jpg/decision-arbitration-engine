@@ -36,8 +36,18 @@ from nova_backend.services.runtime_policy_enforcement_service import (
 from nova_backend.services.runtime_governor_arbitration_service import (
     RuntimeGovernorArbitrationService,
 )
-
-
+from nova_backend.services.runtime_identity_service import (
+    RuntimeIdentityService,
+)
+from nova_backend.services.runtime_goal_persistence_service import (
+    RuntimeGoalPersistenceService,
+)
+from nova_backend.services.runtime_planning_service import (
+    RuntimePlanningService,
+)
+from nova_backend.services.runtime_world_model_service import (
+    RuntimeWorldModelService,
+)
 class SafeUnifiedRuntime:
     def __init__(
         self,
@@ -75,7 +85,16 @@ class SafeUnifiedRuntime:
         )
 
         self.runtime_governor = RuntimeGovernorArbitrationService()
-
+        self.runtime_identity = RuntimeIdentityService()
+        self.runtime_goal_persistence = (
+            RuntimeGoalPersistenceService()
+        )
+        self.runtime_planning = (
+        RuntimePlanningService()
+        )
+        self.runtime_world_model = (
+        RuntimeWorldModelService()
+        )
         self.observability = observability or ObservabilityService()
         self.graph_runtime = graph_runtime or GraphRuntimeService()
         self.governor = governor or GovernorService()
@@ -371,6 +390,85 @@ class SafeUnifiedRuntime:
 
         execution_state["runtime_governor"] = runtime_governor
 
+        runtime_identity = (
+            self.runtime_identity
+            .evolve_identity(
+                trend=(
+                    runtime_trend_analysis
+                ),
+                runtime_policy=(
+                    adaptive_policy
+                ),
+                runtime_governor=(
+                    runtime_governor
+                ),
+            )
+        )
+
+        execution_state[
+            "runtime_identity"
+        ] = runtime_identity
+
+        runtime_goal = (
+            self.runtime_goal_persistence
+            .evolve_goal(
+                runtime_identity=(
+                    runtime_identity
+                ),
+                runtime_governor=(
+                    runtime_governor
+                ),
+                trend=(
+                    runtime_trend_analysis
+                ),
+            )
+        )
+
+        execution_state[
+            "runtime_goal"
+        ] = runtime_goal
+
+        runtime_plan = (
+            self.runtime_planning
+            .build_plan(
+                runtime_goal=(
+                    runtime_goal
+                ),
+                runtime_identity=(
+                    runtime_identity
+                ),
+                trend=(
+                    runtime_trend_analysis
+                ),
+            )
+        )
+
+        execution_state[
+            "runtime_plan"
+        ] = runtime_plan
+
+        runtime_world_model = (
+            self.runtime_world_model
+            .simulate(
+                runtime_goal=(
+                    runtime_goal
+                ),
+                runtime_identity=(
+                    runtime_identity
+                ),
+                runtime_plan=(
+                    runtime_plan
+                ),
+                trend=(
+                    runtime_trend_analysis
+                ),
+            )
+        )
+
+        execution_state[
+            "runtime_world_model"
+        ] = runtime_world_model
+
         before_graph = (
             execution_state.get("graph", {}).copy()
             if isinstance(execution_state.get("graph"), dict)
@@ -440,10 +538,24 @@ class SafeUnifiedRuntime:
                 "failure_type": failure_type,
                 "final_action": final_action,
                 "runtime_governor": runtime_governor,
+                "runtime_identity": (
+                    runtime_identity
+                ),
+                "runtime_goal": (
+                    runtime_goal
+                ),
+                "runtime_plan": (
+                    runtime_plan
+                ),
+                "runtime_world_model": (
+                    runtime_world_model
+                ),
             }
         )
 
-        self.runtime_history = self.runtime_history[-25:]
+        self.runtime_history = (
+            self.runtime_history[-25:]
+        )
 
         result = {
             "ok": True,
@@ -485,6 +597,12 @@ class SafeUnifiedRuntime:
             "runtime_trend_analysis": runtime_trend_analysis,
             "runtime_adaptive_policy": runtime_adaptive_policy,
             "runtime_governor": runtime_governor,
+            "runtime_identity": (
+                runtime_identity
+            ),
+            "runtime_goal": (
+                runtime_goal
+            ),
         }
 
         self.observability.end_trace(
