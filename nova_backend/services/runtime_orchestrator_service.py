@@ -16,6 +16,7 @@ from nova_backend.services.runtime_graph_evolution_service import RuntimeGraphEv
 from nova_backend.services.runtime_prediction_service import RuntimePredictionService
 from nova_backend.services.runtime_prediction_history_service import RuntimePredictionHistoryService
 from nova_backend.services.runtime_prediction_drift_service import RuntimePredictionDriftService
+from nova_backend.services.runtime_drift_policy_service import RuntimeDriftPolicyService
 
 class RuntimeOrchestratorService:
     def __init__(self):
@@ -70,6 +71,10 @@ class RuntimeOrchestratorService:
             RuntimePredictionDriftService(
                 self.runtime_prediction_history
             )
+        )
+
+        self.runtime_drift_policy = (
+            RuntimeDriftPolicyService()
         )
 
     def register_default_engines(self):
@@ -560,6 +565,12 @@ class RuntimeOrchestratorService:
             self.runtime_prediction_drift.recommend_drift_response()
         )
 
+        runtime_drift_policy = (
+            self.runtime_drift_policy.build_policy(
+                runtime_prediction_drift
+            )
+        )
+
         drift_text = " ".join(
             self._safe_list(
                 runtime_prediction_drift.get(
@@ -642,6 +653,24 @@ class RuntimeOrchestratorService:
                 priority
                 * runtime_confidence
             )
+
+            if "repair" in tags:
+                score += runtime_drift_policy.get(
+                    "repair_bias",
+                    0,
+                )
+
+            if "debug" in tags:
+                score += runtime_drift_policy.get(
+                    "debug_bias",
+                    0,
+                )
+
+            if "planning" in tags:
+                score += runtime_drift_policy.get(
+                    "planning_bias",
+                    0,
+                )
 
             if (
                 "stabilization mode" in recommendation_text
@@ -892,6 +921,10 @@ class RuntimeOrchestratorService:
 
         self.last_runtime_prediction_drift = (
             runtime_prediction_drift
+        )
+
+        self.last_runtime_drift_policy = (
+            runtime_drift_policy
         )
 
         return {
@@ -1425,6 +1458,14 @@ class RuntimeOrchestratorService:
                 getattr(
                     self,
                     "last_runtime_prediction_drift",
+                    {},
+                )
+            ),
+
+            "runtime_drift_policy": (
+                getattr(
+                    self,
+                    "last_runtime_drift_policy",
                     {},
                 )
             ),
