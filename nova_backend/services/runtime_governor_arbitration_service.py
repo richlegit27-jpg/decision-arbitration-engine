@@ -72,6 +72,13 @@ class RuntimeGovernorArbitrationService:
 
         selected_action = scores[selected_engine]["action"]
 
+        selected_action = self._rewrite_selected_action(
+            selected_engine=selected_engine,
+            selected_action=selected_action,
+            runtime_policy=runtime_policy,
+            trend=trend,
+        )
+
         return {
             "ok": True,
             "selected_engine": selected_engine,
@@ -80,6 +87,46 @@ class RuntimeGovernorArbitrationService:
             "candidates": candidates,
             "reason": f"{selected_engine}_pressure_selected",
         }
+
+    def _rewrite_selected_action(
+        self,
+        selected_engine,
+        selected_action,
+        runtime_policy,
+        trend,
+    ):
+        runtime_health = str(
+            runtime_policy.get("runtime_health", "")
+        ).lower()
+
+        retry_actions = self._safe_int(
+            trend.get("retry_actions"),
+            0,
+        )
+
+        instability_ratio = self._safe_float(
+            trend.get("instability_ratio"),
+            0.0,
+        )
+
+        action_lc = str(selected_action).lower()
+
+        if (
+            selected_engine == "policy"
+            and action_lc == "retry"
+            and runtime_health == "unstable"
+            and retry_actions >= 3
+        ):
+            return "cooldown_repair"
+
+        if (
+            selected_engine == "policy"
+            and instability_ratio >= 0.70
+            and action_lc in {"mutate", "evolve", "mutation"}
+        ):
+            return "stabilize"
+
+        return selected_action
 
     def _policy_pressure_score(
         self,

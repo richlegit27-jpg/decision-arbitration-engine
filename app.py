@@ -619,6 +619,51 @@ def api_runtime_summary():
             }
         ), 500
 
+@app.route("/api/runtime/cycle", methods=["POST"])
+def api_runtime_cycle():
+    try:
+        runtime = RuntimeBootstrap.build(
+            chat_service=chat_service,
+        )
+
+        result = runtime.run_cycle(
+            execution_state={
+                "status": "failed",
+                "error": "api_runtime_cycle_test",
+                "steps": [
+                    {
+                        "title": "Runtime API cycle test",
+                        "status": "failed",
+                    }
+                ],
+            },
+            world_state={},
+            scheduler_state={},
+            knowledge_graph={},
+        )
+
+        summary = getattr(
+            runtime,
+            "last_compressed_runtime",
+            {},
+        )
+
+        return jsonify(
+            {
+                "ok": True,
+                "result": result,
+                "runtime": summary,
+            }
+        )
+
+    except Exception as e:
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(e),
+            }
+        ), 500
+
 @app.post("/api/fetch")
 def api_fetch():
     data = request.get_json(silent=True) or {}

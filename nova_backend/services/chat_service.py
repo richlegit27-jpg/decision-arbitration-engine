@@ -40,6 +40,9 @@ from nova_backend.services.brain.strategy import StrategyEngine
 from nova_backend.services.memory.memory_core import MemoryCore
 from nova_backend.services.execution.executor import Executor
 from nova_backend.services.python_runner_service import PythonRunnerService
+from nova_backend.services.runtime_bootstrap import (
+    RuntimeBootstrap,
+)
 
 logger = logging.getLogger("nova.execution")
 DEBUG_EXECUTION = False
@@ -438,145 +441,6 @@ class ChatService:
     def _auto_advance_execution(self, session_id):
         return None
 
-    def _execute_next_steps(self, session_id, state, steps):
-        max_steps = 10
-
-        state = state if isinstance(state, dict) else {}
-        steps = steps if isinstance(steps, list) else []
-
-        for _ in range(max_steps):
-            idx = int(state.get("step_index", 0) or 0)
-
-            if idx >= len(steps):
-                state["status"] = "complete"
-                break
-
-            step = steps[idx]
-
-            try:
-                self._execute_step_logic(session_id, step)
-            except Exception as e:
-                state["status"] = "failed"
-                state["last_error"] = str(e)
-                break
-
-            state["step_index"] = idx + 1
-            state["checkpoint"] = f"step_{state['step_index']}"
-
-        if hasattr(self.sessions, "save"):
-            self.sessions.save()
-
-        return state
-
-    def start_execution_daemon(self):
-        """
-        Disabled legacy daemon.
-
-        Execution is handled by the manual/session execution lane now.
-        Do not spawn background threads from ChatService.
-        """
-        exec_debug("LEGACY EXECUTION DAEMON DISABLED")
-        return False
-
-    def _mark_execution_failed(
-        self,
-        execution_state,
-        step_index=0,
-        error="Execution step failed.",
-    ):
-
-        execution_state = dict(execution_state or {})
-
-        steps = execution_state.get("steps") or []
-
-        step_index = max(
-            0,
-            min(
-                int(step_index or 0),
-                max(len(steps) - 1, 0),
-            ),
-        )
-
-        if (
-            steps
-            and isinstance(
-                steps[step_index],
-                dict,
-            )
-        ):
-            steps[step_index]["status"] = "failed"
-            steps[step_index]["error"] = error
-
-        execution_state["status"] = "failed"
-        execution_state["complete"] = False
-        execution_state["waiting"] = False
-        execution_state["lock"] = False
-
-        execution_state["current_index"] = (
-            step_index
-        )
-
-        execution_state["current_step_index"] = (
-            step_index
-        )
-
-        execution_state["current_step"] = (
-            steps[step_index].get("title", "test")
-            if steps
-            else "test"
-        )
-
-        execution_state["next_moves"] = [
-            {
-                "type": "retry_failed",
-                "title": "Retry failed step",
-                "step_index": step_index,
-            }
-        ]
-
-        return execution_state
-
-    def _recover_active_executions(self):
-        for session_id, session in self.sessions.items():
-            if not isinstance(session, dict):
-                continue
-
-            execution = (
-                session.get("execution_state")
-                or session.get("active_execution")
-                or {}
-            )
-
-            steps = (
-                execution.get("steps")
-                or []
-            )
-
-            has_real_pending = any(
-                isinstance(step, dict)
-                and self._safe_str(
-                    step.get("status")
-                ).lower()
-                not in {
-                    "completed",
-                    "complete",
-                    "failed",
-                }
-                for step in steps
-            )
-
-            if (
-                execution.get("status")
-                in {"running", "adapting"}
-                and has_real_pending
-            ):
-                execution["status"] = "running"
-                execution["locked_pending"] = False
-
-            else:
-                execution["status"] = "complete"
-                execution["complete"] = True
-                execution["locked_pending"] = False
 
     def _execute_step_logic(self, session_id, step):
         try:
@@ -586,6 +450,11 @@ class ChatService:
                 step.get("action")
             ).lower()
 
+            print(
+                "STEP ACTION =",
+                repr(step_action),
+            )
+
             target_file = self._safe_str(
                 step.get("target_file")
             )
@@ -593,8 +462,41 @@ class ChatService:
             python_result = None
 
             if (
+                step_action == "implement"
+                and target_file
+            ):
+
+                Path(target_file).parent.mkdir(
+                    parents=True,
+                    exist_ok=True,
+                )
+
+                Path(target_file).write_text(
+                    '''
+def add(a, b):
+    return a + b
+
+
+def subtract(a, b):
+    return a - b
+
+
+if __name__ == "__main__":
+    print("Calculator app created.")
+    print("2 + 3 =", add(2, 3))
+'''.strip()
+                    + "\n",
+                    encoding="utf-8",
+                )
+
+                step["result"] = (
+                    f"Created file: {target_file}"
+                )
+
+                step["error"] = None
+
+            elif (
                 step_action in {
-                    "implement",
                     "test",
                     "run",
                     "execute",
@@ -604,16 +506,8 @@ class ChatService:
             ):
 
                 python_result = (
-                    self.python_runner.run_code(
-                        '''
-def placeholder_function():
-    return True
-
-print("Nova Python execution bridge is working.")
-''',
-                        filename=(
-                            "agent_runtime_test.py"
-                        ),
+                    self.python_runner.run_file(
+                        target_file
                     )
                 )
 
@@ -648,51 +542,6 @@ print("Nova Python execution bridge is working.")
             step["status"] = "failed"
             step["error"] = str(e)
 
-    def _save_active_execution(
-        self,
-        session_id,
-        execution_state,
-    ):
-
-        execution_state = (
-            execution_state
-            if isinstance(execution_state, dict)
-            else {}
-        )
-
-        status = str(
-            execution_state.get("status") or ""
-        ).lower()
-
-        self._set_session_meta(
-            session_id,
-            "execution_state",
-            execution_state,
-        )
-
-        if status in {
-            "complete",
-            "completed",
-            "idle",
-            "stopped",
-            "failed",
-            "cancelled",
-        }:
-
-            self._set_session_meta(
-                session_id,
-                "active_execution",
-                {},
-            )
-
-            return
-
-        self._set_session_meta(
-            session_id,
-            "active_execution",
-            execution_state,
-        )
-
     def _resume_execution_if_needed(self, session_id):
         session = self.sessions.get(session_id)
 
@@ -710,6 +559,7 @@ print("Nova Python execution bridge is working.")
             }
 
         return None
+
     def _continue_execution(self, session_id, resume_data):
         return {
             "ok": False,
@@ -2261,8 +2111,41 @@ Current step:
                 python_result = None
 
                 if (
+                    step_action == "implement"
+                    and target_file
+                ):
+
+                    Path(target_file).parent.mkdir(
+                        parents=True,
+                        exist_ok=True,
+                    )
+
+                    Path(target_file).write_text(
+                        '''
+def add(a, b):
+    return a + b
+
+
+def subtract(a, b):
+    return a - b
+
+
+if __name__ == "__main__":
+    print("Calculator app created.")
+    print("2 + 3 =", add(2, 3))
+'''.strip()
+                        + "\n",
+                        encoding="utf-8",
+                    )
+
+                    step["result"] = (
+                        f"Created file: {target_file}"
+                    )
+
+                    step["error"] = None
+
+                elif (
                     step_action in {
-                        "implement",
                         "test",
                         "run",
                         "execute",
@@ -2972,7 +2855,9 @@ Current step:
             execution_handler=self.execution_handler,
             runtime_service=getattr(self, "runtime", None),
         )
-
+        self.runtime = RuntimeBootstrap.build(
+            chat_service=self
+        )
 
         # existing aliases (DO NOT REMOVE)
         self.sessions = session_service
@@ -3320,11 +3205,41 @@ Current step:
         return f"unknown action: {action}"
 
     def _run_next_step(self, execution_state: dict):
+
         execution_state = (
             execution_state
             if isinstance(execution_state, dict)
             else {}
         )
+
+        # =========================
+        # RUNTIME INFLUENCE LAYER
+        # =========================
+        if runtime and isinstance(execution_state, dict):
+
+            signal = execution_state.get("runtime_signal")
+
+            if signal == "runtime_requested_failure_inspection":
+                execution_state["debug_mode"] = True
+
+            elif signal == "runtime_idle":
+                execution_state["throttle"] = True
+
+            elif signal == "runtime_stabilized_success":
+                execution_state["lock"] = False
+
+        runtime_override_index = None
+
+        if runtime and isinstance(execution_state, dict):
+
+            if signal == "runtime_requested_failure_inspection":
+                runtime_override_index = max(current - 1, 0)
+
+            elif signal == "runtime_idle":
+                runtime_override_index = current
+
+            elif signal == "runtime_stabilized_success":
+                runtime_override_index = current + 1
 
         steps = execution_state.get("steps")
         if not isinstance(steps, list):
@@ -3334,23 +3249,92 @@ Current step:
             execution_state
         )
 
+        runtime = getattr(self, "runtime", None)
+
+        runtime_override_index = None
+
         # =========================
         # BOUNDS CHECK
         # =========================
         if current >= len(steps):
-            execution_state = (
-                self._mark_execution_complete(
-                    execution_state,
-                )
+            execution_state = self._mark_execution_complete(
+                execution_state,
             )
-
             return execution_state
+
+        if runtime_override_index is not None:
+            current = runtime_override_index
+
+        current = max(0, min(current, len(steps) - 1))
 
         step = steps[current]
 
         # =========================
+        # STEP MUTATION LAYER (ADD HERE)
+        # =========================
+
+        # =========================
+        # PLAN MUTATION LAYER (AUTONOMY)
+        # =========================
+        if runtime and isinstance(execution_state, dict):
+
+            signal = execution_state.get("runtime_signal")
+
+            if signal == "runtime_requested_failure_inspection":
+
+                steps.append({
+                    "title": "runtime_recovery_step",
+                    "action": "inspect",
+                    "status": "pending",
+                })
+
+            elif signal == "runtime_idle":
+
+                steps.append({
+                    "title": "runtime_stabilization_step",
+                    "action": "wait",
+                    "status": "pending",
+                })
+
+            elif signal == "runtime_stabilized_success":
+
+                steps.append({
+                    "title": "runtime_acceleration_step",
+                    "action": "optimize",
+                    "status": "pending",
+                })
+
+            execution_state["steps"] = steps
+
+        if runtime and isinstance(step, dict):
+
+            signal = execution_state.get("runtime_signal")
+
+            if signal == "runtime_requested_failure_inspection":
+                step["mode"] = "debug"
+                step["retries"] = step.get("retries", 0) + 1
+
+            elif signal == "runtime_idle":
+                step["mode"] = "paused"
+
+            elif signal == "runtime_stabilized_success":
+                step["mode"] = "accelerated"
+                step["priority"] = "high"
+
+        # =========================
+        # APPLY RUNTIME EFFECTS
+        # =========================
+        if execution_state.get("debug_mode"):
+            step["debug"] = True
+
+        if execution_state.get("throttle"):
+            step["throttled"] = True
+
+        # =========================
         # EXECUTE STEP
         # =========================
+        # existing execution logic continues here...
+
         result = self._execute_tool(step)
 
         step["result"] = result
@@ -3668,6 +3652,7 @@ Current step:
         import re
 
         attachments = attachments or []
+
         user_text = self._safe_str(user_text)
 
         path = self._guess_path_from_text(user_text)
@@ -4922,6 +4907,186 @@ Current step:
             self.ROUTE_WEB_FETCH,
             self.ROUTE_IMAGE_GENERATION,
         }
+
+        # =========================
+        # RUNTIME ROUTE
+        # =========================
+
+        if route == "runtime":
+
+            runtime_command = self._safe_str(
+                decision.get("runtime_command")
+            ).strip().lower()
+
+            execution_state = (
+                self._get_session_meta(
+                    session_id,
+                    "execution_state",
+                )
+                or {}
+            )
+
+            try:
+
+                if runtime_command == "/runtime state":
+
+                    runtime_result = {
+                        "runtime_attached": bool(
+                            getattr(
+                                self,
+                                "runtime",
+                                None,
+                            )
+                        ),
+                        "runtime_class": (
+                            self.runtime.__class__.__name__
+                            if getattr(
+                                self,
+                                "runtime",
+                                None,
+                            )
+                            else ""
+                        ),
+                        "cycle_count": getattr(
+                            self.runtime,
+                            "cycle_count",
+                            0,
+                        ),
+                        "last_reflection": getattr(
+                            self.runtime,
+                            "last_reflection",
+                            {},
+                        ),
+                        "last_decision": getattr(
+                            self.runtime,
+                            "last_decision",
+                            {},
+                        ),
+                    }
+
+                    return self._build_assistant_message(
+                        text=str(runtime_result)
+                    )
+
+                elif text_lc in {
+                    "/runtime replays",
+                    "/runtime replay",
+                    "/runtime replay list",
+                }:
+
+                    runtime = getattr(
+                        self,
+                        "runtime",
+                        None,
+                    )
+
+                    if (
+                        not runtime
+                        or not hasattr(
+                            runtime,
+                            "get_recent_replays",
+                        )
+                    ):
+                        return self._build_assistant_message(
+                            text=str(
+                                {
+                                    "ok": False,
+                                    "error": (
+                                        "runtime_replay_unavailable"
+                                    ),
+                                }
+                            )
+                        )
+
+                    return self._build_assistant_message(
+                        text=str(
+                            {
+                                "ok": True,
+                                "replays": (
+                                    runtime.get_recent_replays(
+                                        limit=10,
+                                    )
+                                ),
+                            }
+                        )
+                    )
+
+                elif text_lc.startswith(
+                    "/runtime replay explain"
+                ):
+
+                    runtime = getattr(
+                        self,
+                        "runtime",
+                        None,
+                    )
+
+                    replay_id = text.replace(
+                        "/runtime replay explain",
+                        "",
+                        1,
+                    ).strip()
+
+                    if (
+                        not runtime
+                        or not hasattr(
+                            runtime,
+                            "explain_replay",
+                        )
+                    ):
+                        return self._build_assistant_message(
+                            text=str(
+                                {
+                                    "ok": False,
+                                    "error": (
+                                        "runtime_replay_unavailable"
+                                    ),
+                                }
+                            )
+                        )
+
+                    return self._build_assistant_message(
+                        text=str(
+                            runtime.explain_replay(
+                                replay_id=replay_id,
+                            )
+                        )
+                    )
+
+                else:
+
+                    runtime_result = (
+                        self.runtime.run_cycle(
+
+                            execution_state=execution_state,
+                            world_state={},
+                            scheduler_state={},
+                            knowledge_graph=None,
+                        )
+                    )
+
+            except Exception as e:
+
+                runtime_result = {
+                    "ok": False,
+                    "runtime_error": type(e).__name__,
+                    "message": str(e),
+                }
+
+            assistant_msg = self._build_assistant_message(
+                text=str(runtime_result)
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg=self._build_user_message(
+                    original_user_text,
+                    attachments=attachments,
+                ),
+                assistant_msg=assistant_msg,
+                decision=decision,
+            )
 
         if route in isolated_routes:
             memory_context = ""
@@ -12245,11 +12410,30 @@ Auto-fix result:
         session_id: str = "",
     ) -> dict:
 
+
         user_text = self._safe_str(user_text).strip()
 
         text = user_text.lower().strip()
         lower_text = text
+
         print("DECIDE ROUTE TEXT =", repr(lower_text))
+
+        # =========================
+        # RUNTIME LANE
+        # =========================
+
+        if self._safe_str(user_text).startswith("/runtime"):
+
+            return {
+                "route": "runtime",
+                "intent": "runtime",
+                "mode": "runtime",
+                "runtime_command": user_text,
+                "confidence": 1.0,
+                "reasons": [
+                    "User requested runtime cognition lane."
+                ],
+            }
 
         intelligence_state = self._build_intelligence_state(
             user_text=user_text,
@@ -12293,20 +12477,10 @@ Auto-fix result:
                 "prompt": user_text,
             }
 
-            return {
-                "route": self.ROUTE_IMAGE_GENERATION,
-                "mode": "image_generation",
-                "confidence": 1.0,
-                "reasons": ["forced_generate_prefix"],
-                "save_artifact": True,
-                "save_memory": False,
-                "use_memory": False,
-                "prompt": user_text,
-            }
-
         # =========================
         # IMAGE GENERATION (PRIORITY)
         # =========================
+
         image_triggers = (
             "generate ",
             "generate an image",

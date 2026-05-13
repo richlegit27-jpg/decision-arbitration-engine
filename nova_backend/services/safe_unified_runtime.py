@@ -680,6 +680,10 @@ class SafeUnifiedRuntime:
             )
         )
 
+        self.last_compressed_runtime = (
+            result.get("compressed_runtime")
+        )
+
         return result
 
     def get_runtime_history(
