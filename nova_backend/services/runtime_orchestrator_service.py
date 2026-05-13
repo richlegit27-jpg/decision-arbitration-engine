@@ -295,6 +295,67 @@ class RuntimeOrchestratorService:
 
         return engine_scores
 
+    def _calculate_runtime_confidence(
+        self,
+        engine_name,
+        engine_state,
+    ):
+
+        engine_name = str(
+            engine_name or ""
+        ).strip()
+
+        engine_state = self._safe_dict(
+            engine_state
+        )
+
+        success_count = int(
+            engine_state.get(
+                "success_count"
+            )
+            or 0
+        )
+
+        failure_count = int(
+            engine_state.get(
+                "failure_count"
+            )
+            or 0
+        )
+
+        total = (
+            success_count
+            + failure_count
+        )
+
+        if total <= 0:
+
+            return 0.50
+
+        confidence = (
+            success_count / total
+        )
+
+        if failure_count >= 3:
+
+            confidence *= 0.75
+
+        if failure_count >= 5:
+
+            confidence *= 0.50
+
+        if "repair" in engine_name:
+
+            confidence += 0.10
+
+        return max(
+            0.05,
+            min(
+                1.0,
+                confidence,
+            ),
+        )
+
     def choose_engines(
         self,
         context=None,
@@ -369,7 +430,24 @@ class RuntimeOrchestratorService:
                 50,
             )
 
-            score = priority
+            engine_state = (
+                self.engine_states.get(
+                    name,
+                    {},
+                )
+            )
+
+            runtime_confidence = (
+                self._calculate_runtime_confidence(
+                    name,
+                    engine_state,
+                )
+            )
+
+            score = (
+                priority
+                * runtime_confidence
+            )
 
             if "debug" in tags and debug_issues:
                 score += 30
@@ -418,6 +496,7 @@ class RuntimeOrchestratorService:
                 {
                     "name": name,
                     "score": score,
+                    "runtime_confidence": runtime_confidence,
                     "priority": priority,
                     "tags": tags,
                 }
@@ -468,6 +547,74 @@ class RuntimeOrchestratorService:
         self.last_plan = plan
 
         return plan
+
+    def _calculate_adaptive_cooldown(
+        self,
+        engine_name,
+        engine_state,
+        runtime_brain=None,
+    ):
+
+        engine_name = str(
+            engine_name or ""
+        ).strip()
+
+        engine_state = self._safe_dict(
+            engine_state
+        )
+
+        runtime_brain = self._safe_dict(
+            runtime_brain
+        )
+
+        failures = int(
+            engine_state.get(
+                "failure_count"
+            )
+            or 0
+        )
+
+        recurring_failures = (
+            self._safe_dict(
+                runtime_brain.get(
+                    "recurring_failures"
+                )
+            )
+        )
+
+        cooldown = 60
+
+        if failures >= 5:
+
+            cooldown += 120
+
+        elif failures >= 3:
+
+            cooldown += 60
+
+        if recurring_failures:
+
+            cooldown += min(
+                120,
+                len(
+                    recurring_failures
+                ) * 5,
+            )
+
+        if "repair" in engine_name:
+
+            cooldown = max(
+                30,
+                cooldown - 30,
+            )
+
+        if "scheduler" in engine_name:
+
+            cooldown += 45
+
+        return cooldown
+
+
 
     def run_engine(
         self,
@@ -532,9 +679,30 @@ class RuntimeOrchestratorService:
             state["status"] = "failed"
 
             if state["failure_count"] >= 3:
-                state["cooldown_until"] = (
-                    self._now() + 60
+
+                runtime_brain = (
+                    self.runtime_brain_store.snapshot()
                 )
+
+                adaptive_cooldown = (
+                    self._calculate_adaptive_cooldown(
+                        name,
+                        state,
+                        runtime_brain,
+                    )
+                )
+
+                state[
+                    "cooldown_until"
+                ] = (
+                    self._now()
+                    + adaptive_cooldown
+                )
+
+                state[
+                    "adaptive_cooldown"
+                ] = adaptive_cooldown
+
                 state["status"] = "cooldown"
 
         self.engine_states[name] = state
