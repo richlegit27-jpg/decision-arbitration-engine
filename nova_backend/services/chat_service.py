@@ -1954,7 +1954,10 @@ Current step:
                     "ok": False,
                     "assistant_message": {
                         "role": "assistant",
-                        "text": "No execution steps available.",
+                        "text": (
+                            "No active execution plan. "
+                            "Start one with: auto-plan <goal>"
+                        ),
                     },
                     "execution": execution_state,
                 }
