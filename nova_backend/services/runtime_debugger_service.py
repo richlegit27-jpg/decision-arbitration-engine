@@ -288,3 +288,46 @@ class RuntimeDebuggerService:
 
     def get_last_report(self):
         return self.last_report
+
+    def build_runtime_graph_report(
+        self,
+        runtime_result=None,
+    ):
+
+        runtime_result = self._safe_dict(
+            runtime_result
+        )
+
+        graph_memory = self._safe_dict(
+            runtime_result.get(
+                "runtime_graph_memory"
+            )
+        )
+
+        graph_density = (
+            self.runtime_graph_analytics.analyze_density()
+        )
+
+        graph_fragmentation = (
+            self.runtime_graph_analytics.detect_fragmentation()
+        )
+
+        graph_evolution = (
+            self.runtime_graph_evolution.recommend_evolution()
+        )
+
+        return {
+            "ok": True,
+
+            "graph_memory": graph_memory,
+
+            "graph_density": graph_density,
+
+            "graph_fragmentation": (
+                graph_fragmentation
+            ),
+
+            "graph_evolution": (
+                graph_evolution
+            ),
+        }
