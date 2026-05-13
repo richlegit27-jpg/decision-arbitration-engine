@@ -10578,3 +10578,24 @@ body.is-rail-open [data-rail-panel="execution"].is-active [data-execution-panel]
   display: block;
   object-fit: cover;
 }
+
+#nova-runtime-panel {
+  position: fixed;
+  right: 18px;
+  bottom: 78px;
+  z-index: 9999;
+  min-width: 240px;
+  padding: 12px 14px;
+  border: 1px solid #374151;
+  border-radius: 14px;
+  background: #111827;
+  color: #e5e7eb;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+}
+
+#nova-runtime-panel-title {
+  margin-bottom: 6px;
+  font-weight: 700;
+}
