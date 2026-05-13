@@ -1,6 +1,7 @@
 import time
 import uuid
 
+from nova_backend.services.runtime_policy_arbitration_service import RuntimePolicyArbitrationService
 from nova_backend.services.runtime_governor_service import RuntimeGovernorService
 from nova_backend.services.runtime_engine_suppression_service import RuntimeEngineSuppressionService
 from nova_backend.services.runtime_failure_intelligence_service import RuntimeFailureIntelligenceService
@@ -30,6 +31,9 @@ class RuntimeOrchestratorService:
         )
         self.runtime_governor = (
             RuntimeGovernorService()
+        )
+        self.runtime_policy_arbitration = (
+            RuntimePolicyArbitrationService()
         )
 
     def register_default_engines(self):
@@ -379,6 +383,7 @@ class RuntimeOrchestratorService:
             runtime_governor
         )
 
+
         if runtime_governor.get("mode") != "stabilization":
 
             return selected
@@ -482,9 +487,11 @@ class RuntimeOrchestratorService:
                 runtime_brain
             )
         )
+
         suppression_report = {}
 
         for name, config in self.engine_registry.items():
+
             if not self.engine_available(name):
                 continue
 
@@ -554,7 +561,9 @@ class RuntimeOrchestratorService:
                 score += 10
 
             for tag in tags:
+
                 if tag in priority_weights:
+
                     score += (
                         priority_weights.get(
                             tag,
@@ -613,22 +622,61 @@ class RuntimeOrchestratorService:
             runtime_governor
         )
 
+        runtime_policy = (
+            self.runtime_policy_arbitration.arbitrate(
+                runtime_governor,
+                runtime_failure_intelligence,
+                runtime_brain,
+            )
+        )
+
+        self.last_runtime_policy = (
+            runtime_policy
+        )
+
         self.last_suppression_report = (
             suppression_report
         )
 
         return selected
 
-
     def build_plan(
         self,
         context=None,
     ):
+
         context = self._safe_dict(context)
 
         selected = self.choose_engines(
             context=context,
         )
+
+        runtime_policy = (
+            self._safe_dict(
+                getattr(
+                    self,
+                    "last_runtime_policy",
+                    {},
+                )
+            )
+        )
+
+        if not runtime_policy.get(
+            "allow_execution",
+            True,
+        ):
+
+            return {
+                "ok": False,
+                "blocked": True,
+                "reason": runtime_policy.get(
+                    "reason",
+                    "Runtime policy blocked execution.",
+                ),
+                "runtime_policy": runtime_policy,
+                "selected_engines": selected,
+                "steps": [],
+            }
 
         plan_id = str(uuid.uuid4())
 
@@ -642,6 +690,7 @@ class RuntimeOrchestratorService:
         }
 
         for item in selected:
+
             plan["steps"].append(
                 {
                     "engine": item.get("name"),
