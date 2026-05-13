@@ -2,16 +2,20 @@ import time
 import uuid
 
 from nova_backend.services.runtime_engine_factory import RuntimeEngineFactory
+from nova_backend.services.runtime_engine_fusion_service import (
+    RuntimeEngineFusionService,
+)
+
 
 class RuntimeOrchestratorService:
-
     def __init__(self):
         self.engine_registry = {}
         self.engine_states = {}
         self.orchestration_history = []
         self.last_plan = {}
+        self.last_fusion = {}
         self.engine_factory = RuntimeEngineFactory()
-
+        self.fusion = RuntimeEngineFusionService()
         self.register_default_engines()
 
     def register_default_engines(self):
@@ -36,10 +40,18 @@ class RuntimeOrchestratorService:
         }
 
     def _safe_dict(self, value):
-        return value if isinstance(value, dict) else {}
+        return (
+            value
+            if isinstance(value, dict)
+            else {}
+        )
 
     def _safe_list(self, value):
-        return value if isinstance(value, list) else []
+        return (
+            value
+            if isinstance(value, list)
+            else []
+        )
 
     def _now(self):
         return time.time()
@@ -137,7 +149,10 @@ class RuntimeOrchestratorService:
         if not registry.get("enabled"):
             return False
 
-        cooldown_until = state.get("cooldown_until", 0)
+        cooldown_until = state.get(
+            "cooldown_until",
+            0,
+        )
 
         if cooldown_until and cooldown_until > self._now():
             return False
@@ -176,6 +191,11 @@ class RuntimeOrchestratorService:
             "healing_applied": healing_report.get("applied", []),
             "trace_id": runtime_result.get("trace_id"),
             "replay_id": runtime_result.get("replay_id"),
+            "last_fusion": (
+                self._safe_dict(
+                    self.last_fusion
+                )
+            ),
         }
 
     def choose_engines(
@@ -197,6 +217,14 @@ class RuntimeOrchestratorService:
 
         execution_status = context.get(
             "execution_status",
+        )
+
+        last_fusion = self._safe_dict(
+            context.get("last_fusion")
+        )
+
+        priority_weights = self._safe_dict(
+            last_fusion.get("priority_weights")
         )
 
         for name, config in self.engine_registry.items():
@@ -230,6 +258,16 @@ class RuntimeOrchestratorService:
                 None,
             }:
                 score += 10
+
+            for tag in tags:
+                if tag in priority_weights:
+                    score += (
+                        priority_weights.get(
+                            tag,
+                            0,
+                        )
+                        * 10
+                    )
 
             selected.append(
                 {
@@ -399,12 +437,20 @@ class RuntimeOrchestratorService:
                 }
             )
 
+        fused_result = self.fusion.fuse_results(
+            results=results,
+        )
+
+        plan["fusion"] = fused_result
+        self.last_fusion = fused_result
+
         report = {
             "ok": True,
             "plan_id": plan.get("plan_id"),
             "results": results,
             "steps": steps,
             "engine_states": self.get_engine_states(),
+            "fusion": fused_result,
         }
 
         self.orchestration_history.append(report)
@@ -441,6 +487,7 @@ class RuntimeOrchestratorService:
             "context": context,
             "plan": plan,
             "report": report,
+            "fusion": report.get("fusion"),
         }
 
     def get_engine_registry(self):
@@ -463,6 +510,9 @@ class RuntimeOrchestratorService:
 
     def get_last_plan(self):
         return self.last_plan
+
+    def get_last_fusion(self):
+        return self.last_fusion
 
     def get_orchestration_history(
         self,
