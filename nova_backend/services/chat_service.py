@@ -1463,9 +1463,14 @@ Current step:
         )
 
         # HARD BLOCK RESURRECTION FROM PAYLOAD
-        payload["active_execution"] = {}
-        payload["execution_state"] = {}
 
+        payload["active_execution"] = (
+            live_execution
+        )
+
+        payload["execution_state"] = (
+            live_execution
+        )
         # =========================
         # INVALID EXECUTION SANITIZER
         # =========================
@@ -8166,6 +8171,22 @@ Current step:
 
         if execution_state:
 
+         execution_state = (
+            self._get_session_meta(
+                session_id,
+                "execution_state",
+            )
+            or self._get_session_meta(
+                session_id,
+                "active_execution",
+            )
+            or execution_state
+            or {}
+        )
+
+        if not isinstance(execution_state, dict):
+            execution_state = {}
+
             steps = execution_state.get("steps") or []
 
             current_index = int(
@@ -8537,7 +8558,7 @@ Current step:
                 self._set_session_meta(
                     session_id,
                     "active_execution",
-                    {},
+                    execution_state,
                 )
 
                 session_payload = self._get_session_payload(
@@ -9057,6 +9078,7 @@ Auto-fix result:
 
         steps = execution_state.get("steps") or []
 
+    
         current_index = int(
             execution_state.get(
                 "current_index",
