@@ -12,7 +12,6 @@ from flask import Flask, Response, jsonify, render_template, request, send_from_
 from flask_cors import CORS
 from bs4 import BeautifulSoup
 import uuid
-from nova_backend.services.runtime_bootstrap import RuntimeBootstrap
 from werkzeug.utils import secure_filename
 from nova_backend.routes.memory_panel_routes import register_memory_panel_routes
 from nova_backend.utils.api_response import ok_response, error_response
@@ -39,6 +38,12 @@ from nova_backend.utils.file_utils import ensure_dir
 from nova_backend.services.chat_service import ChatService
 from nova_backend.services.execution_handler import NextMove, default_executor
 from nova_backend.services.execution_daemon import ExecutionDaemon
+from nova_backend.services.safe_unified_runtime import (
+    SafeUnifiedRuntime,
+)
+from nova_backend.services.runtime_bootstrap import (
+    RuntimeBootstrap,
+)
 
 # -----------------------
 # APP SETUP
@@ -67,6 +72,25 @@ memory_service = MemoryService(str(MEMORY_FILE))
 web_service = WebService(timeout=WEB_TIMEOUT)
 recon_service = ReconService(timeout=RECON_TIMEOUT)
 intent_router = IntentRouterService()
+runtime_brain = SafeUnifiedRuntime()
+
+print(
+    "RESTORED RUNTIME =",
+    getattr(
+        runtime_brain,
+        "restored_runtime_state",
+        {},
+    ),
+)
+
+print(
+    "LAST COMPRESSED =",
+    getattr(
+        runtime_brain,
+        "last_compressed_runtime",
+        {},
+    ),
+)
 
 chat_service = ChatService(
     session_service=session_service,
@@ -74,6 +98,13 @@ chat_service = ChatService(
     artifact_service=artifact_service,
     web_service=web_service,
     recon_service=recon_service,
+)
+
+chat_service.runtime = runtime_brain
+chat_service.safe_runtime = runtime_brain
+
+RuntimeBootstrap.save(
+    runtime_brain
 )
 
 if hasattr(chat_service, "start_execution_daemon"):
@@ -594,11 +625,23 @@ def api_state():
 @app.route("/api/runtime/summary", methods=["GET"])
 def api_runtime_summary():
     try:
-        runtime = RuntimeBootstrap.build(
-            chat_service=chat_service,
+        runtime = getattr(
+            chat_service,
+            "runtime",
+            None,
         )
 
-        summary = getattr(
+        if runtime is None:
+            runtime = getattr(
+                chat_service,
+                "safe_runtime",
+                None,
+            )
+
+        if runtime is None:
+               runtime = runtime_brain
+
+        compressed = getattr(
             runtime,
             "last_compressed_runtime",
             {},
@@ -607,7 +650,7 @@ def api_runtime_summary():
         return jsonify(
             {
                 "ok": True,
-                "runtime": summary,
+                "runtime": compressed or {},
             }
         )
 
@@ -622,9 +665,7 @@ def api_runtime_summary():
 @app.route("/api/runtime/cycle", methods=["POST"])
 def api_runtime_cycle():
     try:
-        runtime = RuntimeBootstrap.build(
-            chat_service=chat_service,
-        )
+        runtime = runtime_brain
 
         result = runtime.run_cycle(
             execution_state={
@@ -640,6 +681,13 @@ def api_runtime_cycle():
             world_state={},
             scheduler_state={},
             knowledge_graph={},
+        )
+
+        runtime.last_compressed_runtime = (
+            result.get(
+                "compressed_runtime",
+                {}
+            )
         )
 
         summary = getattr(
@@ -743,6 +791,41 @@ def api_chat():
 
         print("CHAT RAW RESULT:", result)
 
+        try:
+            runtime_result = runtime_brain.run_cycle(
+                execution_state={
+                    "status": "active",
+                    "user_text": user_text,
+                    "session_id": session_id,
+                    "last_response": (
+                        result.get("assistant_message", {})
+                        .get("text", "")
+                    ),
+                },
+                world_state={
+                    "active_session": session_id,
+                },
+                scheduler_state={},
+                knowledge_graph={},
+            )
+
+            runtime_brain.last_compressed_runtime = (
+                runtime_result.get(
+                    "compressed_runtime",
+                    {}
+                )
+            )
+
+            result["runtime"] = runtime_result.get(
+                "compressed_runtime",
+                {}
+            )
+
+        except Exception as runtime_error:
+            print(
+                "LIVE RUNTIME CYCLE FAILED =",
+                runtime_error,
+            )
         if result is None:
             result = {
                 "ok": False,
