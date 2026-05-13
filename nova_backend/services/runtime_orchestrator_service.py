@@ -10,7 +10,9 @@ from nova_backend.services.runtime_engine_factory import RuntimeEngineFactory
 from nova_backend.services.runtime_engine_fusion_service import (
     RuntimeEngineFusionService,
 )
-
+from nova_backend.services.runtime_graph_memory_service import RuntimeGraphMemoryService
+from nova_backend.services.runtime_graph_query_service import RuntimeGraphQueryService
+from nova_backend.services.runtime_graph_evolution_service import RuntimeGraphEvolutionService
 
 class RuntimeOrchestratorService:
     def __init__(self):
@@ -34,6 +36,21 @@ class RuntimeOrchestratorService:
         )
         self.runtime_policy_arbitration = (
             RuntimePolicyArbitrationService()
+        )
+        self.runtime_graph_memory = (
+            RuntimeGraphMemoryService()
+        )
+
+        self.runtime_graph_query = (
+            RuntimeGraphQueryService(
+                self.runtime_graph_memory
+            )
+        )
+
+        self.runtime_graph_evolution = (
+            RuntimeGraphEvolutionService(
+                self.runtime_graph_memory
+            )
         )
 
     def register_default_engines(self):
@@ -490,6 +507,30 @@ class RuntimeOrchestratorService:
 
         suppression_report = {}
 
+        runtime_graph_recommendations = (
+            self.runtime_graph_query.recommend_runtime_actions()
+        )
+
+        recommendation_text = " ".join(
+            self._safe_list(
+                runtime_graph_recommendations.get(
+                    "recommendations"
+                )
+            )
+        ).lower()
+
+        runtime_graph_evolution = (
+            self.runtime_graph_evolution.recommend_evolution()
+        )
+
+        evolution_text = " ".join(
+            self._safe_list(
+                runtime_graph_evolution.get(
+                    "recommendations"
+                )
+            )
+        ).lower()
+
         for name, config in self.engine_registry.items():
 
             if not self.engine_available(name):
@@ -542,6 +583,54 @@ class RuntimeOrchestratorService:
                 priority
                 * runtime_confidence
             )
+
+            if (
+                "stabilization mode" in recommendation_text
+                and "repair" in tags
+            ):
+
+                score += 10
+
+            if (
+                "planner compression" in recommendation_text
+                and "planning" in tags
+            ):
+
+                score += 8
+
+            if (
+                "runtime policies" in recommendation_text
+                and "policy" in tags
+            ):
+
+                score += 8
+
+            if (
+                "system instability" in evolution_text
+                and (
+                    "repair" in tags
+                    or "debug" in tags
+                )
+            ):
+
+                score += 15
+
+            if (
+                "moderate runtime stability" in evolution_text
+                and "planning" in tags
+            ):
+
+                score += 8
+
+            if (
+                "high runtime stability" in evolution_text
+                and (
+                    "scheduler" in tags
+                    or "reflection" in tags
+                )
+            ):
+
+                score += 10
 
             if "debug" in tags and debug_issues:
                 score += 30
@@ -638,7 +727,59 @@ class RuntimeOrchestratorService:
             suppression_report
         )
 
-        return selected
+        runtime_graph_memory = (
+            self.runtime_graph_memory.record_orchestration(
+                plan={
+                    "selected_count": len(selected),
+                },
+                report={
+                    "suppression_report": suppression_report,
+                },
+                runtime_governor=runtime_governor,
+                runtime_policy=runtime_policy,
+            )
+        )
+
+        runtime_graph_patterns = (
+            self.runtime_graph_query.detect_hot_paths()
+        )
+
+        runtime_graph_summary = (
+            self.runtime_graph_query.summarize_patterns()
+        )
+
+        self.last_runtime_graph_memory = (
+            runtime_graph_memory
+        )
+
+        self.last_runtime_graph_patterns = (
+            runtime_graph_patterns
+        )
+
+        self.last_runtime_graph_summary = (
+            runtime_graph_summary
+        )
+
+        self.last_runtime_graph_recommendations = (
+            runtime_graph_recommendations
+        )
+
+        self.last_runtime_graph_evolution = (
+            runtime_graph_evolution
+        )
+
+        return {
+            "selected_engines": selected,
+            "runtime_graph_memory": runtime_graph_memory,
+            "runtime_graph_patterns": runtime_graph_patterns,
+            "runtime_graph_summary": runtime_graph_summary,
+            "runtime_graph_recommendations": (
+                runtime_graph_recommendations
+            ),
+            "runtime_graph_evolution": (
+                runtime_graph_evolution
+            ),
+        }
 
     def build_plan(
         self,
@@ -647,8 +788,14 @@ class RuntimeOrchestratorService:
 
         context = self._safe_dict(context)
 
-        selected = self.choose_engines(
+        selected_result = self.choose_engines(
             context=context,
+        )
+
+        selected = self._safe_list(
+            selected_result.get(
+                "selected_engines"
+            )
         )
 
         runtime_policy = (
@@ -1077,6 +1224,47 @@ class RuntimeOrchestratorService:
             "plan": plan,
             "report": report,
             "fusion": report.get("fusion"),
+
+            "runtime_graph_memory": (
+                getattr(
+                    self,
+                    "last_runtime_graph_memory",
+                    {},
+                )
+            ),
+
+            "runtime_graph_patterns": (
+                getattr(
+                    self,
+                    "last_runtime_graph_patterns",
+                    {},
+                )
+            ),
+
+            "runtime_graph_summary": (
+                getattr(
+                    self,
+                    "last_runtime_graph_summary",
+                    {},
+                )
+            ),
+
+            "runtime_graph_recommendations": (
+                getattr(
+                    self,
+                    "last_runtime_graph_recommendations",
+                    {},
+                )
+            ),
+
+            "runtime_graph_evolution": (
+                getattr(
+                    self,
+                    "last_runtime_graph_evolution",
+                    {},
+                )
+            ),
+
             "recursive_result": recursive_result,
         }
 
