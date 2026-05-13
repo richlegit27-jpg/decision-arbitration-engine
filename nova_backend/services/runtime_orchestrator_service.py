@@ -933,34 +933,151 @@ class RuntimeOrchestratorService:
 
         return report
 
+    def _should_run_additional_cycle(
+        self,
+        report,
+        runtime_governor,
+        runtime_policy,
+    ):
+
+        report = self._safe_dict(
+            report
+        )
+
+        runtime_governor = (
+            self._safe_dict(
+                runtime_governor
+            )
+        )
+
+        runtime_policy = (
+            self._safe_dict(
+                runtime_policy
+            )
+        )
+
+        if not runtime_policy.get(
+            "allow_execution",
+            True,
+        ):
+
+            return False
+
+        if (
+            runtime_governor.get("mode")
+            == "stabilization"
+        ):
+
+            return True
+
+        failed = 0
+
+        for result in self._safe_list(
+            report.get("results")
+        ):
+
+            result_data = self._safe_dict(
+                result.get("result")
+            )
+
+            if not result_data.get("ok"):
+                failed += 1
+
+        return failed >= 2
+
     def orchestrate(
         self,
         runtime_result=None,
         execution_state=None,
         debug_report=None,
         healing_report=None,
+        cycle_depth=0,
+        max_cycles=3,
     ):
-        context = self.build_orchestration_context(
-            runtime_result=runtime_result,
-            execution_state=execution_state,
-            debug_report=debug_report,
-            healing_report=healing_report,
+
+        context = (
+            self.build_orchestration_context(
+                runtime_result=runtime_result,
+                execution_state=execution_state,
+                debug_report=debug_report,
+                healing_report=healing_report,
+            )
         )
 
         plan = self.build_plan(
             context=context,
         )
 
+        if not plan.get("ok"):
+
+            return {
+                "ok": False,
+                "blocked": True,
+                "cycle_depth": cycle_depth,
+                "plan": plan,
+            }
+
         report = self.run_plan(
             plan=plan,
         )
 
+        runtime_governor = (
+            self._safe_dict(
+                getattr(
+                    self,
+                    "last_runtime_governor",
+                    {},
+                )
+            )
+        )
+
+        runtime_policy = (
+            self._safe_dict(
+                getattr(
+                    self,
+                    "last_runtime_policy",
+                    {},
+                )
+            )
+        )
+
+        should_continue = (
+            self._should_run_additional_cycle(
+                report,
+                runtime_governor,
+                runtime_policy,
+            )
+        )
+
+        recursive_result = None
+
+        if (
+            should_continue
+            and cycle_depth < max_cycles
+        ):
+
+            recursive_result = (
+                self.orchestrate(
+                    runtime_result=runtime_result,
+                    execution_state=execution_state,
+                    debug_report=debug_report,
+                    healing_report=healing_report,
+                    cycle_depth=(
+                        cycle_depth + 1
+                    ),
+                    max_cycles=max_cycles,
+                )
+            )
+
         return {
             "ok": True,
+            "cycle_depth": cycle_depth,
+            "continued": should_continue,
             "context": context,
             "plan": plan,
             "report": report,
             "fusion": report.get("fusion"),
+            "recursive_result": recursive_result,
         }
 
     def get_engine_registry(self):
