@@ -5304,7 +5304,12 @@ function bindEvents() {
       throw new Error("new chat failed");
     }
 
-    const data = await response.json();
+const data = await response.json();
+
+console.log(
+    "[NOVA RUNTIME PAYLOAD]",
+    data.runtime
+);
 
     if (data && data.active_session_id) {
       state.activeSessionId = String(data.active_session_id);
