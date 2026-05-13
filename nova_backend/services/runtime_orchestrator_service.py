@@ -1,6 +1,7 @@
 import time
 import uuid
 
+from nova_backend.services.runtime_governor_service import RuntimeGovernorService
 from nova_backend.services.runtime_engine_suppression_service import RuntimeEngineSuppressionService
 from nova_backend.services.runtime_failure_intelligence_service import RuntimeFailureIntelligenceService
 from nova_backend.services.runtime_brain_store_service import RuntimeBrainStoreService
@@ -26,6 +27,9 @@ class RuntimeOrchestratorService:
         )
         self.runtime_engine_suppression = (
             RuntimeEngineSuppressionService()
+        )
+        self.runtime_governor = (
+            RuntimeGovernorService()
         )
 
     def register_default_engines(self):
