@@ -1,7 +1,5 @@
 class RuntimeGraphEvolutionService:
 
-from nova_backend.services.runtime_graph_evolution_service import RuntimeGraphEvolutionService
-
     def __init__(
         self,
         graph_memory=None,
@@ -11,24 +9,12 @@ from nova_backend.services.runtime_graph_evolution_service import RuntimeGraphEv
             graph_memory
         )
 
-        self.runtime_graph_query = RuntimeGraphQueryService(
-            self.runtime_graph_memory
-         )
-
     def _safe_dict(self, value):
 
         return (
             value
             if isinstance(value, dict)
             else {}
-        )
-
-    def _safe_list(self, value):
-
-        return (
-            value
-            if isinstance(value, list)
-            else []
         )
 
     def analyze_success_patterns(self):

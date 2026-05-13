@@ -1,6 +1,25 @@
+from nova_backend.services.runtime_graph_analytics_service import RuntimeGraphAnalyticsService
+from nova_backend.services.runtime_graph_evolution_service import RuntimeGraphEvolutionService
+
 class RuntimeDebuggerService:
-    def __init__(self):
+    def __init__(
+        self,
+        graph_memory=None,
+    ):
+
         self.last_report = {}
+
+        self.runtime_graph_analytics = (
+            RuntimeGraphAnalyticsService(
+                graph_memory
+            )
+        )
+
+        self.runtime_graph_evolution = (
+            RuntimeGraphEvolutionService(
+                graph_memory
+            )
+        )
 
     def _safe_dict(self, value):
         return value if isinstance(value, dict) else {}
@@ -43,6 +62,18 @@ class RuntimeDebuggerService:
         if not reflection.get("signal"):
             issues.append("missing_reflection_signal")
 
+        graph_density = (
+            self.runtime_graph_analytics.analyze_density()
+        )
+
+        graph_fragmentation = (
+            self.runtime_graph_analytics.detect_fragmentation()
+        )
+
+        graph_evolution = (
+            self.runtime_graph_evolution.recommend_evolution()
+        )
+
         report = {
             "ok": len(issues) == 0,
             "issues": issues,
@@ -53,6 +84,17 @@ class RuntimeDebuggerService:
             "final_action": runtime_result.get("final_action"),
             "trace_id": runtime_result.get("trace_id"),
             "replay_id": runtime_result.get("replay_id"),
+
+            "runtime_graph_memory": (
+                runtime_result.get(
+                    "runtime_graph_memory",
+                    {}
+                )
+            ),
+
+            "graph_density": graph_density,
+            "graph_fragmentation": graph_fragmentation,
+            "graph_evolution": graph_evolution,
         }
 
         self.last_report = report
