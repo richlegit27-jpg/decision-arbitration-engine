@@ -45,6 +45,10 @@ from nova_backend.services.runtime_bootstrap import (
     RuntimeBootstrap,
 )
 
+from nova_backend.services.runtime_response_sanitizer_service import (
+    RuntimeResponseSanitizerService,
+)
+
 # -----------------------
 # APP SETUP
 # -----------------------
@@ -73,6 +77,7 @@ web_service = WebService(timeout=WEB_TIMEOUT)
 recon_service = ReconService(timeout=RECON_TIMEOUT)
 intent_router = IntentRouterService()
 runtime_brain = SafeUnifiedRuntime()
+runtime_response_sanitizer = RuntimeResponseSanitizerService()
 
 print(
     "RESTORED RUNTIME =",
@@ -1104,7 +1109,13 @@ def api_fetch():
 
     result = web_service.fetch(url)
 
-    return jsonify(result)
+    clean_result = (
+        runtime_response_sanitizer.sanitize(
+            result
+        )
+    )
+
+    return jsonify(clean_result)
 
 @app.get("/api/sessions")
 def api_sessions():

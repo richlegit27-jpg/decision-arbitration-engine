@@ -4908,6 +4908,16 @@ if __name__ == "__main__":
                 )
 
                 memory_lines = []
+                fallback_lines = []
+                seen_memory = set()
+
+                blocked_internal_phrases = {
+                    "execution handler",
+                    "next move",
+                    "internal reasoning",
+                    "thinking step",
+                    "need to run",
+                }
 
                 for item in dominant_memory:
 
@@ -4922,43 +4932,27 @@ if __name__ == "__main__":
                     if not text:
                         continue
 
+                    text_lower = text.lower()
+
+                    if any(
+                        phrase in text_lower
+                        for phrase in blocked_internal_phrases
+                    ):
+                        continue
+
+                    normalized = text_lower.strip()
+
+                    if normalized in seen_memory:
+                        continue
+
+                    seen_memory.add(normalized)
+
                     memory_lines.append(
                         f"- {text}"
                     )
 
-                fallback_lines = []
-
-                mission_name = self._safe_str(
-                    mission.get("mission")
-                ).strip()
-
-                if mission_name:
-                    fallback_lines.append(
-                        "Last known mission:"
-                    )
-                    fallback_lines.append(
-                        f"- {mission_name}"
-                    )
-
-                priorities = (
-                    mission.get("priorities")
-                    or []
-                )
-
-                for priority in priorities[:3]:
-
-                    priority = self._safe_str(
-                        priority
-                    ).strip()
-
-                    if priority:
-                        fallback_lines.append(
-                            f"- {priority}"
-                        )
-
                 if memory_lines:
 
-                    fallback_lines.append("")
                     fallback_lines.append(
                         "Recovered operational context:"
                     )
@@ -4991,7 +4985,7 @@ if __name__ == "__main__":
                         "meta": {},
                     },
                     assistant_msg=assistant_msg,
-                )
+                ) 
 
             working_state = self._get_working_state(session_id)
 
@@ -5363,6 +5357,10 @@ if __name__ == "__main__":
                     dominant_memory.append(
                         f"- {text}"
                     )
+
+
+
+
 
                     memory_dominance_debug.append(
                         text[:300]
@@ -12136,11 +12134,26 @@ Auto-fix result:
 
     def _should_save_memory_text(self, text, kind=None) -> bool:
         cleaned = self._normalize_memory_text_for_save(text)
+
         if not cleaned:
             return False
 
         kind = self._safe_str(kind).lower().strip()
         lowered = cleaned.lower()
+
+        blocked_internal_phrases = (
+            "execution handler",
+            "next move",
+            "internal reasoning",
+            "thinking step",
+            "need to run",
+            "i should now",
+            "i need to now",
+            "run the execution",
+        )
+
+        if any(pattern in lowered for pattern in blocked_internal_phrases):
+            return False
 
         junk_patterns = (
             "traceback",
@@ -16027,6 +16040,8 @@ Next action:
                 )
             ):
                 score += 9.0
+
+
 
             if not has_real_state:
 

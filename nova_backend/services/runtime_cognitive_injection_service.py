@@ -1,173 +1,155 @@
 class RuntimeCognitiveInjectionService:
     """
-    Compresses runtime state into small cognition signals
-    that chat/intelligence routing can safely consume.
+    Converts large runtime state into a small cognition-safe summary.
+
+    Goal:
+        Never inject the full runtime JSON into chat.
+        Only inject stable, useful operating signals.
     """
 
-    def __init__(self):
-        pass
-
-    def build(self, runtime_summary=None, runtime_decision=None):
-
-        runtime_summary = self._safe_dict(runtime_summary)
-        runtime_decision = self._safe_dict(runtime_decision)
-
-        cycle_count = self._first_present(
-            runtime_summary,
-            [
-                "cycle_count",
-                "cycles",
-                "cycle",
-            ],
-            0,
-        )
-
-        active_goal = self._first_present(
-            runtime_summary,
-            [
-                "active_goal",
-                "runtime_goal",
-                "goal",
-            ],
-            "",
-        )
-
-        predicted_state = self._nested_first_present(
-            runtime_summary,
-            [
-                ("runtime_world_model", "predicted_state"),
-                ("world_model", "predicted_state"),
-                ("prediction", "predicted_state"),
-            ],
-            "",
-        )
-
-        risk_forecast = self._nested_first_present(
-            runtime_summary,
-            [
-                ("runtime_world_model", "risk_forecast"),
-                ("world_model", "risk_forecast"),
-                ("prediction", "risk_forecast"),
-            ],
-            "",
-        )
-
-        last_action = self._first_present(
-            runtime_decision,
-            [
-                "final_action",
-                "action",
-                "selected_action",
-            ],
-            "",
-        )
-
-        runtime_pressure = self._build_pressure(
-            risk_forecast=risk_forecast,
-            predicted_state=predicted_state,
-        )
-
-        recommendation = self._build_recommendation(
-            risk_forecast=risk_forecast,
-            predicted_state=predicted_state,
-            last_action=last_action,
-        )
-
-        return {
-            "runtime_active_goal": active_goal,
-            "runtime_predicted_state": predicted_state,
-            "runtime_risk": risk_forecast,
-            "runtime_last_action": last_action,
-            "runtime_cycle_count": cycle_count,
-            "runtime_pressure": runtime_pressure,
-            "runtime_recommendation": recommendation,
-            "has_runtime_cognition": bool(
-                active_goal
-                or predicted_state
-                or risk_forecast
-                or last_action
-                or cycle_count
-            ),
-        }
+    def __init__(self, max_lines: int = 8):
+        self.max_lines = max_lines
 
     def _safe_dict(self, value):
-
         if isinstance(value, dict):
             return value
-
         return {}
 
-    def _first_present(self, data, keys, default=None):
+    def _safe_str(self, value):
+        if value is None:
+            return ""
 
-        data = self._safe_dict(data)
+        try:
+            return str(value).strip()
+        except Exception:
+            return ""
+
+    def _dig(self, data, *keys):
+        current = data
 
         for key in keys:
+            if not isinstance(current, dict):
+                return ""
 
-            value = data.get(key)
+            current = current.get(key)
 
-            if value not in (None, "", [], {}):
-                return value
+        return current
 
-        return default
+    def build_summary(self, runtime_state) -> str:
+        runtime_state = self._safe_dict(runtime_state)
 
-    def _nested_first_present(self, data, paths, default=None):
+        compressed = self._safe_dict(
+            runtime_state.get("compressed_runtime")
+        )
 
-        data = self._safe_dict(data)
+        if not compressed:
+            compressed = runtime_state
 
-        for parent_key, child_key in paths:
+        world_prediction = self._safe_dict(
+            compressed.get("runtime_world_prediction")
+        )
 
-            parent = self._safe_dict(
-                data.get(parent_key)
-            )
+        execution_router = self._safe_dict(
+            compressed.get("runtime_execution_router")
+        )
 
-            value = parent.get(child_key)
+        execution_queue = self._safe_dict(
+            compressed.get("runtime_execution_queue")
+        )
 
-            if value not in (None, "", [], {}):
-                return value
+        queue_state = self._safe_dict(
+            execution_queue.get("execution_state")
+        )
 
-        return default
+        identity = self._safe_dict(
+            queue_state.get("runtime_identity")
+        )
 
-    def _build_pressure(
+        identity_state = self._safe_dict(
+            identity.get("identity_state")
+        )
+
+        goal = self._safe_dict(
+            queue_state.get("runtime_goal")
+        )
+
+        goal_state = self._safe_dict(
+            goal.get("goal_state")
+        )
+
+        lines = []
+
+        def add(label, value):
+            value = self._safe_str(value)
+
+            if not value:
+                return
+
+            lines.append(f"- {label}: {value}")
+
+        add(
+            "health",
+            compressed.get("runtime_health"),
+        )
+
+        add(
+            "route",
+            compressed.get("runtime_route"),
+        )
+
+        add(
+            "signal",
+            compressed.get("runtime_signal"),
+        )
+
+        add(
+            "goal",
+            world_prediction.get("active_goal")
+            or goal_state.get("current_goal"),
+        )
+
+        add(
+            "predicted_state",
+            world_prediction.get("predicted_state"),
+        )
+
+        add(
+            "risk_forecast",
+            world_prediction.get("risk_forecast"),
+        )
+
+        add(
+            "autonomy_mode",
+            execution_router.get("autonomy_mode"),
+        )
+
+        add(
+            "runtime_identity",
+            identity_state.get("runtime_identity"),
+        )
+
+        if not lines:
+            return ""
+
+        lines = lines[: self.max_lines]
+
+        return "Runtime state:\n" + "\n".join(lines)
+
+    def inject(
         self,
-        risk_forecast="",
-        predicted_state="",
-    ):
+        user_text: str = "",
+        runtime_state=None,
+        existing_context: str = "",
+    ) -> str:
 
-        risk = str(risk_forecast or "").lower()
-        predicted = str(predicted_state or "").lower()
+        summary = self.build_summary(runtime_state)
 
-        if risk in {"high", "critical"}:
-            return "execution instability detected"
+        existing_context = self._safe_str(existing_context)
 
-        if "unstable" in predicted:
-            return "runtime instability detected"
+        if not summary:
+            return existing_context
 
-        if "stabil" in predicted:
-            return "runtime stabilization in progress"
+        if existing_context:
+            return summary + "\n\n" + existing_context
 
-        if risk:
-            return "runtime risk signal detected"
-
-        return ""
-
-    def _build_recommendation(
-        self,
-        risk_forecast="",
-        predicted_state="",
-        last_action="",
-    ):
-
-        risk = str(risk_forecast or "").lower()
-        predicted = str(predicted_state or "").lower()
-        action = str(last_action or "").lower()
-
-        if risk in {"high", "critical"}:
-            return "reduce concurrent execution load"
-
-        if "pause" in action:
-            return "hold execution until runtime stabilizes"
-
-        if "stabil" in predicted:
-            return "continue observing runtime state"
-
-        return ""
+        return summary
