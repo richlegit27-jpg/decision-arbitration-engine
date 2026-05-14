@@ -239,6 +239,10 @@ from nova_backend.services.runtime_mutation_safety_service import (
     RuntimeMutationSafetyService,
 )
 
+from nova_backend.services.runtime_health_scoring_service import (
+    RuntimeHealthScoringService,
+)
+
 class SafeUnifiedRuntime:
     def __init__(
         self,
@@ -496,6 +500,10 @@ class SafeUnifiedRuntime:
         )
         self.runtime_strategy_memory = (
             RuntimeStrategyMemoryService()
+        )
+
+        self.runtime_health_scoring = (
+            RuntimeHealthScoringService()
         )
 
         if persisted_runtime:
@@ -2222,6 +2230,14 @@ class SafeUnifiedRuntime:
                     "execution_state": execution_state,
                 }
             )
+
+        result[
+            "runtime_health"
+        ] = self.runtime_health_scoring.score(
+            execution_state=execution_state,
+            runtime_result=result,
+            runtime_history=self.runtime_history,
+        )
 
         return result
 
