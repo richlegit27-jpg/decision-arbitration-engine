@@ -128,6 +128,26 @@ from nova_backend.services.runtime_state_diff_engine import (
 from nova_backend.services.runtime_mutation_sandbox import (
     RuntimeMutationSandbox,
 )
+
+from nova_backend.services.runtime_subgoal_engine import (
+    RuntimeSubgoalEngine,
+)
+
+from nova_backend.services.runtime_goal_arbitration_engine import (
+    RuntimeGoalArbitrationEngine,
+)
+
+from nova_backend.services.runtime_recursive_planner import (
+    RuntimeRecursivePlanner,
+)
+
+from nova_backend.services.runtime_plan_executor import (
+    RuntimePlanExecutor,
+)
+
+from nova_backend.services.runtime_scheduler_engine import (
+    RuntimeSchedulerEngine,
+)
     
 class SafeUnifiedRuntime:
     def __init__(
@@ -287,6 +307,30 @@ class SafeUnifiedRuntime:
 
         self.runtime_rollback_engine = (
             RuntimeRollbackEngine()
+        )
+
+        self.runtime_subgoal_engine = (
+            RuntimeSubgoalEngine()
+        )
+
+        self.runtime_goal_arbitration = (
+            RuntimeGoalArbitrationEngine()
+        )
+
+        self.runtime_recursive_planner = (
+            RuntimeRecursivePlanner()
+        )
+
+        self.runtime_plan_executor = (
+            RuntimePlanExecutor()
+        )
+
+        self.runtime_scheduler = (
+            RuntimeSchedulerEngine()
+        )
+
+        self.runtime_scheduler = (
+            RuntimeSchedulerEngine()
         )
 
         persisted_runtime = (
@@ -1094,6 +1138,139 @@ class SafeUnifiedRuntime:
         result["runtime_prediction"] = (
             prediction_report
         )
+
+        mutation_report = (
+
+            self.runtime_mutation_sandbox.evaluate(
+                before_state=before_state,
+                after_state=execution_state,
+                mutation_reason=final_action,
+            )
+        )
+
+        result["runtime_mutation_sandbox"] = (
+            mutation_report
+        )
+
+        rollback_report = (
+            self.runtime_rollback_engine.decide(
+                mutation_report=mutation_report,
+                checkpoint_report=checkpoint_report,
+                runtime_result=result,
+            )
+        )
+
+        subgoal_report = (
+            self.runtime_subgoal_engine.generate(
+                runtime_goal=runtime_goal,
+                runtime_prediction=prediction_report,
+                runtime_signal=(
+                    execution_state.get(
+                        "runtime_signal"
+                    )
+                ),
+            )
+        )
+
+        arbitration_report = (
+            self.runtime_goal_arbitration.prioritize(
+                subgoals=(
+                    subgoal_report.get(
+                        "subgoals",
+                        [],
+                    )
+                ),
+                runtime_signal=(
+                    execution_state.get(
+                        "runtime_signal"
+                    )
+                ),
+            )
+        )
+
+        recursive_plan = (
+            self.runtime_recursive_planner.expand(
+                selected_goal=(
+                    arbitration_report.get(
+                        "selected_goal",
+                        {},
+                    )
+                ),
+                runtime_signal=(
+                    execution_state.get(
+                        "runtime_signal"
+                    )
+                ),
+            )
+        )
+        execution_plan_report = (
+            self.runtime_plan_executor.execute(
+                recursive_plan=recursive_plan,
+                runtime_signal=(
+                    execution_state.get(
+                        "runtime_signal"
+                    )
+                ),
+            )
+        )
+
+        scheduler_report = (
+            self.runtime_scheduler.schedule(
+                execution_plan=(
+                    execution_plan_report
+                ),
+                runtime_signal=(
+                    execution_state.get(
+                        "runtime_signal"
+                    )
+                ),
+            )
+        )
+
+        result["runtime_scheduler"] = (
+            scheduler_report
+        )
+
+        result["runtime_plan_execution"] = (
+            execution_plan_report
+        )
+
+        result["runtime_recursive_plan"] = (
+            recursive_plan
+        )
+
+        result["runtime_goal_arbitration"] = (
+            arbitration_report
+        )
+
+        result["runtime_subgoals"] = (
+            subgoal_report
+        )
+
+        result["runtime_rollback"] = (
+            rollback_report
+        )
+
+        if rollback_report.get(
+            "should_rollback"
+        ):
+
+            execution_state = (
+                rollback_report.get(
+                    "restore_state",
+                    {},
+                )
+            )
+
+            execution_state[
+                "runtime_signal"
+            ] = (
+                "runtime_rollback_executed"
+            )
+
+            execution_state[
+                "recovery_mode"
+            ] = True
 
         orchestration_report = self.runtime_orchestrator.orchestrate(
             runtime_result={

@@ -1,74 +1,75 @@
-from nova_backend.services.runtime_engine_base import RuntimeEngineBase
+class RuntimeSchedulerEngine:
 
+    name = "runtime_scheduler_engine"
 
-class RuntimeSchedulerEngine(RuntimeEngineBase):
-    def __init__(self):
-        super().__init__(
-            name="runtime_scheduler_engine",
-            tags=[
-                "scheduler",
-                "planning",
-                "future",
-                "runtime",
-            ],
+    tags = [
+        "runtime",
+        "scheduler",
+        "planning",
+    ]
+
+    def schedule(
+        self,
+        execution_plan=None,
+        runtime_signal=None,
+    ):
+
+        execution_plan = (
+            execution_plan
+            if isinstance(execution_plan, dict)
+            else {}
         )
 
-    def execute(
-        self,
-        context=None,
-    ):
-        context = self._safe_dict(context)
-
-        execution_status = self._safe_str(
-            context.get("execution_status")
+        runtime_signal = str(
+            runtime_signal
+            or ""
         ).lower()
 
-        failed_count = context.get(
-            "failed_count",
-            0,
+        executed_steps = (
+            execution_plan.get(
+                "executed_steps",
+                []
+            )
+            if isinstance(
+                execution_plan.get(
+                    "executed_steps"
+                ),
+                list,
+            )
+            else []
         )
 
-        future_tasks = []
+        queue = []
 
-        if failed_count > 0:
-            future_tasks.append(
+        for index, step in enumerate(
+            executed_steps
+        ):
+
+            queue.append(
                 {
-                    "task": "retry_failed_execution",
-                    "priority": "high",
-                    "reason": "Execution failures detected.",
+                    "queue_index": index,
+                    "step": step.get(
+                        "step"
+                    ),
+                    "status": "queued",
                 }
             )
 
-        if execution_status in {
-            "complete",
-            "completed",
-        }:
-            future_tasks.append(
-                {
-                    "task": "prepare_next_goal",
-                    "priority": "medium",
-                    "reason": "Execution completed successfully.",
-                }
-            )
+        scheduler_mode = "normal"
 
-        if execution_status in {
-            "",
-            "idle",
-            None,
+        if runtime_signal in {
+            "runtime_integrity_block",
+            "runtime_rollback_executed",
+            "runtime_escalation_required",
         }:
-            future_tasks.append(
-                {
-                    "task": "await_new_work",
-                    "priority": "low",
-                    "reason": "Runtime is idle.",
-                }
+
+            scheduler_mode = (
+                "priority_recovery"
             )
 
         return {
             "ok": True,
-            "action": "runtime_schedule_generated",
-            "future_tasks": future_tasks,
-            "future_task_count": len(
-                future_tasks
-            ),
+            "scheduler_mode": scheduler_mode,
+            "queue": queue,
+            "queue_size": len(queue),
         }
