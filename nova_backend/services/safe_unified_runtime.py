@@ -247,6 +247,10 @@ from nova_backend.services.runtime_self_preservation_service import (
     RuntimeSelfPreservationService,
 )
 
+from nova_backend.services.runtime_adaptive_throttle_service import (
+    RuntimeAdaptiveThrottleService,
+)
+
 class SafeUnifiedRuntime:
     def __init__(
         self,
@@ -549,6 +553,10 @@ class SafeUnifiedRuntime:
 
         self.runtime_self_preservation = (
             RuntimeSelfPreservationService()
+        )
+
+        self.runtime_adaptive_throttle = (
+            RuntimeAdaptiveThrottleService()
         )
 
     def debug_runtime_result(
@@ -2276,6 +2284,30 @@ class SafeUnifiedRuntime:
         result[
             "runtime_self_preservation"
         ] = runtime_self_preservation
+
+        runtime_adaptive_throttle = (
+            self.runtime_adaptive_throttle.throttle(
+                execution_state=execution_state,
+                runtime_health=result.get(
+                    "runtime_health",
+                    {},
+                ),
+                runtime_self_preservation=(
+                    runtime_self_preservation
+                ),
+            )
+        )
+
+        execution_state = (
+            runtime_adaptive_throttle.get(
+                "execution_state",
+                execution_state,
+            )
+        )
+
+        result[
+            "runtime_adaptive_throttle"
+        ] = runtime_adaptive_throttle
 
         return result
 
