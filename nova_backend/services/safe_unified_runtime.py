@@ -1,16 +1,10 @@
-﻿from nova_backend.services.governor_service import GovernorService
-from nova_backend.services.runtime_output_compression_service import RuntimeOutputCompressionService
-from nova_backend.services.runtime_graph_memory_service import RuntimeGraphMemoryService
+﻿
 from nova_backend.services.graph_runtime_service import (
     GraphRuntimeService,
 )
 
 from nova_backend.services.governor_service import (
     GovernorService,
-)
-
-from nova_backend.services.graph_runtime_service import (
-    GraphRuntimeService,
 )
 
 from nova_backend.services.observability_service import (
@@ -441,10 +435,6 @@ class SafeUnifiedRuntime:
             RuntimeSchedulerEngine()
         )
 
-        self.runtime_scheduler = (
-            RuntimeSchedulerEngine()
-        )
-
         self.runtime_autonomy_loop = (
             RuntimeAutonomyLoop()
         )
@@ -479,10 +469,6 @@ class SafeUnifiedRuntime:
 
         self.runtime_execution_queue = (
             RuntimeExecutionQueueService()
-        )
-
-        self.runtime_autonomous_executor = (
-            RuntimeAutonomousExecutor()
         )
 
         self.runtime_consensus = (
