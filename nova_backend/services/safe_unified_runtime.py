@@ -5,54 +5,86 @@ from nova_backend.services.graph_runtime_service import (
     GraphRuntimeService,
 )
 
-from nova_backend.services.runtime_compression_service import (
-    RuntimeCompressionService,
+from nova_backend.services.governor_service import (
+    GovernorService,
 )
+
+from nova_backend.services.graph_runtime_service import (
+    GraphRuntimeService,
+)
+
 from nova_backend.services.observability_service import (
     ObservabilityService,
 )
+
 from nova_backend.services.runtime_learning_service import (
     RuntimeLearningService,
 )
+
 from nova_backend.services.runtime_replay_service import (
     RuntimeReplayService,
 )
+
 from nova_backend.services.runtime_debugger_service import (
     RuntimeDebuggerService,
 )
+
 from nova_backend.services.runtime_self_healing_service import (
     RuntimeSelfHealingService,
 )
+
 from nova_backend.services.runtime_orchestrator_service import (
     RuntimeOrchestratorService,
 )
+
+from nova_backend.services.runtime_output_compression_service import (
+    RuntimeOutputCompressionService,
+)
+
+from nova_backend.services.runtime_compression_service import (
+    RuntimeCompressionService,
+)
+
+from nova_backend.services.runtime_graph_memory_service import (
+    RuntimeGraphMemoryService,
+)
+
 from nova_backend.services.runtime_graph_query_service import (
     RuntimeGraphQueryService,
 )
+
 from nova_backend.services.runtime_trend_analysis_service import (
     RuntimeTrendAnalysisService,
 )
+
 from nova_backend.services.runtime_policy_adaptation_service import (
     RuntimePolicyAdaptationService,
 )
+
 from nova_backend.services.runtime_policy_enforcement_service import (
     RuntimePolicyEnforcementService,
 )
+
 from nova_backend.services.runtime_governor_arbitration_service import (
     RuntimeGovernorArbitrationService,
 )
+
 from nova_backend.services.runtime_identity_service import (
     RuntimeIdentityService,
 )
+
 from nova_backend.services.runtime_goal_persistence_service import (
     RuntimeGoalPersistenceService,
 )
+
 from nova_backend.services.runtime_planning_service import (
     RuntimePlanningService,
 )
+
 from nova_backend.services.runtime_world_model_service import (
     RuntimeWorldModelService,
 )
+
 from nova_backend.services.runtime_snapshot_service import (
     RuntimeSnapshotService,
 )
@@ -60,6 +92,7 @@ from nova_backend.services.runtime_snapshot_service import (
 from nova_backend.services.runtime_signal_pruning_service import (
     RuntimeSignalPruningService,
 )
+
 from nova_backend.services.runtime_drift_memory_service import (
     RuntimeDriftMemoryService,
 )
@@ -67,10 +100,35 @@ from nova_backend.services.runtime_drift_memory_service import (
 from nova_backend.services.runtime_auto_recovery_service import (
     RuntimeAutoRecoveryService,
 )
+
 from nova_backend.services.runtime_persistence_service import (
     RuntimePersistenceService,
 )
 
+from nova_backend.services.runtime_integrity_service import (
+    RuntimeIntegrityService,
+)
+
+from nova_backend.services.runtime_prediction_engine import (
+    RuntimePredictionEngine,
+)
+
+from nova_backend.services.runtime_checkpoint_guardian import (
+    RuntimeCheckpointGuardian,
+)
+
+from nova_backend.services.runtime_rollback_engine import (
+    RuntimeRollbackEngine,
+)
+
+from nova_backend.services.runtime_state_diff_engine import (
+    RuntimeStateDiffEngine,
+)
+
+from nova_backend.services.runtime_mutation_sandbox import (
+    RuntimeMutationSandbox,
+)
+    
 class SafeUnifiedRuntime:
     def __init__(
         self,
@@ -88,30 +146,81 @@ class SafeUnifiedRuntime:
         self.last_reflection = {}
         self.last_decision = {}
         self.runtime_history = []
-        self.runtime_output_compression = RuntimeOutputCompressionService()
-        self.runtime_graph_memory = RuntimeGraphMemoryService()
+        self.last_compressed_runtime = {}
 
-        self.runtime_graph_query = RuntimeGraphQueryService(
-            graph_memory=self.runtime_graph_memory,
+        self.observability = (
+            observability
+            or ObservabilityService()
         )
 
-        self.runtime_trend_analysis = RuntimeTrendAnalysisService(
-            graph_memory=self.runtime_graph_memory,
+        self.graph_runtime = (
+            graph_runtime
+            or GraphRuntimeService()
         )
 
-        self.runtime_policy_adaptation = RuntimePolicyAdaptationService(
-            trend_analyzer=self.runtime_trend_analysis,
+        self.governor = (
+            governor
+            or GovernorService()
         )
 
-        self.runtime_policy_enforcement = RuntimePolicyEnforcementService(
-            policy_adapter=self.runtime_policy_adaptation,
+        self.learning = (
+            learning
+            or RuntimeLearningService()
         )
 
-        self.runtime_governor = RuntimeGovernorArbitrationService()
-        self.runtime_identity = RuntimeIdentityService()
+        self.replay = (
+            replay
+            or RuntimeReplayService()
+        )
+
+        self.runtime_output_compression = (
+            RuntimeOutputCompressionService()
+        )
+
+        self.runtime_compressor = (
+            RuntimeCompressionService()
+        )
+
+        self.runtime_graph_memory = (
+            RuntimeGraphMemoryService()
+        )
+
+        self.runtime_graph_query = (
+            RuntimeGraphQueryService(
+                graph_memory=self.runtime_graph_memory,
+            )
+        )
+
+        self.runtime_trend_analysis = (
+            RuntimeTrendAnalysisService(
+                graph_memory=self.runtime_graph_memory,
+            )
+        )
+
+        self.runtime_policy_adaptation = (
+            RuntimePolicyAdaptationService(
+                trend_analyzer=self.runtime_trend_analysis,
+            )
+        )
+
+        self.runtime_policy_enforcement = (
+            RuntimePolicyEnforcementService(
+                policy_adapter=self.runtime_policy_adaptation,
+            )
+        )
+
+        self.runtime_governor = (
+            RuntimeGovernorArbitrationService()
+        )
+
+        self.runtime_identity = (
+            RuntimeIdentityService()
+        )
+
         self.runtime_goal_persistence = (
             RuntimeGoalPersistenceService()
         )
+
         self.runtime_planning = (
             RuntimePlanningService()
         )
@@ -119,39 +228,65 @@ class SafeUnifiedRuntime:
         self.runtime_world_model = (
             RuntimeWorldModelService()
         )
-        self.observability = observability or ObservabilityService()
-        self.graph_runtime = graph_runtime or GraphRuntimeService()
-        self.governor = governor or GovernorService()
-        self.learning = learning or RuntimeLearningService()
-        self.replay = replay or RuntimeReplayService()
 
-        self.debugger = debugger or RuntimeDebuggerService(
-            graph_memory=self.runtime_graph_memory,
+        self.debugger = (
+            debugger
+            or RuntimeDebuggerService(
+                graph_memory=self.runtime_graph_memory,
+            )
         )
 
-        self.self_healing = self_healing or RuntimeSelfHealingService()
-        self.runtime_orchestrator = RuntimeOrchestratorService()
-        self.runtime_compressor = (
-            RuntimeCompressionService()
+        self.self_healing = (
+            self_healing
+            or RuntimeSelfHealingService()
+        )
+
+        self.runtime_orchestrator = (
+            RuntimeOrchestratorService()
         )
 
         self.runtime_signal_pruning = (
             RuntimeSignalPruningService()
         )
 
-        self.last_compressed_runtime = {}
-
         self.runtime_snapshot = (
             RuntimeSnapshotService()
         )
+
         self.runtime_drift_memory = (
             RuntimeDriftMemoryService()
         )
+
         self.runtime_auto_recovery = (
             RuntimeAutoRecoveryService()
         )
+
         self.runtime_persistence = (
             RuntimePersistenceService()
+        )
+
+        self.runtime_integrity = (
+            RuntimeIntegrityService()
+        )
+
+        self.runtime_prediction = (
+            RuntimePredictionEngine()
+        )
+
+        self.runtime_checkpoint_guardian = (
+            RuntimeCheckpointGuardian()
+        )
+
+        self.runtime_state_diff = (
+            RuntimeStateDiffEngine()
+        )
+
+        self.runtime_mutation_sandbox = (
+            RuntimeMutationSandbox()
+        )
+
+        self.runtime_rollback_engine = (
+            RuntimeRollbackEngine()
         )
 
         persisted_runtime = (
@@ -615,6 +750,107 @@ class SafeUnifiedRuntime:
             or "runtime_idle"
         )
 
+        runtime_memory_event = {
+            "cycle": self.cycle_count,
+            "signal": runtime_signal,
+            "action": final_action,
+            "risk": (
+                runtime_world_model.get(
+                    "risk_forecast"
+                )
+                if isinstance(runtime_world_model, dict)
+                else "unknown"
+            ),
+            "goal": (
+                runtime_goal.get(
+                    "active_goal"
+                )
+                if isinstance(runtime_goal, dict)
+                else "unknown"
+            ),
+        }
+
+        anomaly_detected = False
+
+        recent_signals = [
+            item.get("runtime_signal")
+            for item in self.runtime_history[-5:]
+            if isinstance(item, dict)
+        ]
+
+        idle_count = recent_signals.count(
+            "runtime_idle"
+        )
+
+        anomaly_cycle_count = idle_count
+
+        if anomaly_cycle_count >= 4:
+            anomaly_detected = True
+
+        if anomaly_cycle_count >= 6:
+
+            anomaly_detected = True
+
+            final_action = (
+                "runtime_force_recovery"
+            )
+
+            runtime_signal = (
+                "runtime_escalation_required"
+            )
+
+            execution_state[
+                "runtime_signal"
+            ] = runtime_signal
+
+            execution_state[
+                "recovery_mode"
+            ] = True
+
+            execution_state[
+                "runtime_policy_shift"
+            ] = (
+                "force_recovery_escalation"
+            )
+
+            execution_state[
+                "runtime_policy_reason"
+            ] = (
+                "Repeated idle cycles exceeded escalation threshold."
+            )
+
+        elif anomaly_cycle_count >= 4:
+
+            anomaly_detected = True
+
+            final_action = (
+                "runtime_self_repair"
+            )
+
+            runtime_signal = (
+                "runtime_anomaly_detected"
+            )
+
+            execution_state[
+                "runtime_signal"
+            ] = runtime_signal
+
+            execution_state[
+                "recovery_mode"
+            ] = True
+
+            execution_state[
+                "runtime_policy_shift"
+            ] = (
+                "increase_recovery_priority"
+            )
+
+            execution_state[
+                "runtime_policy_reason"
+            ] = (
+                "Repeated idle runtime cycles triggered anomaly recovery."
+            )
+
         self.runtime_history.append(
             {
                 "cycle": self.cycle_count,
@@ -630,6 +866,30 @@ class SafeUnifiedRuntime:
                 "runtime_signal": (
                     runtime_signal
                 ),
+                "runtime_memory_event": (
+                    runtime_memory_event
+                ),
+                "anomaly_detected": (
+                    anomaly_detected
+                ),
+
+                "recovery_mode": (
+                    execution_state.get(
+                        "recovery_mode",
+                        False,
+                    )
+                ),
+                "runtime_policy_shift": (
+                    execution_state.get(
+                        "runtime_policy_shift"
+                    )
+                ),
+                "runtime_policy_reason": (
+                    execution_state.get(
+                        "runtime_policy_reason"
+                    )
+                ),
+
                 "runtime_governor": runtime_governor,
                 "control": control,
                 "failure_type": failure_type,
@@ -657,7 +917,10 @@ class SafeUnifiedRuntime:
             "ok": True,
             "runtime_graph_memory": (
                 self.runtime_graph_memory.export_memory()
-                if hasattr(self.runtime_graph_memory, "export_memory")
+                if hasattr(
+                    self.runtime_graph_memory,
+                    "export_memory",
+                )
                 else {
                     "events": getattr(
                         self.runtime_graph_memory,
@@ -673,7 +936,9 @@ class SafeUnifiedRuntime:
                     ),
                 }
             ),
-            "cycle": "observe_reflect_learn_govern_graph_trace",
+            "cycle": (
+                "observe_reflect_learn_govern_graph_trace"
+            ),
             "cycle_count": self.cycle_count,
             "trace_id": trace_id,
             "execution": execution_summary,
@@ -689,10 +954,18 @@ class SafeUnifiedRuntime:
             "mutated_execution_state": execution_state,
             "previous_reflection": previous_reflection,
             "previous_decision": previous_decision,
-            "runtime_policy_enforcement": policy_enforcement,
-            "runtime_trend_analysis": runtime_trend_analysis,
-            "runtime_adaptive_policy": runtime_adaptive_policy,
-            "runtime_governor": runtime_governor,
+            "runtime_policy_enforcement": (
+                policy_enforcement
+            ),
+            "runtime_trend_analysis": (
+                runtime_trend_analysis
+            ),
+            "runtime_adaptive_policy": (
+                runtime_adaptive_policy
+            ),
+            "runtime_governor": (
+                runtime_governor
+            ),
             "runtime_identity": (
                 runtime_identity
             ),
@@ -700,6 +973,34 @@ class SafeUnifiedRuntime:
                 runtime_goal
             ),
         }
+
+        integrity_report = (
+            self.runtime_integrity.validate(
+                execution_state=execution_state,
+                runtime_result=result,
+                runtime_history=self.runtime_history,
+            )
+        )
+
+        result["runtime_integrity"] = (
+            integrity_report
+        )
+
+        if integrity_report.get("blocked"):
+
+            execution_state[
+                "runtime_signal"
+            ] = (
+                "runtime_integrity_block"
+            )
+
+            execution_state[
+                "recovery_mode"
+            ] = True
+
+            final_action = (
+                "runtime_integrity_recovery"
+            )
 
         self.observability.end_trace(
             trace_id=trace_id,
@@ -751,7 +1052,48 @@ class SafeUnifiedRuntime:
         )
 
         result["healing_plan"] = healing_plan
+
         result["healing_report"] = healing_report
+
+        prediction_report = (
+            self.runtime_prediction.predict(
+                runtime_history=self.runtime_history,
+                execution_state=execution_state,
+                runtime_result=result,
+            )
+        )
+
+        checkpoint_report = (
+            self.runtime_checkpoint_guardian
+            .create_checkpoint(
+                execution_state=execution_state,
+                runtime_result=result,
+                reason=(
+                    execution_state.get(
+                        "runtime_signal"
+                    )
+                ),
+            )
+        )
+
+        state_diff_report = (
+            self.runtime_state_diff.compare(
+                before_state=before_state,
+                after_state=execution_state,
+            )
+        )
+
+        result["runtime_state_diff"] = (
+            state_diff_report
+        )
+
+        result["runtime_checkpoint"] = (
+            checkpoint_report
+        )
+
+        result["runtime_prediction"] = (
+            prediction_report
+        )
 
         orchestration_report = self.runtime_orchestrator.orchestrate(
             runtime_result={
