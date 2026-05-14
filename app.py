@@ -638,18 +638,10 @@ def api_state():
 @app.route("/api/runtime/summary", methods=["GET"])
 def api_runtime_summary():
     try:
-        runtime = getattr(
-            chat_service,
-            "runtime",
-            None,
-        )
+        runtime = getattr(chat_service, "runtime", None)
 
         if runtime is None:
-            runtime = getattr(
-                chat_service,
-                "safe_runtime",
-                None,
-            )
+            runtime = getattr(chat_service, "safe_runtime", None)
 
         if runtime is None:
             runtime = runtime_brain
@@ -663,16 +655,55 @@ def api_runtime_summary():
         if not isinstance(compressed, dict):
             compressed = {}
 
-        return jsonify(
-            {
-                "ok": True,
-                "runtime": compressed,
-                "runtime_execution_router": compressed.get(
-                    "runtime_execution_router",
-                    {},
-                ),
-            }
+        # ----------------------------
+        # EXTRACT LIVE LAYERS
+        # ----------------------------
+
+        def safe_dict(val):
+            return val if isinstance(val, dict) else {}
+
+        runtime_health = safe_dict(
+            compressed.get("runtime_health", {})
         )
+
+        runtime_throttle = safe_dict(
+            compressed.get("runtime_adaptive_throttle", {})
+        )
+
+        runtime_preservation = safe_dict(
+            compressed.get("runtime_self_preservation", {})
+        )
+
+        runtime_mutation = safe_dict(
+            compressed.get("runtime_mutation_safety", {})
+        )
+
+        response = {
+            "ok": True,
+            "runtime": compressed,
+            "health": runtime_health,
+            "throttle": runtime_throttle,
+            "self_preservation": runtime_preservation,
+            "mutation_safety": runtime_mutation,
+            "health_state": runtime_health.get("health_state"),
+            "health_score": runtime_health.get("health_score"),
+            "throttle_level": runtime_throttle.get("throttle_level"),
+            "allowed_autonomy": runtime_throttle.get("allowed_autonomy"),
+            "preservation_mode": runtime_preservation.get("preservation_mode"),
+            "mutation_allowed": runtime_mutation.get("mutation_allowed"),
+            "rollback_required": compressed.get(
+                "runtime_rollback_required",
+                False,
+            ),
+            "final_action": compressed.get(
+                "runtime_final_action"
+            ),
+            "runtime_signal": compressed.get(
+                "runtime_signal"
+            ),
+        }
+
+        return jsonify(response)
 
     except Exception as e:
         return jsonify(
@@ -680,7 +711,6 @@ def api_runtime_summary():
                 "ok": False,
                 "error": str(e),
                 "runtime": {},
-                "runtime_execution_router": {},
             }
         ), 500
 
@@ -2051,8 +2081,41 @@ def execution_stream():
         import json
         return f"event: {name}\ndata: {json.dumps(payload)}\n\n"
 
-    def save_execution(execution):
-        session["working_state"]["execution"][session_id] = execution
+def save_execution(execution):
+
+    session = session_service.get_session(
+        session_id
+    )
+
+    if not isinstance(session, dict):
+        return
+
+    working_state = session.get(
+        "working_state",
+        {},
+    )
+
+    if not isinstance(working_state, dict):
+        working_state = {}
+
+    execution_map = working_state.get(
+        "execution",
+        {},
+    )
+
+    if not isinstance(execution_map, dict):
+        execution_map = {}
+
+    execution_map[session_id] = execution
+
+    working_state["execution"] = execution_map
+
+    session["working_state"] = working_state
+
+    session_service.update_session(
+        session_id,
+        session,
+    )
 
     def replay_existing_step(execution, replay_step, step_title):
         move = replay_step.get("move") if isinstance(replay_step, dict) else None
