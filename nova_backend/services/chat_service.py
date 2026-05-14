@@ -47,6 +47,10 @@ from nova_backend.services.runtime_cognitive_injection_service import (
     RuntimeCognitiveInjectionService,
 )
 
+from nova_backend.services.runtime_cognitive_firewall import (
+    RuntimeCognitiveFirewall,
+)
+
 logger = logging.getLogger("nova.execution")
 DEBUG_EXECUTION = False
 
@@ -643,7 +647,7 @@ Rules:
         if not code:
             return code
 
-        # 1. convert tabs â†’ 4 spaces
+        # 1. convert tabs → 4 spaces
         code = code.replace("\t", "    ")
 
         # 2. normalize line endings
@@ -2843,64 +2847,141 @@ if __name__ == "__main__":
         web_service: WebService,
         recon_service: ReconService,
     ):
+
+        self.runtime_cognitive_firewall = RuntimeCognitiveFirewall()
+
+        # =========================
+        # CORE SERVICES
+        # =========================
+
         self.session_service = session_service
         self.memory_service = memory_service
         self.artifact_service = artifact_service
         self.web_service = web_service
         self.recon_service = recon_service
-        self.rewrite_service = ResponseRewriteService()
-        self.python_runner = PythonRunnerService()
-        self.runtime_cognitive_injection = RuntimeCognitiveInjectionService()
 
-        # execution engine
-        self.execution_handler = ExecutionHandler(default_executor)
+        # =========================
+        # EXISTING ALIASES
+        # DO NOT REMOVE
+        # =========================
 
-        self.execution_loop = ExecutionLoopService(
-            execution_handler=self.execution_handler,
-            runtime_service=getattr(self, "runtime", None),
-        )
-        self.runtime = RuntimeBootstrap.build(
-            chat_service=self
-        )
-
-        # existing aliases (DO NOT REMOVE)
         self.sessions = session_service
         self.memory = memory_service
+        self.memories = memory_service
         self.artifacts = artifact_service
         self.web = web_service
         self.recon = recon_service
-        self.memories = memory_service
-        # config
-        self.image_model = os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1")
-        self.image_size = os.getenv("NOVA_IMAGE_SIZE", "1024x1024")
-        self.chat_model = os.getenv("OPENAI_MODEL", "gpt-5.4")
-        self.model = self.chat_model
-        exec_debug("MODEL CHECK:", hasattr(self, "model"), self.model)
 
-        self.memory_limit = int(os.getenv("NOVA_MEMORY_LIMIT", "3"))
+        # =========================
+        # CONFIG
+        # =========================
 
-        # services
-        self.execution_service = ExecutionService()
-        self.intent_service = IntentService()
-
-        # uploads
-        self.uploads_dir = Path(
-            os.getenv("UPLOADS_DIR", r"C:\Users\Owner\nova\uploads")
+        self.image_model = os.getenv(
+            "NOVA_IMAGE_MODEL",
+            "gpt-image-1",
         )
-        self.uploads_dir.mkdir(parents=True, exist_ok=True)
-        exec_debug("CHATSERVICE INIT uploads_dir =", self.uploads_dir)
+
+        self.image_size = os.getenv(
+            "NOVA_IMAGE_SIZE",
+            "1024x1024",
+        )
+
+        self.chat_model = os.getenv(
+            "OPENAI_MODEL",
+            "gpt-5.4",
+        )
+
+        self.model = self.chat_model
+
+        exec_debug(
+            "MODEL CHECK:",
+            hasattr(
+                self,
+                "model",
+            ),
+            self.model,
+        )
+
+        self.memory_limit = int(
+            os.getenv(
+                "NOVA_MEMORY_LIMIT",
+                "3",
+            )
+        )
+
+        # =========================
+        # UPLOADS
+        # =========================
+
+        self.uploads_dir = Path(
+            os.getenv(
+                "UPLOADS_DIR",
+                r"C:\Users\Owner\nova\uploads",
+            )
+        )
+
+        self.uploads_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        exec_debug(
+            "CHATSERVICE INIT uploads_dir =",
+            self.uploads_dir,
+        )
+
+        # =========================
+        # CORE CLIENTS
+        # =========================
+
+        self.client = OpenAI()
+        self.agent = AgentService()
+        self.memory_ranker = MemoryRankerService()
+        self.tools = ToolService(
+            base_dir=os.getcwd()
+        )
+
+        # =========================
+        # RESPONSE / INTENT SERVICES
+        # =========================
+
+        self.rewrite_service = ResponseRewriteService()
+        self.intent_service = IntentService()
+        self.python_runner = PythonRunnerService()
+
+        # =========================
+        # RUNTIME COGNITION
+        # =========================
 
         self.runtime_cognitive_injection = (
             RuntimeCognitiveInjectionService()
         )
 
-        # core clients
-        self.client = OpenAI()
-        self.agent = AgentService()
-        self.memory_ranker = MemoryRankerService()
-        self.tools = ToolService(base_dir=os.getcwd())
+        self.runtime_brain = None
 
-        # autonomy
+        # =========================
+        # EXECUTION ENGINE
+        # =========================
+
+        self.execution_handler = ExecutionHandler(
+            default_executor
+        )
+
+        self.runtime = RuntimeBootstrap.build(
+            chat_service=self
+        )
+
+        self.execution_loop = ExecutionLoopService(
+            execution_handler=self.execution_handler,
+            runtime_service=self.runtime,
+        )
+
+        self.execution_service = ExecutionService()
+
+        # =========================
+        # AUTONOMY
+        # =========================
+
         self.autonomy = AutonomyService(
             web_service=self.web,
             recon_service=self.recon,
@@ -2914,6 +2995,7 @@ if __name__ == "__main__":
         # =========================
         # AGENT CORE (NEW ARCHITECTURE)
         # =========================
+
         self.brain = BrainCore()
         self.strategy = StrategyEngine()
         self.memory_core = MemoryCore()
@@ -3010,7 +3092,7 @@ if __name__ == "__main__":
                 "status": result.get("execution", {}).get("status"),
             })
 
-            exec_debug("TEST RUN:", t, "→", result.get("execution", {}).get("status"))
+            exec_debug("TEST RUN:", t, "?", result.get("execution", {}).get("status"))
 
         return {
             "ok": True,
@@ -3047,7 +3129,7 @@ if __name__ == "__main__":
         elif execution_state.get("status") is None:
 
             diagnosis["root_cause"] = "execution state not updated (possible routing issue)"
-            diagnosis["fix_suggestion"] = "check decision → executor wiring"
+            diagnosis["fix_suggestion"] = "check decision ? executor wiring"
 
         # -------------------------
         # DEFAULT CASE
@@ -4814,8 +4896,8 @@ if __name__ == "__main__":
                 dominant_memory = (
                     self._rank_memory_context(
                         user_text=user_text,
-                        memory_items=(
-                            self.memories.get_memories()
+                        memories=(
+                            self.memories.all()
                             or []
                         ),
                         working_state=working_state,
@@ -5491,7 +5573,7 @@ if __name__ == "__main__":
         if is_working:
             assistant_text = (
                 assistant_text.strip()
-                + "\n\n(I’m keeping track of this and continuing the work.)"
+                + "\n\n(I m keeping track of this and continuing the work.)"
             )
 
         # =====================================
@@ -5515,7 +5597,7 @@ if __name__ == "__main__":
         ):
             assistant_text = (
                 assistant_text.strip()
-                + "\n\n(I’m tracking this and continuing in the background.)"
+                + "\n\n(I m tracking this and continuing in the background.)"
             )
 
         try:
@@ -5557,10 +5639,10 @@ if __name__ == "__main__":
             if "name" in text_lc:
                 assistant_text = (
                     "I do not have your name in this session yet. "
-                    "Tell me your name once and I’ll use it for this chat."
+                    "Tell me your name once and I ll use it for this chat."
                 )
             else:
-                assistant_text = "I’m here. Send the next instruction."
+                assistant_text = "I m here. Send the next instruction."
 
         intelligence_result = self._apply_response_intelligence(
             user_text=user_text,
@@ -5826,7 +5908,7 @@ if __name__ == "__main__":
 
         user_text_lc = str(user_text or "").lower().strip()
 
-        # Ã°Å¸â€Â¥ 1. HARD USER OVERRIDE (strongest)
+        # ðŸ”¥ 1. HARD USER OVERRIDE (strongest)
         if any(p in user_text_lc for p in [
             "don't give short",
             "dont give short",
@@ -5847,7 +5929,7 @@ if __name__ == "__main__":
         ]):
             return "short"
 
-        # Ã°Å¸â€Â¥ 2. MEMORY (most recent wins)
+        # ðŸ”¥ 2. MEMORY (most recent wins)
         for m in reversed(memory_items or []):
             if not isinstance(m, dict):
                 continue
@@ -5860,7 +5942,7 @@ if __name__ == "__main__":
             if "short answers" in text:
                 return "short"
 
-        # Ã°Å¸â€Â¥ 3. DEFAULT
+        # ðŸ”¥ 3. DEFAULT
         return "normal"
 
     def _build_diff_preview(self, old: str, new: str, file_path: str) -> str:
@@ -6197,7 +6279,7 @@ if __name__ == "__main__":
             "send the code",
             "send one of these",
             "send the code and",
-            "whatÃ¢â‚¬â„¢s the symptom",
+            "whatâ€™s the symptom",
             "what's the symptom",
             "tell me what you need",
             "i can help",
@@ -6654,7 +6736,7 @@ if __name__ == "__main__":
                 "SMFF mode:\n"
                 "- Send full file path.\n"
                 "- Send the full broken function or file.\n"
-                "- Iâ€™ll return the full replacement, cleanly indented."
+                "- I’ll return the full replacement, cleanly indented."
             ).strip()
 
         stuck_exact = {
@@ -6696,7 +6778,7 @@ if __name__ == "__main__":
             return {
                 "assistant_text": (
                     "Send the full function and file path.\n"
-                    "Iâ€™ll return the full replacement block, cleanly indented."
+                    "I’ll return the full replacement block, cleanly indented."
                 ),
                 "intelligence": {
                     "strategy": "smff_bug_intake",
@@ -6712,7 +6794,7 @@ if __name__ == "__main__":
             return {
                 "assistant_text": (
                     "Paste the error, file path, or failing behavior.\n"
-                    "Iâ€™ll help patch it."
+                    "I’ll help patch it."
                 ),
                 "intelligence": {
                     "strategy": "bug_intake",
@@ -6729,7 +6811,7 @@ if __name__ == "__main__":
             return {
                 "assistant_text": (
                     "Paste the text, code, error, screenshot, or link.\n"
-                    "Iâ€™ll break it down clearly."
+                    "I’ll break it down clearly."
                 ),
                 "intelligence": {
                     "strategy": "clarify_missing_subject",
@@ -6749,7 +6831,7 @@ if __name__ == "__main__":
         hard_override_applied = False
 
         if not assistant_text:
-            assistant_text = "I couldnâ€™t generate a useful answer from that. Send the exact thing you want handled."
+            assistant_text = "I couldn’t generate a useful answer from that. Send the exact thing you want handled."
 
         try:
             intelligence = self._fuse_response_intelligence(
@@ -6939,18 +7021,18 @@ if __name__ == "__main__":
         if smff_active and code_intent and not asks_alternatives:
             return (
                 "Send full file path + full broken code.\n"
-                "Iâ€™ll return the full replacement, cleanly indented.\n\n"
+                "I’ll return the full replacement, cleanly indented.\n\n"
                 "PowerShell test:\n"
                 "python -m py_compile <file_path>"
             )
 
         if smff_active and code_intent and asks_alternatives:
             return (
-                "Option A â€” safest:\n"
-                "Send the full file path + full broken file. Iâ€™ll return the full-file replacement.\n\n"
-                "Option B â€” faster:\n"
-                "Send the full function only. Iâ€™ll return the full function replacement.\n\n"
-                "Option C â€” debug-only:\n"
+                "Option A — safest:\n"
+                "Send the full file path + full broken file. I’ll return the full-file replacement.\n\n"
+                "Option B — faster:\n"
+                "Send the full function only. I’ll return the full function replacement.\n\n"
+                "Option C — debug-only:\n"
                 "Run this and send the exact error:\n"
                 "python -m py_compile <file_path>"
             )
@@ -6992,7 +7074,7 @@ if __name__ == "__main__":
         ):
             return (
                 "Send the full function and file path.\n"
-                "Iâ€™ll return the full replacement block, cleanly indented."
+                "I’ll return the full replacement block, cleanly indented."
             )
 
         kill_phrases = [
@@ -7023,7 +7105,7 @@ if __name__ == "__main__":
 
         bad_endings = [
             "Example:",
-            "Hereâ€™s how:",
+            "Here’s how:",
             "Here's how:",
             "This prints:",
             "That prints:",
@@ -7044,7 +7126,7 @@ if __name__ == "__main__":
             if (
                 last.endswith(":")
                 or last.endswith("-")
-                or last_lc in {"example", "output", "result", "hereâ€™s how", "here's how"}
+                or last_lc in {"example", "output", "result", "here’s how", "here's how"}
             ):
                 lines.pop()
                 continue
@@ -7530,7 +7612,7 @@ if __name__ == "__main__":
 
         clean_query = re.sub(r"\s+", " ", clean_query).strip()
 
-        # ðŸ”¥ empty â†’ global news
+        # 🔥 empty → global news
         if not clean_query:
             return [
                 "world news",
@@ -11046,44 +11128,6 @@ Auto-fix result:
             for _, item in ranked[:limit]
         ]
 
-    def _format_memory_context(
-        self,
-        memory_items,
-    ) -> str:
-
-        memory_items = memory_items or []
-
-        lines = []
-
-        for item in memory_items:
-
-            if isinstance(item, dict):
-                kind = self._safe_str(
-                    item.get("kind")
-                ).strip()
-
-                text = self._safe_str(
-                    item.get("text")
-                ).strip()
-
-            else:
-                kind = ""
-                text = self._safe_str(item).strip()
-
-            if not text:
-                continue
-
-            if kind:
-                lines.append(
-                    f"- [{kind}] {text}"
-                )
-
-            else:
-                lines.append(f"- {text}")
-
-        return "\n".join(lines).strip()
-
-
     def _build_memory_recall_text(
         self,
         session_id: str = "",
@@ -11223,7 +11267,7 @@ Auto-fix result:
             )
 
         return (
-            "Here’s what I remember:\n"
+            "Here s what I remember:\n"
             + "\n".join(lines)
         )
 
@@ -11287,7 +11331,7 @@ Auto-fix result:
 
         if not cleaned:
             return (
-                f'I couldn’t find strong '
+                f'I couldn t find strong '
                 f'live results for "{query}".'
             )
 
@@ -11376,7 +11420,7 @@ Auto-fix result:
                 import re
 
                 text = re.split(
-                    r"[-–—]\s*Top sources\s*[-–—]",
+                    r"[-  ]\s*Top sources\s*[-  ]",
                     text,
                     flags=re.IGNORECASE,
                 )[0].strip()
@@ -11388,7 +11432,7 @@ Auto-fix result:
                 )[0].strip()
 
             clean_text = re.split(
-                r"[-–—]\s*Top sources\s*[-–—]",
+                r"[-  ]\s*Top sources\s*[-  ]",
                 text,
                 flags=re.IGNORECASE,
             )[0]
@@ -11430,7 +11474,7 @@ Auto-fix result:
 
         return (
             "\n".join(fallback_parts).strip()
-            or f'Here’s what I found for "{query}".'
+            or f'Here s what I found for "{query}".'
         )
 
     # =========================
@@ -12208,7 +12252,7 @@ Auto-fix result:
             if text_parts:
                 return "\n".join(text_parts).strip()
 
-        return "IÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢m here, but the model returned an empty response."
+        return "IÃ¢â‚¬â„¢m here, but the model returned an empty response."
 
     # ==============================
     # DECISION CONTRACT
@@ -12819,11 +12863,11 @@ Auto-fix result:
             return False
 
 
-        # Ã°Å¸â€Â¥ PLAN CREATION
+        # ðŸ”¥ PLAN CREATION
         if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
             return True
 
-        # Ã°Å¸â€Â¥ FALLBACK: coding / structured intent
+        # ðŸ”¥ FALLBACK: coding / structured intent
         if decision and decision.get("mode") in {"coding", "analysis"}:
             return True
 
@@ -14144,7 +14188,7 @@ Next action:
         current_index = -1
 
         for i, line in enumerate(lines):
-            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"]):
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"]):
                 step_indexes.append(i)
 
             if "[>]" in line:
@@ -14155,8 +14199,8 @@ Next action:
     def _refresh_execution_header(self, body: str):
         lines = self._safe_str(body).splitlines()
 
-        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"]))
-        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "Ã¢Å“â€", "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â"]))
+        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"]))
+        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "âœ”", "Ã¢Å“â€"]))
 
         updated = "\n".join(lines)
         updated = re.sub(
@@ -14173,8 +14217,8 @@ Next action:
                     .replace("[ ]", "")
                     .replace("[x]", "")
                     .replace("[X]", "")
+                    .replace("âœ”", "")
                     .replace("Ã¢Å“â€", "")
-                    .replace("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â", "")
                     .strip(" -")
                     .strip()
                 )
@@ -14927,7 +14971,7 @@ Next action:
 
         def _clean_value(value: str) -> str:
             value = self._safe_str(value).strip()
-            value = value.strip("+    Ã¢â€ Â (FOUR SPACES Ã¢â‚¬â€ press space 4 times)\r\n-:;,.")
+            value = value.strip("+    â† (FOUR SPACES â€” press space 4 times)\r\n-:;,.")
             return value
 
         def _set_if_present(field_name: str, value: str):
@@ -15743,7 +15787,12 @@ Next action:
         execution_state=None,
         limit: int = 12,
         session_id: str = "",
+        memory_items=None,
     ):
+
+        if memories is None and memory_items is not None:
+            memories = memory_items
+
         memories = memories or self._get_memory_list()
         working_state = working_state or {}
         execution_state = execution_state or {}
@@ -15766,33 +15815,98 @@ Next action:
             )
         )
 
+        casual_query = any(
+            x in text_lc
+            for x in (
+                "hi",
+                "hello",
+                "hey",
+                "yo",
+                "sup",
+                "what is",
+                "who is",
+                "tell me",
+                "joke",
+                "2+2",
+                "how are you",
+            )
+        )
+
+        operational_query = any(
+            x in text_lc
+            for x in (
+                "continue",
+                "resume",
+                "next",
+                "what next",
+                "active task",
+                "where are we",
+                "current file",
+                "fix",
+                "execution",
+                "run step",
+                "run all",
+            )
+        )
+
         priority_terms = []
 
         if is_execution_chat:
 
-            priority_terms.extend([
-                str(working_state.get("active_task") or "").lower(),
-                str(working_state.get("current_file") or "").lower(),
-                str(working_state.get("current_bug") or "").lower(),
-                str(working_state.get("next_move") or "").lower(),
-                str(working_state.get("checkpoint") or "").lower(),
-            ])
+            priority_terms.extend(
+                [
+                    str(working_state.get("active_task") or "").lower(),
+                    str(working_state.get("current_file") or "").lower(),
+                    str(working_state.get("current_bug") or "").lower(),
+                    str(working_state.get("next_move") or "").lower(),
+                    str(working_state.get("checkpoint") or "").lower(),
+                ]
+            )
 
-            priority_terms.extend([
-                str(execution_state.get("status") or "").lower(),
-                str(execution_state.get("goal") or "").lower(),
-                str(
-                    execution_state.get("current_step_title")
-                    or execution_state.get("current_step")
-                    or ""
-                ).lower(),
-            ])
+            priority_terms.extend(
+                [
+                    str(execution_state.get("status") or "").lower(),
+                    str(execution_state.get("goal") or "").lower(),
+                    str(
+                        execution_state.get("current_step_title")
+                        or execution_state.get("current_step")
+                        or ""
+                    ).lower(),
+                ]
+            )
 
-        priority_terms = [term for term in priority_terms if term]
+        priority_terms = [
+            term
+            for term in priority_terms
+            if term
+        ]
+
+        has_real_state = any(
+            [
+                working_state.get("active_task"),
+                working_state.get("current_file"),
+                working_state.get("current_bug"),
+                working_state.get("next_move"),
+                working_state.get("checkpoint"),
+                execution_state.get("steps"),
+                execution_state.get("current_step"),
+                execution_state.get("status") == "running",
+            ]
+        )
+
         ranked = []
 
         for index, memory in enumerate(memories):
+
+            kind = ""
+            category = ""
+            content = ""
+            created_at = ""
+            updated_at = ""
+            raw_weight = 1
+
             if isinstance(memory, dict):
+
                 content = str(
                     memory.get("content")
                     or memory.get("text")
@@ -15808,20 +15922,50 @@ Next action:
                     or ""
                 ).lower()
 
-                created_at = str(memory.get("created_at") or "").lower()
-                updated_at = str(memory.get("updated_at") or "").lower()
-                raw_weight = memory.get("weight", 1)
+                kind = str(
+                    memory.get("kind")
+                    or memory.get("type")
+                    or memory.get("category")
+                    or ""
+                ).lower()
+
+                created_at = str(
+                    memory.get("created_at")
+                    or ""
+                ).lower()
+
+                updated_at = str(
+                    memory.get("updated_at")
+                    or ""
+                ).lower()
+
+                raw_weight = memory.get(
+                    "weight",
+                    1,
+                )
+
             else:
+
                 content = str(memory or "").strip()
-                category = ""
-                created_at = ""
-                updated_at = ""
-                raw_weight = 1
 
             if not content:
                 continue
 
             content_lc = content.lower()
+
+            blocked_runtime_memory_patterns = [
+                "big butts",
+                "cannot lie",
+                "joke memory",
+                "meme memory",
+                "temporary joke",
+            ]
+
+            if any(
+                pattern in content_lc
+                for pattern in blocked_runtime_memory_patterns
+            ):
+                continue
 
             try:
                 score = float(raw_weight)
@@ -15829,42 +15973,9 @@ Next action:
                 score = 1.0
 
             for word in text_lc.split():
+
                 if len(word) >= 4 and word in content_lc:
                     score += 2.0
-
-            casual_query = any(
-                x in text_lc
-                for x in [
-                    "hi",
-                    "hello",
-                    "hey",
-                    "yo",
-                    "sup",
-                    "what is",
-                    "who is",
-                    "tell me",
-                    "joke",
-                    "2+2",
-                    "how are you",
-                ]
-            )
-
-            operational_query = any(
-                x in text_lc
-                for x in [
-                    "continue",
-                    "resume",
-                    "next",
-                    "what next",
-                    "active task",
-                    "where are we",
-                    "current file",
-                    "fix",
-                    "execution",
-                    "run step",
-                    "run all",
-                ]
-            )
 
             if (
                 casual_query
@@ -15880,13 +15991,25 @@ Next action:
             if is_execution_chat and "operational" in category:
                 score += 15.0
 
-            if is_execution_chat and ("working" in category or "state" in category):
+            if (
+                is_execution_chat
+                and (
+                    "working" in category
+                    or "state" in category
+                )
+            ):
                 score += 14.0
 
             if is_execution_chat and "execution" in category:
                 score += 13.0
 
-            if is_execution_chat and ("correction" in category or "fix" in category):
+            if (
+                is_execution_chat
+                and (
+                    "correction" in category
+                    or "fix" in category
+                )
+            ):
                 score += 12.0
 
             if (
@@ -15896,19 +16019,14 @@ Next action:
             ):
                 score += 10.0
 
-            if is_execution_chat and ("project" in category or "nova" in content_lc):
+            if (
+                is_execution_chat
+                and (
+                    "project" in category
+                    or "nova" in content_lc
+                )
+            ):
                 score += 9.0
-
-            has_real_state = any([
-                working_state.get("active_task"),
-                working_state.get("current_file"),
-                working_state.get("current_bug"),
-                working_state.get("next_move"),
-                working_state.get("checkpoint"),
-                execution_state.get("steps"),
-                execution_state.get("current_step"),
-                execution_state.get("status") == "running",
-            ])
 
             if not has_real_state:
 
@@ -15931,6 +16049,7 @@ Next action:
                     score -= 100.0
 
             for term in priority_terms:
+
                 if term and term in content_lc:
                     score += 20.0
 
@@ -15966,7 +16085,10 @@ Next action:
                 "do not use",
             ]
 
-            if any(marker in content_lc for marker in stale_markers):
+            if any(
+                marker in content_lc
+                for marker in stale_markers
+            ):
                 score -= 20.0
 
             if updated_at or created_at:
@@ -15990,6 +16112,7 @@ Next action:
         )
 
         try:
+
             should_debug_memory_dominance = any(
                 (
                     isinstance(item, dict)
@@ -16007,13 +16130,15 @@ Next action:
             )
 
             if should_debug_memory_dominance:
+
                 print(
                     "[MEMORY DOMINANCE TOP]",
                     [
                         {
                             "score": item.get("score"),
                             "content": str(
-                                item.get("content") or ""
+                                item.get("content")
+                                or ""
                             )[:120],
                         }
                         for item in ranked[:5]
@@ -16021,47 +16146,18 @@ Next action:
                 )
 
         except Exception as e:
-            exec_debug("MEMORY_DOMINANCE_AUDIT_FAILED:", e)
+
+            exec_debug(
+                "MEMORY_DOMINANCE_AUDIT_FAILED:",
+                e,
+            )
 
         top = ranked[: max(1, int(limit or 12))]
 
-        return [item["memory"] for item in top]
-
-    def _format_memory_context(
-        self,
-        memory_items: list[dict],
-    ) -> str:
-
-        if not isinstance(memory_items, list) or not memory_items:
-            return ""
-
-        lines = []
-
-        for item in memory_items[: self.memory_limit]:
-            if not isinstance(item, dict):
-                continue
-
-            text = self._safe_str(
-                item.get("text")
-                or item.get("content")
-                or item.get("memory")
-                or item.get("summary")
-            )
-            kind = self._safe_str(
-                item.get("kind")
-                or item.get("category")
-                or item.get("type")
-            )
-
-            if not text:
-                continue
-
-            if kind:
-                lines.append(f"- [{kind}] {text}")
-            else:
-                lines.append(f"- {text}")
-
-        return "\n".join(lines).strip()
+        return [
+            item["memory"]
+            for item in top
+        ]
 
     def _memory_text_tokens(
         self,
@@ -16096,7 +16192,14 @@ Next action:
     def _format_memory_context(
         self,
         memory_items: list[dict],
+        user_text: str = "",
     ) -> str:
+
+        if hasattr(self, "runtime_cognitive_firewall"):
+            memory_items = self.runtime_cognitive_firewall.filter_for_runtime(
+                memory_items,
+                user_text=user_text,
+            )
 
         if not isinstance(memory_items, list) or not memory_items:
             return ""
@@ -16161,7 +16264,7 @@ Next action:
             return 9.0
 
         if k in {"style"}:
-            return 8.0   # Ã°Å¸â€Â¥ NEW Ã¢â‚¬â€ how you want responses
+            return 8.0   # ðŸ”¥ NEW â€” how you want responses
 
         if k in {"preference"}:
             return 7.0
@@ -16217,7 +16320,7 @@ Next action:
         item_session = self._safe_str(item.get("session_id"))
 
         if current_session and item_session and current_session == item_session:
-            return 0.75   # Ã¢â€ â€œ reduced from 1.5
+            return 0.75   # â†“ reduced from 1.5
 
         return 0.0
 
@@ -16328,7 +16431,7 @@ Next action:
             "image", "picture", "photo", "art", "scene", "visual"
         ]
 
-        # Ã°Å¸â€Â¥ detect intent: action + image concept
+        # ðŸ”¥ detect intent: action + image concept
         if any(k in text for k in keywords) and any(i in text for i in image_words):
             return True
 
@@ -16829,10 +16932,10 @@ def _save_artifact_fallback(self, artifact: dict):
                 assistant_text = self._extract_response_text(response)
 
             except Exception:
-                assistant_text = "I couldnÃ¢â‚¬â„¢t analyze that image."
+                assistant_text = "I couldnâ€™t analyze that image."
 
         else:
-            assistant_text = "I couldnÃ¢â‚¬â„¢t find an image attachment to analyze."
+            assistant_text = "I couldnâ€™t find an image attachment to analyze."
 
         return {
             "ok": True,
@@ -16864,7 +16967,7 @@ def _save_artifact_fallback(self, artifact: dict):
             return ""
 
         return (
-            "\n\nRESPONSE POLICY â€” HIGH PRIORITY:\n"
+            "\n\nRESPONSE POLICY — HIGH PRIORITY:\n"
             f"- Mode: {mode or 'normal'}\n"
             f"- Answer length: {answer_length or 'normal'}\n"
             f"- Tone: {tone or 'direct'}\n"
@@ -17160,7 +17263,10 @@ def _save_artifact_fallback(self, artifact: dict):
 
             add_memory_item(item)
 
-        memory_block = self._format_memory_context(selected_memory)
+        memory_block = self._format_memory_context(
+            selected_memory,
+            user_text=user_text,
+        )
 
         if not has_real_state:
 

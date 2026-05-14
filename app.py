@@ -73,7 +73,6 @@ web_service = WebService(timeout=WEB_TIMEOUT)
 recon_service = ReconService(timeout=RECON_TIMEOUT)
 intent_router = IntentRouterService()
 runtime_brain = SafeUnifiedRuntime()
-chat_service.runtime_brain = runtime_brain
 
 print(
     "RESTORED RUNTIME =",
@@ -101,8 +100,16 @@ chat_service = ChatService(
     recon_service=recon_service,
 )
 
+# =========================
+# RUNTIME BINDING
+# =========================
+
 chat_service.runtime = runtime_brain
 chat_service.safe_runtime = runtime_brain
+chat_service.runtime_brain = runtime_brain
+
+app.runtime_brain = runtime_brain
+app.config["runtime_brain"] = runtime_brain
 
 RuntimeBootstrap.save(
     runtime_brain
