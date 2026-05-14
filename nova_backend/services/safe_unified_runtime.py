@@ -229,6 +229,22 @@ from nova_backend.services.runtime_state_commit_service import (
     RuntimeStateCommitService,
 )
 
+from nova_backend.services.runtime_strategy_memory_service import (
+    RuntimeStrategyMemoryService,
+)
+
+from nova_backend.services.runtime_self_repair_planner_service import (
+    RuntimeSelfRepairPlannerService,
+)
+
+from nova_backend.services.runtime_rollback_intelligence_service import (
+    RuntimeRollbackIntelligenceService,
+)
+
+from nova_backend.services.runtime_mutation_safety_service import (
+    RuntimeMutationSafetyService,
+)
+
 class SafeUnifiedRuntime:
     def __init__(
         self,
@@ -492,6 +508,9 @@ class SafeUnifiedRuntime:
         self.runtime_state_normalizer = (
             RuntimeStateNormalizerService()
         )
+        self.runtime_strategy_memory = (
+            RuntimeStrategyMemoryService()
+        )
 
         if persisted_runtime:
 
@@ -516,6 +535,18 @@ class SafeUnifiedRuntime:
 
         self.runtime_priority_memory = (
             RuntimePriorityMemoryService()
+        )
+
+        self.runtime_self_repair_planner = (
+            RuntimeSelfRepairPlannerService()
+        )
+
+        self.runtime_rollback_intelligence = (
+            RuntimeRollbackIntelligenceService()
+        )
+
+        self.runtime_mutation_safety = (
+            RuntimeMutationSafetyService()
         )
 
     def debug_runtime_result(
@@ -672,6 +703,18 @@ class SafeUnifiedRuntime:
         knowledge_graph=None,
     ):
         execution_state = self._safe_dict(execution_state)
+        if hasattr(
+            self,
+            "runtime_persistence",
+        ) and hasattr(
+            self.runtime_persistence,
+            "hydrate_execution_state",
+        ):
+            execution_state = (
+                self.runtime_persistence.hydrate_execution_state(
+                    execution_state=execution_state,
+                )
+            )
         world_state = self._safe_dict(world_state)
         scheduler_state = self._safe_dict(scheduler_state)
         knowledge_graph = self._safe_dict(knowledge_graph)
@@ -824,13 +867,68 @@ class SafeUnifiedRuntime:
             or execution_state
         )
 
-        runtime_trend_analysis = self.runtime_trend_analysis.analyze()
-        runtime_adaptive_policy = self.runtime_policy_adaptation.adapt_policy()
+        runtime_trend_analysis = (
+            self.runtime_trend_analysis.analyze()
+        )
+
+        runtime_governance_memory = self._safe_dict(
+            execution_state.get(
+                "runtime_governance_memory"
+            )
+        )
+
+        runtime_adaptive_policy = (
+            self.runtime_policy_adaptation.adapt_policy(
+                governance_memory=(
+                    runtime_governance_memory
+                ),
+                execution_state=(
+                    execution_state
+                ),
+            )
+        )
 
         adaptive_policy = (
-            runtime_adaptive_policy.get("adaptive_policy")
-            if isinstance(runtime_adaptive_policy, dict)
+            runtime_adaptive_policy.get(
+                "adaptive_policy"
+            )
+            if isinstance(
+                runtime_adaptive_policy,
+                dict,
+            )
             else {}
+        )
+        runtime_summary_memory = (
+            execution_state.get(
+                "runtime_summary_memory",
+                [],
+            )
+        )
+
+        runtime_governance_memory = {
+            "summary_count": (
+                len(runtime_summary_memory)
+                if isinstance(runtime_summary_memory, list)
+                else 0
+            ),
+            "top_memory": (
+                runtime_summary_memory[:3]
+                if isinstance(runtime_summary_memory, list)
+                else []
+            ),
+            "has_high_importance_memory": (
+                any(
+                    isinstance(item, dict)
+                    and item.get("importance_score", 0) >= 10
+                    for item in runtime_summary_memory
+                )
+                if isinstance(runtime_summary_memory, list)
+                else False
+            ),
+        }
+
+        execution_state["runtime_governance_memory"] = (
+            runtime_governance_memory
         )
 
         runtime_governor = self.runtime_governor.arbitrate(
@@ -1131,9 +1229,8 @@ class SafeUnifiedRuntime:
                 "strategy": strategy_memory,
                 "meta_policy": meta_policy,
                 "final_action": final_action,
-                "runtime_signal": (
-                    runtime_signal
-                ),
+                "runtime_signal": runtime_signal,
+
                 "runtime_memory_event": (
                     runtime_memory_event
                 ),
@@ -1147,30 +1244,41 @@ class SafeUnifiedRuntime:
                         False,
                     )
                 ),
+
                 "runtime_policy_shift": (
                     execution_state.get(
                         "runtime_policy_shift"
                     )
                 ),
+
                 "runtime_policy_reason": (
                     execution_state.get(
                         "runtime_policy_reason"
                     )
                 ),
 
-                "runtime_governor": runtime_governor,
+                "runtime_governor": (
+                    runtime_governor
+                ),
+
                 "control": control,
-                "failure_type": failure_type,
+
+                "failure_type": (
+                    failure_type
+                ),
 
                 "runtime_identity": (
                     runtime_identity
                 ),
+
                 "runtime_goal": (
                     runtime_goal
                 ),
+
                 "runtime_plan": (
                     runtime_plan
                 ),
+
                 "runtime_world_model": (
                     runtime_world_model
                 ),
@@ -1215,6 +1323,24 @@ class SafeUnifiedRuntime:
             "policy": policy,
             "memory": policy_memory,
             "strategy": strategy_memory,
+            "runtime_strategy_scores": (
+                execution_state.get(
+                    "runtime_strategy_scores",
+                    {}
+                )
+            ),
+
+            "runtime_preferred_strategy": (
+                execution_state.get(
+                    "runtime_preferred_strategy"
+                )
+            ),
+
+            "runtime_suppressed_strategy": (
+                execution_state.get(
+                    "runtime_suppressed_strategy"
+                )
+            ),
             "meta_policy": meta_policy,
             "control": control,
             "failure_type": failure_type,
@@ -1745,6 +1871,34 @@ class SafeUnifiedRuntime:
                 ),
             )
         )
+
+        if isinstance(
+            result.get("runtime_drift_memory"),
+            dict,
+        ):
+
+            drift_history = (
+                result["runtime_drift_memory"].get(
+                    "history",
+                    [],
+                )
+            )
+
+            if isinstance(
+                drift_history,
+                list,
+            ):
+
+                result["runtime_drift_memory"]["history"] = (
+                    drift_history[-25:]
+                )
+
+                result["runtime_drift_memory"]["history_count"] = (
+                    len(
+                        result["runtime_drift_memory"]["history"]
+                    )
+                )
+
         result["runtime_auto_recovery"] = (
             self.runtime_auto_recovery.recover(
                 runtime_result=result,
@@ -1797,6 +1951,73 @@ class SafeUnifiedRuntime:
                 execution_state=execution_state,
             )
         )
+
+        if isinstance(
+            memory_compression_report,
+            dict,
+        ):
+
+            compressed_execution_state = (
+                memory_compression_report.get(
+                    "execution_state"
+                )
+            )
+
+            if isinstance(
+                compressed_execution_state,
+                dict,
+            ):
+                execution_state.update(
+                    compressed_execution_state
+                )
+
+            execution_state[
+                "runtime_summary_memory"
+            ] = (
+                compressed_execution_state.get(
+                    "runtime_summary_memory",
+                    [],
+                )
+                if isinstance(
+                    compressed_execution_state,
+                    dict,
+                )
+                else []
+            )
+
+            execution_state[
+                "risk_memory_state"
+            ] = (
+                compressed_execution_state.get(
+                    "risk_memory_state",
+                    {},
+                )
+                if isinstance(
+                    compressed_execution_state,
+                    dict,
+                )
+                else {}
+            )
+
+            execution_state[
+                "persistent_risk_score"
+            ] = int(
+                execution_state.get(
+                    "persistent_risk_score",
+                    0,
+                )
+                or 0
+            )
+
+            execution_state[
+                "persistent_recovery_pressure"
+            ] = int(
+                execution_state.get(
+                    "persistent_recovery_pressure",
+                    0,
+                )
+                or 0
+            )
 
         execution_state = (
             memory_compression_report.get(
@@ -1893,6 +2114,156 @@ class SafeUnifiedRuntime:
                 "runtime_signal"
             ),
         )
+
+
+        print(
+            "RUNTIME SIGNAL DEBUG =",
+            execution_state.get(
+                "runtime_signal"
+            ),
+        )
+
+        print(
+            "RUNTIME SIGNAL DEBUG =",
+            execution_state.get(
+                "runtime_signal"
+            ),
+        )
+
+        if hasattr(
+            self,
+            "runtime_mutation_safety",
+        ):
+            runtime_mutation_safety = (
+                self.runtime_mutation_safety.evaluate_mutation(
+                    execution_state=execution_state,
+                    proposed_mutation={
+                        "mutation_type": (
+                            execution_state.get(
+                                "runtime_mutation_type",
+                                "autonomous_mutation",
+                            )
+                        ),
+                    },
+                )
+            )
+
+            execution_state = (
+                runtime_mutation_safety.get(
+                    "execution_state",
+                    execution_state,
+                )
+                if isinstance(runtime_mutation_safety, dict)
+                else execution_state
+            )
+
+            result[
+                "runtime_mutation_safety"
+            ] = runtime_mutation_safety
+
+        if hasattr(
+            self,
+            "runtime_rollback_intelligence",
+        ):
+            runtime_rollback_intelligence = (
+                self.runtime_rollback_intelligence.evaluate(
+                    execution_state=execution_state,
+                )
+            )
+
+            execution_state = (
+                runtime_rollback_intelligence.get(
+                    "execution_state",
+                    execution_state,
+                )
+                if isinstance(
+                    runtime_rollback_intelligence,
+                    dict,
+                )
+                else execution_state
+            )
+
+            result[
+                "runtime_rollback_intelligence"
+            ] = runtime_rollback_intelligence
+
+        if hasattr(
+            self,
+            "runtime_self_repair_planner",
+        ):
+
+            runtime_self_repair_plan = (
+                self.runtime_self_repair_planner.build_repair_plan(
+                    execution_state=execution_state,
+                )
+            )
+
+            execution_state = (
+                runtime_self_repair_plan.get(
+                    "execution_state",
+                    execution_state,
+                )
+            )
+
+            result[
+                "runtime_self_repair_plan"
+            ] = runtime_self_repair_plan
+
+        if hasattr(
+            self,
+            "runtime_strategy_memory",
+        ):
+            strategy_reinforcement = (
+                self.runtime_strategy_memory.remember(
+                    execution_state=execution_state,
+                    final_action=final_action,
+                    runtime_signal=execution_state.get(
+                        "runtime_signal"
+                    ),
+                )
+            )
+
+        if hasattr(
+            self,
+            "runtime_strategy_memory",
+        ):
+            strategy_reinforcement = (
+                self.runtime_strategy_memory.remember(
+                    execution_state=execution_state,
+                    final_action=final_action,
+                    runtime_signal=execution_state.get(
+                        "runtime_signal"
+                    ),
+                )
+            )
+
+            execution_state = (
+                strategy_reinforcement.get(
+                    "execution_state",
+                    execution_state,
+                )
+            )
+
+            result[
+                "runtime_strategy_reinforcement"
+            ] = strategy_reinforcement
+
+        if hasattr(
+            self,
+            "runtime_persistence",
+
+        ) and hasattr(
+            self.runtime_persistence,
+            "save",
+        ):
+            result[
+                "runtime_persistence"
+            ] = self.runtime_persistence.save(
+                runtime_result={
+                    **result,
+                    "execution_state": execution_state,
+                }
+            )
 
         return result
 
