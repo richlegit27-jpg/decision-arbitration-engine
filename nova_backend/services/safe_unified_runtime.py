@@ -2115,21 +2115,6 @@ class SafeUnifiedRuntime:
             ),
         )
 
-
-        print(
-            "RUNTIME SIGNAL DEBUG =",
-            execution_state.get(
-                "runtime_signal"
-            ),
-        )
-
-        print(
-            "RUNTIME SIGNAL DEBUG =",
-            execution_state.get(
-                "runtime_signal"
-            ),
-        )
-
         if hasattr(
             self,
             "runtime_mutation_safety",
