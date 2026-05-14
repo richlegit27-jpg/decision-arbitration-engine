@@ -172,6 +172,26 @@ from nova_backend.services.runtime_operating_loop import (
 from nova_backend.services.runtime_execution_router import (
     RuntimeExecutionRouter,
 )
+
+from nova_backend.services.runtime_execution_mutation_service import (
+    RuntimeExecutionMutationService,
+)
+
+from nova_backend.services.runtime_execution_queue_service import (
+    RuntimeExecutionQueueService,
+)
+
+from nova_backend.services.runtime_autonomous_executor import (
+    RuntimeAutonomousExecutor,
+)
+
+from nova_backend.services.runtime_autonomous_memory_service import (
+    RuntimeAutonomousMemoryService,
+)
+
+from nova_backend.services.runtime_policy_learning_service import (
+    RuntimePolicyLearningService,
+)
     
 class SafeUnifiedRuntime:
     def __init__(
@@ -191,6 +211,18 @@ class SafeUnifiedRuntime:
         self.last_decision = {}
         self.runtime_history = []
         self.last_compressed_runtime = {}
+
+        self.runtime_autonomous_executor = (
+            RuntimeAutonomousExecutor()
+        )
+
+        self.runtime_autonomous_memory = (
+            RuntimeAutonomousMemoryService()
+        )
+
+        self.runtime_policy_learning = (
+            RuntimePolicyLearningService()
+        )
 
         self.observability = (
             observability
@@ -385,6 +417,18 @@ class SafeUnifiedRuntime:
             RuntimeExecutionRouter()
         )
 
+        self.runtime_execution_mutation = (
+            RuntimeExecutionMutationService()
+        )
+
+        self.runtime_execution_queue = (
+            RuntimeExecutionQueueService()
+        )
+
+        self.runtime_autonomous_executor = (
+            RuntimeAutonomousExecutor()
+        )
+
         if persisted_runtime:
 
             self.last_compressed_runtime = (
@@ -397,6 +441,7 @@ class SafeUnifiedRuntime:
             self.restored_runtime_state = (
                 persisted_runtime
             )
+
 
         else:
 
@@ -590,6 +635,65 @@ class SafeUnifiedRuntime:
         )
 
         reflection = self._reflect(execution_summary)
+
+        runtime_policy_learning = (
+            self.runtime_policy_learning.evolve_policy(
+                runtime_autonomous_memory=execution_state.get(
+                    "runtime_autonomous_memory",
+                    [],
+                )
+            )
+        )
+
+        runtime_execution_queue = (
+            self.runtime_execution_queue.build_autonomous_queue(
+                execution_state=execution_state,
+                runtime_governor={},
+                reflection=reflection,
+                runtime_policy_learning=runtime_policy_learning,
+            )
+        )
+
+        runtime_autonomous_execution = (
+            self.runtime_autonomous_executor.execute(
+                execution_state=execution_state,
+                runtime_execution_queue=runtime_execution_queue,
+            )
+        )
+
+        execution_state = (
+            runtime_autonomous_execution.get(
+                "execution_state",
+                execution_state,
+            )
+        )
+
+        execution_state["cycle_count"] = (
+            self.cycle_count
+        )
+
+        runtime_autonomous_memory = (
+            self.runtime_autonomous_memory.remember(
+                execution_state=execution_state,
+                runtime_autonomous_execution=runtime_autonomous_execution,
+            )
+        )
+
+        runtime_policy_learning = (
+            self.runtime_policy_learning.evolve_policy(
+                runtime_autonomous_memory=runtime_autonomous_memory.get(
+                    "runtime_autonomous_memory",
+                    [],
+                )
+            )
+        )
+
+        execution_state = (
+            runtime_autonomous_memory.get(
+                "execution_state",
+                execution_state,
+            )
+        )
 
         decision = {
             "action": reflection.get("next_action"),
@@ -1357,6 +1461,68 @@ class SafeUnifiedRuntime:
         result["runtime_execution_router"] = (
             runtime_execution_route
         )
+
+        runtime_execution_mutation = (
+            self.runtime_execution_mutation.mutate(
+                execution_state=execution_state,
+                runtime_execution_router=(
+                    runtime_execution_route
+                ),
+                bridge_state={
+                    "bridge_action": (
+                        "runtime_directed_execution"
+                        if runtime_execution_route.get(
+                            "execute_now"
+                        )
+                        else "observe_only"
+                    ),
+                    "execution_action": (
+                        "runtime_execute_now"
+                        if runtime_execution_route.get(
+                            "execute_now"
+                        )
+                        else ""
+                    ),
+                },
+            )
+        )
+
+        execution_state = (
+            runtime_execution_mutation.get(
+                "execution_state",
+                execution_state,
+            )
+        )
+        runtime_autonomous_execution = (
+            self.runtime_autonomous_executor.execute(
+                execution_state=execution_state,
+                runtime_execution_queue=runtime_execution_queue,
+            )
+        )
+
+        execution_state = (
+            runtime_autonomous_execution.get(
+                "execution_state",
+                execution_state,
+            )
+        )
+
+        result["runtime_execution_queue"] = (
+            runtime_execution_queue
+        )
+
+        result["runtime_autonomous_execution"] = (
+            runtime_autonomous_execution
+        )
+
+        result["runtime_autonomous_memory"] = (
+            runtime_autonomous_memory
+        )
+
+        result["runtime_policy_learning"] = (
+            runtime_policy_learning
+        )
+
         result["runtime_operating_loop"] = (
             operating_report
         )
