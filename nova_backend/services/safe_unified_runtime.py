@@ -192,7 +192,31 @@ from nova_backend.services.runtime_autonomous_memory_service import (
 from nova_backend.services.runtime_policy_learning_service import (
     RuntimePolicyLearningService,
 )
-    
+
+from nova_backend.services.runtime_consensus_service import (
+    RuntimeConsensusService,
+)
+
+from nova_backend.services.runtime_restriction_service import (
+    RuntimeRestrictionService,
+)
+
+from nova_backend.services.runtime_memory_compression_service import (
+    RuntimeMemoryCompressionService,
+)
+
+from nova_backend.services.runtime_priority_memory_service import (
+    RuntimePriorityMemoryService,
+)
+   
+from nova_backend.services.runtime_constitution_service import (
+    RuntimeConstitutionService,
+)
+
+from nova_backend.services.runtime_escalation_service import (
+    RuntimeEscalationService,
+)
+
 class SafeUnifiedRuntime:
     def __init__(
         self,
@@ -255,6 +279,10 @@ class SafeUnifiedRuntime:
 
         self.runtime_compressor = (
             RuntimeCompressionService()
+        )
+
+        self.runtime_memory_compression = (
+            RuntimeMemoryCompressionService()
         )
 
         self.runtime_graph_memory = (
@@ -429,6 +457,22 @@ class SafeUnifiedRuntime:
             RuntimeAutonomousExecutor()
         )
 
+        self.runtime_consensus = (
+            RuntimeConsensusService()
+        )
+
+        self.runtime_constitution = (
+            RuntimeConstitutionService()
+        )
+
+        self.runtime_escalation = (
+            RuntimeEscalationService()
+        )
+
+        self.runtime_restrictions = (
+            RuntimeRestrictionService()
+        )
+
         if persisted_runtime:
 
             self.last_compressed_runtime = (
@@ -442,15 +486,19 @@ class SafeUnifiedRuntime:
                 persisted_runtime
             )
 
-
         else:
 
             self.restored_runtime_state = {}
+
+        self.runtime_priority_memory = (
+            RuntimePriorityMemoryService()
+        )
 
     def debug_runtime_result(
         self,
         runtime_result=None,
     ):
+
         return self.debugger.inspect_runtime_result(
             runtime_result or {},
         )
@@ -1567,6 +1615,42 @@ class SafeUnifiedRuntime:
             rollback_report
         )
 
+
+
+        consensus_report = (
+            self.runtime_consensus.resolve(
+                execution_state=execution_state,
+                runtime_result=result,
+                integrity_report=integrity_report,
+                rollback_report=rollback_report,
+                prediction_report=prediction_report,
+                runtime_governor=runtime_governor,
+                autonomy_report=autonomy_report,
+                mutation_report=mutation_report,
+            )
+        )
+
+        execution_state = (
+            consensus_report.get(
+                "execution_state",
+                execution_state,
+            )
+        )
+
+        result["runtime_consensus"] = (
+            consensus_report
+        )
+
+        if consensus_report.get(
+            "blocked"
+        ) and consensus_report.get(
+            "action"
+        ) == "block_and_recover":
+
+            execution_state[
+                "recovery_mode"
+            ] = True
+
         if rollback_report.get(
             "should_rollback"
         ):
@@ -1649,11 +1733,88 @@ class SafeUnifiedRuntime:
                 result
             )
         )
+
+        priority_memory_report = (
+            self.runtime_priority_memory.prioritize(
+                execution_state=execution_state,
+            )
+        )
+
+        execution_state = (
+            priority_memory_report.get(
+                "execution_state",
+                execution_state,
+            )
+        )
+
+        result["runtime_priority_memory"] = (
+            priority_memory_report
+        )
+
+        memory_compression_report = (
+            self.runtime_memory_compression.compress(
+                execution_state=execution_state,
+            )
+        )
+
+        execution_state = (
+            memory_compression_report.get(
+                "execution_state",
+                execution_state,
+            )
+        )
+
+        result["runtime_memory_compression"] = (
+            memory_compression_report
+        )
+
         result["runtime_persistence"] = (
             self.runtime_persistence.save(
                 result
             )
         )
+
+        escalation_report = (
+            self.runtime_escalation.evaluate(
+                execution_state=execution_state,
+                runtime_history=self.runtime_history,
+                prediction_report=prediction_report,
+                integrity_report=integrity_report,
+            )
+        )
+
+        execution_state = (
+            escalation_report.get(
+                "execution_state",
+                execution_state,
+            )
+        )
+
+        result["runtime_escalation"] = (
+            escalation_report
+        )
+
+        constitution_report = (
+            self.runtime_constitution.evaluate(
+                execution_state=execution_state,
+                integrity_report=integrity_report,
+                rollback_report=rollback_report,
+                escalation_report=escalation_report,
+                consensus_report=consensus_report,
+            )
+        )
+
+        execution_state = (
+            constitution_report.get(
+                "execution_state",
+                execution_state,
+            )
+        )
+
+        result["runtime_constitution"] = (
+            constitution_report
+        )
+
         print(
             "RUNTIME SIGNAL DEBUG =",
             execution_state.get(
