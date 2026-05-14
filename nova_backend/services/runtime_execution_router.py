@@ -78,14 +78,28 @@ class RuntimeExecutionRouter:
             )
         ).lower()
 
-        if runtime_signal in {
+        autonomous_execution_signals = {
+            "runtime_requested_failure_inspection",
+            "runtime_anomaly_detected",
+            "runtime_escalation_required",
+        }
+
+        recovery_execution_signals = {
             "runtime_integrity_block",
             "runtime_rollback_executed",
             "runtime_escalation_required",
-        }:
+        }
+
+        if runtime_signal in recovery_execution_signals:
 
             route = "recovery_execution"
             priority = "critical"
+            execute_now = True
+
+        elif runtime_signal in autonomous_execution_signals:
+
+            route = "autonomous_execution"
+            priority = "high"
             execute_now = True
 
         elif (

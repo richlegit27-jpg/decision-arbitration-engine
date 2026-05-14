@@ -873,6 +873,60 @@ def api_runtime_bridge():
             else {}
         )
 
+        runtime = getattr(
+            chat_service,
+            "runtime",
+            None,
+        )
+
+        if runtime is None:
+            runtime = getattr(
+                chat_service,
+                "safe_runtime",
+                None,
+            )
+
+        if runtime is None:
+            runtime = runtime_brain
+
+        compressed = getattr(
+            runtime,
+            "last_compressed_runtime",
+            {},
+        )
+
+        if not isinstance(compressed, dict):
+            compressed = {}
+
+        router = compressed.get(
+            "runtime_execution_router",
+            {},
+        )
+
+        if not isinstance(router, dict):
+            router = {}
+
+        router_execute_now = bool(
+            router.get(
+                "execute_now",
+                False,
+            )
+        )
+
+        router_route = str(
+            router.get(
+                "route",
+                "observe_only",
+            )
+        ).strip()
+
+        router_priority = str(
+            router.get(
+                "priority",
+                "low",
+            )
+        ).strip()
+
         recommended_action = str(
             decision.get("recommended_action") or "observe"
         ).strip()
@@ -896,6 +950,20 @@ def api_runtime_bridge():
             bridge_action = "observe_only"
             execution_action = ""
 
+        if router_execute_now and router_route in {
+            "normal_autonomous_execution",
+            "guarded_recovery_execution",
+            "recovery_execution",
+        }:
+
+            bridge_action = (
+                "runtime_directed_execution"
+            )
+
+            execution_action = (
+                "runtime_execute_now"
+            )
+
         payload = request.get_json(
             silent=True
         ) or {}
@@ -908,11 +976,14 @@ def api_runtime_bridge():
 
         auto_execute = (
             allow_auto_execute
-            and bridge_action
-            == "suggest_execution"
+            and bridge_action in {
+                "suggest_execution",
+                "runtime_directed_execution",
+            }
             and execution_action in {
                 "retry_failed",
                 "pause",
+                "runtime_execute_now",
             }
         )
 
@@ -931,6 +1002,18 @@ def api_runtime_bridge():
                     ),
                     "auto_execute": (
                         auto_execute
+                    ),
+                    "router_execute_now": (
+                        router_execute_now
+                    ),
+                    "router_route": (
+                        router_route
+                    ),
+                    "router_priority": (
+                        router_priority
+                    ),
+                    "runtime_execution_router": (
+                        router
                     ),
                     "reason": (
                         decision.get("reason")

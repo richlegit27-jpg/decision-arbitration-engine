@@ -217,6 +217,18 @@ from nova_backend.services.runtime_escalation_service import (
     RuntimeEscalationService,
 )
 
+from nova_backend.services.runtime_authority_service import (
+    RuntimeAuthorityService,
+)
+
+from nova_backend.services.runtime_state_normalizer_service import (
+    RuntimeStateNormalizerService,
+)
+
+from nova_backend.services.runtime_state_commit_service import (
+    RuntimeStateCommitService,
+)
+
 class SafeUnifiedRuntime:
     def __init__(
         self,
@@ -465,12 +477,20 @@ class SafeUnifiedRuntime:
             RuntimeConstitutionService()
         )
 
+        self.runtime_authority = (
+            RuntimeAuthorityService()
+        )
+
         self.runtime_escalation = (
             RuntimeEscalationService()
         )
 
         self.runtime_restrictions = (
             RuntimeRestrictionService()
+        )
+
+        self.runtime_state_normalizer = (
+            RuntimeStateNormalizerService()
         )
 
         if persisted_runtime:
@@ -489,6 +509,10 @@ class SafeUnifiedRuntime:
         else:
 
             self.restored_runtime_state = {}
+
+        self.runtime_state_commit = (
+            RuntimeStateCommitService()
+        )
 
         self.runtime_priority_memory = (
             RuntimePriorityMemoryService()
@@ -1734,6 +1758,23 @@ class SafeUnifiedRuntime:
             )
         )
 
+        state_normalizer_report = (
+            self.runtime_state_normalizer.normalize(
+                execution_state=execution_state,
+            )
+        )
+
+        execution_state = (
+            state_normalizer_report.get(
+                "execution_state",
+                execution_state,
+            )
+        )
+
+        result["runtime_state_normalizer"] = (
+            state_normalizer_report
+        )
+
         priority_memory_report = (
             self.runtime_priority_memory.prioritize(
                 execution_state=execution_state,
@@ -1809,6 +1850,37 @@ class SafeUnifiedRuntime:
                 "execution_state",
                 execution_state,
             )
+        )
+
+        authority_report = (
+            self.runtime_authority.resolve(
+                execution_state=execution_state,
+                current_action=final_action,
+                current_signal=execution_state.get(
+                    "runtime_signal"
+                ),
+                constitution_report=constitution_report,
+                escalation_report=escalation_report,
+                integrity_report=integrity_report,
+            )
+        )
+
+        execution_state = (
+            authority_report.get(
+                "execution_state",
+                execution_state,
+            )
+        )
+
+        final_action = (
+            authority_report.get(
+                "final_action",
+                final_action,
+            )
+        )
+
+        result["runtime_authority"] = (
+            authority_report
         )
 
         result["runtime_constitution"] = (

@@ -2,17 +2,6 @@
   "memory": [
     {
       "text": "my name is richard",
-      "kind": "note",
-      "source": "chat-auto",
-      "session_id": "",
-      "weight": 1.0,
-      "id": "memory_c77be2b2e51a4d7ca4ed5e7746f201e6",
-      "updated_at": "2026-04-27T22:02:53.407909+00:00",
-      "created_at": "2026-04-27T22:02:53.407909+00:00",
-      "count": 1
-    },
-    {
-      "text": "my name is richard",
       "kind": "profile",
       "source": "auto",
       "session_id": "session_a39b711a890143dda1f0c0bf7290b8d8",

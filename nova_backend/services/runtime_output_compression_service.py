@@ -39,24 +39,52 @@ class RuntimeOutputCompressionService:
             "ok": result.get("ok", True),
             "cycle_count": result.get("cycle_count"),
             "final_action": result.get("final_action"),
+
             "runtime_route": (
                 result.get("runtime_route")
                 or mutated.get("runtime_route")
             ),
+
             "runtime_signal": (
                 result.get("runtime_signal")
                 or mutated.get("runtime_signal")
             ),
+
             "healing_mode": (
                 result.get("healing_mode")
                 or mutated.get("healing_mode")
             ),
-            "runtime_health": trend.get("runtime_health"),
-            "stability_ratio": trend.get("stability_ratio"),
-            "runtime_world_prediction": world_model.get("prediction"),
+
+            "runtime_health": (
+                trend.get("runtime_health")
+            ),
+
+            "stability_ratio": (
+                trend.get("stability_ratio")
+            ),
+
+            "runtime_world_prediction": (
+                world_model.get("prediction")
+            ),
+
             "runtime_execution_router": (
                 result.get(
                     "runtime_execution_router",
                     {},
                 )
-            ),        }
+            ),
+
+            "runtime_execution_queue": (
+                result.get(
+                    "runtime_execution_queue",
+                    {},
+                )
+            ),
+
+            "runtime_autonomous_execution": (
+                result.get(
+                    "runtime_autonomous_execution",
+                    {},
+                )
+            ),
+        }
