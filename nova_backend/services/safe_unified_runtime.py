@@ -1,4 +1,4 @@
-from nova_backend.services.governor_service import GovernorService
+﻿from nova_backend.services.governor_service import GovernorService
 from nova_backend.services.runtime_output_compression_service import RuntimeOutputCompressionService
 from nova_backend.services.runtime_graph_memory_service import RuntimeGraphMemoryService
 from nova_backend.services.graph_runtime_service import (
@@ -167,6 +167,10 @@ from nova_backend.services.runtime_collective_intelligence import (
 
 from nova_backend.services.runtime_operating_loop import (
     RuntimeOperatingLoop,
+)
+
+from nova_backend.services.runtime_execution_router import (
+    RuntimeExecutionRouter,
 )
     
 class SafeUnifiedRuntime:
@@ -375,6 +379,10 @@ class SafeUnifiedRuntime:
 
         self.runtime_operating_loop = (
             RuntimeOperatingLoop()
+        )
+
+        self.runtime_execution_router = (
+            RuntimeExecutionRouter()
         )
 
         if persisted_runtime:
@@ -1332,6 +1340,23 @@ class SafeUnifiedRuntime:
             )
         )
 
+        runtime_execution_route = (
+            self.runtime_execution_router.route(
+                scheduler_report=scheduler_report,
+                autonomy_report=autonomy_report,
+                supervision_report=supervision_report,
+                operating_report=operating_report,
+                runtime_signal=(
+                    execution_state.get(
+                        "runtime_signal"
+                    )
+                ),
+            )
+        )
+
+        result["runtime_execution_router"] = (
+            runtime_execution_route
+        )
         result["runtime_operating_loop"] = (
             operating_report
         )
