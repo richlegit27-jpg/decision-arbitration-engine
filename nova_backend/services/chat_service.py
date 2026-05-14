@@ -5020,8 +5020,7 @@ if __name__ == "__main__":
                         "runtime",
                         None,
                     )
-
-                    replay_id = text.replace(
+                    replay_id = runtime_command.replace(
                         "/runtime replay explain",
                         "",
                         1,
@@ -5526,14 +5525,26 @@ if __name__ == "__main__":
                 )
             ).strip()
 
-            if (
+            protected_memory_answers = {
+                "richard",
+                "richard.",
+                "your name is richard.",
+            }
+
+            current_text_lc = (
+                assistant_text.lower().strip()
+            )
+
+            rewritten_text_lc = (
+                rewritten_text.lower().strip()
+            )
+
+            if current_text_lc in protected_memory_answers:
+                pass
+
+            elif (
                 rewritten_text
                 and len(rewritten_text.split()) >= 3
-                and rewritten_text.lower() not in {
-                    "richard",
-                    "richard.",
-                    "your name is richard.",
-                }
             ):
                 assistant_text = rewritten_text
 
@@ -16917,12 +16928,40 @@ def _save_artifact_fallback(self, artifact: dict):
                     "mission",
                 }
 
+                identity_keywords = {
+                    "name",
+                    "identity",
+                    "profile",
+                    "user",
+                }
+
+                if (
+                    category in identity_keywords
+                    or kind in identity_keywords
+                ):
+                    add_memory_item(item)
+                    continue
+
+                identity_keywords = {
+                    "name",
+                    "identity",
+                    "profile",
+                    "user",
+                    "preference",
+                }
+
+                if (
+                    category in identity_keywords
+                    or kind in identity_keywords
+                ):
+                    cleaned_memory.append(item)
+                    continue
+
                 if (
                     category in blocked_categories
                     or kind in blocked_kinds
                 ):
                     continue
-
             add_memory_item(item)
 
         # =========================
@@ -16946,6 +16985,14 @@ def _save_artifact_fallback(self, artifact: dict):
                 "task",
                 "mission",
             }:
+                continue
+
+            if not has_real_state and kind in {
+                "profile",
+                "identity",
+                "preference",
+            }:
+                add_memory_item(item)
                 continue
 
             if kind in [

@@ -1160,8 +1160,10 @@ def api_chat():
         )
 
         try:
-            if hasattr(runtime_service, "run_cycle"):
-                runtime_service.run_cycle(
+
+            if hasattr(runtime_brain, "run_cycle"):
+
+                runtime_brain.run_cycle(
                     execution_state={
                         "source": "api_chat",
                         "user_text": user_text,
@@ -1172,6 +1174,7 @@ def api_chat():
                         "event": "chat_completed",
                     },
                 )
+
         except Exception as runtime_error:
             print(
                 "RUNTIME CHAT CYCLE ERROR:",
