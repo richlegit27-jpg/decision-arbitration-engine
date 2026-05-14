@@ -1715,9 +1715,20 @@ state.messages = dedupeMessages(mergedMessages)
       state.execution || {};
   }
 
-  renderSessionList();
-  renderSessionList();
-  renderChat();
+    window.dispatchEvent(
+      new CustomEvent(
+        "nova:runtime:update",
+        {
+          detail: {
+            runtime_health: "active",
+            runtime_route: "chat_activity",
+            runtime_signal: "chat_payload_received"
+          }
+        }
+      )
+    );
+
+  renderSessionList();  renderChat();
   renderArtifacts();
   renderMemory();
   renderExecution();
@@ -5305,11 +5316,6 @@ function bindEvents() {
     }
 
 const data = await response.json();
-
-console.log(
-    "[NOVA RUNTIME PAYLOAD]",
-    data.runtime
-);
 
 if (data.runtime && typeof data.runtime === "object") {
     window.NovaLastRuntime = data.runtime;
