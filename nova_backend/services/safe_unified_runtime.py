@@ -148,6 +148,26 @@ from nova_backend.services.runtime_plan_executor import (
 from nova_backend.services.runtime_scheduler_engine import (
     RuntimeSchedulerEngine,
 )
+
+from nova_backend.services.runtime_autonomy_loop import (
+    RuntimeAutonomyLoop,
+)
+
+from nova_backend.services.runtime_autonomy_supervisor import (
+    RuntimeAutonomySupervisor,
+)
+
+from nova_backend.services.runtime_multi_agent_mesh import (
+    RuntimeMultiAgentMesh,
+)
+
+from nova_backend.services.runtime_collective_intelligence import (
+    RuntimeCollectiveIntelligence,
+)
+
+from nova_backend.services.runtime_operating_loop import (
+    RuntimeOperatingLoop,
+)
     
 class SafeUnifiedRuntime:
     def __init__(
@@ -333,8 +353,28 @@ class SafeUnifiedRuntime:
             RuntimeSchedulerEngine()
         )
 
+        self.runtime_autonomy_loop = (
+            RuntimeAutonomyLoop()
+        )
+
+        self.runtime_autonomy_supervisor = (
+            RuntimeAutonomySupervisor()
+        )
+
         persisted_runtime = (
             self.runtime_persistence.load()
+        )
+
+        self.runtime_multi_agent_mesh = (
+            RuntimeMultiAgentMesh()
+        )
+
+        self.runtime_collective_intelligence = (
+            RuntimeCollectiveIntelligence()
+        )
+
+        self.runtime_operating_loop = (
+            RuntimeOperatingLoop()
         )
 
         if persisted_runtime:
@@ -1225,6 +1265,91 @@ class SafeUnifiedRuntime:
                     )
                 ),
             )
+        )
+
+        autonomy_report = (
+            self.runtime_autonomy_loop.run(
+                scheduler_report=(
+                    scheduler_report
+                ),
+                runtime_signal=(
+                    execution_state.get(
+                        "runtime_signal"
+                    )
+                ),
+            )
+        )
+
+        supervision_report = (
+            self.runtime_autonomy_supervisor.supervise(
+                autonomy_report=(
+                    autonomy_report
+                ),
+                runtime_signal=(
+                    execution_state.get(
+                        "runtime_signal"
+                    )
+                ),
+            )
+        )
+
+        mesh_report = (
+            self.runtime_multi_agent_mesh.coordinate(
+                supervision_report=(
+                    supervision_report
+                ),
+                runtime_signal=(
+                    execution_state.get(
+                        "runtime_signal"
+                    )
+                ),
+            )
+        )
+
+        collective_report = (
+            self.runtime_collective_intelligence.synthesize(
+                mesh_report=(
+                    mesh_report
+                ),
+                runtime_signal=(
+                    execution_state.get(
+                        "runtime_signal"
+                    )
+                ),
+            )
+        )
+
+        operating_report = (
+            self.runtime_operating_loop.cycle(
+                collective_report=(
+                    collective_report
+                ),
+                runtime_signal=(
+                    execution_state.get(
+                        "runtime_signal"
+                    )
+                ),
+            )
+        )
+
+        result["runtime_operating_loop"] = (
+            operating_report
+        )
+
+        result["runtime_collective_intelligence"] = (
+            collective_report
+        )
+
+        result["runtime_multi_agent_mesh"] = (
+            mesh_report
+        )
+
+        result["runtime_autonomy_supervision"] = (
+            supervision_report
+        )
+
+        result["runtime_autonomy_loop"] = (
+            autonomy_report
         )
 
         result["runtime_scheduler"] = (
