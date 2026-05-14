@@ -2209,19 +2209,6 @@ class SafeUnifiedRuntime:
                 "runtime_self_repair_plan"
             ] = runtime_self_repair_plan
 
-        if hasattr(
-            self,
-            "runtime_strategy_memory",
-        ):
-            strategy_reinforcement = (
-                self.runtime_strategy_memory.remember(
-                    execution_state=execution_state,
-                    final_action=final_action,
-                    runtime_signal=execution_state.get(
-                        "runtime_signal"
-                    ),
-                )
-            )
 
         if hasattr(
             self,
