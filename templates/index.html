@@ -602,9 +602,16 @@
         };
     }
 
-    window.addEventListener("nova:runtime:update", function (event) {
-        updateRuntimePanel(event.detail || {});
-    });
+window.addEventListener("nova:runtime:update", function () {
+    fetch("/api/runtime/summary")
+        .then(function (response) {
+            return response.json();
+        })
+        .then(function (payload) {
+            updateRuntimePanel(payload.runtime || {});
+        })
+        .catch(function () {});
+});
 
     fetch("/api/runtime/summary")
         .then(function (response) {

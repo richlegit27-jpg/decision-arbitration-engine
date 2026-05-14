@@ -552,6 +552,17 @@ class SafeUnifiedRuntime:
             meta_policy=meta_policy,
         )
 
+        if not execution_state.get(
+            "runtime_signal"
+        ):
+
+            execution_state[
+                "runtime_signal"
+            ] = (
+                reflection.get("signal")
+                or "runtime_idle"
+            )
+
         after_graph = (
             execution_state.get("graph", {}).copy()
             if isinstance(execution_state.get("graph"), dict)
@@ -590,6 +601,20 @@ class SafeUnifiedRuntime:
             },
         )
 
+        runtime_signal = (
+            execution_state.get(
+                "runtime_signal"
+            )
+        )
+
+        runtime_signal = (
+            execution_state.get(
+                "runtime_signal"
+            )
+            or reflection.get("signal")
+            or "runtime_idle"
+        )
+
         self.runtime_history.append(
             {
                 "cycle": self.cycle_count,
@@ -601,10 +626,14 @@ class SafeUnifiedRuntime:
                 "memory": policy_memory,
                 "strategy": strategy_memory,
                 "meta_policy": meta_policy,
+                "final_action": final_action,
+                "runtime_signal": (
+                    runtime_signal
+                ),
+                "runtime_governor": runtime_governor,
                 "control": control,
                 "failure_type": failure_type,
-                "final_action": final_action,
-                "runtime_governor": runtime_governor,
+
                 "runtime_identity": (
                     runtime_identity
                 ),
@@ -789,6 +818,12 @@ class SafeUnifiedRuntime:
             self.runtime_persistence.save(
                 result
             )
+        )
+        print(
+            "RUNTIME SIGNAL DEBUG =",
+            execution_state.get(
+                "runtime_signal"
+            ),
         )
 
         return result

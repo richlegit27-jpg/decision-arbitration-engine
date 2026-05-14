@@ -711,8 +711,6 @@ def api_runtime_history():
                     or {}
                 )
 
-            control = item.get("control") or {}
-
             compressed_history.append(
                 {
                     "cycle": item.get("cycle"),
@@ -722,10 +720,8 @@ def api_runtime_history():
                     "failure_type": item.get(
                         "failure_type"
                     ),
-                    "runtime_signal": (
-                        control.get("runtime_signal")
-                        if isinstance(control, dict)
-                        else ""
+                    "runtime_signal": item.get(
+                        "runtime_signal"
                     ),
                     "predicted_state": prediction.get(
                         "predicted_state"
@@ -737,7 +733,7 @@ def api_runtime_history():
                         "active_goal"
                     ),
                 }
-            )
+            )            
 
         return jsonify(
             {
@@ -1065,6 +1061,24 @@ def api_chat():
             attachments=attachments,
         )
 
+        try:
+            if hasattr(runtime_service, "run_cycle"):
+                runtime_service.run_cycle(
+                    execution_state={
+                        "source": "api_chat",
+                        "user_text": user_text,
+                        "session_id": session_id,
+                    },
+                    world_state={
+                        "route": "chat",
+                        "event": "chat_completed",
+                    },
+                )
+        except Exception as runtime_error:
+            print(
+                "RUNTIME CHAT CYCLE ERROR:",
+                runtime_error,
+            )
         print("CHAT RAW RESULT:", result)
 
         try:
