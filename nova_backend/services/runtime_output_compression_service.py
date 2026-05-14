@@ -54,4 +54,9 @@ class RuntimeOutputCompressionService:
             "runtime_health": trend.get("runtime_health"),
             "stability_ratio": trend.get("stability_ratio"),
             "runtime_world_prediction": world_model.get("prediction"),
-        }
+            "runtime_execution_router": (
+                result.get(
+                    "runtime_execution_router",
+                    {},
+                )
+            ),        }

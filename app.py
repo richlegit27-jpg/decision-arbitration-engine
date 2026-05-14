@@ -639,7 +639,7 @@ def api_runtime_summary():
             )
 
         if runtime is None:
-               runtime = runtime_brain
+            runtime = runtime_brain
 
         compressed = getattr(
             runtime,
@@ -647,10 +647,17 @@ def api_runtime_summary():
             {},
         )
 
+        if not isinstance(compressed, dict):
+            compressed = {}
+
         return jsonify(
             {
                 "ok": True,
-                "runtime": compressed or {},
+                "runtime": compressed,
+                "runtime_execution_router": compressed.get(
+                    "runtime_execution_router",
+                    {},
+                ),
             }
         )
 
@@ -659,6 +666,8 @@ def api_runtime_summary():
             {
                 "ok": False,
                 "error": str(e),
+                "runtime": {},
+                "runtime_execution_router": {},
             }
         ), 500
 
@@ -713,6 +722,12 @@ def api_runtime_history():
 
             compressed_history.append(
                 {
+                    "runtime_memory_event": item.get(
+                        "runtime_memory_event"
+                    ),
+                    "anomaly_detected": item.get(
+                        "anomaly_detected"
+                    ),
                     "cycle": item.get("cycle"),
                     "final_action": item.get(
                         "final_action"
