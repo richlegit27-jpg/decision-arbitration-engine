@@ -73,6 +73,7 @@ web_service = WebService(timeout=WEB_TIMEOUT)
 recon_service = ReconService(timeout=RECON_TIMEOUT)
 intent_router = IntentRouterService()
 runtime_brain = SafeUnifiedRuntime()
+chat_service.runtime_brain = runtime_brain
 
 print(
     "RESTORED RUNTIME =",

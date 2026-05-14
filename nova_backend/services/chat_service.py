@@ -43,6 +43,9 @@ from nova_backend.services.python_runner_service import PythonRunnerService
 from nova_backend.services.runtime_bootstrap import (
     RuntimeBootstrap,
 )
+from nova_backend.services.runtime_cognitive_injection_service import (
+    RuntimeCognitiveInjectionService,
+)
 
 logger = logging.getLogger("nova.execution")
 DEBUG_EXECUTION = False
@@ -2847,6 +2850,7 @@ if __name__ == "__main__":
         self.recon_service = recon_service
         self.rewrite_service = ResponseRewriteService()
         self.python_runner = PythonRunnerService()
+        self.runtime_cognitive_injection = RuntimeCognitiveInjectionService()
 
         # execution engine
         self.execution_handler = ExecutionHandler(default_executor)
@@ -2865,7 +2869,7 @@ if __name__ == "__main__":
         self.artifacts = artifact_service
         self.web = web_service
         self.recon = recon_service
-
+        self.memories = memory_service
         # config
         self.image_model = os.getenv("NOVA_IMAGE_MODEL", "gpt-image-1")
         self.image_size = os.getenv("NOVA_IMAGE_SIZE", "1024x1024")
@@ -2885,6 +2889,10 @@ if __name__ == "__main__":
         )
         self.uploads_dir.mkdir(parents=True, exist_ok=True)
         exec_debug("CHATSERVICE INIT uploads_dir =", self.uploads_dir)
+
+        self.runtime_cognitive_injection = (
+            RuntimeCognitiveInjectionService()
+        )
 
         # core clients
         self.client = OpenAI()
@@ -2917,6 +2925,64 @@ if __name__ == "__main__":
 
     def _debug(self, *args):
         exec_debug(*args)
+
+    def _build_runtime_cognition(self):
+
+        runtime_summary = {}
+        runtime_decision = {}
+
+        runtime = getattr(
+            self,
+            "runtime_brain",
+            None,
+        )
+
+        if runtime is None:
+
+            return {
+                "has_runtime_cognition": False,
+            }
+
+        if hasattr(
+            runtime,
+            "get_summary",
+        ):
+
+            runtime_summary = runtime.get_summary()
+
+        elif hasattr(
+            runtime,
+            "summary",
+        ):
+
+            runtime_summary = runtime.summary()
+
+        elif hasattr(
+            runtime,
+            "runtime_state",
+        ):
+
+            runtime_summary = getattr(
+                runtime,
+                "runtime_state",
+                {},
+            )
+
+        if hasattr(
+            runtime,
+            "last_decision",
+        ):
+
+            runtime_decision = getattr(
+                runtime,
+                "last_decision",
+                {},
+            )
+
+        return self.runtime_cognitive_injection.build(
+            runtime_summary=runtime_summary,
+            runtime_decision=runtime_decision,
+        )
 
     def _run_test_harness(self, session_id):
 
@@ -16962,6 +17028,7 @@ def _save_artifact_fallback(self, artifact: dict):
                     or kind in blocked_kinds
                 ):
                     continue
+
             add_memory_item(item)
 
         # =========================
