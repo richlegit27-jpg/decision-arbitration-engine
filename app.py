@@ -662,6 +662,282 @@ def api_runtime_summary():
             }
         ), 500
 
+@app.route("/api/runtime/history", methods=["GET"])
+def api_runtime_history():
+    try:
+        runtime = getattr(
+            chat_service,
+            "runtime",
+            None,
+        )
+
+        if runtime is None:
+            runtime = getattr(
+                chat_service,
+                "safe_runtime",
+                None,
+            )
+
+        if runtime is None:
+            runtime = runtime_brain
+
+        history = getattr(
+            runtime,
+            "runtime_history",
+            [],
+        )
+
+        if not isinstance(history, list):
+            history = []
+
+        compressed_history = []
+
+        for item in history[-10:]:
+            if not isinstance(item, dict):
+                continue
+
+            world_model = item.get(
+                "runtime_world_model"
+            ) or {}
+
+            prediction = {}
+
+            if isinstance(world_model, dict):
+                prediction = (
+                    world_model.get("prediction")
+                    or world_model.get(
+                        "runtime_world_prediction"
+                    )
+                    or {}
+                )
+
+            control = item.get("control") or {}
+
+            compressed_history.append(
+                {
+                    "cycle": item.get("cycle"),
+                    "final_action": item.get(
+                        "final_action"
+                    ),
+                    "failure_type": item.get(
+                        "failure_type"
+                    ),
+                    "runtime_signal": (
+                        control.get("runtime_signal")
+                        if isinstance(control, dict)
+                        else ""
+                    ),
+                    "predicted_state": prediction.get(
+                        "predicted_state"
+                    ),
+                    "risk_forecast": prediction.get(
+                        "risk_forecast"
+                    ),
+                    "active_goal": prediction.get(
+                        "active_goal"
+                    ),
+                }
+            )
+
+        return jsonify(
+            {
+                "ok": True,
+                "history": compressed_history,
+                "count": len(compressed_history),
+            }
+        )
+
+    except Exception as e:
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(e),
+                "history": [],
+            }
+        ), 500
+
+@app.route("/api/runtime/decision", methods=["GET"])
+def api_runtime_decision():
+    try:
+        runtime = getattr(
+            chat_service,
+            "runtime",
+            None,
+        )
+
+        if runtime is None:
+            runtime = getattr(
+                chat_service,
+                "safe_runtime",
+                None,
+            )
+
+        if runtime is None:
+            runtime = runtime_brain
+
+        compressed = getattr(
+            runtime,
+            "last_compressed_runtime",
+            {},
+        )
+
+        if not isinstance(compressed, dict):
+            compressed = {}
+
+        prediction = compressed.get(
+            "runtime_world_prediction",
+            {},
+        )
+
+        if not isinstance(prediction, dict):
+            prediction = {}
+
+        health = str(
+            compressed.get("runtime_health") or ""
+        ).strip().lower()
+
+        signal = str(
+            compressed.get("runtime_signal") or ""
+        ).strip().lower()
+
+        route = str(
+            compressed.get("runtime_route") or ""
+        ).strip().lower()
+
+        risk = str(
+            prediction.get("risk_forecast") or ""
+        ).strip().lower()
+
+        recommended_action = "observe"
+        reason = "Runtime is stable enough to keep observing."
+
+        if risk == "high" or health == "unstable":
+            recommended_action = "inspect_failure"
+            reason = "Runtime risk is high or unstable."
+
+        elif signal == "runtime_requested_failure_inspection":
+            recommended_action = "inspect_failure"
+            reason = "Runtime requested failure inspection."
+
+        elif risk == "medium":
+            recommended_action = "cooldown_repair"
+            reason = "Runtime risk is medium; repair should be throttled."
+
+        elif route == "recovery" or health == "recovering":
+            recommended_action = "preserve_recovery"
+            reason = "Runtime is recovering; avoid aggressive mutation."
+
+        return jsonify(
+            {
+                "ok": True,
+                "decision": {
+                    "recommended_action": recommended_action,
+                    "reason": reason,
+                    "runtime_health": health,
+                    "runtime_signal": signal,
+                    "runtime_route": route,
+                    "risk_forecast": risk,
+                },
+            }
+        )
+
+    except Exception as e:
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(e),
+                "decision": {},
+            }
+        ), 500
+
+@app.route("/api/runtime/bridge", methods=["POST"])
+def api_runtime_bridge():
+    try:
+        decision_response = api_runtime_decision()
+        response_payload = decision_response.get_json()
+
+        decision = (
+            response_payload.get("decision", {})
+            if isinstance(response_payload, dict)
+            else {}
+        )
+
+        recommended_action = str(
+            decision.get("recommended_action") or "observe"
+        ).strip()
+
+        bridge_action = "none"
+        execution_action = ""
+
+        if recommended_action == "inspect_failure":
+            bridge_action = "suggest_execution"
+            execution_action = "retry_failed"
+
+        elif recommended_action == "cooldown_repair":
+            bridge_action = "suggest_execution"
+            execution_action = "pause"
+
+        elif recommended_action == "preserve_recovery":
+            bridge_action = "observe_only"
+            execution_action = ""
+
+        elif recommended_action == "observe":
+            bridge_action = "observe_only"
+            execution_action = ""
+
+        payload = request.get_json(
+            silent=True
+        ) or {}
+
+        allow_auto_execute = bool(
+            payload.get(
+                "allow_auto_execute"
+            )
+        )
+
+        auto_execute = (
+            allow_auto_execute
+            and bridge_action
+            == "suggest_execution"
+            and execution_action in {
+                "retry_failed",
+                "pause",
+            }
+        )
+
+        return jsonify(
+            {
+                "ok": True,
+                "bridge": {
+                    "recommended_action": (
+                        recommended_action
+                    ),
+                    "bridge_action": (
+                        bridge_action
+                    ),
+                    "execution_action": (
+                        execution_action
+                    ),
+                    "auto_execute": (
+                        auto_execute
+                    ),
+                    "reason": (
+                        decision.get("reason")
+                        or ""
+                    ),
+                },
+            }
+        )
+
+    except Exception as e:
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(e),
+                "bridge": {},
+            }
+        ), 500
+
 @app.route("/api/runtime/cycle", methods=["POST"])
 def api_runtime_cycle():
     try:
@@ -807,13 +1083,6 @@ def api_chat():
                 },
                 scheduler_state={},
                 knowledge_graph={},
-            )
-
-            runtime_brain.last_compressed_runtime = (
-                runtime_result.get(
-                    "compressed_runtime",
-                    {}
-                )
             )
 
             result["runtime"] = runtime_result.get(

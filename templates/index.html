@@ -16,6 +16,26 @@
     <div>Route: <span id="nova-runtime-route">waiting</span></div>
     <div>Signal: <span id="nova-runtime-signal">waiting</span></div>
     <div>Risk: <span id="nova-runtime-risk">waiting</span></div>
+    <div>Updated: <span id="nova-runtime-updated">waiting</span></div>
+
+    <div>
+      History:
+      <div id="nova-runtime-history"></div>
+    </div>
+
+    <div>Decision: <span id="nova-runtime-decision">waiting</span></div>
+    <div>Reason: <span id="nova-runtime-decision-reason">waiting</span></div>
+    <div>Bridge: <span id="nova-runtime-bridge">waiting</span></div>
+    <div>Exec: <span id="nova-runtime-exec-action">waiting</span></div>
+
+<label>
+  <input id="nova-runtime-auto-execute" type="checkbox">
+  Allow Auto Execute
+</label>
+
+    <button id="nova-runtime-run-action" type="button">
+      Run Suggested Action
+    </button>
   </div>
 
   <div class="nova-app-shell" data-app-shell>  
@@ -342,8 +362,9 @@
 <script src="/static/js/nova-session-rail.js?v=session-rail-fix-2026-04-20-001"></script>
 <script src="/static/js/nova-memory.js?v=memory-panel-2026-04-15-002"></script>
 <script>
-    window.addEventListener("nova:runtime:update", function (event) {
-        const runtime = event.detail || {};
+    function updateRuntimePanel(runtime) {
+        runtime = runtime || {};
+
         const prediction = runtime.runtime_world_prediction || {};
 
         const setText = function (id, value) {
@@ -374,11 +395,225 @@
             prediction.risk_forecast
         );
 
-        console.log(
-            "[NOVA RUNTIME UI UPDATE]",
-            runtime
+        setText(
+            "nova-runtime-updated",
+            new Date().toLocaleTimeString()
         );
+
+        fetch("/api/runtime/history")
+            .then(function (response) {
+                if (!response.ok) {
+                    return {
+                        history: []
+                    };
+                }
+
+                return response.json();
+            })
+            .then(function (payload) {
+                const historyEl = document.getElementById(
+                    "nova-runtime-history"
+                );
+
+                if (!historyEl) {
+                    return;
+                }
+
+                const history = Array.isArray(payload.history)
+                    ? payload.history
+                    : [];
+
+                const latest = history
+                    .slice(-3)
+                    .map(function (item) {
+                        return [
+                            "#" + (item.cycle || "?"),
+                            item.final_action || "unknown",
+                            item.risk_forecast || "risk?"
+                        ].join(" ");
+                    })
+                    .join(" | ");
+
+                if (latest) {
+                    historyEl.innerHTML = history
+                        .slice(-5)
+                        .map(function (item) {
+                            const risk =
+                                item.risk_forecast || "unknown";
+
+                            let icon = "⚪";
+
+                            if (risk === "low") {
+                                icon = "🟢";
+                            } else if (risk === "medium") {
+                                icon = "🟡";
+                            } else if (risk === "high") {
+                                icon = "🔴";
+                            }
+
+                            return (
+                                "<div>" +
+                                icon +
+                                " #" +
+                                (item.cycle || "?") +
+                                " " +
+                                (
+                                    item.final_action ||
+                                    "unknown"
+                                ) +
+                                "</div>"
+                            );
+                        })
+                        .join("");
+                } else {
+                    historyEl.innerHTML =
+                        "<div>empty</div>";
+                }
+            })
+            .catch(function () {});
+
+        fetch("/api/runtime/decision")
+            .then(function (response) {
+                return response.json();
+            })
+            .then(function (payload) {
+                const decision = payload.decision || {};
+
+                setText(
+                    "nova-runtime-decision",
+                    decision.recommended_action
+                );
+
+                setText(
+                    "nova-runtime-decision-reason",
+                    decision.reason
+                );
+            })
+            .catch(function () {});
+
+        fetch("/api/runtime/bridge", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                allow_auto_execute:
+                    document.getElementById(
+                        "nova-runtime-auto-execute"
+                    )
+                        ? document.getElementById(
+                            "nova-runtime-auto-execute"
+                        ).checked
+                        : false
+            })
+        })
+            .then(function (response) {
+
+                return response.json();
+            })
+            .then(function (payload) {
+
+                const bridge =
+                    payload.bridge || {};
+
+                const autoExecute =
+                    bridge.auto_execute === true;
+
+                const bridgeAction =
+                    bridge.bridge_action || "";
+
+                const executionAction =
+                    bridge.execution_action || "none";
+
+                setText(
+                    "nova-runtime-bridge",
+                    bridgeAction
+                );
+
+                setText(
+                    "nova-runtime-exec-action",
+                    executionAction
+                );
+
+                const runtimeStatus =
+                    document.getElementById(
+                        "nova-runtime-status"
+                    );
+
+                if (runtimeStatus) {
+
+                    runtimeStatus.textContent =
+                        autoExecute
+                            ? (
+                                "AUTO EXECUTE ENABLED | " +
+                                bridgeAction
+                            )
+                            : (
+                                "OBSERVE ONLY | " +
+                                bridgeAction
+                            );
+                }
+
+                console.log(
+                    "[NOVA RUNTIME BRIDGE]",
+                    payload
+                );
+            })
+
+    }
+
+    const runButton = document.getElementById(
+        "nova-runtime-run-action"
+    );
+
+    if (runButton) {
+        runButton.onclick = function () {
+            const actionEl = document.getElementById(
+                "nova-runtime-exec-action"
+            );
+
+            const action = actionEl
+                ? actionEl.textContent
+                : "";
+
+            if (
+                !action ||
+                action === "none" ||
+                action === "waiting"
+            ) {
+                return;
+            }
+
+            fetch("/api/execution/control", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    session_id:
+                        (
+                            window.NovaComposerBundle &&
+                            window.NovaComposerBundle.state &&
+                            window.NovaComposerBundle.state.activeSessionId
+                        ) || "",
+                    action: action
+                })
+            });
+        };
+    }
+
+    window.addEventListener("nova:runtime:update", function (event) {
+        updateRuntimePanel(event.detail || {});
     });
+
+    fetch("/api/runtime/summary")
+        .then(function (response) {
+            return response.json();
+        })
+        .then(function (payload) {
+            updateRuntimePanel(payload.runtime || {});
+        })
+        .catch(function () {});
 </script>
 </body>
 </html>
