@@ -912,6 +912,27 @@ Rules:
                 or {}
             )
 
+            session = self.session_service.get_session(
+                session_id
+            )
+
+            if not isinstance(
+                session,
+                dict,
+            ):
+                session = {}
+
+            execution_state = (
+                session.get(
+                    "active_execution"
+                )
+                or session.get(
+                    "execution_state"
+                )
+                or execution_state
+                or {}
+            )
+
             execution_state = self._process_execution(
                 execution_state,
                 session_id,
@@ -1035,15 +1056,88 @@ Current step:
                 session_id,
                 "execution_state",
             )
-            or session.get("execution_state")
-            or session.get("active_execution")
-            or session.get("meta", {}).get("execution_state")
-            or session.get("meta", {}).get("active_execution")
+            or session.get(
+                "execution_state"
+            )
+            or session.get(
+                "active_execution"
+            )
+            or session.get(
+                "meta",
+                {},
+            ).get("execution_state")
+            or session.get(
+                "meta",
+                {},
+            ).get("active_execution")
             or {}
         )
 
-        if not isinstance(execution_state, dict):
+        if not isinstance(
+            execution_state,
+            dict,
+        ):
             execution_state = {}
+
+        steps = (
+            execution_state.get("steps")
+            or []
+        )
+
+        current_index = int(
+            execution_state.get(
+                "current_index",
+                0,
+            )
+            or 0
+        )
+
+        if not isinstance(
+            steps,
+            list,
+        ):
+            steps = []
+
+        if current_index < 0:
+            current_index = 0
+
+        if current_index >= len(steps):
+            current_index = len(steps)
+
+        print(
+            "EXECUTION DEBUG BEFORE COMPLETE CHECK =",
+            {
+                "command": user_text,
+                "current_index": current_index,
+                "steps_len": len(steps),
+                "status": execution_state.get(
+                    "status"
+                ),
+                "current_step": execution_state.get(
+                    "current_step"
+                ),
+            },
+        )
+
+        print(
+            "EXECUTION ABOUT TO PROCESS COMMAND",
+            user_text,
+        )
+
+        if not steps:
+
+            execution_state["status"] = (
+                "idle"
+            )
+
+            execution_state["current_step"] = ""
+
+            execution_state["progress"] = 0
+
+            self._save_execution_state(
+                session_id,
+                execution_state,
+            )
 
         if text in {"next", "nex", "continue", "resume"}:
 
@@ -1193,6 +1287,48 @@ Current step:
             }
 
         return None
+
+    def _save_execution_state(
+        self,
+        session_id="",
+        execution_state=None,
+    ):
+        session_id = self._safe_str(session_id).strip()
+
+        if not session_id:
+            return {}
+
+        execution_state = (
+            execution_state
+            if isinstance(execution_state, dict)
+            else {}
+        )
+
+        working_state = (
+            self._get_working_state(session_id)
+            or {}
+        )
+
+        working_state["execution_state"] = execution_state
+
+        self._update_working_state(
+            session_id,
+            working_state,
+        )
+
+        self._set_session_meta(
+            session_id,
+            "execution_state",
+            execution_state,
+        )
+
+        self._set_session_meta(
+            session_id,
+            "active_execution",
+            execution_state,
+        )
+
+        return execution_state
 
     def _get_session_meta(self, session_id: str, key: str = "", default=None):
         session_id = self._safe_str(session_id).strip()
@@ -1781,9 +1917,20 @@ Current step:
         execution_state=None,
     ):
 
-        execution_state = execution_state or {}
+        persisted_execution_state = {}
 
-        command = self._safe_str(command).strip().lower()
+        execution_state = (
+            execution_state
+            if isinstance(
+                execution_state,
+                dict,
+            )
+            else {}
+        )
+
+        command = self._safe_str(
+            command
+        ).strip().lower()
 
         intelligence_intent = self._safe_str(
             execution_state.get("intent")
@@ -1806,16 +1953,37 @@ Current step:
         elif intelligence_intent == "cancel_execution":
             command = "cancel"
 
-        execution_state = (
-            execution_state
-            or self._get_session_meta(
-                session_id,
-                "execution_state",
-            )
+        working_state = (
+            self._get_working_state(session_id)
             or {}
         )
 
-        steps = execution_state.get("steps") or []
+        persisted_execution_state = self._load_execution_state(
+            session_id
+        )
+
+        if (
+            isinstance(
+                persisted_execution_state,
+                dict,
+            )
+            and persisted_execution_state.get(
+                "steps"
+            )
+        ):
+            execution_state = (
+                persisted_execution_state
+            )
+        else:
+            execution_state = (
+                execution_state
+                or {}
+            )
+
+        steps = (
+            execution_state.get("steps")
+            or []
+        )
 
         current_index = int(
             execution_state.get(
@@ -1825,20 +1993,42 @@ Current step:
             or 0
         )
 
+        if not isinstance(
+            steps,
+            list,
+        ):
+            steps = []
+
+        if current_index < 0:
+            current_index = 0
+
+        if current_index >= len(steps):
+            current_index = len(steps)
+
         print(
             "EXECUTION DEBUG BEFORE COMPLETE CHECK =",
             {
                 "command": command,
                 "current_index": current_index,
                 "steps_len": len(steps),
-                "status": execution_state.get("status"),
-                "current_step": execution_state.get("current_step"),
+                "status": execution_state.get(
+                    "status"
+                ),
+                "current_step": execution_state.get(
+                    "current_step"
+                ),
             },
+        )
+
+        print(
+            "EXECUTION ABOUT TO PROCESS COMMAND",
+            command,
         )
 
         # =========================
         # NEXT AFTER COMPLETION
         # =========================
+
         if command in {
             "next",
             "continue",
@@ -1846,8 +2036,13 @@ Current step:
         }:
 
             execution_state["current_index"] = 0
-            execution_state["status"] = "running"
-            execution_state["lock"] = False
+
+            execution_state["status"] = (
+                "running"
+            )
+
+            execution_state["waiting"] = False
+
             execution_state["complete"] = False
 
             self._set_session_meta(
@@ -1856,13 +2051,41 @@ Current step:
                 execution_state,
             )
 
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                execution_state,
+            )
+
+            current_index = 0
+
+        if not steps:
+
+            execution_state["status"] = "idle"
+
+            execution_state["current_step"] = ""
+
+            execution_state["progress"] = 0
+
+            self._set_session_meta(
+                session_id,
+                "execution_state",
+                execution_state,
+            )
+
+            self._set_session_meta(
+                session_id,
+                "active_execution",
+                execution_state,
+            )
+
             return {
-                "ok": True,
+                "ok": False,
                 "assistant_message": {
                     "role": "assistant",
                     "text": (
-                        "Execution reset. "
-                        "Use 'run step' to continue."
+                        "No active execution plan. "
+                        "Start one with: auto-plan <goal>"
                     ),
                 },
                 "execution": execution_state,
@@ -1875,6 +2098,47 @@ Current step:
             "run_step",
             "run step",
         }:
+
+            if not steps:
+
+                persisted_execution = (
+                    self._get_session_meta(
+                        session_id,
+                        "active_execution",
+                    )
+                    or self._get_session_meta(
+                        session_id,
+                        "execution_state",
+                    )
+                    or {}
+                )
+
+                if (
+                    isinstance(
+                        persisted_execution,
+                        dict,
+                    )
+                    and persisted_execution.get(
+                        "steps"
+                    )
+                ):
+                    execution_state = (
+                        persisted_execution
+                    )
+
+                    steps = (
+                        execution_state.get(
+                            "steps",
+                            [],
+                        )
+                    )
+
+                    current_index = int(
+                        execution_state.get(
+                            "current_index",
+                            0,
+                        )
+                    )
 
             if not steps:
                 return {
@@ -4759,7 +5023,18 @@ if __name__ == "__main__":
                     )
 
                     session_obj["execution_state"] = execution_state
-                    session_obj["active_execution"] = {}
+
+                    session_obj["active_execution"] = (
+                        execution_state
+                        if (
+                            isinstance(execution_state, dict)
+                            and execution_state.get("steps")
+                            and self._safe_str(
+                                execution_state.get("status")
+                            ).lower() != "complete"
+                        )
+                        else {}
+                    )
 
                     self.sessions.update_session(
                         session_id,
@@ -4774,9 +5049,8 @@ if __name__ == "__main__":
 
             if execution_state:
 
-                self._set_session_meta(
+                self._save_execution_state(
                     session_id,
-                    "execution_state",
                     execution_state,
                 )
 
@@ -4953,12 +5227,11 @@ if __name__ == "__main__":
 
                 if memory_lines:
 
-                    fallback_lines.append(
-                        "Recovered operational context:"
-                    )
-
                     fallback_lines.extend(
-                        memory_lines[:5]
+                        [
+                            "Recent context available (trimmed for safety):",
+                            *memory_lines[:3],
+                        ]
                     )
 
                 if not fallback_lines:
@@ -4967,10 +5240,29 @@ if __name__ == "__main__":
                         "No active working state is currently tracked."
                     )
 
+                clean_fallback = []
+
+                for line in fallback_lines:
+
+                    line_str = self._safe_str(line).strip()
+
+                    if not line_str:
+                        continue
+
+                    if (
+                        "Recovered operational context"
+                        in line_str
+                    ):
+                        continue
+
+                    clean_fallback.append(line_str)
+
                 assistant_msg = (
                     self._build_assistant_message(
-                        text="\n".join(
-                            fallback_lines
+                        text="\n".join(clean_fallback)
+                        or (
+                            "No active working state "
+                            "is currently tracked."
                         )
                     )
                 )
@@ -4985,17 +5277,24 @@ if __name__ == "__main__":
                         "meta": {},
                     },
                     assistant_msg=assistant_msg,
-                ) 
-
-            working_state = self._get_working_state(session_id)
-
-            execution_state = (
-                self._get_session_meta(
-                    session_id,
-                    "execution_state",
                 )
+
+            working_state = (
+                self._get_working_state(session_id)
                 or {}
             )
+
+            persisted_execution_state = self._load_execution_state(
+                session_id
+            )
+
+            if (
+                isinstance(persisted_execution_state, dict)
+                and persisted_execution_state.get("steps")
+            ):
+                execution_state = persisted_execution_state
+            else:
+                execution_state = {}
 
             reconciled = self._reconcile_execution_state(
                 session_id=session_id,
@@ -5020,7 +5319,7 @@ if __name__ == "__main__":
 
             assistant_text = self._format_mission_state(
                 mission_state
-            )
+            ) 
 
             return {
                 "ok": True,
@@ -8623,22 +8922,26 @@ if __name__ == "__main__":
         # EXECUTION STATE HANDLING
         # =========================
 
-        if execution_state:
-
-         execution_state = (
+        execution_state = (
             self._get_session_meta(
                 session_id,
                 "execution_state",
             )
-            or self._get_session_meta(
-                session_id,
-                "active_execution",
+            or session.get("execution_state")
+            or session.get("active_execution")
+            or session.get("meta", {}).get(
+                "execution_state"
             )
-            or execution_state
+            or session.get("meta", {}).get(
+                "active_execution"
+            )
             or {}
         )
 
-        if not isinstance(execution_state, dict):
+        if not isinstance(
+            execution_state,
+            dict,
+        ):
             execution_state = {}
 
             steps = execution_state.get("steps") or []
@@ -9396,6 +9699,49 @@ if __name__ == "__main__":
             "waiting": False,
         }
 
+        runtime = getattr(
+            self,
+            "runtime",
+            None,
+        )
+
+        if runtime is not None:
+
+            runtime_queue = getattr(
+                runtime,
+                "runtime_execution_queue",
+                None,
+            )
+
+            if isinstance(
+                runtime_queue,
+                list,
+            ):
+
+                runtime_queue.clear()
+
+                for step in normalized_steps:
+
+                    if not isinstance(
+                        step,
+                        dict,
+                    ):
+                        continue
+
+                    runtime_queue.append(
+                        {
+                            "step_id": step.get("id"),
+                            "title": step.get("title"),
+                            "action": step.get("action"),
+                            "status": "queued",
+                        }
+                    )
+
+                print(
+                    "RUNTIME QUEUE DEBUG =",
+                    runtime_queue,
+                )
+
         self._set_session_meta(
             session_id,
             "execution_state",
@@ -9405,7 +9751,17 @@ if __name__ == "__main__":
         self._set_session_meta(
             session_id,
             "active_execution",
-            {},
+            (
+                execution_state
+                if (
+                    isinstance(execution_state, dict)
+                    and execution_state.get("steps")
+                    and self._safe_str(
+                        execution_state.get("status")
+                    ).lower() != "complete"
+                )
+                else {}
+            ),
         )
 
         try:
@@ -9415,7 +9771,18 @@ if __name__ == "__main__":
             )
 
             session_obj["execution_state"] = execution_state
-            session_obj["active_execution"] = {}
+
+            session_obj["active_execution"] = (
+                execution_state
+                if (
+                    isinstance(execution_state, dict)
+                    and execution_state.get("steps")
+                    and self._safe_str(
+                        execution_state.get("status")
+                    ).lower() != "complete"
+                )
+                else {}
+            )
 
             self.sessions.update_session(
                 session_id,
