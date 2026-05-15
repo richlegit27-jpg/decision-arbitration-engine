@@ -2045,15 +2045,8 @@ Current step:
 
             execution_state["complete"] = False
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
-                execution_state,
-            )
-
-            self._set_session_meta(
-                session_id,
-                "active_execution",
                 execution_state,
             )
 
@@ -2067,15 +2060,8 @@ Current step:
 
             execution_state["progress"] = 0
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
-                execution_state,
-            )
-
-            self._set_session_meta(
-                session_id,
-                "active_execution",
                 execution_state,
             )
 
@@ -2163,19 +2149,17 @@ Current step:
                 execution_state["current_step"] = ""
                 execution_state["current_step_title"] = ""
 
-                self._set_session_meta(
-                    session_id,
-                    "execution_state",
-                    execution_state,
-                )
+            self._save_execution_state(
+                session_id,
+                execution_state,
+            )
 
-                self._set_session_meta(
-                    session_id,
-                    "active_execution",
-                    {},
-                )
+            self._save_execution_state(
+                session_id,
+                {},
+            )
 
-                return {
+            return {
                     "ok": True,
                     "assistant_message": {
                         "role": "assistant",
@@ -2194,9 +2178,8 @@ Current step:
                 current_index += 1
                 execution_state["current_index"] = current_index
 
-                self._set_session_meta(
+                self._save_execution_state(
                     session_id,
-                    "execution_state",
                     execution_state,
                 )
 
@@ -2208,19 +2191,18 @@ Current step:
                     execution_state["current_step"] = ""
                     execution_state["current_step_title"] = ""
 
-                    self._set_session_meta(
+                    self._save_execution_state(
                         session_id,
-                        "execution_state",
                         execution_state,
                     )
 
-                    self._set_session_meta(
+                    self._save_execution_state(
                         session_id,
-                        "active_execution",
                         {},
                     )
 
                     return {
+
                         "ok": True,
                         "assistant_message": {
                             "role": "assistant",
@@ -2237,16 +2219,11 @@ Current step:
             execution_state["current_step"] = step.get("title") or ""
             execution_state["current_step_title"] = step.get("title") or ""
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
                 execution_state,
             )
 
-            self._save_active_execution(
-                session_id,
-                execution_state,
-            )
 
             result = self._execute_step_logic(
                 session_id=session_id,
@@ -2275,9 +2252,8 @@ Current step:
                 execution_state["current_step"] = ""
                 execution_state["current_step_title"] = ""
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
                 execution_state,
             )
 
@@ -2345,11 +2321,6 @@ Current step:
                 execution_state["current_step"] = step.get("title") or ""
                 execution_state["current_step_title"] = step.get("title") or ""
 
-                self._set_session_meta(
-                    session_id,
-                    "execution_state",
-                    execution_state,
-                )
 
                 self._save_active_execution(
                     session_id,
@@ -2360,7 +2331,6 @@ Current step:
                     session_id=session_id,
                     step=step,
                 )
-
 
                 execution_state["history"] = (
                     execution_state.get("history")
@@ -2481,11 +2451,6 @@ if __name__ == "__main__":
                     execution_state["current_step_title"] = ""
                     break
 
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                execution_state,
-            )
 
             self._save_active_execution(
                 session_id,
@@ -2551,9 +2516,8 @@ if __name__ == "__main__":
             else:
                 execution_state["retry_strategy"] = "change_strategy"
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
                 execution_state,
             )
 
@@ -2575,15 +2539,13 @@ if __name__ == "__main__":
             execution_state["current_step"] = ""
             execution_state["current_step_title"] = ""
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
                 execution_state,
             )
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "active_execution",
                 {},
             )
 
@@ -2610,15 +2572,13 @@ if __name__ == "__main__":
             execution_state["current_step"] = ""
             execution_state["current_step_title"] = ""
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
                 execution_state,
             )
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "active_execution",
                 {},
             )
 
@@ -5005,13 +4965,7 @@ if __name__ == "__main__":
 
             if execution_state:
 
-                self._set_session_meta(
-                    session_id,
-                    "execution_state",
-                    execution_state,
-                )
-
-                self._update_session_execution(
+                self._save_execution_state(
                     session_id,
                     execution_state,
                 )
@@ -7222,12 +7176,6 @@ if __name__ == "__main__":
                             or execution
                         )
 
-                        self._set_session_meta(
-                            session_id,
-                            "execution_state",
-                            execution,
-                        )
-
                         self._save_active_execution(
                             session_id,
                             execution,
@@ -8896,9 +8844,8 @@ if __name__ == "__main__":
         if execution_state:
             execution_state["lock"] = False
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
                 execution_state,
             )
 
@@ -8981,19 +8928,17 @@ if __name__ == "__main__":
                 execution_state["current_step"] = ""
                 execution_state["progress"] = 0
 
-                self._set_session_meta(
-                    session_id,
-                    "active_execution",
-                    {},
-                )
+            self._save_execution_state(
+                session_id,
+                {},
+            )
 
-                self._set_session_meta(
-                    session_id,
-                    "execution_state",
-                    execution_state,
-                )
+            self._save_execution_state(
+                session_id,
+                execution_state,
+            )
 
-                return {
+            return {
                     "ok": True,
                     "assistant_message": {
                         "role": "assistant",
@@ -9027,52 +8972,26 @@ if __name__ == "__main__":
                 )
 
                 execution_state["current_index"] = len(steps)
+                execution_state["current_step_index"] = len(steps)
+                execution_state["progress"] = len(steps)
+                execution_state["current_step"] = "complete"
+                execution_state["current_step_title"] = "complete"
+                execution_state["complete"] = True
                 execution_state["lock"] = False
 
-                self._set_session_meta(
+                self._save_execution_state(
                     session_id,
-                    "execution_state",
                     execution_state,
                 )
-
-                self._set_session_meta(
-                    session_id,
-                    "active_execution",
-                    {},
-                )
-                steps = (
-                    execution_state.get("steps")
-                    or []
-                )
-
-                execution_state["current_index"] = (
-                    len(steps)
-                )
-
-                execution_state["current_step_index"] = (
-                    len(steps)
-                )
-
-                execution_state["progress"] = (
-                    len(steps)
-                )
-
-                execution_state["current_step"] = (
-                    "complete"
-                )
-
-                execution_state["current_step_title"] = (
-                    "complete"
-                )
-
-                execution_state["complete"] = True
-
 
                 return {
                     "ok": True,
                     "assistant_message": {
                         "role": "assistant",
-                        "text": "Execution complete. Type 'next' to restart or 'auto-plan <task>'.",
+                        "text": (
+                            "Execution complete. Type 'next' "
+                            "to restart or 'auto-plan <task>'."
+                        ),
                     },
                     "execution": execution_state,
                 }
@@ -9087,9 +9006,8 @@ if __name__ == "__main__":
             "cancel",
         }:
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
                 execution_state,
             )
 
@@ -9170,13 +9088,7 @@ if __name__ == "__main__":
 
                 execution_state["next_moves"] = []
 
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                execution_state,
-            )
-
-            self._save_active_execution(
+            self._save_execution_state(
                 session_id,
                 execution_state,
             )
@@ -9333,24 +9245,21 @@ if __name__ == "__main__":
                         ),
                     )
                 )
-                self._set_session_meta(
-                    session_id,
-                    "execution_state",
-                    execution_state,
+            self._save_execution_state(
+                session_id,
+                execution_state,
+            )
+
+            session_payload = self._get_session_payload(
+                session_id
+            )
+
+            if isinstance(session_payload, dict):
+
+                session_payload["execution_state"] = (
+                    execution_state
                 )
 
-                self._set_session_meta(
-                    session_id,
-                    "active_execution",
-                    execution_state,
-                )
-
-                session_payload = self._get_session_payload(
-                    session_id
-                )
-
-                if isinstance(session_payload, dict):
-                    session_payload["execution_state"] = execution_state
                 session_payload["active_execution"] = (
                     execution_state
                     if (
@@ -9580,15 +9489,8 @@ if __name__ == "__main__":
                 "BLOCKED GENERAL CHAT EXECUTION PLAN"
             )
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
-                {},
-            )
-
-            self._set_session_meta(
-                session_id,
-                "active_execution",
                 {},
             )
 
@@ -9668,15 +9570,8 @@ if __name__ == "__main__":
 
         if invalid_general_goal:
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
-                {},
-            )
-
-            self._set_session_meta(
-                session_id,
-                "active_execution",
                 {},
             )
 
@@ -9947,13 +9842,7 @@ Auto-fix result:
                 )
             )
 
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                execution_state,
-            )
-
-            self._save_active_execution(
+            self._save_execution_state(
                 session_id,
                 execution_state,
             )
@@ -9967,13 +9856,7 @@ Auto-fix result:
         if execution_state.get("lock"):
             execution_state["lock"] = False
 
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                execution_state,
-            )
-
-            self._save_active_execution(
+            self._save_execution_state(
                 session_id,
                 execution_state,
             )
@@ -10054,13 +9937,7 @@ Auto-fix result:
 
                 next_index = current_index + 1
 
-            self._set_session_meta(
-                session_id,
-                "execution_state",
-                execution_state,
-            )
-
-            self._save_active_execution(
+            self._save_execution_state(
                 session_id,
                 execution_state,
             )
@@ -10218,25 +10095,12 @@ Auto-fix result:
 
             execution_state = {}
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "active_execution",
-                {},
-            )
-
-            self._set_session_meta(
-                session_id,
-                "execution_state",
                 {},
             )
 
             return execution_state
-
-        self._set_session_meta(
-            session_id,
-            "execution_state",
-            execution_state,
-        )
 
         self._save_active_execution(
             session_id,
@@ -10266,15 +10130,8 @@ Auto-fix result:
 
         if "respond normally" in goal_text:
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "active_execution",
-                {},
-            )
-
-            self._set_session_meta(
-                session_id,
-                "execution_state",
                 {},
             )
 
@@ -13389,9 +13246,8 @@ Auto-fix result:
             if not working_state.get("last_success"):
                 working_state["last_success"] = "execution_complete"
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
                 execution_state,
             )
 
@@ -13948,9 +13804,8 @@ Auto-fix result:
         if self._safe_str(execution.get("status")).lower() == "complete":
             execution = {}
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
                 {},
             )
 
@@ -14008,11 +13863,10 @@ Auto-fix result:
                 error="Execution step failed.",
             )
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
-                live_execution,
-            )
+                execution_state,
+            )      
 
             return {
                 "ok": False,
@@ -18066,15 +17920,8 @@ def _save_artifact_fallback(self, artifact: dict):
                 [],
             )
 
-            self._set_session_meta(
+            self._save_execution_state(
                 session_id,
-                "execution_state",
-                {},
-            )
-
-            self._set_session_meta(
-                session_id,
-                "active_execution",
                 {},
             )
 
