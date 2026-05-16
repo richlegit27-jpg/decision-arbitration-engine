@@ -8241,47 +8241,53 @@ if __name__ == "__main__":
         text = str(user_text or "").strip()
         user_msg = self._build_user_message(user_text, attachments=attachments)
 
+        direct_url = ""
 
-        if text.startswith("http://") or text.startswith("https://"):
-            print("DIRECT_URL_PATCH_HIT =", text)
+        try:
+            direct_url = self._extract_first_url(text)
+        except Exception:
+            direct_url = ""
+
+        if direct_url:
+            print("DIRECT_URL_PATCH_HIT =", direct_url)
 
             web_result = {}
 
             try:
                 if hasattr(self, "web") and hasattr(self.web, "fetch"):
-                    web_result = self.web.fetch(text)
+                    web_result = self.web.fetch(direct_url)
                 else:
                     web_result = {
                         "ok": False,
                         "error": "Web service is not available.",
-                        "url": text,
+                        "url": direct_url,
                     }
 
             except Exception as exc:
                 web_result = {
                     "ok": False,
                     "error": str(exc),
-                    "url": text,
+                    "url": direct_url,
                 }
 
             if not isinstance(web_result, dict):
                 web_result = {
                     "ok": False,
                     "error": "Invalid web fetch result.",
-                    "url": text,
+                    "url": direct_url,
                 }
 
             source_url = self._safe_str(
                 web_result.get("final_url")
                 or web_result.get("source_url")
                 or web_result.get("url")
-                or text
+                or direct_url
             ).strip()
 
             title = self._safe_str(
                 web_result.get("title")
                 or source_url
-                or text
+                or direct_url
             ).strip()
 
             summary = self._safe_str(
@@ -8389,7 +8395,7 @@ if __name__ == "__main__":
                     "strategy": "web_fetch",
                     "query": text,
                     "fresh": False,
-                    "source_urls": [source_url] if source_url else [text],
+                    "source_urls": [source_url] if source_url else [direct_url],
                     "sources": [source],
                     "web_fetch_ok": bool(web_result.get("ok", True)),
                     "web_fetch_error": error,
@@ -8833,7 +8839,7 @@ if __name__ == "__main__":
                 }
             )
 
-        def _final_source_rank(item):
+        def _source_rank_score(item):
             title_value = self._safe_str(
                 item.get("title")
             ).lower()
@@ -8846,12 +8852,18 @@ if __name__ == "__main__":
                 item.get("snippet")
             ).lower()
 
+            url_value = self._safe_str(
+                item.get("url")
+            ).lower()
+
             combined = (
                 title_value
                 + " "
                 + source_value
                 + " "
                 + snippet_value
+                + " "
+                + url_value
             )
 
             score = 0
@@ -8869,24 +8881,80 @@ if __name__ == "__main__":
                     score += 30
                 if term in snippet_value:
                     score += 20
+                if term in url_value:
+                    score += 20
 
-            if "openai" in combined:
+            trusted_sources = [
+                "reuters",
+                "apnews",
+                "bbc",
+                "bloomberg",
+                "cnbc",
+                "cbc",
+                "globalnews",
+                "ctvnews",
+                "espn",
+                "cbssports",
+                "sports.yahoo",
+                "tsn",
+                "sportsnet",
+                "wired",
+            ]
+
+            if any(source in combined for source in trusted_sources):
+                score += 60
+
+            if "openai" in query.lower() and "openai" in combined:
                 score += 200
 
-            if "greg brockman" in combined:
-                score += 100
-
-            if "wired" in source_value:
-                score += 60
+            if "greg brockman" in query.lower() and "greg brockman" in combined:
+                score += 150
 
             if "anthropic" in combined and "openai" in query.lower():
                 score -= 150
+
+            weak_sources = [
+                "basketnews",
+                "heavy.com",
+                "outkick",
+                "rumor",
+                "reaction",
+                "opinion",
+                "reddit",
+                "forum",
+            ]
+
+            if any(weak_word in combined for weak_word in weak_sources):
+                score -= 80
+
+            generic_titles = {
+                "news",
+                "latest news",
+                "updates",
+                "nba news",
+                "technology news",
+            }
+
+            if title_value.strip().lower() in generic_titles:
+                score -= 200
+
+            if len(title_value.strip()) < 12:
+                score -= 120
+
+            if "espn" in source_value:
+                score += 90
+
+            if source_value in {"nba", "nba.com"}:
+                score += 90
+
+            if "reuters" in source_value:
+                score += 120
 
             return score
 
         sources = sorted(
             cleaned_final_sources,
-            key=_final_source_rank,
+            key=_source_rank_score,
             reverse=True,
         )
 
@@ -8895,6 +8963,32 @@ if __name__ == "__main__":
             for item in sources
             if isinstance(item, dict) and item.get("url")
         ]
+
+        exec_debug(
+            "WEB_RANK_PROOF:",
+            {
+                "query": query,
+                "final_order": [
+                    {
+                        "score": _source_rank_score(item),
+                        "source": item.get("source", ""),
+                        "title": item.get("title", ""),
+                        "url": item.get("url", ""),
+                    }
+                    for item in sources
+                    if isinstance(item, dict)
+                ],
+                "meta_sources_sent": [
+                    {
+                        "source": item.get("source", ""),
+                        "title": item.get("title", ""),
+                        "url": item.get("url", ""),
+                    }
+                    for item in sources[:5]
+                    if isinstance(item, dict)
+                ],
+            },
+        )
 
         exec_debug(
             "WEB_FINAL_SOURCE_DEBUG:",
