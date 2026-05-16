@@ -5372,17 +5372,17 @@ function bindEvents() {
       throw new Error("new chat failed");
     }
 
-const data = await response.json();
+    const data = await response.json();
 
-if (data.runtime && typeof data.runtime === "object") {
-    window.NovaLastRuntime = data.runtime;
+    if (data.runtime && typeof data.runtime === "object") {
+      window.NovaLastRuntime = data.runtime;
 
-    window.dispatchEvent(
+      window.dispatchEvent(
         new CustomEvent("nova:runtime:update", {
-            detail: data.runtime,
+          detail: data.runtime,
         })
-    );
-}
+      );
+    }
 
     if (data && data.active_session_id) {
       state.activeSessionId = String(data.active_session_id);
@@ -5391,8 +5391,35 @@ if (data.runtime && typeof data.runtime === "object") {
     }
 
     applyStatePayload(data);
+
+    state.web = [];
+
+    if (!state.rail) {
+      state.rail = {};
+    }
+
+    state.rail.selectedId = "";
+    state.rail.selectedKind = "";
+
+    if (state.rail.tab === "web") {
+      state.rail.tab = "artifacts";
+    }
+
+    if (els.railViewer) {
+      els.railViewer.innerHTML = "";
+      els.railViewer.hidden = true;
+    }
+
     renderChat();
     renderSessionList();
+
+    if (typeof renderWebList === "function") {
+      renderWebList();
+    }
+
+    if (typeof renderArtifacts === "function") {
+      renderArtifacts();
+    }
 
     return data;
   }
