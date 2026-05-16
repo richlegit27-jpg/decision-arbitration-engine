@@ -5620,9 +5620,9 @@ document.addEventListener("click", function (e) {
   if (!sourceCard) return;
 
   e.preventDefault();
+  e.stopPropagation();
 
   const url = String(sourceCard.dataset.url || "").trim();
-
   const title = String(sourceCard.dataset.title || "Source").trim();
 
   if (!url) return;
@@ -5630,6 +5630,12 @@ document.addEventListener("click", function (e) {
   if (typeof window.fetchSourcePreviewIntoRail === "function") {
     window.fetchSourcePreviewIntoRail(url, title);
   }
+
+  window.open(
+    url,
+    "_blank",
+    "noopener,noreferrer"
+  );
 });
 
 document.addEventListener("click", function (event) {
