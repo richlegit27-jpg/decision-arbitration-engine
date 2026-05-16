@@ -3140,6 +3140,7 @@ if __name__ == "__main__":
     def _clean_web_results(self, results: list) -> list:
         cleaned = []
         seen_domains = set()
+        seen_urls = set()
 
         for item in results or []:
             if not isinstance(item, dict):
@@ -3154,37 +3155,73 @@ if __name__ == "__main__":
 
             low_url = url.lower()
 
-            # decode duckduckgo redirect instead of skipping
+            # Decode DuckDuckGo redirect instead of skipping.
             if "duckduckgo.com" in low_url:
                 try:
                     from urllib.parse import parse_qs, unquote, urlparse
+
                     parsed = urlparse(url)
                     qs = parse_qs(parsed.query)
+
                     if "uddg" in qs:
                         url = unquote(qs["uddg"][0])
                         low_url = url.lower()
+
                 except Exception:
                     continue
 
+            if url in seen_urls:
+                continue
+
+            seen_urls.add(url)
+
             try:
                 from urllib.parse import urlparse
-                domain = urlparse(url).netloc.lower().replace("www.", "")
+
+                domain = (
+                    urlparse(url)
+                    .netloc
+                    .lower()
+                    .replace("www.", "")
+                )
+
             except Exception:
                 domain = ""
 
-            # only dedupe by domain
-            if domain and domain in seen_domains and len(cleaned) >= 3:
+            source_key = domain
+
+            # Google News RSS wraps real publishers behind news.google.com URLs.
+            # Use the publisher name from the title/snippet for diversity scoring
+            # so ESPN, CBS, NYT, etc. do not all collapse into news.google.com.
+            if domain == "news.google.com":
+                publisher = ""
+
+                if " - " in title:
+                    publisher = title.rsplit(" - ", 1)[-1].strip()
+
+                if not publisher and "  " in snippet:
+                    publisher = snippet.rsplit("  ", 1)[-1].strip()
+
+                publisher = publisher.lower().replace("www.", "")
+
+                if publisher:
+                    source_key = publisher
+
+            # Allow a few same-domain results, but prefer diversity after that.
+            if source_key and source_key in seen_domains and len(cleaned) >= 3:
                 continue
 
-            if domain:
-                seen_domains.add(domain)
+            if source_key:
+                seen_domains.add(source_key)
 
-            cleaned.append({
-                "title": title,
-                "snippet": snippet,
-                "content": snippet,
-                "url": url,
-            })
+            cleaned.append(
+                {
+                    "title": title,
+                    "snippet": snippet,
+                    "content": snippet,
+                    "url": url,
+                }
+            )
 
         cleaned = sorted(
             cleaned,
@@ -8470,6 +8507,24 @@ if __name__ == "__main__":
 
         cleaned_sources = self._clean_web_results(raw_results)
 
+        exec_debug(
+            "WEB_SOURCE_DEBUG_COUNTS:",
+            {
+                "raw_results": len(raw_results),
+                "cleaned_sources": len(cleaned_sources),
+                "raw_titles": [
+                    item.get("title", "")
+                    for item in raw_results[:10]
+                    if isinstance(item, dict)
+                ],
+                "cleaned_titles": [
+                    item.get("title", "")
+                    for item in cleaned_sources[:10]
+                    if isinstance(item, dict)
+                ],
+            },
+        )
+
         def _rank_key(item):
             url = self._safe_str(item.get("url")).lower()
             title = self._safe_str(item.get("title")).lower()
@@ -8840,6 +8895,24 @@ if __name__ == "__main__":
             for item in sources
             if isinstance(item, dict) and item.get("url")
         ]
+
+        exec_debug(
+            "WEB_FINAL_SOURCE_DEBUG:",
+            {
+                "sources_count": len(sources),
+                "source_urls_count": len(source_urls),
+                "source_names": [
+                    item.get("source", "")
+                    for item in sources
+                    if isinstance(item, dict)
+                ],
+                "source_titles": [
+                    item.get("title", "")
+                    for item in sources
+                    if isinstance(item, dict)
+                ],
+            },
+        )
 
         exec_debug("WEB_SOURCES_FINAL:", sources)
         exec_debug("WEB_SOURCE_URLS_FINAL:", source_urls)
