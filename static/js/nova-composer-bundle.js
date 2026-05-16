@@ -5554,6 +5554,122 @@ function bindEvents() {
   if (typeof wireMemoryClicks === "function") wireMemoryClicks();
 }
 
+// --- START PATCH: Full Rail UX (inline preview + close + auto-scroll + keyboard nav) ---
+(function() {
+    const NovaComposerBundle = window.NovaComposerBundle || {};
+
+    // Bind clicks on rail source cards
+    NovaComposerBundle.bindSourceCardClicks = function() {
+        const rail = document.querySelector("#nova-rail-container");
+        const viewer = document.querySelector("#nova-rail-viewer");
+        if (!rail || !viewer) return;
+
+        rail.querySelectorAll(".nova-rail-source-card").forEach(card => {
+            card.removeEventListener("click", card._novaClickHandler);
+
+            const handler = (e) => {
+                e.preventDefault();
+                const url = card.getAttribute("data-url") || card.dataset.url;
+                if (!url) return;
+
+                // Highlight clicked card
+                rail.querySelectorAll(".nova-rail-source-card.selected").forEach(c => {
+                    c.classList.remove("selected");
+                });
+                card.classList.add("selected");
+
+                // Load URL into inline viewer
+                viewer.innerHTML =
+                    '<iframe src="' + url + '" style="width:100%;height:100%;border:none;"></iframe>';
+                viewer.hidden = false;
+
+                // Add close button if not exists
+                if (!document.querySelector("#nova-rail-viewer-close")) {
+                    const closeBtn = document.createElement("button");
+                    closeBtn.id = "nova-rail-viewer-close";
+                    closeBtn.textContent = "×";
+                    closeBtn.style.position = "absolute";
+                    closeBtn.style.top = "5px";
+                    closeBtn.style.right = "5px";
+                    closeBtn.style.zIndex = "999";
+                    closeBtn.style.background = "#fff";
+                    closeBtn.style.border = "1px solid #ccc";
+                    closeBtn.style.borderRadius = "4px";
+                    closeBtn.style.padding = "2px 6px";
+                    closeBtn.style.cursor = "pointer";
+
+                    closeBtn.addEventListener("click", () => {
+                        viewer.innerHTML = "";
+                        viewer.hidden = true;
+                        rail.querySelectorAll(".nova-rail-source-card.selected").forEach(c => {
+                            c.classList.remove("selected");
+                        });
+                    });
+
+                    viewer.appendChild(closeBtn);
+                }
+
+                // Scroll clicked card into view
+                card.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+            };
+
+            card.addEventListener("click", handler);
+            card._novaClickHandler = handler;
+        });
+    };
+
+    // Patch SOURCE PREVIEW RESPONSE to auto-bind clicks
+    const originalHandleSourcePreview = NovaComposerBundle.handleSourcePreviewResponse;
+    NovaComposerBundle.handleSourcePreviewResponse = function(response) {
+        if (typeof originalHandleSourcePreview === "function") {
+            originalHandleSourcePreview(response);
+        }
+        NovaComposerBundle.bindSourceCardClicks();
+    };
+
+    // --- Keyboard navigation ---
+    const rail = document.querySelector("#nova-rail-container");
+    if (rail) {
+        let selectedIndex = -1;
+
+        document.addEventListener("keydown", function (e) {
+            const cards = rail.querySelectorAll(".nova-rail-source-card");
+            if (!cards.length) return;
+
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, cards.length - 1);
+                highlightCard(cards, selectedIndex);
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, 0);
+                highlightCard(cards, selectedIndex);
+            } else if (e.key === "Enter") {
+                e.preventDefault();
+                if (selectedIndex >= 0 && selectedIndex < cards.length) {
+                    cards[selectedIndex].click();
+                }
+            }
+        });
+
+        function highlightCard(cards, index) {
+            cards.forEach(c => c.classList.remove("selected"));
+            if (index >= 0 && index < cards.length) {
+                const card = cards[index];
+                card.classList.add("selected");
+                card.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+            }
+        }
+
+        // Reset index when new source cards appear
+        const observer = new MutationObserver(() => { selectedIndex = -1; });
+        observer.observe(rail, { childList: true, subtree: true });
+    }
+
+    window.NovaComposerBundle = NovaComposerBundle;
+})();
+// --- END PATCH ---
+
 async function boot() {
   if (state.booted) return;
   state.booted = true;
@@ -5718,7 +5834,10 @@ document.addEventListener("click", function (e) {
   const title = String(sourceCard.dataset.title || "Source").trim();
   const webId = String(sourceCard.dataset.webId || "").trim();
 
-  if (!url) return;
+  if (!url || url === "#") {
+    showToast("No source URL available.", "error");
+    return;
+  }
 
   if (!state.rail) {
     state.rail = {};
@@ -5936,16 +6055,26 @@ function renderWeb() {
     const summary = escapeHtml(rawSummary);
     const url = escapeHtml(rawUrl);
 
+    const clickableClass = rawUrl
+      ? "nova-web-card nova-source-card"
+      : "nova-web-card is-disabled";
+
+    const disabledAttr = rawUrl
+      ? ""
+      : " disabled";
+
     return (
-      '<button type="button" class="nova-web-card nova-source-card" ' +
+      '<button type="button" class="' + clickableClass + '" ' +
         'data-web-id="' + id + '" ' +
         'data-no-chat-action="1" ' +
         'data-url="' + url + '" ' +
         'data-title="' + title + '" ' +
-        'data-preview="' + summary + '">' +
+        'data-preview="' + summary + '"' +
+        disabledAttr +
+        '>' +
         '<div class="nova-web-card-title">' + title + '</div>' +
         (summary ? '<div class="nova-web-card-summary">' + summary.slice(0, 220) + '</div>' : "") +
-        (url ? '<div class="nova-web-card-url">' + url + '</div>' : "") +
+        (url ? '<div class="nova-web-card-url">' + url + '</div>' : '<div class="nova-web-card-url">No source URL available</div>') +
       '</button>'
     );
   }).join("");
