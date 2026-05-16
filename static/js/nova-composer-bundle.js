@@ -5553,8 +5553,9 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
   if (typeof setRailTab === "function") setRailTab("web");
 
   const viewer =
-    document.querySelector("#webMount") ||
+    (els && els.railViewer) ||
     document.querySelector("[data-rail-viewer]") ||
+    document.querySelector("#webMount") ||
     document.querySelector('[data-rail-panel="web"] .nova-rail-content') ||
     document.querySelector('[data-rail-panel="web"]') ||
     document.querySelector(".nova-rail-content");
@@ -5564,11 +5565,19 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
     return;
   }
 
+  viewer.hidden = false;
+
   viewer.innerHTML = `
     <div class="nova-viewer-shell">
-      <div class="nova-viewer-title">${escapeHtml(title)}</div>
-      <div class="nova-viewer-body">
-        <p>Loading preview...</p>
+      <div class="nova-viewer-card nova-web-viewer-card">
+        <div class="nova-viewer-kicker">Web Preview</div>
+        <div class="nova-viewer-title">${escapeHtml(title)}</div>
+        <div class="nova-viewer-body">
+          <p>Loading preview...</p>
+        </div>
+        <a class="nova-web-viewer-open" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">
+          Open source
+        </a>
       </div>
     </div>
   `;
@@ -5584,18 +5593,24 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
     .then(function (data) {
       console.log("SOURCE PREVIEW RESPONSE", data);
 
-      const finalUrl = String((data && data.url) || url);
-      const finalTitle = String((data && data.title) || title || "Source preview");
-      const finalPreview = String((data && data.preview) || "No preview found.");
+      const finalUrl = String((data && data.url) || url).trim();
+      const finalTitle = String((data && data.title) || title || "Source preview").trim();
+      const finalPreview = String((data && data.preview) || "No preview found.").trim();
+
+      viewer.hidden = false;
 
       viewer.innerHTML = `
         <div class="nova-viewer-shell">
-          <div class="nova-viewer-title">${escapeHtml(finalTitle)}</div>
-          <div class="nova-viewer-body">
-            <p>${escapeHtml(finalPreview).replace(/\n/g, "<br>")}</p>
-            <button type="button" data-open-full="${escapeHtml(finalUrl)}">
-              Open full article →
-            </button>
+          <div class="nova-viewer-card nova-web-viewer-card">
+            <div class="nova-viewer-kicker">Web Preview</div>
+            <div class="nova-viewer-title">${escapeHtml(finalTitle)}</div>
+            <div class="nova-web-viewer-url">${escapeHtml(finalUrl)}</div>
+            <div class="nova-viewer-body">
+              <p>${escapeHtml(finalPreview).replace(/\n/g, "<br>")}</p>
+            </div>
+            <a class="nova-web-viewer-open" href="${escapeHtml(finalUrl)}" target="_blank" rel="noopener noreferrer">
+              Open source
+            </a>
           </div>
         </div>
       `;
@@ -5603,11 +5618,19 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
     .catch(function (error) {
       console.error("SOURCE PREVIEW ERROR:", error);
 
+      viewer.hidden = false;
+
       viewer.innerHTML = `
         <div class="nova-viewer-shell">
-          <div class="nova-viewer-title">Source preview</div>
-          <div class="nova-viewer-body">
-            <p>Failed to load preview.</p>
+          <div class="nova-viewer-card nova-web-viewer-card">
+            <div class="nova-viewer-kicker">Web Preview</div>
+            <div class="nova-viewer-title">${escapeHtml(title || "Source preview")}</div>
+            <div class="nova-viewer-body">
+              <p>Failed to load preview.</p>
+            </div>
+            <a class="nova-web-viewer-open" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">
+              Open source
+            </a>
           </div>
         </div>
       `;
@@ -5627,8 +5650,18 @@ document.addEventListener("click", function (e) {
 
   if (!url) return;
 
+  if (e.ctrlKey || e.metaKey || e.shiftKey) {
+    window.open(
+      url,
+      "_blank",
+      "noopener,noreferrer"
+    );
+    return;
+  }
+
   if (typeof window.fetchSourcePreviewIntoRail === "function") {
     window.fetchSourcePreviewIntoRail(url, title);
+    return;
   }
 
   window.open(
