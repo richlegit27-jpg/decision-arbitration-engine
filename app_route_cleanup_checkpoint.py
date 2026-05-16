@@ -45,10 +45,6 @@ from nova_backend.services.runtime_bootstrap import (
     RuntimeBootstrap,
 )
 
-from nova_backend.services.runtime_response_sanitizer_service import (
-    RuntimeResponseSanitizerService,
-)
-
 # -----------------------
 # APP SETUP
 # -----------------------
@@ -77,48 +73,23 @@ web_service = WebService(timeout=WEB_TIMEOUT)
 recon_service = ReconService(timeout=RECON_TIMEOUT)
 intent_router = IntentRouterService()
 runtime_brain = SafeUnifiedRuntime()
-runtime_response_sanitizer = RuntimeResponseSanitizerService()
 
-restored_runtime = getattr(
-    runtime_brain,
-    "restored_runtime_state",
-    {},
+print(
+    "RESTORED RUNTIME =",
+    getattr(
+        runtime_brain,
+        "restored_runtime_state",
+        {},
+    ),
 )
 
 print(
-    "RESTORED RUNTIME OK",
-    {
-        "runtime_health": restored_runtime.get(
-            "runtime_health"
-        ),
-        "runtime_signal": restored_runtime.get(
-            "runtime_signal"
-        ),
-        "cycle_count": restored_runtime.get(
-            "cycle_count"
-        ),
-    },
-)
-
-last_compressed = getattr(
-    runtime_brain,
-    "last_compressed_runtime",
-    {},
-)
-
-print(
-    "LAST COMPRESSED OK",
-    {
-        "runtime_health": last_compressed.get(
-            "runtime_health"
-        ),
-        "runtime_signal": last_compressed.get(
-            "runtime_signal"
-        ),
-        "cycle_count": last_compressed.get(
-            "cycle_count"
-        ),
-    },
+    "LAST COMPRESSED =",
+    getattr(
+        runtime_brain,
+        "last_compressed_runtime",
+        {},
+    ),
 )
 
 chat_service = ChatService(
@@ -129,16 +100,8 @@ chat_service = ChatService(
     recon_service=recon_service,
 )
 
-# =========================
-# RUNTIME BINDING
-# =========================
-
 chat_service.runtime = runtime_brain
 chat_service.safe_runtime = runtime_brain
-chat_service.runtime_brain = runtime_brain
-
-app.runtime_brain = runtime_brain
-app.config["runtime_brain"] = runtime_brain
 
 RuntimeBootstrap.save(
     runtime_brain
@@ -661,19 +624,413 @@ def api_state():
 
 @app.route("/api/runtime/summary", methods=["GET"])
 def api_runtime_summary():
-    return jsonify({"ok": True})
+    try:
+        runtime = getattr(
+            chat_service,
+            "runtime",
+            None,
+        )
+
+        if runtime is None:
+            runtime = getattr(
+                chat_service,
+                "safe_runtime",
+                None,
+            )
+
+        if runtime is None:
+            runtime = runtime_brain
+
+        compressed = getattr(
+            runtime,
+            "last_compressed_runtime",
+            {},
+        )
+
+        if not isinstance(compressed, dict):
+            compressed = {}
+
+        return jsonify(
+            {
+                "ok": True,
+                "runtime": compressed,
+                "runtime_execution_router": compressed.get(
+                    "runtime_execution_router",
+                    {},
+                ),
+            }
+        )
+
+    except Exception as e:
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(e),
+                "runtime": {},
+                "runtime_execution_router": {},
+            }
+        ), 500
 
 @app.route("/api/runtime/history", methods=["GET"])
 def api_runtime_history():
-    return jsonify({"ok": True})
+    try:
+        runtime = getattr(
+            chat_service,
+            "runtime",
+            None,
+        )
+
+        if runtime is None:
+            runtime = getattr(
+                chat_service,
+                "safe_runtime",
+                None,
+            )
+
+        if runtime is None:
+            runtime = runtime_brain
+
+        history = getattr(
+            runtime,
+            "runtime_history",
+            [],
+        )
+
+        if not isinstance(history, list):
+            history = []
+
+        compressed_history = []
+
+        for item in history[-10:]:
+            if not isinstance(item, dict):
+                continue
+
+            world_model = item.get(
+                "runtime_world_model"
+            ) or {}
+
+            prediction = {}
+
+            if isinstance(world_model, dict):
+                prediction = (
+                    world_model.get("prediction")
+                    or world_model.get(
+                        "runtime_world_prediction"
+                    )
+                    or {}
+                )
+
+            compressed_history.append(
+                {
+                    "runtime_memory_event": item.get(
+                        "runtime_memory_event"
+                    ),
+                    "anomaly_detected": item.get(
+                        "anomaly_detected"
+                    ),
+                    "cycle": item.get("cycle"),
+                    "final_action": item.get(
+                        "final_action"
+                    ),
+                    "failure_type": item.get(
+                        "failure_type"
+                    ),
+                    "runtime_signal": item.get(
+                        "runtime_signal"
+                    ),
+                    "predicted_state": prediction.get(
+                        "predicted_state"
+                    ),
+                    "risk_forecast": prediction.get(
+                        "risk_forecast"
+                    ),
+                    "active_goal": prediction.get(
+                        "active_goal"
+                    ),
+                }
+            )            
+
+        return jsonify(
+            {
+                "ok": True,
+                "history": compressed_history,
+                "count": len(compressed_history),
+            }
+        )
+
+    except Exception as e:
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(e),
+                "history": [],
+            }
+        ), 500
 
 @app.route("/api/runtime/decision", methods=["GET"])
 def api_runtime_decision():
-    return jsonify({"ok": True})
+    try:
+        runtime = getattr(
+            chat_service,
+            "runtime",
+            None,
+        )
+
+        if runtime is None:
+            runtime = getattr(
+                chat_service,
+                "safe_runtime",
+                None,
+            )
+
+        if runtime is None:
+            runtime = runtime_brain
+
+        compressed = getattr(
+            runtime,
+            "last_compressed_runtime",
+            {},
+        )
+
+        if not isinstance(compressed, dict):
+            compressed = {}
+
+        prediction = compressed.get(
+            "runtime_world_prediction",
+            {},
+        )
+
+        if not isinstance(prediction, dict):
+            prediction = {}
+
+        health = str(
+            compressed.get("runtime_health") or ""
+        ).strip().lower()
+
+        signal = str(
+            compressed.get("runtime_signal") or ""
+        ).strip().lower()
+
+        route = str(
+            compressed.get("runtime_route") or ""
+        ).strip().lower()
+
+        risk = str(
+            prediction.get("risk_forecast") or ""
+        ).strip().lower()
+
+        recommended_action = "observe"
+        reason = "Runtime is stable enough to keep observing."
+
+        if risk == "high" or health == "unstable":
+            recommended_action = "inspect_failure"
+            reason = "Runtime risk is high or unstable."
+
+        elif signal == "runtime_requested_failure_inspection":
+            recommended_action = "inspect_failure"
+            reason = "Runtime requested failure inspection."
+
+        elif risk == "medium":
+            recommended_action = "cooldown_repair"
+            reason = "Runtime risk is medium; repair should be throttled."
+
+        elif route == "recovery" or health == "recovering":
+            recommended_action = "preserve_recovery"
+            reason = "Runtime is recovering; avoid aggressive mutation."
+
+        return jsonify(
+            {
+                "ok": True,
+                "decision": {
+                    "recommended_action": recommended_action,
+                    "reason": reason,
+                    "runtime_health": health,
+                    "runtime_signal": signal,
+                    "runtime_route": route,
+                    "risk_forecast": risk,
+                },
+            }
+        )
+
+    except Exception as e:
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(e),
+                "decision": {},
+            }
+        ), 500
 
 @app.route("/api/runtime/bridge", methods=["POST"])
 def api_runtime_bridge():
-    return jsonify({"ok": True})
+    try:
+        decision_response = api_runtime_decision()
+        response_payload = decision_response.get_json()
+
+        decision = (
+            response_payload.get("decision", {})
+            if isinstance(response_payload, dict)
+            else {}
+        )
+
+        runtime = getattr(
+            chat_service,
+            "runtime",
+            None,
+        )
+
+        if runtime is None:
+            runtime = getattr(
+                chat_service,
+                "safe_runtime",
+                None,
+            )
+
+        if runtime is None:
+            runtime = runtime_brain
+
+        compressed = getattr(
+            runtime,
+            "last_compressed_runtime",
+            {},
+        )
+
+        if not isinstance(compressed, dict):
+            compressed = {}
+
+        router = compressed.get(
+            "runtime_execution_router",
+            {},
+        )
+
+        if not isinstance(router, dict):
+            router = {}
+
+        router_execute_now = bool(
+            router.get(
+                "execute_now",
+                False,
+            )
+        )
+
+        router_route = str(
+            router.get(
+                "route",
+                "observe_only",
+            )
+        ).strip()
+
+        router_priority = str(
+            router.get(
+                "priority",
+                "low",
+            )
+        ).strip()
+
+        recommended_action = str(
+            decision.get("recommended_action") or "observe"
+        ).strip()
+
+        bridge_action = "none"
+        execution_action = ""
+
+        if recommended_action == "inspect_failure":
+            bridge_action = "suggest_execution"
+            execution_action = "retry_failed"
+
+        elif recommended_action == "cooldown_repair":
+            bridge_action = "suggest_execution"
+            execution_action = "pause"
+
+        elif recommended_action == "preserve_recovery":
+            bridge_action = "observe_only"
+            execution_action = ""
+
+        elif recommended_action == "observe":
+            bridge_action = "observe_only"
+            execution_action = ""
+
+        if router_execute_now and router_route in {
+            "normal_autonomous_execution",
+            "guarded_recovery_execution",
+            "recovery_execution",
+        }:
+
+            bridge_action = (
+                "runtime_directed_execution"
+            )
+
+            execution_action = (
+                "runtime_execute_now"
+            )
+
+        payload = request.get_json(
+            silent=True
+        ) or {}
+
+        allow_auto_execute = bool(
+            payload.get(
+                "allow_auto_execute"
+            )
+        )
+
+        auto_execute = (
+            allow_auto_execute
+            and bridge_action in {
+                "suggest_execution",
+                "runtime_directed_execution",
+            }
+            and execution_action in {
+                "retry_failed",
+                "pause",
+                "runtime_execute_now",
+            }
+        )
+
+        return jsonify(
+            {
+                "ok": True,
+                "bridge": {
+                    "recommended_action": (
+                        recommended_action
+                    ),
+                    "bridge_action": (
+                        bridge_action
+                    ),
+                    "execution_action": (
+                        execution_action
+                    ),
+                    "auto_execute": (
+                        auto_execute
+                    ),
+                    "router_execute_now": (
+                        router_execute_now
+                    ),
+                    "router_route": (
+                        router_route
+                    ),
+                    "router_priority": (
+                        router_priority
+                    ),
+                    "runtime_execution_router": (
+                        router
+                    ),
+                    "reason": (
+                        decision.get("reason")
+                        or ""
+                    ),
+                },
+            }
+        )
+
+    except Exception as e:
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(e),
+                "bridge": {},
+            }
+        ), 500
 
 @app.route("/api/runtime/cycle", methods=["POST"])
 def api_runtime_cycle():
@@ -739,13 +1096,7 @@ def api_fetch():
 
     result = web_service.fetch(url)
 
-    clean_result = (
-        runtime_response_sanitizer.sanitize(
-            result
-        )
-    )
-
-    return jsonify(clean_result)
+    return jsonify(result)
 
 @app.get("/api/sessions")
 def api_sessions():
@@ -808,11 +1159,57 @@ def api_chat():
             attachments=attachments,
         )
 
-        # TEMP DISABLED:
-        # runtime_brain.run_cycle is crashing on undefined working_state.
-        # Keep disabled until execution mutation is stable.
+        try:
+
+            if hasattr(runtime_brain, "run_cycle"):
+
+                runtime_brain.run_cycle(
+                    execution_state={
+                        "source": "api_chat",
+                        "user_text": user_text,
+                        "session_id": session_id,
+                    },
+                    world_state={
+                        "route": "chat",
+                        "event": "chat_completed",
+                    },
+                )
+
+        except Exception as runtime_error:
+            print(
+                "RUNTIME CHAT CYCLE ERROR:",
+                runtime_error,
+            )
         print("CHAT RAW RESULT:", result)
 
+        try:
+            runtime_result = runtime_brain.run_cycle(
+                execution_state={
+                    "status": "active",
+                    "user_text": user_text,
+                    "session_id": session_id,
+                    "last_response": (
+                        result.get("assistant_message", {})
+                        .get("text", "")
+                    ),
+                },
+                world_state={
+                    "active_session": session_id,
+                },
+                scheduler_state={},
+                knowledge_graph={},
+            )
+
+            result["runtime"] = runtime_result.get(
+                "compressed_runtime",
+                {}
+            )
+
+        except Exception as runtime_error:
+            print(
+                "LIVE RUNTIME CYCLE FAILED =",
+                runtime_error,
+            )
         if result is None:
             result = {
                 "ok": False,
@@ -836,9 +1233,8 @@ def api_chat():
 
                 if assistant_meta.get("pending_execution_action"):
                     assistant_meta["pending_execution_action"] = ""
-
         except Exception as cleanup_error:
-            print("PENDING EXECUTION CLEANUP FAILED:", cleanup_error)
+            print("PENDING EXECUTION CLEANUP FAILED:", cleanup_error)  
 
         assistant_message = result.get("assistant_message") or {
             "role": "assistant",
@@ -848,27 +1244,18 @@ def api_chat():
         payload = {
             "ok": result.get("ok", True),
             "assistant_message": assistant_message,
-            "active_session_id": (
-                result.get("active_session_id")
-                or result.get("session_id")
-                or session_id
-            ),
-            "session": (
-                result.get("session")
-                or session_service.get_session(session_id)
-            ),
+
+            "active_session_id": result.get("active_session_id") or result.get("session_id") or session_id,
+            "session": result.get("session") or session_service.get_session(session_id),
+            "sessions": result.get("sessions") or session_service.get_all(),
+            "artifacts": result.get("artifacts") or artifact_service.build_list_payload(),
+            "memory": result.get("memory") or memory_service.build_list_payload(),
             "saved_artifact": result.get("saved_artifact"),
-            "runtime": {},
+            "runtime": result.get("runtime") or {},
             "debug": result.get("debug") or {},
         }
 
-        return json_ok(
-            **{
-                k: v
-                for k, v in payload.items()
-                if v is not None
-            }
-        )
+        return json_ok(**{k: v for k, v in payload.items() if v is not None})
 
     except Exception as exc:
         import traceback
@@ -1645,41 +2032,8 @@ def execution_stream():
         import json
         return f"event: {name}\ndata: {json.dumps(payload)}\n\n"
 
-def save_execution(execution):
-
-    session = session_service.get_session(
-        session_id
-    )
-
-    if not isinstance(session, dict):
-        return
-
-    working_state = session.get(
-        "working_state",
-        {},
-    )
-
-    if not isinstance(working_state, dict):
-        working_state = {}
-
-    execution_map = working_state.get(
-        "execution",
-        {},
-    )
-
-    if not isinstance(execution_map, dict):
-        execution_map = {}
-
-    execution_map[session_id] = execution
-
-    working_state["execution"] = execution_map
-
-    session["working_state"] = working_state
-
-    session_service.update_session(
-        session_id,
-        session,
-    )
+    def save_execution(execution):
+        session["working_state"]["execution"][session_id] = execution
 
     def replay_existing_step(execution, replay_step, step_title):
         move = replay_step.get("move") if isinstance(replay_step, dict) else None
@@ -1700,34 +2054,8 @@ def save_execution(execution):
         ))
 
         replay_ok = bool(getattr(replay_result, "success", False))
-
         replay_step["status"] = "done" if replay_ok else "failed"
         replay_step["output"] = getattr(replay_result, "output", {})
-
-        runtime = getattr(chat_service, "runtime", None)
-
-        if runtime is not None:
-            runtime_strategy_memory = getattr(
-                runtime,
-                "runtime_strategy_memory",
-                None,
-            )
-
-            if isinstance(runtime_strategy_memory, list):
-                runtime_strategy_memory.append(
-                    {
-                        "action": move.get("type") or action,
-                        "success": replay_ok,
-                        "failure": not replay_ok,
-                        "runtime_signal": (
-                            "execution_success"
-                            if replay_ok
-                            else "execution_failure"
-                        ),
-                        "score_delta": 1 if replay_ok else -1,
-                    }
-                )
-
         execution["status"] = "complete" if replay_ok else "error"
         execution["current_step"] = "Replay complete" if replay_ok else f"Replay failed: {step_title}"
 
@@ -1744,15 +2072,7 @@ def save_execution(execution):
             yield send_event("error", {"ok": False, "error": "missing action", "done": True})
             return
 
-        session = session_service.get_session(
-            session_id
-        )
-
-        if not isinstance(
-            session,
-            dict,
-        ):
-            session = {}
+        session = {}
 
         execution = (session or {}).get("working_state", {}).get("execution") or {}
         if not isinstance(execution, dict):

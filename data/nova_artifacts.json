@@ -851,6 +851,31 @@
       "root_id": "artifact_1a4ff707a8574d86b5636fd60b0f7738",
       "updated_at": "2026-05-12T03:23:11.990996+00:00",
       "created_at": "2026-05-12T03:23:11.990996+00:00"
+    },
+    {
+      "kind": "image_generation",
+      "type": "image_generation",
+      "title": "Generated image",
+      "body": "generate an image of a dragon",
+      "summary": "Generated image for: generate an image of a dragon",
+      "preview": "/api/uploads/generated_9261a758ebef45deb4c266ec11220966.png",
+      "session_id": "session_1d90f0b8814f4dcc9186579447273421",
+      "source": "generated",
+      "image_url": "/api/uploads/generated_9261a758ebef45deb4c266ec11220966.png",
+      "prompt": "generate an image of a dragon",
+      "revised_prompt": "",
+      "parent_id": null,
+      "meta": {
+        "image_url": "/api/uploads/generated_9261a758ebef45deb4c266ec11220966.png",
+        "prompt": "generate an image of a dragon",
+        "generation_mode": "text_to_image",
+        "source_type": "generated"
+      },
+      "id": "artifact_ab55b04e794a4c2fb9c0f277f227e838",
+      "version": 1,
+      "root_id": "artifact_ab55b04e794a4c2fb9c0f277f227e838",
+      "updated_at": "2026-05-14T18:36:32.076223+00:00",
+      "created_at": "2026-05-14T18:36:32.076223+00:00"
     }
   ]
 }

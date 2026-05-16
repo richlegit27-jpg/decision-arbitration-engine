@@ -113,11 +113,32 @@ class RuntimeExecutionRouter:
             priority = "high"
             execute_now = True
 
-        elif autonomy_mode == "active_execution":
+        elif (
+            autonomy_mode == "active_execution"
+            or (
+                runtime_signal in {
+                    "runtime_anomaly_detected",
+                    "runtime_requested_failure_inspection",
+                }
+                and execute_now
+            )
+        ):
 
-            route = "normal_autonomous_execution"
-            priority = "medium"
+            route = (
+                "normal_autonomous_execution"
+            )
+
+            priority = "high"
+
             execute_now = True
+
+            autonomy_mode = (
+                "active_execution"
+            )
+
+            operating_mode = (
+                "directed_autonomy"
+            )
 
         return {
             "ok": True,

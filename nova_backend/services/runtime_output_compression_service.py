@@ -27,6 +27,9 @@ class RuntimeOutputCompressionService:
             policy_enforcement.get("execution_state")
         )
 
+        if not execution_state:
+            execution_state = mutated
+
         world_model = self._safe_dict(
             execution_state.get("runtime_world_model")
         )
@@ -65,6 +68,20 @@ class RuntimeOutputCompressionService:
 
             "runtime_world_prediction": (
                 world_model.get("prediction")
+            ),
+
+            "runtime_summary_memory": (
+                execution_state.get(
+                    "runtime_summary_memory",
+                    [],
+                )
+            ),
+
+            "runtime_compressed_memory": (
+                execution_state.get(
+                    "runtime_compressed_memory",
+                    {},
+                )
             ),
 
             "runtime_execution_router": (

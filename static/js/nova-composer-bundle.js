@@ -174,6 +174,62 @@ function applyBackendSessionState(payload, explicitSessionId) {
     }
   }
 
+function normalizeAssistantMessage(data) {
+
+  if (!data || typeof data !== "object") {
+    return {
+      text: "",
+      meta: {},
+    };
+  }
+
+  if (
+    data.assistant_message &&
+    typeof data.assistant_message === "object"
+  ) {
+
+    return {
+      text: String(
+        data.assistant_message.text || ""
+      ).trim(),
+
+      image_url: String(
+        data.assistant_message.image_url || ""
+      ).trim(),
+
+      audio_url: String(
+        data.assistant_message.audio_url || ""
+      ).trim(),
+
+      video_url: String(
+        data.assistant_message.video_url || ""
+      ).trim(),
+
+      meta:
+        typeof data.assistant_message.meta === "object"
+          ? data.assistant_message.meta
+          : {},
+    };
+  }
+
+  if (typeof data.assistant_message === "string") {
+
+    return {
+      text: data.assistant_message,
+      meta: {},
+    };
+  }
+
+  return {
+    text: String(data.text || "").trim(),
+    meta: {},
+  };
+}
+
+function firstRealFunction() {
+
+}
+
 function resolveUploadUrl(url) {
   const raw = String(url || "").trim();
   if (!raw) return "";
@@ -5090,17 +5146,18 @@ async function playVoiceReplyFromText(text) {
 
   stopCurrentTtsPlayback();
 
-  const payload = await requestVoiceReply(cleanText);
+const payload = await requestVoiceReply(cleanText);
 
-  const url = String(
-    (payload &&
-      payload.assistant_message &&
-      payload.assistant_message.meta &&
-      payload.assistant_message.meta.audio_url) ||
+const normalized =
+    normalizeAssistantMessage(payload);
+
+const url = String(
+    normalized.audio_url ||
+    (normalized.meta && normalized.meta.audio_url) ||
     (payload && payload.audio_url) ||
     (payload && payload.url) ||
     ""
-  ).trim();
+).trim();
 
   if (!url) {
     throw new Error("Voice reply URL missing.");
@@ -5893,12 +5950,18 @@ async function maybeAutoSaveMemoryFromChatText(userText) {
 }
 
 function wireMemoryControls() {
+  if (window.__novaMemoryWired) {
+    return;
+  }
+
+  window.__novaMemoryWired = true;
+
   console.log("WIRE MEMORY CONTROLS ACTIVE");
 
   const addBtn = document.querySelector("[data-memory-add-button]");
   const input = document.querySelector("[data-memory-add-text]");
 
-  // âœ… ADD MEMORY (button click)
+  // ADD MEMORY (button click)
   if (addBtn && !addBtn.__novaMemoryAddWired) {
     addBtn.__novaMemoryAddWired = true;
 

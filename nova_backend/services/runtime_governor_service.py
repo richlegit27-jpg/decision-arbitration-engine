@@ -8,7 +8,10 @@ class RuntimeGovernorService:
             "danger",
         }
 
-    def _safe_dict(self, value):
+    def _safe_dict(
+        self,
+        value,
+    ):
 
         return (
             value
@@ -29,8 +32,10 @@ class RuntimeGovernorService:
             )
         )
 
-        runtime_brain = self._safe_dict(
-            runtime_brain
+        runtime_brain = (
+            self._safe_dict(
+                runtime_brain
+            )
         )
 
         selected_engines = (
@@ -49,6 +54,57 @@ class RuntimeGovernorService:
             or "normal"
         ).lower()
 
+        runtime_signal = str(
+            runtime_brain.get(
+                "runtime_signal"
+            )
+            or runtime_failure_intelligence.get(
+                "runtime_signal"
+            )
+            or ""
+        ).lower()
+
+        runtime_bridge_authorized = bool(
+            runtime_brain.get(
+                "runtime_bridge_authorized"
+            )
+            or runtime_failure_intelligence.get(
+                "runtime_bridge_authorized"
+            )
+        )
+
+        runtime_execution_router = self._safe_dict(
+            runtime_brain.get(
+                "runtime_execution_router"
+            )
+            or runtime_failure_intelligence.get(
+                "runtime_execution_router"
+            )
+        )
+
+        execute_now = bool(
+            runtime_brain.get(
+                "execute_now"
+            )
+            or runtime_brain.get(
+                "runtime_execute_now"
+            )
+            or runtime_failure_intelligence.get(
+                "execute_now"
+            )
+            or runtime_failure_intelligence.get(
+                "runtime_execute_now"
+            )
+            or runtime_execution_router.get(
+                "execute_now"
+            )
+        )
+
+        directed_execution_allowed = (
+            runtime_bridge_authorized
+            and execute_now
+        )
+
         governor = {
             "mode": "normal",
             "allow_execution": True,
@@ -58,6 +114,14 @@ class RuntimeGovernorService:
             "reason": "",
             "selected_count": len(
                 selected_engines
+            ),
+            "runtime_signal": runtime_signal,
+            "runtime_bridge_authorized": (
+                runtime_bridge_authorized
+            ),
+            "execute_now": execute_now,
+            "directed_execution_allowed": (
+                directed_execution_allowed
             ),
         }
 
@@ -98,6 +162,28 @@ class RuntimeGovernorService:
 
             governor["reason"] = (
                 "No engines available after suppression."
+            )
+
+        if directed_execution_allowed:
+
+            governor["mode"] = (
+                "directed_execution"
+            )
+
+            governor[
+                "allow_execution"
+            ] = True
+
+            governor["force_repair"] = False
+
+            governor["force_debug"] = False
+
+            governor["risk_level"] = (
+                "controlled"
+            )
+
+            governor["reason"] = (
+                "Runtime bridge authorized directed execution."
             )
 
         return governor

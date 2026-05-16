@@ -17,9 +17,42 @@ class RuntimeGovernorArbitrationService:
         reflection_action=None,
         runtime_policy=None,
         trend=None,
+        governance_memory=None,
+        execution_state=None,
     ):
-        runtime_policy = self._safe_dict(runtime_policy)
-        trend = self._safe_dict(trend)
+
+        runtime_policy = self._safe_dict(
+            runtime_policy
+        )
+
+        trend = self._safe_dict(
+            trend
+        )
+
+        governance_memory = (
+            governance_memory
+            if isinstance(
+                governance_memory,
+                dict,
+            )
+            else {}
+        )
+
+        execution_state = (
+            execution_state
+            if isinstance(
+                execution_state,
+                dict,
+            )
+            else {}
+        )
+
+        has_high_importance_memory = (
+            governance_memory.get(
+                "has_high_importance_memory",
+                False,
+            )
+        )
 
         candidates = {
             "repair": repair_action,
@@ -32,12 +65,17 @@ class RuntimeGovernorArbitrationService:
         scores = {}
 
         for engine, action in candidates.items():
+
             if not action:
                 continue
 
-            score = self.weights.get(engine, 1.0)
+            score = self.weights.get(
+                engine,
+                1.0,
+            )
 
             if engine == "policy":
+
                 score += self._policy_pressure_score(
                     runtime_policy=runtime_policy,
                     trend=trend,
@@ -45,17 +83,70 @@ class RuntimeGovernorArbitrationService:
                 )
 
             if engine == "repair":
+
                 score += self._repair_pressure_score(
                     trend=trend,
                     action=action,
                 )
 
+            if has_high_importance_memory:
+
+                if action in {
+                    "mutate",
+                    "evolve",
+                    "retry",
+                }:
+                    score -= 0.5
+
+                if action in {
+                    "pause",
+                    "observe",
+                    "stabilize",
+                    "careful_resume",
+                }:
+                    score += 0.5
+
             scores[engine] = {
                 "action": action,
-                "score": round(score, 4),
+                "score": round(
+                    score,
+                    4,
+                ),
+            }
+
+        # =====================================
+        # EXECUTION QUEUE OVERRIDE
+        # =====================================
+
+        queue_override_active = (
+            execution_state.get(
+                "runtime_execute_now"
+            )
+            and execution_state.get(
+                "runtime_bridge_authorized"
+            )
+        )
+
+        if queue_override_active:
+
+            return {
+                "ok": True,
+                "selected_engine": (
+                    "execution_queue_override"
+                ),
+                "selected_action": (
+                    "autonomous_execution"
+                ),
+                "scores": scores,
+                "candidates": candidates,
+                "reason": (
+                    "Active runtime execution queue "
+                    "overrides passive governance."
+                ),
             }
 
         if not scores:
+
             return {
                 "ok": False,
                 "selected_engine": None,
@@ -70,13 +161,17 @@ class RuntimeGovernorArbitrationService:
             key=lambda item: scores[item]["score"],
         )
 
-        selected_action = scores[selected_engine]["action"]
+        selected_action = scores[
+            selected_engine
+        ]["action"]
 
-        selected_action = self._rewrite_selected_action(
-            selected_engine=selected_engine,
-            selected_action=selected_action,
-            runtime_policy=runtime_policy,
-            trend=trend,
+        selected_action = (
+            self._rewrite_selected_action(
+                selected_engine=selected_engine,
+                selected_action=selected_action,
+                runtime_policy=runtime_policy,
+                trend=trend,
+            )
         )
 
         return {
@@ -85,7 +180,10 @@ class RuntimeGovernorArbitrationService:
             "selected_action": selected_action,
             "scores": scores,
             "candidates": candidates,
-            "reason": f"{selected_engine}_pressure_selected",
+            "reason": (
+                f"{selected_engine}"
+                "_pressure_selected"
+            ),
         }
 
     def _rewrite_selected_action(

@@ -1,42 +1,176 @@
 class RuntimeAutonomousExecutor:
+    def __init__(
+        self,
+        allowed_actions=None,
+    ):
+        self.allowed_actions = allowed_actions or [
+            "retry_failed",
+            "pause",
+            "repair_step",
+            "rollback_runtime",
+            "mutate_strategy",
+            "isolate_failure",
+            "checkpoint_runtime",
+            "escalate_supervision",
+            "reroute_execution",
+            "rebuild_plan",
+        ]
 
-    name = "runtime_autonomous_executor"
+    def _safe_dict(
+        self,
+        value,
+    ):
+        return (
+            value
+            if isinstance(value, dict)
+            else {}
+        )
 
-    tags = [
-        "runtime",
-        "autonomy",
-        "execution",
-        "executor",
-    ]
+    def _policy_blocks_action(
+        self,
+        action,
+        adaptive_policy,
+    ):
+        adaptive_policy = self._safe_dict(
+            adaptive_policy
+        )
+
+        allow_mutation = bool(
+            adaptive_policy.get(
+                "allow_mutation",
+                True,
+            )
+        )
+
+        allow_evolution = bool(
+            adaptive_policy.get(
+                "allow_evolution",
+                True,
+            )
+        )
+
+        healing_aggressiveness = str(
+            adaptive_policy.get(
+                "healing_aggressiveness",
+                "normal",
+            )
+            or "normal"
+        ).lower()
+
+        mutation_actions = {
+            "mutate_strategy",
+            "rebuild_plan",
+            "reroute_execution",
+        }
+
+        evolution_actions = {
+            "mutate_strategy",
+            "rebuild_plan",
+        }
+
+        recovery_actions = {
+            "repair_step",
+            "rollback_runtime",
+            "isolate_failure",
+            "checkpoint_runtime",
+            "escalate_supervision",
+        }
+
+        if (
+            not allow_mutation
+            and action in mutation_actions
+        ):
+            return (
+                True,
+                "adaptive_policy_blocked_mutation",
+            )
+
+        if (
+            not allow_evolution
+            and action in evolution_actions
+        ):
+            return (
+                True,
+                "adaptive_policy_blocked_evolution",
+            )
+
+        if (
+            healing_aggressiveness == "maximum"
+            and action not in recovery_actions
+            and action != "pause"
+        ):
+            return (
+                True,
+                "adaptive_policy_forced_recovery_mode",
+            )
+
+        return (
+            False,
+            "",
+        )
 
     def execute(
         self,
         execution_state=None,
         runtime_execution_queue=None,
     ):
-
         execution_state = (
             execution_state
             if isinstance(execution_state, dict)
             else {}
         )
 
-        runtime_execution_queue = (
+        queue = (
             runtime_execution_queue
-            if isinstance(runtime_execution_queue, dict)
-            else {}
-        )
-
-        queue = runtime_execution_queue.get(
-            "queue",
-            execution_state.get(
+            if runtime_execution_queue is not None
+            else execution_state.get(
                 "runtime_execution_queue",
                 [],
-            ),
+            )
         )
 
-        if not isinstance(queue, list):
+        if isinstance(queue, dict):
+
+            queue = queue.get(
+                "queue",
+                [],
+            )
+
+        queue = execution_state.get(
+            "runtime_execution_queue"
+        )
+
+        if not queue:
+
+            queue = execution_state.get(
+                "runtime_execution_router"
+            )
+
+        if (
+            isinstance(
+                queue,
+                dict,
+            )
+            and queue.get(
+                "queue"
+            )
+        ):
+
+            queue = queue.get(
+                "queue"
+            )
+
+        if not isinstance(
+            queue,
+            list,
+        ):
             queue = []
+
+        adaptive_policy = self._safe_dict(
+            execution_state.get(
+                "adaptive_policy"
+            )
+        )
 
         executed_actions = []
         blocked_actions = []
@@ -56,7 +190,6 @@ class RuntimeAutonomousExecutor:
         )
 
         if safety_lock:
-
             return {
                 "ok": True,
                 "executed": False,
@@ -67,7 +200,6 @@ class RuntimeAutonomousExecutor:
             }
 
         if not auto_execute_allowed:
-
             return {
                 "ok": True,
                 "executed": False,
@@ -91,8 +223,21 @@ class RuntimeAutonomousExecutor:
                 )
             ).lower()
 
-            if action == "retry_failed":
+            blocked_by_policy, block_reason = (
+                self._policy_blocks_action(
+                    action=action,
+                    adaptive_policy=adaptive_policy,
+                )
+            )
 
+            if blocked_by_policy:
+                blocked_item = dict(item)
+                blocked_item["blocked_reason"] = block_reason
+                blocked_actions.append(blocked_item)
+                remaining_queue.append(item)
+                continue
+
+            if action == "retry_failed":
                 execution_state["runtime_last_autonomous_action"] = (
                     "retry_failed"
                 )
@@ -100,21 +245,50 @@ class RuntimeAutonomousExecutor:
                 execution_state["runtime_signal"] = (
                     "runtime_autonomous_retry"
                 )
+                executed_actions.append(item)
+
+
+            elif action == "mutate_strategy":
+
+                execution_state[
+                    "runtime_last_autonomous_action"
+                ] = "mutate_strategy"
+
+                execution_state[
+                    "runtime_strategy_mutation_requested"
+                ] = True
+
+                execution_state[
+                    "runtime_signal"
+                ] = "runtime_strategy_mutation"
+
+                executed_actions.append(item)
+
+            elif action == "reroute_execution":
+
+                execution_state[
+                    "runtime_last_autonomous_action"
+                ] = "reroute_execution"
+
+                execution_state[
+                    "runtime_execution_reroute_requested"
+                ] = True
+
+                execution_state[
+                    "runtime_signal"
+                ] = "runtime_execution_reroute"
 
                 executed_actions.append(item)
 
             elif action == "pause":
-
                 execution_state["runtime_last_autonomous_action"] = "pause"
                 execution_state["runtime_autonomous_pause_requested"] = True
                 execution_state["runtime_signal"] = (
                     "runtime_autonomous_pause"
                 )
-
                 executed_actions.append(item)
 
             elif action == "repair_step":
-
                 execution_state["runtime_last_autonomous_action"] = (
                     "repair_step"
                 )
@@ -123,11 +297,9 @@ class RuntimeAutonomousExecutor:
                     "runtime_autonomous_repair_step"
                 )
                 execution_state["recovery_mode"] = True
-
                 executed_actions.append(item)
 
             elif action == "rollback_runtime":
-
                 execution_state["runtime_last_autonomous_action"] = (
                     "rollback_runtime"
                 )
@@ -136,11 +308,9 @@ class RuntimeAutonomousExecutor:
                     "runtime_autonomous_rollback"
                 )
                 execution_state["recovery_mode"] = True
-
                 executed_actions.append(item)
 
             elif action == "mutate_strategy":
-
                 execution_state["runtime_last_autonomous_action"] = (
                     "mutate_strategy"
                 )
@@ -148,11 +318,9 @@ class RuntimeAutonomousExecutor:
                 execution_state["runtime_signal"] = (
                     "runtime_autonomous_strategy_mutation"
                 )
-
                 executed_actions.append(item)
 
             elif action == "isolate_failure":
-
                 execution_state["runtime_last_autonomous_action"] = (
                     "isolate_failure"
                 )
@@ -161,11 +329,9 @@ class RuntimeAutonomousExecutor:
                     "runtime_autonomous_failure_isolation"
                 )
                 execution_state["recovery_mode"] = True
-
                 executed_actions.append(item)
 
             elif action == "checkpoint_runtime":
-
                 execution_state["runtime_last_autonomous_action"] = (
                     "checkpoint_runtime"
                 )
@@ -173,11 +339,9 @@ class RuntimeAutonomousExecutor:
                 execution_state["runtime_signal"] = (
                     "runtime_autonomous_checkpoint"
                 )
-
                 executed_actions.append(item)
 
             elif action == "escalate_supervision":
-
                 execution_state["runtime_last_autonomous_action"] = (
                     "escalate_supervision"
                 )
@@ -185,11 +349,9 @@ class RuntimeAutonomousExecutor:
                 execution_state["runtime_signal"] = (
                     "runtime_autonomous_supervision_escalation"
                 )
-
                 executed_actions.append(item)
 
             elif action == "reroute_execution":
-
                 execution_state["runtime_last_autonomous_action"] = (
                     "reroute_execution"
                 )
@@ -197,11 +359,9 @@ class RuntimeAutonomousExecutor:
                 execution_state["runtime_signal"] = (
                     "runtime_autonomous_reroute_execution"
                 )
-
                 executed_actions.append(item)
 
             elif action == "rebuild_plan":
-
                 execution_state["runtime_last_autonomous_action"] = (
                     "rebuild_plan"
                 )
@@ -209,11 +369,9 @@ class RuntimeAutonomousExecutor:
                 execution_state["runtime_signal"] = (
                     "runtime_autonomous_rebuild_plan"
                 )
-
                 executed_actions.append(item)
 
             else:
-
                 blocked_actions.append(item)
                 remaining_queue.append(item)
 
