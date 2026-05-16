@@ -1356,6 +1356,9 @@ Current step:
             else {}
         )
 
+        execution_state["_execution_processing"] = False
+        execution_state["lock"] = False
+
         working_state = (
             self._get_working_state(session_id)
             or {}
@@ -2409,22 +2412,39 @@ Current step:
             step["status"] = "running"
 
             execution_state["status"] = "running"
-            execution_state["current_step"] = step.get("title") or ""
-            execution_state["current_step_title"] = step.get("title") or ""
+            execution_state["current_step"] = (
+                step.get("title")
+                or ""
+            )
+            execution_state["current_step_title"] = (
+                step.get("title")
+                or ""
+            )
 
-            self._execute_step_logic(
+            result = self._execute_step_logic(
                 session_id=session_id,
                 step=step,
             )
 
-            result = step.get(
-                "result",
-                "",
+            print(
+                "AFTER EXECUTE 2415 STEP OBJECT =",
+                step,
             )
 
-            self._execute_step_logic(
-                session_id=session_id,
-                step=step,
+            step["status"] = "completed"
+
+            if result:
+                step["result"] = result
+
+            execution_state["steps"][
+                current_index
+            ] = dict(step)
+
+            steps = execution_state["steps"]
+
+            print(
+                "AFTER EXECUTE 2415 STEPS AFTER WRITEBACK =",
+                execution_state.get("steps"),
             )
 
             result = step.get(
@@ -2441,12 +2461,55 @@ Current step:
                 f"completed: {step.get('title')}"
             )
 
-            execution_state["current_index"] = current_index + 1
+            execution_state["current_index"] = (
+                current_index + 1
+            )
+
+            execution_state["current_step_index"] = (
+                current_index + 1
+            )
 
             execution_state["progress"] = (
                 current_index + 1
             )
+
             execution_state["waiting"] = True
+
+            execution_state["_execution_processing"] = False
+
+            next_index = execution_state.get(
+                "current_index",
+                current_index + 1,
+            )
+
+            if next_index < len(steps):
+                next_step = steps[next_index]
+
+                execution_state["current_step"] = (
+                    next_step.get("title")
+                    or ""
+                )
+
+                execution_state["current_step_title"] = (
+                    next_step.get("title")
+                    or ""
+                )
+            execution_state["_execution_processing"] = False
+
+            next_index = execution_state["current_index"]
+
+            if next_index < len(steps):
+                next_step = steps[next_index]
+
+                execution_state["current_step"] = (
+                    next_step.get("title")
+                    or ""
+                )
+
+                execution_state["current_step_title"] = (
+                    next_step.get("title")
+                    or ""
+                )
 
             if (
                 execution_state["current_index"]
@@ -2528,15 +2591,27 @@ Current step:
                     execution_state["complete"] = True
                     execution_state["current_step"] = ""
                     execution_state["current_step_title"] = ""
+                    execution_state["_execution_processing"] = False
                     break
 
                 step = steps[current_index]
+
                 step["status"] = "running"
 
-                execution_state["status"] = "running"
-                execution_state["current_step"] = step.get("title") or ""
-                execution_state["current_step_title"] = step.get("title") or ""
+                execution_state["steps"][
+                    current_index
+                ] = dict(step)
 
+                execution_state["status"] = "running"
+                execution_state["current_step"] = (
+                    step.get("title")
+                    or ""
+                )
+                execution_state["current_step_title"] = (
+                    step.get("title")
+                    or ""
+                )
+                execution_state["_execution_processing"] = False
 
                 self._save_active_execution(
                     session_id,
@@ -2546,6 +2621,32 @@ Current step:
                 result = self._execute_step_logic(
                     session_id=session_id,
                     step=step,
+                )
+
+                print(
+                    "AFTER EXECUTE STEP OBJECT =",
+                    step,
+                )
+
+                print(
+                    "AFTER EXECUTE EXECUTION STEPS BEFORE WRITEBACK =",
+                    execution_state.get("steps"),
+                )
+
+                step["status"] = "completed"
+
+                if result:
+                    step["result"] = result
+
+                execution_state["steps"][
+                    current_index
+                ] = dict(step)
+
+                steps = execution_state["steps"]
+
+                print(
+                    "AFTER EXECUTE EXECUTION STEPS AFTER WRITEBACK =",
+                    execution_state.get("steps"),
                 )
 
                 execution_state["history"] = (
@@ -9064,6 +9165,28 @@ if __name__ == "__main__":
                 execution_state,
             )
 
+        execution_state = (
+            self._load_execution_state(
+                session_id
+            )
+            or execution_state
+            or session.get("execution_state")
+            or session.get("active_execution")
+            or session.get("meta", {}).get(
+                "execution_state"
+            )
+            or session.get("meta", {}).get(
+                "active_execution"
+            )
+            or {}
+        )
+
+        if not isinstance(
+            execution_state,
+            dict,
+        ):
+            execution_state = {}
+
         # =========================
         # EXECUTION COMMAND DISPATCH
         # =========================
@@ -9076,19 +9199,21 @@ if __name__ == "__main__":
             )
 
             if already_processing:
-                return {
-                    "ok": True,
-                    "assistant_message": (
-                        self._build_assistant_message(
-                            "Execution already processing."
-                        )
-                    ),
-                    "execution": execution_state,
-                }
+                execution_state[
+                    "_execution_processing"
+                ] = False
+
+                execution_state["lock"] = False
+                execution_state["waiting"] = True
+
+                self._save_execution_state(
+                    session_id,
+                    execution_state,
+                )
 
             execution_state[
                 "_execution_processing"
-            ] = True
+            ] = False
 
             print(
                 "EXECUTION ABOUT TO PROCESS COMMAND",
@@ -14596,38 +14721,67 @@ Next action:
         progress=None,
         waiting=None,
     ):
-
         execution = (
             execution
             if isinstance(execution, dict)
             else {}
         )
 
+        original_steps = execution.get("steps")
+
         execution = self._normalize_execution_state(
             execution
         )
 
+        if isinstance(original_steps, list):
+            execution["steps"] = original_steps
+
+        steps = (
+            execution.get("steps")
+            if isinstance(execution.get("steps"), list)
+            else []
+        )
+
         if current_index is not None:
+            try:
+                current_index = int(current_index)
+            except Exception:
+                current_index = 0
 
             current_index = max(
                 0,
-                int(current_index),
+                current_index,
             )
+
+            if steps:
+                current_index = min(
+                    current_index,
+                    len(steps),
+                )
 
             execution["current_index"] = (
                 current_index
             )
 
-            if (
-                execution.get("status")
-                == "complete"
-                or status == "complete"
-            ):
+            execution["current_step_index"] = (
+                current_index
+            )
 
-                pass
+        else:
+            try:
+                current_index = int(
+                    execution.get("current_index", 0)
+                    or 0
+                )
+            except Exception:
+                current_index = 0
+
+            current_index = max(
+                0,
+                current_index,
+            )
 
         if status is not None:
-
             execution["status"] = (
                 self._safe_str(status)
                 or execution.get("status")
@@ -14635,7 +14789,6 @@ Next action:
             )
 
         if current_step is not None:
-
             execution["current_step"] = (
                 current_step
             )
@@ -14644,15 +14797,31 @@ Next action:
                 current_step
             )
 
+        elif (
+            steps
+            and current_index < len(steps)
+            and isinstance(steps[current_index], dict)
+        ):
+            execution["current_step"] = (
+                steps[current_index].get("title", "")
+            )
+
+            execution["current_step_title"] = (
+                steps[current_index].get("title", "")
+            )
+
         if progress is not None:
+            try:
+                progress = int(progress)
+            except Exception:
+                progress = 0
 
             execution["progress"] = max(
                 0,
-                int(progress),
+                progress,
             )
 
         if waiting is not None:
-
             execution["waiting"] = bool(
                 waiting
             )
@@ -14662,8 +14831,7 @@ Next action:
         )
 
         execution["complete"] = bool(
-            execution.get("status")
-            == "complete"
+            execution.get("status") == "complete"
         )
 
         return execution
