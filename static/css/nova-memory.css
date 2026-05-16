@@ -1,0 +1,278 @@
+[data-memory-panel] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.nova-memory-toolbar {
+  display: grid;
+  grid-template-columns: 1fr 120px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.nova-memory-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.nova-memory-status {
+  min-height: 18px;
+}
+
+.nova-memory-status[data-state="loading"] {
+  opacity: 0.8;
+}
+
+.nova-memory-status[data-state="error"] {
+  color: #ff8a8a;
+}
+
+.nova-memory-status[data-state="ok"] {
+  color: #8fe3a1;
+}
+
+.nova-memory-add {
+  display: grid;
+  grid-template-columns: 1fr 120px 120px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.nova-memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.nova-memory-empty {
+  opacity: 0.7;
+  font-size: 13px;
+  padding: 12px 0;
+}
+
+.nova-memory-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nova-memory-card.is-active {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nova-memory-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.nova-memory-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nova-memory-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nova-memory-badge.is-soft {
+  opacity: 0.8;
+}
+
+.nova-memory-card__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.nova-memory-icon-btn {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: inherit;
+  border-radius: 10px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.nova-memory-icon-btn.is-danger {
+  color: #ff9c9c;
+}
+
+.nova-memory-card__text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.45;
+  font-size: 14px;
+}
+
+.nova-memory-card__meta {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+@media (max-width: 900px) {
+  .nova-memory-toolbar,
+  .nova-memory-add {
+    grid-template-columns: 1fr;
+  }
+}
+
+.nova-memory-add {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.nova-memory-add textarea,
+.nova-memory-add select {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 14, 24, 0.95);
+  color: #f5f7fb;
+  padding: 10px;
+  outline: none;
+}
+
+.nova-memory-add textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
+.nova-memory-add textarea::placeholder {
+  color: rgba(245, 247, 251, 0.55);
+}
+
+.nova-memory-add button {
+  width: 100%;
+  border-radius: 10px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.16);
+  color: #f5f7fb;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.nova-memory-add button:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+[data-memory-refresh],
+.nova-memory-toolbar {
+  display: none !important;
+}
+
+.nova-memory-add textarea,
+.nova-memory-add select,
+.nova-memory-add button {
+  background: #0b1020 !important;
+  color: #f5f7fb !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+}
+
+.nova-memory-add textarea::placeholder {
+  color: rgba(245, 247, 251, 0.55) !important;
+}
+
+.nova-memory-add textarea {
+  min-height: 80px !important;
+  padding: 10px !important;
+  border-radius: 10px !important;
+  resize: vertical;
+}
+
+.nova-memory-add select,
+.nova-memory-add button {
+  padding: 10px !important;
+  border-radius: 10px !important;
+}
+
+.nova-memory-add {
+  background: rgba(255, 255, 255, 0.06) !important;
+  padding: 10px !important;
+  border-radius: 14px !important;
+}
+
+/* FORCE MEMORY ADD PANEL DARK FIX */
+[data-memory-panel] [data-memory-add],
+.nova-memory-add {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 10px !important;
+  padding: 12px !important;
+  margin: 10px 0 12px 0 !important;
+  border-radius: 14px !important;
+  background: #101624 !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+}
+
+[data-memory-panel] [data-memory-add-text],
+[data-memory-panel] [data-memory-add-kind],
+[data-memory-panel] [data-memory-add-button],
+.nova-memory-add textarea,
+.nova-memory-add select,
+.nova-memory-add button {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  background: #080d18 !important;
+  color: #f5f7fb !important;
+  -webkit-text-fill-color: #f5f7fb !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 10px !important;
+  padding: 10px 12px !important;
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  outline: none !important;
+}
+
+[data-memory-panel] [data-memory-add-text],
+.nova-memory-add textarea {
+  min-height: 88px !important;
+  resize: vertical !important;
+}
+
+[data-memory-panel] [data-memory-add-text]::placeholder,
+.nova-memory-add textarea::placeholder {
+  color: rgba(245, 247, 251, 0.55) !important;
+  -webkit-text-fill-color: rgba(245, 247, 251, 0.55) !important;
+}
+
+[data-memory-panel] [data-memory-add-button],
+.nova-memory-add button {
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  background: #1f2a44 !important;
+}
+
+[data-memory-panel] [data-memory-add-button]:hover,
+.nova-memory-add button:hover {
+  background: #2b3a5f !important;
+}

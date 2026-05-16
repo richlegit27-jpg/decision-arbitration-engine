@@ -1,0 +1,143 @@
+/* =========================
+   CHAT MESSAGES
+========================= */
+.chat-message,
+.message,
+.msg {
+  max-width: min(820px, 88%);
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  line-height: 1.55;
+  font-size: 15px;
+  box-shadow: var(--shadow-md);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.chat-message.user,
+.message.user,
+.msg.user {
+  align-self: flex-end;
+  background: linear-gradient(180deg, var(--accent-soft), rgba(121, 168, 255, 0.08));
+  border-color: rgba(121, 168, 255, 0.28);
+}
+
+.chat-message.assistant,
+.message.assistant,
+.msg.assistant {
+  align-self: flex-start;
+  background: var(--panel-2);
+}
+
+.chat-message.system,
+.message.system,
+.msg.system {
+  align-self: center;
+  max-width: min(760px, 92%);
+  background: var(--panel-3);
+  color: var(--muted);
+  font-size: 13px;
+  border-style: dashed;
+}
+
+.chat-message pre,
+.message pre,
+.msg pre {
+  margin: 12px 0 0;
+  padding: 12px;
+  border-radius: 12px;
+  overflow-x: auto;
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid var(--line);
+}
+
+.chat-message code,
+.message code,
+.msg code {
+  font-family: Consolas, Monaco, monospace;
+  font-size: 13px;
+}
+
+.chat-message p,
+.message p,
+.msg p {
+  margin: 0 0 10px;
+}
+
+.chat-message p:last-child,
+.message p:last-child,
+.msg p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-message ul,
+.chat-message ol,
+.message ul,
+.message ol,
+.msg ul,
+.msg ol {
+  margin: 10px 0 10px 18px;
+  padding: 0;
+}
+
+.chat-message li,
+.message li,
+.msg li {
+  margin: 4px 0;
+}
+
+.chat-message blockquote,
+.message blockquote,
+.msg blockquote {
+  margin: 10px 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+}
+
+.chat-message .message-actions,
+.message .message-actions,
+.msg .message-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.chat-message .message-action,
+.message .message-action,
+.msg .message-action {
+  border: 1px solid var(--line);
+  background: var(--panel-3);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.chat-message .message-action:hover,
+.message .message-action:hover,
+.msg .message-action:hover {
+  background: var(--accent-soft);
+  border-color: rgba(121, 168, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+.chat-message {
+  transform-origin: bottom;
+  animation: msgIn 0.18s ease;
+}
+
+@keyframes msgIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

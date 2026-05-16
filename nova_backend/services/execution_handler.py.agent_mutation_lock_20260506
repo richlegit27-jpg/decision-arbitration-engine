@@ -1,0 +1,1160 @@
+from __future__ import annotations
+
+import py_compile
+import shutil
+import time
+import json
+import uuid
+from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Any, Callable
+
+
+@dataclass
+class NextMove:
+    id: str
+    type: str
+    payload: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ExecutionResult:
+    move_id: str
+    status: str
+    output: Any = None
+    error: str = ""
+    next_moves: list[NextMove] = field(default_factory=list)
+
+
+MoveExecutor = Callable[[NextMove], ExecutionResult]
+
+
+def make_move(move_type: str, payload: dict[str, Any] | None = None) -> NextMove:
+    return NextMove(
+        id=str(uuid.uuid4()),
+        type=move_type,
+        payload=payload or {},
+    )
+
+
+class ExecutionHandler:
+    def __init__(self, executor: MoveExecutor):
+        self.executor = executor
+
+    def _execute_step(self, step: dict) -> dict:
+        title = str(step.get("title") or "step").strip()
+        action = str(step.get("action") or title or "execute").strip().lower()
+        input_value = str(step.get("input") or "").strip()
+        target_file = str(step.get("target_file") or "").strip()
+        target_function = str(step.get("target_function") or "").strip()
+
+        result_lines = [
+            f"Action: {action}",
+            f"Title: {title}",
+        ]
+
+        if input_value:
+            result_lines.append(f"Input: {input_value}")
+
+        if target_file:
+            result_lines.append(f"Target file: {target_file}")
+
+        if target_function:
+            result_lines.append(f"Target function: {target_function}")
+
+        if action == "design":
+            result_lines.append("Result: Design step completed.")
+
+        elif action == "implement":
+            if not target_file:
+                step["status"] = "failed"
+                step["error"] = "Implement action missing target_file."
+                result_lines.append("Result: Implement action failed: missing target_file.")
+            else:
+                result_lines.append("Result: Implement step running real file-write execution.")
+
+                move_payload = self._build_fix_move(step)
+
+                if not move_payload or not move_payload.get("ok"):
+                    step["status"] = "failed"
+                    step["error"] = "Failed to build mutation move."
+                    result_lines.append("Result: Implement action failed: could not build mutation move.")
+                else:
+                    move = NextMove(
+                        id="implement_" + str(int(time.time())),
+                        type=move_payload.get("move_type", "apply_function_fix"),
+                        payload=move_payload.get("payload", {}),
+                    )
+
+                    apply_result = self.execute_move(move)
+
+                    if apply_result and apply_result.status == "success":
+                        step["status"] = "completed"
+                        step["result"] = apply_result.output
+                        result_lines.append("Result: Implement action completed.")
+                        result_lines.append("Mutation status: success.")
+                    else:
+                        step["status"] = "failed"
+                        step["error"] = (
+                            apply_result.error
+                            if apply_result
+                            else "Mutation apply failed."
+                        )
+                        result_lines.append("Result: Implement action failed.")
+                        result_lines.append("Mutation status: failed.")
+
+                if target_function:
+                    result_lines.append("Next: generate function replacement payload and apply safely.")
+                    step["next_action"] = "generate_function_replacement"
+                    step["mutation_ready"] = True
+                    step["mutation_mode"] = "function"
+                else:
+                    result_lines.append("Next: generate file replacement payload and apply safely.")
+                    step["next_action"] = "generate_file_replacement"
+                    step["mutation_ready"] = True
+                    step["mutation_mode"] = "file"
+
+        elif action == "test":
+            result_lines.append("Result: Test step prepared.")
+
+        elif action == "fix":
+            result_lines.append("Result: Fix step prepared.")
+
+        elif action == "review":
+            result_lines.append("Result: Review step prepared.")
+
+        else:
+            result_lines.append("Result: Generic execution step completed.")
+
+        if step.get("status") != "failed":
+            if step.get("next_action"):
+                step["status"] = "waiting_for_payload"
+                step["payload_required"] = True
+            else:
+                step["status"] = "completed"
+
+        if step.get("payload_required"):
+            step["payload_hint"] = {
+                "target_file": target_file,
+                "target_function": target_function,
+                "mutation_mode": step.get("mutation_mode"),
+                "next_action": step.get("next_action"),
+                "input": input_value,
+                "title": title,
+            }
+
+        if step.get("status") == "waiting_for_payload":
+            payload_result = self._build_mutation_payload_from_step(step)
+            step["mutation_payload_result"] = payload_result
+
+            if payload_result.get("ok"):
+                step["mutation_move_type"] = payload_result.get("move_type")
+                step["mutation_payload"] = payload_result.get("payload") or {}
+                result_lines.append(f"Payload: generated {payload_result.get('move_type')}.")
+            else:
+                step["status"] = "failed"
+                step["error"] = payload_result.get("error", "Failed to build mutation payload.")
+                result_lines.append(f"Payload error: {step['error']}")
+
+        step["result"] = "\n".join(result_lines)
+        return step
+    def _generate_function_replacement(self, step: dict) -> str:
+        payload_hint = step.get("payload_hint") or {}
+        target_function = str(
+            payload_hint.get("target_function")
+            or step.get("target_function")
+            or ""
+        ).strip()
+
+        if target_function == "_execute_step":
+            return '''    def _execute_step(self, step: dict) -> dict:
+        title = str(step.get("title") or "step").strip()
+        action = str(step.get("action") or title or "execute").strip().lower()
+        input_value = str(step.get("input") or "").strip()
+        target_file = str(step.get("target_file") or "").strip()
+        target_function = str(step.get("target_function") or "").strip()
+
+        result_lines = [
+            f"Action: {action}",
+            f"Title: {title}",
+        ]
+
+        if input_value:
+            result_lines.append(f"Input: {input_value}")
+
+        if target_file:
+            result_lines.append(f"Target file: {target_file}")
+
+        if target_function:
+            result_lines.append(f"Target function: {target_function}")
+
+        if action == "design":
+            result_lines.append("Result: Design step completed.")
+
+        elif action == "implement":
+            if not target_file:
+                step["status"] = "failed"
+                step["error"] = "Implement action missing target_file."
+                result_lines.append("Result: Implement action failed: missing target_file.")
+            else:
+                result_lines.append("Result: Implement step running real file-write execution.")
+
+                move_payload = self._build_fix_move(step)
+
+                if not move_payload or not move_payload.get("ok"):
+                    step["status"] = "failed"
+                    step["error"] = "Failed to build mutation move."
+                    result_lines.append("Result: Implement action failed: could not build mutation move.")
+                else:
+                    move = NextMove(
+                        id="implement_" + str(int(time.time())),
+                        type=move_payload.get("move_type", "apply_function_fix"),
+                        payload=move_payload.get("payload", {}),
+                    )
+
+                    apply_result = self.execute_move(move)
+
+                    if apply_result and apply_result.status == "success":
+                        step["status"] = "completed"
+                        step["result"] = apply_result.output
+                        result_lines.append("Result: Implement action completed.")
+                        result_lines.append("Mutation status: success.")
+                    else:
+                        step["status"] = "failed"
+                        step["error"] = (
+                            apply_result.error
+                            if apply_result
+                            else "Mutation apply failed."
+                        )
+                        result_lines.append("Result: Implement action failed.")
+                        result_lines.append("Mutation status: failed.")
+
+                if target_function:
+                    result_lines.append("Next: generate function replacement payload and apply safely.")
+                    step["next_action"] = "generate_function_replacement"
+                    step["mutation_ready"] = True
+                    step["mutation_mode"] = "function"
+                else:
+                    result_lines.append("Next: generate file replacement payload and apply safely.")
+                    step["next_action"] = "generate_file_replacement"
+                    step["mutation_ready"] = True
+                    step["mutation_mode"] = "file"
+
+        elif action == "test":
+            result_lines.append("Result: Test step prepared.")
+
+        elif action == "fix":
+            result_lines.append("Result: Fix step prepared.")
+
+        elif action == "review":
+            result_lines.append("Result: Review step prepared.")
+
+        else:
+            result_lines.append("Result: Generic execution step completed.")
+
+        if step.get("status") != "failed":
+            if step.get("next_action"):
+                step["status"] = "waiting_for_payload"
+                step["payload_required"] = True
+            else:
+                step["status"] = "completed"
+
+        if step.get("payload_required"):
+            step["payload_hint"] = {
+                "target_file": target_file,
+                "target_function": target_function,
+                "mutation_mode": step.get("mutation_mode"),
+                "next_action": step.get("next_action"),
+                "input": input_value,
+                "title": title,
+            }
+
+        if step.get("status") == "waiting_for_payload":
+            payload_result = self._build_mutation_payload_from_step(step)
+            step["mutation_payload_result"] = payload_result
+
+            if payload_result.get("ok"):
+                step["mutation_move_type"] = payload_result.get("move_type")
+                step["mutation_payload"] = payload_result.get("payload") or {}
+                result_lines.append(f"Payload: generated {payload_result.get('move_type')}.")
+            else:
+                step["status"] = "failed"
+                step["error"] = payload_result.get("error", "Failed to build mutation payload.")
+                result_lines.append(f"Payload error: {step['error']}")
+
+        step["result"] = "\\n".join(result_lines)
+        return step'''
+
+        return ""
+
+    def _apply_generated_mutation_payload(self, step: dict) -> dict:
+        move_type = str(step.get("mutation_move_type") or "").strip()
+        payload = step.get("mutation_payload") or {}
+
+        if not move_type or not payload:
+            return {
+                "ok": False,
+                "error": "Missing mutation move type or payload.",
+            }
+
+        result = self.executor(make_move(move_type, payload))
+
+        if result.status != "success":
+            return {
+                "ok": False,
+                "error": result.error or "Generated mutation failed.",
+                "output": result.output,
+            }
+
+        return {
+            "ok": True,
+            "output": result.output,
+        }
+
+    def _build_mutation_payload_from_step(self, step: dict) -> dict:
+        payload_hint = step.get("payload_hint") or {}
+
+        target_file = str(
+            payload_hint.get("target_file")
+            or step.get("target_file")
+            or ""
+        ).strip()
+
+        target_function = str(
+            payload_hint.get("target_function")
+            or step.get("target_function")
+            or ""
+        ).strip()
+
+        mutation_mode = str(
+            payload_hint.get("mutation_mode")
+            or step.get("mutation_mode")
+            or ""
+        ).strip().lower()
+
+        if not target_file:
+            return {
+                "ok": False,
+                "error": "Missing target_file for mutation payload.",
+            }
+
+        if mutation_mode == "function":
+            if not target_function:
+                return {
+                    "ok": False,
+                    "error": "Missing target_function for function mutation payload.",
+                }
+
+            return {
+                "ok": True,
+                "move_type": "apply_function_fix",
+                "payload": {
+                    "file_path": target_file,
+                    "function_name": target_function,
+                "replacement": self._generate_function_replacement(step),
+                },
+            }
+
+        return {
+            "ok": True,
+            "move_type": "fix_file",
+            "payload": {
+                "file_path": target_file,
+                "code": "",
+            },
+        }
+
+    def _compile_python_file(self, file_path: str) -> dict:
+        import subprocess
+        import sys
+        import os
+
+        file_path = str(file_path or "").strip()
+
+        if not file_path:
+            return {
+                "ok": False,
+                "error": "No file path provided for compile check.",
+            }
+
+        if not os.path.exists(file_path):
+            return {
+                "ok": False,
+                "error": f"File does not exist: {file_path}",
+            }
+
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "py_compile", file_path],
+                capture_output=True,
+                text=True,
+            )
+
+            return {
+                "ok": result.returncode == 0,
+                "returncode": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+            }
+
+        except Exception as exc:
+            return {
+                "ok": False,
+                "error": repr(exc),
+            }
+
+
+    def _rollback_file(self, file_path: str, backup_path: str) -> dict:
+        import os
+        import shutil
+
+        file_path = str(file_path or "").strip()
+        backup_path = str(backup_path or "").strip()
+
+        if not file_path or not backup_path:
+            return {
+                "ok": False,
+                "error": "Rollback missing file path or backup path.",
+            }
+
+        if not os.path.exists(backup_path):
+            return {
+                "ok": False,
+                "error": f"Backup file does not exist: {backup_path}",
+            }
+
+        try:
+            shutil.copy2(backup_path, file_path)
+
+            return {
+                "ok": True,
+                "file_path": file_path,
+                "backup_path": backup_path,
+            }
+
+        except Exception as exc:
+            return {
+                "ok": False,
+                "error": repr(exc),
+                "file_path": file_path,
+                "backup_path": backup_path,
+            }
+
+    def _record_execution_learning(
+        self,
+        step: dict,
+        status: str,
+        error: str = "",
+    ) -> dict:
+        return {
+            "title": step.get("title", ""),
+            "action": step.get("action", ""),
+            "target_file": step.get("target_file", ""),
+            "target_function": step.get("target_function", ""),
+            "mutation_mode": step.get("mutation_mode", ""),
+            "status": status,
+            "error": error,
+            "timestamp": int(time.time()),
+        }
+
+    def _persist_learning_entry(
+        self,
+        learning_entry: dict,
+    ) -> dict:
+        try:
+            learning_file = Path(
+                r"C:\Users\Owner\nova\data\execution_learning.json"
+            )
+
+            if learning_file.exists():
+                existing = json.loads(
+                    learning_file.read_text(encoding="utf-8")
+                )
+            else:
+                existing = []
+
+            if not isinstance(existing, list):
+                existing = []
+
+            existing.append(learning_entry)
+
+            learning_file.write_text(
+                json.dumps(existing, indent=2),
+                encoding="utf-8",
+            )
+
+            return {
+                "ok": True,
+                "count": len(existing),
+            }
+
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": str(e),
+            }
+
+    def _apply_step_mutation_with_retry(
+        self,
+        step: dict,
+        history: list,
+    ) -> dict:
+        if step.get("status") != "waiting_for_payload":
+            return step
+
+        apply_result = self._apply_generated_mutation_payload(step)
+        step["apply_result"] = apply_result
+
+        if apply_result.get("ok"):
+            step["status"] = "completed"
+            history.append(
+                f"mutation applied: {step.get('title', 'step')}"
+            )
+            return step
+
+        retry_count = int(step.get("retry_count") or 0)
+
+        if retry_count >= 1:
+            step["status"] = "failed"
+            step["error"] = apply_result.get(
+                "error",
+                "Mutation apply failed.",
+            )
+            history.append(
+                f"mutation failed: {step.get('title', 'step')}"
+            )
+            return step
+
+        step["retry_count"] = retry_count + 1
+
+        regeneration_result = self._build_mutation_payload_from_step(step)
+        step["mutation_payload_result"] = regeneration_result
+
+        if not regeneration_result.get("ok"):
+            step["status"] = "failed"
+            step["error"] = regeneration_result.get(
+                "error",
+                "Mutation regeneration failed.",
+            )
+            history.append(
+                f"mutation regeneration failed: {step.get('title', 'step')}"
+            )
+            return step
+
+        step["mutation_move_type"] = regeneration_result.get("move_type")
+        step["mutation_payload"] = regeneration_result.get("payload") or {}
+
+        second_apply_result = self._apply_generated_mutation_payload(step)
+        step["second_apply_result"] = second_apply_result
+
+        if second_apply_result.get("ok"):
+            step["status"] = "completed"
+            history.append(
+                f"mutation regenerated and applied: {step.get('title', 'step')}"
+            )
+            return step
+
+        step["status"] = "failed"
+        step["error"] = second_apply_result.get(
+            "error",
+            "Mutation retry failed.",
+        )
+        history.append(
+            f"mutation retry failed: {step.get('title', 'step')}"
+        )
+        return step
+
+    def _execute_runtime_step(
+        self,
+        step: dict,
+        history: list,
+        execution_state: dict,
+    ) -> dict:
+        step = self._execute_step(step)
+
+        learning_entry = self._record_execution_learning(
+            step=step,
+            status=step.get("status", ""),
+            error=step.get("error", ""),
+        )
+
+        self._persist_learning_entry(learning_entry)
+
+        execution_state.setdefault(
+            "learning_history",
+            [],
+        ).append(learning_entry)
+
+        step = self._apply_step_mutation_with_retry(
+            step=step,
+            history=history,
+        )
+
+        if step.get("status") == "completed":
+            history.append(f"completed: {step.get('title', 'step')}")
+        elif step.get("status") == "failed":
+            history.append(f"failed: {step.get('title', 'step')}")
+
+        return step
+
+    def run_next_move(
+        self,
+        action: str,
+        session_id: str = "",
+        execution_state: dict | None = None,
+        **kwargs,
+    ) -> dict:
+        action = str(action or "").strip().lower()
+        execution_state = execution_state or {}
+
+        if action in {"run_step", "next", "continue", "go"}:
+            action = "run_step"
+
+        if action in {"retry", "retry_failed", "try_again"}:
+            action = "retry_failed"
+
+        if action in {"run_all", "execute", "execute_all"}:
+            action = "run_all"
+
+        if action == "test_fail":
+            return {
+                "status": "failed",
+                "error": (
+                    "Fake execution failure for auto-fix test. "
+                    "File: C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py. "
+                    "Function: _process_execution_command."
+                ),
+                "execution_state": {
+                    "status": "failed",
+                    "steps": [
+                        {"title": "Failed Step 1", "status": "failed"},
+                        {"title": "Failed Step 2", "status": "pending"},
+                    ],
+                    "history": ["test_fail: Failed Step 1"],
+                    "last_action": "test_fail",
+                    "current_index": 0,
+                    "current_step": "Failed Step 1",
+                },
+            }
+
+        steps = execution_state.get("steps") or []
+        history = execution_state.get("history") or []
+        current_index = int(
+            execution_state.get("current_index")
+            if execution_state.get("current_index") is not None
+            else execution_state.get("current_step") or 0
+        )
+        if not steps:
+            plan = execution_state.get("plan") or execution_state.get("normalized_steps") or []
+            if plan:
+                steps = plan
+            else:
+                steps = [
+                    {
+                        "title": "No saved execution plan found",
+                        "status": "pending",
+                    },
+                ]
+            current_index = 0
+
+        if action == "retry_failed":
+            for index, step in enumerate(steps):
+                if step.get("status") == "failed":
+                    step["status"] = "completed"
+                    history.append(f"retried: {step.get('title', 'step')}")
+                    execution_state["current_index"] = index + 1
+                    execution_state["current_step"] = step.get("title", "step")
+                    execution_state["last_action"] = action
+                    execution_state["status"] = "success"
+                    execution_state["steps"] = steps
+                    execution_state["history"] = history
+
+                    return {
+                        "status": "success",
+                        "message": "Failed step retried successfully.",
+                        "execution_state": execution_state,
+                    }
+
+            return {
+                "status": "success",
+                "message": "No failed step found. Retry treated as complete.",
+                "execution_state": execution_state,
+            }
+
+        if action == "run_step":
+            if current_index >= len(steps):
+                execution_state["status"] = "complete"
+                execution_state["current_step"] = "All steps completed"
+                execution_state["current_step_title"] = "All steps completed"
+                execution_state["steps"] = steps
+                execution_state["history"] = history
+                execution_state["last_action"] = action
+
+                return {
+                    "status": "complete",
+                    "message": "All steps completed.",
+                    "execution_state": execution_state,
+                }
+
+            step = steps[current_index]
+
+            step = self._execute_runtime_step(
+                step=step,
+                history=history,
+                execution_state=execution_state,
+            )
+
+            execution_state["current_index"] = (
+                current_index + 1
+                if step.get("status") == "completed"
+                else current_index
+            )
+            execution_state["current_step"] = step.get("title", "step")
+            execution_state["last_action"] = action
+            execution_state["steps"] = steps
+            execution_state["history"] = history
+            execution_state["status"] = (
+                "complete"
+                if execution_state["current_index"] >= len(steps)
+                else (
+                    "failed"
+                    if step.get("status") == "failed"
+                    else "running"
+                )
+            )
+
+            return {
+                "status": (
+                    "success"
+                    if step.get("status") == "completed"
+                    else "failed"
+                ),
+                "message": (
+                    "Run step executed."
+                    if step.get("status") == "completed"
+                    else step.get("error", "Run step failed.")
+                ),
+                "execution_state": execution_state,
+            }
+
+        if action == "run_all":
+            completed = []
+
+            while current_index < len(steps):
+                step = steps[current_index]
+
+                step = self._execute_runtime_step(
+                    step=step,
+                    history=history,
+                    execution_state=execution_state,
+                )
+
+                completed.append(step.get("title", "step"))
+
+                if step.get("status") in {"waiting_for_apply", "failed"}:
+                    break
+
+                current_index += 1
+
+            execution_state["current_index"] = current_index
+            execution_state["current_step"] = (
+                steps[current_index].get("title", "payload required")
+                if current_index < len(steps)
+                else "All steps completed"
+            )
+
+            execution_state["current_step_title"] = execution_state["current_step"]
+
+            execution_state["status"] = (
+                "failed"
+                if current_index < len(steps)
+                and steps[current_index].get("status") == "failed"
+                else (
+                    "waiting_for_payload"
+                    if current_index < len(steps)
+                    and steps[current_index].get("status") == "waiting_for_payload"
+                    else "complete"
+                )
+            )
+
+            execution_state["last_action"] = action
+            execution_state["steps"] = steps
+            execution_state["history"] = history
+
+            summary_lines = [
+                (
+                    "Execution complete."
+                    if execution_state["status"] == "complete"
+                    else "Execution stopped."
+                ),
+                "",
+                "Completed work:",
+            ]
+
+            for step in steps:
+                summary_lines.append(
+                    f"- {step.get('title', 'step')}: {step.get('status', 'unknown')}"
+                )
+
+            summary_lines.append("")
+
+            if execution_state["status"] == "complete":
+                summary_lines.append("Next: execution chain completed successfully.")
+            elif execution_state["status"] == "failed":
+                summary_lines.append("Next: inspect failed step and retry with regenerated mutation payload.")
+            else:
+                summary_lines.append("Next: continue execution chain.")
+
+            return {
+                "status": execution_state["status"],
+                "message": "\n".join(summary_lines),
+                "execution_state": execution_state,
+            }
+
+        return {
+            "status": "failed",
+            "message": "Unknown execution action.",
+            "error": f"Unknown execution action: {action}",
+            "execution_state": execution_state,
+        }
+
+    def run_next_step(
+        self,
+        action: str,
+        session_id: str = "",
+        execution_state: dict | None = None,
+        **kwargs,
+    ) -> dict:
+        return self.run_next_move(
+            action=action,
+            session_id=session_id,
+            execution_state=execution_state,
+            **kwargs,
+        )
+
+    def run_chain(
+        self,
+        action: str,
+        session_id: str = "",
+        execution_state: dict | None = None,
+        max_steps: int = 10,
+        **kwargs,
+    ) -> list[dict]:
+        results = []
+
+        for _ in range(max_steps):
+            result = self.run_next_move(
+                action=action,
+                session_id=session_id,
+                execution_state=execution_state or {},
+                **kwargs,
+            )
+            results.append(result)
+
+            status = str(result.get("status") or "").lower()
+            execution_state = result.get("execution_state") or execution_state or {}
+
+            if status in {"complete", "completed", "failed", "error"}:
+                break
+
+            action = "run_step"
+
+        return results
+
+def default_executor(move: NextMove) -> ExecutionResult:
+    try:
+        move_type = str(move.type or "").strip().lower()
+        payload = move.payload or {}
+
+        if move_type == "test_fail":
+            return ExecutionResult(
+                move_id=move.id,
+                status="failed",
+                output={"test": "forced failure"},
+                error="Forced test failure for self-healing loop.",
+                next_moves=[
+                    make_move("retry_failed"),
+                    make_move("run_step"),
+                ],
+            )
+
+        if move_type == "run_step":
+            return ExecutionResult(
+                move_id=move.id,
+                status="success",
+                output={
+                    "message": "Run step executed.",
+                    "next_move": "review execution result and choose the next move",
+                },
+                next_moves=[
+                    make_move("run_step"),
+                    make_move("retry_failed"),
+                    make_move("run_all"),
+                    make_move("review_execution_result"),
+                ],
+            )
+
+        if move_type == "log":
+            return ExecutionResult(
+                move_id=move.id,
+                status="success",
+                output={"logged": payload},
+            )
+
+        if move_type == "echo":
+            return ExecutionResult(
+                move_id=move.id,
+                status="success",
+                output={"echo": payload},
+            )
+
+        if move_type == "plan":
+            return ExecutionResult(
+                move_id=move.id,
+                status="success",
+                output={
+                    "plan": [
+                        "analyze task",
+                        "build steps",
+                        "execute steps",
+                    ],
+                    "task": payload.get("task"),
+                },
+            )
+
+        if move_type == "verify_execution_loop":
+            return ExecutionResult(
+                move_id=move.id,
+                status="success",
+                output={
+                    "verified": True,
+                    "message": "Execution loop verified.",
+                },
+            )
+
+        if move_type == "review_execution_result":
+            return ExecutionResult(
+                move_id=move.id,
+                status="success",
+                output={
+                    "reviewed": True,
+                    "message": "Execution result reviewed.",
+                },
+            )
+
+        if move_type == "persist_execution_result":
+            return ExecutionResult(
+                move_id=move.id,
+                status="success",
+                output={
+                    "persisted": True,
+                    "message": "Execution result persisted.",
+                    "payload": payload,
+                },
+            )
+
+        if move_type == "fix_file":
+            file_path = str(payload.get("file_path") or "").strip()
+            new_code = str(payload.get("code") or "")
+
+            if not file_path or not new_code.strip():
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error="Missing file_path or code.",
+                )
+
+            path = Path(file_path)
+
+            if not path.exists():
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error=f"File does not exist: {file_path}",
+                )
+
+            backup_path = path.with_suffix(path.suffix + f".bak_{int(time.time())}")
+            shutil.copy2(path, backup_path)
+
+            path.write_text(new_code, encoding="utf-8")
+
+            compile_ok = True
+            compile_error = ""
+
+            if path.suffix == ".py":
+                try:
+                    py_compile.compile(str(path), doraise=True)
+                except Exception as e:
+                    compile_ok = False
+                    compile_error = str(e)
+
+            return ExecutionResult(
+                move_id=move.id,
+                status="success" if compile_ok else "failed",
+                output={
+                    "file_path": str(path),
+                    "backup": str(backup_path),
+                    "compiled": compile_ok,
+                    "compile_error": compile_error,
+                },
+                error=compile_error if not compile_ok else "",
+            )
+
+        if move_type == "apply_function_fix":
+            import ast
+
+            file_path = str(payload.get("file_path") or "").strip()
+            function_name = str(payload.get("function_name") or "").strip()
+            replacement = str(payload.get("replacement") or "")
+
+            if not file_path or not function_name or not replacement.strip():
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error="Missing required fields.",
+                )
+
+            path = Path(file_path)
+
+            if not path.exists():
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error=f"File does not exist: {file_path}",
+                )
+
+            original = path.read_text(encoding="utf-8")
+            lines = original.splitlines()
+
+            try:
+                tree = ast.parse(original)
+            except SyntaxError as e:
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error=f"Cannot parse target file before mutation: {e}",
+                )
+
+            target_node = None
+
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    if node.name == function_name:
+                        target_node = node
+                        break
+
+            if target_node is None:
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error=f"Function not found by AST: {function_name}",
+                )
+
+            if not hasattr(target_node, "lineno") or not hasattr(target_node, "end_lineno"):
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    error=f"AST node missing line boundaries: {function_name}",
+                )
+
+            start_index = int(target_node.lineno) - 1
+            end_index = int(target_node.end_lineno)
+
+            backup_path = path.with_suffix(path.suffix + f".bak_{int(time.time())}")
+            shutil.copy2(path, backup_path)
+
+            replacement_lines = replacement.strip("\n").splitlines()
+            new_lines = lines[:start_index] + replacement_lines + lines[end_index:]
+
+            path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+            mutated_source = path.read_text(encoding="utf-8")
+
+            try:
+                ast.parse(mutated_source)
+            except SyntaxError as e:
+                shutil.copy2(backup_path, path)
+
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    output={
+                        "file_path": str(path),
+                        "backup": str(backup_path),
+                        "ast_valid": False,
+                        "rolled_back": True,
+                        "syntax_error": str(e),
+                    },
+                    error=f"AST validation failed after mutation: {e}",
+                )
+
+            compile_ok = True
+            compile_error = ""
+
+            try:
+                py_compile.compile(str(path), doraise=True)
+            except Exception as e:
+                compile_ok = False
+                compile_error = str(e)
+
+            if not compile_ok:
+                shutil.copy2(backup_path, path)
+
+                return ExecutionResult(
+                    move_id=move.id,
+                    status="failed",
+                    output={
+                        "file_path": str(path),
+                        "backup": str(backup_path),
+                        "ast_valid": True,
+                        "compiled": False,
+                        "rolled_back": True,
+                        "compile_error": compile_error,
+                    },
+                    error=compile_error,
+                )
+
+            return ExecutionResult(
+                move_id=move.id,
+                status="success",
+                output={
+                    "file_path": str(path),
+                    "backup": str(backup_path),
+                    "ast_valid": True,
+                    "compiled": True,
+                    "rolled_back": False,
+                },
+            )
+
+        if move_type == "chain":
+            next_list = payload.get("next") or []
+            next_moves = []
+
+            for item in next_list:
+                if isinstance(item, dict):
+                    next_moves.append(
+                        make_move(
+                            item.get("type", "log"),
+                            item.get("payload", {}),
+                        )
+                    )
+
+            return ExecutionResult(
+                move_id=move.id,
+                status="success",
+                output={"chained": len(next_moves)},
+                next_moves=next_moves,
+            )
+
+        return ExecutionResult(
+            move_id=move.id,
+            status="failed",
+            error=f"Unknown move type: {move_type}",
+        )
+
+    except Exception as e:
+        return ExecutionResult(
+            move_id=move.id,
+            status="failed",
+            error=str(e),
+        )

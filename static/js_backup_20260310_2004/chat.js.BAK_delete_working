@@ -1,0 +1,1073 @@
+﻿// C:\Users\Owner\nova\static\js\chat.js
+
+(() => {
+"use strict"
+
+function byId(id){
+  return document.getElementById(id)
+}
+
+function escapeHtml(value){
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;")
+}
+
+function makeId(prefix){
+  if(window.crypto && typeof window.crypto.randomUUID === "function"){
+    return window.crypto.randomUUID()
+  }
+  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`
+}
+
+const STORAGE_KEYS = {
+  activeChatId: "nova_active_chat_id",
+}
+
+const SCROLL_LOCK_THRESHOLD = 120
+
+const el = {
+  body: document.body,
+  appShell: byId("appShell"),
+  sidebar: byId("sidebar"),
+  mobileOverlay: byId("mobileOverlay"),
+  btnSidebarToggle: byId("btnSidebarToggle"),
+  btnCloseSidebar: byId("btnCloseSidebar"),
+  btnNewChat: byId("btnNewChat"),
+  chatList: byId("chatList"),
+  messagesScroll: byId("messagesScroll"),
+  messages: byId("messages"),
+  emptyState: byId("emptyState"),
+  topbarTitle: byId("topbarTitle"),
+  composerForm: byId("composerForm"),
+  input: byId("input"),
+  sendBtn: byId("sendBtn"),
+  stopBtn: byId("stopBtn"),
+  attachBtn: byId("attachBtn"),
+  fileInput: byId("fileInput"),
+  pendingAttachments: byId("pendingAttachments"),
+  pendingAttachmentsList: byId("pendingAttachmentsList"),
+  jumpToLatestBtn: byId("jumpToLatestBtn"),
+}
+
+const state = {
+  chats: [],
+  activeChatId: null,
+  chatId: null,
+  messages: [],
+  isStreaming: false,
+  isLoadingChats: false,
+  isLoadingMessages: false,
+  lastUserMessageId: null,
+  lastUploadedAttachments: [],
+  copiedMessageId: null,
+  shouldAutoScroll: true,
+  pendingFiles: [],
+}
+
+let streamService = null
+let scrollFrameId = 0
+
+function focusInput(){
+  try{
+    el.input?.focus()
+  }catch(error){
+    console.error("Nova focusInput error:", error)
+  }
+}
+
+function getSavedActiveChatId(){
+  try{
+    return localStorage.getItem(STORAGE_KEYS.activeChatId) || ""
+  }catch(_error){
+    return ""
+  }
+}
+
+function saveActiveChatId(chatId){
+  try{
+    if(chatId){
+      localStorage.setItem(STORAGE_KEYS.activeChatId, String(chatId))
+    }else{
+      localStorage.removeItem(STORAGE_KEYS.activeChatId)
+    }
+  }catch(_error){
+    // ignore storage errors
+  }
+}
+
+function setSidebarOpen(isOpen){
+  const open = !!isOpen
+  el.sidebar?.classList.toggle("is-open", open)
+  if(el.sidebar){
+    el.sidebar.dataset.open = open ? "true" : "false"
+  }
+  el.mobileOverlay?.classList.toggle("is-visible", open)
+  el.body?.classList.toggle("sidebar-open", open)
+}
+
+function openSidebar(){
+  setSidebarOpen(true)
+}
+
+function closeSidebar(){
+  setSidebarOpen(false)
+}
+
+function toggleSidebar(){
+  setSidebarOpen(!(el.body?.classList.contains("sidebar-open")))
+}
+
+async function fetchJson(url, options = {}){
+  const response = await fetch(url, {
+    method: options.method || "GET",
+    headers: {
+      "Accept": "application/json",
+      ...(options.headers || {}),
+    },
+    body: options.body,
+  })
+
+  let data = null
+
+  try{
+    data = await response.json()
+  }catch(_error){
+    data = null
+  }
+
+  if(!response.ok){
+    const message =
+      data?.error ||
+      data?.message ||
+      `HTTP ${response.status}`
+
+    throw new Error(message)
+  }
+
+  return data
+}
+
+function normalizeChat(chat){
+  if(!chat || typeof chat !== "object"){
+    return null
+  }
+
+  const chatId = String(chat.chat_id || chat.id || "").trim()
+  if(!chatId){
+    return null
+  }
+
+  return {
+    id: chatId,
+    chat_id: chatId,
+    title: String(chat.title || "New chat"),
+    created_at: chat.created_at || null,
+    updated_at: chat.updated_at || chat.updated || null,
+    isLocalOnly: false,
+  }
+}
+
+function normalizeMessage(message){
+  if(!message || typeof message !== "object"){
+    return null
+  }
+
+  const messageId = String(message.message_id || message.id || makeId("msg")).trim()
+
+  return {
+    id: messageId,
+    message_id: messageId,
+    chat_id: String(message.chat_id || state.activeChatId || ""),
+    role: message.role === "assistant" ? "assistant" : "user",
+    content: String(message.content || ""),
+    created_at: message.created_at || null,
+    pending: Boolean(message.pending),
+    error: Boolean(message.error),
+    attachments: Array.isArray(message.attachments) ? message.attachments : [],
+  }
+}
+
+function sortChatsNewestFirst(chats){
+  return [...chats].sort((a, b) => {
+    const aTime = Date.parse(a.updated_at || a.created_at || 0) || 0
+    const bTime = Date.parse(b.updated_at || b.created_at || 0) || 0
+    return bTime - aTime
+  })
+}
+
+function upsertChat(chatInput, { moveToTop = false } = {}){
+  const chat = normalizeChat(chatInput) || chatInput
+  if(!chat){
+    return null
+  }
+
+  const chatId = String(chat.chat_id || chat.id || "").trim()
+  if(!chatId){
+    return null
+  }
+
+  const existingIndex = state.chats.findIndex((item) => {
+    return String(item.chat_id || item.id) === chatId
+  })
+
+  if(existingIndex >= 0){
+    state.chats[existingIndex] = {
+      ...state.chats[existingIndex],
+      ...chat,
+      id: chatId,
+      chat_id: chatId,
+    }
+
+    if(moveToTop){
+      const [updated] = state.chats.splice(existingIndex, 1)
+      state.chats.unshift(updated)
+      return updated
+    }
+
+    return state.chats[existingIndex]
+  }
+
+  const nextChat = {
+    id: chatId,
+    chat_id: chatId,
+    title: chat.title || "New chat",
+    created_at: chat.created_at || null,
+    updated_at: chat.updated_at || null,
+    isLocalOnly: Boolean(chat.isLocalOnly),
+  }
+
+  if(moveToTop){
+    state.chats.unshift(nextChat)
+  }else{
+    state.chats.push(nextChat)
+    state.chats = sortChatsNewestFirst(state.chats)
+  }
+
+  return nextChat
+}
+
+function moveChatToTop(chatId){
+  const index = state.chats.findIndex((chat) => {
+    return String(chat.chat_id || chat.id) === String(chatId)
+  })
+
+  if(index <= 0){
+    return
+  }
+
+async function deleteChat(chatId){
+  const targetChatId = String(chatId || "").trim()
+  if(!targetChatId){
+    return
+  }
+
+  const confirmed = window.confirm("Delete this chat?")
+  if(!confirmed){
+    return
+  }
+
+  try{
+    await fetchJson(`/api/chats/${encodeURIComponent(targetChatId)}`, {
+      method: "DELETE",
+    })
+  }catch(error){
+    console.error("Nova deleteChat error:", error)
+  }
+
+  state.chats = state.chats.filter((chat) => {
+    return String(chat.chat_id || chat.id || "") !== targetChatId
+  })
+
+  if(String(state.activeChatId || "") === targetChatId){
+    const nextChat = state.chats[0] || null
+    state.activeChatId = nextChat ? String(nextChat.chat_id || nextChat.id || "") : null
+    state.chatId = state.activeChatId
+
+    if(state.activeChatId){
+      await loadMessages(state.activeChatId)
+    }else{
+      state.messages = []
+      renderMessages()
+      renderEmptyState()
+      renderChatList()
+      updateTopbarTitle()
+      saveActiveChatId("")
+    }
+  }else{
+    renderChatList()
+  }
+}
+
+  const [chat] = state.chats.splice(index, 1)
+  state.chats.unshift(chat)
+}
+
+function setActiveChat(chatId){
+  const value = String(chatId || "").trim() || null
+  state.activeChatId = value
+  state.chatId = value
+  saveActiveChatId(value)
+}
+
+function formatMessageHtml(content){
+  return escapeHtml(content || "").replace(/\n/g, "<br>")
+}
+
+function formatBytes(bytes){
+  const size = Number(bytes || 0)
+
+  if(size < 1024){
+    return `${size} B`
+  }
+
+  if(size < 1024 * 1024){
+    return `${(size / 1024).toFixed(1)} KB`
+  }
+
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function getPendingFiles(){
+  if(!Array.isArray(state.pendingFiles)){
+    state.pendingFiles = []
+  }
+
+  return state.pendingFiles
+}
+
+function clearPendingFiles(){
+  state.pendingFiles = []
+  state.lastUploadedAttachments = []
+
+  if(el.fileInput){
+    el.fileInput.value = ""
+  }
+
+  renderPendingAttachments()
+}
+
+function renderPendingAttachments(){
+  const files = getPendingFiles()
+
+  if(!el.pendingAttachments || !el.pendingAttachmentsList){
+    return
+  }
+
+  if(!files.length){
+    el.pendingAttachments.hidden = true
+    el.pendingAttachmentsList.innerHTML = ""
+    return
+  }
+
+  el.pendingAttachments.hidden = false
+  el.pendingAttachmentsList.innerHTML = files.map((file, index) => {
+    return `
+      <div class="pending-attachment-item">
+        <div class="pending-attachment-meta">
+          <div class="pending-attachment-name">${escapeHtml(file.name || "file")}</div>
+          <div class="pending-attachment-size">${escapeHtml(formatBytes(file.size || 0))}</div>
+        </div>
+        <button
+          type="button"
+          class="pending-attachment-remove"
+          data-remove-pending-index="${index}"
+          aria-label="Remove attachment"
+          title="Remove attachment"
+        >
+          ×
+        </button>
+      </div>
+    `
+  }).join("")
+}
+
+function removePendingFile(index){
+  const files = getPendingFiles()
+  const resolvedIndex = Number(index)
+
+  if(Number.isNaN(resolvedIndex) || resolvedIndex < 0 || resolvedIndex >= files.length){
+    return
+  }
+
+  files.splice(resolvedIndex, 1)
+  renderPendingAttachments()
+  updateComposerState()
+
+  if(!files.length && el.fileInput){
+    el.fileInput.value = ""
+  }
+}
+
+function renderChats(){
+  if(!el.chatList){
+    return
+  }
+
+  if(!state.chats.length){
+    el.chatList.innerHTML = `<div class="chat-list-empty">No chats yet</div>`
+    return
+  }
+
+  el.chatList.innerHTML = state.chats.map((chat) => {
+    const chatId = chat.chat_id || chat.id
+    const title = chat.title || "New chat"
+
+    return `
+      <button
+        type="button"
+        class="chat-list-item${String(chatId) === String(state.activeChatId) ? " is-active" : ""}"
+        data-chat-id="${escapeHtml(chatId)}"
+      >
+        <span class="chat-list-item-title">${escapeHtml(title)}</span>
+      </button>
+    `
+  }).join("")
+}
+
+function getScrollElement(){
+  return el.messagesScroll || el.messages?.closest(".messages-scroll") || el.messages || null
+}
+
+function getDistanceFromBottom(){
+  const scrollEl = getScrollElement()
+  if(!scrollEl){
+    return 0
+  }
+
+  return Math.max(
+    0,
+    scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight
+  )
+}
+
+function isNearBottom(){
+  return getDistanceFromBottom() <= SCROLL_LOCK_THRESHOLD
+}
+
+function updateJumpToLatestVisibility(){
+  if(!el.jumpToLatestBtn){
+    return
+  }
+
+  const hasMessages = state.messages.length > 0
+  const shouldShow = hasMessages && !state.shouldAutoScroll
+
+  el.jumpToLatestBtn.hidden = !shouldShow
+}
+
+function performScrollToBottom(force = false){
+  const scrollEl = getScrollElement()
+  if(!scrollEl){
+    return
+  }
+
+  if(!force && !state.shouldAutoScroll){
+    updateJumpToLatestVisibility()
+    return
+  }
+
+  scrollEl.scrollTop = scrollEl.scrollHeight
+  state.shouldAutoScroll = true
+  updateJumpToLatestVisibility()
+}
+
+function scrollMessagesToBottom(force = false){
+  const scrollEl = getScrollElement()
+  if(!scrollEl){
+    return
+  }
+
+  if(!force && !state.shouldAutoScroll){
+    updateJumpToLatestVisibility()
+    return
+  }
+
+  if(scrollFrameId){
+    cancelAnimationFrame(scrollFrameId)
+    scrollFrameId = 0
+  }
+
+  scrollFrameId = requestAnimationFrame(() => {
+    scrollFrameId = requestAnimationFrame(() => {
+      scrollFrameId = 0
+      performScrollToBottom(force)
+    })
+  })
+}
+
+function renderMessages(){
+  if(!el.messages){
+    return
+  }
+
+  const shouldStickToBottom = state.shouldAutoScroll || isNearBottom()
+
+  if(!state.messages.length){
+    el.messages.innerHTML = ""
+    if(el.emptyState){
+      el.emptyState.hidden = false
+    }
+    state.shouldAutoScroll = true
+    updateJumpToLatestVisibility()
+    return
+  }
+
+  if(el.emptyState){
+    el.emptyState.hidden = true
+  }
+
+  el.messages.innerHTML = state.messages.map((message, index) => {
+    const role = message.role === "assistant" ? "assistant" : "user"
+    const avatar = role === "assistant" ? "N" : "Y"
+    const content = formatMessageHtml(message.content || "")
+    const isPending = !!message.pending
+    const isError = !!message.error
+
+    return `
+      <article
+        class="message role-${role}${isPending ? " is-pending" : ""}${isError ? " is-error" : ""}"
+        data-message-id="${escapeHtml(message.id || message.message_id || String(index))}"
+      >
+        <div class="message-avatar">${avatar}</div>
+        <div class="message-main">
+          <div class="message-bubble">
+            <div class="message-content">${content}</div>
+          </div>
+        </div>
+      </article>
+    `
+  }).join("")
+
+  if(shouldStickToBottom){
+    state.shouldAutoScroll = true
+    scrollMessagesToBottom(true)
+  }else{
+    state.shouldAutoScroll = false
+    updateJumpToLatestVisibility()
+  }
+}
+
+function renderTopbar(){
+  if(!el.topbarTitle){
+    return
+  }
+
+  const activeChat = state.chats.find((chat) => {
+    return String(chat.chat_id || chat.id) === String(state.activeChatId)
+  })
+
+  el.topbarTitle.textContent = activeChat?.title || "New chat"
+}
+
+function renderAll(){
+  renderChats()
+  renderMessages()
+  renderTopbar()
+  renderPendingAttachments()
+}
+
+function autoResizeInput(){
+  if(!el.input){
+    return
+  }
+
+  el.input.style.height = "auto"
+  el.input.style.height = `${Math.min(el.input.scrollHeight, 280)}px`
+}
+
+function updateComposerState(){
+  const hasText = !!String(el.input?.value || "").trim()
+  const hasFiles = getPendingFiles().length > 0
+
+  if(el.sendBtn){
+    el.sendBtn.disabled = state.isStreaming || (!hasText && !hasFiles)
+  }
+
+  if(el.stopBtn){
+    el.stopBtn.hidden = !state.isStreaming
+    el.stopBtn.disabled = !state.isStreaming
+  }
+
+  if(el.attachBtn){
+    el.attachBtn.disabled = state.isStreaming
+  }
+
+  if(el.fileInput){
+    el.fileInput.disabled = state.isStreaming
+  }
+}
+
+function handleMessagesScroll(){
+  state.shouldAutoScroll = isNearBottom()
+  updateJumpToLatestVisibility()
+}
+
+function jumpToLatest(){
+  state.shouldAutoScroll = true
+  scrollMessagesToBottom(true)
+}
+
+function bindEmptyStateSuggestions(){
+  const chips = Array.from(document.querySelectorAll("[data-suggestion]"))
+
+  for(const chip of chips){
+    chip.addEventListener("click", () => {
+      if(!el.input){
+        return
+      }
+
+      el.input.value = String(chip.dataset.suggestion || "")
+      autoResizeInput()
+      updateComposerState()
+      focusInput()
+
+      try{
+        el.input.setSelectionRange(el.input.value.length, el.input.value.length)
+      }catch(_error){
+        // ignore caret placement errors
+      }
+    })
+  }
+}
+
+async function loadChats(){
+  state.isLoadingChats = true
+
+  try{
+    const data = await fetchJson("/api/chats")
+    const chats = Array.isArray(data?.chats) ? data.chats : []
+
+    state.chats = chats
+      .map(normalizeChat)
+      .filter(Boolean)
+
+    state.chats = sortChatsNewestFirst(state.chats)
+
+    const savedActive = getSavedActiveChatId()
+    const hasSavedActive = state.chats.some((chat) => {
+      return String(chat.chat_id || chat.id) === String(savedActive)
+    })
+
+    if(hasSavedActive){
+      setActiveChat(savedActive)
+    }else if(state.activeChatId){
+      const stillExists = state.chats.some((chat) => {
+        return String(chat.chat_id || chat.id) === String(state.activeChatId)
+      })
+
+      if(!stillExists){
+        setActiveChat(state.chats[0]?.chat_id || state.chats[0]?.id || null)
+      }
+    }else{
+      setActiveChat(state.chats[0]?.chat_id || state.chats[0]?.id || null)
+    }
+
+    renderChats()
+    renderTopbar()
+
+    return state.chats
+  }finally{
+    state.isLoadingChats = false
+  }
+}
+
+async function loadChat(chatId, options = {}){
+  const resolvedChatId = String(chatId || "").trim()
+  if(!resolvedChatId){
+    return
+  }
+
+  if(state.isStreaming && !options.force){
+    return
+  }
+
+  state.isLoadingMessages = true
+  state.shouldAutoScroll = true
+  setActiveChat(resolvedChatId)
+
+  try{
+    const data = await fetchJson(`/api/chats/${encodeURIComponent(resolvedChatId)}`)
+    const chat = normalizeChat(data?.chat)
+    const messages = Array.isArray(data?.messages) ? data.messages : []
+
+    if(chat){
+      upsertChat(chat)
+    }
+
+    state.messages = messages
+      .map(normalizeMessage)
+      .filter(Boolean)
+
+    renderAll()
+    scrollMessagesToBottom(true)
+  }catch(error){
+    console.error("Nova loadChat error:", error)
+    state.messages = [{
+      id: makeId("msg_error"),
+      message_id: makeId("msg_error"),
+      role: "assistant",
+      content: `⚠️ ${error?.message || error}`,
+      error: true,
+      pending: false,
+      attachments: [],
+    }]
+    renderAll()
+    scrollMessagesToBottom(true)
+  }finally{
+    state.isLoadingMessages = false
+  }
+}
+
+function createChat(){
+  const text = String(el.input?.value || "").trim()
+  const chatId = makeId("chat")
+
+  upsertChat({
+    id: chatId,
+    chat_id: chatId,
+    title: text ? text.slice(0, 60) : "New chat",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    isLocalOnly: true,
+  }, { moveToTop: true })
+
+  setActiveChat(chatId)
+  state.messages = []
+  state.shouldAutoScroll = true
+
+  renderAll()
+  updateComposerState()
+  focusInput()
+  scrollMessagesToBottom(true)
+
+  if(window.innerWidth <= 620){
+    closeSidebar()
+  }
+}
+
+function ensureActiveChat(){
+  if(state.activeChatId){
+    return state.activeChatId
+  }
+
+  const chatId = makeId("chat")
+
+  upsertChat({
+    id: chatId,
+    chat_id: chatId,
+    title: "New chat",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    isLocalOnly: true,
+  }, { moveToTop: true })
+
+  setActiveChat(chatId)
+  return chatId
+}
+
+async function refreshSidebarAfterSend(chatIdFromResult){
+  const resolvedChatId = String(chatIdFromResult || state.activeChatId || "").trim()
+
+  try{
+    await loadChats()
+  }catch(error){
+    console.error("Nova loadChats after send error:", error)
+  }
+
+  if(resolvedChatId){
+    setActiveChat(resolvedChatId)
+    moveChatToTop(resolvedChatId)
+  }
+
+  renderChats()
+  renderTopbar()
+}
+
+async function sendMessage(customText = null){
+  const text = String(customText ?? el.input?.value ?? "").trim()
+  const files = [...getPendingFiles()]
+
+  if((!text && files.length === 0) || state.isStreaming){
+    updateComposerState()
+    return
+  }
+
+  const fallbackChatId = ensureActiveChat()
+  const activeChat = state.chats.find((chat) => {
+    return String(chat.chat_id || chat.id) === String(fallbackChatId)
+  })
+
+  if(activeChat && (!activeChat.title || activeChat.title === "New chat")){
+    activeChat.title = text.slice(0, 60) || (files[0]?.name || "New chat")
+    activeChat.updated_at = new Date().toISOString()
+  }
+
+  moveChatToTop(fallbackChatId)
+  state.shouldAutoScroll = true
+
+  try{
+    if(!streamService || typeof streamService.sendMessage !== "function"){
+      throw new Error("Nova stream service is not initialized")
+    }
+
+    const result = await streamService.sendMessage({
+      chatId: fallbackChatId,
+      message: text,
+      files,
+    })
+
+    if(result?.ok !== false){
+      if(el.input){
+        el.input.value = ""
+      }
+
+      clearPendingFiles()
+      autoResizeInput()
+      updateComposerState()
+
+      await refreshSidebarAfterSend(result?.chat_id || state.activeChatId || fallbackChatId)
+    }else{
+      updateComposerState()
+    }
+  }catch(error){
+    console.error("Nova sendMessage error:", error)
+
+    state.messages.push({
+      id: makeId("msg_assistant"),
+      message_id: makeId("msg_assistant"),
+      role: "assistant",
+      content: `⚠️ ${error?.message || error}`,
+      error: true,
+      pending: false,
+      attachments: [],
+    })
+
+    renderAll()
+  }finally{
+    updateComposerState()
+    scrollMessagesToBottom()
+    focusInput()
+  }
+}
+
+function bindEvents(){
+  el.btnSidebarToggle?.addEventListener("click", toggleSidebar)
+  el.btnCloseSidebar?.addEventListener("click", closeSidebar)
+  el.mobileOverlay?.addEventListener("click", closeSidebar)
+  el.btnNewChat?.addEventListener("click", createChat)
+  el.jumpToLatestBtn?.addEventListener("click", jumpToLatest)
+  el.messagesScroll?.addEventListener("scroll", handleMessagesScroll, { passive: true })
+
+  el.chatList?.addEventListener("click", async (event) => {
+    const item = event.target.closest("[data-chat-id]")
+    if(!item){
+      return
+    }
+
+    const chatId = item.dataset.chatId
+    if(!chatId){
+      return
+    }
+
+    await loadChat(chatId)
+
+    if(window.innerWidth <= 620){
+      closeSidebar()
+    }
+  })
+
+  el.attachBtn?.addEventListener("click", (event) => {
+    event.preventDefault()
+
+    if(state.isStreaming){
+      return
+    }
+
+    try{
+      el.fileInput?.click()
+    }catch(error){
+      console.error("Nova attach click error:", error)
+    }
+  })
+
+  el.fileInput?.addEventListener("change", (event) => {
+    const selectedFiles = Array.from(event.target?.files || [])
+
+    if(!selectedFiles.length){
+      return
+    }
+
+    state.pendingFiles = selectedFiles
+    state.lastUploadedAttachments = selectedFiles.map((file) => ({
+      name: file.name || "file",
+      size: Number(file.size || 0),
+      content_type: file.type || "",
+    }))
+
+    renderPendingAttachments()
+    updateComposerState()
+    focusInput()
+  })
+
+  el.pendingAttachmentsList?.addEventListener("click", (event) => {
+    const removeBtn = event.target.closest("[data-remove-pending-index]")
+    if(!removeBtn){
+      return
+    }
+
+    removePendingFile(removeBtn.dataset.removePendingIndex)
+  })
+
+  el.sendBtn?.addEventListener("click", (event) => {
+    event.preventDefault()
+    sendMessage()
+  })
+
+  el.composerForm?.addEventListener("submit", (event) => {
+    event.preventDefault()
+    sendMessage()
+  })
+
+  el.stopBtn?.addEventListener("click", (event) => {
+    event.preventDefault()
+    streamService?.abortActiveStream?.()
+    focusInput()
+  })
+
+  el.input?.addEventListener("input", () => {
+    autoResizeInput()
+    updateComposerState()
+  })
+
+  el.input?.addEventListener("keydown", (event) => {
+    if(event.key === "Enter" && !event.shiftKey){
+      event.preventDefault()
+      sendMessage()
+    }
+  })
+
+  document.addEventListener("keydown", (event) => {
+    if(event.key === "Escape"){
+      if(state.isStreaming){
+        streamService?.abortActiveStream?.()
+        focusInput()
+        return
+      }
+
+      closeSidebar()
+    }
+  })
+
+  window.addEventListener("resize", () => {
+    if(window.innerWidth <= 620){
+      closeSidebar()
+    }else{
+      openSidebar()
+    }
+
+    if(state.shouldAutoScroll){
+      scrollMessagesToBottom(true)
+    }else{
+      updateJumpToLatestVisibility()
+    }
+  })
+}
+
+function initServices(){
+  if(!window.NovaStreamService || typeof window.NovaStreamService.create !== "function"){
+    throw new Error("NovaStreamService is missing")
+  }
+
+  streamService = window.NovaStreamService.create({
+    state,
+    elements: {
+      messages: el.messages,
+    },
+    utils: {
+      generateId: makeId,
+    },
+    renderService: {
+      renderMessages,
+      renderAll,
+      scrollToBottom: scrollMessagesToBottom,
+    },
+    chatService: {
+      loadChats,
+    },
+    attachmentsService: {
+      renderPendingAttachments,
+      clearPendingFiles,
+      getPendingFiles,
+    },
+  })
+}
+
+async function bootstrap(){
+  await loadChats()
+
+  if(state.activeChatId){
+    await loadChat(state.activeChatId)
+  }else{
+    renderAll()
+    scrollMessagesToBottom(true)
+  }
+
+  updateComposerState()
+  renderPendingAttachments()
+}
+
+async function init(){
+  if(window.innerWidth > 620){
+    openSidebar()
+  }else{
+    closeSidebar()
+  }
+
+  initServices()
+  autoResizeInput()
+  renderAll()
+  bindEvents()
+  bindEmptyStateSuggestions()
+  updateJumpToLatestVisibility()
+  renderPendingAttachments()
+
+  window.NovaChatApp = {
+    state,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+    createChat,
+    sendMessage,
+    renderAll,
+    loadChats,
+    loadChat,
+    jumpToLatest,
+    clearPendingFiles,
+  }
+
+  try{
+    await bootstrap()
+  }catch(error){
+    console.error("Nova bootstrap error:", error)
+    renderAll()
+    updateComposerState()
+  }
+}
+
+if(document.readyState === "loading"){
+  document.addEventListener("DOMContentLoaded", () => {
+    init().catch((error) => {
+      console.error("Nova init error:", error)
+    })
+  }, { once: true })
+}else{
+  init().catch((error) => {
+    console.error("Nova init error:", error)
+  })
+}
+
+})()

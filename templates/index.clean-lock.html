@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Nova</title>
+  <link rel="stylesheet" href="/static/css/nova-main.css?v=route-inspector-2026-04-03-001" />
+</head>
+<body>
+  <div id="novaAppShell" class="nova-app-shell">
+    <aside id="novaSidebar" class="nova-sidebar" data-collapsed="false">
+      <div class="nova-sidebar-top">
+        <button id="sidebarToggle" class="nova-icon-btn nova-sidebar-toggle" type="button" aria-label="Toggle sidebar">☰</button>
+
+        <div class="nova-brand">
+          <div class="nova-brand-mark">N</div>
+          <div class="nova-brand-text">
+            <div class="nova-brand-title">Nova</div>
+            <div class="nova-brand-subtitle">Ultimate 2026</div>
+          </div>
+        </div>
+
+        <button id="newChatBtn" class="nova-btn nova-btn-primary nova-new-chat-btn" type="button">+ New Chat</button>
+      </div>
+
+      <div class="nova-sidebar-collapsed-tools">
+        <button id="collapsedNewChatBtn" class="nova-icon-btn" type="button" aria-label="New chat">＋</button>
+      </div>
+
+      <div class="nova-session-rail-header">
+        <div class="nova-panel-title">Sessions</div>
+        <div id="sessionCount" class="nova-panel-subtitle">0 sessions</div>
+      </div>
+
+      <div id="sessionList" class="nova-session-list"></div>
+    </aside>
+
+    <main class="nova-main">
+      <header class="nova-topbar">
+        <div class="nova-topbar-left">
+          <div class="nova-topbar-title-wrap">
+            <div id="sessionTitle" class="nova-topbar-title">Nova</div>
+            <div id="sessionSubtitle" class="nova-topbar-subtitle">Fast local AI workspace</div>
+          </div>
+        </div>
+
+        <div class="nova-topbar-right">
+          <div id="modelChip" class="nova-chip nova-chip-accent">gpt-5.4</div>
+          <div id="statusChip" class="nova-chip nova-chip-good">Ready</div>
+          <button id="routeInspectorBtn" class="nova-icon-btn" type="button" aria-label="Open route inspector">🧭</button>
+        </div>
+      </header>
+
+      <section id="chatScroll" class="nova-chat-scroll">
+        <div id="chatMessages" class="nova-chat-messages"></div>
+      </section>
+
+      <footer class="nova-composer-shell">
+        <div id="pendingUploads" class="nova-pending-uploads"></div>
+
+        <div class="nova-composer">
+          <div class="nova-composer-controls">
+            <label for="fileInput" class="nova-btn nova-btn-ghost">📎 Attach</label>
+            <input id="fileInput" type="file" multiple hidden />
+            <button id="voiceBtn" class="nova-btn nova-btn-ghost" type="button" aria-label="Voice">🎤</button>
+            <button id="clearInputBtn" class="nova-btn nova-btn-ghost" type="button" aria-label="Clear input">⌫</button>
+          </div>
+
+          <div class="nova-composer-main">
+            <textarea id="chatInput" rows="1" placeholder="Message Nova"></textarea>
+
+            <div class="nova-composer-footer">
+              <div id="composerHint" class="nova-composer-hint">Enter to send · Shift+Enter for newline · Upload stages files before send</div>
+              <button id="sendBtn" class="nova-btn nova-btn-primary nova-send-btn" type="button">Send</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="composerStatus" class="nova-composer-status">Ready</div>
+      </footer>
+    </main>
+
+    <aside id="rightRail" class="nova-right-rail" data-open="true">
+      <div class="nova-right-rail-top">
+        <div class="nova-right-rail-tabs">
+          <button class="nova-rail-tab is-active" data-panel="artifacts" type="button">Artifacts</button>
+          <button class="nova-rail-tab" data-panel="memory" type="button">Memory</button>
+          <button class="nova-rail-tab" data-panel="web" type="button">Web</button>
+          <button class="nova-rail-tab" data-panel="route" type="button">Route</button>
+        </div>
+
+        <button id="rightRailCloseBtn" class="nova-icon-btn" type="button" aria-label="Close panel">×</button>
+      </div>
+
+      <div class="nova-right-rail-heading">
+        <div id="rightRailTitle" class="nova-panel-title">Artifacts</div>
+        <div id="rightRailSubtitle" class="nova-panel-subtitle">Saved outputs tied to this session</div>
+      </div>
+
+      <div class="nova-right-rail-body">
+        <section id="panelArtifacts" class="nova-rail-panel is-active">
+          <div id="artifactList" class="nova-rail-list"></div>
+        </section>
+
+        <section id="panelMemory" class="nova-rail-panel">
+          <div class="nova-memory-tools">
+            <input id="memoryInput" class="nova-input" type="text" placeholder="Add memory note" />
+            <button id="memoryAddBtn" class="nova-btn nova-btn-primary" type="button">Add</button>
+          </div>
+          <div id="memoryList" class="nova-rail-list"></div>
+        </section>
+
+        <section id="panelWeb" class="nova-rail-panel">
+          <div id="webList" class="nova-rail-list"></div>
+        </section>
+
+        <section id="panelRoute" class="nova-rail-panel">
+          <div id="routeInspector" class="nova-route-inspector">
+            <div class="nova-empty-state">
+              <div class="nova-empty-title">Route Inspector</div>
+              <div class="nova-empty-text">Click a route badge on an assistant message or the compass button to inspect saved route metadata.</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script src="/static/js/nova-artifacts.js?v=artifact-upgrade-2026-04-03-006"></script>
+  <script src="/static/js/nova-composer-bundle.js?v=route-inspector-2026-04-03-001"></script>
+</body>
+</html>

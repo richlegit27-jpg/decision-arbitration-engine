@@ -1,0 +1,80 @@
+/* Body / Workspace Background */
+body {
+  background: linear-gradient(135deg, #0a0a0f, #1c1b2f, #12121f);
+  font-family: Inter, sans-serif;
+  color: #e7edf5;
+}
+
+/* Sidebar */
+.sidebar {
+  background: rgba(18,18,30,0.85); /* translucent darker sidebar */
+  backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(255,255,255,0.05);
+  padding: 1rem;
+}
+
+/* Sidebar buttons */
+.sidebar-actions button {
+  background: rgba(255,255,255,0.05);
+  border-radius: 8px;
+  padding: 0.4rem 0.8rem;
+  margin-bottom: 0.5rem;
+  transition: background 0.2s;
+}
+
+.sidebar-actions button:hover {
+  background: rgba(255,255,255,0.1);
+  cursor: pointer;
+}
+
+/* Workspace */
+.workspace {
+  backdrop-filter: blur(12px);
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+/* Chat bubbles */
+.chat-message.user, .chat-message.assistant {
+  background: rgba(255,255,255,0.08);
+  border-radius: 1rem;
+  padding: 0.6rem 1rem;
+  margin-bottom: 0.5rem;
+  backdrop-filter: blur(8px);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.chat-message.user:hover, .chat-message.assistant:hover {
+  transform: translateY(-1px);
+  background: rgba(255,255,255,0.12);
+}
+
+/* Memory panel */
+.memory-panel {
+  backdrop-filter: blur(14px);
+  background: rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 1rem;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+/* Drop zone */
+#dropZone {
+  border: 2px dashed rgba(255,255,255,0.2);
+  border-radius: 8px;
+  padding: 0.5rem;
+  transition: background 0.2s;
+}
+
+#dropZone:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+/* Voice button */
+#voiceBtn {
+  background: rgba(255,255,255,0.08);
+  border-radius: 50%;
+  padding: 0.5rem;
+  backdrop-filter: blur(6px);
+}

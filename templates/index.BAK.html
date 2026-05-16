@@ -1,0 +1,140 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Nova</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+<style>
+
+body{
+background:#09090b;
+color:#e4e4e7;
+font-family:system-ui;
+}
+
+#chat{
+max-width:900px;
+margin:auto;
+padding:30px 20px 120px 20px;
+}
+
+.msg-row{
+display:flex;
+gap:12px;
+margin-bottom:22px;
+}
+
+.avatar{
+width:34px;
+height:34px;
+border-radius:8px;
+background:#18181b;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:16px;
+}
+
+.message{
+flex:1;
+line-height:1.6;
+}
+
+.message pre{
+background:#111;
+padding:14px;
+border-radius:8px;
+overflow:auto;
+position:relative;
+}
+
+.copy-btn{
+position:absolute;
+top:6px;
+right:6px;
+font-size:12px;
+background:#27272a;
+padding:4px 8px;
+border-radius:6px;
+cursor:pointer;
+}
+
+.cursor{
+display:inline-block;
+width:6px;
+height:16px;
+background:#22c55e;
+margin-left:4px;
+animation:blink 1s infinite;
+}
+
+@keyframes blink{
+0%{opacity:1}
+50%{opacity:0}
+100%{opacity:1}
+}
+
+#composer{
+position:fixed;
+bottom:0;
+left:0;
+right:0;
+background:#09090b;
+padding:16px;
+border-top:1px solid #27272a;
+}
+
+#input{
+width:100%;
+background:#18181b;
+padding:12px;
+border-radius:8px;
+color:white;
+}
+
+#scrollBottom{
+position:fixed;
+right:20px;
+bottom:120px;
+background:#18181b;
+padding:10px;
+border-radius:8px;
+cursor:pointer;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="chat"></div>
+
+<div id="composer">
+
+<textarea id="input"
+rows="2"
+placeholder="Type a message… (Enter to send, Shift+Enter newline)"
+></textarea>
+
+</div>
+
+<button id="scrollBottom">⬇</button>
+
+<script src="/static/js/chat.js"></script>
+
+<script>
+hljs.highlightAll()
+</script>
+
+</body>
+</html>

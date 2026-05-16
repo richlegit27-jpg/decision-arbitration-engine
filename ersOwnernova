@@ -1,0 +1,20 @@
+[33ma968b21[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mbrain-pass-working-2026-03-27[m[33m)[m backup checkpoint before session rail rollback
+[33m1c75ab3[m save checkpoint live search real publisher resolution
+[33m55e99d0[m[33m ([m[1;33mtag: [m[1;33mweb-card-render-premium-2026-04-01[m[33m)[m web card render premium: polished chat card, artifact reopen, web rail sync
+[33m6377331[m[33m ([m[1;33mtag: [m[1;33mweb-fetch-polish-2026-03-31[m[33m)[m web fetch polish: clean summary, stable web meta, artifact reopen ready, ssl fallback locked, route stable
+[33m68c5570[m[33m ([m[1;33mtag: [m[1;33mSTABLE-2026-03-31[m[33m)[m STABLE BASELINE: chat + UI + responsive + working send/upload
+[33m464d377[m composer upload to chat normalized media contract wired
+[33m3628b66[m media-render-path polish image video audio in chat and artifacts
+[33mea3dd29[m backend-lock-stable-2026-03-31 media-prep checkpoint (chat + artifacts + memory unified, no streaming yet)
+[33m2da483d[m checkpoint: session rail + composer restore + left/right rail controls
+[33m3d2acdf[m wire composer with session rail switching and refresh flow
+[33m9d0ef4f[m wire session rail list switch refresh and new chat flow
+[33mcab9109[m add session rail and session switching flow
+[33m9a69c4e[m finish real session persistence and restore pipeline
+[33m001ab16[m stabilize rendered message hooks for session history restore
+[33mcdc7e75[m persist session messages and restore chat on load
+[33m8a4763d[m history pipeline wired and visible in chat
+[33mae7c96b[m show history badge in chat responses
+[33m0bd762c[m frontend sends recent chat history to backend
+[33m28dd87d[m history pass-through on real model path
+[33mbb5437d[m checkpoint: unified chat render contract + stable api chat payload + unified right rail

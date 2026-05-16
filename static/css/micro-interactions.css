@@ -1,0 +1,74 @@
+/* COMPOSER INTERACTIONS */
+#composer {
+  transition: background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+#composer:hover {
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+}
+
+#messageInput:focus {
+  border-color: var(--accent);
+  box-shadow: 0 4px 15px rgba(121,168,255,0.3);
+}
+
+/* TOPBAR MICRO EFFECTS */
+#topBar {
+  transition: background 260ms ease, box-shadow 260ms ease;
+}
+
+#topBar:hover {
+  background: color-mix(in srgb, var(--panel) 95%, transparent);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+/* CHAT BUBBLE MICRO EFFECTS */
+.message-bubble {
+  transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.message-bubble.user:hover {
+  transform: translateY(-1px);
+  background: rgba(121,168,255,0.18);
+  box-shadow: 0 6px 20px rgba(121,168,255,0.15);
+}
+
+.message-bubble.assistant:hover {
+  transform: translateY(-1px);
+  background: rgba(255,255,255,0.045);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.05);
+}
+
+.message-bubble.system:hover {
+  transform: translateY(-1px);
+  background: rgba(255,255,255,0.055);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+}
+
+/* MEMORY PANEL CARDS */
+.memory-card {
+  transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.memory-card:hover {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--panel-2) 92%, transparent);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.12);
+}
+
+/* SIDEBAR BUTTON MICRO EFFECTS */
+.sidebar-top button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+/* ELEVATED HOVER SHADOWS */
+button, .icon-btn, .primary-btn, .ghost-btn {
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+button:hover, .icon-btn:hover, .primary-btn:hover, .ghost-btn:hover {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}

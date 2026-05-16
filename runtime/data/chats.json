@@ -1,0 +1,402 @@
+{
+  "chats": {
+    "chat_20260313163921697409": {
+      "id": "chat_20260313163921697409",
+      "title": "New Chat",
+      "created_at": "2026-03-13T16:39:21.697444+00:00",
+      "updated_at": "2026-03-13T16:39:23.072218+00:00",
+      "messages": [
+        {
+          "id": "msg_20260313163921700073",
+          "role": "user",
+          "content": "hello",
+          "created_at": "2026-03-13T16:39:21.700094+00:00"
+        },
+        {
+          "id": "msg_20260313163923072177",
+          "role": "assistant",
+          "content": "Hello! How can I assist you today?",
+          "created_at": "2026-03-13T16:39:23.072212+00:00"
+        }
+      ]
+    },
+    "chat_20260313164452793844": {
+      "id": "chat_20260313164452793844",
+      "title": "New Chat",
+      "created_at": "2026-03-13T16:44:52.793886+00:00",
+      "updated_at": "2026-03-13T16:44:56.207720+00:00",
+      "messages": [
+        {
+          "id": "msg_20260313164452800302",
+          "role": "user",
+          "content": "why do the israeli's kill children during war",
+          "created_at": "2026-03-13T16:44:52.800439+00:00"
+        },
+        {
+          "id": "msg_20260313164456207666",
+          "role": "assistant",
+          "content": "I understand this is a deeply emotional and sensitive topic. Civilian casualties, including children, tragically occur in conflicts involving many parties worldwide. These situations are often complex, involving densely populated areas, asymmetric warfare, and various military and political factors. It's important to consider verified sources and multiple perspectives to understand the full context.\n\nIf you want, I can help provide information on the broader conflict context or direct you to reliable resources. Let me know how you'd like to proceed.",
+          "created_at": "2026-03-13T16:44:56.207712+00:00"
+        }
+      ]
+    },
+    "chat_20260313170459441147": {
+      "id": "chat_20260313170459441147",
+      "title": "New Chat",
+      "created_at": "2026-03-13T17:04:59.441185+00:00",
+      "updated_at": "2026-03-13T17:40:58.521571+00:00",
+      "messages": [
+        {
+          "id": "msg_20260313171032902619",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T17:10:32.902659+00:00"
+        },
+        {
+          "id": "msg_20260313171034416370",
+          "role": "assistant",
+          "content": "Hello! How can I assist you today?",
+          "created_at": "2026-03-13T17:10:34.416402+00:00"
+        },
+        {
+          "id": "msg_20260313171130486036",
+          "role": "user",
+          "content": "how are you",
+          "created_at": "2026-03-13T17:11:30.486073+00:00"
+        },
+        {
+          "id": "msg_20260313171132103873",
+          "role": "assistant",
+          "content": "I'm doing great, thanks for asking! How can I help you today?",
+          "created_at": "2026-03-13T17:11:32.103905+00:00"
+        },
+        {
+          "id": "msg_20260313171452736630",
+          "role": "user",
+          "content": "Generate an image:",
+          "created_at": "2026-03-13T17:14:52.736667+00:00"
+        },
+        {
+          "id": "msg_20260313171454209837",
+          "role": "assistant",
+          "content": "Please provide details about the image you want me to generate—such as style, content, colors, or any specific elements you want included.",
+          "created_at": "2026-03-13T17:14:54.209874+00:00"
+        },
+        {
+          "id": "msg_20260313173357010400",
+          "role": "user",
+          "content": "tell me about the war in iran",
+          "created_at": "2026-03-13T17:33:57.010509+00:00"
+        },
+        {
+          "id": "msg_20260313173401181767",
+          "role": "assistant",
+          "content": "As of my knowledge cutoff in June 2024, there is no ongoing full-scale war inside Iran. However, Iran has been involved in various regional conflicts and tensions, including:\n\n- The Iran-Iraq War (1980-1988), a major conflict in the 1980s.\n- Ongoing tensions with the United States and some Gulf countries.\n- Proxy conflicts in countries like Syria, Yemen, and Iraq involving Iranian-backed groups.\n- Internal unrest or protests due to political and economic issues, but not a declared war.\n\nIf you want, I can provide more specific historical details or information about current regional security dynamics involving Iran. Let me know what you prefer.",
+          "created_at": "2026-03-13T17:34:01.181796+00:00"
+        },
+        {
+          "id": "msg_20260313174056840767",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T17:40:56.840811+00:00"
+        },
+        {
+          "id": "msg_20260313174058521532",
+          "role": "assistant",
+          "content": "Hi again! What can I do for you?",
+          "created_at": "2026-03-13T17:40:58.521565+00:00"
+        }
+      ]
+    },
+    "chat_20260313182207694790": {
+      "id": "chat_20260313182207694790",
+      "title": "New Chat",
+      "created_at": "2026-03-13T18:22:07.694843+00:00",
+      "updated_at": "2026-03-13T18:22:07.694843+00:00",
+      "messages": []
+    },
+    "chat_20260313182839829900": {
+      "id": "chat_20260313182839829900",
+      "title": "New Chat",
+      "created_at": "2026-03-13T18:28:39.829921+00:00",
+      "updated_at": "2026-03-13T18:56:01.445867+00:00",
+      "messages": [
+        {
+          "id": "msg_20260313183821771583",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T18:38:21.771641+00:00"
+        },
+        {
+          "id": "msg_20260313183823506080",
+          "role": "assistant",
+          "content": "Nova AI error: Error code: 404 - {'error': {'message': 'The model `gpt-5.3` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+          "created_at": "2026-03-13T18:38:23.506115+00:00"
+        },
+        {
+          "id": "msg_20260313183851242278",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T18:38:51.242324+00:00"
+        },
+        {
+          "id": "msg_20260313183851879499",
+          "role": "assistant",
+          "content": "Nova AI error: Error code: 404 - {'error': {'message': 'The model `gpt-5.3` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+          "created_at": "2026-03-13T18:38:51.879522+00:00"
+        },
+        {
+          "id": "msg_20260313184137172460",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T18:41:37.172523+00:00"
+        },
+        {
+          "id": "msg_20260313184138405143",
+          "role": "assistant",
+          "content": "Nova AI error: Error code: 404 - {'error': {'message': 'The model `gpt-5.3` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+          "created_at": "2026-03-13T18:41:38.405177+00:00"
+        },
+        {
+          "id": "msg_20260313184315883147",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T18:43:15.883224+00:00"
+        },
+        {
+          "id": "msg_20260313184317364033",
+          "role": "assistant",
+          "content": "Hi! How can I help you with your engineering or software project today?",
+          "created_at": "2026-03-13T18:43:17.364077+00:00"
+        },
+        {
+          "id": "msg_20260313184339625311",
+          "role": "user",
+          "content": "how are you",
+          "created_at": "2026-03-13T18:43:39.625358+00:00"
+        },
+        {
+          "id": "msg_20260313184341783309",
+          "role": "assistant",
+          "content": "I'm here and ready to assist you with any engineering or software tasks you have. Let me know how I can help!",
+          "created_at": "2026-03-13T18:43:41.783359+00:00"
+        },
+        {
+          "id": "msg_20260313184353098839",
+          "role": "user",
+          "content": "how are you",
+          "created_at": "2026-03-13T18:43:53.098907+00:00"
+        },
+        {
+          "id": "msg_20260313184353731077",
+          "role": "assistant",
+          "content": "Nova AI error: Error code: 404 - {'error': {'message': 'The model `gpt-5.3` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+          "created_at": "2026-03-13T18:43:53.731103+00:00"
+        },
+        {
+          "id": "msg_20260313184629576510",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T18:46:29.576586+00:00"
+        },
+        {
+          "id": "msg_20260313184631388097",
+          "role": "assistant",
+          "content": "Hi! How can I assist you with your software project or debugging task today?",
+          "created_at": "2026-03-13T18:46:31.388151+00:00"
+        },
+        {
+          "id": "msg_20260313185204012333",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T18:52:04.012377+00:00"
+        },
+        {
+          "id": "msg_20260313185205767801",
+          "role": "assistant",
+          "content": "Hi! How can I help you with your engineering or software project today?",
+          "created_at": "2026-03-13T18:52:05.767845+00:00"
+        },
+        {
+          "id": "msg_20260313185600114068",
+          "role": "user",
+          "content": "can you tell me the current date",
+          "created_at": "2026-03-13T18:56:00.114116+00:00"
+        },
+        {
+          "id": "msg_20260313185601445814",
+          "role": "assistant",
+          "content": "I'm unable to provide the current date. Please check your system clock for the most accurate information. Let me know if you need assistance with a project!",
+          "created_at": "2026-03-13T18:56:01.445859+00:00"
+        }
+      ]
+    },
+    "chat_20260313183151341631": {
+      "id": "chat_20260313183151341631",
+      "title": "New Chat",
+      "created_at": "2026-03-13T18:31:51.341666+00:00",
+      "updated_at": "2026-03-13T18:31:51.341666+00:00",
+      "messages": []
+    },
+    "chat_20260313183311085777": {
+      "id": "chat_20260313183311085777",
+      "title": "New Chat",
+      "created_at": "2026-03-13T18:33:11.085799+00:00",
+      "updated_at": "2026-03-13T18:33:12.059606+00:00",
+      "messages": [
+        {
+          "id": "msg_20260313183311089701",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T18:33:11.089724+00:00"
+        },
+        {
+          "id": "msg_20260313183312059560",
+          "role": "assistant",
+          "content": "Nova AI error: Error code: 404 - {'error': {'message': 'The model `gpt-5.3` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+          "created_at": "2026-03-13T18:33:12.059599+00:00"
+        }
+      ]
+    },
+    "chat_20260313183534352404": {
+      "id": "chat_20260313183534352404",
+      "title": "New Chat",
+      "created_at": "2026-03-13T18:35:34.352427+00:00",
+      "updated_at": "2026-03-13T18:35:35.610251+00:00",
+      "messages": [
+        {
+          "id": "msg_20260313183534355716",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T18:35:34.355738+00:00"
+        },
+        {
+          "id": "msg_20260313183535610219",
+          "role": "assistant",
+          "content": "Nova AI error: Error code: 404 - {'error': {'message': 'The model `gpt-5.3` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+          "created_at": "2026-03-13T18:35:35.610245+00:00"
+        }
+      ]
+    },
+    "chat_20260313183551166807": {
+      "id": "chat_20260313183551166807",
+      "title": "New Chat",
+      "created_at": "2026-03-13T18:35:51.166829+00:00",
+      "updated_at": "2026-03-13T18:35:52.230107+00:00",
+      "messages": [
+        {
+          "id": "msg_20260313183551170622",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T18:35:51.170643+00:00"
+        },
+        {
+          "id": "msg_20260313183552230072",
+          "role": "assistant",
+          "content": "Nova AI error: Error code: 404 - {'error': {'message': 'The model `gpt-5.3` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+          "created_at": "2026-03-13T18:35:52.230101+00:00"
+        }
+      ]
+    },
+    "chat_20260313185800791791": {
+      "id": "chat_20260313185800791791",
+      "title": "New Chat",
+      "created_at": "2026-03-13T18:58:00.791830+00:00",
+      "updated_at": "2026-03-13T18:58:11.042647+00:00",
+      "messages": [
+        {
+          "id": "msg_20260313185809223993",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T18:58:09.224041+00:00"
+        },
+        {
+          "id": "msg_20260313185811042590",
+          "role": "assistant",
+          "content": "Hello! How can I assist you today? If you need help with a project or debugging something, just let me know!",
+          "created_at": "2026-03-13T18:58:11.042638+00:00"
+        }
+      ]
+    },
+    "chat_20260313185828216606": {
+      "id": "chat_20260313185828216606",
+      "title": "New Chat",
+      "created_at": "2026-03-13T18:58:28.216664+00:00",
+      "updated_at": "2026-03-13T18:58:30.256363+00:00",
+      "messages": [
+        {
+          "id": "msg_20260313185828223432",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T18:58:28.223480+00:00"
+        },
+        {
+          "id": "msg_20260313185830256326",
+          "role": "assistant",
+          "content": "Hello! How can I assist you today? If you need help with a project or debugging something, just let me know!",
+          "created_at": "2026-03-13T18:58:30.256354+00:00"
+        }
+      ]
+    },
+    "chat_20260313190324035960": {
+      "id": "chat_20260313190324035960",
+      "title": "New Chat",
+      "created_at": "2026-03-13T19:03:24.036016+00:00",
+      "updated_at": "2026-03-13T19:03:25.588663+00:00",
+      "messages": [
+        {
+          "id": "msg_20260313190324043057",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T19:03:24.043110+00:00"
+        },
+        {
+          "id": "msg_20260313190325588604",
+          "role": "assistant",
+          "content": "Hello! How can I assist you today? If you need help with a project or debugging something, just let me know!",
+          "created_at": "2026-03-13T19:03:25.588654+00:00"
+        }
+      ]
+    },
+    "chat_20260313192059691898": {
+      "id": "chat_20260313192059691898",
+      "title": "New Chat",
+      "created_at": "2026-03-13T19:20:59.691945+00:00",
+      "updated_at": "2026-03-13T19:21:01.878370+00:00",
+      "messages": [
+        {
+          "id": "msg_20260313192059699982",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T19:20:59.700045+00:00"
+        },
+        {
+          "id": "msg_20260313192101878313",
+          "role": "assistant",
+          "content": "Hello! How can I assist you today? If you need help with a project or debugging something, just let me know!",
+          "created_at": "2026-03-13T19:21:01.878360+00:00"
+        }
+      ]
+    },
+    "chat_20260313193638287900": {
+      "id": "chat_20260313193638287900",
+      "title": "New Chat",
+      "created_at": "2026-03-13T19:36:38.287990+00:00",
+      "updated_at": "2026-03-13T19:36:40.393540+00:00",
+      "messages": [
+        {
+          "id": "msg_20260313193638295109",
+          "role": "user",
+          "content": "hi",
+          "created_at": "2026-03-13T19:36:38.295197+00:00"
+        },
+        {
+          "id": "msg_20260313193640393484",
+          "role": "assistant",
+          "content": "Hello! How can I assist you today? If you need help with a project or debugging something, just let me know!",
+          "created_at": "2026-03-13T19:36:40.393531+00:00"
+        }
+      ]
+    }
+  }
+}

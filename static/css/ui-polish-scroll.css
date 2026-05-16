@@ -1,0 +1,81 @@
+/* ===============================
+   NOVA SCROLL & BACKGROUND SHIMMER
+   Subtle motion for chats & memory
+   =============================== */
+
+/* BACKGROUND SHIMMER */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    120deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(255,255,255,0.01) 50%,
+    rgba(255,255,255,0.03) 100%
+  );
+  background-size: 200% 200%;
+  animation: shimmer 15s linear infinite;
+  z-index: 0;
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 200% 200%; }
+}
+
+/* CHAT SCROLL INDICATORS */
+#chatMessages::before,
+#chatMessages::after {
+  content: "";
+  position: sticky;
+  left: 0;
+  right: 0;
+  height: 24px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--bg) 0%, rgba(0,0,0,0) 100%);
+  z-index: 1;
+}
+
+#chatMessages::after {
+  top: auto;
+  bottom: 0;
+  background: linear-gradient(to top, var(--bg) 0%, rgba(0,0,0,0) 100%);
+}
+
+/* MEMORY PANEL SCROLL INDICATORS */
+#memoryList::before,
+#memoryList::after {
+  content: "";
+  position: sticky;
+  left: 0;
+  right: 0;
+  height: 16px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--bg) 0%, rgba(0,0,0,0) 100%);
+  z-index: 1;
+}
+
+#memoryList::after {
+  top: auto;
+  bottom: 0;
+  background: linear-gradient(to top, var(--bg) 0%, rgba(0,0,0,0) 100%);
+}
+
+/* SCROLLBAR SUBTLE STYLE */
+#chatMessages::-webkit-scrollbar,
+#memoryList::-webkit-scrollbar {
+  width: 6px;
+}
+
+#chatMessages::-webkit-scrollbar-thumb,
+#memoryList::-webkit-scrollbar-thumb {
+  background: rgba(121,168,255,0.15);
+  border-radius: 999px;
+}
+
+#chatMessages::-webkit-scrollbar-track,
+#memoryList::-webkit-scrollbar-track {
+  background: transparent;
+}

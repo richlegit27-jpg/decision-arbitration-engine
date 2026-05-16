@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Env / secrets
+.env
+*.key
+*.pem
+
+# Uploads (generated files)
+uploads/
+
+# Runtime data (sessions, artifacts, memory)
+data/
+
+# Optional backups
+data/backups/
+nova_backups/
+full_*/
+
+# Temp / logs
+*.log
+*.tmp
+
+# OS junk
+.DS_Store
+Thumbs.db
+# Nova runtime/session data
+data/nova_sessions*.json
+data/*nova_sessions*.json
+data/backups/*.json
+*.lockbackup.json
+*.badlock.json
+__pycache__/
+*.pyc
+
+# Nova runtime/private local data
+data/
+!data/.gitkeep

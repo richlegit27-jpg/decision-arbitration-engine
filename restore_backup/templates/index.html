@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Nova Polished Endgame</title>
+<link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/static/css/layout.css">
+<link rel="stylesheet" href="/static/css/answer-payload.css">
+</head>
+<body class="chat-bg-dark sidebar-open">
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="sidebar-header">
+    <button id="sidebarToggleBtn">☰</button>
+    <h2>Nova</h2>
+  </div>
+  <ul id="chatList"></ul>
+  <button id="newChatBtn" class="new-chat-btn">+ New Chat</button>
+</div>
+
+<!-- MAIN PANEL -->
+<div id="mainPanel">
+  <div id="chatPanel">
+    <ul id="messages"></ul>
+  </div>
+
+  <!-- COMPOSER -->
+  <form id="composerForm">
+    <input id="composerInput" placeholder="Type a message..." autocomplete="off">
+    <button id="sendBtn" type="submit">Send</button>
+    <button id="attachBtn" type="button">📎</button>
+    <button id="imageBtn" type="button">🖼️</button>
+    <button id="voiceBtn" type="button">🎤</button>
+    <div id="pendingAttachments"></div>
+  </form>
+</div>
+
+<!-- MEMORY PANEL -->
+<div id="memoryPanel">
+  <button id="closeMemoryPanelBtn">✕</button>
+  <h3>Memory</h3>
+  <div id="memoryList"></div>
+  <button id="deleteAllMemoryBtn">Delete All Memory</button>
+</div>
+
+<!-- FILES PANEL -->
+<div id="filesPanel">
+  <button id="closeFilesPanelBtn">✕</button>
+  <h3>Files</h3>
+  <div id="filesList"></div>
+  <div id="uploadedFilesList"></div>
+  <button id="clearFilesBtn">Clear Files</button>
+</div>
+
+<!-- FOOTER -->
+<div id="footer">
+  <button id="themeToggleBtn">🌙</button>
+  <button id="logoutBtn">Logout</button>
+</div>
+
+<script src="/static/js/nova-bindings.js"></script>
+</body>
+</html>
