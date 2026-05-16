@@ -5595,8 +5595,13 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
 
   if (!url) return;
 
-  if (typeof openRail === "function") openRail();
-  if (typeof setRailTab === "function") setRailTab("web");
+  if (typeof openRail === "function") {
+    openRail();
+  }
+
+  if (typeof setRailTab === "function") {
+    setRailTab("web");
+  }
 
   const viewer =
     (els && els.railViewer) ||
@@ -5618,6 +5623,7 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
       <div class="nova-viewer-card nova-web-viewer-card">
         <div class="nova-viewer-kicker">Web Preview</div>
         <div class="nova-viewer-title">${escapeHtml(title)}</div>
+        <div class="nova-web-viewer-url">${escapeHtml(url)}</div>
         <div class="nova-viewer-body">
           <p>Loading preview...</p>
         </div>
@@ -5630,10 +5636,18 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
 
   fetch("/api/web/preview", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: url }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      url: url,
+    }),
   })
     .then(function (response) {
+      if (!response.ok) {
+        throw new Error("Preview request failed");
+      }
+
       return response.json();
     })
     .then(function (data) {
@@ -5671,8 +5685,9 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
           <div class="nova-viewer-card nova-web-viewer-card">
             <div class="nova-viewer-kicker">Web Preview</div>
             <div class="nova-viewer-title">${escapeHtml(title || "Source preview")}</div>
+            <div class="nova-web-viewer-url">${escapeHtml(url)}</div>
             <div class="nova-viewer-body">
-              <p>Failed to load preview.</p>
+              <p>Preview could not load, but the source link is still available.</p>
             </div>
             <a class="nova-web-viewer-open" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">
               Open source
