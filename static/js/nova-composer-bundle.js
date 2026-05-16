@@ -5693,8 +5693,13 @@ document.addEventListener("click", function (e) {
 
   const url = String(sourceCard.dataset.url || "").trim();
   const title = String(sourceCard.dataset.title || "Source").trim();
+  const webId = String(sourceCard.dataset.webId || "").trim();
 
   if (!url) return;
+
+  if (webId && typeof setRailSelectedItem === "function") {
+    setRailSelectedItem("web", webId);
+  }
 
   if (e.ctrlKey || e.metaKey || e.shiftKey) {
     window.open(
@@ -5777,7 +5782,6 @@ document.addEventListener("click", function (event) {
   document.body.appendChild(modal);
   document.addEventListener("keydown", escHandler);
 });
-
 function renderWeb() {
   renderExecution();
 
@@ -5809,39 +5813,64 @@ function renderWeb() {
     return;
   }
 
-els.webList.innerHTML = items.map(function (item) {
-  const viewer = item.viewer || {};
-  const meta = item.meta || {};
+  els.webList.innerHTML = items.map(function (item, index) {
+    const viewer = item.viewer || {};
+    const meta = item.meta || {};
 
-  const id = escapeHtml(item.id || meta.id || viewer.id || "");
-  const title = escapeHtml(viewer.title || item.title || meta.title || "Web result");
-  const summary = escapeHtml(
-    viewer.analysis_text ||
-    item.summary ||
-    item.preview ||
-    meta.summary ||
-    ""
-  );
+    const rawId = String(
+      item.id ||
+      meta.id ||
+      viewer.id ||
+      "web-" + index
+    ).trim();
 
-  const url = escapeHtml(
-    viewer.source_url ||
-    item.source_url ||
-    meta.source_url ||
-    ""
-  );
+    const rawTitle = String(
+      viewer.title ||
+      item.title ||
+      meta.title ||
+      "Web result"
+    ).trim();
 
-  return (
-    '<button type="button" class="nova-web-card" data-artifact-open="' + id + '">' +
-      '<div class="nova-web-card-title">' + title + '</div>' +
-      (summary ? '<div class="nova-web-card-summary">' + summary.slice(0, 220) + '</div>' : "") +
-      (url ? '<div class="nova-web-card-url">' + url + '</div>' : "") +
-    '</button>'
-  );
-}).join("");
+    const rawSummary = String(
+      viewer.analysis_text ||
+      item.summary ||
+      item.preview ||
+      meta.summary ||
+      ""
+    ).trim();
 
-if (typeof wireWebLinks === "function") {
-  wireWebLinks();
-}
+    const rawUrl = String(
+      viewer.source_url ||
+      item.source_url ||
+      meta.source_url ||
+      viewer.url ||
+      item.url ||
+      meta.url ||
+      ""
+    ).trim();
+
+    const id = escapeHtml(rawId);
+    const title = escapeHtml(rawTitle);
+    const summary = escapeHtml(rawSummary);
+    const url = escapeHtml(rawUrl);
+
+    return (
+      '<button type="button" class="nova-web-card nova-source-card" ' +
+        'data-web-id="' + id + '" ' +
+        'data-no-chat-action="1" ' +
+        'data-url="' + url + '" ' +
+        'data-title="' + title + '" ' +
+        'data-preview="' + summary + '">' +
+        '<div class="nova-web-card-title">' + title + '</div>' +
+        (summary ? '<div class="nova-web-card-summary">' + summary.slice(0, 220) + '</div>' : "") +
+        (url ? '<div class="nova-web-card-url">' + url + '</div>' : "") +
+      '</button>'
+    );
+  }).join("");
+
+  if (typeof wireWebLinks === "function") {
+    wireWebLinks();
+  }
 }
 
 function renderWorkingContextCard(workingContext) {
