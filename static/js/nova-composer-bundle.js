@@ -3522,19 +3522,23 @@ function finalizeStreamMessage(payload) {
       },
     });
 
-if (data.saved_artifact && typeof data.saved_artifact === "object") {
-  const artifactId = String(data.saved_artifact.id || "").trim();
+    if (data && data.saved_artifact && data.saved_artifact.id) {
+      const artifactId = String(data.saved_artifact.id || "").trim();
 
-  const exists = (state.artifacts || []).some(function (item) {
-    return String((item && item.id) || "").trim() === artifactId;
-  });
+      const exists = (state.artifacts || []).some(function (item) {
+        return String((item && item.id) || "").trim() === artifactId;
+      });
 
-  if (!exists) {
-    state.artifacts = [data.saved_artifact].concat(state.artifacts || []);
-  }
+      if (!exists) {
+        state.artifacts = [data.saved_artifact].concat(state.artifacts || []);
+      }
 
-  renderArtifacts();
-}
+      renderArtifacts();
+
+      if (typeof renderWeb === "function") {
+        renderWeb();
+      }
+    }
 
     if (state.stream) {
       state.stream.placeholderId = "";
@@ -4332,7 +4336,6 @@ if (data && data.assistant_message && data.assistant_message.image_url) {
 }
 
 if (data && data.saved_artifact && data.saved_artifact.id) {
-
   state.artifacts = Array.isArray(state.artifacts)
     ? state.artifacts
     : [];
@@ -4347,8 +4350,13 @@ if (data && data.saved_artifact && data.saved_artifact.id) {
 
   renderArtifacts();
 
+  if (typeof renderWeb === "function") {
+    renderWeb();
+  }
+
   openArtifactFromStateOrBackend(data.saved_artifact.id);
 }
+
     state.messages = (state.messages || []).map(function (msg) {
       if (!msg || String(msg.role || "") !== "assistant") return msg;
 
@@ -5797,6 +5805,7 @@ document.addEventListener("click", function (event) {
   document.body.appendChild(modal);
   document.addEventListener("keydown", escHandler);
 });
+
 function renderWeb() {
   renderExecution();
 
@@ -5842,12 +5851,34 @@ function renderWeb() {
   });
 
   const items = webItems.length ? webItems : artifactWebItems;
+
   if (!items.length) {
+    if (!state.rail) {
+      state.rail = {};
+    }
+
+    if (state.rail.selectedKind === "web") {
+      state.rail.selectedKind = "";
+      state.rail.selectedId = "";
+    }
+
     els.webList.innerHTML =
       '<div class="nova-memory-empty">' +
-        '<div class="nova-memory-empty-title">No web results yet</div>' +
-        '<div class="nova-memory-empty-copy">Search something live and the result will appear here.</div>' +
+        '<div class="nova-memory-empty-title">No web results for this session</div>' +
+        '<div class="nova-memory-empty-copy">Run a live search or open a source result, and it will appear here.</div>' +
       '</div>';
+
+    if (els.railViewer && state.rail.tab === "web") {
+      els.railViewer.innerHTML =
+        '<div class="nova-viewer-shell">' +
+          '<div class="nova-viewer-empty">' +
+            '<div class="nova-viewer-empty-title">No web preview selected</div>' +
+            '<div class="nova-viewer-empty-copy">Choose a web result from this session to preview it here.</div>' +
+          '</div>' +
+        '</div>';
+      els.railViewer.hidden = false;
+    }
+
     return;
   }
 
@@ -6666,18 +6697,14 @@ if (
     });
   }
 
-  if (finalEvent && Array.isArray(finalEvent.artifacts)) {
-    state.artifacts = finalEvent.artifacts.slice();
-  }
-
-  if (finalEvent && Array.isArray(finalEvent.memory)) {
-    state.memory = finalEvent.memory.map(normalizeMemoryItem);
-  }
-
   renderReplyUi();
 
   if (typeof renderArtifacts === "function") {
     renderArtifacts();
+  }
+
+  if (typeof renderWeb === "function") {
+    renderWeb();
   }
 
   renderMemory();
