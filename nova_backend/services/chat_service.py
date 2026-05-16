@@ -453,11 +453,6 @@ class ChatService:
         try:
             step["status"] = "running"
 
-            print(
-                "RAW STEP IN EXECUTE =",
-                step,
-            )
-
             step_action = self._safe_str(
                 step.get("action")
             ).lower()
@@ -1325,15 +1320,6 @@ Current step:
             or {}
         )
 
-        print(
-            "LOAD EXECUTION STATE STEPS =",
-            (
-                fallback_state.get("steps")
-                if isinstance(fallback_state, dict)
-                else None
-            ),
-        )
-
         return (
             fallback_state
             if isinstance(fallback_state, dict)
@@ -1371,15 +1357,6 @@ Current step:
             working_state,
         )
 
-        print(
-            "SAVE EXECUTION CURRENT INDEX =",
-            execution_state.get("current_index"),
-        )
-
-        print(
-            "SAVE EXECUTION STATE STEPS =",
-            execution_state.get("steps"),
-        )
 
         self._execution_state_cache = getattr(
             self,
@@ -2347,16 +2324,6 @@ Current step:
                 or execution_state
             )
 
-            print(
-                "REFRESHED STEPS =",
-                refreshed_steps,
-            )
-
-            print(
-                "ORIGINAL STEPS =",
-                steps,
-            )
-
             refreshed_steps = (
                 refreshed_execution.get(
                     "steps"
@@ -2374,16 +2341,6 @@ Current step:
                 )
             ):
                 refreshed_steps = steps
-
-            print(
-                "REFRESHED STEPS =",
-                refreshed_steps,
-            )
-
-            print(
-                "ORIGINAL STEPS =",
-                steps,
-            )
 
             original_step = (
                 steps[current_index]
@@ -2426,10 +2383,6 @@ Current step:
                 step=step,
             )
 
-            print(
-                "AFTER EXECUTE 2415 STEP OBJECT =",
-                step,
-            )
 
             step["status"] = "completed"
 
@@ -2441,11 +2394,6 @@ Current step:
             ] = dict(step)
 
             steps = execution_state["steps"]
-
-            print(
-                "AFTER EXECUTE 2415 STEPS AFTER WRITEBACK =",
-                execution_state.get("steps"),
-            )
 
             result = step.get(
                 "result",
@@ -9028,15 +8976,6 @@ if __name__ == "__main__":
             action = "execute"
             brain_state["decision"] = action
 
-        print(
-            "BRAIN ACTION =",
-            action,
-        )
-
-        print(
-            "ACTION VALUE =",
-            repr(action),
-        )
 
         # CHAT EXIT PATH
         if action == "chat" and text not in execution_keywords:
