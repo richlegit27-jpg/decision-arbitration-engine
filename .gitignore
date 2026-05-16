@@ -38,3 +38,10 @@ __pycache__/
 # Nova runtime/private local data
 data/
 !data/.gitkeep
+
+# Generated uploads and junk
+uploads/
+templates/templates/
+*.bak_*
+*.bak
+tore --source*
