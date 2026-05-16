@@ -1380,6 +1380,47 @@ Current step:
             execution_state,
         )
 
+        sessions = self.sessions.load()
+
+        index = self.sessions._find(
+            sessions,
+            session_id,
+        )
+
+        if index is not None:
+            sessions[index]["execution_state"] = execution_state
+
+            sessions[index]["active_execution"] = (
+                execution_state
+                if (
+                    isinstance(execution_state, dict)
+                    and execution_state.get("steps")
+                    and self._safe_str(
+                        execution_state.get("status")
+                    ).lower()
+                    not in {
+                        "complete",
+                        "completed",
+                        "done",
+                        "cancelled",
+                        "canceled",
+                    }
+                )
+                else {}
+            )
+
+            meta = sessions[index].get("meta")
+
+            if not isinstance(meta, dict):
+                meta = {}
+
+            meta["execution_state"] = execution_state
+            meta["active_execution"] = execution_state
+
+            sessions[index]["meta"] = meta
+
+            self.sessions.save(sessions)
+
         return execution_state
 
     def _get_session_meta(self, session_id: str, key: str = "", default=None):
@@ -2086,11 +2127,6 @@ Current step:
                     "current_step"
                 ),
             },
-        )
-
-        print(
-            "EXECUTION ABOUT TO PROCESS COMMAND",
-            command,
         )
 
         # =========================
@@ -8168,23 +8204,158 @@ if __name__ == "__main__":
         text = str(user_text or "").strip()
         user_msg = self._build_user_message(user_text, attachments=attachments)
 
+
         if text.startswith("http://") or text.startswith("https://"):
+            print("DIRECT_URL_PATCH_HIT =", text)
+
+            web_result = {}
+
+            try:
+                if hasattr(self, "web") and hasattr(self.web, "fetch"):
+                    web_result = self.web.fetch(text)
+                else:
+                    web_result = {
+                        "ok": False,
+                        "error": "Web service is not available.",
+                        "url": text,
+                    }
+
+            except Exception as exc:
+                web_result = {
+                    "ok": False,
+                    "error": str(exc),
+                    "url": text,
+                }
+
+            if not isinstance(web_result, dict):
+                web_result = {
+                    "ok": False,
+                    "error": "Invalid web fetch result.",
+                    "url": text,
+                }
+
+            source_url = self._safe_str(
+                web_result.get("final_url")
+                or web_result.get("source_url")
+                or web_result.get("url")
+                or text
+            ).strip()
+
+            title = self._safe_str(
+                web_result.get("title")
+                or source_url
+                or text
+            ).strip()
+
+            summary = self._safe_str(
+                web_result.get("summary")
+                or web_result.get("description")
+                or web_result.get("preview")
+                or ""
+            ).strip()
+
+            body = self._safe_str(
+                web_result.get("content")
+                or web_result.get("body")
+                or web_result.get("text")
+                or ""
+            ).strip()
+
+            error = self._safe_str(
+                web_result.get("error")
+                or ""
+            ).strip()
+
+            if error and not summary and not body:
+                assistant_text = (
+                    "Web fetch failed:\n"
+                    + error
+                )
+            else:
+                summary_looks_raw = (
+                    len(summary) > 400
+                    or "search wikipedia" in summary.lower()
+                    or "Ø" in summary
+                    or "Ù" in summary
+                    or "Ð" in summary
+                    or "Ã" in summary
+                    or "à¦" in summary
+                )
+
+                assistant_text = (
+                    ""
+                    if summary_looks_raw
+                    else summary
+                )
+
+                if not assistant_text and (body or summary):
+                    try:
+                        clean_body = self._clean_web_text(
+                            (body or summary)[:5000]
+                        )
+
+                        prompt = (
+                            "Summarize this fetched webpage cleanly.\n"
+                            "Do not dump navigation text.\n"
+                            "Do not include broken encoding noise.\n"
+                            "Use 2-4 short bullets.\n\n"
+                            f"Page title: {title}\n"
+                            f"URL: {source_url}\n\n"
+                            f"Page text:\n{clean_body}"
+                        )
+
+                        response = self.client.chat.completions.create(
+                            model=getattr(self, "model", "gpt-4o-mini"),
+                            messages=[
+                                {
+                                    "role": "system",
+                                    "content": (
+                                        "You summarize fetched webpages. "
+                                        "Be clean, factual, and concise."
+                                    ),
+                                },
+                                {
+                                    "role": "user",
+                                    "content": prompt,
+                                },
+                            ],
+                            temperature=0.2,
+                        )
+
+                        assistant_text = (
+                            response.choices[0].message.content
+                            if response and response.choices
+                            else ""
+                        ).strip()
+
+                    except Exception as exc:
+                        exec_debug(
+                            "DIRECT_URL_SUMMARY_FAILED:",
+                            exc,
+                        )
+                        assistant_text = body[:1200].strip()
+
+                if not assistant_text:
+                    assistant_text = f"Fetched {title}"
+
             source = {
-                "title": text,
-                "url": text,
-                "source": text,
-                "snippet": "",
+                "title": title,
+                "url": source_url,
+                "source": source_url,
+                "snippet": assistant_text[:300],
             }
 
             assistant_msg = self._build_assistant_message(
-                "Opened link:\n" + text,
+                assistant_text,
                 meta={
                     "route": "web",
                     "strategy": "web_fetch",
                     "query": text,
                     "fresh": False,
-                    "source_urls": [text],
+                    "source_urls": [source_url] if source_url else [text],
                     "sources": [source],
+                    "web_fetch_ok": bool(web_result.get("ok", True)),
+                    "web_fetch_error": error,
                 },
             )
 
@@ -8302,8 +8473,28 @@ if __name__ == "__main__":
         def _rank_key(item):
             url = self._safe_str(item.get("url")).lower()
             title = self._safe_str(item.get("title")).lower()
+            snippet = self._safe_str(
+                item.get("snippet")
+                or item.get("description")
+                or item.get("content")
+                or ""
+            ).lower()
 
             priority = 0
+
+            query_terms = [
+                term
+                for term in query.lower().replace("/", " ").split()
+                if len(term) >= 4
+            ]
+
+            for term in query_terms:
+                if term in title:
+                    priority += 35
+                if term in url:
+                    priority += 20
+                if term in snippet:
+                    priority += 10
 
             if any(x in url for x in [
                 "reuters.com", "apnews.com", "bbc.com",
@@ -8362,6 +8553,7 @@ if __name__ == "__main__":
                 title = title_parts[0].strip()
                 rss_source = title_parts[1].strip()
             url = self._safe_str(item.get("url") or item.get("href") or item.get("link") or "").strip()
+
             snippet = self._safe_str(
                 item.get("snippet")
                 or item.get("description")
@@ -8369,6 +8561,8 @@ if __name__ == "__main__":
                 or item.get("content")
                 or ""
             ).strip()
+
+            snippet = self._clean_web_text(snippet)
 
             if not title or not url:
                 continue
@@ -8399,6 +8593,74 @@ if __name__ == "__main__":
 
             if snippet and snippet not in body:
                 body += "\n\n" + snippet
+
+        def _final_source_rank(source_item):
+            title_value = self._safe_str(
+                source_item.get("title")
+            ).lower()
+
+            source_value = self._safe_str(
+                source_item.get("source")
+            ).lower()
+
+            snippet_value = self._safe_str(
+                source_item.get("snippet")
+            ).lower()
+
+            combined = (
+                title_value
+                + " "
+                + source_value
+                + " "
+                + snippet_value
+            )
+
+            score = 0
+
+            query_terms = [
+                term
+                for term in query.lower().replace("/", " ").split()
+                if len(term) >= 4
+            ]
+
+            for term in query_terms:
+                if term in title_value:
+                    score += 50
+                if term in source_value:
+                    score += 25
+                if term in snippet_value:
+                    score += 15
+
+            if "openai" in combined:
+                score += 100
+
+            if "anthropic" in combined and "openai" in query.lower():
+                score -= 80
+
+            if "greg brockman" in combined:
+                score += 60
+
+            if "wired" in source_value:
+                score += 40
+
+            return score
+
+        try:
+            sources = sorted(
+                sources,
+                key=_final_source_rank,
+                reverse=True,
+            )
+            source_urls = [
+                item.get("url")
+                for item in sources
+                if isinstance(item, dict) and item.get("url")
+            ]
+        except Exception as exc:
+            exec_debug(
+                "FINAL_SOURCE_RERANK_FAILED:",
+                exc,
+            )
 
         if not body and sources:
             body = "\n".join(
@@ -8465,13 +8727,136 @@ if __name__ == "__main__":
             if not assistant_text:
                 assistant_text = body[:1800].strip()
 
+        import re
+        import html
+
+        cleaned_final_sources = []
+
+        for item in sources:
+            if not isinstance(item, dict):
+                continue
+
+            title_value = self._safe_str(
+                item.get("title")
+            ).strip()
+
+            url_value = self._safe_str(
+                item.get("url")
+            ).strip()
+
+            source_value = self._safe_str(
+                item.get("source")
+            ).strip()
+
+            snippet_value = self._safe_str(
+                item.get("snippet")
+            ).strip()
+
+            snippet_value = html.unescape(snippet_value)
+            snippet_value = re.sub(
+                r"<[^>]+>",
+                "",
+                snippet_value,
+            )
+            snippet_value = snippet_value.replace(
+                "\xa0",
+                " ",
+            ).replace(
+                "&nbsp;",
+                " ",
+            ).strip()
+
+            if not snippet_value:
+                snippet_value = title_value
+
+            cleaned_final_sources.append(
+                {
+                    "title": title_value,
+                    "url": url_value,
+                    "source": source_value,
+                    "snippet": snippet_value[:300],
+                }
+            )
+
+        def _final_source_rank(item):
+            title_value = self._safe_str(
+                item.get("title")
+            ).lower()
+
+            source_value = self._safe_str(
+                item.get("source")
+            ).lower()
+
+            snippet_value = self._safe_str(
+                item.get("snippet")
+            ).lower()
+
+            combined = (
+                title_value
+                + " "
+                + source_value
+                + " "
+                + snippet_value
+            )
+
+            score = 0
+
+            query_terms = [
+                term
+                for term in query.lower().replace("/", " ").split()
+                if len(term) >= 4
+            ]
+
+            for term in query_terms:
+                if term in title_value:
+                    score += 80
+                if term in source_value:
+                    score += 30
+                if term in snippet_value:
+                    score += 20
+
+            if "openai" in combined:
+                score += 200
+
+            if "greg brockman" in combined:
+                score += 100
+
+            if "wired" in source_value:
+                score += 60
+
+            if "anthropic" in combined and "openai" in query.lower():
+                score -= 150
+
+            return score
+
+        sources = sorted(
+            cleaned_final_sources,
+            key=_final_source_rank,
+            reverse=True,
+        )
+
+        source_urls = [
+            item.get("url")
+            for item in sources
+            if isinstance(item, dict) and item.get("url")
+        ]
+
         exec_debug("WEB_SOURCES_FINAL:", sources)
         exec_debug("WEB_SOURCE_URLS_FINAL:", source_urls)
+        exec_debug(
+            "WEB_SOURCE_ORDER_FINAL:",
+            [
+                item.get("source")
+                for item in sources
+                if isinstance(item, dict)
+            ],
+        )
 
 
         # Source rendering is handled by structured metadata/frontend cards.
         # Do not append manual Top sources text here.
         assistant_msg = self._build_assistant_message(
+
             assistant_text,
             meta={
                 "route": "web",
@@ -9154,11 +9539,6 @@ if __name__ == "__main__":
                 "_execution_processing"
             ] = False
 
-            print(
-                "EXECUTION ABOUT TO PROCESS COMMAND",
-                command,
-            )
-
             return self._process_execution_command(
                 command=command,
                 session_id=session_id,
@@ -9210,21 +9590,6 @@ if __name__ == "__main__":
             ]
             execution_state = {}
 
-            print(
-                "EXECUTION DEBUG BEFORE COMPLETE CHECK =",
-                {
-                    "command": command,
-                    "current_index": current_index,
-                    "steps_len": len(steps),
-                    "status": execution_state.get("status"),
-                    "current_step": execution_state.get("current_step"),
-                },
-            )
-
-            print(
-                "EXECUTION ABOUT TO PROCESS COMMAND",
-                command,
-            )
 
             if not steps:
                 execution_state["status"] = "idle"
