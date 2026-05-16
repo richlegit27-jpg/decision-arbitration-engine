@@ -5720,8 +5720,21 @@ document.addEventListener("click", function (e) {
 
   if (!url) return;
 
-  if (webId && typeof setRailSelectedItem === "function") {
-    setRailSelectedItem("web", webId);
+  if (!state.rail) {
+    state.rail = {};
+  }
+
+  if (!state.rail) {
+    state.rail = {};
+  }
+
+  if (webId) {
+    state.rail.selectedKind = "web";
+    state.rail.selectedId = webId;
+
+    if (typeof setRailSelectedItem === "function") {
+      setRailSelectedItem("web", webId);
+    }
   }
 
   if (e.ctrlKey || e.metaKey || e.shiftKey) {
@@ -5939,6 +5952,24 @@ function renderWeb() {
 
   if (typeof wireWebLinks === "function") {
     wireWebLinks();
+  }
+
+  if (
+    state.rail &&
+    state.rail.selectedKind === "web" &&
+    state.rail.selectedId &&
+    typeof setRailSelectedItem === "function"
+  ) {
+    const selectedStillExists = !!document.querySelector(
+      '[data-web-id="' + cssEscape(state.rail.selectedId) + '"]'
+    );
+
+    if (selectedStillExists) {
+      setRailSelectedItem("web", state.rail.selectedId);
+    } else {
+      state.rail.selectedKind = "";
+      state.rail.selectedId = "";
+    }
   }
 }
 
