@@ -149,11 +149,30 @@ function applyBackendSessionState(payload, explicitSessionId) {
 
       applyBackendSessionState(data || {}, targetSessionId);
 
+      state.web = Array.isArray(state.web) ? state.web : [];
+
+      if (!state.rail) {
+        state.rail = {};
+      }
+
       state.rail.selectedId = "";
       state.rail.selectedKind = "";
+
+      if (state.rail.tab === "web") {
+        state.rail.tab = "artifacts";
+      }
+
       if (els.railViewer) {
         els.railViewer.innerHTML = "";
         els.railViewer.hidden = true;
+      }
+
+      if (typeof renderWebList === "function") {
+        renderWebList();
+      }
+
+      if (typeof renderArtifacts === "function") {
+        renderArtifacts();
       }
 
       if (state.pendingArtifactOpenId) {
