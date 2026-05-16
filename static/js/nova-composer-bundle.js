@@ -5811,14 +5811,37 @@ function renderWeb() {
 
   if (!els.webList) return;
 
-  const items = safeArray(state.web).length
-    ? safeArray(state.web)
-    : safeArray(state.artifacts).filter(function (item) {
-        const kind = String((item && item.kind) || "").toLowerCase();
-        const source = String((item && item.source) || "").toLowerCase();
-        return kind === "web_result" || kind === "web_search" || source === "web_fetch";
-      });
+  const activeSessionId = String(state.activeSessionId || "").trim();
 
+  const sessionOwnsItem = function (item) {
+    const itemSessionId = String(
+      (item && item.session_id) ||
+      (item && item.sessionId) ||
+      (item && item.meta && item.meta.session_id) ||
+      (item && item.meta && item.meta.sessionId) ||
+      ""
+    ).trim();
+
+    return !activeSessionId || !itemSessionId || itemSessionId === activeSessionId;
+  };
+
+  const webItems = safeArray(state.web).filter(function (item) {
+    return sessionOwnsItem(item);
+  });
+
+  const artifactWebItems = safeArray(state.artifacts).filter(function (item) {
+    const kind = String((item && item.kind) || "").toLowerCase();
+    const source = String((item && item.source) || "").toLowerCase();
+
+    const isWeb =
+      kind === "web_result" ||
+      kind === "web_search" ||
+      source === "web_fetch";
+
+    return isWeb && sessionOwnsItem(item);
+  });
+
+  const items = webItems.length ? webItems : artifactWebItems;
   if (!items.length) {
     els.webList.innerHTML =
       '<div class="nova-memory-empty">' +
