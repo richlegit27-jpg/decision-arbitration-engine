@@ -1246,6 +1246,15 @@ function autoPlayLastAssistantTTS() {
 
             const data = await response.json();
 
+            window.__lastNovaResponse = data;
+
+            console.log("[NovaEmergencyBridge] chat response data", data);
+            console.log("[NovaEmergencyBridge] route/debug", data.debug);
+            console.log(
+                "[NovaEmergencyBridge] execution_state",
+                data.execution_state || data.active_execution || data.execution
+            );
+
             if (data.session_id || (data.session && data.session.id)) {
                 setSessionId(data.session_id || data.session.id);
             }
@@ -1257,8 +1266,73 @@ function autoPlayLastAssistantTTS() {
                     text: data.assistant_text || data.text || data.output_text || "No response text returned.",
                 };
 
-placeholder.text = assistant.text || data.assistant_text || data.text || "No response text returned.";
-placeholder.role = "assistant";
+            placeholder.text = assistant.text || data.assistant_text || data.text || "No response text returned.";
+            placeholder.role = "assistant";
+
+let executionFromResponse =
+    data.execution_state ||
+    data.active_execution ||
+    data.execution ||
+    (data.session && data.session.execution_state) ||
+    (data.session && data.session.active_execution) ||
+    null;
+
+if (
+    !executionFromResponse &&
+    data.debug &&
+    data.debug.route === "execution_plan_created"
+) {
+    executionFromResponse = {
+        status: "running",
+        current_step: "Step 1",
+        steps: [
+            {
+                title: "Step 1",
+                description: "Clarify the goal and prepare the work area.",
+                status: "pending",
+            },
+            {
+                title: "Step 2",
+                description: "Perform the main implementation or test action.",
+                status: "pending",
+            },
+            {
+                title: "Step 3",
+                description: "Verify the result and summarize the next move.",
+                status: "pending",
+            },
+        ],
+    };
+}
+
+if (
+    executionFromResponse &&
+    typeof executionFromResponse === "object" &&
+    Array.isArray(executionFromResponse.steps)
+) {
+    state.execution = state.execution || {};
+    state.execution.status = executionFromResponse.status || "running";
+    state.execution.currentStep =
+        executionFromResponse.current_step ||
+        executionFromResponse.currentStep ||
+        executionFromResponse.current_step_title ||
+        executionFromResponse.currentStepTitle ||
+        executionFromResponse.current_step_name ||
+        executionFromResponse.currentStepName ||
+        executionFromResponse.current_step ||
+        "Step 1";
+    state.execution.steps = executionFromResponse.steps;
+    state.execution.lastResponse = data;
+
+    if (typeof window.NovaEmergencyRenderExecution === "function") {
+        window.NovaEmergencyRenderExecution();
+    }
+
+    console.log("[NovaEmergencyBridge] execution synced from chat response", {
+        status: state.execution.status,
+        steps: state.execution.steps.length,
+    });
+}
 
 state.pendingUploads = [];
 if (window.NovaEmergencyAttachments && typeof window.NovaEmergencyAttachments.render === "function") {
@@ -1713,4 +1787,801 @@ window.NovaEmergencyHandleFiles = handleFiles;
 
     setTimeout(wireUploadButtons, 500);
     setTimeout(wireUploadButtons, 1500);
+})();
+
+// =====================================================
+// NOVA EMERGENCY SESSION RESTORE BRIDGE
+// Append at bottom of nova-custom.js
+// =====================================================
+(function () {
+    "use strict";
+
+    if (window.NovaEmergencySessionRestoreBooted) return;
+    window.NovaEmergencySessionRestoreBooted = true;
+
+    const state = window.NovaComposerState || window.state || {};
+    window.NovaComposerState = state;
+    window.state = state;
+
+    state.messages = Array.isArray(state.messages) ? state.messages : [];
+    state.activeSessionId = state.activeSessionId || "";
+
+    function qs(selector, root) {
+        return (root || document).querySelector(selector);
+    }
+
+    function normalizeMessage(msg) {
+        msg = msg || {};
+        return {
+            id: msg.id || msg.message_id || ("msg_" + Date.now() + "_" + Math.random().toString(16).slice(2)),
+            role: msg.role || "assistant",
+            text: msg.text || msg.assistant_text || msg.content || "",
+            attachments: Array.isArray(msg.attachments) ? msg.attachments : [],
+            meta: msg.meta || {},
+        };
+    }
+
+    function findThread() {
+        return (
+            qs("[data-chat-thread]") ||
+            qs("[data-messages]") ||
+            qs("#chat-thread") ||
+            qs("#chat-messages") ||
+            qs(".chat-thread") ||
+            qs(".messages")
+        );
+    }
+
+    function escapeHtml(value) {
+        return String(value || "").replace(/[&<>'"]/g, function (char) {
+            return {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                "'": "&#39;",
+                '"': "&quot;",
+            }[char] || char;
+        });
+    }
+
+    function renderMessages() {
+        const thread = findThread();
+        if (!thread) return;
+
+        thread.innerHTML = state.messages.map(function (msg) {
+            const role = msg.role === "user" ? "user" : "assistant";
+            return (
+                '<div class="nova-message nova-message-' + role + '">' +
+                    '<div class="nova-message-role">' + escapeHtml(role) + "</div>" +
+                    '<div class="nova-message-text">' + escapeHtml(msg.text) + "</div>" +
+                "</div>"
+            );
+        }).join("");
+
+        thread.scrollTop = thread.scrollHeight;
+    }
+
+    function getSessionIdFromPayload(payload) {
+        if (!payload || typeof payload !== "object") return "";
+
+        return (
+            payload.active_session_id ||
+            payload.activeSessionId ||
+            payload.session_id ||
+            (payload.session && payload.session.id) ||
+            (payload.active && payload.active.id) ||
+            ""
+        );
+    }
+
+    function getMessagesFromPayload(payload) {
+        if (!payload || typeof payload !== "object") return [];
+
+        if (Array.isArray(payload.messages)) return payload.messages;
+        if (payload.session && Array.isArray(payload.session.messages)) return payload.session.messages;
+        if (payload.active && Array.isArray(payload.active.messages)) return payload.active.messages;
+        if (payload.current_session && Array.isArray(payload.current_session.messages)) return payload.current_session.messages;
+
+        return [];
+    }
+
+    async function restoreActiveSession() {
+        try {
+            const response = await fetch("/api/sessions", {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json",
+                },
+            });
+
+            const data = await response.json();
+
+            let activeSession = null;
+
+            if (Array.isArray(data.sessions)) {
+                activeSession =
+                    data.sessions.find(function (session) {
+                        return session && (session.active || session.is_active);
+                    }) ||
+                    data.sessions[0] ||
+                    null;
+            }
+
+            if (data.active && typeof data.active === "object") {
+                activeSession = data.active;
+            }
+
+            if (data.session && typeof data.session === "object") {
+                activeSession = data.session;
+            }
+
+            const sessionId =
+                getSessionIdFromPayload(data) ||
+                (activeSession && activeSession.id) ||
+                state.activeSessionId ||
+                "";
+
+            if (sessionId) {
+                state.activeSessionId = sessionId;
+                document.body.setAttribute("data-session-id", sessionId);
+            }
+
+            const messages =
+                getMessagesFromPayload(data).length
+                    ? getMessagesFromPayload(data)
+                    : activeSession && Array.isArray(activeSession.messages)
+                        ? activeSession.messages
+                        : [];
+
+            if (messages.length) {
+                state.messages = messages.map(normalizeMessage);
+                renderMessages();
+            }
+
+            console.log("[NovaEmergencySessionRestore] restored", {
+                activeSessionId: state.activeSessionId,
+                messageCount: state.messages.length,
+                hasThread: !!findThread(),
+            });
+        } catch (err) {
+            console.error("[NovaEmergencySessionRestore] failed", err);
+        }
+    }
+
+    window.NovaEmergencyRestoreSession = restoreActiveSession;
+
+    setTimeout(restoreActiveSession, 300);
+    setTimeout(restoreActiveSession, 1200);
+})();
+
+// =====================================================
+// NOVA EMERGENCY ARTIFACT RAIL BRIDGE
+// Append at bottom of nova-custom.js
+// =====================================================
+(function () {
+    "use strict";
+
+    if (window.NovaEmergencyArtifactRailBooted) return;
+    window.NovaEmergencyArtifactRailBooted = true;
+
+    const state = window.NovaComposerState || window.state || {};
+    window.NovaComposerState = state;
+    window.state = state;
+
+    state.artifacts = Array.isArray(state.artifacts) ? state.artifacts : [];
+
+    function qs(selector, root) {
+        return (root || document).querySelector(selector);
+    }
+
+    function escapeHtml(value) {
+        return String(value || "").replace(/[&<>'"]/g, function (char) {
+            return {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                "'": "&#39;",
+                '"': "&quot;",
+            }[char] || char;
+        });
+    }
+
+    function findArtifactRail() {
+        let rail =
+            qs("[data-artifact-rail]") ||
+            qs("[data-rail-panel='artifacts']") ||
+            qs("#rail-artifacts") ||
+            qs("#artifacts-rail") ||
+            qs(".artifact-rail");
+
+        if (!rail) {
+            rail = document.createElement("div");
+            rail.id = "rail-artifacts";
+            rail.setAttribute("data-artifact-rail", "true");
+            rail.style.padding = "10px";
+            rail.style.display = "flex";
+            rail.style.flexDirection = "column";
+            rail.style.gap = "8px";
+
+            const rightRail =
+                qs("[data-right-rail]") ||
+                qs("#right-rail") ||
+                qs(".right-rail") ||
+                qs("aside") ||
+                document.body;
+
+            rightRail.appendChild(rail);
+        }
+
+        return rail;
+    }
+
+    function normalizeArtifact(item) {
+        item = item || {};
+        return {
+            id: item.id || item.artifact_id || ("artifact_" + Date.now() + "_" + Math.random().toString(16).slice(2)),
+            title: item.title || item.name || item.filename || item.type || "Artifact",
+            type: item.type || item.kind || "artifact",
+            content: item.content || item.text || item.body || "",
+            url: item.url || item.file_url || "",
+            session_id: item.session_id || state.activeSessionId || "",
+            raw: item,
+        };
+    }
+
+    function getArtifactsFromPayload(payload) {
+        if (!payload || typeof payload !== "object") return [];
+
+        if (Array.isArray(payload.artifacts)) return payload.artifacts;
+        if (payload.session && Array.isArray(payload.session.artifacts)) return payload.session.artifacts;
+        if (payload.active && Array.isArray(payload.active.artifacts)) return payload.active.artifacts;
+        if (payload.current_session && Array.isArray(payload.current_session.artifacts)) return payload.current_session.artifacts;
+
+        return [];
+    }
+
+    function openArtifact(artifact) {
+        state.activeArtifact = artifact;
+
+        let viewer =
+            qs("[data-artifact-viewer]") ||
+            qs("#artifact-viewer") ||
+            qs(".artifact-viewer");
+
+        if (!viewer) {
+            viewer = document.createElement("div");
+            viewer.id = "artifact-viewer";
+            viewer.setAttribute("data-artifact-viewer", "true");
+            viewer.style.position = "fixed";
+            viewer.style.right = "20px";
+            viewer.style.bottom = "20px";
+            viewer.style.width = "420px";
+            viewer.style.maxWidth = "calc(100vw - 40px)";
+            viewer.style.maxHeight = "70vh";
+            viewer.style.overflow = "auto";
+            viewer.style.zIndex = "99999";
+            viewer.style.background = "#111";
+            viewer.style.color = "#fff";
+            viewer.style.border = "1px solid rgba(255,255,255,0.2)";
+            viewer.style.borderRadius = "14px";
+            viewer.style.padding = "14px";
+            document.body.appendChild(viewer);
+        }
+
+        const content = artifact.content || artifact.url || "No artifact content.";
+        viewer.innerHTML =
+            '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px;">' +
+                '<strong>' + escapeHtml(artifact.title) + '</strong>' +
+                '<button type="button" data-close-artifact-viewer="true">Close</button>' +
+            '</div>' +
+            '<pre style="white-space:pre-wrap;font-size:12px;line-height:1.4;">' +
+                escapeHtml(content) +
+            '</pre>';
+
+        const closeBtn = qs("[data-close-artifact-viewer]", viewer);
+        if (closeBtn) {
+            closeBtn.onclick = function () {
+                viewer.remove();
+            };
+        }
+    }
+
+    function renderArtifactRail() {
+        const rail = findArtifactRail();
+        if (!rail) return;
+
+        const artifacts = Array.isArray(state.artifacts) ? state.artifacts : [];
+
+        rail.innerHTML =
+            '<div style="font-weight:700;margin-bottom:6px;">Artifacts</div>';
+
+        if (!artifacts.length) {
+            rail.innerHTML += '<div style="font-size:12px;opacity:0.65;">No artifacts yet</div>';
+            return;
+        }
+
+        artifacts.forEach(function (rawArtifact) {
+            const artifact = normalizeArtifact(rawArtifact);
+
+            const card = document.createElement("button");
+            card.type = "button";
+            card.className = "nova-artifact-card";
+            card.style.textAlign = "left";
+            card.style.padding = "10px";
+            card.style.borderRadius = "12px";
+            card.style.border = "1px solid rgba(255,255,255,0.16)";
+            card.style.background = "rgba(255,255,255,0.06)";
+            card.style.cursor = "pointer";
+            card.style.color = "inherit";
+
+            card.innerHTML =
+                '<div style="font-weight:700;font-size:13px;">' + escapeHtml(artifact.title) + '</div>' +
+                '<div style="font-size:11px;opacity:0.7;margin-top:3px;">' + escapeHtml(artifact.type) + '</div>';
+
+            card.onclick = function () {
+                openArtifact(artifact);
+            };
+
+            rail.appendChild(card);
+        });
+
+        console.log("[NovaEmergencyArtifactRail] rendered", {
+            count: artifacts.length,
+            rail: rail,
+        });
+    }
+
+    async function restoreArtifacts() {
+        try {
+            const response = await fetch("/api/sessions", {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json",
+                },
+            });
+
+            const data = await response.json();
+
+            let activeSession = null;
+
+            if (Array.isArray(data.sessions)) {
+                activeSession =
+                    data.sessions.find(function (session) {
+                        return session && (session.active || session.is_active || session.id === state.activeSessionId);
+                    }) ||
+                    data.sessions[0] ||
+                    null;
+            }
+
+            if (data.active && typeof data.active === "object") activeSession = data.active;
+            if (data.session && typeof data.session === "object") activeSession = data.session;
+
+            let artifacts = getArtifactsFromPayload(data);
+
+            if (!artifacts.length && activeSession && Array.isArray(activeSession.artifacts)) {
+                artifacts = activeSession.artifacts;
+            }
+
+            state.artifacts = artifacts.map(normalizeArtifact);
+            renderArtifactRail();
+
+            console.log("[NovaEmergencyArtifactRail] restored", {
+                count: state.artifacts.length,
+                activeSessionId: state.activeSessionId,
+            });
+        } catch (err) {
+            console.error("[NovaEmergencyArtifactRail] restore failed", err);
+            renderArtifactRail();
+        }
+    }
+
+    window.NovaEmergencyRenderArtifacts = renderArtifactRail;
+    window.NovaEmergencyRestoreArtifacts = restoreArtifacts;
+
+    setTimeout(restoreArtifacts, 400);
+    setTimeout(restoreArtifacts, 1300);
+})();
+
+// =====================================================
+// NOVA EMERGENCY EXECUTION PANEL BRIDGE
+// Append at bottom of nova-custom.js
+// =====================================================
+(function () {
+    "use strict";
+
+    if (window.NovaEmergencyExecutionBridgeBooted) return;
+    window.NovaEmergencyExecutionBridgeBooted = true;
+
+    const state = window.NovaComposerState || window.state || {};
+    window.NovaComposerState = state;
+    window.state = state;
+
+    state.execution = state.execution || {
+        status: "idle",
+        currentStep: "",
+        steps: [],
+        lastAction: "",
+        lastResponse: null,
+    };
+
+    function qs(selector, root) {
+        return (root || document).querySelector(selector);
+    }
+
+    function qsa(selector, root) {
+        return Array.from((root || document).querySelectorAll(selector));
+    }
+
+    function escapeHtml(value) {
+        return String(value || "").replace(/[&<>'"]/g, function (char) {
+            return {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                "'": "&#39;",
+                '"': "&quot;",
+            }[char] || char;
+        });
+    }
+
+    function findExecutionPanel() {
+        let panel =
+            qs("[data-execution-panel]") ||
+            qs("[data-rail-panel='execution']") ||
+            qs("#execution-panel") ||
+            qs("#rail-execution") ||
+            qs(".execution-panel");
+
+        if (!panel) {
+            panel = document.createElement("div");
+            panel.id = "execution-panel";
+            panel.setAttribute("data-execution-panel", "true");
+            panel.style.padding = "10px";
+            panel.style.display = "flex";
+            panel.style.flexDirection = "column";
+            panel.style.gap = "8px";
+
+            const rightRail =
+                qs("[data-right-rail]") ||
+                qs("#right-rail") ||
+                qs(".right-rail") ||
+                qs("aside") ||
+                document.body;
+
+            rightRail.appendChild(panel);
+        }
+
+        return panel;
+    }
+
+    function getSessionId() {
+        return (
+            state.activeSessionId ||
+            document.body.getAttribute("data-session-id") ||
+            ""
+        );
+    }
+
+    function getExecutionText(action) {
+        const map = {
+            run_step: "run_step",
+            run_all: "run_all",
+            retry_failed: "retry_failed",
+            stop: "stop",
+            next: "next",
+            resume: "resume",
+        };
+
+        return map[action] || action || "run_step";
+    }
+
+    function normalizeExecutionFromResponse(data, action) {
+        data = data || {};
+
+        const meta = data.meta || data.debug || {};
+        const execution =
+            data.execution ||
+            data.execution_state ||
+            data.active_execution ||
+            meta.execution ||
+            meta.execution_state ||
+            {};
+
+        const text =
+            data.text ||
+            data.assistant_text ||
+            (data.assistant_message && data.assistant_message.text) ||
+            "";
+
+        const steps = Array.isArray(execution.steps)
+            ? execution.steps
+            : Array.isArray(data.steps)
+                ? data.steps
+                : Array.isArray(meta.steps)
+                    ? meta.steps
+                    : state.execution.steps || [];
+
+        state.execution.lastAction = action || "";
+        state.execution.lastResponse = data;
+        state.execution.status =
+            execution.status ||
+            data.status ||
+            meta.status ||
+            state.execution.status ||
+            "idle";
+
+        state.execution.currentStep =
+            execution.current_step ||
+            execution.currentStep ||
+            execution.step ||
+            data.current_step ||
+            meta.current_step ||
+            "";
+
+        state.execution.steps = steps;
+        state.execution.lastText = text;
+    }
+
+    function renderExecutionPanel() {
+        const panel = findExecutionPanel();
+        if (!panel) return;
+
+        const steps = Array.isArray(state.execution.steps) ? state.execution.steps : [];
+
+        const stepHtml = steps.length
+            ? steps.map(function (step, index) {
+                const title =
+                    (step && (step.title || step.name || step.text || step.description)) ||
+                    ("Step " + (index + 1));
+
+                const status =
+                    (step && step.status) ||
+                    "pending";
+
+                return (
+                    '<div style="padding:8px;border:1px solid rgba(255,255,255,0.14);border-radius:10px;margin-top:6px;">' +
+                        '<div style="font-size:12px;font-weight:700;">' + escapeHtml(title) + '</div>' +
+                        '<div style="font-size:11px;opacity:0.7;">' + escapeHtml(status) + '</div>' +
+                    '</div>'
+                );
+            }).join("")
+            : '<div style="font-size:12px;opacity:0.65;margin-top:8px;">No execution steps loaded.</div>';
+
+        panel.innerHTML =
+            '<div style="font-weight:800;margin-bottom:6px;">Execution</div>' +
+            '<div style="font-size:12px;opacity:0.8;margin-bottom:8px;">Status: ' +
+                escapeHtml(state.execution.status || "idle") +
+            '</div>' +
+            '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">' +
+                '<button type="button" data-emergency-exec-action="run_step">Run Step</button>' +
+                '<button type="button" data-emergency-exec-action="run_all">Run All</button>' +
+                '<button type="button" data-emergency-exec-action="retry_failed">Retry</button>' +
+                '<button type="button" data-emergency-exec-action="stop">Stop</button>' +
+            '</div>' +
+            '<div style="font-size:12px;opacity:0.8;">Current: ' +
+                escapeHtml(state.execution.currentStep || "-") +
+            '</div>' +
+            '<div style="margin-top:8px;">' + stepHtml + '</div>' +
+            (
+                state.execution.lastText
+                    ? '<pre style="white-space:pre-wrap;font-size:12px;line-height:1.4;margin-top:10px;padding:8px;border-radius:10px;background:rgba(255,255,255,0.06);">' +
+                        escapeHtml(state.execution.lastText) +
+                      '</pre>'
+                    : ''
+            );
+
+        qsa("[data-emergency-exec-action]", panel).forEach(function (button) {
+            button.onclick = function () {
+                runExecutionAction(button.getAttribute("data-emergency-exec-action"));
+            };
+        });
+
+        console.log("[NovaEmergencyExecutionBridge] rendered", {
+            status: state.execution.status,
+            steps: steps.length,
+            panel: panel,
+        });
+    }
+
+    async function runExecutionAction(action) {
+        const command = getExecutionText(action);
+
+        state.execution.status = "running";
+        state.execution.lastAction = action;
+        renderExecutionPanel();
+
+        try {
+            const response = await fetch("/api/chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                body: JSON.stringify({
+                    user_text: command,
+                    session_id: getSessionId(),
+                    attachments: [],
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.session_id || (data.session && data.session.id)) {
+                state.activeSessionId = data.session_id || data.session.id;
+                document.body.setAttribute("data-session-id", state.activeSessionId);
+            }
+
+            normalizeExecutionFromResponse(data, action);
+            renderExecutionPanel();
+
+            if (typeof window.NovaEmergencyRestoreSession === "function") {
+                window.NovaEmergencyRestoreSession();
+            }
+
+            console.log("[NovaEmergencyExecutionBridge] action complete", {
+                action: action,
+                command: command,
+                status: state.execution.status,
+                data: data,
+            });
+        } catch (err) {
+            console.error("[NovaEmergencyExecutionBridge] action failed", err);
+
+            state.execution.status = "error";
+            state.execution.lastText = String(err && err.message ? err.message : err);
+            renderExecutionPanel();
+        }
+    }
+
+    async function restoreExecutionState() {
+        try {
+            const response = await fetch("/api/sessions", {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json",
+                },
+            });
+
+            const data = await response.json();
+
+            let activeSession = null;
+
+            if (Array.isArray(data.sessions)) {
+                activeSession =
+                    data.sessions.find(function (session) {
+                        return session && (session.active || session.is_active || session.id === state.activeSessionId);
+                    }) ||
+                    data.sessions[0] ||
+                    null;
+            }
+
+            if (data.active && typeof data.active === "object") activeSession = data.active;
+            if (data.session && typeof data.session === "object") activeSession = data.session;
+
+            const meta =
+                (activeSession && activeSession.meta) ||
+                (activeSession && activeSession.metadata) ||
+                data.meta ||
+                {};
+
+            const execution =
+                (activeSession && activeSession.execution_state) ||
+                (activeSession && activeSession.active_execution) ||
+                meta.execution_state ||
+                meta.active_execution ||
+                {};
+
+            if (execution && typeof execution === "object" && Object.keys(execution).length) {
+                state.execution.status = execution.status || state.execution.status || "idle";
+                state.execution.currentStep =
+                    execution.current_step ||
+                    execution.currentStep ||
+                    execution.step ||
+                    state.execution.currentStep ||
+                    "";
+
+                state.execution.steps = Array.isArray(execution.steps)
+                    ? execution.steps
+                    : state.execution.steps || [];
+            }
+
+            renderExecutionPanel();
+
+            console.log("[NovaEmergencyExecutionBridge] restored", {
+                status: state.execution.status,
+                steps: Array.isArray(state.execution.steps) ? state.execution.steps.length : 0,
+                activeSessionId: state.activeSessionId,
+            });
+        } catch (err) {
+            console.error("[NovaEmergencyExecutionBridge] restore failed", err);
+            renderExecutionPanel();
+        }
+    }
+
+    window.runExecutionAction = runExecutionAction;
+    window.NovaEmergencyRunExecution = runExecutionAction;
+    window.NovaEmergencyRenderExecution = renderExecutionPanel;
+    window.NovaEmergencyRestoreExecution = restoreExecutionState;
+
+    setTimeout(restoreExecutionState, 500);
+    setTimeout(restoreExecutionState, 1500);
+})();
+
+// =====================================================
+// NOVA EMERGENCY FLOATING EXECUTION BUTTONS
+// Append at bottom of nova-custom.js
+// =====================================================
+(function () {
+    "use strict";
+
+    if (window.NovaEmergencyFloatingExecBooted) return;
+    window.NovaEmergencyFloatingExecBooted = true;
+
+    function makeButton(label, action) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = label;
+        btn.style.padding = "8px 10px";
+        btn.style.borderRadius = "10px";
+        btn.style.border = "1px solid rgba(255,255,255,0.2)";
+        btn.style.background = "rgba(255,255,255,0.08)";
+        btn.style.color = "inherit";
+        btn.style.cursor = "pointer";
+
+        btn.onclick = function () {
+            if (typeof window.NovaEmergencyRunExecution === "function") {
+                window.NovaEmergencyRunExecution(action);
+            } else if (typeof window.runExecutionAction === "function") {
+                window.runExecutionAction(action);
+            } else {
+                console.error("[NovaFloatingExec] execution function missing");
+            }
+        };
+
+        return btn;
+    }
+
+    function bootFloatingExec() {
+        if (document.querySelector("[data-floating-exec-controls]")) return;
+
+        const box = document.createElement("div");
+        box.setAttribute("data-floating-exec-controls", "true");
+        box.style.position = "fixed";
+        box.style.right = "18px";
+        box.style.bottom = "18px";
+        box.style.zIndex = "999999";
+        box.style.display = "flex";
+        box.style.flexDirection = "column";
+        box.style.gap = "8px";
+        box.style.padding = "12px";
+        box.style.borderRadius = "16px";
+        box.style.background = "rgba(10,10,10,0.92)";
+        box.style.border = "1px solid rgba(255,255,255,0.18)";
+        box.style.boxShadow = "0 12px 40px rgba(0,0,0,0.45)";
+        box.style.color = "#fff";
+
+        const title = document.createElement("div");
+        title.textContent = "Execution";
+        title.style.fontWeight = "800";
+        title.style.fontSize = "13px";
+        title.style.marginBottom = "2px";
+
+        box.appendChild(title);
+        box.appendChild(makeButton("Run Step", "run_step"));
+        box.appendChild(makeButton("Run All", "run_all"));
+        box.appendChild(makeButton("Retry", "retry_failed"));
+        box.appendChild(makeButton("Stop", "stop"));
+
+        document.body.appendChild(box);
+
+        console.log("[NovaFloatingExec] loaded");
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", bootFloatingExec);
+    } else {
+        bootFloatingExec();
+    }
+
+    setTimeout(bootFloatingExec, 500);
 })();

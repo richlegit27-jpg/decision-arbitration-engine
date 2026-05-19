@@ -10387,6 +10387,76 @@ if __name__ == "__main__":
         exec_debug("HANDLE IS BEING CALLED")
         print("HANDLE HIT USER_TEXT =", repr(user_text))
 
+        text_lc = self._safe_str(user_text).lower().strip()
+
+        if text_lc.startswith("auto-plan "):
+            plan_goal = self._safe_str(user_text)[len("auto-plan "):].strip()
+
+            if not plan_goal:
+                plan_goal = "Create a simple execution plan."
+
+            execution_state = {
+                "status": "running",
+                "goal": plan_goal,
+                "original_user_text": plan_goal,
+                "current_index": 0,
+                "current_step": "Step 1",
+                "waiting": False,
+                "steps": [
+                    {
+                        "title": "Step 1",
+                        "description": "Clarify the goal and prepare the work area.",
+                        "status": "pending",
+                    },
+                    {
+                        "title": "Step 2",
+                        "description": "Perform the main implementation or test action.",
+                        "status": "pending",
+                    },
+                    {
+                        "title": "Step 3",
+                        "description": "Verify the result and summarize the next move.",
+                        "status": "pending",
+                    },
+                ],
+            }
+
+            self._save_execution_state(
+                session_id,
+                execution_state,
+            )
+
+            session_payload = self._get_session_payload(session_id)
+
+            if isinstance(session_payload, dict):
+                session_payload["execution_state"] = execution_state
+                session_payload["active_execution"] = execution_state
+
+            assistant_text = (
+                "Execution plan created.\n\n"
+                "Step 1: Clarify the goal and prepare the work area.\n"
+                "Step 2: Perform the main implementation or test action.\n"
+                "Step 3: Verify the result and summarize the next move.\n\n"
+                "Click Run Step to begin."
+            )
+
+            return {
+                "ok": True,
+                "text": assistant_text,
+                "assistant_text": assistant_text,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": assistant_text,
+                },
+                "session_id": session_id,
+                "execution_state": execution_state,
+                "active_execution": execution_state,
+                "debug": {
+                    "route_taken": "auto_plan_emergency",
+                    "steps": 3,
+                },
+            }
+
         exec_debug(
             "CHAT_SERVICE_FILE =",
             __file__,
@@ -10497,18 +10567,32 @@ if __name__ == "__main__":
                 session_id
             )
 
+
+
+
             if isinstance(session_payload, dict):
 
                 session_payload["execution_state"] = (
                     execution_state
                 )
 
-                session_payload["active_execution"] = (
+            if isinstance(session_payload, dict):
+                session_payload["execution_state"] = (
                     execution_state
+                )
+
+                safe_execution_state = (
+                    execution_state
+                    if isinstance(execution_state, dict)
+                    else {}
+                )
+
+                session_payload["active_execution"] = (
+                    safe_execution_state
                     if (
-                        execution_state.get("steps")
+                        safe_execution_state.get("steps")
                         and self._safe_str(
-                            execution_state.get("status")
+                            safe_execution_state.get("status")
                         ).lower()
                         not in {
                             "complete",
