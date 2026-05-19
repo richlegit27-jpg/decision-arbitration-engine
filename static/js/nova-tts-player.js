@@ -7,6 +7,16 @@
 
 const NOVA_TTS_VOICE_KEY = "nova_tts_voice";
 
+const NOVA_TTS_AUTOSPEAK_KEY = "nova_tts_autospeak";
+
+function getAutoSpeakEnabled() {
+  return localStorage.getItem(NOVA_TTS_AUTOSPEAK_KEY) === "true";
+}
+
+function setAutoSpeakEnabled(enabled) {
+  localStorage.setItem(NOVA_TTS_AUTOSPEAK_KEY, enabled ? "true" : "false");
+}
+
 function getSelectedVoice() {
   return localStorage.getItem(NOVA_TTS_VOICE_KEY) || "alloy";
 }
@@ -264,8 +274,27 @@ function setSelectedVoice(voice) {
       document.querySelector("#chat-thread") ||
       document.body;
 
+    let lastAutoSpokenText = "";
+
     const observer = new MutationObserver(function () {
       addInlineButtons();
+
+      if (!getAutoSpeakEnabled()) {
+        return;
+      }
+
+      const lastMessage = getLastAssistantMessage();
+      const text = getMessageTextFromElement(lastMessage);
+
+      if (!text || text === lastAutoSpokenText) {
+        return;
+      }
+
+      lastAutoSpokenText = text;
+
+      setTimeout(function () {
+        playText(text, getGlobalTtsButton());
+      }, 300);
     });
 
     observer.observe(target, {
@@ -324,9 +353,46 @@ function ensureVoicePicker() {
   globalButton.parentElement.appendChild(picker);
 }
 
+function ensureAutoSpeakToggle() {
+  if (document.querySelector("#nova-tts-autospeak-toggle")) {
+    return;
+  }
+
+  const globalButton = getGlobalTtsButton();
+
+  if (!globalButton || !globalButton.parentElement) {
+    return;
+  }
+
+  const label = document.createElement("label");
+  label.id = "nova-tts-autospeak-toggle";
+  label.title = "Auto-speak assistant replies";
+  label.style.marginLeft = "8px";
+  label.style.fontSize = "12px";
+  label.style.cursor = "pointer";
+  label.style.userSelect = "none";
+
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = getAutoSpeakEnabled();
+  checkbox.style.marginRight = "4px";
+
+  checkbox.onchange = function () {
+    setAutoSpeakEnabled(checkbox.checked);
+    console.log("[NovaTTS] auto-speak", checkbox.checked);
+  };
+
+  label.appendChild(checkbox);
+  label.appendChild(document.createTextNode("auto"));
+
+  globalButton.parentElement.appendChild(label);
+}
+
   function wireTts() {
     injectStyles();
     addInlineButtons();
+    ensureVoicePicker();
+    ensureAutoSpeakToggle();
 
     const globalButton = getGlobalTtsButton();
 
