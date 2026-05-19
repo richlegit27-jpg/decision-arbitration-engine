@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   if (window.NovaComposerBundle) return;
@@ -88,7 +88,7 @@ window.escapeHtml = function(str) {
   // =============================
   // End of Chunk 1
   // =============================
-  console.log("[NovaComposerBundle] Chunk 1 loaded ✅");
+  console.log("[NovaComposerBundle] Chunk 1 loaded âœ…");
 })();
 
 (function(){
@@ -256,7 +256,7 @@ window.addAttachment = function(att) {
   // =============================
   // Initialize demo content
   // =============================
-  console.log("[NovaComposerBundle] Chunk 2 loaded ✅");
+  console.log("[NovaComposerBundle] Chunk 2 loaded âœ…");
 
 })();
 
@@ -441,8 +441,8 @@ function stopTTS() {
 // ==============================
 
 // ==============================
-// NOVA COMPOSER BUNDLE — CHUNK 4
-// Lines ~2,101–2,800
+// NOVA COMPOSER BUNDLE â€” CHUNK 4
+// Lines ~2,101â€“2,800
 // Includes: execution panel updates, TTS integration, attachment rendering, working state
 // ==============================
 
@@ -553,8 +553,8 @@ function saveArtifactOrMemory(obj) {
 // ==============================
 
 // ==============================
-// NOVA COMPOSER BUNDLE — CHUNK 5
-// Lines ~2,801–3,500
+// NOVA COMPOSER BUNDLE â€” CHUNK 5
+// Lines ~2,801â€“3,500
 // Includes: streaming text handling, token flush scheduling, execution helpers
 // ==============================
 
@@ -653,8 +653,8 @@ function stopExecution() {
 // ==============================
 
 // ==============================
-// NOVA COMPOSER BUNDLE — CHUNK 6
-// Lines ~3,501–4,200
+// NOVA COMPOSER BUNDLE â€” CHUNK 6
+// Lines ~3,501â€“4,200
 // Includes: TTS control, attachment & message utilities, execution helpers
 // ==============================
 
@@ -747,8 +747,8 @@ function showImagePreview(url) {
 // ==============================
 
 // ==============================
-// NOVA COMPOSER BUNDLE — CHUNK 7
-// Lines ~4,201–4,900
+// NOVA COMPOSER BUNDLE â€” CHUNK 7
+// Lines ~4,201â€“4,900
 // Includes: streaming queue, token flush, execution control, and TTS helpers
 // ==============================
 
@@ -830,8 +830,8 @@ function stopCurrentTts() {
 // ==============================
 
 // ==============================
-// NOVA COMPOSER BUNDLE — CHUNK 8
-// Lines ~4,901–5,600
+// NOVA COMPOSER BUNDLE â€” CHUNK 8
+// Lines ~4,901â€“5,600
 // Includes: chat rendering, attachment wiring, execution helpers, TTS management
 // ==============================
 
@@ -906,8 +906,8 @@ function refreshExecutionPanel() {
 // ==============================
 
 // ==============================
-// NOVA COMPOSER BUNDLE — CHUNK 9
-// Lines ~5,601–6,300
+// NOVA COMPOSER BUNDLE â€” CHUNK 9
+// Lines ~5,601â€“6,300
 // Includes: streaming flush, token handling, execution helpers, TTS
 // ==============================
 
@@ -1002,8 +1002,8 @@ function stopCurrentTts() {
 // ==============================
 
 // ==============================
-// NOVA COMPOSER BUNDLE — CHUNK 10
-// Lines ~6,301–7,000
+// NOVA COMPOSER BUNDLE â€” CHUNK 10
+// Lines ~6,301â€“7,000
 // Includes: final execution helpers, streaming flush, attachment & TTS cleanup
 // ==============================
 
@@ -1081,7 +1081,7 @@ function autoPlayLastAssistantTTS() {
 }
 
 // ==============================
-// End of Chunk 10 — Complete JS Bundle
+// End of Chunk 10 â€” Complete JS Bundle
 // ==============================
 
 // =====================================================
@@ -1513,7 +1513,7 @@ function renderPendingUploads() {
         const name = att.name || att.filename || att.stored_name || "attachment";
         const status = att.status || "uploaded";
 
-        chip.textContent = "📎 " + name + " — " + status;
+        chip.textContent = "ðŸ“Ž " + name + " â€” " + status;
         chip.style.padding = "6px 10px";
         chip.style.border = "1px solid rgba(255,255,255,0.25)";
         chip.style.borderRadius = "999px";
@@ -2139,6 +2139,9 @@ window.NovaEmergencyHandleFiles = handleFiles;
 
             viewer.style.marginTop = "10px";
             viewer.style.padding = "10px";
+            viewer.style.position = "sticky";
+            viewer.style.top = "8px";
+            viewer.style.zIndex = "20";
             viewer.style.borderRadius = "14px";
             viewer.style.border = "1px solid rgba(255,255,255,0.12)";
             viewer.style.background = "rgba(15,23,42,0.72)";
@@ -2146,11 +2149,16 @@ window.NovaEmergencyHandleFiles = handleFiles;
             viewer.style.overflow = "auto";
 
             const rail = findArtifactRail();
-            rail.appendChild(viewer);
+            const firstCard = rail.querySelector(".nova-artifact-card");
+
+            if (firstCard) {
+                rail.insertBefore(viewer, firstCard);
+            } else {
+                rail.appendChild(viewer);
+            }
         }
 
         const title = artifact.title || artifact.name || "Artifact";
-
         const url =
             artifact.url ||
             artifact.file_url ||
@@ -2173,9 +2181,15 @@ window.NovaEmergencyHandleFiles = handleFiles;
 
         if (isImage && url) {
             bodyHtml =
+                '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;margin-bottom:10px;">' +
+                    '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer" ' +
+                    'style="padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,0.16);text-decoration:none;color:white;background:rgba(17,24,39,0.78);font-size:12px;">Open image</a>' +
+                    '<a href="' + escapeHtml(url) + '" download ' +
+                    'style="padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,0.16);text-decoration:none;color:white;background:rgba(17,24,39,0.78);font-size:12px;">Download</a>' +
+                '</div>' +
                 '<div style="margin-top:10px;">' +
                     '<img src="' + escapeHtml(url) + '" ' +
-                    'style="max-width:100%;height:auto;border-radius:12px;display:block;" ' +
+                    'style="width:100%;max-width:100%;height:auto;border-radius:14px;display:block;border:1px solid rgba(255,255,255,0.12);" ' +
                     'alt="' + escapeHtml(title) + '">' +
                 '</div>' +
                 '<div style="margin-top:8px;font-size:11px;opacity:0.7;word-break:break-all;">' +
@@ -2242,10 +2256,10 @@ window.NovaEmergencyHandleFiles = handleFiles;
             card.style.textAlign = "left";
             card.style.padding = "10px";
             card.style.borderRadius = "12px";
-            card.style.border = "1px solid rgba(255,255,255,0.16)";
+            card.style.border = "1px solid rgba(255,255,255,0.14)";
             card.style.background = "rgba(255,255,255,0.06)";
-            card.style.cursor = "pointer";
             card.style.color = "inherit";
+            card.style.cursor = "pointer";
 
             card.innerHTML =
                 '<div style="font-weight:700;font-size:13px;">' + escapeHtml(artifact.title) + '</div>' +
@@ -2280,7 +2294,11 @@ window.NovaEmergencyHandleFiles = handleFiles;
             if (Array.isArray(data.sessions)) {
                 activeSession =
                     data.sessions.find(function (session) {
-                        return session && (session.active || session.is_active || session.id === state.activeSessionId);
+                        return session && (
+                            session.active ||
+                            session.is_active ||
+                            session.id === state.activeSessionId
+                        );
                     }) ||
                     data.sessions[0] ||
                     null;
@@ -2310,6 +2328,7 @@ window.NovaEmergencyHandleFiles = handleFiles;
 
     window.NovaEmergencyRenderArtifacts = renderArtifactRail;
     window.NovaEmergencyRestoreArtifacts = restoreArtifacts;
+    window.NovaEmergencyOpenArtifact = openArtifact;
 
     setTimeout(restoreArtifacts, 400);
     setTimeout(restoreArtifacts, 1300);
@@ -2809,6 +2828,7 @@ window.NovaEmergencyHandleFiles = handleFiles;
         if (Array.isArray(session.memories)) return session.memories;
         if (session.meta && Array.isArray(session.meta.memory)) return session.meta.memory;
         if (session.meta && Array.isArray(session.meta.used_memory)) return session.meta.used_memory;
+
         if (session.working_state && typeof session.working_state === "object") {
             const ws = session.working_state;
             const items = [];
@@ -2830,7 +2850,9 @@ window.NovaEmergencyHandleFiles = handleFiles;
         const rail = findMemoryRail();
         if (!rail) return;
 
-        const memories = Array.isArray(state.memory) ? state.memory.map(normalizeMemory) : [];
+        const memories = Array.isArray(state.memory)
+            ? state.memory.map(normalizeMemory)
+            : [];
 
         rail.innerHTML =
             '<div style="font-weight:800;margin-bottom:6px;">Memory</div>' +
@@ -2864,9 +2886,7 @@ window.NovaEmergencyHandleFiles = handleFiles;
         }
 
         const refresh = qs("[data-memory-refresh]", rail);
-        if (refresh) {
-            refresh.onclick = restoreMemory;
-        }
+        if (refresh) refresh.onclick = restoreMemory;
 
         const clear = qs("[data-memory-clear-view]", rail);
         if (clear) {
@@ -2898,7 +2918,11 @@ window.NovaEmergencyHandleFiles = handleFiles;
             if (Array.isArray(data.sessions)) {
                 activeSession =
                     data.sessions.find(function (session) {
-                        return session && (session.active || session.is_active || session.id === state.activeSessionId);
+                        return session && (
+                            session.active ||
+                            session.is_active ||
+                            session.id === state.activeSessionId
+                        );
                     }) ||
                     data.sessions[0] ||
                     null;
@@ -3024,3 +3048,5 @@ window.NovaEmergencyHandleFiles = handleFiles;
 
     setTimeout(bootManualPicker, 500);
 })();
+
+
