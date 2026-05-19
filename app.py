@@ -49,6 +49,12 @@ from nova_backend.services.runtime_response_sanitizer_service import (
     RuntimeResponseSanitizerService,
 )
 
+from nova_backend.services.audio_transcription_service import (
+    is_audio_attachment,
+    resolve_audio_path,
+    transcribe_audio_file,
+)
+
 # -----------------------
 # APP SETUP
 # -----------------------
@@ -799,35 +805,44 @@ def api_chat():
 
         audio_size = item.get("size") or item.get("size_bytes") or ""
 
-        if audio_mime.lower().startswith("audio/") or audio_name.lower().endswith(
-            (
-                ".mp3",
-                ".wav",
-                ".m4a",
-                ".aac",
-                ".ogg",
-                ".webm",
-                ".flac",
+        if is_audio_attachment(item):
+            audio_path = resolve_audio_path(
+                item,
+                uploads_dir=str(UPLOADS_DIR),
             )
-        ):
+
+            if audio_path:
+                transcript = transcribe_audio_file(audio_path)
+                response_text = (
+                    "I transcribed the audio.\n\n"
+                    f"File: {audio_name}\n"
+                    f"Type: {audio_mime}\n"
+                    f"Size: {audio_size}\n"
+                    f"URL: {audio_url}\n\n"
+                    "Transcript:\n"
+                    f"{transcript}"
+                )
+            else:
+                response_text = (
+                    "I received the audio attachment, but could not find the local audio file.\n\n"
+                    f"File: {audio_name}\n"
+                    f"Type: {audio_mime}\n"
+                    f"Size: {audio_size}\n"
+                    f"URL: {audio_url}"
+                )
+
             return jsonify(
                 {
                     "ok": True,
                     "assistant_message": {
                         "role": "assistant",
-                        "text": (
-                            "I received the audio attachment.\n\n"
-                            f"File: {audio_name}\n"
-                            f"Type: {audio_mime}\n"
-                            f"Size: {audio_size}\n"
-                            f"URL: {audio_url}\n\n"
-                            "Audio upload is working. Transcription is the next audio layer."
-                        ),
+                        "text": response_text,
                         "attachments": attachments,
                         "meta": {
                             "attachment_analysis": True,
                             "attachment_count": len(raw_attachment_items),
                             "has_audio": True,
+                            "transcription": bool(audio_path),
                         },
                     },
                     "active_session_id": session_id,
@@ -840,14 +855,14 @@ def api_chat():
                     "saved_artifact": None,
                     "runtime": {},
                     "debug": {
-                        "route_taken": "absolute_audio_exit_after_normalize",
+                        "route_taken": "audio_transcription_after_normalize",
                         "file_name": audio_name,
                         "mime_type": audio_mime,
                         "url": audio_url,
+                        "audio_path": str(audio_path) if audio_path else "",
                     },
                 }
             )
-
     try:
         result = chat_service.handle(
             user_text=user_text,
