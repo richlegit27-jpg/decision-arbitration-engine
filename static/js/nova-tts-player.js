@@ -128,6 +128,23 @@ function setHandsFreeEnabled(enabled) {
   cursor: pointer;
 }
 
+#nova-speaking-status-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.56);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+#nova-speaking-status-label:empty {
+  display: none;
+}
+
       #nova-tts-autospeak-toggle:hover {
         border-color: rgba(255,255,255,0.28);
         color: white;
@@ -197,6 +214,27 @@ function setHandsFreeEnabled(enabled) {
     return shell;
   }
 
+function setSpeakingStatus(text) {
+  let label = document.querySelector("#nova-speaking-status-label");
+
+  if (!label) {
+    label = document.createElement("span");
+    label.id = "nova-speaking-status-label";
+    label.textContent = "";
+
+    const shell = document.querySelector(".nova-voice-control-shell");
+    const globalButton = getGlobalTtsButton();
+
+    if (shell) {
+      shell.appendChild(label);
+    } else if (globalButton && globalButton.parentElement) {
+      globalButton.parentElement.appendChild(label);
+    }
+  }
+
+  label.textContent = text || "";
+}
+
   function setButtonState(button, state) {
     if (!button) {
       return;
@@ -211,15 +249,19 @@ function setHandsFreeEnabled(enabled) {
       return;
     }
 
-    if (state === "playing") {
-      button.textContent = "⏹️";
-      button.title = "Stop voice";
-      button.classList.add("is-playing");
-      return;
-    }
+if (state === "playing") {
+  button.textContent = "⏹️";
+  button.title = "Speaking… click to stop";
+  button.setAttribute("aria-label", "Speaking. Click to stop.");
+  button.classList.add("is-playing");
+  setSpeakingStatus("Speaking… click 🔊/⏹️ to stop");
+  return;
+}
 
     button.textContent = "🔊";
     button.title = "Play voice";
+    button.setAttribute("aria-label", "Play voice");
+    setSpeakingStatus("");
   }
 
   function resetAllButtons() {

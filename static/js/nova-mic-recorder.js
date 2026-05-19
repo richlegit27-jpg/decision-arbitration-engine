@@ -231,6 +231,12 @@
       throw new Error(data.error || "Chat request failed.");
     }
 
+    const transcript = String(data.transcript || "").trim();
+
+if (transcript) {
+  appendMessage("user", transcript + "\n\n🎙️ voice");
+}
+
     const text =
       data.assistant_message?.text ||
       data.message ||
@@ -265,7 +271,7 @@
 
         const blob = new Blob(chunks, { type: "audio/webm" });
 
-        appendMessage("user", "🎙️ Voice message sent...");
+        setStatusText("Transcribing…");
 
         const attachment = await uploadBlob(blob);
         await sendToChat(attachment);
