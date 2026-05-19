@@ -11146,3 +11146,45 @@ body:not(.is-right-rail-open):not(.nova-right-rail-open) .nova-right-rail:not(.i
     opacity: 1 !important;
     pointer-events: auto !important;
 }
+
+/* NOVA RIGHT RAIL SINGLE PANEL VISIBILITY FIX */
+.nova-right-rail [data-rail-panel],
+.nova-right-rail .nova-rail-panel,
+.nova-right-rail [data-side-panel],
+.nova-right-rail .nova-side-panel {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.nova-right-rail [data-rail-panel].is-active,
+.nova-right-rail .nova-rail-panel.is-active,
+.nova-right-rail [data-side-panel].is-active,
+.nova-right-rail .nova-side-panel.is-active {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* NOVA RIGHT RAIL POSITION FIX */
+.nova-right-rail,
+body.is-right-rail-open .nova-right-rail,
+body.nova-right-rail-open .nova-right-rail {
+    position: fixed !important;
+    top: 72px !important;
+    right: 18px !important;
+    bottom: 18px !important;
+    width: min(420px, calc(100vw - 36px)) !important;
+    max-height: calc(100vh - 90px) !important;
+    z-index: 9999 !important;
+    overflow: hidden !important;
+}
+
+.nova-right-rail .nova-rail-panel,
+.nova-right-rail [data-rail-panel] {
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
+}
