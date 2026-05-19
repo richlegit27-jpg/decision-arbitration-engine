@@ -2601,7 +2601,10 @@ function buildNovaMessageActions(msg) {
 
             if (messages.length) {
                 state.messages = messages.map(normalizeMessage);
-                renderMessages();
+
+                if (typeof window.NovaEmergencyRender === "function") {
+                    window.NovaEmergencyRender();
+                }
             }
 
             console.log("[NovaEmergencySessionRestore] restored", {
@@ -2609,6 +2612,7 @@ function buildNovaMessageActions(msg) {
                 messageCount: state.messages.length,
                 hasThread: !!findThread(),
             });
+
         } catch (err) {
             console.error("[NovaEmergencySessionRestore] failed", err);
         }
