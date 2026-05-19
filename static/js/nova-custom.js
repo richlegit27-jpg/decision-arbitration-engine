@@ -1182,22 +1182,63 @@ function autoPlayLastAssistantTTS() {
         };
     }
 
-    function renderMessages() {
-        const thread = findThread();
-        if (!thread) return;
+function renderMessages() {
+    const thread = findThread();
+    if (!thread) return;
 
-        thread.innerHTML = state.messages.map(function (msg) {
-            const role = msg.role === "user" ? "user" : "assistant";
-            return (
-                '<div class="nova-message nova-message-' + role + '">' +
-                    '<div class="nova-message-role">' + escapeHtml(role) + "</div>" +
-                    '<div class="nova-message-text">' + escapeHtml(msg.text) + "</div>" +
-                "</div>"
-            );
-        }).join("");
+    thread.innerHTML = state.messages.map(function (msg) {
+        msg = msg || {};
 
-        thread.scrollTop = thread.scrollHeight;
+        const role = msg.role === "user" ? "user" : "assistant";
+        const text = String(msg.text || msg.content || "").trim();
+        const imageUrl = getNovaMessageImageUrl(msg);
+
+        const imageHtml = imageUrl
+            ? (
+                '<div class="nova-message-image-wrap">' +
+                    '<img class="nova-message-image" src="' + escapeHtml(imageUrl) + '" alt="Generated image">' +
+                '</div>'
+            )
+            : "";
+
+        return (
+            '<div class="nova-message nova-message-' + role + '">' +
+                '<div class="nova-message-bubble">' +
+                    '<div class="nova-message-role">' + escapeHtml(role) + '</div>' +
+                    '<div class="nova-message-text">' + formatNovaMessageText(text) + '</div>' +
+                    imageHtml +
+                '</div>' +
+                buildNovaMessageActions(msg) +
+            '</div>'
+        );
+    }).join("");
+
+    qsa(".nova-message-image-wrap").forEach(function (wrap) {
+        const img = wrap.querySelector("img");
+        if (!img) return;
+
+        const messageEl = wrap.closest(".nova-message");
+        const textEl = messageEl ? messageEl.querySelector(".nova-message-text") : null;
+        const imageText = textEl ? textEl.innerText : "";
+        const imageUrl = img.getAttribute("src") || "";
+
+        appendImageActions(wrap, imageText, imageUrl);
+    });
+
+    if (typeof wireMessageActionButtons === "function") {
+        wireMessageActionButtons();
     }
+
+    if (typeof wireImageActionButtons === "function") {
+        wireImageActionButtons();
+    }
+
+    if (typeof wireGeneratedImageClicks === "function") {
+        wireGeneratedImageClicks();
+    }
+
+    thread.scrollTop = thread.scrollHeight;
+}
 
 function addMessage(role, text, extra) {
     const msg = Object.assign(
@@ -1236,6 +1277,117 @@ function copyNovaText(value) {
     document.body.removeChild(temp);
 
     console.log("[NovaEmergencyBridge] copied fallback", text);
+}
+
+
+function formatNovaMessageText(value) {
+    const raw = String(value || "");
+
+    if (!raw.trim()) {
+        return "";
+    }
+
+    const parts = [];
+    const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = codeBlockRegex.exec(raw)) !== null) {
+        const before = raw.slice(lastIndex, match.index);
+        if (before) {
+            parts.push({
+                type: "text",
+                value: before
+            });
+        }
+
+        parts.push({
+            type: "code",
+            language: match[1] || "text",
+            value: match[2] || ""
+        });
+
+        lastIndex = codeBlockRegex.lastIndex;
+    }
+
+    const after = raw.slice(lastIndex);
+    if (after) {
+        parts.push({
+            type: "text",
+            value: after
+        });
+    }
+
+    if (!parts.length) {
+        parts.push({
+            type: "text",
+            value: raw
+        });
+    }
+
+    return parts.map(function (part) {
+        if (part.type === "code") {
+            const codeId = "nova_code_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+            const lang = escapeHtml(part.language || "text");
+            const code = escapeHtml(part.value || "");
+
+            return (
+                '<div class="nova-code-box" data-nova-code-box="true">' +
+                    '<div class="nova-code-header">' +
+                        '<span class="nova-code-lang">' + lang + '</span>' +
+                        '<button type="button" class="nova-code-copy-btn" data-nova-copy-code-id="' + codeId + '">Copy code</button>' +
+                    '</div>' +
+                    '<pre class="nova-code-pre"><code id="' + codeId + '">' + code + '</code></pre>' +
+                '</div>'
+            );
+        }
+
+        let text = escapeHtml(part.value || "");
+
+        text = text
+            .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+            .replace(/`([^`]+)`/g, '<code class="nova-inline-code">$1</code>')
+            .replace(/\n{2,}/g, "</p><p>")
+            .replace(/\n/g, "<br>");
+
+        return '<div class="nova-message-rich-text"><p>' + text + '</p></div>';
+    }).join("");
+}
+
+function getNovaMessageImageUrl(msg) {
+    msg = msg || {};
+
+    return (
+        msg.image_url ||
+        msg.imageUrl ||
+        msg.url ||
+        (msg.meta && msg.meta.image_url) ||
+        (msg.meta && msg.meta.preview) ||
+        ""
+    );
+}
+
+function buildNovaMessageActions(msg) {
+    msg = msg || {};
+
+    const text = String(msg.text || msg.content || "").trim();
+    const imageUrl = getNovaMessageImageUrl(msg);
+
+    if (msg.role !== "assistant") {
+        return "";
+    }
+
+    return (
+        '<div class="nova-message-actions">' +
+            '<button type="button" class="nova-msg-action-btn" data-nova-copy-message="' + escapeHtml(text) + '">Copy</button>' +
+            '<button type="button" class="nova-msg-action-btn" data-nova-regen-message="true">Regenerate</button>' +
+            (
+                imageUrl
+                    ? '<button type="button" class="nova-msg-action-btn" data-nova-copy-image-url="' + escapeHtml(imageUrl) + '">Copy image URL</button>'
+                    : ""
+            ) +
+        '</div>'
+    );
 }
 
 function appendImageActions(wrap, imageText, imageUrl) {
@@ -1353,6 +1505,69 @@ function wireImageActionButtons() {
 
         const regenButton = event.target.closest("[data-nova-regen-image]");
         if (regenButton) {
+            event.preventDefault();
+
+            const input = findInput();
+            if (input) {
+                input.value = "regen";
+            }
+
+            sendMessage();
+        }
+    }, true);
+}
+
+function wireMessageActionButtons() {
+    if (document.body.__novaMessageActionButtonsWired) return;
+    document.body.__novaMessageActionButtonsWired = true;
+
+    document.body.addEventListener("click", function (event) {
+        const codeCopy = event.target.closest("[data-nova-copy-code-id]");
+        if (codeCopy) {
+            event.preventDefault();
+
+            const codeId = codeCopy.getAttribute("data-nova-copy-code-id") || "";
+            const codeEl = codeId ? document.getElementById(codeId) : null;
+            copyNovaText(codeEl ? codeEl.textContent : "");
+
+            codeCopy.textContent = "Copied";
+            setTimeout(function () {
+                codeCopy.textContent = "Copy code";
+            }, 900);
+
+            return;
+        }
+
+        const copyMessage = event.target.closest("[data-nova-copy-message]");
+        if (copyMessage) {
+            event.preventDefault();
+
+            copyNovaText(copyMessage.getAttribute("data-nova-copy-message") || "");
+
+            copyMessage.textContent = "Copied";
+            setTimeout(function () {
+                copyMessage.textContent = "Copy";
+            }, 900);
+
+            return;
+        }
+
+        const copyImageUrl = event.target.closest("[data-nova-copy-image-url]");
+        if (copyImageUrl) {
+            event.preventDefault();
+
+            copyNovaText(copyImageUrl.getAttribute("data-nova-copy-image-url") || "");
+
+            copyImageUrl.textContent = "Copied";
+            setTimeout(function () {
+                copyImageUrl.textContent = "Copy image URL";
+            }, 900);
+
+            return;
+        }
+
+        const regenMessage = event.target.closest("[data-nova-regen-message]");
+        if (regenMessage) {
             event.preventDefault();
 
             const input = findInput();
@@ -1523,8 +1738,9 @@ img.addEventListener("click", function (event) {
     window.open(placeholder.image_url, "_blank");
 });
 
-        wrap.appendChild(img);
-        lastCard.appendChild(wrap);
+wrap.appendChild(img);
+appendImageActions(wrap, placeholder.text, placeholder.image_url);
+lastCard.appendChild(wrap);
 
         console.log("[NovaEmergencyBridge] direct image injected", {
             image_url: placeholder.image_url,
@@ -1674,37 +1890,37 @@ renderMessages();
         }
     }
 
-    function wireSend() {
-        const button = findSendButton();
-        const input = findInput();
 
-        if (button && !button.__novaEmergencyWired) {
-            button.__novaEmergencyWired = true;
-            button.addEventListener("click", function (event) {
-                event.preventDefault();
-                sendMessage();
-            });
-        }
+function wireSend() {
+    const button = findSendButton();
+    const input = findInput();
 
-        if (input && !input.__novaEmergencyWired) {
-            input.__novaEmergencyWired = true;
-            input.addEventListener("keydown", function (event) {
-                if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    sendMessage();
-                }
-            });
-        }
-
-wireImageActionButtons();
-wireGeneratedImageClicks();
-
-        console.log("[NovaEmergencyBridge] wired", {
-            hasInput: !!input,
-            hasButton: !!button,
-            hasThread: !!findThread(),
+    if (button && !button.__novaEmergencyWired) {
+        button.__novaEmergencyWired = true;
+        button.addEventListener("click", function (event) {
+            event.preventDefault();
+            sendMessage();
         });
     }
+
+    if (input && !input.__novaEmergencyWired) {
+        input.__novaEmergencyWired = true;
+        input.addEventListener("keydown", function (event) {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+    }
+
+    wireImageActionButtons();
+
+    console.log("[NovaEmergencyBridge] wired", {
+        hasInput: !!input,
+        hasButton: !!button,
+        hasThread: !!findThread(),
+    });
+}
 
     window.NovaEmergencySend = sendMessage;
     window.NovaEmergencyRender = renderMessages;
@@ -1830,8 +2046,10 @@ function renderPendingUploads() {
     const uploads = Array.isArray(state.pendingUploads) ? state.pendingUploads : [];
 
     if (!uploads.length) {
-        container.innerHTML = '<div style="font-size:12px;opacity:0.65;">No attachments staged</div>';
-        return;
+container.innerHTML = "";
+container.hidden = true;
+container.style.display = "none";
+return;
     }
 
     uploads.forEach(function (att, index) {
@@ -2197,39 +2415,116 @@ function findThread() {
         });
     }
 
-function renderMessages() {
-    const thread = findThread();
-    if (!thread) return;
+function getNovaMessageImageUrl(msg) {
+    msg = msg || {};
 
-    thread.innerHTML = state.messages.map(function (msg) {
-        const role = msg.role === "user" ? "user" : "assistant";
+    return (
+        msg.image_url ||
+        msg.imageUrl ||
+        msg.url ||
+        (msg.meta && msg.meta.image_url) ||
+        (msg.meta && msg.meta.preview) ||
+        ""
+    );
+}
 
-        const imageUrl =
-            msg.image_url ||
-            msg.imageUrl ||
-            msg.url ||
-            (msg.meta && msg.meta.image_url) ||
-            "";
+function formatNovaMessageText(value) {
+    const raw = String(value || "");
 
-        const imageHtml = imageUrl
-            ? (
-                '<div class="nova-message-image-wrap" style="margin-top:10px;">' +
-                    '<img src="' + escapeHtml(imageUrl) + '" alt="Generated image" ' +
-                    'style="width:100%;max-width:420px;height:auto;border-radius:14px;display:block;border:1px solid rgba(255,255,255,0.12);" />' +
+    if (!raw.trim()) {
+        return "";
+    }
+
+    const parts = [];
+    const codeBlockRegex = /```([a-zA-Z0-9_-]*)\s*([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = codeBlockRegex.exec(raw)) !== null) {
+        const before = raw.slice(lastIndex, match.index);
+
+        if (before) {
+            parts.push({
+                type: "text",
+                value: before
+            });
+        }
+
+        parts.push({
+            type: "code",
+            language: match[1] || "text",
+            value: match[2] || ""
+        });
+
+        lastIndex = codeBlockRegex.lastIndex;
+    }
+
+    const after = raw.slice(lastIndex);
+
+    if (after) {
+        parts.push({
+            type: "text",
+            value: after
+        });
+    }
+
+    if (!parts.length) {
+        parts.push({
+            type: "text",
+            value: raw
+        });
+    }
+
+    return parts.map(function (part) {
+        if (part.type === "code") {
+            const codeId = "nova_code_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+            const lang = escapeHtml(part.language || "text");
+            const code = escapeHtml(part.value || "");
+
+            return (
+                '<div class="nova-code-box" data-nova-code-box="true">' +
+                    '<div class="nova-code-header">' +
+                        '<span class="nova-code-lang">' + lang + '</span>' +
+                        '<button type="button" class="nova-code-copy-btn" data-nova-copy-code-id="' + codeId + '">Copy code</button>' +
+                    '</div>' +
+                    '<pre class="nova-code-pre"><code id="' + codeId + '">' + code + '</code></pre>' +
                 '</div>'
-            )
-            : "";
+            );
+        }
 
-        return (
-            '<div class="nova-message nova-message-' + role + '">' +
-                '<div class="nova-message-role">' + escapeHtml(role) + "</div>" +
-                '<div class="nova-message-text">' + escapeHtml(msg.text || "") + "</div>" +
-                imageHtml +
-            "</div>"
-        );
+        let text = escapeHtml(part.value || "");
+
+        text = text
+            .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+            .replace(/`([^`]+)`/g, '<code class="nova-inline-code">$1</code>')
+            .replace(/\n{2,}/g, "</p><p>")
+            .replace(/\n/g, "<br>");
+
+        return '<div class="nova-message-rich-text"><p>' + text + '</p></div>';
     }).join("");
+}
 
-    thread.scrollTop = thread.scrollHeight;
+function buildNovaMessageActions(msg) {
+    msg = msg || {};
+
+    const text = String(msg.text || msg.content || "").trim();
+    const imageUrl = getNovaMessageImageUrl(msg);
+
+    if (msg.role !== "assistant") {
+        return "";
+    }
+
+    return (
+        '<div class="nova-message-actions">' +
+            '<button type="button" class="nova-msg-action-btn" data-nova-copy-message="' + escapeHtml(text) + '">Copy</button>' +
+            '<button type="button" class="nova-msg-action-btn" data-nova-regen-message="true">Regenerate</button>' +
+            (
+                imageUrl
+                    ? '<button type="button" class="nova-msg-action-btn" data-nova-copy-image-url="' + escapeHtml(imageUrl) + '">Copy image URL</button>'
+                    : ""
+            ) +
+        '</div>'
+    );
 }
 
     function getSessionIdFromPayload(payload) {
