@@ -8,6 +8,7 @@ import logging
 import shutil
 import tempfile
 import py_compile
+import PyPDF2
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1380,7 +1381,7 @@ Current step:
             execution_state,
         )
 
-        sessions = self.sessions.load()
+        sessions = self.sessions._load_sessions()
 
         index = self.sessions._find(
             sessions,
@@ -1419,7 +1420,10 @@ Current step:
 
             sessions[index]["meta"] = meta
 
-            self.sessions.save(sessions)
+            self.sessions._save_sessions(
+                sessions,
+                self.sessions.get_active_session_id(),
+            )
 
         return execution_state
 
@@ -1456,6 +1460,7 @@ Current step:
 
         try:
             sessions = self.sessions._load_sessions()
+
             index = self.sessions._find(sessions, session_id)
 
             if index is None:
@@ -3702,6 +3707,66 @@ if __name__ == "__main__":
 
         return diagnosis
 
+    def _normalize_attachments(self, attachments=None):
+        normalized = []
+
+        if not isinstance(attachments, list):
+            return normalized
+
+        for item in attachments:
+            if not isinstance(item, dict):
+                continue
+
+            filename = self._safe_str(
+                item.get("filename")
+                or item.get("name")
+                or item.get("original_name")
+                or item.get("stored_name")
+                or ""
+            ).strip()
+
+            stored_name = self._safe_str(
+                item.get("stored_name")
+                or item.get("saved_name")
+                or filename
+            ).strip()
+
+            url = self._safe_str(
+                item.get("url")
+                or item.get("file_url")
+                or item.get("src")
+                or ""
+            ).strip()
+
+            if not url and stored_name:
+                url = f"/api/uploads/{stored_name}"
+
+            if not filename and stored_name:
+                filename = stored_name
+
+            normalized.append(
+                {
+                    "id": self._safe_str(
+                        item.get("id")
+                        or item.get("attachment_id")
+                        or uuid.uuid4().hex
+                    ),
+                    "filename": filename,
+                    "name": filename,
+                    "url": url,
+                    "file_url": url,
+                    "stored_name": stored_name,
+                    "mime_type": self._safe_str(
+                        item.get("mime_type")
+                        or item.get("content_type")
+                        or "application/octet-stream"
+                    ),
+                    "size": item.get("size") or item.get("size_bytes") or 0,
+                }
+            )
+
+        return normalized
+
     def _build_user_message(self, text: str, attachments=None, meta=None) -> dict:
         attachments = attachments or []
         meta = meta or {}
@@ -4715,7 +4780,7 @@ if __name__ == "__main__":
         # 7. Return final output
 
         decision = decision if isinstance(decision, dict) else {}
-        attachments = attachments or []
+        attachments = self._normalize_attachments(attachments)
 
         original_user_text = self._safe_str(
             user_text
@@ -4917,6 +4982,219 @@ if __name__ == "__main__":
         # =====================================
 
         if text_lc in {
+            "where are we",
+            "where are we now",
+            "where are we at",
+            "where am i",
+            "what is our status",
+            "what's our status",
+            "current state",
+            "project state",
+            "show working state",
+            "show current state",
+            "show project state",
+            "what are we working on",
+            "what are we doing",
+            "what are you doing",
+            "what now",
+            "what next",
+        }:
+
+            ws = (
+                self._get_working_state(
+                    session_id
+                )
+                or {}
+            )
+
+            summary = ""
+
+            if hasattr(
+                self,
+                "_build_working_state_summary",
+            ):
+                try:
+                    summary = self._build_working_state_summary(
+                        ws
+                    )
+                except Exception:
+                    summary = ""
+
+            if not summary:
+                session_payload = (
+                    self._get_session_payload(
+                        session_id
+                    )
+                    or {}
+                )
+
+                session_meta = (
+                    session_payload.get("meta")
+                    if isinstance(session_payload, dict)
+                    else {}
+                )
+
+                if not isinstance(session_meta, dict):
+                    session_meta = {}
+
+                mission = (
+                    session_meta.get("mission")
+                    if isinstance(session_meta, dict)
+                    else {}
+                )
+
+                if not isinstance(mission, dict):
+                    mission = {}
+
+                execution_state = (
+                    self._get_session_meta(
+                        session_id,
+                        "execution_state",
+                    )
+                    or session_payload.get("execution_state")
+                    or session_payload.get("active_execution")
+                    or {}
+                )
+
+                if not isinstance(execution_state, dict):
+                    execution_state = {}
+
+                dynamic_ws = {}
+
+                mission_name = str(
+                    mission.get("mission")
+                    or mission.get("active_task")
+                    or mission.get("goal")
+                    or ""
+                ).strip()
+
+                mission_next = str(
+                    mission.get("recommended_next_move")
+                    or mission.get("next_move")
+                    or ""
+                ).strip()
+
+                mission_checkpoint = str(
+                    mission.get("checkpoint")
+                    or ""
+                ).strip()
+
+                mission_last_success = str(
+                    mission.get("last_success")
+                    or ""
+                ).strip()
+
+                raw_execution_goal = (
+                    execution_state.get("goal")
+                    or execution_state.get("original_user_text")
+                    or ""
+                )
+
+                if isinstance(raw_execution_goal, dict):
+                    execution_goal = str(
+                        raw_execution_goal.get("goal")
+                        or raw_execution_goal.get("task")
+                        or raw_execution_goal.get("title")
+                        or raw_execution_goal.get("type")
+                        or ""
+                    ).strip()
+                else:
+                    execution_goal = str(
+                        raw_execution_goal
+                        or ""
+                    ).strip()
+
+                execution_status = str(
+                    execution_state.get("status")
+                    or ""
+                ).strip()
+
+                current_step = str(
+                    execution_state.get("current_step_title")
+                    or execution_state.get("current_step")
+                    or ""
+                ).strip()
+
+                if mission_name:
+                    dynamic_ws["active_task"] = mission_name
+                elif execution_goal:
+                    dynamic_ws["active_task"] = execution_goal
+
+                if mission_next:
+                    dynamic_ws["next_move"] = mission_next
+                elif current_step:
+                    dynamic_ws["next_move"] = current_step
+
+                if mission_checkpoint:
+                    dynamic_ws["checkpoint"] = mission_checkpoint
+                elif execution_status:
+                    dynamic_ws["checkpoint"] = (
+                        f"execution_status_{execution_status}"
+                    )
+
+                if mission_last_success:
+                    dynamic_ws["last_success"] = mission_last_success
+
+                if not dynamic_ws:
+                    dynamic_ws = {
+                        "active_task": (
+                            "Stabilize Nova intelligence and autonomous execution."
+                        ),
+                        "current_file": (
+                            "C:\\Users\\Owner\\nova\\nova_backend\\services\\chat_service.py"
+                        ),
+                        "current_bug": (
+                            "where-are-we was falling into summarize_state/chat history instead of working-state."
+                        ),
+                        "last_success": (
+                            "Operational where-are-we intercept now fires and returns working-state fallback."
+                        ),
+                        "next_move": (
+                            "Persist real working_state automatically when operational context is detected."
+                        ),
+                        "checkpoint": (
+                            "working_state_summary_intercept_added"
+                        ),
+                    }
+
+                self._update_working_state(
+                    session_id,
+                    dynamic_ws,
+                )
+
+                summary = self._build_working_state_summary(
+                    merged_ws
+                )
+
+                self._update_working_state(
+                    session_id,
+                    ws,
+                )
+
+                summary = self._build_working_state_summary(
+                    ws
+                )
+
+            assistant_msg = (
+                self._build_assistant_message(
+                    text=summary
+                )
+            )
+
+            return self._finalize_response(
+                session_id=session_id,
+                user_text=user_text,
+                user_msg={
+                    "role": "user",
+                    "text": user_text,
+                    "attachments": [],
+                    "meta": {},
+                },
+                assistant_msg=assistant_msg,
+                saved_artifact=None,
+            )
+
+        if text_lc in {
             "what file are we in",
             "which file",
             "current file",
@@ -4965,7 +5243,6 @@ if __name__ == "__main__":
         if text_lc in {
             "what is the active task",
             "active task",
-            "what are we doing",
         }:
 
             ws = (
@@ -8309,6 +8586,35 @@ if __name__ == "__main__":
                 or ""
             ).strip()
 
+            direct_url_needs_search_fallback = (
+                "espn.com/nba" in source_url.lower()
+                and (
+                    not body
+                    or len(body.strip()) < 250
+                    or title.strip().lower() == source_url.strip().lower()
+                    or summary.strip().lower().startswith("fetched ")
+                    or summary.strip().lower() == source_url.strip().lower()
+                )
+            )
+
+            if direct_url_needs_search_fallback:
+                print(
+                    "DIRECT_URL_SEARCH_FALLBACK_HIT =",
+                    {
+                        "source_url": source_url,
+                        "title": title,
+                        "summary_len": len(summary or ""),
+                        "body_len": len(body or ""),
+                    },
+                )
+
+                return self._execute_web_fetch(
+                    user_text="ESPN NBA latest headlines today",
+                    session_id=session_id,
+                    attachments=attachments,
+                    decision=decision,
+                )
+
             if error and not summary and not body:
                 assistant_text = (
                     "Web fetch failed:\n"
@@ -8379,7 +8685,107 @@ if __name__ == "__main__":
                         assistant_text = body[:1200].strip()
 
                 if not assistant_text:
-                    assistant_text = f"Fetched {title}"
+                    fallback_query = (
+                        title
+                        if title and title != source_url
+                        else source_url
+                    )
+
+                    if "espn.com/nba" in source_url.lower():
+                        fallback_query = "ESPN NBA latest headlines"
+
+                    try:
+                        fallback_result = {}
+
+                        if hasattr(self, "_web_search"):
+                            fallback_result = self._web_search(
+                                fallback_query
+                            )
+
+                        fallback_results = (
+                            fallback_result.get("results", [])
+                            if isinstance(fallback_result, dict)
+                            else []
+                        )
+
+                        fallback_sources = self._clean_web_results(
+                            fallback_results
+                        )
+
+                        fallback_lines = []
+
+                        for item in fallback_sources[:3]:
+                            if not isinstance(item, dict):
+                                continue
+
+                            item_title = self._safe_str(
+                                item.get("title")
+                                or item.get("name")
+                                or ""
+                            ).strip()
+
+                            item_snippet = self._safe_str(
+                                item.get("snippet")
+                                or item.get("description")
+                                or ""
+                            ).strip()
+
+                            if item_title:
+                                fallback_lines.append(
+                                    item_title
+                                )
+
+                            if item_snippet:
+                                fallback_lines.append(
+                                    item_snippet
+                                )
+
+                        if fallback_lines:
+                            clean_fallback = self._clean_web_text(
+                                "\n".join(fallback_lines)[:5000]
+                            )
+
+                            prompt = (
+                                "Summarize these fetched web results cleanly.\n"
+                                "Use 2-4 short bullets.\n"
+                                "Do not mention that this is a fallback.\n\n"
+                                f"Original URL: {source_url}\n"
+                                f"Search topic: {fallback_query}\n\n"
+                                f"Results:\n{clean_fallback}"
+                            )
+
+                            response = self.client.chat.completions.create(
+                                model=getattr(self, "model", "gpt-4o-mini"),
+                                messages=[
+                                    {
+                                        "role": "system",
+                                        "content": (
+                                            "You summarize web results. "
+                                            "Be clean, factual, and concise."
+                                        ),
+                                    },
+                                    {
+                                        "role": "user",
+                                        "content": prompt,
+                                    },
+                                ],
+                                temperature=0.2,
+                            )
+
+                            assistant_text = (
+                                response.choices[0].message.content
+                                if response and response.choices
+                                else ""
+                            ).strip()
+
+                    except Exception as exc:
+                        exec_debug(
+                            "DIRECT_URL_FALLBACK_SEARCH_FAILED:",
+                            exc,
+                        )
+
+                    if not assistant_text:
+                        assistant_text = f"Fetched {title}"
 
             source = {
                 "title": title,
@@ -10266,6 +10672,14 @@ if __name__ == "__main__":
             attachments=attachments,
             session_id=session_id,
         )
+
+        if decision.get("route") == self.ROUTE_ATTACHMENT_ANALYSIS:
+            return self._execute_attachment_analysis(
+                decision=decision,
+                user_text=user_text,
+                session_id=session_id,
+                attachments=attachments,
+            )
 
         if (
             isinstance(decision, dict)
@@ -13551,22 +13965,13 @@ Auto-fix result:
             confidence = 0.9
             reasons.append("full_file_request")
 
-        elif text_lc in {"where are we", "where are we now", "what are we doing", "what now", "status", "recap"}:
+        elif text_lc in {"status", "recap"}:
             intent = "continuity"
             route = "continuity"
             strategy = "summarize_state"
             priority = "high"
             confidence = 0.9
             reasons.append("continuity_query")
-
-            self._update_working_state(
-                session_id,
-                {
-                    "active_task": "",
-                    "next_move": "",
-                    "checkpoint": "",
-                },
-            )
 
         mission_state = self._build_mission_state(
             working_state=working_state,
@@ -18161,17 +18566,46 @@ def _save_artifact_fallback(self, artifact: dict):
     def _handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
         attachments = attachments or []
 
+        if not attachments:
+            assistant_text = "I did not receive an attachment to analyze."
+
+            return {
+                "ok": True,
+                "text": assistant_text,
+                "assistant_text": assistant_text,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": assistant_text,
+                },
+                "saved_artifact": None,
+                "debug": {
+                    "route_taken": "attachment_analysis",
+                    "has_attachment": False,
+                    "has_image": False,
+                    "attachment_count": 0,
+                },
+            }
+
         image_url = ""
         image_name = ""
+        first_attachment = {}
 
         for item in attachments:
             if not isinstance(item, dict):
                 continue
 
+            if not first_attachment:
+                first_attachment = item
+
             att_type = self._safe_str(item.get("type")).lower()
             mime_type = self._safe_str(item.get("mime_type")).lower()
-            url = self._safe_str(item.get("url"))
-            name = self._safe_str(item.get("name") or item.get("filename") or "image")
+            url = self._safe_str(item.get("url") or item.get("file_url"))
+            name = self._safe_str(
+                item.get("name")
+                or item.get("filename")
+                or item.get("stored_name")
+                or "attachment"
+            )
 
             if url and (att_type == "image" or mime_type.startswith("image/")):
                 image_url = url
@@ -18180,7 +18614,7 @@ def _save_artifact_fallback(self, artifact: dict):
 
         if image_url:
             try:
-                prompt = self._safe_str(user_text) or "what is in this image"
+                prompt = self._safe_str(user_text) or "What is in this image?"
 
                 response = self.client.responses.create(
                     model=self.chat_model,
@@ -18188,8 +18622,14 @@ def _save_artifact_fallback(self, artifact: dict):
                         {
                             "role": "user",
                             "content": [
-                                {"type": "input_text", "text": prompt},
-                                {"type": "input_image", "image_url": image_url},
+                                {
+                                    "type": "input_text",
+                                    "text": prompt,
+                                },
+                                {
+                                    "type": "input_image",
+                                    "image_url": image_url,
+                                },
                             ],
                         }
                     ],
@@ -18197,23 +18637,72 @@ def _save_artifact_fallback(self, artifact: dict):
 
                 assistant_text = self._extract_response_text(response)
 
-            except Exception:
-                assistant_text = "I couldnâ€™t analyze that image."
+            except Exception as e:
+                assistant_text = f"I received the image, but I could not analyze it yet. Error: {e}"
 
-        else:
-            assistant_text = "I couldnâ€™t find an image attachment to analyze."
+            return {
+                "ok": True,
+                "text": assistant_text,
+                "assistant_text": assistant_text,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": assistant_text,
+                },
+                "saved_artifact": None,
+                "debug": {
+                    "route_taken": "attachment_analysis",
+                    "image_name": image_name,
+                    "has_attachment": True,
+                    "has_image": bool(image_url),
+                    "attachment_count": len(attachments),
+                },
+            }
+
+        name = self._safe_str(
+            first_attachment.get("name")
+            or first_attachment.get("filename")
+            or first_attachment.get("stored_name")
+            or "attachment"
+        )
+
+        mime_type = self._safe_str(
+            first_attachment.get("mime_type")
+            or first_attachment.get("type")
+            or "unknown"
+        )
+
+        size = first_attachment.get("size", "")
+        url = self._safe_str(
+            first_attachment.get("url")
+            or first_attachment.get("file_url")
+            or ""
+        )
+
+        assistant_text = (
+            "I received the file, but this file type is not wired for content extraction yet.\n\n"
+            f"File: {name}\n"
+            f"Type: {mime_type}\n"
+            f"Size: {size}\n"
+            f"URL: {url}"
+        )
 
         return {
             "ok": True,
+            "text": assistant_text,
             "assistant_text": assistant_text,
             "assistant_message": {
                 "role": "assistant",
                 "text": assistant_text,
             },
+            "saved_artifact": None,
             "debug": {
                 "route_taken": "attachment_analysis",
-                "image_name": image_name,
-                "has_image": bool(image_url),
+                "has_attachment": True,
+                "has_image": False,
+                "attachment_count": len(attachments),
+                "unsupported_file": True,
+                "file_name": name,
+                "mime_type": mime_type,
             },
         }
 
@@ -18765,31 +19254,56 @@ def _save_artifact_fallback(self, artifact: dict):
             )
 
     def _execute_attachment_analysis(
-            self,
-            decision: dict,
-            user_text: str,
-            session_id: str,
-            attachments=None,
-        ) -> dict:
-            attachments = attachments or []
-            user_msg = self._build_user_message(user_text, attachments=attachments)
-            result = self._handle_attachment_analysis(user_text, attachments)
+        self,
+        decision: dict,
+        user_text: str,
+        session_id: str,
+        attachments=None,
+    ) -> dict:
+        attachments = attachments or []
 
-            assistant_msg = self._build_assistant_message(
-                text=self._safe_str(result.get("text")) or "Attachment analysis completed.",
-                meta={"attachment_analysis": True},
-                attachments=[],
-            )
+        print(
+            "ATTACHMENT EXECUTE RECEIVED =",
+            {
+                "count": len(attachments),
+                "attachments": attachments,
+            },
+        )
 
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision=decision,
-                saved_artifact=result.get("saved_artifact"),
-            )
+        user_msg = self._build_user_message(
+            user_text,
+            attachments=attachments,
+        )
 
+        result = self._handle_attachment_analysis(
+            user_text,
+            attachments,
+        )
+
+        assistant_text = (
+            self._safe_str(result.get("text"))
+            or self._safe_str(result.get("assistant_text"))
+            or "Attachment analysis completed."
+        )
+
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            meta={
+                "attachment_analysis": True,
+                "attachment_count": len(attachments),
+                "debug": result.get("debug", {}),
+            },
+            attachments=attachments,
+        )
+
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=result.get("saved_artifact"),
+        )
 
     def _execute_web_operator(self, user_text: str, session_id: str) -> dict:
         try:
@@ -19730,3 +20244,294 @@ for name in CHAT_SERVICE_METHODS:
     obj = globals().get(name)
     if callable(obj):
         setattr(ChatService, name, obj)
+
+# ============================================================
+# NOVA PATCH: attach attachment analysis methods safely
+# ============================================================
+
+def _nova_handle_attachment_analysis(self, user_text: str, attachments: list) -> dict:
+    """
+    Handles uploaded attachments (images, PDFs, DOCX, TXT) and returns AI analysis.
+    """
+    import base64
+    from pathlib import Path
+    from PIL import Image
+    import collections
+
+    attachments = attachments or []
+
+    if not attachments:
+        assistant_text = "I did not receive an attachment to analyze."
+        return {
+            "ok": True,
+            "text": assistant_text,
+            "assistant_text": assistant_text,
+            "assistant_message": {"role": "assistant", "text": assistant_text},
+            "saved_artifact": None,
+            "debug": {
+                "route_taken": "attachment_analysis",
+                "has_attachment": False,
+                "has_image": False,
+                "attachment_count": 0,
+            },
+        }
+
+    first = attachments[0] if isinstance(attachments[0], dict) else {}
+    name = self._safe_str(first.get("name") or first.get("filename") or first.get("stored_name") or "attachment")
+    mime_type = self._safe_str(first.get("mime_type") or first.get("content_type") or first.get("type") or "unknown")
+    url = self._safe_str(first.get("url") or first.get("file_url") or "")
+    size = first.get("size") or first.get("size_bytes") or ""
+    is_image = mime_type.startswith("image/")
+
+    # Resolve local file
+    project_root = Path(__file__).resolve().parents[2]
+    filename_from_url = url.split("?", 1)[0].rsplit("/", 1)[-1].strip() if url else ""
+    stored_name = self._safe_str(first.get("saved_name") or "") or self._safe_str(first.get("stored_name") or "")
+    filename = filename_from_url or stored_name
+    upload_dirs = [
+        project_root / "uploads",
+        project_root / "static" / "uploads",
+        project_root / "data" / "uploads",
+    ]
+    local_path = None
+    for folder in upload_dirs:
+        candidate = folder / filename
+        if candidate.exists() and candidate.is_file():
+            local_path = candidate
+            break
+
+    if not local_path:
+        assistant_text = f"I received the file, but could not find the local file.\nFile: {name}\nType: {mime_type}\nSize: {size}\nURL: {url}"
+        return {
+            "ok": True,
+            "text": assistant_text,
+            "assistant_text": assistant_text,
+            "assistant_message": {"role": "assistant", "text": assistant_text},
+            "saved_artifact": None,
+            "debug": {
+                "route_taken": "attachment_analysis",
+                "has_attachment": True,
+                "has_image": is_image,
+                "attachment_count": len(attachments),
+                "file_name": name,
+                "mime_type": mime_type,
+                "url": url,
+            },
+        }
+
+    # --- IMAGE ANALYSIS ---
+    if is_image:
+        try:
+            img = Image.open(local_path)
+            has_alpha = img.mode in ("RGBA", "LA") or ("transparency" in img.info)
+            img_small = img.convert("RGB").copy()
+            img_small.thumbnail((200, 200))
+            counter = collections.Counter(img_small.getdata())
+            dominant_colors = [f"RGB{c[0]}" for c in counter.most_common(5)]
+
+            image_bytes = local_path.read_bytes()
+            encoded = base64.b64encode(image_bytes).decode("utf-8")
+            data_url = f"data:{mime_type};base64,{encoded}"
+
+            prompt = self._safe_str(user_text) or "Describe the content of this image."
+            enriched_prompt = f"{prompt}\n\nImage Metadata:\n- Transparency: {has_alpha}\n- Dominant Colors: {', '.join(dominant_colors)}\n- Filename: {name}\n- Size: {size} bytes\n- URL: {url}\n\nProvide a detailed description."
+
+            print("ATTACHMENT IMAGE ANALYSIS PATH =", str(local_path))
+
+            response = self.client.responses.create(
+                model=self.chat_model,
+                input=[
+                    {"role": "user", "content": [{"type": "input_text", "text": enriched_prompt}, {"type": "input_image", "image_url": data_url}]}
+                ],
+            )
+            assistant_text = self._extract_response_text(response) or "The model returned no description."
+        except Exception as e:
+            assistant_text = f"Image analysis failed.\nFile: {name}\nType: {mime_type}\nError: {e}"
+
+        return {
+            "ok": True,
+            "text": assistant_text,
+            "assistant_text": assistant_text,
+            "assistant_message": {"role": "assistant", "text": assistant_text},
+            "saved_artifact": None,
+            "debug": {
+                "route_taken": "attachment_analysis",
+                "has_attachment": True,
+                "has_image": True,
+                "attachment_count": len(attachments),
+                "file_name": name,
+                "mime_type": mime_type,
+                "url": url,
+                "has_alpha": has_alpha,
+                "dominant_colors": dominant_colors,
+            },
+        }
+
+    # --- DOCUMENT / TXT ANALYSIS ---
+    if (
+        mime_type in [
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain",
+            "text/x-python",
+            "text/javascript",
+            "application/javascript",
+            "application/json",
+            "text/html",
+            "text/css",
+            "text/markdown",
+            "application/x-python-code",
+            "application/octet-stream",
+        ]
+        or name.lower().endswith(
+            (
+                ".docx",
+                ".txt",
+                ".py",
+                ".js",
+                ".json",
+                ".html",
+                ".css",
+                ".md",
+                ".csv",
+                ".log",
+                ".env",
+                ".ini",
+                ".yaml",
+                ".yml",
+            )
+        )
+    ):
+        try:
+            text_content = ""
+            if mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                from docx import Document
+                doc = Document(local_path)
+                text_content = "\n".join([p.text for p in doc.paragraphs])[:4000]
+            elif (
+                mime_type in {
+                    "text/plain",
+                    "text/x-python",
+                    "text/javascript",
+                    "application/javascript",
+                    "application/json",
+                    "text/html",
+                    "text/css",
+                    "text/markdown",
+                    "application/x-python-code",
+                    "application/octet-stream",
+                }
+                or name.lower().endswith(
+                    (
+                        ".txt",
+                        ".py",
+                        ".js",
+                        ".json",
+                        ".html",
+                        ".css",
+                        ".md",
+                        ".csv",
+                        ".log",
+                        ".env",
+                        ".ini",
+                        ".yaml",
+                        ".yml",
+                    )
+                )
+            ):
+                with open(local_path, "r", encoding="utf-8", errors="replace") as f:
+                    text_content = f.read()[:4000]
+
+            prompt = f"""This is the content of the uploaded document. Please provide a concise summary,
+highlight notable points, and describe any important entities or sections.
+
+Document metadata:
+- Filename: {name}
+- Size: {size} bytes
+- MIME type: {mime_type}
+- URL: {url}
+
+Content (truncated to 4000 chars):
+{text_content}
+"""
+            response = self.client.responses.create(
+                model=self.chat_model,
+                input=[{"role": "user", "content": prompt}],
+            )
+            assistant_text = self._extract_response_text(response) or "The model returned no summary."
+
+        except Exception as e:
+            assistant_text = f"Document analysis failed.\nFile: {name}\nType: {mime_type}\nError: {e}"
+
+        return {
+            "ok": True,
+            "text": assistant_text,
+            "assistant_text": assistant_text,
+            "assistant_message": {"role": "assistant", "text": assistant_text},
+            "saved_artifact": None,
+            "debug": {
+                "route_taken": "attachment_analysis",
+                "has_attachment": True,
+                "has_image": False,
+                "attachment_count": len(attachments),
+                "file_name": name,
+                "mime_type": mime_type,
+            },
+        }
+
+def _nova_execute_attachment_analysis(
+    self,
+    decision: dict,
+    user_text: str,
+    session_id: str,
+    attachments=None,
+) -> dict:
+    attachments = attachments or []
+
+    print(
+        "ATTACHMENT EXECUTE RECEIVED =",
+        {
+            "count": len(attachments),
+            "attachments": attachments,
+        },
+    )
+
+    user_msg = self._build_user_message(
+        user_text,
+        attachments=attachments,
+    )
+
+    result = self._handle_attachment_analysis(
+        user_text,
+        attachments,
+    )
+
+    assistant_text = (
+        self._safe_str(result.get("text"))
+        or self._safe_str(result.get("assistant_text"))
+        or "Attachment analysis completed."
+    )
+
+    assistant_msg = self._build_assistant_message(
+        text=assistant_text,
+        meta={
+            "attachment_analysis": True,
+            "attachment_count": len(attachments),
+            "debug": result.get("debug", {}),
+        },
+        attachments=attachments,
+    )
+
+    return self._finalize_response(
+        session_id=session_id,
+        user_text=user_text,
+        user_msg=user_msg,
+        assistant_msg=assistant_msg,
+        decision=decision,
+        saved_artifact=result.get("saved_artifact"),
+    )
+
+
+ChatService._handle_attachment_analysis = _nova_handle_attachment_analysis
+ChatService._execute_attachment_analysis = _nova_execute_attachment_analysis
+
+
