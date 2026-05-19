@@ -1199,16 +1199,21 @@ function autoPlayLastAssistantTTS() {
         thread.scrollTop = thread.scrollHeight;
     }
 
-    function addMessage(role, text) {
-        const msg = normalizeMessage({
+function addMessage(role, text, extra) {
+    const msg = Object.assign(
+        {
+            id: "local_" + Date.now() + "_" + Math.random().toString(16).slice(2),
             role: role,
-            text: text,
-        });
+            text: text || "",
+            created_at: new Date().toISOString()
+        },
+        extra || {}
+    );
 
-        state.messages.push(msg);
-        renderMessages();
-        return msg;
-    }
+    state.messages.push(msg);
+    renderMessages();
+    return msg;
+}
 
     async function sendMessage() {
         const input = findInput();
@@ -1258,15 +1263,119 @@ function autoPlayLastAssistantTTS() {
                 setSessionId(data.session_id || data.session.id);
             }
 
-            const assistant =
-                data.assistant_message ||
-                {
-                    role: "assistant",
-                    text: data.assistant_text || data.text || data.output_text || "No response text returned.",
-                };
+const assistant =
+    data.assistant_message ||
+    {
+        role: "assistant",
+        text: data.assistant_text || data.text || data.output_text || "No response text returned.",
+    };
 
-            placeholder.text = assistant.text || data.assistant_text || data.text || "No response text returned.";
-            placeholder.role = "assistant";
+placeholder.text =
+    assistant.text ||
+    assistant.content ||
+    data.assistant_text ||
+    data.text ||
+    data.output_text ||
+    (data.saved_artifact && data.saved_artifact.summary) ||
+    (data.saved_artifact && data.saved_artifact.body) ||
+    "No response text returned.";
+
+placeholder.role = "assistant";
+
+const assistantImageUrl =
+    assistant.image_url ||
+    data.image_url ||
+    (assistant.meta && assistant.meta.image_url) ||
+    (assistant.meta && assistant.meta.preview) ||
+    (data.meta && data.meta.image_url) ||
+    (data.saved_artifact && data.saved_artifact.image_url) ||
+    (data.saved_artifact && data.saved_artifact.preview) ||
+    (data.saved_artifact &&
+        data.saved_artifact.viewer &&
+        data.saved_artifact.viewer.image_url) ||
+    "";
+
+placeholder.image_url = assistantImageUrl;
+
+placeholder.meta = Object.assign(
+    {},
+    placeholder.meta || {},
+    assistant.meta || {},
+    data.meta || {},
+    (data.saved_artifact && data.saved_artifact.meta) || {},
+    {
+        image_url: assistantImageUrl
+    }
+);
+
+console.log("[NovaEmergencyBridge] assistant image url", placeholder.image_url);
+
+renderMessages();
+
+console.log("[NovaEmergencyBridge] forced image render after response", {
+    image_url: placeholder.image_url,
+    images: document.querySelectorAll(
+    ".nova-message img, .assistant-msg img, .user-msg img, .message img, .chat-message img, .nova-message-image-wrap img"
+).length
+});
+
+if (
+    placeholder.image_url &&
+    document.querySelectorAll(
+        ".nova-message img, .assistant-msg img, .user-msg img, .message img, .chat-message img, .nova-message-image-wrap img"
+    ).length === 0
+) {
+    const thread = findThread();
+
+    const cards = thread
+        ? thread.querySelectorAll(
+            ".nova-message, .assistant-msg, .user-msg, .message, .chat-message, [data-message-role]"
+        )
+        : [];
+
+    const lastCard = cards.length
+        ? cards[cards.length - 1]
+        : (thread ? thread.lastElementChild : null);
+
+    console.log("[NovaEmergencyBridge] injection target check", {
+        hasThread: !!thread,
+        cardCount: cards.length,
+        hasLastCard: !!lastCard,
+        lastCard: lastCard,
+        image_url: placeholder.image_url
+    });
+
+    if (lastCard && !lastCard.querySelector("img")) {
+        const wrap = document.createElement("div");
+        wrap.className = "nova-message-image-wrap";
+        wrap.style.marginTop = "10px";
+
+        const img = document.createElement("img");
+        img.src = placeholder.image_url;
+        img.alt = "Generated image";
+        img.style.width = "100%";
+        img.style.maxWidth = "420px";
+        img.style.height = "auto";
+        img.style.borderRadius = "14px";
+        img.style.display = "block";
+        img.style.border = "1px solid rgba(255,255,255,0.12)";
+
+        wrap.appendChild(img);
+        lastCard.appendChild(wrap);
+
+        console.log("[NovaEmergencyBridge] direct image injected", {
+            image_url: placeholder.image_url,
+            images: document.querySelectorAll(
+                ".nova-message img, .assistant-msg img, .user-msg img, .message img, .chat-message img, .nova-message-image-wrap img"
+            ).length
+        });
+    }
+}
+
+if (window.NovaEmergencyRestoreArtifacts) {
+    setTimeout(window.NovaEmergencyRestoreArtifacts, 250);
+    setTimeout(window.NovaEmergencyRestoreArtifacts, 1000);
+}
 
 let executionFromResponse =
     data.execution_state ||
@@ -1319,7 +1428,6 @@ if (
         executionFromResponse.currentStepTitle ||
         executionFromResponse.current_step_name ||
         executionFromResponse.currentStepName ||
-        executionFromResponse.current_step ||
         "Step 1";
     state.execution.steps = executionFromResponse.steps;
     state.execution.lastResponse = data;
@@ -1335,7 +1443,10 @@ if (
 }
 
 state.pendingUploads = [];
-if (window.NovaEmergencyAttachments && typeof window.NovaEmergencyAttachments.render === "function") {
+if (
+    window.NovaEmergencyAttachments &&
+    typeof window.NovaEmergencyAttachments.render === "function"
+) {
     window.NovaEmergencyAttachments.render();
 }
 
@@ -1821,17 +1932,41 @@ window.NovaEmergencyHandleFiles = handleFiles;
         };
     }
 
-    function findThread() {
-        return (
-            qs("[data-chat-thread]") ||
-            qs("[data-messages]") ||
-            qs("#chat-thread") ||
-            qs("#chat-messages") ||
-            qs(".chat-thread") ||
-            qs(".messages")
-        );
-    }
+function findThread() {
+    const selectors = [
+        "[data-chat-thread]",
+        "[data-messages]",
+        "#chat-thread",
+        "#chat-messages",
+        ".chat-thread",
+        ".messages"
+    ];
 
+    const candidates = selectors
+        .map(function (selector) {
+            return qs(selector);
+        })
+        .filter(Boolean);
+
+    const visible = candidates.find(function (el) {
+        return (
+            el &&
+            el.isConnected &&
+            el.getClientRects &&
+            el.getClientRects().length > 0
+        );
+    });
+
+    const chosen = visible || candidates[0] || null;
+
+    console.log("[NovaEmergencyBridge] selected thread", {
+        candidateCount: candidates.length,
+        foundVisible: !!visible,
+        chosen: chosen
+    });
+
+    return chosen;
+}
     function escapeHtml(value) {
         return String(value || "").replace(/[&<>'"]/g, function (char) {
             return {
@@ -1844,22 +1979,49 @@ window.NovaEmergencyHandleFiles = handleFiles;
         });
     }
 
-    function renderMessages() {
-        const thread = findThread();
-        if (!thread) return;
+function renderMessages() {
+    const thread = findThread();
+    if (!thread) return;
 
-        thread.innerHTML = state.messages.map(function (msg) {
-            const role = msg.role === "user" ? "user" : "assistant";
-            return (
-                '<div class="nova-message nova-message-' + role + '">' +
-                    '<div class="nova-message-role">' + escapeHtml(role) + "</div>" +
-                    '<div class="nova-message-text">' + escapeHtml(msg.text) + "</div>" +
-                "</div>"
-            );
-        }).join("");
+    thread.innerHTML = state.messages.map(function (msg) {
+        const role = msg.role === "user" ? "user" : "assistant";
+        const text = escapeHtml(msg.text || msg.content || "");
+        const imageUrl =
+            msg.image_url ||
+            msg.imageUrl ||
+            msg.url ||
+            (msg.meta && msg.meta.image_url) ||
+            "";
 
-        thread.scrollTop = thread.scrollHeight;
-    }
+        const imageHtml = imageUrl
+            ? (
+                '<div class="nova-message-image-wrap" style="margin-top:10px;">' +
+                    '<img src="' + escapeHtml(imageUrl) + '" alt="Generated image" ' +
+                    'style="width:100%;max-width:420px;height:auto;border-radius:14px;display:block;border:1px solid rgba(255,255,255,0.12);" />' +
+                '</div>'
+            )
+            : "";
+
+        return (
+            '<div class="nova-message nova-message-' + role + '">' +
+                '<div class="nova-message-role">' + role + '</div>' +
+                '<div class="nova-message-text">' + text + '</div>' +
+                imageHtml +
+            '</div>'
+        );
+    }).join("");
+
+    thread.scrollTop = thread.scrollHeight;
+
+    console.log("[NovaEmergencyBridge] rendered messages with images", {
+        messages: state.messages.length,
+        images: thread.querySelectorAll("img").length,
+        lastImageUrl:
+            state.messages.length > 0
+                ? state.messages[state.messages.length - 1].image_url
+                : ""
+    });
+}
 
     function getSessionIdFromPayload(payload) {
         if (!payload || typeof payload !== "object") return "";

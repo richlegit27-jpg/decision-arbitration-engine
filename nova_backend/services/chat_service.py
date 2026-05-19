@@ -20311,6 +20311,8 @@ def _nova_runtime_handle_image_generation(
             "session": self._get_session_payload(session_id),
         }
 
+# ACTIVE 2026-05-19:
+# Image generation handler bridge.
 ChatService._handle_image_generation = _nova_runtime_handle_image_generation
 
 # ============================================================
@@ -20321,7 +20323,6 @@ ChatService._handle_image_generation = _nova_runtime_handle_image_generation
 CHAT_SERVICE_METHODS = [
     "_handle_image_generation",
 ]
-
 for name in CHAT_SERVICE_METHODS:
     if hasattr(ChatService, name):
         continue
@@ -20403,6 +20404,57 @@ def _nova_handle_attachment_analysis(self, user_text: str, attachments: list) ->
             },
         }
 
+
+
+
+
+    # --- AUDIO ANALYSIS ---
+    is_audio = (
+        mime_type.startswith("audio/")
+        or name.lower().endswith(
+            (
+                ".mp3",
+                ".wav",
+                ".m4a",
+                ".aac",
+                ".ogg",
+                ".webm",
+                ".flac",
+            )
+        )
+    )
+
+    if is_audio:
+        assistant_text = (
+            "I received the audio attachment.\n\n"
+            f"File: {name}\n"
+            f"Type: {mime_type}\n"
+            f"Size: {size}\n"
+            f"URL: {url}\n\n"
+            "Audio upload is working. Transcription is the next audio layer."
+        )
+
+        return {
+            "ok": True,
+            "text": assistant_text,
+            "assistant_text": assistant_text,
+            "assistant_message": {
+                "role": "assistant",
+                "text": assistant_text,
+            },
+            "saved_artifact": None,
+            "debug": {
+                "route_taken": "attachment_analysis",
+                "has_attachment": True,
+                "has_image": False,
+                "has_audio": True,
+                "attachment_count": len(attachments),
+                "file_name": name,
+                "mime_type": mime_type,
+                "url": url,
+            },
+        }
+
     # --- IMAGE ANALYSIS ---
     if is_image:
         try:
@@ -20450,6 +20502,7 @@ def _nova_handle_attachment_analysis(self, user_text: str, attachments: list) ->
                 "dominant_colors": dominant_colors,
             },
         }
+
 
     # --- DOCUMENT / TXT ANALYSIS ---
     if (
@@ -20588,6 +20641,79 @@ def _nova_execute_attachment_analysis(
         user_text,
         attachments,
     )
+
+    if not isinstance(result, dict):
+        first_attachment = attachments[0] if attachments and isinstance(attachments[0], dict) else {}
+
+        attachment_name = self._safe_str(
+            first_attachment.get("name")
+            or first_attachment.get("filename")
+            or first_attachment.get("stored_name")
+            or "attachment"
+        )
+
+        attachment_mime = self._safe_str(
+            first_attachment.get("mime_type")
+            or first_attachment.get("content_type")
+            or first_attachment.get("type")
+            or "unknown"
+        )
+
+        attachment_url = self._safe_str(
+            first_attachment.get("url")
+            or first_attachment.get("file_url")
+            or ""
+        )
+
+        attachment_size = first_attachment.get("size") or first_attachment.get("size_bytes") or ""
+
+        if attachment_mime.startswith("audio/") or attachment_name.lower().endswith(
+            (
+                ".mp3",
+                ".wav",
+                ".m4a",
+                ".aac",
+                ".ogg",
+                ".webm",
+                ".flac",
+            )
+        ):
+            assistant_text = (
+                "I received the audio attachment.\n\n"
+                f"File: {attachment_name}\n"
+                f"Type: {attachment_mime}\n"
+                f"Size: {attachment_size}\n"
+                f"URL: {attachment_url}\n\n"
+                "Audio upload is working. Transcription is the next audio layer."
+            )
+
+            result = {
+                "ok": True,
+                "text": assistant_text,
+                "assistant_text": assistant_text,
+                "saved_artifact": None,
+                "debug": {
+                    "route_taken": "attachment_analysis",
+                    "has_attachment": True,
+                    "has_image": False,
+                    "has_audio": True,
+                    "attachment_count": len(attachments),
+                    "file_name": attachment_name,
+                    "mime_type": attachment_mime,
+                    "url": attachment_url,
+                },
+            }
+        else:
+            result = {
+                "ok": True,
+                "text": "Attachment analysis completed.",
+                "assistant_text": "Attachment analysis completed.",
+                "saved_artifact": None,
+                "debug": {
+                    "route_taken": "attachment_analysis",
+                    "attachment_count": len(attachments),
+                },
+            }
 
     assistant_text = (
         self._safe_str(result.get("text"))
