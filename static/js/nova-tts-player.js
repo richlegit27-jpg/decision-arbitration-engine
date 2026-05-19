@@ -8,6 +8,16 @@
   const NOVA_TTS_VOICE_KEY = "nova_tts_voice";
   const NOVA_TTS_AUTOSPEAK_KEY = "nova_tts_autospeak";
 
+const NOVA_HANDS_FREE_KEY = "nova_hands_free";
+
+function getHandsFreeEnabled() {
+  return localStorage.getItem(NOVA_HANDS_FREE_KEY) === "true";
+}
+
+function setHandsFreeEnabled(enabled) {
+  localStorage.setItem(NOVA_HANDS_FREE_KEY, enabled ? "true" : "false");
+}
+
   function getAutoSpeakEnabled() {
     return localStorage.getItem(NOVA_TTS_AUTOSPEAK_KEY) === "true";
   }
@@ -93,20 +103,30 @@
         border-color: rgba(255,255,255,0.28);
       }
 
-      #nova-tts-autospeak-toggle {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        height: 28px;
-        padding: 0 9px;
-        border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.14);
-        background: rgba(17,24,39,0.78);
-        color: rgba(255,255,255,0.88);
-        font-size: 12px;
-        cursor: pointer;
-        user-select: none;
-      }
+#nova-hands-free-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(17,24,39,0.78);
+  color: rgba(255,255,255,0.88);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+#nova-hands-free-toggle:hover {
+  border-color: rgba(255,255,255,0.28);
+  color: white;
+}
+
+#nova-hands-free-toggle input {
+  accent-color: #60a5fa;
+  cursor: pointer;
+}
 
       #nova-tts-autospeak-toggle:hover {
         border-color: rgba(255,255,255,0.28);
@@ -272,6 +292,14 @@
         currentAudio = null;
         busy = false;
         resetAllButtons();
+
+        if (getHandsFreeEnabled() && window.NovaMicRecorder) {
+          console.log("[NovaTTS] hands-free ready for next voice turn");
+
+          if (typeof window.NovaMicRecorder.showHandsFreeReady === "function") {
+            window.NovaMicRecorder.showHandsFreeReady();
+          }
+        }
       };
 
       currentAudio.onerror = function () {
@@ -460,11 +488,42 @@
     shell.appendChild(label);
   }
 
+function ensureHandsFreeToggle() {
+  if (document.querySelector("#nova-hands-free-toggle")) {
+    return;
+  }
+
+  const shell = ensureControlShell();
+
+  if (!shell) {
+    return;
+  }
+
+  const label = document.createElement("label");
+  label.id = "nova-hands-free-toggle";
+  label.title = "Hands-free voice mode";
+
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = getHandsFreeEnabled();
+
+  checkbox.onchange = function () {
+    setHandsFreeEnabled(checkbox.checked);
+    console.log("[NovaTTS] hands-free", checkbox.checked);
+  };
+
+  label.appendChild(checkbox);
+  label.appendChild(document.createTextNode("hands-free"));
+
+  shell.appendChild(label);
+}
+
   function wireTts() {
     injectStyles();
     addInlineButtons();
     ensureVoicePicker();
     ensureAutoSpeakToggle();
+    ensureHandsFreeToggle();
 
     const globalButton = getGlobalTtsButton();
 

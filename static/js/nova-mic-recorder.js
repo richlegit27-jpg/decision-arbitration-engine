@@ -50,6 +50,39 @@
     return document.querySelector('[data-action="voice"]');
   }
 
+  function getStatusLabel() {
+    let label = document.querySelector("#nova-voice-status-label");
+
+    if (!label) {
+      label = document.createElement("span");
+      label.id = "nova-voice-status-label";
+      label.textContent = "";
+      label.style.marginLeft = "8px";
+      label.style.fontSize = "12px";
+      label.style.opacity = "0.85";
+      label.style.whiteSpace = "nowrap";
+      label.style.pointerEvents = "none";
+
+      const button = getVoiceButton();
+
+      if (button && button.parentElement) {
+        button.parentElement.appendChild(label);
+      }
+    }
+
+    return label;
+  }
+
+  function setStatusText(text) {
+    const label = getStatusLabel();
+
+    if (!label) {
+      return;
+    }
+
+    label.textContent = text || "";
+  }
+
   function setButtonState(state) {
     const button = getVoiceButton();
 
@@ -57,27 +90,85 @@
       return;
     }
 
-    button.classList.remove("is-recording", "is-busy");
+    button.classList.remove("is-recording", "is-busy", "is-voice-ready");
 
     if (state === "recording") {
       button.textContent = "⏹️";
       button.title = "Stop recording";
       button.setAttribute("aria-label", "Stop recording");
       button.classList.add("is-recording");
+      setStatusText("Listening…");
       return;
     }
 
     if (state === "busy") {
       button.textContent = "⏳";
-      button.title = "Transcribing";
-      button.setAttribute("aria-label", "Transcribing");
+      button.title = "Thinking";
+      button.setAttribute("aria-label", "Thinking");
       button.classList.add("is-busy");
+      setStatusText("Thinking…");
       return;
     }
 
     button.textContent = "🎤";
     button.title = "Voice";
     button.setAttribute("aria-label", "Voice");
+    button.classList.add("is-voice-ready");
+    setStatusText("");
+  }
+
+  function injectStyles() {
+    if (document.querySelector("#nova-mic-recorder-style")) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = "nova-mic-recorder-style";
+    style.textContent = `
+      [data-action="voice"].is-recording {
+        background: rgba(220, 38, 38, 0.92) !important;
+        color: white !important;
+        animation: novaVoicePulse 1.05s infinite;
+      }
+
+      [data-action="voice"].is-busy {
+        opacity: 0.72;
+        cursor: wait !important;
+      }
+
+      [data-action="voice"].is-voice-ready {
+        cursor: pointer;
+      }
+
+      #nova-voice-status-label {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.56);
+        color: rgba(255, 255, 255, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      #nova-voice-status-label:empty {
+        display: none;
+      }
+
+      @keyframes novaVoicePulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
+        }
+        70% {
+          box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
   }
 
   async function uploadBlob(blob) {
@@ -174,13 +265,13 @@
 
         const blob = new Blob(chunks, { type: "audio/webm" });
 
-        appendMessage("user", "🎙️ Voice recording sent for transcription...");
+        appendMessage("user", "🎙️ Voice message sent...");
 
         const attachment = await uploadBlob(blob);
         await sendToChat(attachment);
       } catch (error) {
         console.error("[NovaMicRecorder] failed", error);
-        appendMessage("assistant", "Mic transcription failed: " + error.message);
+        appendMessage("assistant", "Mic failed: " + error.message);
       } finally {
         if (micStream) {
           micStream.getTracks().forEach(function (track) {
@@ -252,6 +343,8 @@
   }
 
   function wireComposerMic() {
+    injectStyles();
+
     const button = getVoiceButton();
 
     if (!button) {
@@ -288,9 +381,13 @@
     boot();
   }
 
-  window.NovaMicRecorder = {
-    start: startRecording,
-    stop: stopRecording,
-    wire: wireComposerMic,
-  };
+window.NovaMicRecorder = {
+  start: startRecording,
+  stop: stopRecording,
+  wire: wireComposerMic,
+  showHandsFreeReady: function () {
+    setButtonState("idle");
+    setStatusText("Hands-free ready… click 🎤 to talk");
+  },
+};
 })();
