@@ -4100,3 +4100,120 @@ function buildNovaMessageActions(msg) {
 
     window.NovaForceComposerButtonAlignment = fixComposerButtons;
 })();
+
+// =====================================================
+// NOVA LEFT RAIL TOGGLE FIX
+// Restores left sidebar open/close without touching right rail
+// =====================================================
+(function () {
+    "use strict";
+
+    if (window.NovaLeftRailToggleFixBooted) return;
+    window.NovaLeftRailToggleFixBooted = true;
+
+    function qs(selector, root) {
+        return (root || document).querySelector(selector);
+    }
+
+    function qsa(selector, root) {
+        return Array.from((root || document).querySelectorAll(selector));
+    }
+
+    function findLeftRail() {
+        return (
+            qs(".nova-sidebar") ||
+            qs(".nova-left-rail") ||
+            qs(".nova-session-rail") ||
+            qs("[data-left-rail]") ||
+            qs("[data-session-rail]") ||
+            qs("#nova-left-rail") ||
+            qs("#session-rail") ||
+            qs(".left-rail") ||
+            qs(".sidebar")
+        );
+    }
+
+    function isLeftToggleButton(button) {
+        if (!button) return false;
+
+        const text = String(button.textContent || "").trim().toLowerCase();
+        const title = String(button.getAttribute("title") || "").trim().toLowerCase();
+        const aria = String(button.getAttribute("aria-label") || "").trim().toLowerCase();
+        const action = String(button.getAttribute("data-action") || "").trim().toLowerCase();
+
+        return (
+            title === "toggle sidebar" ||
+            aria === "toggle sidebar" ||
+            action === "toggle-sidebar" ||
+            action === "sidebar" ||
+            action === "left-rail" ||
+            text === "☰" ||
+            text === "x"
+        );
+    }
+
+    function toggleLeftRail() {
+        const rail = findLeftRail();
+
+        if (!rail) {
+            console.warn("[NovaLeftRailToggleFix] left rail not found");
+            return false;
+        }
+
+        const isOpen =
+            rail.classList.contains("is-open") ||
+            rail.classList.contains("is-active") ||
+            document.body.classList.contains("is-left-rail-open") ||
+            document.body.classList.contains("nova-left-rail-open");
+
+        if (isOpen) {
+            rail.classList.remove("is-open");
+            rail.classList.remove("is-active");
+            rail.classList.remove("active");
+            rail.classList.add("is-collapsed");
+
+            document.body.classList.remove("is-left-rail-open");
+            document.body.classList.remove("nova-left-rail-open");
+            document.body.classList.add("is-left-rail-collapsed");
+
+            rail.setAttribute("aria-hidden", "true");
+
+            console.log("[NovaLeftRailToggleFix] closed");
+            return true;
+        }
+
+        rail.classList.add("is-open");
+        rail.classList.add("is-active");
+        rail.classList.add("active");
+        rail.classList.remove("is-collapsed");
+
+        document.body.classList.add("is-left-rail-open");
+        document.body.classList.add("nova-left-rail-open");
+        document.body.classList.remove("is-left-rail-collapsed");
+
+        rail.setAttribute("aria-hidden", "false");
+
+        console.log("[NovaLeftRailToggleFix] opened", rail);
+        return true;
+    }
+
+    document.addEventListener("click", function (event) {
+        const button = event.target.closest("button, [role='button'], a");
+
+        if (!button) return;
+        if (!isLeftToggleButton(button)) return;
+
+        const title = String(button.getAttribute("title") || "").toLowerCase();
+        const aria = String(button.getAttribute("aria-label") || "").toLowerCase();
+
+        if (title === "toggle sidebar" || aria === "toggle sidebar") {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleLeftRail();
+        }
+    }, true);
+
+    window.NovaToggleLeftRail = toggleLeftRail;
+
+    console.log("[NovaLeftRailToggleFix] loaded");
+})();

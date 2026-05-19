@@ -11511,3 +11511,45 @@ button[data-rail-toggle],
     border-color: rgba(255, 255, 255, 0.24) !important;
     transform: translateY(-1px) !important;
 }
+
+/* NOVA LEFT RAIL OPEN/CLOSE FIX */
+body.is-left-rail-open .nova-left-rail,
+body.nova-left-rail-open .nova-left-rail,
+body.is-left-rail-open .nova-session-rail,
+body.nova-left-rail-open .nova-session-rail,
+.nova-left-rail.is-open,
+.nova-left-rail.is-active,
+.nova-session-rail.is-open,
+.nova-session-rail.is-active {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transform: translateX(0) !important;
+}
+
+.nova-left-rail.is-collapsed,
+.nova-session-rail.is-collapsed,
+body.is-left-rail-collapsed .nova-left-rail,
+body.is-left-rail-collapsed .nova-session-rail {
+    transform: translateX(-100%) !important;
+}
+
+/* NOVA SIDEBAR LEFT RAIL FIX */
+body.is-left-rail-open .nova-sidebar,
+body.nova-left-rail-open .nova-sidebar,
+.nova-sidebar.is-open,
+.nova-sidebar.is-active {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transform: translateX(0) !important;
+    width: 260px !important;
+    min-width: 260px !important;
+}
+
+.nova-sidebar.is-collapsed,
+body.is-left-rail-collapsed .nova-sidebar {
+    transform: translateX(-100%) !important;
+}
