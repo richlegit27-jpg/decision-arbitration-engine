@@ -5,6 +5,16 @@
   let busy = false;
   let wired = false;
 
+const NOVA_TTS_VOICE_KEY = "nova_tts_voice";
+
+function getSelectedVoice() {
+  return localStorage.getItem(NOVA_TTS_VOICE_KEY) || "alloy";
+}
+
+function setSelectedVoice(voice) {
+  localStorage.setItem(NOVA_TTS_VOICE_KEY, voice || "alloy");
+}
+
   function findAssistantMessages() {
     return Array.from(
       document.querySelectorAll(
@@ -118,7 +128,7 @@
       },
       body: JSON.stringify({
         text: text,
-        voice: "alloy",
+        voice: getSelectedVoice(),
       }),
     });
 
@@ -263,6 +273,56 @@
       subtree: true,
     });
   }
+
+function ensureVoicePicker() {
+  if (document.querySelector("#nova-tts-voice-picker")) {
+    return;
+  }
+
+  const globalButton = getGlobalTtsButton();
+
+  if (!globalButton || !globalButton.parentElement) {
+    return;
+  }
+
+  const picker = document.createElement("select");
+  picker.id = "nova-tts-voice-picker";
+  picker.title = "TTS voice";
+  picker.value = getSelectedVoice();
+
+  const voices = [
+    "alloy",
+    "ash",
+    "ballad",
+    "coral",
+    "echo",
+    "fable",
+    "nova",
+    "onyx",
+    "sage",
+    "shimmer",
+    "verse",
+  ];
+
+  voices.forEach(function (voice) {
+    const option = document.createElement("option");
+    option.value = voice;
+    option.textContent = voice;
+    picker.appendChild(option);
+  });
+
+  picker.onchange = function () {
+    setSelectedVoice(picker.value);
+    console.log("[NovaTTS] voice selected", picker.value);
+  };
+
+  picker.style.marginLeft = "6px";
+  picker.style.borderRadius = "999px";
+  picker.style.padding = "4px 8px";
+  picker.style.fontSize = "12px";
+
+  globalButton.parentElement.appendChild(picker);
+}
 
   function wireTts() {
     injectStyles();
