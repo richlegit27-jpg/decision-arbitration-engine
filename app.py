@@ -6,7 +6,7 @@ import shutil
 import hashlib
 from datetime import datetime
 from pathlib import Path
-
+from nova_backend.services.tts_service import create_tts_audio
 
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory
 from flask_cors import CORS
@@ -1384,6 +1384,32 @@ def api_recon_analyze():
         result=result,
         artifact=recon_service.build_artifact_payload(result),
     )
+
+@app.post("/api/tts")
+def api_tts():
+    data = request_json()
+
+    text = str(data.get("text") or "").strip()
+    voice = str(data.get("voice") or "alloy").strip() or "alloy"
+
+    if not text:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Missing text for TTS.",
+                "audio_url": "",
+            }
+        ), 400
+
+    result = create_tts_audio(
+        text=text,
+        uploads_dir=str(UPLOADS_DIR),
+        voice=voice,
+    )
+
+    status_code = 200 if result.get("ok") else 500
+
+    return jsonify(result), status_code
 
 @app.post("/api/upload")
 def api_upload():
