@@ -2585,3 +2585,218 @@ window.NovaEmergencyHandleFiles = handleFiles;
 
     setTimeout(bootFloatingExec, 500);
 })();
+
+// =====================================================
+// NOVA EMERGENCY MEMORY BRIDGE
+// Append at bottom of nova-custom.js
+// =====================================================
+(function () {
+    "use strict";
+
+    if (window.NovaEmergencyMemoryBridgeBooted) return;
+    window.NovaEmergencyMemoryBridgeBooted = true;
+
+    const state = window.NovaComposerState || window.state || {};
+    window.NovaComposerState = state;
+    window.state = state;
+
+    state.memory = Array.isArray(state.memory) ? state.memory : [];
+
+    function qs(selector, root) {
+        return (root || document).querySelector(selector);
+    }
+
+    function escapeHtml(value) {
+        return String(value || "").replace(/[&<>'"]/g, function (char) {
+            return {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                "'": "&#39;",
+                '"': "&quot;",
+            }[char] || char;
+        });
+    }
+
+    function findMemoryRail() {
+        let rail =
+            qs("[data-memory-rail]") ||
+            qs("[data-rail-panel='memory']") ||
+            qs("#rail-memory") ||
+            qs("#memory-rail") ||
+            qs(".memory-rail");
+
+        if (!rail) {
+            rail = document.createElement("div");
+            rail.id = "rail-memory";
+            rail.setAttribute("data-memory-rail", "true");
+            rail.style.padding = "10px";
+            rail.style.display = "flex";
+            rail.style.flexDirection = "column";
+            rail.style.gap = "8px";
+
+            const rightRail =
+                qs("[data-right-rail]") ||
+                qs("#right-rail") ||
+                qs(".right-rail") ||
+                qs("aside") ||
+                document.body;
+
+            rightRail.appendChild(rail);
+        }
+
+        return rail;
+    }
+
+    function normalizeMemory(item) {
+        if (typeof item === "string") {
+            return {
+                id: "memory_" + Math.random().toString(16).slice(2),
+                text: item,
+                kind: "memory",
+                pinned: false,
+            };
+        }
+
+        item = item || {};
+
+        return {
+            id: item.id || item.memory_id || ("memory_" + Math.random().toString(16).slice(2)),
+            text: item.text || item.content || item.body || item.summary || item.title || "",
+            kind: item.kind || item.type || "memory",
+            pinned: !!item.pinned,
+            raw: item,
+        };
+    }
+
+    function extractMemoryFromSession(session) {
+        if (!session || typeof session !== "object") return [];
+
+        if (Array.isArray(session.memory)) return session.memory;
+        if (Array.isArray(session.memories)) return session.memories;
+        if (session.meta && Array.isArray(session.meta.memory)) return session.meta.memory;
+        if (session.meta && Array.isArray(session.meta.used_memory)) return session.meta.used_memory;
+        if (session.working_state && typeof session.working_state === "object") {
+            const ws = session.working_state;
+            const items = [];
+
+            if (ws.active_task) items.push({ text: "Active task: " + ws.active_task, kind: "working_state" });
+            if (ws.current_file) items.push({ text: "Current file: " + ws.current_file, kind: "working_state" });
+            if (ws.current_bug) items.push({ text: "Current bug: " + ws.current_bug, kind: "working_state" });
+            if (ws.last_success) items.push({ text: "Last success: " + ws.last_success, kind: "working_state" });
+            if (ws.next_move) items.push({ text: "Next move: " + ws.next_move, kind: "working_state" });
+            if (ws.checkpoint) items.push({ text: "Checkpoint: " + ws.checkpoint, kind: "working_state" });
+
+            return items;
+        }
+
+        return [];
+    }
+
+    function renderMemoryRail() {
+        const rail = findMemoryRail();
+        if (!rail) return;
+
+        const memories = Array.isArray(state.memory) ? state.memory.map(normalizeMemory) : [];
+
+        rail.innerHTML =
+            '<div style="font-weight:800;margin-bottom:6px;">Memory</div>' +
+            '<div style="display:flex;gap:6px;margin-bottom:8px;">' +
+                '<button type="button" data-memory-refresh="true">Refresh</button>' +
+                '<button type="button" data-memory-clear-view="true">Clear View</button>' +
+            '</div>';
+
+        if (!memories.length) {
+            rail.innerHTML += '<div style="font-size:12px;opacity:0.65;">No memory items loaded.</div>';
+        } else {
+            memories.forEach(function (memory) {
+                const card = document.createElement("div");
+                card.className = "nova-memory-card";
+                card.style.padding = "10px";
+                card.style.borderRadius = "12px";
+                card.style.border = "1px solid rgba(255,255,255,0.16)";
+                card.style.background = "rgba(255,255,255,0.06)";
+                card.style.fontSize = "12px";
+                card.style.lineHeight = "1.4";
+
+                card.innerHTML =
+                    '<div style="font-weight:700;font-size:11px;opacity:0.7;margin-bottom:4px;">' +
+                        escapeHtml(memory.kind) +
+                        (memory.pinned ? " · pinned" : "") +
+                    '</div>' +
+                    '<div>' + escapeHtml(memory.text || "(empty memory)") + '</div>';
+
+                rail.appendChild(card);
+            });
+        }
+
+        const refresh = qs("[data-memory-refresh]", rail);
+        if (refresh) {
+            refresh.onclick = restoreMemory;
+        }
+
+        const clear = qs("[data-memory-clear-view]", rail);
+        if (clear) {
+            clear.onclick = function () {
+                state.memory = [];
+                renderMemoryRail();
+            };
+        }
+
+        console.log("[NovaEmergencyMemoryBridge] rendered", {
+            count: memories.length,
+            rail: rail,
+        });
+    }
+
+    async function restoreMemory() {
+        try {
+            const response = await fetch("/api/sessions", {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json",
+                },
+            });
+
+            const data = await response.json();
+
+            let activeSession = null;
+
+            if (Array.isArray(data.sessions)) {
+                activeSession =
+                    data.sessions.find(function (session) {
+                        return session && (session.active || session.is_active || session.id === state.activeSessionId);
+                    }) ||
+                    data.sessions[0] ||
+                    null;
+            }
+
+            if (data.active && typeof data.active === "object") activeSession = data.active;
+            if (data.session && typeof data.session === "object") activeSession = data.session;
+
+            let memory = [];
+
+            if (Array.isArray(data.memory)) memory = data.memory;
+            if (!memory.length && Array.isArray(data.memories)) memory = data.memories;
+            if (!memory.length && activeSession) memory = extractMemoryFromSession(activeSession);
+
+            state.memory = memory.map(normalizeMemory);
+
+            renderMemoryRail();
+
+            console.log("[NovaEmergencyMemoryBridge] restored", {
+                count: state.memory.length,
+                activeSessionId: state.activeSessionId,
+            });
+        } catch (err) {
+            console.error("[NovaEmergencyMemoryBridge] restore failed", err);
+            renderMemoryRail();
+        }
+    }
+
+    window.NovaEmergencyRenderMemory = renderMemoryRail;
+    window.NovaEmergencyRestoreMemory = restoreMemory;
+
+    setTimeout(restoreMemory, 600);
+    setTimeout(restoreMemory, 1600);
+})();kij
