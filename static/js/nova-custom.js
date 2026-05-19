@@ -1215,6 +1215,156 @@ function addMessage(role, text, extra) {
     return msg;
 }
 
+function copyNovaText(value) {
+    const text = String(value || "").trim();
+    if (!text) return;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+            console.log("[NovaEmergencyBridge] copied", text);
+        }).catch(function (err) {
+            console.error("[NovaEmergencyBridge] copy failed", err);
+        });
+        return;
+    }
+
+    const temp = document.createElement("textarea");
+    temp.value = text;
+    document.body.appendChild(temp);
+    temp.select();
+    document.execCommand("copy");
+    document.body.removeChild(temp);
+
+    console.log("[NovaEmergencyBridge] copied fallback", text);
+}
+
+function appendImageActions(wrap, imageText, imageUrl) {
+    if (!wrap || wrap.querySelector(".nova-image-actions")) return;
+
+    const actions = document.createElement("div");
+    actions.className = "nova-image-actions";
+    actions.style.display = "flex";
+    actions.style.flexWrap = "wrap";
+    actions.style.gap = "8px";
+    actions.style.marginTop = "8px";
+
+    const copyTextBtn = document.createElement("button");
+    copyTextBtn.type = "button";
+    copyTextBtn.textContent = "Copy text";
+    copyTextBtn.setAttribute("data-nova-copy-text", imageText || "");
+
+    const copyUrlBtn = document.createElement("button");
+    copyUrlBtn.type = "button";
+    copyUrlBtn.textContent = "Copy image URL";
+    copyUrlBtn.setAttribute("data-nova-copy-url", imageUrl || "");
+
+    const regenBtn = document.createElement("button");
+    regenBtn.type = "button";
+    regenBtn.textContent = "Regen";
+    regenBtn.setAttribute("data-nova-regen-image", "true");
+
+    [copyTextBtn, copyUrlBtn, regenBtn].forEach(function (button) {
+        button.style.padding = "6px 10px";
+        button.style.borderRadius = "999px";
+        button.style.border = "1px solid rgba(255,255,255,0.18)";
+        button.style.background = "rgba(255,255,255,0.08)";
+        button.style.color = "inherit";
+        button.style.cursor = "pointer";
+        button.style.fontSize = "12px";
+        actions.appendChild(button);
+    });
+
+    wrap.appendChild(actions);
+}
+
+function openNovaImageViewer(imageUrl) {
+    const url = String(imageUrl || "").trim();
+    if (!url) return;
+
+    const win = window.open("", "_blank");
+    if (!win) {
+        window.open(url, "_blank");
+        return;
+    }
+
+    win.document.write(
+        '<!DOCTYPE html>' +
+        '<html>' +
+        '<head>' +
+            '<title>Nova Image</title>' +
+            '<style>' +
+                'html,body{margin:0;width:100%;height:100%;background:#05070d;color:white;font-family:Arial,sans-serif;}' +
+                'body{display:flex;align-items:center;justify-content:center;overflow:hidden;}' +
+                '.wrap{width:100%;height:100%;display:flex;flex-direction:column;}' +
+                '.bar{padding:10px 14px;background:rgba(255,255,255,0.08);display:flex;gap:10px;align-items:center;}' +
+                '.bar button,.bar a{border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.1);color:white;border-radius:999px;padding:7px 12px;text-decoration:none;cursor:pointer;font-size:13px;}' +
+                '.stage{flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;padding:16px;}' +
+                'img{max-width:100%;max-height:100%;object-fit:contain;border-radius:12px;}' +
+            '</style>' +
+        '</head>' +
+        '<body>' +
+            '<div class="wrap">' +
+                '<div class="bar">' +
+                    '<button onclick="window.close()">Close</button>' +
+                    '<a href="' + url + '" target="_blank">Open raw</a>' +
+                '</div>' +
+                '<div class="stage">' +
+                    '<img src="' + url + '" alt="Generated image">' +
+                '</div>' +
+            '</div>' +
+        '</body>' +
+        '</html>'
+    );
+
+    win.document.close();
+}
+
+function wireGeneratedImageClicks() {
+    if (document.body.__novaGeneratedImageClicksWired) return;
+    document.body.__novaGeneratedImageClicksWired = true;
+
+    document.body.addEventListener("click", function (event) {
+        const img = event.target.closest(".nova-message-image-wrap img");
+        if (!img) return;
+
+        event.preventDefault();
+        openNovaImageViewer(img.getAttribute("src") || img.src || "");
+    }, true);
+}
+
+function wireImageActionButtons() {
+    if (document.body.__novaImageActionButtonsWired) return;
+    document.body.__novaImageActionButtonsWired = true;
+
+    document.body.addEventListener("click", function (event) {
+        const copyTextButton = event.target.closest("[data-nova-copy-text]");
+        if (copyTextButton) {
+            event.preventDefault();
+            copyNovaText(copyTextButton.getAttribute("data-nova-copy-text") || "");
+            return;
+        }
+
+        const copyUrlButton = event.target.closest("[data-nova-copy-url]");
+        if (copyUrlButton) {
+            event.preventDefault();
+            copyNovaText(copyUrlButton.getAttribute("data-nova-copy-url") || "");
+            return;
+        }
+
+        const regenButton = event.target.closest("[data-nova-regen-image]");
+        if (regenButton) {
+            event.preventDefault();
+
+            const input = findInput();
+            if (input) {
+                input.value = "regen";
+            }
+
+            sendMessage();
+        }
+    }, true);
+}
+
     async function sendMessage() {
         const input = findInput();
         if (!input) {
@@ -1359,6 +1509,19 @@ if (
         img.style.borderRadius = "14px";
         img.style.display = "block";
         img.style.border = "1px solid rgba(255,255,255,0.12)";
+img.style.cursor = "zoom-in";
+
+img.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (typeof openNovaImageViewer === "function") {
+        openNovaImageViewer(placeholder.image_url);
+        return;
+    }
+
+    window.open(placeholder.image_url, "_blank");
+});
 
         wrap.appendChild(img);
         lastCard.appendChild(wrap);
@@ -1416,8 +1579,9 @@ setTimeout(function () {
         img.style.display = "block";
         img.style.border = "1px solid rgba(255,255,255,0.12)";
 
-        wrap.appendChild(img);
-        lastCard.appendChild(wrap);
+wrap.appendChild(img);
+appendImageActions(wrap, placeholder.text, placeholder.image_url);
+lastCard.appendChild(wrap);
 
         console.log("[NovaEmergencyBridge] delayed image reinjected", {
             image_url: placeholder.image_url,
@@ -1531,6 +1695,9 @@ renderMessages();
                 }
             });
         }
+
+wireImageActionButtons();
+wireGeneratedImageClicks();
 
         console.log("[NovaEmergencyBridge] wired", {
             hasInput: !!input,
