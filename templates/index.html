@@ -257,19 +257,25 @@
   <div class="nova-artifact-list" data-artifact-list></div>
 </div>
 
-<!-- ✅ EXECUTION PANEL (OUTSIDE artifacts) -->
+<!-- Minimal Execution Panel -->
 <div class="nova-rail-panel" data-rail-panel="execution">
-  <div class="nova-rail-header">Execution</div>
+  <div data-execution-panel style="display:block; min-height:240px; padding:12px;">
+    <div class="nova-panel-shell">
+      <div class="nova-panel-title">Execution</div>
 
-  <div style="padding:10px; display:flex; gap:8px; flex-wrap:wrap;">
-    <button onclick="runExec('run_step')">Run Step</button>
-    <button onclick="runExec('run_all')">Run All</button>
-    <button onclick="runExec('pause')">Pause</button>
-    <button onclick="runExec('resume')">Resume</button>
-    <button onclick="runExec('reset')">Reset</button>
+      <div class="nova-panel-card">
+        <button type="button" data-exec-action="run_step">Run Step</button>
+        <button type="button" data-exec-action="run_all">Run All</button>
+        <button type="button" data-exec-action="retry_failed">Retry</button>
+        <button type="button" data-exec-action="stop">Stop</button>
+      </div>
+
+      <div class="nova-panel-card">
+        <div><strong>Status:</strong> idle</div>
+        <div><strong>Steps:</strong> 0</div>
+      </div>
+    </div>
   </div>
-
-  <pre id="nova-exec-state" style="padding:10px; font-size:12px; white-space:pre-wrap;"></pre>
 </div>
 
 <!-- MEMORY PANEL -->
@@ -358,9 +364,10 @@
 </div>
 
 <!-- <script src="/static/js/nova-execution-viewer.js"></script> -->
-<script src="/static/js/nova-composer-bundle.js?v=image-hard-exit-001"></script>
 <script src="/static/js/nova-session-rail.js?v=session-rail-fix-2026-04-20-001"></script>
 <script src="/static/js/nova-memory.js?v=memory-panel-2026-04-15-002"></script>
+<script src="/static/js/nova-custom.js?v=mic-recorder-002"></script>
+<script src="/static/js/nova-mic-recorder.js?v=mic-recorder-003"></script>
 <script>
     function updateRuntimePanel(runtime) {
         runtime = runtime || {};
