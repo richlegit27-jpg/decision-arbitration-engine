@@ -5,25 +5,24 @@
   let busy = false;
   let wired = false;
 
-const NOVA_TTS_VOICE_KEY = "nova_tts_voice";
+  const NOVA_TTS_VOICE_KEY = "nova_tts_voice";
+  const NOVA_TTS_AUTOSPEAK_KEY = "nova_tts_autospeak";
 
-const NOVA_TTS_AUTOSPEAK_KEY = "nova_tts_autospeak";
+  function getAutoSpeakEnabled() {
+    return localStorage.getItem(NOVA_TTS_AUTOSPEAK_KEY) === "true";
+  }
 
-function getAutoSpeakEnabled() {
-  return localStorage.getItem(NOVA_TTS_AUTOSPEAK_KEY) === "true";
-}
+  function setAutoSpeakEnabled(enabled) {
+    localStorage.setItem(NOVA_TTS_AUTOSPEAK_KEY, enabled ? "true" : "false");
+  }
 
-function setAutoSpeakEnabled(enabled) {
-  localStorage.setItem(NOVA_TTS_AUTOSPEAK_KEY, enabled ? "true" : "false");
-}
+  function getSelectedVoice() {
+    return localStorage.getItem(NOVA_TTS_VOICE_KEY) || "alloy";
+  }
 
-function getSelectedVoice() {
-  return localStorage.getItem(NOVA_TTS_VOICE_KEY) || "alloy";
-}
-
-function setSelectedVoice(voice) {
-  localStorage.setItem(NOVA_TTS_VOICE_KEY, voice || "alloy");
-}
+  function setSelectedVoice(voice) {
+    localStorage.setItem(NOVA_TTS_VOICE_KEY, voice || "alloy");
+  }
 
   function findAssistantMessages() {
     return Array.from(
@@ -63,9 +62,65 @@ function setSelectedVoice(voice) {
     const style = document.createElement("style");
     style.id = "nova-tts-player-style";
     style.textContent = `
+      .nova-voice-control-shell {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-left: 8px;
+        padding: 4px 6px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(15,23,42,0.62);
+        backdrop-filter: blur(14px);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+        vertical-align: middle;
+      }
+
+      #nova-tts-voice-picker {
+        min-width: 86px;
+        height: 28px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(17,24,39,0.92);
+        color: white;
+        padding: 0 9px;
+        font-size: 12px;
+        outline: none;
+        cursor: pointer;
+      }
+
+      #nova-tts-voice-picker:hover {
+        border-color: rgba(255,255,255,0.28);
+      }
+
+      #nova-tts-autospeak-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 28px;
+        padding: 0 9px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(17,24,39,0.78);
+        color: rgba(255,255,255,0.88);
+        font-size: 12px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      #nova-tts-autospeak-toggle:hover {
+        border-color: rgba(255,255,255,0.28);
+        color: white;
+      }
+
+      #nova-tts-autospeak-toggle input {
+        accent-color: #60a5fa;
+        cursor: pointer;
+      }
+
       .nova-inline-tts-button {
         margin-left: 8px;
-        padding: 4px 8px;
+        padding: 5px 9px;
         border-radius: 999px;
         border: 1px solid rgba(255,255,255,0.16);
         background: rgba(17,24,39,0.78);
@@ -74,25 +129,52 @@ function setSelectedVoice(voice) {
         line-height: 1;
         cursor: pointer;
         vertical-align: middle;
-        opacity: 0.85;
+        opacity: 0.86;
+        transition:
+          opacity 140ms ease,
+          transform 140ms ease,
+          border-color 140ms ease,
+          background 140ms ease;
       }
 
       .nova-inline-tts-button:hover {
         opacity: 1;
         transform: translateY(-1px);
+        border-color: rgba(255,255,255,0.3);
       }
 
-      .nova-inline-tts-button.is-playing {
+      .nova-inline-tts-button.is-playing,
+      [data-action="tts-toggle"].is-playing {
         background: rgba(220,38,38,0.88);
       }
 
-      .nova-inline-tts-button.is-busy {
+      .nova-inline-tts-button.is-busy,
+      [data-action="tts-toggle"].is-busy {
         opacity: 0.65;
         cursor: wait;
       }
     `;
 
     document.head.appendChild(style);
+  }
+
+  function ensureControlShell() {
+    const globalButton = getGlobalTtsButton();
+
+    if (!globalButton || !globalButton.parentElement) {
+      return null;
+    }
+
+    let shell = document.querySelector(".nova-voice-control-shell");
+
+    if (!shell) {
+      shell = document.createElement("span");
+      shell.className = "nova-voice-control-shell";
+
+      globalButton.parentElement.insertBefore(shell, globalButton.nextSibling);
+    }
+
+    return shell;
   }
 
   function setButtonState(button, state) {
@@ -303,90 +385,80 @@ function setSelectedVoice(voice) {
     });
   }
 
-function ensureVoicePicker() {
-  if (document.querySelector("#nova-tts-voice-picker")) {
-    return;
+  function ensureVoicePicker() {
+    if (document.querySelector("#nova-tts-voice-picker")) {
+      return;
+    }
+
+    const shell = ensureControlShell();
+
+    if (!shell) {
+      return;
+    }
+
+    const picker = document.createElement("select");
+    picker.id = "nova-tts-voice-picker";
+    picker.title = "TTS voice";
+    picker.value = getSelectedVoice();
+
+    const voices = [
+      "alloy",
+      "ash",
+      "ballad",
+      "coral",
+      "echo",
+      "fable",
+      "nova",
+      "onyx",
+      "sage",
+      "shimmer",
+      "verse",
+    ];
+
+    voices.forEach(function (voice) {
+      const option = document.createElement("option");
+      option.value = voice;
+      option.textContent = voice;
+      picker.appendChild(option);
+    });
+
+    picker.onchange = function () {
+      setSelectedVoice(picker.value);
+      console.log("[NovaTTS] voice selected", picker.value);
+    };
+
+    shell.appendChild(picker);
   }
 
-  const globalButton = getGlobalTtsButton();
+  function ensureAutoSpeakToggle() {
+    if (document.querySelector("#nova-tts-autospeak-toggle")) {
+      return;
+    }
 
-  if (!globalButton || !globalButton.parentElement) {
-    return;
+    const shell = ensureControlShell();
+
+    if (!shell) {
+      return;
+    }
+
+    const label = document.createElement("label");
+    label.id = "nova-tts-autospeak-toggle";
+    label.title = "Auto-speak assistant replies";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = getAutoSpeakEnabled();
+
+    checkbox.onchange = function () {
+      setAutoSpeakEnabled(checkbox.checked);
+      console.log("[NovaTTS] auto-speak", checkbox.checked);
+    };
+
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode("auto"));
+
+    shell.appendChild(label);
   }
-
-  const picker = document.createElement("select");
-  picker.id = "nova-tts-voice-picker";
-  picker.title = "TTS voice";
-  picker.value = getSelectedVoice();
-
-  const voices = [
-    "alloy",
-    "ash",
-    "ballad",
-    "coral",
-    "echo",
-    "fable",
-    "nova",
-    "onyx",
-    "sage",
-    "shimmer",
-    "verse",
-  ];
-
-  voices.forEach(function (voice) {
-    const option = document.createElement("option");
-    option.value = voice;
-    option.textContent = voice;
-    picker.appendChild(option);
-  });
-
-  picker.onchange = function () {
-    setSelectedVoice(picker.value);
-    console.log("[NovaTTS] voice selected", picker.value);
-  };
-
-  picker.style.marginLeft = "6px";
-  picker.style.borderRadius = "999px";
-  picker.style.padding = "4px 8px";
-  picker.style.fontSize = "12px";
-
-  globalButton.parentElement.appendChild(picker);
-}
-
-function ensureAutoSpeakToggle() {
-  if (document.querySelector("#nova-tts-autospeak-toggle")) {
-    return;
-  }
-
-  const globalButton = getGlobalTtsButton();
-
-  if (!globalButton || !globalButton.parentElement) {
-    return;
-  }
-
-  const label = document.createElement("label");
-  label.id = "nova-tts-autospeak-toggle";
-  label.title = "Auto-speak assistant replies";
-  label.style.marginLeft = "8px";
-  label.style.fontSize = "12px";
-  label.style.cursor = "pointer";
-  label.style.userSelect = "none";
-
-  const checkbox = document.createElement("input");
-  checkbox.type = "checkbox";
-  checkbox.checked = getAutoSpeakEnabled();
-  checkbox.style.marginRight = "4px";
-
-  checkbox.onchange = function () {
-    setAutoSpeakEnabled(checkbox.checked);
-    console.log("[NovaTTS] auto-speak", checkbox.checked);
-  };
-
-  label.appendChild(checkbox);
-  label.appendChild(document.createTextNode("auto"));
-
-  globalButton.parentElement.appendChild(label);
-}
 
   function wireTts() {
     injectStyles();
