@@ -763,43 +763,90 @@ def api_chat():
 
     user_text = str(data.get("user_text") or "").strip()
     print("API CHAT USER_TEXT =", repr(user_text))
+
     session_id = str(data.get("session_id") or "").strip()
     attachments = normalize_attachments(data.get("attachments"))
 
-    regen_commands = {
-        "regen",
-        "regenerate",
-        "redo image",
-        "make another",
-        "another image",
-    }
+    print("API CHAT RAW ATTACHMENTS =", repr(data.get("attachments")))
+    print("API CHAT NORMALIZED ATTACHMENTS =", repr(attachments))
 
-    if user_text.lower().strip() in regen_commands:
-        last_prompt = chat_service._get_session_meta(
-            session_id,
-            "last_image_prompt",
-        ) or "generate an image"
+    # --- ABSOLUTE AUDIO EXIT RIGHT AFTER NORMALIZE ---
+    raw_attachment_items = attachments if isinstance(attachments, list) else []
 
-        result = chat_service._handle_image_generation(
-            prompt=last_prompt,
-            session_id=session_id,
-            parent_artifact_id="",
-            source_type="regenerated",
+    for item in raw_attachment_items:
+        if not isinstance(item, dict):
+            continue
+
+        audio_name = str(
+            item.get("name")
+            or item.get("filename")
+            or item.get("stored_name")
+            or "audio attachment"
         )
 
-        return jsonify(result)
+        audio_mime = str(
+            item.get("mime_type")
+            or item.get("content_type")
+            or item.get("type")
+            or ""
+        )
 
-    if not session_id:
-        active = session_service.get_active()
-        if active:
-            session_id = str(active.get("id") or "").strip()
+        audio_url = str(
+            item.get("url")
+            or item.get("file_url")
+            or ""
+        )
 
-    if not session_id:
-        created = session_service.create("New Chat")
-        session_id = created["id"]
+        audio_size = item.get("size") or item.get("size_bytes") or ""
 
-    if not user_text and not attachments:
-        return json_error("Missing user_text or attachments", 400)
+        if audio_mime.lower().startswith("audio/") or audio_name.lower().endswith(
+            (
+                ".mp3",
+                ".wav",
+                ".m4a",
+                ".aac",
+                ".ogg",
+                ".webm",
+                ".flac",
+            )
+        ):
+            return jsonify(
+                {
+                    "ok": True,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": (
+                            "I received the audio attachment.\n\n"
+                            f"File: {audio_name}\n"
+                            f"Type: {audio_mime}\n"
+                            f"Size: {audio_size}\n"
+                            f"URL: {audio_url}\n\n"
+                            "Audio upload is working. Transcription is the next audio layer."
+                        ),
+                        "attachments": attachments,
+                        "meta": {
+                            "attachment_analysis": True,
+                            "attachment_count": len(raw_attachment_items),
+                            "has_audio": True,
+                        },
+                    },
+                    "active_session_id": session_id,
+                    "session": {
+                        "id": session_id,
+                        "title": "Active Chat",
+                        "messages": [],
+                        "meta": {},
+                    },
+                    "saved_artifact": None,
+                    "runtime": {},
+                    "debug": {
+                        "route_taken": "absolute_audio_exit_after_normalize",
+                        "file_name": audio_name,
+                        "mime_type": audio_mime,
+                        "url": audio_url,
+                    },
+                }
+            )
 
     try:
         result = chat_service.handle(
@@ -808,9 +855,6 @@ def api_chat():
             attachments=attachments,
         )
 
-        # TEMP DISABLED:
-        # runtime_brain.run_cycle is crashing on undefined working_state.
-        # Keep disabled until execution mutation is stable.
         print("CHAT RAW RESULT:", result)
 
         if result is None:
@@ -856,6 +900,12 @@ def api_chat():
             "session": (
                 result.get("session")
                 or session_service.get_session(session_id)
+                or {
+                    "id": session_id,
+                    "title": "Active Chat",
+                    "messages": [],
+                    "meta": {},
+                }
             ),
             "saved_artifact": result.get("saved_artifact"),
             "runtime": {},
@@ -872,8 +922,23 @@ def api_chat():
 
     except Exception as exc:
         import traceback
-        traceback.print_exc()
-        return json_error(str(exc), 500)
+
+        error_text = traceback.format_exc()
+
+        print("")
+        print("========== API CHAT CRASH TRACEBACK ==========")
+        print(error_text)
+        print("========== END API CHAT CRASH TRACEBACK ==========")
+        print("")
+
+        return jsonify(
+            {
+                "ok": False,
+                "error": str(exc),
+                "traceback": error_text,
+            }
+        ), 500
+
 
 @app.get("/api/sessions/<session_id>")
 def api_session_by_id(session_id: str):
