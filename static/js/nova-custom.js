@@ -1598,9 +1598,14 @@ function wireMessageActionButtons() {
         try {
             const payload = {
                 user_text: text,
-                session_id: getSessionId(),
                 attachments: Array.isArray(state.pendingUploads) ? state.pendingUploads : [],
             };
+
+            const currentSessionId = getSessionId();
+
+            if (currentSessionId) {
+                payload.session_id = currentSessionId;
+            }
 
             window.__lastNovaPayload = payload;
             console.log("[NovaEmergencyBridge] outgoing payload", payload);
@@ -1624,9 +1629,11 @@ function wireMessageActionButtons() {
                 data.execution_state || data.active_execution || data.execution
             );
 
-            if (data.session_id || (data.session && data.session.id)) {
-                setSessionId(data.session_id || data.session.id);
-            }
+if (data.session_id || (data.session && data.session.id)) {
+    window.__novaLocalNewChatActive = false;
+
+    setSessionId(data.session_id || data.session.id);
+}
 
 const assistant =
     data.assistant_message ||
@@ -2551,9 +2558,14 @@ function buildNovaMessageActions(msg) {
         return [];
     }
 
-    async function restoreActiveSession() {
-        try {
-            const response = await fetch("/api/sessions", {
+async function restoreActiveSession() {
+    try {
+        if (window.__novaLocalNewChatActive === true) {
+            console.log("[NovaEmergencySessionRestore] skipped because local new chat is active");
+            return;
+        }
+
+        const response = await fetch("/api/sessions", {
                 method: "GET",
                 headers: {
                     "Accept": "application/json",
@@ -3750,8 +3762,6 @@ function buildNovaMessageActions(msg) {
         if (value.includes("artifact")) return "artifacts";
         if (value.includes("image")) return "artifacts";
         if (value.includes("media")) return "artifacts";
-        if (value.includes("session")) return "sessions";
-        if (value.includes("chat")) return "sessions";
         if (value.includes("close")) return "close";
 
         return value;
@@ -3875,7 +3885,6 @@ function buildNovaMessageActions(msg) {
                 cleaned === "web" ||
                 cleaned === "execution" ||
                 cleaned === "artifacts" ||
-                cleaned === "sessions" ||
                 cleaned === "close"
             ) {
                 return cleaned;
@@ -3897,7 +3906,6 @@ function buildNovaMessageActions(msg) {
             target === "web" ||
             target === "execution" ||
             target === "artifacts" ||
-            target === "sessions" ||
             target === "close"
         ) {
             event.preventDefault();
@@ -4216,4 +4224,86 @@ function buildNovaMessageActions(msg) {
     window.NovaToggleLeftRail = toggleLeftRail;
 
     console.log("[NovaLeftRailToggleFix] loaded");
+})();
+
+// =====================================================
+// NOVA NEW CHAT BUTTON FIX
+// Local new chat reset. No POST /api/sessions.
+// =====================================================
+(function () {
+    "use strict";
+
+    window.NovaNewChatButtonFixBooted = true;
+
+function resetToNewChat() {
+    window.NovaComposerState = window.NovaComposerState || window.state || {};
+    window.state = window.NovaComposerState;
+
+    window.__novaLocalNewChatActive = true;
+
+    window.state.activeSessionId = "";
+    window.state.messages = [];
+    window.state.pendingUploads = [];
+
+    document.body.removeAttribute("data-session-id");
+
+        const input =
+            document.querySelector("[data-composer-input]") ||
+            document.querySelector("[data-chat-input]") ||
+            document.querySelector("#chat-input") ||
+            document.querySelector("#user-input") ||
+            document.querySelector("textarea");
+
+        if (input) {
+            input.value = "";
+            input.focus();
+        }
+
+        if (typeof window.NovaEmergencyRender === "function") {
+            window.NovaEmergencyRender();
+        }
+
+        if (
+            window.NovaEmergencyAttachments &&
+            typeof window.NovaEmergencyAttachments.render === "function"
+        ) {
+            window.NovaEmergencyAttachments.render();
+        }
+
+        console.log("[NovaNewChatButtonFix] local new chat opened", {
+            sessionId: window.state.activeSessionId,
+        });
+
+        return true;
+    }
+
+    document.addEventListener("click", function (event) {
+        const button = event.target.closest("button, [role='button'], a");
+        if (!button) return;
+
+        const text = String(button.textContent || "").trim().toLowerCase();
+        const title = String(button.getAttribute("title") || "").trim().toLowerCase();
+        const aria = String(button.getAttribute("aria-label") || "").trim().toLowerCase();
+        const action = String(button.getAttribute("data-action") || "").trim().toLowerCase();
+        const className = String(button.className || "").toLowerCase();
+
+        const isNewChat =
+            text === "new chat" ||
+            title === "new chat" ||
+            aria === "new chat" ||
+            action === "new-chat" ||
+            className.includes("nova-new-chat-btn");
+
+        if (!isNewChat) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        resetToNewChat();
+    }, true);
+
+    window.NovaCreateNewChat = resetToNewChat;
+
+    console.log("[NovaNewChatButtonFix] loaded local-only");
 })();

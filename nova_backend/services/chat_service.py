@@ -10383,6 +10383,17 @@ if __name__ == "__main__":
                 )
             }
 
+    def _ensure_session_id(self, session_id=None):
+        session_id = str(session_id or "").strip()
+
+        if session_id:
+            return session_id
+
+        return (
+            "session_"
+            + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
+        )
+
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         exec_debug("HANDLE IS BEING CALLED")
         print("HANDLE HIT USER_TEXT =", repr(user_text))
@@ -10465,7 +10476,7 @@ if __name__ == "__main__":
         attachments = attachments or []
 
         if not session_id:
-            session_id = self._create_session()
+            session_id = self._ensure_session_id(session_id)
 
         answer_depth = self._detect_answer_depth(user_text)
         self._set_session_meta(session_id, "answer_depth", answer_depth)
@@ -20323,6 +20334,7 @@ ChatService._handle_image_generation = _nova_runtime_handle_image_generation
 CHAT_SERVICE_METHODS = [
     "_handle_image_generation",
 ]
+
 for name in CHAT_SERVICE_METHODS:
     if hasattr(ChatService, name):
         continue
