@@ -419,10 +419,8 @@ function playTTS(messageId) {
     state.tts.audio.pause();
   }
 
-  const audio = new Audio(`https://api.tts.fake/${encodeURIComponent(msg.text)}`);
-  state.tts.audio = audio;
-  audio.play();
-  state.tts.playing = true;
+console.warn("[Nova] old fake playTTS disabled. Use nova-tts-player.js.");
+return;
 
   audio.onended = () => {
     state.tts.playing = false;
@@ -980,10 +978,8 @@ function playTTSForMessage(messageId) {
   const msg = state.messages.find(m => m.id === messageId);
   if (!msg || !msg.text) return;
 
-  stopCurrentTts();
-  const audio = new Audio(`https://api.tts.fake/${encodeURIComponent(msg.text)}`);
-  state.tts.audio = audio;
-  state.tts.playing = true;
+console.warn("[Nova] old fake playTTSForMessage disabled. Use nova-tts-player.js.");
+return;
 
   audio.onended = () => {
     state.tts.audio = null;
