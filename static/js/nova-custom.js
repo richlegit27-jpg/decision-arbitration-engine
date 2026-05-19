@@ -2018,14 +2018,85 @@ window.NovaEmergencyHandleFiles = handleFiles;
 
     function normalizeArtifact(item) {
         item = item || {};
+
+        const raw = item.raw && typeof item.raw === "object" ? item.raw : item;
+        const viewer = raw.viewer && typeof raw.viewer === "object" ? raw.viewer : {};
+        const meta = raw.meta && typeof raw.meta === "object" ? raw.meta : {};
+
+        const url =
+            item.url ||
+            item.file_url ||
+            item.source_url ||
+            item.image_url ||
+            item.output_url ||
+            item.generated_url ||
+            item.viewer_url ||
+            item.path ||
+            raw.url ||
+            raw.file_url ||
+            raw.source_url ||
+            raw.image_url ||
+            raw.preview ||
+            raw.output_url ||
+            raw.generated_url ||
+            raw.viewer_url ||
+            viewer.url ||
+            viewer.file_url ||
+            viewer.source_url ||
+            viewer.image_url ||
+            viewer.video_url ||
+            viewer.audio_url ||
+            meta.url ||
+            meta.file_url ||
+            meta.source_url ||
+            meta.image_url ||
+            "";
+
         return {
-            id: item.id || item.artifact_id || ("artifact_" + Date.now() + "_" + Math.random().toString(16).slice(2)),
-            title: item.title || item.name || item.filename || item.type || "Artifact",
-            type: item.type || item.kind || "artifact",
-            content: item.content || item.text || item.body || "",
-            url: item.url || item.file_url || "",
-            session_id: item.session_id || state.activeSessionId || "",
-            raw: item,
+            id:
+                item.id ||
+                item.artifact_id ||
+                raw.id ||
+                raw.artifact_id ||
+                ("artifact_" + Date.now() + "_" + Math.random().toString(16).slice(2)),
+
+            title:
+                item.title ||
+                item.name ||
+                item.filename ||
+                raw.title ||
+                raw.name ||
+                raw.filename ||
+                viewer.title ||
+                item.type ||
+                raw.type ||
+                raw.kind ||
+                "Artifact",
+
+            type:
+                item.type ||
+                item.kind ||
+                raw.type ||
+                raw.kind ||
+                viewer.kind ||
+                "artifact",
+
+            content:
+                item.content ||
+                item.text ||
+                item.body ||
+                raw.content ||
+                raw.text ||
+                raw.body ||
+                raw.prompt ||
+                viewer.body ||
+                "",
+
+            url: url,
+            image_url: raw.image_url || viewer.image_url || meta.image_url || url,
+            preview: raw.preview || url,
+            session_id: item.session_id || raw.session_id || "",
+            raw: raw,
         };
     }
 
@@ -2041,7 +2112,19 @@ window.NovaEmergencyHandleFiles = handleFiles;
     }
 
     function openArtifact(artifact) {
+        artifact = normalizeArtifact(artifact);
         state.activeArtifact = artifact;
+
+        const rightRail =
+            qs("[data-right-rail]") ||
+            qs("#right-rail") ||
+            qs(".right-rail") ||
+            null;
+
+        if (rightRail) {
+            rightRail.classList.add("is-open", "is-active");
+            rightRail.style.display = "";
+        }
 
         let viewer =
             qs("[data-artifact-viewer]") ||
@@ -2052,31 +2135,74 @@ window.NovaEmergencyHandleFiles = handleFiles;
             viewer = document.createElement("div");
             viewer.id = "artifact-viewer";
             viewer.setAttribute("data-artifact-viewer", "true");
-            viewer.style.position = "fixed";
-            viewer.style.right = "20px";
-            viewer.style.bottom = "20px";
-            viewer.style.width = "420px";
-            viewer.style.maxWidth = "calc(100vw - 40px)";
+            viewer.className = "artifact-viewer";
+
+            viewer.style.marginTop = "10px";
+            viewer.style.padding = "10px";
+            viewer.style.borderRadius = "14px";
+            viewer.style.border = "1px solid rgba(255,255,255,0.12)";
+            viewer.style.background = "rgba(15,23,42,0.72)";
             viewer.style.maxHeight = "70vh";
             viewer.style.overflow = "auto";
-            viewer.style.zIndex = "99999";
-            viewer.style.background = "#111";
-            viewer.style.color = "#fff";
-            viewer.style.border = "1px solid rgba(255,255,255,0.2)";
-            viewer.style.borderRadius = "14px";
-            viewer.style.padding = "14px";
-            document.body.appendChild(viewer);
+
+            const rail = findArtifactRail();
+            rail.appendChild(viewer);
         }
 
-        const content = artifact.content || artifact.url || "No artifact content.";
+        const title = artifact.title || artifact.name || "Artifact";
+
+        const url =
+            artifact.url ||
+            artifact.file_url ||
+            artifact.source_url ||
+            artifact.image_url ||
+            artifact.output_url ||
+            artifact.generated_url ||
+            artifact.viewer_url ||
+            artifact.path ||
+            "";
+
+        const content = artifact.content || artifact.text || artifact.body || "";
+        const type = String(artifact.type || artifact.kind || "").toLowerCase();
+
+        const isImage =
+            type.includes("image") ||
+            /\.(png|jpg|jpeg|gif|webp|bmp|svg)(\?.*)?$/i.test(url);
+
+        let bodyHtml = "";
+
+        if (isImage && url) {
+            bodyHtml =
+                '<div style="margin-top:10px;">' +
+                    '<img src="' + escapeHtml(url) + '" ' +
+                    'style="max-width:100%;height:auto;border-radius:12px;display:block;" ' +
+                    'alt="' + escapeHtml(title) + '">' +
+                '</div>' +
+                '<div style="margin-top:8px;font-size:11px;opacity:0.7;word-break:break-all;">' +
+                    escapeHtml(url) +
+                '</div>';
+        } else if (url) {
+            bodyHtml =
+                '<div style="margin-top:10px;">' +
+                    '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer">Open artifact</a>' +
+                '</div>' +
+                '<pre style="white-space:pre-wrap;font-size:12px;line-height:1.4;margin-top:10px;">' +
+                    escapeHtml(content || url) +
+                '</pre>';
+        } else {
+            bodyHtml =
+                '<pre style="white-space:pre-wrap;font-size:12px;line-height:1.4;margin-top:10px;">' +
+                    escapeHtml(content || "No artifact content.") +
+                '</pre>';
+        }
+
         viewer.innerHTML =
             '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px;">' +
-                '<strong>' + escapeHtml(artifact.title) + '</strong>' +
+                '<strong>' + escapeHtml(title) + '</strong>' +
                 '<button type="button" data-close-artifact-viewer="true">Close</button>' +
             '</div>' +
-            '<pre style="white-space:pre-wrap;font-size:12px;line-height:1.4;">' +
-                escapeHtml(content) +
-            '</pre>';
+            '<div style="font-size:11px;opacity:0.7;">' + escapeHtml(type || "artifact") + '</div>' +
+            bodyHtml;
 
         const closeBtn = qs("[data-close-artifact-viewer]", viewer);
         if (closeBtn) {
@@ -2084,6 +2210,13 @@ window.NovaEmergencyHandleFiles = handleFiles;
                 viewer.remove();
             };
         }
+
+        viewer.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+        });
+
+        console.log("[NovaEmergencyArtifactRail] opened", artifact);
     }
 
     function renderArtifactRail() {
@@ -2799,7 +2932,7 @@ window.NovaEmergencyHandleFiles = handleFiles;
 
     setTimeout(restoreMemory, 600);
     setTimeout(restoreMemory, 1600);
-})()
+})();
 
 // =====================================================
 // NOVA EMERGENCY MANUAL FILE PICKER
