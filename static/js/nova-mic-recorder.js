@@ -1,13 +1,13 @@
 (function () {
   "use strict";
 
-let micStream = null;
-let mediaRecorder = null;
-let chunks = [];
-let recording = false;
-let busy = false;
-let wired = false;
-let lastToggleAt = 0;;
+  let micStream = null;
+  let mediaRecorder = null;
+  let chunks = [];
+  let recording = false;
+  let busy = false;
+  let wired = false;
+  let lastToggleAt = 0;
 
   function getActiveSessionId() {
     return (
@@ -118,9 +118,12 @@ let lastToggleAt = 0;;
 
   async function sendToChat(attachment) {
     const payload = {
-      user_text: "what is in this audio?",
+      user_text: "voice_input",
       session_id: getActiveSessionId(),
       attachments: [attachment],
+      meta: {
+        voice_conversation: true,
+      },
     };
 
     const response = await fetch("/api/chat", {
@@ -210,43 +213,43 @@ let lastToggleAt = 0;;
     }
   }
 
-async function toggleRecorder(event) {
-  const voiceButton = event.target.closest('[data-action="voice"]');
+  async function toggleRecorder(event) {
+    const voiceButton = event.target.closest('[data-action="voice"]');
 
-  if (!voiceButton) {
-    return;
-  }
-
-  const now = Date.now();
-
-  if (now - lastToggleAt < 700) {
-    return;
-  }
-
-  lastToggleAt = now;
-
-  event.preventDefault();
-  event.stopPropagation();
-
-  if (typeof event.stopImmediatePropagation === "function") {
-    event.stopImmediatePropagation();
-  }
-
-  try {
-    if (recording) {
-      stopRecording();
+    if (!voiceButton) {
       return;
     }
 
-    await startRecording();
-  } catch (error) {
-    console.error("[NovaMicRecorder] mic failed", error);
-    appendMessage("assistant", "Mic failed: " + error.message);
-    recording = false;
-    busy = false;
-    setButtonState("idle");
+    const now = Date.now();
+
+    if (now - lastToggleAt < 700) {
+      return;
+    }
+
+    lastToggleAt = now;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (typeof event.stopImmediatePropagation === "function") {
+      event.stopImmediatePropagation();
+    }
+
+    try {
+      if (recording) {
+        stopRecording();
+        return;
+      }
+
+      await startRecording();
+    } catch (error) {
+      console.error("[NovaMicRecorder] mic failed", error);
+      appendMessage("assistant", "Mic failed: " + error.message);
+      recording = false;
+      busy = false;
+      setButtonState("idle");
+    }
   }
-}
 
   function wireComposerMic() {
     const button = getVoiceButton();
@@ -261,7 +264,7 @@ async function toggleRecorder(event) {
     button.style.cursor = "pointer";
 
     if (!wired) {
-document.addEventListener("click", toggleRecorder, true);
+      document.addEventListener("click", toggleRecorder, true);
       wired = true;
     }
 
@@ -276,6 +279,7 @@ document.addEventListener("click", toggleRecorder, true);
     setTimeout(wireComposerMic, 500);
     setTimeout(wireComposerMic, 1500);
     setTimeout(wireComposerMic, 3000);
+    setTimeout(wireComposerMic, 5000);
   }
 
   if (document.readyState === "loading") {

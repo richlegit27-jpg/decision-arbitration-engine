@@ -813,6 +813,58 @@ def api_chat():
 
             if audio_path:
                 transcript = transcribe_audio_file(audio_path)
+
+                is_voice_conversation = (
+                    user_text.lower().strip() == "voice_input"
+                    or bool((data.get("meta") or {}).get("voice_conversation"))
+                )
+
+                if is_voice_conversation:
+                    result = chat_service.handle(
+                        user_text=transcript,
+                        session_id=session_id,
+                        attachments=[],
+                    )
+
+                    assistant_message = result.get("assistant_message") or {
+                        "role": "assistant",
+                        "text": "",
+                    }
+
+                    payload = {
+                        "ok": result.get("ok", True),
+                        "voice_conversation": True,
+                        "transcript": transcript,
+                        "assistant_message": assistant_message,
+                        "active_session_id": (
+                            result.get("active_session_id")
+                            or result.get("session_id")
+                            or session_id
+                        ),
+                        "session": (
+                            result.get("session")
+                            or session_service.get_session(session_id)
+                            or {
+                                "id": session_id,
+                                "title": "Active Chat",
+                                "messages": [],
+                                "meta": {},
+                            }
+                        ),
+                        "saved_artifact": result.get("saved_artifact"),
+                        "runtime": {},
+                        "debug": {
+                            "route_taken": "voice_conversation_transcript_to_chat",
+                            "file_name": audio_name,
+                            "mime_type": audio_mime,
+                            "url": audio_url,
+                            "audio_path": str(audio_path),
+                            "transcript": transcript,
+                        },
+                    }
+
+                    return jsonify(payload)
+
                 response_text = (
                     "I transcribed the audio.\n\n"
                     f"File: {audio_name}\n"
