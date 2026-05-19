@@ -3912,3 +3912,191 @@ function buildNovaMessageActions(msg) {
     console.log("[NovaRightRailToggleFix] loaded");
 })();
 
+// =====================================================
+// NOVA HIDE DUPLICATE ATTACH FILE BUTTON
+// Keeps normal + attach button, hides extra "Attach File"
+// =====================================================
+(function () {
+    "use strict";
+
+    function hideDuplicateAttachFileButton() {
+        Array.from(document.querySelectorAll("button")).forEach(function (button) {
+            const text = String(button.textContent || "").trim().toLowerCase();
+            const title = String(button.getAttribute("title") || "").trim().toLowerCase();
+            const aria = String(button.getAttribute("aria-label") || "").trim().toLowerCase();
+
+            if (
+                text === "attach file" ||
+                title === "attach file" ||
+                aria === "attach file"
+            ) {
+                button.style.display = "none";
+                button.style.visibility = "hidden";
+                button.style.pointerEvents = "none";
+                button.setAttribute("aria-hidden", "true");
+
+                console.log("[NovaHideDuplicateAttachFileButton] hidden", button);
+            }
+        });
+    }
+
+    hideDuplicateAttachFileButton();
+    setTimeout(hideDuplicateAttachFileButton, 500);
+    setTimeout(hideDuplicateAttachFileButton, 1500);
+
+    window.NovaHideDuplicateAttachFileButton = hideDuplicateAttachFileButton;
+})();
+
+// =====================================================
+// NOVA FORCE COMPOSER BUTTON ALIGNMENT
+// Fixes + / mic / TTS / send row directly
+// =====================================================
+(function () {
+    "use strict";
+
+    if (window.NovaForceComposerButtonAlignmentBooted) return;
+    window.NovaForceComposerButtonAlignmentBooted = true;
+
+    function qsa(selector, root) {
+        return Array.from((root || document).querySelectorAll(selector));
+    }
+
+    function setImportant(el, prop, value) {
+        if (!el) return;
+        el.style.setProperty(prop, value, "important");
+    }
+
+    function findButton(matchFn) {
+        return qsa("button").find(matchFn) || null;
+    }
+
+    function findComposerRoot(buttons) {
+        const validButtons = buttons.filter(Boolean);
+
+        for (const btn of validButtons) {
+            const root =
+                btn.closest(".nova-composer") ||
+                btn.closest("[data-composer]") ||
+                btn.closest(".nova-input-shell") ||
+                btn.closest("[data-input-shell]");
+
+            if (root) return root;
+        }
+
+        return null;
+    }
+
+    function fixComposerButtons() {
+        const attachButton = findButton(function (btn) {
+            const text = String(btn.textContent || "").trim();
+            const title = String(btn.getAttribute("title") || "").toLowerCase();
+            const aria = String(btn.getAttribute("aria-label") || "").toLowerCase();
+            const cls = String(btn.className || "");
+
+            return (
+                cls.includes("nova-composer-btn") &&
+                text === "+" &&
+                (title.includes("attach") || aria.includes("attach"))
+            );
+        });
+
+        const micButton = findButton(function (btn) {
+            return (
+                btn.getAttribute("data-action") === "voice" ||
+                String(btn.getAttribute("aria-label") || "").toLowerCase() === "voice" ||
+                String(btn.getAttribute("title") || "").toLowerCase() === "voice"
+            );
+        });
+
+        const ttsButton = findButton(function (btn) {
+            return (
+                btn.getAttribute("data-action") === "tts-toggle" ||
+                String(btn.getAttribute("aria-label") || "").toLowerCase().includes("play voice") ||
+                String(btn.getAttribute("title") || "").toLowerCase().includes("play voice")
+            );
+        });
+
+        const sendButton = findButton(function (btn) {
+            const text = String(btn.textContent || "").trim().toLowerCase();
+            return (
+                btn.getAttribute("data-action") === "send" ||
+                btn.hasAttribute("data-send-button") ||
+                text === "send"
+            );
+        });
+
+        const composer = findComposerRoot([attachButton, micButton, ttsButton, sendButton]);
+
+        if (composer) {
+            setImportant(composer, "display", "flex");
+            setImportant(composer, "align-items", "center");
+            setImportant(composer, "gap", "10px");
+            setImportant(composer, "position", "relative");
+        }
+
+        [attachButton, micButton, ttsButton, sendButton].forEach(function (btn) {
+            if (!btn) return;
+
+            setImportant(btn, "position", "static");
+            setImportant(btn, "display", "inline-flex");
+            setImportant(btn, "align-items", "center");
+            setImportant(btn, "justify-content", "center");
+            setImportant(btn, "height", "42px");
+            setImportant(btn, "min-height", "42px");
+            setImportant(btn, "max-height", "42px");
+            setImportant(btn, "margin", "0");
+            setImportant(btn, "transform", "none");
+            setImportant(btn, "top", "auto");
+            setImportant(btn, "left", "auto");
+            setImportant(btn, "right", "auto");
+            setImportant(btn, "bottom", "auto");
+            setImportant(btn, "z-index", "5");
+            setImportant(btn, "flex-shrink", "0");
+        });
+
+        if (attachButton) {
+            setImportant(attachButton, "width", "42px");
+            setImportant(attachButton, "min-width", "42px");
+            setImportant(attachButton, "max-width", "42px");
+            setImportant(attachButton, "order", "1");
+        }
+
+        if (micButton) {
+            setImportant(micButton, "width", "48px");
+            setImportant(micButton, "min-width", "48px");
+            setImportant(micButton, "max-width", "48px");
+            setImportant(micButton, "order", "2");
+        }
+
+        if (ttsButton) {
+            setImportant(ttsButton, "width", "48px");
+            setImportant(ttsButton, "min-width", "48px");
+            setImportant(ttsButton, "max-width", "48px");
+            setImportant(ttsButton, "order", "3");
+        }
+
+        if (sendButton) {
+            setImportant(sendButton, "width", "auto");
+            setImportant(sendButton, "min-width", "60px");
+            setImportant(sendButton, "max-width", "none");
+            setImportant(sendButton, "padding-left", "14px");
+            setImportant(sendButton, "padding-right", "14px");
+            setImportant(sendButton, "order", "4");
+        }
+
+        console.log("[NovaForceComposerButtonAlignment] fixed", {
+            attach: !!attachButton,
+            mic: !!micButton,
+            tts: !!ttsButton,
+            send: !!sendButton,
+            composer: !!composer
+        });
+    }
+
+    fixComposerButtons();
+    setTimeout(fixComposerButtons, 300);
+    setTimeout(fixComposerButtons, 1000);
+    setTimeout(fixComposerButtons, 2000);
+
+    window.NovaForceComposerButtonAlignment = fixComposerButtons;
+})();

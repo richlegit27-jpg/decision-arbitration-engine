@@ -11188,3 +11188,326 @@ body.nova-right-rail-open .nova-right-rail {
     max-height: 100% !important;
     overflow-y: auto !important;
 }
+
+/* NOVA COMPOSER POLISH LOCK */
+.nova-composer,
+.nova-input-shell,
+[data-composer],
+[data-input-shell] {
+    background: rgba(24, 30, 48, 0.66);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 24px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.20);
+    backdrop-filter: blur(18px);
+}
+
+.nova-composer textarea,
+.nova-composer input,
+[data-composer] textarea,
+[data-composer] input,
+#user-input,
+#chat-input {
+    background: rgba(255, 255, 255, 0.075) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 20px !important;
+    color: #f8f9ff !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.nova-composer textarea:focus,
+.nova-composer input:focus,
+[data-composer] textarea:focus,
+[data-composer] input:focus,
+#user-input:focus,
+#chat-input:focus {
+    background: rgba(255, 255, 255, 0.105) !important;
+    border-color: rgba(140, 170, 255, 0.42) !important;
+    box-shadow: 0 0 0 3px rgba(120, 150, 255, 0.12) !important;
+}
+
+.nova-composer button,
+.nova-composer-btn,
+[data-composer] button {
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    background: rgba(255, 255, 255, 0.10) !important;
+    color: #f8f9ff !important;
+    border-radius: 999px !important;
+    transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+.nova-composer button:hover,
+.nova-composer-btn:hover,
+[data-composer] button:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.17) !important;
+    border-color: rgba(255, 255, 255, 0.26) !important;
+}
+
+.nova-composer button[data-action="send"],
+[data-action="send"],
+[data-send-button] {
+    background: linear-gradient(135deg, rgba(92, 150, 255, 0.92), rgba(168, 120, 255, 0.88)) !important;
+    border-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+/* NOVA CLEAN WORKSPACE OVERLAY FIX */
+
+/* Hide floating Runtime Brain box if it blocks composer */
+#nova-runtime-panel {
+    display: none !important;
+}
+
+/* Hide duplicate/floating execution widgets that sit over the composer */
+.nova-floating-exec,
+[data-floating-exec],
+#nova-floating-exec,
+.nova-exec-floating,
+[data-exec-floating] {
+    display: none !important;
+}
+
+/* Keep the real right rail execution panel usable */
+[data-rail-panel="execution"],
+[data-rail-panel="execution"] [data-execution-panel] {
+    display: block;
+}
+
+/* Make composer stay above normal page content */
+.nova-composer,
+.nova-input-shell,
+[data-composer],
+[data-input-shell] {
+    position: relative !important;
+    z-index: 5000 !important;
+}
+
+/* Make send button easier to see */
+.nova-composer button[data-action="send"],
+[data-action="send"],
+[data-send-button] {
+    min-width: 46px !important;
+    min-height: 42px !important;
+    box-shadow: 0 10px 26px rgba(92, 150, 255, 0.28) !important;
+}
+
+/* NOVA HARD HIDE FLOATING EXECUTION BLOCKERS */
+#nova-floating-exec,
+.nova-floating-exec,
+[data-floating-exec],
+[data-exec-floating],
+.nova-exec-floating,
+.nova-execution-floating,
+.nova-floating-execution,
+[data-execution-floating],
+#nova-execution-floating,
+#floating-execution,
+.floating-execution {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* NOVA LEFT PANEL POLISH LOCK */
+.nova-left-rail,
+.nova-session-rail,
+[data-left-rail],
+[data-session-rail] {
+    background: rgba(24, 30, 48, 0.66) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 14px 0 38px rgba(0, 0, 0, 0.18) !important;
+    backdrop-filter: blur(18px);
+}
+
+.nova-session-item,
+[data-session-item],
+.nova-chat-session {
+    background: rgba(255, 255, 255, 0.085) !important;
+    border: 1px solid rgba(255, 255, 255, 0.11) !important;
+    border-radius: 16px !important;
+    margin-bottom: 8px !important;
+    transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+.nova-session-item:hover,
+[data-session-item]:hover,
+.nova-chat-session:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.13) !important;
+    border-color: rgba(255, 255, 255, 0.20) !important;
+}
+
+.nova-session-item.is-active,
+[data-session-item].is-active,
+.nova-chat-session.is-active {
+    background: linear-gradient(135deg, rgba(92, 150, 255, 0.28), rgba(168, 120, 255, 0.22)) !important;
+    border-color: rgba(150, 175, 255, 0.42) !important;
+}
+
+/* NOVA UPLOAD BUTTON MIC OVERLAP FIX */
+button[data-action="upload"],
+button[data-action="attach"],
+.nova-composer-btn[data-action="upload"],
+.nova-composer-btn[data-action="attach"],
+button[aria-label*="Upload"],
+button[aria-label*="Attach"],
+button[title*="Upload"],
+button[title*="Attach"] {
+    margin-right: 12px !important;
+    transform: translateX(-18px) !important;
+    z-index: 1 !important;
+}
+
+/* Keep mic above upload if they still touch */
+button[data-action="voice"],
+.nova-composer-btn[data-action="voice"],
+button[aria-label*="Voice"],
+button[title*="Voice"] {
+    position: relative !important;
+    z-index: 5 !important;
+}
+
+/* NOVA CLEAN COMPOSER BUTTON ROW FIX */
+.nova-composer {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+.nova-composer-btn {
+    position: static !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    margin: 0 !important;
+    transform: none !important;
+    flex: 0 0 44px !important;
+    line-height: 1 !important;
+}
+
+.nova-composer-btn[data-action="voice"] {
+    width: 48px !important;
+    min-width: 48px !important;
+}
+
+.nova-composer-btn[data-action="tts-toggle"] {
+    width: 48px !important;
+    min-width: 48px !important;
+}
+
+.nova-composer-btn[data-action="send"],
+.nova-composer-btn:last-child {
+    width: auto !important;
+    min-width: 60px !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+}
+
+/* NOVA TOP RIGHT PANEL BUTTON ALIGN FIX */
+.nova-topbar,
+.nova-header,
+.nova-chat-header,
+.nova-main-header,
+[data-topbar],
+[data-chat-header] {
+    display: flex !important;
+    align-items: center !important;
+}
+
+/* right panel / rail open button */
+button[data-action="open-rail"],
+button[data-action="toggle-rail"],
+button[data-action="right-rail"],
+button[data-open-rail],
+button[data-rail-toggle],
+.nova-rail-toggle,
+.nova-right-rail-toggle,
+.nova-panel-toggle {
+    align-self: center !important;
+    margin-top: 0 !important;
+    transform: translateY(-3px) !important;
+}
+
+/* NOVA ALIGN RIGHT PANEL OPEN BUTTON */
+#rail-reopen-btn {
+    position: fixed !important;
+    top: 18px !important;
+    right: 78px !important;
+    width: 44px !important;
+    height: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 10050 !important;
+    margin: 0 !important;
+    transform: none !important;
+}
+
+/* NOVA ALIGN RIGHT PANEL OPEN BUTTON */
+#rail-reopen-btn {
+    position: fixed !important;
+    top: 14px !important;
+    right: 78px !important;
+    width: 44px !important;
+    height: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 10050 !important;
+    margin: 0 !important;
+    transform: none !important;
+}
+
+/* NOVA HEADER STATUS LEFT SHIFT */
+.nova-model-status,
+.nova-model-label,
+.nova-status-label,
+.nova-ready-status,
+[data-model-status],
+[data-model-label],
+[data-status-label],
+[data-ready-status] {
+    margin-right: 70px !important;
+    transform: translateX(-48px) !important;
+}
+
+/* NOVA MOVE READY MODEL LEFT */
+.nova-topbar-right {
+    transform: translateX(-100px) !important;
+}
+
+/* NOVA ALIGN RIGHT PANEL OPEN BUTTON */
+#rail-reopen-btn {
+    position: fixed !important;
+    top: 14px !important;
+    right: 18px !important;
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 10050 !important;
+    margin: 0 !important;
+    transform: none !important;
+
+    border-radius: 999px !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #f8f9ff !important;
+    font-size: 18px !important;
+    line-height: 1 !important;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18) !important;
+}
+
+#rail-reopen-btn:hover {
+    background: rgba(255, 255, 255, 0.14) !important;
+    border-color: rgba(255, 255, 255, 0.24) !important;
+    transform: translateY(-1px) !important;
+}
