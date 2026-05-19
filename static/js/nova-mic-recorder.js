@@ -45,6 +45,145 @@
     thread.scrollTop = thread.scrollHeight;
   }
 
+  function injectStyles() {
+    if (document.querySelector("#nova-mic-recorder-style")) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = "nova-mic-recorder-style";
+    style.textContent = `
+      #nova-mic-recorder-button {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 2147483647;
+        width: 56px;
+        height: 56px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.18);
+        background: linear-gradient(135deg, #111827, #1f2937);
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        box-shadow: 0 14px 40px rgba(0,0,0,0.38);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        visibility: visible;
+        opacity: 1;
+        pointer-events: auto;
+        transition:
+          transform 140ms ease,
+          box-shadow 140ms ease,
+          background 140ms ease,
+          border-color 140ms ease;
+      }
+
+      #nova-mic-recorder-button:hover {
+        transform: translateY(-2px) scale(1.04);
+        box-shadow: 0 18px 50px rgba(0,0,0,0.46);
+        border-color: rgba(255,255,255,0.34);
+      }
+
+      #nova-mic-recorder-button.is-recording {
+        background: linear-gradient(135deg, #7f1d1d, #dc2626);
+        animation: novaMicPulse 1.05s infinite;
+      }
+
+      #nova-mic-recorder-button.is-busy {
+        opacity: 0.75;
+        cursor: wait;
+      }
+
+      #nova-mic-recorder-label {
+        position: fixed;
+        right: 88px;
+        bottom: 35px;
+        z-index: 2147483647;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: rgba(17,24,39,0.92);
+        color: white;
+        font-size: 12px;
+        line-height: 1;
+        border: 1px solid rgba(255,255,255,0.16);
+        box-shadow: 0 10px 28px rgba(0,0,0,0.25);
+        opacity: 0;
+        transform: translateX(8px);
+        pointer-events: none;
+        transition:
+          opacity 140ms ease,
+          transform 140ms ease;
+      }
+
+      #nova-mic-recorder-label.is-visible {
+        opacity: 1;
+        transform: translateX(0);
+      }
+
+      @keyframes novaMicPulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(239,68,68,0.48), 0 14px 40px rgba(0,0,0,0.38);
+        }
+        70% {
+          box-shadow: 0 0 0 14px rgba(239,68,68,0), 0 14px 40px rgba(0,0,0,0.38);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(239,68,68,0), 0 14px 40px rgba(0,0,0,0.38);
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  function setLabel(text, visible) {
+    let label = document.querySelector("#nova-mic-recorder-label");
+
+    if (!label) {
+      label = document.createElement("div");
+      label.id = "nova-mic-recorder-label";
+      document.body.appendChild(label);
+    }
+
+    label.textContent = text || "";
+
+    if (visible) {
+      label.classList.add("is-visible");
+    } else {
+      label.classList.remove("is-visible");
+    }
+  }
+
+  function setButtonState(button, state) {
+    if (!button) {
+      return;
+    }
+
+    button.classList.remove("is-recording", "is-busy");
+
+    if (state === "recording") {
+      button.textContent = "⏹️";
+      button.title = "Stop recording";
+      button.classList.add("is-recording");
+      setLabel("Recording… click to stop", true);
+      return;
+    }
+
+    if (state === "busy") {
+      button.textContent = "⏳";
+      button.title = "Transcribing...";
+      button.classList.add("is-busy");
+      setLabel("Transcribing…", true);
+      return;
+    }
+
+    button.textContent = "🎙️";
+    button.title = "Record voice";
+    setLabel("", false);
+  }
+
   async function uploadBlob(blob) {
     const file = new File(
       [blob],
@@ -127,6 +266,8 @@
 
     mediaRecorder.onstop = async function () {
       try {
+        setButtonState(button, "busy");
+
         const blob = new Blob(chunks, { type: "audio/webm" });
 
         appendMessage("user", "🎙️ Voice recording sent for transcription...");
@@ -148,22 +289,14 @@
         chunks = [];
         recording = false;
 
-        if (button) {
-          button.textContent = "🎙️";
-          button.title = "Record voice";
-          button.classList.remove("is-recording");
-        }
+        setButtonState(button, "idle");
       }
     };
 
     mediaRecorder.start();
     recording = true;
 
-    if (button) {
-      button.textContent = "⏹️";
-      button.title = "Stop recording";
-      button.classList.add("is-recording");
-    }
+    setButtonState(button, "recording");
 
     console.log("[NovaMicRecorder] recording started");
   }
@@ -195,39 +328,23 @@
     } catch (error) {
       console.error("[NovaMicRecorder] mic failed", error);
       appendMessage("assistant", "Mic failed: " + error.message);
+      setButtonState(clickedButton, "idle");
     }
   }
 
   function ensureButton() {
+    injectStyles();
+
     let button = document.querySelector("#nova-mic-recorder-button");
 
     if (!button) {
       button = document.createElement("button");
       button.id = "nova-mic-recorder-button";
       button.type = "button";
-      button.textContent = "🎙️";
-      button.title = "Record voice";
-
-      button.style.position = "fixed";
-      button.style.right = "24px";
-      button.style.bottom = "24px";
-      button.style.zIndex = "2147483647";
-      button.style.width = "60px";
-      button.style.height = "60px";
-      button.style.borderRadius = "999px";
-      button.style.border = "3px solid white";
-      button.style.background = "red";
-      button.style.color = "white";
-      button.style.fontSize = "26px";
-      button.style.cursor = "pointer";
-      button.style.boxShadow = "0 10px 30px rgba(0,0,0,0.45)";
-      button.style.display = "block";
-      button.style.visibility = "visible";
-      button.style.opacity = "1";
-      button.style.pointerEvents = "auto";
-
       document.body.appendChild(button);
     }
+
+    setButtonState(button, "idle");
 
     button.onclick = handleMicClick;
 

@@ -1236,6 +1236,9 @@ function autoPlayLastAssistantTTS() {
                 attachments: Array.isArray(state.pendingUploads) ? state.pendingUploads : [],
             };
 
+            window.__lastNovaPayload = payload;
+            console.log("[NovaEmergencyBridge] outgoing payload", payload);
+
             const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: {
@@ -1308,7 +1311,8 @@ if (
 if (
     executionFromResponse &&
     typeof executionFromResponse === "object" &&
-    Array.isArray(executionFromResponse.steps)
+    Array.isArray(executionFromResponse.steps) &&
+    executionFromResponse.steps.length > 0
 ) {
     state.execution = state.execution || {};
     state.execution.status = executionFromResponse.status || "running";
@@ -2799,4 +2803,95 @@ window.NovaEmergencyHandleFiles = handleFiles;
 
     setTimeout(restoreMemory, 600);
     setTimeout(restoreMemory, 1600);
-})();kij
+})()
+
+// =====================================================
+// NOVA EMERGENCY MANUAL FILE PICKER
+// Append at bottom of nova-custom.js
+// =====================================================
+(function () {
+    "use strict";
+
+    if (window.NovaEmergencyManualFilePickerBooted) return;
+    window.NovaEmergencyManualFilePickerBooted = true;
+
+    function bootManualPicker() {
+        if (document.querySelector("[data-manual-file-picker]")) return;
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = "Attach File";
+        btn.setAttribute("data-manual-file-picker", "true");
+
+        btn.style.position = "fixed";
+        btn.style.left = "18px";
+        btn.style.bottom = "18px";
+        btn.style.zIndex = "999999";
+        btn.style.padding = "10px 12px";
+        btn.style.borderRadius = "12px";
+        btn.style.border = "1px solid rgba(255,255,255,0.2)";
+        btn.style.background = "rgba(10,10,10,0.92)";
+        btn.style.color = "#fff";
+        btn.style.cursor = "pointer";
+
+        const input = document.createElement("input");
+        input.type = "file";
+        input.multiple = true;
+        input.style.display = "none";
+        input.accept = [
+            ".mp3",
+            ".wav",
+            ".m4a",
+            ".aac",
+            ".ogg",
+            ".webm",
+            ".flac",
+            ".txt",
+            ".py",
+            ".js",
+            ".json",
+            ".html",
+            ".css",
+            ".md",
+            ".docx",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".webp"
+        ].join(",");
+
+        input.addEventListener("change", function () {
+            if (
+                typeof window.NovaEmergencyHandleFiles === "function" &&
+                input.files &&
+                input.files.length
+            ) {
+                window.NovaEmergencyHandleFiles(input.files);
+            } else {
+                console.error("[NovaManualFilePicker] NovaEmergencyHandleFiles missing or no files selected", {
+                    hasHandler: typeof window.NovaEmergencyHandleFiles === "function",
+                    files: input.files ? input.files.length : 0,
+                });
+            }
+
+            input.value = "";
+        });
+
+        btn.onclick = function () {
+            input.click();
+        };
+
+        document.body.appendChild(input);
+        document.body.appendChild(btn);
+
+        console.log("[NovaManualFilePicker] loaded");
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", bootManualPicker);
+    } else {
+        bootManualPicker();
+    }
+
+    setTimeout(bootManualPicker, 500);
+})();
