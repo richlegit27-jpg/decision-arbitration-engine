@@ -5,10 +5,6 @@
   let busy = false;
   let wired = false;
 
-  function getTtsButton() {
-    return document.querySelector('[data-action="tts-toggle"]');
-  }
-
   function findAssistantMessages() {
     return Array.from(
       document.querySelectorAll(
@@ -35,21 +31,51 @@
     return assistantMessages[assistantMessages.length - 1] || null;
   }
 
-  function getTargetAssistantText(event) {
-    const clickedMessage = event.target.closest(
-      ".nova-message-assistant, [data-role='assistant'], [data-message-role='assistant']"
-    );
-
-    if (clickedMessage) {
-      return getMessageTextFromElement(clickedMessage);
-    }
-
-    return getMessageTextFromElement(getLastAssistantMessage());
+  function getGlobalTtsButton() {
+    return document.querySelector('[data-action="tts-toggle"]');
   }
 
-  function setButtonState(state) {
-    const button = getTtsButton();
+  function injectStyles() {
+    if (document.querySelector("#nova-tts-player-style")) {
+      return;
+    }
 
+    const style = document.createElement("style");
+    style.id = "nova-tts-player-style";
+    style.textContent = `
+      .nova-inline-tts-button {
+        margin-left: 8px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.16);
+        background: rgba(17,24,39,0.78);
+        color: white;
+        font-size: 13px;
+        line-height: 1;
+        cursor: pointer;
+        vertical-align: middle;
+        opacity: 0.85;
+      }
+
+      .nova-inline-tts-button:hover {
+        opacity: 1;
+        transform: translateY(-1px);
+      }
+
+      .nova-inline-tts-button.is-playing {
+        background: rgba(220,38,38,0.88);
+      }
+
+      .nova-inline-tts-button.is-busy {
+        opacity: 0.65;
+        cursor: wait;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  function setButtonState(button, state) {
     if (!button) {
       return;
     }
@@ -71,7 +97,17 @@
     }
 
     button.textContent = "🔊";
-    button.title = "Play voice reply";
+    button.title = "Play voice";
+  }
+
+  function resetAllButtons() {
+    const buttons = document.querySelectorAll(
+      '[data-action="tts-toggle"], .nova-inline-tts-button'
+    );
+
+    buttons.forEach(function (button) {
+      setButtonState(button, "idle");
+    });
   }
 
   async function createSpeech(text) {
@@ -103,10 +139,10 @@
     }
 
     busy = false;
-    setButtonState("idle");
+    resetAllButtons();
   }
 
-  async function playText(text) {
+  async function playText(text, button) {
     if (!text) {
       console.warn("[NovaTTS] No assistant text found.");
       return;
@@ -123,7 +159,8 @@
 
     try {
       busy = true;
-      setButtonState("busy");
+      resetAllButtons();
+      setButtonState(button, "busy");
 
       const audioUrl = await createSpeech(text);
 
@@ -132,17 +169,17 @@
       currentAudio.onended = function () {
         currentAudio = null;
         busy = false;
-        setButtonState("idle");
+        resetAllButtons();
       };
 
       currentAudio.onerror = function () {
         currentAudio = null;
         busy = false;
-        setButtonState("idle");
+        resetAllButtons();
         console.error("[NovaTTS] Audio playback failed.");
       };
 
-      setButtonState("playing");
+      setButtonState(button, "playing");
       await currentAudio.play();
 
       console.log("[NovaTTS] playing", audioUrl);
@@ -150,14 +187,41 @@
       console.error("[NovaTTS] failed", error);
       busy = false;
       currentAudio = null;
-      setButtonState("idle");
+      resetAllButtons();
     }
   }
 
-  async function handleTtsClick(event) {
-    const button = event.target.closest('[data-action="tts-toggle"]');
+  function addInlineButtons() {
+    injectStyles();
 
-    if (!button) {
+    const assistantMessages = findAssistantMessages();
+
+    assistantMessages.forEach(function (message) {
+      if (message.querySelector(".nova-inline-tts-button")) {
+        return;
+      }
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "nova-inline-tts-button";
+      button.setAttribute("data-action", "tts-message");
+      button.textContent = "🔊";
+      button.title = "Play this reply";
+
+      const target =
+        message.querySelector(".nova-message-role") ||
+        message.querySelector(".nova-message-text") ||
+        message;
+
+      target.appendChild(button);
+    });
+  }
+
+  async function handleTtsClick(event) {
+    const inlineButton = event.target.closest(".nova-inline-tts-button");
+    const globalButton = event.target.closest('[data-action="tts-toggle"]');
+
+    if (!inlineButton && !globalButton) {
       return;
     }
 
@@ -168,44 +232,80 @@
       event.stopImmediatePropagation();
     }
 
-    const text = getTargetAssistantText(event);
-    await playText(text);
-  }
+    if (inlineButton) {
+      const message = inlineButton.closest(
+        ".nova-message-assistant, [data-role='assistant'], [data-message-role='assistant']"
+      );
 
-  function wireTtsButton() {
-    const button = getTtsButton();
-
-    if (!button) {
-      console.warn("[NovaTTS] TTS button not found");
+      const text = getMessageTextFromElement(message);
+      await playText(text, inlineButton);
       return;
     }
 
-    button.setAttribute("data-nova-tts-bound", "true");
-    button.style.pointerEvents = "auto";
-    button.style.cursor = "pointer";
+    const lastMessage = getLastAssistantMessage();
+    const text = getMessageTextFromElement(lastMessage);
+    await playText(text, globalButton);
+  }
+
+  function observeMessages() {
+    const target =
+      document.querySelector("[data-chat-thread]") ||
+      document.querySelector(".nova-thread") ||
+      document.querySelector("#chat-thread") ||
+      document.body;
+
+    const observer = new MutationObserver(function () {
+      addInlineButtons();
+    });
+
+    observer.observe(target, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  function wireTts() {
+    injectStyles();
+    addInlineButtons();
+
+    const globalButton = getGlobalTtsButton();
+
+    if (globalButton) {
+      globalButton.setAttribute("data-nova-tts-bound", "true");
+      globalButton.style.pointerEvents = "auto";
+      globalButton.style.cursor = "pointer";
+      setButtonState(globalButton, "idle");
+    }
 
     if (!wired) {
       document.addEventListener("click", handleTtsClick, true);
+      observeMessages();
       wired = true;
     }
 
-    setButtonState("idle");
+    setTimeout(addInlineButtons, 500);
+    setTimeout(addInlineButtons, 1500);
+    setTimeout(addInlineButtons, 3000);
 
-    console.log("[NovaTTS] button wired", button);
+    console.log("[NovaTTS] wired");
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", wireTtsButton);
+    document.addEventListener("DOMContentLoaded", wireTts);
   } else {
-    wireTtsButton();
+    wireTts();
   }
 
   window.NovaTTS = {
     playLast: function () {
-      return playText(getMessageTextFromElement(getLastAssistantMessage()));
+      const lastMessage = getLastAssistantMessage();
+      return playText(getMessageTextFromElement(lastMessage), getGlobalTtsButton());
     },
-    playText: playText,
+    playText: function (text) {
+      return playText(text, getGlobalTtsButton());
+    },
     stop: stopAudio,
-    wire: wireTtsButton,
+    wire: wireTts,
+    addButtons: addInlineButtons,
   };
 })();
