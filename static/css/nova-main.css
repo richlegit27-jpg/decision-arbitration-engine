@@ -11101,3 +11101,48 @@ body.is-rail-open [data-rail-panel="execution"].is-active [data-execution-panel]
     border-color: rgba(255, 255, 255, 0.26);
 }
 
+/* NOVA EMERGENCY RAIL OPEN FIX */
+body.is-rail-open .nova-rail,
+body.nova-rail-open .nova-rail,
+body.is-rail-open .nova-right-rail,
+body.nova-rail-open .nova-right-rail {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+[data-rail-panel].is-active,
+[data-side-panel].is-active,
+.nova-rail-panel.is-active,
+.nova-side-panel.is-active {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* NOVA RIGHT RAIL OPEN/CLOSE FIX */
+body.is-right-rail-open .nova-right-rail,
+body.nova-right-rail-open .nova-right-rail,
+.nova-right-rail.is-active,
+.nova-right-rail.is-open {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+body:not(.is-right-rail-open):not(.nova-right-rail-open) .nova-right-rail:not(.is-active):not(.is-open) {
+    pointer-events: none;
+}
+
+[data-rail-panel].is-active,
+[data-side-panel].is-active,
+.nova-rail-panel.is-active,
+.nova-side-panel.is-active {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}

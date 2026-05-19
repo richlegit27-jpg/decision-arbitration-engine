@@ -3720,3 +3720,195 @@ function buildNovaMessageActions(msg) {
 })();
 
 
+// =====================================================
+// NOVA RIGHT RAIL TOGGLE FIX
+// Memory / Web / Execution / Close
+// Append at bottom of nova-custom.js
+// =====================================================
+(function () {
+    "use strict";
+
+    if (window.NovaRightRailToggleFixBooted) return;
+    window.NovaRightRailToggleFixBooted = true;
+
+    function qs(selector, root) {
+        return (root || document).querySelector(selector);
+    }
+
+    function qsa(selector, root) {
+        return Array.from((root || document).querySelectorAll(selector));
+    }
+
+    function cleanName(value) {
+        value = String(value || "").toLowerCase().trim();
+
+        if (value.includes("memory")) return "memory";
+        if (value.includes("web")) return "web";
+        if (value.includes("execution")) return "execution";
+        if (value.includes("exec")) return "execution";
+        if (value.includes("runtime")) return "execution";
+        if (value.includes("artifact")) return "artifacts";
+        if (value.includes("image")) return "artifacts";
+        if (value.includes("media")) return "artifacts";
+        if (value.includes("session")) return "sessions";
+        if (value.includes("chat")) return "sessions";
+        if (value.includes("close")) return "close";
+
+        return value;
+    }
+
+    function findRightRail() {
+        return (
+            qs(".nova-right-rail") ||
+            qs("[data-right-rail]") ||
+            qs("#nova-right-rail") ||
+            qs(".right-rail")
+        );
+    }
+
+    function findPanel(name) {
+        name = cleanName(name);
+
+        return (
+            qs('[data-rail-panel="' + name + '"]') ||
+            qs('[data-side-panel="' + name + '"]') ||
+            qs('[data-panel="' + name + '"]') ||
+            qs("#" + name + "-panel") ||
+            qs("#nova-" + name + "-panel") ||
+            qs("#" + name) ||
+            qs("." + name + "-panel")
+        );
+    }
+
+    function closeRightRail() {
+        const rail = findRightRail();
+
+        document.body.classList.remove("is-rail-open");
+        document.body.classList.remove("nova-rail-open");
+        document.body.classList.remove("is-right-rail-open");
+        document.body.classList.remove("nova-right-rail-open");
+
+        qsa("[data-rail-panel], [data-side-panel], .nova-rail-panel, .nova-side-panel").forEach(function (panel) {
+            panel.classList.remove("is-active");
+            panel.classList.remove("active");
+            panel.setAttribute("aria-hidden", "true");
+        });
+
+        if (rail) {
+            rail.classList.remove("is-active");
+            rail.classList.remove("active");
+            rail.classList.remove("is-open");
+            rail.setAttribute("aria-hidden", "true");
+        }
+
+        console.log("[NovaRightRailToggleFix] closed");
+    }
+
+    function openRightPanel(name) {
+        name = cleanName(name);
+
+        if (name === "close") {
+            closeRightRail();
+            return true;
+        }
+
+        const rail = findRightRail();
+        const panel = findPanel(name);
+
+        if (!panel) {
+            console.warn("[NovaRightRailToggleFix] panel not found", name);
+            return false;
+        }
+
+        qsa("[data-rail-panel], [data-side-panel], .nova-rail-panel, .nova-side-panel").forEach(function (item) {
+            item.classList.remove("is-active");
+            item.classList.remove("active");
+            item.setAttribute("aria-hidden", "true");
+        });
+
+        document.body.classList.add("is-rail-open");
+        document.body.classList.add("nova-rail-open");
+        document.body.classList.add("is-right-rail-open");
+        document.body.classList.add("nova-right-rail-open");
+
+        if (rail) {
+            rail.classList.add("is-active");
+            rail.classList.add("active");
+            rail.classList.add("is-open");
+            rail.setAttribute("aria-hidden", "false");
+        }
+
+        panel.classList.add("is-active");
+        panel.classList.add("active");
+        panel.setAttribute("aria-hidden", "false");
+
+        console.log("[NovaRightRailToggleFix] opened", {
+            name: name,
+            railFound: !!rail,
+            panelFound: !!panel
+        });
+
+        return true;
+    }
+
+    function getButtonTarget(button) {
+        if (!button) return "";
+
+        const attrs = [
+            "data-rail-target",
+            "data-side-target",
+            "data-panel-target",
+            "data-open-panel",
+            "data-open-rail",
+            "data-target",
+            "data-action",
+            "aria-controls",
+            "title",
+            "aria-label"
+        ];
+
+        for (let i = 0; i < attrs.length; i += 1) {
+            const value = button.getAttribute(attrs[i]);
+            const cleaned = cleanName(value);
+            if (
+                cleaned === "memory" ||
+                cleaned === "web" ||
+                cleaned === "execution" ||
+                cleaned === "artifacts" ||
+                cleaned === "sessions" ||
+                cleaned === "close"
+            ) {
+                return cleaned;
+            }
+        }
+
+        return cleanName(button.textContent || "");
+    }
+
+    document.addEventListener("click", function (event) {
+        const button = event.target.closest("button, [role='button'], a, [data-action], [data-rail-target], [data-side-target], [data-panel-target]");
+
+        if (!button) return;
+
+        const target = getButtonTarget(button);
+
+        if (
+            target === "memory" ||
+            target === "web" ||
+            target === "execution" ||
+            target === "artifacts" ||
+            target === "sessions" ||
+            target === "close"
+        ) {
+            event.preventDefault();
+            event.stopPropagation();
+            openRightPanel(target);
+        }
+    }, true);
+
+    window.NovaOpenRightPanel = openRightPanel;
+    window.NovaCloseRightRail = closeRightRail;
+
+    console.log("[NovaRightRailToggleFix] loaded");
+})();
+
