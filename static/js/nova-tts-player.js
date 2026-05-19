@@ -3,23 +3,48 @@
 
   let currentAudio = null;
   let busy = false;
-
-  function getLastAssistantText() {
-    const assistantMessages = Array.from(
-      document.querySelectorAll(".nova-message-assistant .nova-message-text")
-    );
-
-    const last = assistantMessages[assistantMessages.length - 1];
-
-    if (!last) {
-      return "";
-    }
-
-    return String(last.innerText || last.textContent || "").trim();
-  }
+  let wired = false;
 
   function getTtsButton() {
     return document.querySelector('[data-action="tts-toggle"]');
+  }
+
+  function findAssistantMessages() {
+    return Array.from(
+      document.querySelectorAll(
+        ".nova-message-assistant, [data-role='assistant'], [data-message-role='assistant']"
+      )
+    );
+  }
+
+  function getMessageTextFromElement(element) {
+    if (!element) {
+      return "";
+    }
+
+    const textElement =
+      element.querySelector(".nova-message-text") ||
+      element.querySelector("[data-message-text]") ||
+      element;
+
+    return String(textElement.innerText || textElement.textContent || "").trim();
+  }
+
+  function getLastAssistantMessage() {
+    const assistantMessages = findAssistantMessages();
+    return assistantMessages[assistantMessages.length - 1] || null;
+  }
+
+  function getTargetAssistantText(event) {
+    const clickedMessage = event.target.closest(
+      ".nova-message-assistant, [data-role='assistant'], [data-message-role='assistant']"
+    );
+
+    if (clickedMessage) {
+      return getMessageTextFromElement(clickedMessage);
+    }
+
+    return getMessageTextFromElement(getLastAssistantMessage());
   }
 
   function setButtonState(state) {
@@ -81,18 +106,10 @@
     setButtonState("idle");
   }
 
-  async function playLastAssistantMessage(event) {
-    const button = event.target.closest('[data-action="tts-toggle"]');
-
-    if (!button) {
+  async function playText(text) {
+    if (!text) {
+      console.warn("[NovaTTS] No assistant text found.");
       return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (typeof event.stopImmediatePropagation === "function") {
-      event.stopImmediatePropagation();
     }
 
     if (currentAudio) {
@@ -101,13 +118,6 @@
     }
 
     if (busy) {
-      return;
-    }
-
-    const text = getLastAssistantText();
-
-    if (!text) {
-      console.warn("[NovaTTS] No assistant text found.");
       return;
     }
 
@@ -144,6 +154,24 @@
     }
   }
 
+  async function handleTtsClick(event) {
+    const button = event.target.closest('[data-action="tts-toggle"]');
+
+    if (!button) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (typeof event.stopImmediatePropagation === "function") {
+      event.stopImmediatePropagation();
+    }
+
+    const text = getTargetAssistantText(event);
+    await playText(text);
+  }
+
   function wireTtsButton() {
     const button = getTtsButton();
 
@@ -156,7 +184,10 @@
     button.style.pointerEvents = "auto";
     button.style.cursor = "pointer";
 
-    document.addEventListener("click", playLastAssistantMessage, true);
+    if (!wired) {
+      document.addEventListener("click", handleTtsClick, true);
+      wired = true;
+    }
 
     setButtonState("idle");
 
@@ -171,13 +202,10 @@
 
   window.NovaTTS = {
     playLast: function () {
-      return playLastAssistantMessage({
-        target: getTtsButton(),
-        preventDefault: function () {},
-        stopPropagation: function () {},
-        stopImmediatePropagation: function () {},
-      });
+      return playText(getMessageTextFromElement(getLastAssistantMessage()));
     },
+    playText: playText,
     stop: stopAudio,
+    wire: wireTtsButton,
   };
 })();
