@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nova Mobile</title>
+
+    <style>
+        :root {
+            --bg: #070711;
+            --panel: rgba(18, 18, 32, 0.94);
+            --panel-soft: rgba(255, 255, 255, 0.055);
+            --border: rgba(255, 255, 255, 0.12);
+            --text: rgba(255, 255, 255, 0.94);
+            --muted: rgba(255, 255, 255, 0.62);
+            --accent: #8d6bff;
+            --accent-2: #00d6ff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            min-height: 100%;
+            margin: 0;
+            overflow-x: hidden;
+            background:
+                radial-gradient(circle at top left, rgba(141, 107, 255, 0.28), transparent 34%),
+                radial-gradient(circle at top right, rgba(0, 214, 255, 0.16), transparent 34%),
+                var(--bg);
+            color: var(--text);
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+        }
+
+        .mobile-shell {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 96px;
+        }
+
+        .mobile-topbar {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-height: 58px;
+            padding: 12px 14px;
+            background: rgba(7, 7, 17, 0.84);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(18px);
+        }
+
+        .mobile-brand {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .mobile-title {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+        }
+
+        .mobile-subtitle {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .mobile-status {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: #39ffb6;
+            box-shadow: 0 0 18px rgba(57, 255, 182, 0.7);
+        }
+
+        .mobile-messages {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            padding: 16px 10px 18px;
+        }
+
+        .welcome-card {
+            width: 100%;
+            max-width: 430px;
+            margin: 18px auto 8px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 26px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.04));
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+            text-align: center;
+        }
+
+        .welcome-card h1 {
+            margin: 0 0 8px;
+            font-size: 24px;
+            line-height: 1.05;
+            letter-spacing: -0.05em;
+        }
+
+        .welcome-card p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.45;
+        }
+
+        .message {
+            width: fit-content;
+            max-width: 92%;
+            padding: 13px 14px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            line-height: 1.45;
+            font-size: 15px;
+            overflow-wrap: anywhere;
+            white-space: pre-wrap;
+            box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22);
+        }
+
+        .message.user {
+            align-self: flex-end;
+            color: white;
+            background: linear-gradient(135deg, rgba(141, 107, 255, 0.98), rgba(54, 125, 255, 0.9));
+            border-bottom-right-radius: 7px;
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.045));
+            border-bottom-left-radius: 7px;
+        }
+
+        .mobile-composer {
+            position: fixed;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            z-index: 100;
+            display: grid;
+            grid-template-columns: 1fr 46px;
+            align-items: end;
+            gap: 8px;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 26px;
+            background: rgba(13, 13, 25, 0.92);
+            backdrop-filter: blur(22px);
+            box-shadow:
+                0 22px 58px rgba(0, 0, 0, 0.42),
+                0 0 42px rgba(141, 107, 255, 0.24);
+        }
+
+        .mobile-input {
+            width: 100%;
+            min-width: 0;
+            height: 46px;
+            min-height: 46px;
+            max-height: 120px;
+            padding: 12px 14px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 18px;
+            outline: none;
+            resize: none;
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.06);
+            font-size: 16px;
+            line-height: 1.25;
+            font-family: inherit;
+        }
+
+        .mobile-input:focus {
+            border-color: rgba(141, 107, 255, 0.62);
+            box-shadow: 0 0 0 4px rgba(141, 107, 255, 0.14);
+        }
+
+        .mobile-send {
+            width: 46px;
+            height: 46px;
+            min-width: 46px;
+            min-height: 46px;
+            border: 0;
+            border-radius: 999px;
+            color: white;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            box-shadow: 0 14px 30px rgba(93, 82, 255, 0.36);
+            font-size: 20px;
+            font-weight: 900;
+        }
+
+        .mobile-send:disabled {
+            opacity: 0.55;
+        }
+    </style>
+</head>
+
+<body>
+    <main class="mobile-shell">
+        <header class="mobile-topbar">
+            <div class="mobile-brand">
+                <div class="mobile-title">Nova</div>
+                <div class="mobile-subtitle">Mobile command center</div>
+            </div>
+            <div class="mobile-status" aria-label="Nova online"></div>
+        </header>
+
+        <section id="nova-main-content-mobile" class="mobile-messages">
+            <div class="welcome-card" id="nova-mobile-welcome">
+                <h1>Nova is live</h1>
+                <p>Clean mobile mode is running. Send a message to test the backend.</p>
+            </div>
+        </section>
+
+        <form id="nova-mobile-form" class="mobile-composer">
+            <textarea id="nova-input-mobile" class="mobile-input" rows="1" placeholder="Message Nova..."></textarea>
+            <button id="nova-send-mobile" class="mobile-send" type="submit">➤</button>
+        </form>
+    </main>
+
+    <script>
+        (function () {
+            "use strict";
+
+            var form = document.getElementById("nova-mobile-form");
+            var input = document.getElementById("nova-input-mobile");
+            var send = document.getElementById("nova-send-mobile");
+            var messages = document.getElementById("nova-main-content-mobile");
+            var welcome = document.getElementById("nova-mobile-welcome");
+            var sessionId = localStorage.getItem("nova_mobile_session_id") || "";
+
+            function addMessage(role, text) {
+                if (welcome) {
+                    welcome.remove();
+                    welcome = null;
+                }
+
+                var bubble = document.createElement("div");
+                bubble.className = "message " + role;
+                bubble.textContent = text || "";
+                messages.appendChild(bubble);
+                window.scrollTo({
+                    top: document.body.scrollHeight,
+                    behavior: "smooth"
+                });
+
+                return bubble;
+            }
+
+            function getAssistantText(data) {
+                if (!data) {
+                    return "No response returned.";
+                }
+
+                if (data.session_id) {
+                    sessionId = data.session_id;
+                    localStorage.setItem("nova_mobile_session_id", sessionId);
+                }
+
+                if (data.active_session_id) {
+                    sessionId = data.active_session_id;
+                    localStorage.setItem("nova_mobile_session_id", sessionId);
+                }
+
+                if (data.assistant_message) {
+                    return (
+                        data.assistant_message.text ||
+                        data.assistant_message.content ||
+                        data.assistant_message.body ||
+                        "No assistant text returned."
+                    );
+                }
+
+                return (
+                    data.assistant_text ||
+                    data.text ||
+                    data.output_text ||
+                    data.response ||
+                    "No response text returned."
+                );
+            }
+
+            async function sendMessage() {
+                var text = input.value.trim();
+
+                if (!text) {
+                    return;
+                }
+
+                input.value = "";
+                addMessage("user", text);
+
+                var thinking = addMessage("assistant", "Thinking...");
+                send.disabled = true;
+
+                try {
+                    var response = await fetch("/api/chat", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            user_text: text,
+                            message: text,
+                            text: text,
+                            session_id: sessionId,
+                            attachments: []
+                        })
+                    });
+
+                    var data = await response.json();
+                    thinking.textContent = getAssistantText(data);
+                } catch (error) {
+                    thinking.textContent = "Mobile request failed: " + error.message;
+                } finally {
+                    send.disabled = false;
+                    input.focus();
+                }
+            }
+
+            form.addEventListener("submit", function (event) {
+                event.preventDefault();
+                sendMessage();
+            });
+
+            input.addEventListener("keydown", function (event) {
+                if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    sendMessage();
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

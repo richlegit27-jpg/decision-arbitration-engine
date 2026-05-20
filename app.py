@@ -72,6 +72,13 @@ ensure_dir(UPLOADS_DIR)
 
 app.config["UPLOAD_FOLDER"] = str(UPLOADS_DIR)
 
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 # -----------------------
 # SERVICES
 # -----------------------
@@ -618,13 +625,7 @@ def cleanup_competing_name_memories(session_id: str, winning_text: str):
             continue
 
         delete_memory_item(item_id)
-# -----------------------
-# PAGE ROUTES
-# -----------------------
 
-@app.get("/")
-def index():
-    return render_template("index.html")
 
 
 # -----------------------
@@ -2567,16 +2568,42 @@ def create_startup_backup():
         except Exception as e:
             print(f"[NOVA BACKUP] Cleanup error: {e}")
 
+
+@app.get("/")
+def home():
+    return render_template("home.html")
+
+@app.route("/mobile")
+def mobile_index():
+    return render_template("index-mobile.html")
+
+@app.get("/app")
+def nova_app():
+    return render_template("index.html")
+
+@app.route("/login")
+def login():
+    return render_template("login.html")
+
+@app.route("/signup")
+def signup():
+    return render_template("signup.html")
+
+
+@app.route("/blog")
+def blog():
+    return render_template("blog.html")
+
+
 # -----------------------
 # MAIN
 # -----------------------
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=5001,
         debug=True,
         use_reloader=False,
     )
-
 
