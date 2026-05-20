@@ -775,7 +775,7 @@ class SafeUnifiedRuntime:
         runtime_task_synthesis = (
             self.runtime_task_synthesis.synthesize_tasks(
                 execution_state=execution_state,
-                working_state=working_state,
+                working_state=world_state,
                 user_intent=execution_state.get("user_intent"),
                 failures=execution_state.get("failures", []),
                 memory=execution_state.get("memory", []),
@@ -1053,15 +1053,10 @@ class SafeUnifiedRuntime:
         )
 
         policy_enforcement = (
-            self.runtime_policy_enforcement.enforce(
-                action=final_action,
-                runtime_health=runtime_health,
-                runtime_risk_pressure=(
-                    runtime_risk_pressure
-                ),
-                governance_memory=(
-                    runtime_governance_memory
-                ),
+            self.runtime_policy_enforcement.enforce_soft(
+                execution_state=execution_state,
+                final_action=final_action,
+                control=control,
             )
         )
 
@@ -1474,6 +1469,40 @@ class SafeUnifiedRuntime:
             or reflection.get("signal")
             or "runtime_idle"
         )
+
+        if execution_summary.get("complete"):
+
+            execution_state[
+                "runtime_repair_requested"
+            ] = False
+
+            execution_state[
+                "runtime_execution_reroute_requested"
+            ] = False
+
+            execution_state[
+                "runtime_failure_isolation_requested"
+            ] = False
+
+            execution_state[
+                "runtime_retry_ceiling_hit"
+            ] = False
+
+            runtime_signal = (
+                "runtime_stabilized_success"
+            )
+
+            execution_state[
+                "recovery_mode"
+            ] = False
+
+            execution_state[
+                "runtime_execute_now"
+            ] = False
+
+            execution_state[
+                "runtime_autonomous_execution_allowed"
+            ] = False
 
         runtime_memory_event = {
             "cycle": self.cycle_count,
@@ -2731,6 +2760,52 @@ class SafeUnifiedRuntime:
             "runtime_signal": result.get("runtime_signal"),
             "runtime_final_action": result.get("runtime_final_action"),
         }
+
+        if execution_summary.get("complete"):
+
+            execution_state[
+                "recovery_mode"
+            ] = False
+
+            execution_state[
+                "runtime_execute_now"
+            ] = False
+
+            execution_state[
+                "runtime_autonomous_execution_allowed"
+            ] = False
+
+            execution_state[
+                "runtime_repair_requested"
+            ] = False
+
+            execution_state[
+                "runtime_failure_isolation_requested"
+            ] = False
+
+            execution_state[
+                "runtime_execution_reroute_requested"
+            ] = False
+
+            execution_state[
+                "runtime_retry_ceiling_hit"
+            ] = False
+
+            execution_state[
+                "runtime_signal"
+            ] = (
+                "runtime_stabilized_success"
+            )
+
+            result[
+                "runtime_signal"
+            ] = (
+                "runtime_stabilized_success"
+            )
+
+            result[
+                "execution_state"
+            ] = execution_state
 
         return result
 
