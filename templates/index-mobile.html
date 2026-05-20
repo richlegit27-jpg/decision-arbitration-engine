@@ -78,12 +78,30 @@
             color: var(--muted);
         }
 
+
         .mobile-status {
             width: 10px;
             height: 10px;
             border-radius: 999px;
             background: #39ffb6;
             box-shadow: 0 0 18px rgba(57, 255, 182, 0.7);
+        }
+
+        .mobile-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .mobile-header-btn {
+            min-height: 34px;
+            padding: 0 13px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.075);
+            font-size: 13px;
+            font-weight: 800;
         }
 
         .mobile-messages {
@@ -212,13 +230,19 @@
 
 <body>
     <main class="mobile-shell">
-        <header class="mobile-topbar">
-            <div class="mobile-brand">
-                <div class="mobile-title">Nova</div>
-                <div class="mobile-subtitle">Mobile command center</div>
-            </div>
-            <div class="mobile-status" aria-label="Nova online"></div>
-        </header>
+<header class="mobile-topbar">
+    <div class="mobile-brand">
+        <div class="mobile-title">Nova</div>
+        <div class="mobile-subtitle">Mobile command center</div>
+    </div>
+
+    <div class="mobile-header-actions">
+        <button id="nova-mobile-new-chat" class="mobile-header-btn" type="button">
+            New
+        </button>
+        <div class="mobile-status" aria-label="Nova online"></div>
+    </div>
+</header>
 
         <section id="nova-main-content-mobile" class="mobile-messages">
             <div class="welcome-card" id="nova-mobile-welcome">
@@ -243,7 +267,7 @@
             var messages = document.getElementById("nova-main-content-mobile");
             var welcome = document.getElementById("nova-mobile-welcome");
             var sessionId = localStorage.getItem("nova_mobile_session_id") || "";
-
+	    var newChat = document.getElementById("nova-mobile-new-chat");
             function addMessage(role, text) {
                 if (welcome) {
                     welcome.remove();
@@ -344,6 +368,26 @@
                     sendMessage();
                 }
             });
+
+            if (newChat) {
+                newChat.addEventListener("click", function () {
+                    sessionId = "";
+                    localStorage.removeItem("nova_mobile_session_id");
+
+                    messages.innerHTML = "";
+
+                    welcome = document.createElement("div");
+                    welcome.className = "welcome-card";
+                    welcome.id = "nova-mobile-welcome";
+                    welcome.innerHTML = [
+                        "<h1>Nova is live</h1>",
+                        "<p>New mobile chat started.</p>"
+                    ].join("");
+
+                    messages.appendChild(welcome);
+                    input.focus();
+                });
+            }
         })();
     </script>
 </body>
