@@ -15,6 +15,9 @@
             --muted: rgba(255, 255, 255, 0.62);
             --accent: #8d6bff;
             --accent-2: #00d6ff;
+            --danger: #ff5f7e;
+            --good: #39ffb6;
+            --warn: #ffd166;
         }
 
         * {
@@ -43,7 +46,7 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            padding-bottom: 96px;
+            padding-bottom: 124px;
         }
 
         .mobile-topbar {
@@ -65,6 +68,7 @@
             display: flex;
             flex-direction: column;
             gap: 2px;
+            min-width: 0;
         }
 
         .mobile-title {
@@ -81,12 +85,13 @@
         .mobile-header-actions {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+            flex-shrink: 0;
         }
 
         .mobile-header-btn {
             min-height: 34px;
-            padding: 0 13px;
+            padding: 0 12px;
             border: 1px solid var(--border);
             border-radius: 999px;
             color: var(--text);
@@ -99,8 +104,121 @@
             width: 10px;
             height: 10px;
             border-radius: 999px;
-            background: #39ffb6;
+            background: var(--good);
             box-shadow: 0 0 18px rgba(57, 255, 182, 0.7);
+        }
+
+        .mobile-status.is-busy {
+            background: var(--warn);
+            box-shadow: 0 0 18px rgba(255, 209, 102, 0.7);
+        }
+
+        .mobile-status.is-offline {
+            background: var(--danger);
+            box-shadow: 0 0 18px rgba(255, 95, 126, 0.7);
+        }
+
+        .mobile-system-status {
+            margin: 10px 10px 0;
+            padding: 9px 12px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.045);
+            font-size: 12px;
+            font-weight: 750;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .mobile-system-status.is-good {
+            color: var(--good);
+        }
+
+        .mobile-system-status.is-warn {
+            color: var(--warn);
+        }
+
+        .mobile-system-status.is-error {
+            color: var(--danger);
+        }
+
+        .mobile-sessions-panel {
+            margin: 12px 10px 0;
+            padding: 14px;
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            background: rgba(18, 18, 32, 0.86);
+            box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+        }
+
+        .mobile-sessions-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .mobile-sessions-title {
+            color: var(--text);
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .mobile-sessions-refresh {
+            min-height: 28px;
+            padding: 0 10px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.055);
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .mobile-sessions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .mobile-session-item {
+            width: 100%;
+            padding: 10px 11px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.055);
+            text-align: left;
+            font: inherit;
+        }
+
+        .mobile-session-item.is-active {
+            border-color: rgba(141, 107, 255, 0.72);
+            background: rgba(141, 107, 255, 0.14);
+        }
+
+        .mobile-session-title {
+            font-size: 13px;
+            font-weight: 850;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .mobile-session-meta {
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 11px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .mobile-messages {
@@ -209,7 +327,12 @@
         }
 
         .mobile-copy-btn:active,
-        .mobile-regen-btn:active {
+        .mobile-regen-btn:active,
+        .mobile-session-item:active,
+        .mobile-header-btn:active,
+        .mobile-sessions-refresh:active,
+        .mobile-attach-btn:active,
+        .mobile-attachment-remove:active {
             transform: scale(0.98);
         }
 
@@ -220,7 +343,7 @@
             bottom: 10px;
             z-index: 100;
             display: grid;
-            grid-template-columns: 1fr 46px;
+            grid-template-columns: 42px 1fr 46px;
             align-items: end;
             gap: 8px;
             padding: 10px;
@@ -231,6 +354,64 @@
             box-shadow:
                 0 22px 58px rgba(0, 0, 0, 0.42),
                 0 0 42px rgba(141, 107, 255, 0.24);
+        }
+
+        .mobile-attach-btn {
+            width: 42px;
+            height: 42px;
+            min-width: 42px;
+            min-height: 42px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.075);
+            font-size: 22px;
+            font-weight: 800;
+        }
+
+        .mobile-input-wrap {
+            min-width: 0;
+        }
+
+        .mobile-attachments {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 7px;
+        }
+
+        .mobile-attachment-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            max-width: 100%;
+            min-height: 28px;
+            padding: 0 8px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.055);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .mobile-attachment-name {
+            max-width: 170px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .mobile-attachment-remove {
+            width: 20px;
+            height: 20px;
+            padding: 0;
+            border: 0;
+            border-radius: 999px;
+            color: white;
+            background: rgba(255, 95, 126, 0.32);
+            font-size: 13px;
+            font-weight: 900;
         }
 
         .mobile-input {
@@ -270,7 +451,10 @@
             font-weight: 900;
         }
 
-        .mobile-send:disabled {
+        .mobile-send:disabled,
+        .mobile-attach-btn:disabled,
+        .mobile-header-btn:disabled,
+        .mobile-sessions-refresh:disabled {
             opacity: 0.55;
         }
     </style>
@@ -293,12 +477,53 @@
                     New
                 </button>
 
+                <button
+                    id="nova-mobile-sessions-toggle"
+                    class="mobile-header-btn"
+                    type="button"
+                >
+                    Sessions
+                </button>
+
                 <div
+                    id="nova-mobile-status-dot"
                     class="mobile-status"
                     aria-label="Nova online"
                 ></div>
             </div>
         </header>
+
+        <div
+            id="nova-mobile-system-status"
+            class="mobile-system-status is-good"
+        >
+            Nova mobile ready.
+        </div>
+
+        <section
+            id="nova-mobile-sessions-panel"
+            class="mobile-sessions-panel"
+            hidden
+        >
+            <div class="mobile-sessions-head">
+                <div class="mobile-sessions-title">Sessions</div>
+
+                <button
+                    id="nova-mobile-sessions-refresh"
+                    class="mobile-sessions-refresh"
+                    type="button"
+                >
+                    Refresh
+                </button>
+            </div>
+
+            <div
+                id="nova-mobile-sessions-list"
+                class="mobile-sessions-list"
+            >
+                No sessions loaded yet.
+            </div>
+        </section>
 
         <section
             id="nova-main-content-mobile"
@@ -309,7 +534,7 @@
                 id="nova-mobile-welcome"
             >
                 <h1>Nova is live</h1>
-                <p>Clean mobile mode is running. Send a message to test the backend.</p>
+                <p>Mobile endgame mode is running. Send, attach, copy, regen, and reopen sessions.</p>
             </div>
         </section>
 
@@ -317,12 +542,37 @@
             id="nova-mobile-form"
             class="mobile-composer"
         >
-            <textarea
-                id="nova-input-mobile"
-                class="mobile-input"
-                rows="1"
-                placeholder="Message Nova..."
-            ></textarea>
+            <input
+                id="nova-mobile-file-input"
+                type="file"
+                multiple
+                hidden
+            >
+
+            <button
+                id="nova-mobile-attach"
+                class="mobile-attach-btn"
+                type="button"
+                aria-label="Attach file"
+                title="Attach file"
+            >
+                +
+            </button>
+
+            <div class="mobile-input-wrap">
+                <div
+                    id="nova-mobile-attachments"
+                    class="mobile-attachments"
+                    hidden
+                ></div>
+
+                <textarea
+                    id="nova-input-mobile"
+                    class="mobile-input"
+                    rows="1"
+                    placeholder="Message Nova..."
+                ></textarea>
+            </div>
 
             <button
                 id="nova-send-mobile"
@@ -345,7 +595,70 @@
             var welcome = document.getElementById("nova-mobile-welcome");
             var sessionId = localStorage.getItem("nova_mobile_session_id") || "";
             var newChat = document.getElementById("nova-mobile-new-chat");
+            var sessionsToggle = document.getElementById("nova-mobile-sessions-toggle");
+            var sessionsPanel = document.getElementById("nova-mobile-sessions-panel");
+            var sessionsList = document.getElementById("nova-mobile-sessions-list");
+            var sessionsRefresh = document.getElementById("nova-mobile-sessions-refresh");
+            var attachButton = document.getElementById("nova-mobile-attach");
+            var fileInput = document.getElementById("nova-mobile-file-input");
+            var attachmentsBox = document.getElementById("nova-mobile-attachments");
+            var statusDot = document.getElementById("nova-mobile-status-dot");
+            var systemStatus = document.getElementById("nova-mobile-system-status");
+            var stagedAttachments = [];
             var lastUserPrompt = "";
+            var isSending = false;
+            var isUploading = false;
+
+            function setStatus(message, kind) {
+                if (!systemStatus) {
+                    return;
+                }
+
+                systemStatus.textContent = message || "Nova mobile ready.";
+                systemStatus.classList.remove("is-good", "is-warn", "is-error");
+
+                if (kind === "error") {
+                    systemStatus.classList.add("is-error");
+                } else if (kind === "warn") {
+                    systemStatus.classList.add("is-warn");
+                } else {
+                    systemStatus.classList.add("is-good");
+                }
+            }
+
+            function setBusy(isBusy) {
+                if (!statusDot) {
+                    return;
+                }
+
+                statusDot.classList.remove("is-busy", "is-offline");
+
+                if (!navigator.onLine) {
+                    statusDot.classList.add("is-offline");
+                    return;
+                }
+
+                if (isBusy) {
+                    statusDot.classList.add("is-busy");
+                }
+            }
+
+            function setControlsDisabled(disabled) {
+                send.disabled = disabled;
+                attachButton.disabled = disabled;
+
+                if (sessionsRefresh) {
+                    sessionsRefresh.disabled = disabled;
+                }
+
+                if (newChat) {
+                    newChat.disabled = disabled;
+                }
+
+                if (sessionsToggle) {
+                    sessionsToggle.disabled = disabled;
+                }
+            }
 
             function fallbackCopy(text, onSuccess, onFail) {
                 var textarea = document.createElement("textarea");
@@ -382,6 +695,32 @@
                 });
             }
 
+            function growInput() {
+                input.style.height = "46px";
+
+                var nextHeight = Math.min(input.scrollHeight, 120);
+
+                input.style.height = Math.max(nextHeight, 46) + "px";
+            }
+
+            async function safeJson(response) {
+                var text = await response.text();
+
+                if (!text) {
+                    return {};
+                }
+
+                try {
+                    return JSON.parse(text);
+                } catch (error) {
+                    return {
+                        ok: false,
+                        text: text,
+                        error: "Response was not JSON."
+                    };
+                }
+            }
+
             function getAssistantText(data) {
                 if (!data) {
                     return "No response returned.";
@@ -397,25 +736,181 @@
                     localStorage.setItem("nova_mobile_session_id", sessionId);
                 }
 
-                if (data.assistant_message) {
-                    return (
+                return (
+                    (data.assistant_message && (
                         data.assistant_message.text ||
                         data.assistant_message.content ||
-                        data.assistant_message.body ||
-                        "No assistant text returned."
-                    );
-                }
-
-                return (
+                        data.assistant_message.body
+                    )) ||
                     data.assistant_text ||
                     data.text ||
                     data.output_text ||
                     data.response ||
+                    data.error ||
                     "No response text returned."
                 );
             }
 
-            async function requestAssistant(promptText) {
+            function getSessionId(item) {
+                return (
+                    item.id ||
+                    item.session_id ||
+                    item.active_session_id ||
+                    item.uuid ||
+                    ""
+                );
+            }
+
+            function getSessionTitle(item) {
+                return (
+                    item.title ||
+                    item.name ||
+                    item.label ||
+                    item.summary ||
+                    item.preview ||
+                    getSessionId(item) ||
+                    "Untitled session"
+                );
+            }
+
+            function getSessionMeta(item) {
+                return (
+                    item.updated_at ||
+                    item.created_at ||
+                    item.modified_at ||
+                    item.timestamp ||
+                    item.last_message ||
+                    getSessionId(item) ||
+                    ""
+                );
+            }
+
+            function normalizeSessionsPayload(data) {
+                if (!data) {
+                    return [];
+                }
+
+                if (Array.isArray(data)) {
+                    return data;
+                }
+
+                if (Array.isArray(data.sessions)) {
+                    return data.sessions;
+                }
+
+                if (Array.isArray(data.items)) {
+                    return data.items;
+                }
+
+                if (Array.isArray(data.results)) {
+                    return data.results;
+                }
+
+                return [];
+            }
+
+            function normalizeUploadedAttachment(data, file) {
+                var attachment = data.attachment || data.file || data.upload || data;
+
+                return {
+                    id: attachment.id || attachment.attachment_id || attachment.stored_name || file.name,
+                    name: attachment.name || attachment.filename || file.name,
+                    filename: attachment.filename || attachment.name || file.name,
+                    stored_name: attachment.stored_name || attachment.saved_name || attachment.filename || file.name,
+                    url: attachment.url || attachment.file_url || attachment.path || "",
+                    mime_type: attachment.mime_type || attachment.type || file.type || "",
+                    size: attachment.size || attachment.size_bytes || file.size || 0,
+                    status: "uploaded"
+                };
+            }
+
+            function renderAttachments() {
+                attachmentsBox.innerHTML = "";
+
+                if (!stagedAttachments.length) {
+                    attachmentsBox.hidden = true;
+                    return;
+                }
+
+                attachmentsBox.hidden = false;
+
+                stagedAttachments.forEach(function (attachment, index) {
+                    var chip = document.createElement("div");
+                    var name = document.createElement("span");
+                    var remove = document.createElement("button");
+
+                    chip.className = "mobile-attachment-chip";
+                    name.className = "mobile-attachment-name";
+                    name.textContent = attachment.name || attachment.filename || "Attachment";
+
+                    remove.className = "mobile-attachment-remove";
+                    remove.type = "button";
+                    remove.textContent = "×";
+
+                    remove.addEventListener("click", function () {
+                        stagedAttachments.splice(index, 1);
+                        renderAttachments();
+                        setStatus("Attachment removed.", "warn");
+                    });
+
+                    chip.appendChild(name);
+                    chip.appendChild(remove);
+                    attachmentsBox.appendChild(chip);
+                });
+            }
+
+            async function uploadFile(file) {
+                var formData = new FormData();
+
+                formData.append("file", file);
+
+                var response = await fetch("/api/upload", {
+                    method: "POST",
+                    body: formData
+                });
+
+                var data = await safeJson(response);
+
+                if (!response.ok) {
+                    throw new Error(data.error || "Upload failed: " + response.status);
+                }
+
+                return normalizeUploadedAttachment(data, file);
+            }
+
+            async function uploadSelectedFiles(files) {
+                if (!files || !files.length || isUploading || isSending) {
+                    return;
+                }
+
+                isUploading = true;
+                attachButton.disabled = true;
+                attachButton.textContent = "...";
+                setBusy(true);
+                setStatus("Uploading attachment...", "warn");
+
+                try {
+                    for (var i = 0; i < files.length; i += 1) {
+                        var attachment = await uploadFile(files[i]);
+                        stagedAttachments.push(attachment);
+                    }
+
+                    renderAttachments();
+                    setStatus("Attachment ready.", "good");
+                } catch (error) {
+                    addMessage("assistant", "Attachment upload failed: " + error.message);
+                    setStatus("Attachment upload failed.", "error");
+                } finally {
+                    isUploading = false;
+                    attachButton.disabled = false;
+                    attachButton.textContent = "+";
+                    fileInput.value = "";
+                    setBusy(false);
+                    input.focus();
+                }
+            }
+
+            async function requestAssistant(promptText, attachments) {
                 var response = await fetch("/api/chat", {
                     method: "POST",
                     headers: {
@@ -426,11 +921,113 @@
                         message: promptText,
                         text: promptText,
                         session_id: sessionId,
-                        attachments: []
+                        attachments: attachments || []
                     })
                 });
 
-                return response.json();
+                var data = await safeJson(response);
+
+                if (!response.ok) {
+                    throw new Error(data.error || "Chat failed: " + response.status);
+                }
+
+                return data;
+            }
+
+            async function loadSessions() {
+                if (!sessionsList) {
+                    return;
+                }
+
+                sessionsList.textContent = "Loading sessions...";
+                setStatus("Loading sessions...", "warn");
+                setBusy(true);
+
+                try {
+                    var response = await fetch("/api/sessions", {
+                        method: "GET",
+                        headers: {
+                            "Accept": "application/json"
+                        }
+                    });
+
+                    var data = await safeJson(response);
+
+                    if (!response.ok) {
+                        throw new Error(data.error || "Sessions failed: " + response.status);
+                    }
+
+                    var sessions = normalizeSessionsPayload(data);
+
+                    renderSessions(sessions);
+                    setStatus("Sessions loaded.", "good");
+                } catch (error) {
+                    sessionsList.textContent = "Could not load sessions: " + error.message;
+                    setStatus("Could not load sessions.", "error");
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            function renderSessions(sessions) {
+                sessionsList.innerHTML = "";
+
+                if (!sessions.length) {
+                    sessionsList.textContent = sessionId
+                        ? "Current mobile session: " + sessionId
+                        : "No sessions found yet.";
+
+                    return;
+                }
+
+                sessions.slice(0, 12).forEach(function (item) {
+                    var itemSessionId = getSessionId(item);
+                    var button = document.createElement("button");
+                    var title = document.createElement("div");
+                    var meta = document.createElement("div");
+
+                    button.className = "mobile-session-item";
+                    button.type = "button";
+
+                    if (itemSessionId && itemSessionId === sessionId) {
+                        button.className += " is-active";
+                    }
+
+                    title.className = "mobile-session-title";
+                    title.textContent = getSessionTitle(item);
+
+                    meta.className = "mobile-session-meta";
+                    meta.textContent = getSessionMeta(item);
+
+                    button.appendChild(title);
+                    button.appendChild(meta);
+
+                    button.addEventListener("click", function () {
+                        if (!itemSessionId) {
+                            return;
+                        }
+
+                        sessionId = itemSessionId;
+                        localStorage.setItem("nova_mobile_session_id", sessionId);
+
+                        sessionsPanel.hidden = true;
+                        messages.innerHTML = "";
+
+                        welcome = document.createElement("div");
+                        welcome.className = "welcome-card";
+                        welcome.id = "nova-mobile-welcome";
+                        welcome.innerHTML = [
+                            "<h1>Session loaded</h1>",
+                            "<p>Mobile is now using this session. Send a message to continue it.</p>"
+                        ].join("");
+
+                        messages.appendChild(welcome);
+                        setStatus("Session loaded.", "good");
+                        input.focus();
+                    });
+
+                    sessionsList.appendChild(button);
+                });
             }
 
             function addAssistantActions(wrap, bubble, sourcePrompt) {
@@ -447,6 +1044,7 @@
 
                     function showCopied() {
                         copyBtn.textContent = "Copied";
+                        setStatus("Copied response.", "good");
 
                         setTimeout(function () {
                             copyBtn.textContent = "Copy";
@@ -455,6 +1053,7 @@
 
                     function showFailed() {
                         copyBtn.textContent = "Failed";
+                        setStatus("Copy failed.", "error");
 
                         setTimeout(function () {
                             copyBtn.textContent = "Copy";
@@ -480,7 +1079,7 @@
                 regenBtn.addEventListener("click", async function () {
                     var promptToUse = sourcePrompt || lastUserPrompt;
 
-                    if (!promptToUse) {
+                    if (!promptToUse || isSending) {
                         regenBtn.textContent = "No prompt";
 
                         setTimeout(function () {
@@ -493,15 +1092,20 @@
                     regenBtn.disabled = true;
                     regenBtn.textContent = "Again";
                     bubble.textContent = "Regenerating...";
+                    setBusy(true);
+                    setStatus("Regenerating response...", "warn");
 
                     try {
-                        var data = await requestAssistant(promptToUse);
+                        var data = await requestAssistant(promptToUse, []);
                         bubble.textContent = getAssistantText(data);
+                        setStatus("Response regenerated.", "good");
                     } catch (error) {
                         bubble.textContent = "Failed to regenerate: " + error.message;
+                        setStatus("Regenerate failed.", "error");
                     } finally {
                         regenBtn.disabled = false;
                         regenBtn.textContent = "Regen";
+                        setBusy(false);
                         scrollToBottom();
                     }
                 });
@@ -538,34 +1142,88 @@
 
             async function sendMessage() {
                 var text = input.value.trim();
+                var attachmentsToSend = stagedAttachments.slice();
 
-                if (!text) {
+                if (isSending || isUploading) {
                     return;
                 }
 
-                lastUserPrompt = text;
+                if (!text && !attachmentsToSend.length) {
+                    setStatus("Type a message or attach a file.", "warn");
+                    return;
+                }
+
+                isSending = true;
+                lastUserPrompt = text || "Please analyze the attached file.";
                 input.value = "";
+                growInput();
 
-                addMessage("user", text);
+                if (attachmentsToSend.length) {
+                    addMessage("user", text || "Attached file");
+                } else {
+                    addMessage("user", text);
+                }
 
-                var thinking = addMessage("assistant", "Thinking...", text);
-                send.disabled = true;
+                var thinking = addMessage("assistant", "Thinking...", lastUserPrompt);
+                setControlsDisabled(true);
+                setBusy(true);
+                setStatus("Sending to Nova...", "warn");
 
                 try {
-                    var data = await requestAssistant(text);
+                    var data = await requestAssistant(lastUserPrompt, attachmentsToSend);
+
                     thinking.textContent = getAssistantText(data);
+                    stagedAttachments = [];
+                    renderAttachments();
+                    setStatus("Nova replied.", "good");
                 } catch (error) {
                     thinking.textContent = "Mobile request failed: " + error.message;
+                    setStatus("Mobile request failed.", "error");
                 } finally {
-                    send.disabled = false;
+                    isSending = false;
+                    setControlsDisabled(false);
+                    setBusy(false);
                     input.focus();
                 }
+            }
+
+            function resetMobileChat() {
+                if (isSending || isUploading) {
+                    return;
+                }
+
+                sessionId = "";
+                lastUserPrompt = "";
+                stagedAttachments = [];
+                localStorage.removeItem("nova_mobile_session_id");
+
+                messages.innerHTML = "";
+                renderAttachments();
+
+                welcome = document.createElement("div");
+                welcome.className = "welcome-card";
+                welcome.id = "nova-mobile-welcome";
+                welcome.innerHTML = [
+                    "<h1>Nova is live</h1>",
+                    "<p>New mobile chat started.</p>"
+                ].join("");
+
+                messages.appendChild(welcome);
+
+                if (sessionsList) {
+                    sessionsList.textContent = "No active mobile session yet.";
+                }
+
+                setStatus("New mobile chat started.", "good");
+                input.focus();
             }
 
             form.addEventListener("submit", function (event) {
                 event.preventDefault();
                 sendMessage();
             });
+
+            input.addEventListener("input", growInput);
 
             input.addEventListener("keydown", function (event) {
                 if (event.key === "Enter" && !event.shiftKey) {
@@ -575,24 +1233,59 @@
             });
 
             if (newChat) {
-                newChat.addEventListener("click", function () {
-                    sessionId = "";
-                    lastUserPrompt = "";
-                    localStorage.removeItem("nova_mobile_session_id");
+                newChat.addEventListener("click", resetMobileChat);
+            }
 
-                    messages.innerHTML = "";
+            if (sessionsToggle && sessionsPanel && sessionsList) {
+                sessionsToggle.addEventListener("click", function () {
+                    sessionsPanel.hidden = !sessionsPanel.hidden;
 
-                    welcome = document.createElement("div");
-                    welcome.className = "welcome-card";
-                    welcome.id = "nova-mobile-welcome";
-                    welcome.innerHTML = [
-                        "<h1>Nova is live</h1>",
-                        "<p>New mobile chat started.</p>"
-                    ].join("");
-
-                    messages.appendChild(welcome);
-                    input.focus();
+                    if (!sessionsPanel.hidden) {
+                        loadSessions();
+                    }
                 });
+            }
+
+            if (sessionsRefresh) {
+                sessionsRefresh.addEventListener("click", loadSessions);
+            }
+
+            if (attachButton && fileInput) {
+                attachButton.addEventListener("click", function () {
+                    if (!isSending && !isUploading) {
+                        fileInput.click();
+                    }
+                });
+
+                fileInput.addEventListener("change", function () {
+                    uploadSelectedFiles(fileInput.files);
+                });
+            }
+
+            window.addEventListener("online", function () {
+                setBusy(isSending || isUploading);
+                setStatus("Back online.", "good");
+            });
+
+            window.addEventListener("offline", function () {
+                setBusy(false);
+
+                if (statusDot) {
+                    statusDot.classList.add("is-offline");
+                }
+
+                setStatus("Offline. Check Wi-Fi or Flask server.", "error");
+            });
+
+            growInput();
+            setBusy(false);
+
+            if (!navigator.onLine) {
+                setStatus("Offline. Check Wi-Fi or Flask server.", "error");
+
+                if (statusDot) {
+                    statusDot.classList.add("is-offline");
+                }
             }
         })();
     </script>
