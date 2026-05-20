@@ -1122,10 +1122,28 @@ def api_sessions_delete():
 
 @app.get("/api/artifacts")
 def api_artifacts():
-    return json_ok(
-        artifacts=artifact_service.build_list_payload(),
-    )
+    import json
+    from pathlib import Path
 
+    artifacts_path = Path(__file__).resolve().parent / "data" / "nova_artifacts.json"
+
+    if not artifacts_path.exists():
+        return {"ok": True, "artifacts": []}
+
+    try:
+        with artifacts_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "artifacts": []}, 500
+
+    if isinstance(data, list):
+        artifacts = data
+    elif isinstance(data, dict):
+        artifacts = data.get("artifacts") or data.get("items") or []
+    else:
+        artifacts = []
+
+    return {"ok": True, "artifacts": artifacts}
 
 @app.get("/api/artifacts/<artifact_id>")
 def api_artifact_view(artifact_id: str):
