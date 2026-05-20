@@ -78,15 +78,6 @@
             color: var(--muted);
         }
 
-
-        .mobile-status {
-            width: 10px;
-            height: 10px;
-            border-radius: 999px;
-            background: #39ffb6;
-            box-shadow: 0 0 18px rgba(57, 255, 182, 0.7);
-        }
-
         .mobile-header-actions {
             display: flex;
             align-items: center;
@@ -102,6 +93,14 @@
             background: rgba(255, 255, 255, 0.075);
             font-size: 13px;
             font-weight: 800;
+        }
+
+        .mobile-status {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: #39ffb6;
+            box-shadow: 0 0 18px rgba(57, 255, 182, 0.7);
         }
 
         .mobile-messages {
@@ -163,6 +162,55 @@
             align-self: flex-start;
             background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.045));
             border-bottom-left-radius: 7px;
+        }
+
+        .message-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-width: 92%;
+        }
+
+        .message-wrap.user {
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+
+        .message-wrap.assistant {
+            align-self: flex-start;
+            align-items: flex-start;
+        }
+
+        .message-wrap .message {
+            max-width: 100%;
+        }
+
+        .mobile-message-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding-left: 2px;
+        }
+
+        .mobile-copy-btn,
+        .mobile-regen-btn {
+            position: relative;
+            z-index: 10;
+            min-height: 28px;
+            padding: 0 10px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.055);
+            font-size: 12px;
+            font-weight: 700;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        .mobile-copy-btn:active,
+        .mobile-regen-btn:active {
+            transform: scale(0.98);
         }
 
         .mobile-composer {
@@ -230,30 +278,59 @@
 
 <body>
     <main class="mobile-shell">
-<header class="mobile-topbar">
-    <div class="mobile-brand">
-        <div class="mobile-title">Nova</div>
-        <div class="mobile-subtitle">Mobile command center</div>
-    </div>
+        <header class="mobile-topbar">
+            <div class="mobile-brand">
+                <div class="mobile-title">Nova</div>
+                <div class="mobile-subtitle">Mobile command center</div>
+            </div>
 
-    <div class="mobile-header-actions">
-        <button id="nova-mobile-new-chat" class="mobile-header-btn" type="button">
-            New
-        </button>
-        <div class="mobile-status" aria-label="Nova online"></div>
-    </div>
-</header>
+            <div class="mobile-header-actions">
+                <button
+                    id="nova-mobile-new-chat"
+                    class="mobile-header-btn"
+                    type="button"
+                >
+                    New
+                </button>
 
-        <section id="nova-main-content-mobile" class="mobile-messages">
-            <div class="welcome-card" id="nova-mobile-welcome">
+                <div
+                    class="mobile-status"
+                    aria-label="Nova online"
+                ></div>
+            </div>
+        </header>
+
+        <section
+            id="nova-main-content-mobile"
+            class="mobile-messages"
+        >
+            <div
+                class="welcome-card"
+                id="nova-mobile-welcome"
+            >
                 <h1>Nova is live</h1>
                 <p>Clean mobile mode is running. Send a message to test the backend.</p>
             </div>
         </section>
 
-        <form id="nova-mobile-form" class="mobile-composer">
-            <textarea id="nova-input-mobile" class="mobile-input" rows="1" placeholder="Message Nova..."></textarea>
-            <button id="nova-send-mobile" class="mobile-send" type="submit">➤</button>
+        <form
+            id="nova-mobile-form"
+            class="mobile-composer"
+        >
+            <textarea
+                id="nova-input-mobile"
+                class="mobile-input"
+                rows="1"
+                placeholder="Message Nova..."
+            ></textarea>
+
+            <button
+                id="nova-send-mobile"
+                class="mobile-send"
+                type="submit"
+            >
+                ➤
+            </button>
         </form>
     </main>
 
@@ -267,23 +344,42 @@
             var messages = document.getElementById("nova-main-content-mobile");
             var welcome = document.getElementById("nova-mobile-welcome");
             var sessionId = localStorage.getItem("nova_mobile_session_id") || "";
-	    var newChat = document.getElementById("nova-mobile-new-chat");
-            function addMessage(role, text) {
-                if (welcome) {
-                    welcome.remove();
-                    welcome = null;
+            var newChat = document.getElementById("nova-mobile-new-chat");
+            var lastUserPrompt = "";
+
+            function fallbackCopy(text, onSuccess, onFail) {
+                var textarea = document.createElement("textarea");
+
+                textarea.value = text;
+                textarea.setAttribute("readonly", "");
+                textarea.style.position = "fixed";
+                textarea.style.left = "-9999px";
+                textarea.style.top = "0";
+
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+
+                try {
+                    var copied = document.execCommand("copy");
+
+                    if (copied) {
+                        onSuccess();
+                    } else {
+                        onFail();
+                    }
+                } catch (error) {
+                    onFail();
                 }
 
-                var bubble = document.createElement("div");
-                bubble.className = "message " + role;
-                bubble.textContent = text || "";
-                messages.appendChild(bubble);
+                document.body.removeChild(textarea);
+            }
+
+            function scrollToBottom() {
                 window.scrollTo({
                     top: document.body.scrollHeight,
                     behavior: "smooth"
                 });
-
-                return bubble;
             }
 
             function getAssistantText(data) {
@@ -319,6 +415,127 @@
                 );
             }
 
+            async function requestAssistant(promptText) {
+                var response = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        user_text: promptText,
+                        message: promptText,
+                        text: promptText,
+                        session_id: sessionId,
+                        attachments: []
+                    })
+                });
+
+                return response.json();
+            }
+
+            function addAssistantActions(wrap, bubble, sourcePrompt) {
+                var actions = document.createElement("div");
+                actions.className = "mobile-message-actions";
+
+                var copyBtn = document.createElement("button");
+                copyBtn.className = "mobile-copy-btn";
+                copyBtn.type = "button";
+                copyBtn.textContent = "Copy";
+
+                copyBtn.addEventListener("click", function () {
+                    var textToCopy = bubble.textContent || "";
+
+                    function showCopied() {
+                        copyBtn.textContent = "Copied";
+
+                        setTimeout(function () {
+                            copyBtn.textContent = "Copy";
+                        }, 1200);
+                    }
+
+                    function showFailed() {
+                        copyBtn.textContent = "Failed";
+
+                        setTimeout(function () {
+                            copyBtn.textContent = "Copy";
+                        }, 1200);
+                    }
+
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(textToCopy).then(showCopied).catch(function () {
+                            fallbackCopy(textToCopy, showCopied, showFailed);
+                        });
+
+                        return;
+                    }
+
+                    fallbackCopy(textToCopy, showCopied, showFailed);
+                });
+
+                var regenBtn = document.createElement("button");
+                regenBtn.className = "mobile-regen-btn";
+                regenBtn.type = "button";
+                regenBtn.textContent = "Regen";
+
+                regenBtn.addEventListener("click", async function () {
+                    var promptToUse = sourcePrompt || lastUserPrompt;
+
+                    if (!promptToUse) {
+                        regenBtn.textContent = "No prompt";
+
+                        setTimeout(function () {
+                            regenBtn.textContent = "Regen";
+                        }, 1200);
+
+                        return;
+                    }
+
+                    regenBtn.disabled = true;
+                    regenBtn.textContent = "Again";
+                    bubble.textContent = "Regenerating...";
+
+                    try {
+                        var data = await requestAssistant(promptToUse);
+                        bubble.textContent = getAssistantText(data);
+                    } catch (error) {
+                        bubble.textContent = "Failed to regenerate: " + error.message;
+                    } finally {
+                        regenBtn.disabled = false;
+                        regenBtn.textContent = "Regen";
+                        scrollToBottom();
+                    }
+                });
+
+                actions.appendChild(copyBtn);
+                actions.appendChild(regenBtn);
+                wrap.appendChild(actions);
+            }
+
+            function addMessage(role, text, sourcePrompt) {
+                if (welcome) {
+                    welcome.remove();
+                    welcome = null;
+                }
+
+                var wrap = document.createElement("div");
+                wrap.className = "message-wrap " + role;
+
+                var bubble = document.createElement("div");
+                bubble.className = "message " + role;
+                bubble.textContent = text || "";
+
+                wrap.appendChild(bubble);
+
+                if (role === "assistant") {
+                    addAssistantActions(wrap, bubble, sourcePrompt);
+                }
+
+                messages.appendChild(wrap);
+                scrollToBottom();
+
+                return bubble;
+            }
+
             async function sendMessage() {
                 var text = input.value.trim();
 
@@ -326,28 +543,16 @@
                     return;
                 }
 
+                lastUserPrompt = text;
                 input.value = "";
+
                 addMessage("user", text);
 
-                var thinking = addMessage("assistant", "Thinking...");
+                var thinking = addMessage("assistant", "Thinking...", text);
                 send.disabled = true;
 
                 try {
-                    var response = await fetch("/api/chat", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify({
-                            user_text: text,
-                            message: text,
-                            text: text,
-                            session_id: sessionId,
-                            attachments: []
-                        })
-                    });
-
-                    var data = await response.json();
+                    var data = await requestAssistant(text);
                     thinking.textContent = getAssistantText(data);
                 } catch (error) {
                     thinking.textContent = "Mobile request failed: " + error.message;
@@ -372,6 +577,7 @@
             if (newChat) {
                 newChat.addEventListener("click", function () {
                     sessionId = "";
+                    lastUserPrompt = "";
                     localStorage.removeItem("nova_mobile_session_id");
 
                     messages.innerHTML = "";
