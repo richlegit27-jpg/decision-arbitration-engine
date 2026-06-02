@@ -148,7 +148,10 @@ class RuntimePolicyEnforcementService:
         execution_state=None,
         final_action=None,
         control=None,
+        **extra_context,
     ):
+        # RUNTIME_POLICY_ENFORCE_SOFT_KWARGS_LOCK
+        extra_context = extra_context or {}
         execution_state = self._safe_dict(
             execution_state
         )

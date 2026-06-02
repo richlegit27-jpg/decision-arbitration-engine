@@ -714,6 +714,10 @@ class SafeUnifiedRuntime:
         scheduler_state=None,
         knowledge_graph=None,
     ):
+        # SAFE_RUNTIME_HEALTH_DEFAULT_LOCK
+        runtime_health = getattr(self, "runtime_health", {}) or {}
+        # SAFE_RUNTIME_RISK_PRESSURE_DEFAULT_LOCK
+        runtime_risk_pressure = getattr(self, "runtime_risk_pressure", {}) or {}
         execution_state = self._safe_dict(execution_state)
         if hasattr(
             self,
@@ -775,7 +779,7 @@ class SafeUnifiedRuntime:
         runtime_task_synthesis = (
             self.runtime_task_synthesis.synthesize_tasks(
                 execution_state=execution_state,
-                working_state=working_state,
+                working_state=getattr(self, "working_state", {}),
                 user_intent=execution_state.get("user_intent"),
                 failures=execution_state.get("failures", []),
                 memory=execution_state.get("memory", []),
@@ -1053,7 +1057,7 @@ class SafeUnifiedRuntime:
         )
 
         policy_enforcement = (
-            self.runtime_policy_enforcement.enforce(
+            self.runtime_policy_enforcement.enforce_soft(
                 action=final_action,
                 runtime_health=runtime_health,
                 runtime_risk_pressure=(
