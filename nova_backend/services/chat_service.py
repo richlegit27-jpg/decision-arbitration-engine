@@ -1192,7 +1192,40 @@ Current step:
                 "execution": execution_state,
             }
 
+        # GO_SMART_COMMAND_BRAIN_LOCK
         if text in {"run it", "run", "execute", "go"}:
+            has_real_state = any(
+                [
+                    working_state.get("active_task"),
+                    working_state.get("current_file"),
+                    working_state.get("current_bug"),
+                    working_state.get("next_move"),
+                    working_state.get("checkpoint"),
+                ]
+            )
+
+            has_real_execution = any(
+                [
+                    bool(execution_state.get("steps")),
+                    execution_state.get("current_step"),
+                    execution_state.get("current_step_title"),
+                    execution_state.get("status") in {"running", "waiting", "paused"},
+                ]
+            )
+
+            if text == "go" and not has_real_state and not has_real_execution:
+                return {
+                    "ok": True,
+                    "is_mission": True,
+                    "type": "empty_go_guard",
+                    "mission": {},
+                    "next_action": "none",
+                    "execution": execution_state,
+                    "assistant_message": self._build_assistant_message(
+                        "No active mission to run. Start one with: auto-plan <goal>"
+                    ),
+                }
+
             return {
                 "ok": True,
                 "is_mission": True,
@@ -13695,9 +13728,7 @@ Auto-fix result:
         }
 
         if text in execution_commands:
-            print("EXECUTION COMMAND TEXT =", repr(text))
-            print("HAS WORKING MISSION =", has_working_mission)
-            print("HAS ACTIVE EXECUTION =", has_active_execution)
+            # GO_SMART_COMMAND_BRAIN_LOCK: removed execution command debug prints
 
             if (
                 text == "resume"
