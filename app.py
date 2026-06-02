@@ -615,6 +615,16 @@ def cleanup_competing_name_memories(session_id: str, winning_text: str):
 def index():
     return render_template("index.html")
 
+@app.get("/preview")
+def preview():
+    return render_template("preview_index.html")
+
+@app.get("/mobile")
+def mobile():
+    return render_template("mobile.html")
+
+
+
 
 # -----------------------
 # HEALTH
