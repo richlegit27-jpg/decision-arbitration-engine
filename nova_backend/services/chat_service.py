@@ -9812,7 +9812,7 @@ if __name__ == "__main__":
 
     def handle(self, user_text: str, session_id: str = "", attachments=None):
         exec_debug("HANDLE IS BEING CALLED")
-        print("HANDLE HIT USER_TEXT =", repr(user_text))
+        # REMOVE_CHAT_HANDLE_DEBUG_PRINT_LOCK
 
         exec_debug(
             "CHAT_SERVICE_FILE =",
