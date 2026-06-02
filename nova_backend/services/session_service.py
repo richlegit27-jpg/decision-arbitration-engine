@@ -440,6 +440,25 @@ class SessionService:
                 return i
         return -1
 
+    # SESSION_SERVICE_LOAD_SAVE_COMPAT_LOCK
+    def load(self):
+        """
+        Compatibility bridge for older ChatService code that expects
+        SessionService.load() to return the session list.
+        """
+        return self._load_sessions()
+
+    def save(self, sessions, active=None):
+        """
+        Compatibility bridge for older ChatService code that expects
+        SessionService.save(sessions). Current storage also tracks
+        active_session_id, so preserve the current active id when one
+        is not explicitly provided.
+        """
+        if active is None:
+            active = self.get_active_session_id()
+        return self._save_sessions(sessions, active)
+
     # -----------------------
     # SESSION CONTROL (FIXED)
     # -----------------------
