@@ -9867,6 +9867,60 @@ if __name__ == "__main__":
 
         lowered = self._safe_str(user_text).lower().strip()
 
+        # TOP_LEVEL_SHORT_COMMAND_INTERCEPT_LOCK
+        if lowered in {"k", "kk", "go"}:
+            working_state = self._get_working_state(session_id)
+            working_state = working_state if isinstance(working_state, dict) else {}
+
+            execution_state = (
+                self._get_session_meta(session_id, "execution_state")
+                or working_state.get("execution_state")
+                or {}
+            )
+            execution_state = execution_state if isinstance(execution_state, dict) else {}
+
+            has_real_state = any(
+                [
+                    working_state.get("active_task"),
+                    working_state.get("current_file"),
+                    working_state.get("current_bug"),
+                    working_state.get("next_move"),
+                    working_state.get("checkpoint"),
+                ]
+            )
+
+            has_real_execution = any(
+                [
+                    bool(execution_state.get("steps")),
+                    execution_state.get("current_step"),
+                    execution_state.get("current_step_title"),
+                    execution_state.get("status") in {"running", "waiting", "paused"},
+                ]
+            )
+
+            if has_real_state or has_real_execution:
+                command = "run_step" if lowered in {"k", "kk", "go"} else lowered
+                return self._process_execution_command(
+                    command=command,
+                    session_id=session_id,
+                    execution_state=execution_state,
+                )
+
+            next_move = self._safe_str(working_state.get("next_move")).strip()
+            message = next_move or "No active mission yet. Start one with: auto-plan <goal>"
+
+            return {
+                "ok": True,
+                "assistant_message": self._build_assistant_message(message),
+                "session": self._get_session_payload(session_id),
+                "debug": {
+                    "route_taken": "top_level_short_command_intercept",
+                    "command": lowered,
+                    "has_real_state": has_real_state,
+                    "has_real_execution": has_real_execution,
+                },
+            }
+
         try:
             self._auto_track_working_state(
                 session_id=session_id,
