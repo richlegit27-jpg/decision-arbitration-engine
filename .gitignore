@@ -26,3 +26,13 @@ full_*/
 # OS junk
 .DS_Store
 Thumbs.db
+# Local Nova backup/runtime clutter
+*.BAK_*
+*.bak
+*.bak_*
+*before_*def*.bak
+_archive/
+archive/
+runtime/qa_logs/
+runtime/regression_tools/
+data/nova_sessions.json
