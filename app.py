@@ -147,12 +147,7 @@ RuntimeBootstrap.save(
 if hasattr(chat_service, "start_execution_daemon"):
     chat_service.start_execution_daemon()
 
-print("CHAT SERVICE OBJ =", chat_service)
-print("CHAT SERVICE TYPE =", type(chat_service))
-print("CHAT SERVICE MODULE =", type(chat_service).__module__)
-print("CHAT SERVICE FILE =", __import__(type(chat_service).__module__, fromlist=[""]).__file__)
-print("CHAT SERVICE HAS HANDLE =", hasattr(chat_service, "handle"))
-print("CHAT SERVICE DIR HAS HANDLE =", "handle" in dir(chat_service))
+# REMOVE_APP_STARTUP_CHATSERVICE_DEBUG_LOCK
 
 # -----------------------
 # HELPERS
