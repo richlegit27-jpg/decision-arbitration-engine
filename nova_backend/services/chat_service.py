@@ -1,19 +1,7 @@
 ﻿from __future__ import annotations
 
 import base64
-import os
-import re
-import uuid
-import logging
-import shutil
-import tempfile
-import py_compile
-
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, List
-
-from nova_backend.services.execution_handler import (
+tg
     ExecutionHandler,
     NextMove,
     default_executor,
@@ -9868,7 +9856,8 @@ if __name__ == "__main__":
         lowered = self._safe_str(user_text).lower().strip()
 
         # TOP_LEVEL_SHORT_COMMAND_INTERCEPT_LOCK
-        if lowered in {"k", "kk", "go"}:
+        # REMOVE_GO_FROM_TOP_LEVEL_INTERCEPT_LOCK
+        if lowered in {"k", "kk"}:
             working_state = self._get_working_state(session_id)
             working_state = working_state if isinstance(working_state, dict) else {}
 
@@ -9898,13 +9887,15 @@ if __name__ == "__main__":
                 ]
             )
 
-            if has_real_state or has_real_execution:
-                command = "run_step" if lowered in {"k", "kk", "go"} else lowered
-                return self._process_execution_command(
-                    command=command,
-                    session_id=session_id,
-                    execution_state=execution_state,
-                )
+    if lowered in {"k", "kk", "go"}:
+        execution_state = self._get_session_meta(session_id, "execution_state") or {}
+        if execution_state.get("steps") or execution_state.get("current_step"):
+            command = "run_step"
+            return self._process_execution_command(
+                command=command,
+                session_id=session_id,
+                execution_state=execution_state,
+            )
 
             next_move = self._safe_str(working_state.get("next_move")).strip()
             message = next_move or "No active mission yet. Start one with: auto-plan <goal>"
