@@ -810,7 +810,7 @@ def api_chat():
         # TEMP DISABLED:
         # runtime_brain.run_cycle is crashing on undefined working_state.
         # Keep disabled until execution mutation is stable.
-        print("CHAT RAW RESULT:", result)
+        # REMOVE_API_CHAT_RAW_RESULT_PRINT_LOCK
 
         if result is None:
             result = {
