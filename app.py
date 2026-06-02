@@ -762,7 +762,6 @@ def api_chat():
     data = request_json()
 
     user_text = str(data.get("user_text") or "").strip()
-    print("API CHAT USER_TEXT =", repr(user_text))
     session_id = str(data.get("session_id") or "").strip()
     attachments = normalize_attachments(data.get("attachments"))
 
@@ -844,6 +843,27 @@ def api_chat():
             "role": "assistant",
             "text": "",
         }
+
+        # API_CHAT_RESPONSE_CONTRACT_LOCK
+        if not isinstance(assistant_message, dict):
+            assistant_message = {
+                "role": "assistant",
+                "text": str(assistant_message or "").strip(),
+            }
+
+        assistant_message.setdefault("role", "assistant")
+
+        assistant_text = str(
+            assistant_message.get("text")
+            or assistant_message.get("content")
+            or assistant_message.get("message")
+            or ""
+        ).strip()
+
+        if not assistant_text and result.get("ok", True):
+            assistant_text = "Nova completed the request but returned an empty assistant response."
+
+        assistant_message["text"] = assistant_text
 
         payload = {
             "ok": result.get("ok", True),
