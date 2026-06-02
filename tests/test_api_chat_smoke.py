@@ -9,7 +9,7 @@ def test_api_chat_endpoint_smoke() -> None:
     response = client.post(
         "/api/chat",
         json={
-            "message": "Say pong only.",
+            "user_text": "Say pong only.",
             "session_id": "pytest_chat_smoke",
             "attachments": [],
         },
