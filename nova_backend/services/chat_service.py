@@ -109,6 +109,8 @@ class ChatService:
             "resume",
             "next",
             "nex",
+            "k",
+            "kk",
             "what now",
             "what next",
             "retry",
@@ -852,6 +854,8 @@ Rules:
         elif text in {
             "next",
             "nex",
+            "k",
+            "kk",
             "continue",
             "continue on",
             "keep going",
@@ -1129,7 +1133,8 @@ Current step:
             or {}
         )
 
-        if text in {"next", "nex", "continue", "resume"}:
+        # SHORT_COMMAND_K_BRAIN_LOCK
+        if text in {"next", "nex", "k", "kk", "continue", "resume"}:
 
             has_real_state = any(
                 [
@@ -1156,7 +1161,7 @@ Current step:
                 message = (
                     "No active work to resume."
                     if text == "resume"
-                    else "No active execution to continue."
+                    else "No active execution to continue. Start one with: auto-plan <goal>"
                 )
 
                 return {
