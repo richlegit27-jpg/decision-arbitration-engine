@@ -1,6 +1,7 @@
+# RUNTIME_GRAPH_TIMEZONE_UTC_LOCK
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from nova_backend.services.runtime_memory_compression_service import (
     RuntimeMemoryCompressionService,
@@ -45,7 +46,7 @@ class RuntimeGraphStoreService:
             return {
                 "events": [],
                 "event_count": 0,
-                "loaded_at": datetime.utcnow().isoformat(),
+                "loaded_at": datetime.now(timezone.utc).isoformat(),
             }
 
         try:
@@ -67,7 +68,7 @@ class RuntimeGraphStoreService:
             return {
                 "events": events[-self.max_events:],
                 "event_count": len(events[-self.max_events:]),
-                "loaded_at": datetime.utcnow().isoformat(),
+                "loaded_at": datetime.now(timezone.utc).isoformat(),
             }
 
         except Exception as exc:
@@ -75,7 +76,7 @@ class RuntimeGraphStoreService:
                 "events": [],
                 "event_count": 0,
                 "error": str(exc),
-                "loaded_at": datetime.utcnow().isoformat(),
+                "loaded_at": datetime.now(timezone.utc).isoformat(),
             }
 
     def save(
@@ -121,7 +122,7 @@ class RuntimeGraphStoreService:
                 "raw_event_count",
                 0,
             ),
-            "saved_at": datetime.utcnow().isoformat(),
+            "saved_at": datetime.now(timezone.utc).isoformat(),
         }
 
         folder = os.path.dirname(self.path)
