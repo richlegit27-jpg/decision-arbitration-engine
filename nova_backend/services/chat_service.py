@@ -13461,7 +13461,7 @@ Auto-fix result:
         text = user_text.lower().strip()
         lower_text = text
 
-        print("DECIDE ROUTE TEXT =", repr(lower_text))
+        # REMOVE_DECIDE_ROUTE_DEBUG_PRINT_LOCK
 
         # =========================
         # RUNTIME LANE
