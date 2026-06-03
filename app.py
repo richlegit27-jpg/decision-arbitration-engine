@@ -2519,16 +2519,28 @@ def api_chat():
                 requested_session_id,
             )
 
+
+        # FORCE_EXTRACTED_TEXT_CHAT_HANDOFF_LOCK
+        # If attachment text was already extracted into user_text, hand off to chat_service as plain text.
+        # This prevents chat_service attachment guards from returning canned attachment responses.
+        attachments_for_chat_service = list(attachments or [])
+        if attachment_content_lines:
+            attachments_for_chat_service = []
+            app.logger.info(
+                "[AttachmentContentGate] extracted attachment text handoff active; raw attachments suppressed for chat_service session_id=%s extracted_count=%s",
+                session_id,
+                len(attachment_content_lines),
+            )
         app.logger.info(
             "[api_chat] calling chat_service.handle session_id=%s attachments_count=%s",
             session_id,
-            len(attachments or []),
+            len(attachments_for_chat_service or []),
         )
 
         result = chat_service.handle(
             user_text=user_text,
             session_id=session_id,
-            attachments=attachments,
+            attachments=attachments_for_chat_service,
         )
 
         try:
@@ -4296,6 +4308,261 @@ try:
                 print(f"[NOVA ROUTE REPAIR] /api/chat endpoint={_nova_rule.endpoint} rebound to api_chat")
 except Exception as _nova_route_repair_error:
     print(f"[NOVA ROUTE REPAIR FAILED] {_nova_route_repair_error}")
+
+
+
+# ATTACHMENT_EXTRACT_ENDPOINT_LOCK
+@app.route("/api/attachment/extract", methods=["POST"])
+def api_attachment_extract():
+    """
+    Extract readable text from an uploaded PDF/image without touching the chat pipeline.
+    Accepts JSON:
+      {
+        "url": "/api/uploads/file.pdf",
+        "path": "optional local path",
+        "mime_type": "application/pdf"
+      }
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+
+        upload_url = str(payload.get("url") or payload.get("file_url") or "").strip()
+        local_path = str(payload.get("path") or "").strip()
+        mime_type = str(payload.get("mime_type") or payload.get("type") or "").strip()
+
+        if not local_path and upload_url:
+            filename = upload_url.replace("\\", "/").split("/")[-1].strip()
+            if filename:
+                local_path = str(Path(UPLOADS_DIR) / filename)
+
+        if not local_path:
+            return jsonify({
+                "ok": False,
+                "error": "Missing url or path.",
+            }), 400
+
+        file_path = Path(local_path)
+
+        if not file_path.exists():
+            return jsonify({
+                "ok": False,
+                "error": f"File not found: {file_path}",
+            }), 404
+
+        if not mime_type:
+            suffix = file_path.suffix.lower()
+            if suffix == ".pdf":
+                mime_type = "application/pdf"
+            elif suffix in {".jpg", ".jpeg"}:
+                mime_type = "image/jpeg"
+            elif suffix == ".png":
+                mime_type = "image/png"
+            elif suffix == ".webp":
+                mime_type = "image/webp"
+            else:
+                mime_type = "application/octet-stream"
+
+        extracted_text = _nova_analyze_binary_attachment_for_prompt(
+            str(file_path),
+            mime_type,
+        )
+
+        extracted_text = str(extracted_text or "").strip()
+
+        app.logger.info(
+            "[AttachmentExtractEndpoint] extracted path=%s chars=%s mime_type=%s",
+            str(file_path),
+            len(extracted_text),
+            mime_type,
+        )
+
+        return jsonify({
+            "ok": True,
+            "path": str(file_path),
+            "url": upload_url,
+            "mime_type": mime_type,
+            "chars": len(extracted_text),
+            "text": extracted_text,
+        })
+
+    except Exception as error:
+        app.logger.exception("[AttachmentExtractEndpoint] failed")
+        return jsonify({
+            "ok": False,
+            "error": str(error),
+        }), 500
+
+
+
+
+# ATTACHMENT_SUMMARIZE_ENDPOINT_LOCK
+def _nova_clean_extracted_attachment_text(text, limit=6000):
+    raw = str(text or "")
+    lines = []
+
+    skip_fragments = (
+        "sponsored",
+        "safesearch",
+        "create a new collection",
+        "saved images",
+        "saved to collections",
+        "related searches",
+        "more images on this site",
+        "go to site",
+    )
+
+    for line in raw.splitlines():
+        cleaned = " ".join(str(line or "").strip().split())
+
+        if not cleaned:
+            continue
+
+        lowered = cleaned.lower()
+
+        if any(fragment in lowered for fragment in skip_fragments):
+            continue
+
+        if len(cleaned) <= 2:
+            continue
+
+        lines.append(cleaned)
+
+    joined = "\n".join(lines)
+    return joined[:limit]
+
+
+def _nova_local_summary_from_text(text):
+    cleaned = _nova_clean_extracted_attachment_text(text)
+    lines = [line for line in cleaned.splitlines() if line.strip()]
+
+    if not lines:
+        return {
+            "summary": "No clean readable text was found.",
+            "key_points": [],
+            "preview": "",
+        }
+
+    title_candidates = []
+    for line in lines[:30]:
+        if 3 <= len(line) <= 90:
+            title_candidates.append(line)
+
+    key_points = []
+    seen = set()
+
+    for line in lines:
+        lowered = line.lower()
+
+        if lowered in seen:
+            continue
+
+        seen.add(lowered)
+
+        if len(line) >= 12:
+            key_points.append(line)
+
+        if len(key_points) >= 10:
+            break
+
+    first_lines = lines[:8]
+    summary = "This attachment appears to contain text extracted from a web/search/image results page or document capture."
+
+    if title_candidates:
+        summary = "This attachment appears to be about: " + "; ".join(title_candidates[:5]) + "."
+
+    return {
+        "summary": summary,
+        "key_points": key_points,
+        "preview": "\n".join(first_lines)[:1200],
+    }
+
+
+@app.route("/api/attachment/summarize", methods=["POST"])
+def api_attachment_summarize():
+    """
+    Extract and summarize an uploaded PDF/image without touching the chat pipeline.
+    Accepts JSON:
+      {
+        "url": "/api/uploads/file.pdf",
+        "path": "optional local path",
+        "mime_type": "application/pdf"
+      }
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+
+        upload_url = str(payload.get("url") or payload.get("file_url") or "").strip()
+        local_path = str(payload.get("path") or "").strip()
+        mime_type = str(payload.get("mime_type") or payload.get("type") or "").strip()
+
+        if not local_path and upload_url:
+            filename = upload_url.replace("\\", "/").split("/")[-1].strip()
+            if filename:
+                local_path = str(Path(UPLOADS_DIR) / filename)
+
+        if not local_path:
+            return jsonify({
+                "ok": False,
+                "error": "Missing url or path.",
+            }), 400
+
+        file_path = Path(local_path)
+
+        if not file_path.exists():
+            return jsonify({
+                "ok": False,
+                "error": f"File not found: {file_path}",
+            }), 404
+
+        if not mime_type:
+            suffix = file_path.suffix.lower()
+            if suffix == ".pdf":
+                mime_type = "application/pdf"
+            elif suffix in {".jpg", ".jpeg"}:
+                mime_type = "image/jpeg"
+            elif suffix == ".png":
+                mime_type = "image/png"
+            elif suffix == ".webp":
+                mime_type = "image/webp"
+            else:
+                mime_type = "application/octet-stream"
+
+        extracted_text = _nova_analyze_binary_attachment_for_prompt(
+            str(file_path),
+            mime_type,
+        )
+
+        cleaned_text = _nova_clean_extracted_attachment_text(extracted_text)
+        local_summary = _nova_local_summary_from_text(extracted_text)
+
+        app.logger.info(
+            "[AttachmentSummarizeEndpoint] summarized path=%s raw_chars=%s clean_chars=%s mime_type=%s",
+            str(file_path),
+            len(str(extracted_text or "")),
+            len(cleaned_text),
+            mime_type,
+        )
+
+        return jsonify({
+            "ok": True,
+            "path": str(file_path),
+            "url": upload_url,
+            "mime_type": mime_type,
+            "raw_chars": len(str(extracted_text or "")),
+            "clean_chars": len(cleaned_text),
+            "summary": local_summary["summary"],
+            "key_points": local_summary["key_points"],
+            "preview": local_summary["preview"],
+            "clean_text": cleaned_text,
+        })
+
+    except Exception as error:
+        app.logger.exception("[AttachmentSummarizeEndpoint] failed")
+        return jsonify({
+            "ok": False,
+            "error": str(error),
+        }), 500
+
 
 if __name__ == "__main__":
     create_startup_backup()
