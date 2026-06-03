@@ -780,15 +780,15 @@ def _nova_pa_read_json_file(path):
 
 
 def _nova_pa_compact_text(value, *, limit=500):
-    text = str(value or "").replace("\r", "\n").strip()
+    text_value = str(value or "").replace("\r", "\n").strip()
 
-    while "\n\n\n" in text:
-        text = text.replace("\n\n\n", "\n\n")
+    while "\n\n\n" in text_value:
+        text_value = text_value.replace("\n\n\n", "\n\n")
 
-    if len(text) > limit:
-        return text[:limit].rstrip() + "..."
+    if len(text_value) > limit:
+        return text_value[:limit].rstrip() + "..."
 
-    return text
+    return text_value
 
 
 def _nova_pa_memory_text(item):
@@ -862,10 +862,15 @@ def _nova_pa_extract_memory_items(payload):
 
 
 def _nova_pa_score_memory_item(item, query_words):
-    text = _nova_pa_memory_text(item)
-    lowered = text.lower()
+    text_value = _nova_pa_memory_text(item)
+    lowered = text_value.lower()
 
-    overlap = sum(1 for word in query_words if word and word in lowered)
+    overlap = sum(
+        1
+        for word in query_words
+        if word and word in lowered
+    )
+
     priority = _nova_pa_memory_priority(item)
 
     return (overlap * 10) + priority
@@ -887,26 +892,34 @@ def _nova_pa_get_memory_context(user_text, *, limit=12, char_limit=3500):
     scored = []
 
     for item in items:
-        text = _nova_pa_memory_text(item)
+        text_value = _nova_pa_memory_text(item)
 
-        if not text:
+        if not text_value:
             continue
 
-        scored.append((
-            _nova_pa_score_memory_item(item, query_words),
-            _nova_pa_memory_priority(item),
-            text,
-            _nova_pa_memory_kind(item),
-        ))
+        scored.append(
+            (
+                _nova_pa_score_memory_item(item, query_words),
+                _nova_pa_memory_priority(item),
+                text_value,
+                _nova_pa_memory_kind(item),
+            )
+        )
 
-    scored.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    scored.sort(
+        key=lambda row: (
+            row[0],
+            row[1],
+        ),
+        reverse=True,
+    )
 
     lines = []
     seen = set()
     used = 0
 
-    for _score, _priority, text, kind in scored:
-        compact = _nova_pa_compact_text(text, limit=450)
+    for _score, _priority, text_value, kind in scored:
+        compact = _nova_pa_compact_text(text_value, limit=450)
         key = compact.lower()[:120]
 
         if key in seen:
@@ -948,16 +961,10 @@ def _nova_pa_message_text(message):
 
     return ""
 
-# ==============================
-# PROJECT-AWARE SESSION FIX
-# ==============================
 
-def _nova_pa_get_recent_session_context_fixed(session_id, *, limit=12, char_limit=3500):
-    """
-    Always fetch the last N user messages from the session, newest first,
-    and return them as compact context lines.
-    """
+def _nova_pa_get_recent_session_context(session_id, *, limit=12, char_limit=3500):
     target_session_id = str(session_id or "").strip()
+
     if not target_session_id:
         return []
 
@@ -970,23 +977,24 @@ def _nova_pa_get_recent_session_context_fixed(session_id, *, limit=12, char_limi
         return []
 
     messages = session.get("messages") or []
+
     if not isinstance(messages, list):
         return []
 
     lines = []
     used = 0
 
-    # reverse so last messages are included first
-    for message in reversed(messages[-limit:]):
+    for message in messages[-limit:]:
         if not isinstance(message, dict):
             continue
 
         role = str(message.get("role") or "message").strip()
-        text = _nova_pa_message_text(message)
-        if not text:
+        text_value = _nova_pa_message_text(message)
+
+        if not text_value:
             continue
 
-        compact = _nova_pa_compact_text(text, limit=350)
+        compact = _nova_pa_compact_text(text_value, limit=350)
         line = f"- [{role}] {compact}"
 
         if used + len(line) > char_limit:
@@ -995,17 +1003,97 @@ def _nova_pa_get_recent_session_context_fixed(session_id, *, limit=12, char_limi
         lines.append(line)
         used += len(line)
 
-    return list(reversed(lines))  # maintain chronological order
+    return lines
 
-# Patch _nova_build_project_aware_context to use the fixed recent session fetch
+
+def _nova_build_project_aware_context(
+    user_text,
+    *,
+    session_id="",
+    requested_session_id="",
+):
+    context_lines = []
+
+    try:
+        memory_lines = _nova_pa_get_memory_context(user_text)
+    except Exception:
+        memory_lines = []
+        app.logger.exception("[project-aware] failed loading persistent memory context")
+
+    if memory_lines:
+        context_lines.append("Relevant persistent memory:")
+        context_lines.extend(memory_lines)
+
+    session_context_id = str(session_id or requested_session_id or "").strip()
+
+    try:
+        recent_lines = _nova_pa_get_recent_session_context(session_context_id)
+    except Exception:
+        recent_lines = []
+        app.logger.exception("[project-aware] failed loading recent session context")
+
+    if recent_lines:
+        if context_lines:
+            context_lines.append("")
+
+        context_lines.append("Recent session context:")
+        context_lines.extend(recent_lines)
+
+    app.logger.info(
+        "[project-aware] built context session_id=%s requested_session_id=%s memory_lines=%s recent_lines=%s total_lines=%s",
+        session_id,
+        requested_session_id,
+        len(memory_lines or []),
+        len(recent_lines or []),
+        len(context_lines or []),
+    )
+
+    if not context_lines:
+        return ""
+
+    return "\n".join([
+        "",
+        "Project-aware context for Nova:",
+        *context_lines,
+    ]).strip()
 
 
 # PROJECT_FOCUS_MEMORY_SAVE_RECALL_LOCK
 def _nova_project_focus_memory_text(focus):
     focus_value = str(focus or "").strip()
+
     if not focus_value:
         return ""
+
     return f"Current project focus: {focus_value}"
+
+
+def _nova_extract_project_focus_from_text(text_value):
+    raw = str(text_value or "").strip()
+
+    if not raw:
+        return ""
+
+    patterns = [
+        r"\bmy\s+current\s+project\s+focus\s+is\s+(.+?)(?:[.!?\n]|$)",
+        r"\bcurrent\s+project\s+focus\s+is\s+(.+?)(?:[.!?\n]|$)",
+        r"\bproject\s+focus\s+is\s+(.+?)(?:[.!?\n]|$)",
+        r"\bfocus\s+is\s+(.+?)(?:[.!?\n]|$)",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, raw, re.IGNORECASE)
+
+        if not match:
+            continue
+
+        focus = str(match.group(1) or "").strip()
+        focus = re.sub(r"\s+", " ", focus).strip(" .!?")
+
+        if focus:
+            return focus
+
+    return ""
 
 
 def _nova_save_project_focus_memory(user_text, session_id):
@@ -1090,8 +1178,10 @@ def _nova_find_project_focus_memory(session_id):
             continue
 
         score = 0
+
         if item_session == target_session_id:
             score += 100
+
         if item_kind == "project_focus":
             score += 25
 
@@ -1116,66 +1206,6 @@ def _nova_find_project_focus_memory(session_id):
     )
 
     return str(candidates[0].get("focus") or "").strip()
-
-
-
-# PROJECT_FOCUS_DIRECT_RECALL_LOCK
-def _nova_is_project_focus_recall_question(user_text):
-    text_value = str(user_text or "").strip().lower()
-
-    if not text_value:
-        return False
-
-    project_terms = (
-        "project focus",
-        "current focus",
-        "focus right now",
-        "what was my focus",
-        "what is my focus",
-        "what's my focus",
-    )
-
-    personal_terms = (
-        "my ",
-        "i ",
-        "me",
-        "our ",
-        "nova",
-        "current",
-    )
-
-    return (
-        any(term in text_value for term in project_terms)
-        and any(term in text_value for term in personal_terms)
-    )
-
-
-def _nova_extract_project_focus_from_text(text_value):
-    raw = str(text_value or "").strip()
-
-    if not raw:
-        return ""
-
-    patterns = [
-        r"\bmy\s+current\s+project\s+focus\s+is\s+(.+?)(?:[.!?\n]|$)",
-        r"\bcurrent\s+project\s+focus\s+is\s+(.+?)(?:[.!?\n]|$)",
-        r"\bproject\s+focus\s+is\s+(.+?)(?:[.!?\n]|$)",
-        r"\bfocus\s+is\s+(.+?)(?:[.!?\n]|$)",
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, raw, re.IGNORECASE)
-
-        if not match:
-            continue
-
-        focus = str(match.group(1) or "").strip()
-        focus = re.sub(r"\s+", " ", focus).strip(" .!?")
-
-        if focus:
-            return focus
-
-    return ""
 
 
 def _nova_find_recent_project_focus(session_id):
@@ -1215,6 +1245,36 @@ def _nova_find_recent_project_focus(session_id):
     return ""
 
 
+def _nova_is_project_focus_recall_question(user_text):
+    text_value = str(user_text or "").strip().lower()
+
+    if not text_value:
+        return False
+
+    project_terms = (
+        "project focus",
+        "current focus",
+        "focus right now",
+        "what was my focus",
+        "what is my focus",
+        "what's my focus",
+    )
+
+    personal_terms = (
+        "my ",
+        "i ",
+        "me",
+        "our ",
+        "nova",
+        "current",
+    )
+
+    return (
+        any(term in text_value for term in project_terms)
+        and any(term in text_value for term in personal_terms)
+    )
+
+
 def _nova_try_project_focus_direct_recall(user_text, session_id):
     if not _nova_is_project_focus_recall_question(user_text):
         return None
@@ -1244,111 +1304,6 @@ def _nova_try_project_focus_direct_recall(user_text, session_id):
     )
 
     return json_ok(**payload)
-
-
-
-def _nova_build_project_aware_context(
-    user_text,
-    *,
-    session_id="",
-    requested_session_id="",
-):
-    import logging
-    context_lines = []
-
-    # persistent memory
-    memory_lines = _nova_pa_get_memory_context(user_text)
-    if memory_lines:
-        context_lines.append("Relevant persistent memory:")
-        context_lines.extend(memory_lines)
-
-    # recent session messages (fixed)
-    session_context_id = str(session_id or requested_session_id or "").strip()
-    recent_lines = _nova_pa_get_recent_session_context_fixed(session_context_id)
-    if recent_lines:
-        if context_lines:
-            context_lines.append("")
-        context_lines.append("Recent session context:")
-        context_lines.extend(recent_lines)
-
-    # log what is being returned for diagnostics
-    logging.getLogger("nova_diagnostics").info(
-        "[project-aware-fixed] user_text=%s session_id=%s requested_session_id=%s context_lines=%s",
-        user_text,
-        session_id,
-        requested_session_id,
-        context_lines,
-    )
-
-    if not context_lines:
-        return ""
-    return "\n".join([
-        "",
-        "Project-aware context for Nova:",
-        *context_lines,
-    ]).strip()
-
-def _nova_build_project_aware_context(
-    user_text,
-    *,
-    session_id="",
-    requested_session_id="",
-):
-    import logging
-    context_lines = []
-
-    # persistent memory
-    memory_lines = _nova_pa_get_memory_context(user_text)
-    if memory_lines:
-        context_lines.append("Relevant persistent memory:")
-        context_lines.extend(memory_lines)
-
-    # recent session messages
-    session_context_id = str(session_id or requested_session_id or "").strip()
-    recent_lines = _nova_pa_get_recent_session_context_fixed(session_context_id)
-    if recent_lines:
-        if context_lines:
-            context_lines.append("")
-        context_lines.append("Recent session context:")
-        context_lines.extend(recent_lines)
-
-    # log what is being returned for diagnostics
-    logging.getLogger("nova_diagnostics").info(
-        "[project-aware] user_text=%s session_id=%s requested_session_id=%s context_lines=%s",
-        user_text,
-        session_id,
-        requested_session_id,
-        context_lines,
-    )
-
-    if not context_lines:
-        return ""
-    return "\n".join([
-        "",
-        "Project-aware context for Nova:",
-        *context_lines,
-    ]).strip()
-
-# Inject into /api/chat flow
-try:
-    project_aware_context = _nova_build_project_aware_context(
-        user_text,
-        session_id=session_id,
-        requested_session_id=requested_session_id,
-    )
-except Exception:
-    project_aware_context = ""
-    app.logger.exception("[api_chat] failed to build project-aware memory context")
-
-if project_aware_context:
-    user_text = f"{user_text}\n\n{project_aware_context}" if user_text else project_aware_context
-    app.logger.info(
-        "[api_chat] DIAGNOSTIC injected project-aware context chars=%s session_id=%s requested_session_id=%s",
-        len(project_aware_context),
-        session_id,
-        requested_session_id,
-    )
-
 
 
 @app.post("/api/chat")
