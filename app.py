@@ -1390,18 +1390,19 @@ def _nova_clean_project_state_value(value):
 
     return cleaned
 
-
-def _nova_project_state_memory_text(kind, value):
+def _nova_project_state_memory_text(kind: str, value: str) -> str:
+    """
+    Return a single line text for the project-state kind, avoiding duplicate labels.
+    """
     config = PROJECT_STATE_MEMORY_KINDS.get(kind) or {}
     label = str(config.get("label") or kind).strip()
-    clean_value = _nova_clean_project_state_value(value)
 
-    if not clean_value:
-        return ""
+    # remove repeated prefix if value already starts with it
+    if value.lower().startswith(label.lower()):
+        return f"{label}: {value[len(label)+1:].strip()}"
+    return f"{label}: {value.strip()}"
 
-    return f"{label}: {clean_value}"
-
-
+# PROJECT_STATE_LABEL_EXTRACTOR_LOCK
 def _nova_extract_project_state_values(user_text):
     raw = str(user_text or "").strip()
     found = []
@@ -1409,9 +1410,49 @@ def _nova_extract_project_state_values(user_text):
     if not raw:
         return found
 
-    for kind, config in PROJECT_STATE_MEMORY_KINDS.items():
-        for pattern in config.get("save_patterns") or []:
-            match = re.search(pattern, raw, re.IGNORECASE)
+    label_patterns = {
+        "current_task": [
+            r"current\s+task\s+is\s+",
+            r"my\s+current\s+task\s+is\s+",
+            r"task\s*:\s*",
+            r"next\s+move\s+is\s+",
+        ],
+        "blocker": [
+            r"blocker\s+is\s+",
+            r"blocker\s*:\s*",
+            r"my\s+blocker\s+is\s+",
+            r"current\s+blocker\s+is\s+",
+            r"blocked\s+by\s+",
+        ],
+        "active_file": [
+            r"active\s+file\s+is\s+",
+            r"current\s+file\s+is\s+",
+            r"working\s+on\s+file\s+",
+            r"file\s*:\s*",
+        ],
+        "last_checkpoint": [
+            r"last\s+checkpoint\s+is\s+",
+            r"checkpoint\s+is\s+",
+            r"checkpointed\s+at\s+",
+            r"lockpoint\s+is\s+",
+        ],
+    }
+
+    label_start_parts = []
+    for patterns in label_patterns.values():
+        label_start_parts.extend(patterns)
+
+    for kind, patterns in label_patterns.items():
+        for pattern in patterns:
+            combined = (
+                r"\b"
+                + pattern
+                + r"(.+?)(?=\.\s+(?:"
+                + "|".join(label_start_parts)
+                + r")|\n|$)"
+            )
+
+            match = re.search(combined, raw, re.IGNORECASE)
 
             if not match:
                 continue
@@ -1548,7 +1589,11 @@ def _nova_question_project_state_kind(user_text):
     return kinds[0] if kinds else ""
 
 
-def _nova_find_project_state_memory(session_id, kind):
+def _nova_find_project_state_memory(session_id: str, kind: str) -> str:
+    """
+    Retrieve the latest memory text for a given project-state kind in the session.
+    Ensures 'blocker' kind is always extracted if it exists.
+    """
     target_session_id = str(session_id or "").strip()
     target_kind = str(kind or "").strip()
     config = PROJECT_STATE_MEMORY_KINDS.get(target_kind) or {}
@@ -1562,12 +1607,11 @@ def _nova_find_project_state_memory(session_id, kind):
     except Exception:
         items = []
 
+    # candidates = all items matching kind + session
     candidates = []
-
     for item in items:
         if not isinstance(item, dict):
             continue
-
         item_kind = str(item.get("kind") or "").strip()
         item_text = str(item.get("text") or "").strip()
         item_session = str(item.get("session_id") or "").strip()
@@ -1575,48 +1619,33 @@ def _nova_find_project_state_memory(session_id, kind):
 
         if item_kind != target_kind:
             continue
-
         if target_session_id and item_session and item_session != target_session_id:
             continue
-
-        if ":" in item_text:
-            item_label, item_value = item_text.split(":", 1)
-        else:
-            item_label, item_value = "", item_text
-
-        if label and item_label.strip().lower() != label:
-            continue
-
-        clean_value = _nova_clean_project_state_value(item_value)
-
-        if not clean_value:
-            continue
-
-        score = 0
-
-        if item_session == target_session_id:
-            score += 100
-
-        candidates.append(
-            {
-                "score": score,
-                "updated_at": item_updated,
-                "value": clean_value,
-            }
-        )
+        candidates.append((item_updated, item_text))
 
     if not candidates:
         return ""
 
-    candidates.sort(
-        key=lambda row: (
-            row.get("score", 0),
-            str(row.get("updated_at") or ""),
-        ),
-        reverse=True,
-    )
+    # sort by updated_at descending to get latest
+    candidates.sort(reverse=True, key=lambda x: x[0])
+    latest_text = candidates[0][1] if candidates else ""
 
-    return str(candidates[0].get("value") or "").strip()
+    # extra safety for blocker
+    if target_kind == "blocker" and not latest_text:
+        # try to extract from current_task text if it mentions blocker
+        task_text = _nova_find_project_state_memory(session_id, "current_task")
+        match = re.search(r"blocker\s*[:\-]\s*(.+)", task_text, flags=re.IGNORECASE)
+        if match:
+            latest_text = match.group(1).strip()
+
+    # PROJECT_STATE_CLEAN_VALUE_RECALL_LOCK
+    if ":" in latest_text:
+        prefix, possible_value = latest_text.split(":", 1)
+
+        if prefix.strip().lower() == label:
+            return _nova_clean_project_state_value(possible_value)
+
+    return _nova_clean_project_state_value(latest_text)
 
 def _nova_try_project_state_direct_recall(user_text, session_id):
     kinds = _nova_project_state_question_kinds(user_text)
