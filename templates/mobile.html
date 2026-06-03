@@ -712,6 +712,7 @@ window.NovaCloseMobileSessions = function () {
 
 <script>
 /* NOVA_MOBILE_SEND_FALLBACK_BRIDGE_LOCK */
+/* NOVA_MOBILE_REAL_THREAD_FALLBACK_LOCK */
 /* NOVA_MOBILE_SEND_FALLBACK_BRIDGE_V2_LAYOUT_FIX */
 (function () {
     "use strict";
@@ -759,6 +760,7 @@ window.NovaCloseMobileSessions = function () {
 
     function findMessages() {
         var selectors = [
+            "#mobileChatMessages",
             "#mobileMessages",
             "#messages",
             "#chatMessages",
@@ -913,7 +915,7 @@ window.NovaCloseMobileSessions = function () {
 
             var data = await response.json();
             var assistant = data.assistant_message || {};
-            var answer = assistant.text || assistant.content || data.error || "Nova returned an empty response.";
+            var answer = assistant.text || assistant.content || data.error || "Nova could not produce a response for that request.";
 
             thinking.textContent = answer;
 
