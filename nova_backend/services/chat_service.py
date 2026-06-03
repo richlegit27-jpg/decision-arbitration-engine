@@ -280,15 +280,118 @@ class ChatService:
 
 
     def _decide_route(self, user_text="", attachments=None, memory_context="", working_context_block="", session_id=""):
-        return {
-            "route": self.ROUTE_GENERAL_CHAT,
-            "mode": "chat",
-            "confidence": 0.6,
-            "reasons": ["fallback_decide_route"],
-            "save_artifact": False,
-            "save_memory": True,
-            "use_memory": True,
+        # WEB_SOURCE_CARD_ROUTE_LOCK
+        text = str(user_text or "").strip()
+        lower = text.lower()
+        attachments = attachments if isinstance(attachments, list) else []
+
+        def base(route, mode="chat", confidence=0.8, reasons=None, save_artifact=False, save_memory=True, use_memory=True, **extra):
+            decision = {
+                "route": route,
+                "mode": mode,
+                "confidence": confidence,
+                "reasons": reasons or [],
+                "save_artifact": save_artifact,
+                "save_memory": save_memory,
+                "use_memory": use_memory,
+            }
+            decision.update(extra)
+            return decision
+
+        if attachments:
+            return base(
+                self.ROUTE_ATTACHMENT_ANALYSIS,
+                mode="attachment_analysis",
+                confidence=0.9,
+                reasons=["attachments_present"],
+                save_artifact=True,
+                save_memory=True,
+                use_memory=True,
+            )
+
+        followup_source_map = {
+            "first": 0,
+            "1": 0,
+            "one": 0,
+            "second": 1,
+            "2": 1,
+            "two": 1,
+            "third": 2,
+            "3": 2,
+            "three": 2,
+            "fourth": 3,
+            "4": 3,
+            "four": 3,
+            "fifth": 4,
+            "5": 4,
+            "five": 4,
         }
+
+        if any(verb in lower for verb in ("open", "show", "view", "click", "read")):
+            for marker, index in followup_source_map.items():
+                if re.search(rf"{re.escape(marker)}", lower):
+                    return base(
+                        self.ROUTE_WEB_FETCH,
+                        mode="followup_web_open",
+                        confidence=0.95,
+                        reasons=["source_followup_open"],
+                        save_artifact=True,
+                        save_memory=False,
+                        use_memory=False,
+                        source_index=index,
+                    )
+
+        if re.match(r"^https?://", text, re.I):
+            return base(
+                self.ROUTE_WEB_FETCH,
+                mode="direct_url",
+                confidence=0.95,
+                reasons=["direct_url"],
+                save_artifact=True,
+                save_memory=False,
+                use_memory=False,
+                url=text,
+            )
+
+        web_markers = [
+            "latest",
+            "fresh",
+            "breaking",
+            "news",
+            "today",
+            "current",
+            "right now",
+            "recent",
+            "update",
+            "updates",
+            "price of",
+            "weather",
+            "search",
+            "look up",
+            "find sources",
+            "top sources",
+        ]
+
+        if any(marker in lower for marker in web_markers):
+            return base(
+                self.ROUTE_WEB_FETCH,
+                mode="search",
+                confidence=0.9,
+                reasons=["fresh_or_source_web_query"],
+                save_artifact=True,
+                save_memory=False,
+                use_memory=False,
+            )
+
+        return base(
+            self.ROUTE_GENERAL_CHAT,
+            mode="chat",
+            confidence=0.6,
+            reasons=["fallback_decide_route"],
+            save_artifact=False,
+            save_memory=True,
+            use_memory=True,
+        )
 
     def _build_memory_context_for_chat(self, user_text="", decision=None, session_id=""):
         decision = decision if isinstance(decision, dict) else {}
@@ -4145,6 +4248,37 @@ if __name__ == "__main__":
             # preserve existing keys (like sources)
             meta.setdefault("sources", meta.get("sources", []))
             meta.setdefault("source_urls", meta.get("source_urls", []))
+
+            # CACHE_WEB_SOURCES_IN_FINALIZE_RESPONSE_LOCK
+            try:
+                source_urls_for_cache = meta.get("source_urls")
+                sources_for_cache = meta.get("sources")
+
+                if isinstance(source_urls_for_cache, list) and source_urls_for_cache:
+                    import json
+                    from pathlib import Path
+                    from datetime import datetime
+
+                    cache_path = Path(r"C:\Users\Owner\nova\data\nova_last_web_sources.json")
+                    cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+                    cache_payload = {
+                        "updated_at": datetime.now().isoformat(timespec="seconds"),
+                        "session_id": self._safe_str(session_id),
+                        "source_urls": [
+                            self._safe_str(url).strip()
+                            for url in source_urls_for_cache[:5]
+                            if self._safe_str(url).strip()
+                        ],
+                        "sources": sources_for_cache[:5] if isinstance(sources_for_cache, list) else [],
+                    }
+
+                    cache_path.write_text(
+                        json.dumps(cache_payload, indent=2, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+            except Exception as exc:
+                exec_debug("CACHE_WEB_SOURCES_IN_FINALIZE_RESPONSE_FAILED:", exc)
 
             if not meta.get("sources"):
                 import re
@@ -8242,6 +8376,123 @@ if __name__ == "__main__":
         text = str(user_text or "").strip()
         user_msg = self._build_user_message(user_text, attachments=attachments)
 
+        # OPEN_WEB_SOURCE_FOLLOWUP_HANDLER_LOCK
+        if self._safe_str(decision.get("strategy")).strip().lower() == "open_web_source_followup":
+            import re
+
+            source_index = 0
+            lowered = text.lower()
+
+            index_map = {
+                "first": 0,
+                "one": 0,
+                "1": 0,
+                "second": 1,
+                "two": 1,
+                "2": 1,
+                "third": 2,
+                "three": 2,
+                "3": 2,
+                "fourth": 3,
+                "four": 3,
+                "4": 3,
+                "fifth": 4,
+                "five": 4,
+                "5": 4,
+            }
+
+            for marker, idx in index_map.items():
+                if re.search(rf"\b{re.escape(marker)}\b", lowered):
+                    source_index = idx
+                    break
+
+            prior_urls = []
+            prior_sources = []
+
+            try:
+                session_payload = self._get_session_payload(session_id)
+                messages = session_payload.get("messages") if isinstance(session_payload, dict) else []
+                messages = messages if isinstance(messages, list) else []
+
+                for msg in reversed(messages):
+                    if not isinstance(msg, dict):
+                        continue
+
+                    if self._safe_str(msg.get("role")).lower() != "assistant":
+                        continue
+
+                    meta = msg.get("meta") if isinstance(msg.get("meta"), dict) else {}
+                    urls = meta.get("source_urls")
+                    sources = meta.get("sources")
+
+                    if isinstance(urls, list) and urls:
+                        prior_urls = [self._safe_str(url).strip() for url in urls if self._safe_str(url).strip()]
+                        prior_sources = sources if isinstance(sources, list) else []
+                        break
+            except Exception as exc:
+                exec_debug("OPEN_WEB_SOURCE_FOLLOWUP_LOOKUP_FAILED:", exc)
+
+            if (not prior_urls or source_index >= len(prior_urls)) and isinstance(getattr(self, "_last_web_source_urls", None), list):
+                cached_urls = [
+                    self._safe_str(url).strip()
+                    for url in getattr(self, "_last_web_source_urls", [])
+                    if self._safe_str(url).strip()
+                ]
+
+                if cached_urls:
+                    prior_urls = cached_urls
+                    cached_sources = getattr(self, "_last_web_sources", [])
+                    prior_sources = cached_sources if isinstance(cached_sources, list) else []
+
+            # WEB_FOLLOWUP_DURABLE_SOURCE_CACHE_LOCK
+            if not prior_urls or source_index >= len(prior_urls):
+                try:
+                    import json
+                    from pathlib import Path
+
+                    cache_path = Path(r"C:\Users\Owner\nova\data\nova_last_web_sources.json")
+
+                    if cache_path.exists():
+                        cache_data = json.loads(cache_path.read_text(encoding="utf-8") or "{}")
+                        cached_urls = cache_data.get("source_urls")
+                        cached_sources = cache_data.get("sources")
+
+                        if isinstance(cached_urls, list) and cached_urls:
+                            prior_urls = [
+                                self._safe_str(url).strip()
+                                for url in cached_urls
+                                if self._safe_str(url).strip()
+                            ]
+                            prior_sources = cached_sources if isinstance(cached_sources, list) else []
+                except Exception as exc:
+                    exec_debug("WEB_FOLLOWUP_DURABLE_SOURCE_CACHE_READ_FAILED:", exc)
+
+            if not prior_urls or source_index >= len(prior_urls):
+                assistant_msg = self._build_assistant_message(
+                    "I could not find a previous source to open. Run a fresh web search first.",
+                    meta={
+                        "strategy": "open_web_source_followup",
+                        "source_index": source_index,
+                        "source_urls": prior_urls,
+                        "sources": prior_sources[:5] if isinstance(prior_sources, list) else [],
+                    },
+                )
+
+                return self._finalize_response(
+                    session_id=session_id,
+                    user_text=user_text,
+                    user_msg=user_msg,
+                    assistant_msg=assistant_msg,
+                    decision=decision,
+                )
+
+            selected_url = prior_urls[source_index]
+            decision["mode"] = "direct_url"
+            decision["url"] = selected_url
+            decision["source_index"] = source_index
+
+            text = selected_url
+
 
         if text.startswith("http://") or text.startswith("https://"):
             print("DIRECT_URL_PATCH_HIT =", text)
@@ -8878,6 +9129,43 @@ if __name__ == "__main__":
             for item in sources
             if isinstance(item, dict) and item.get("url")
         ]
+
+        # WEB_FOLLOWUP_LAST_SOURCE_CACHE_LOCK
+        try:
+            self._last_web_source_urls = [
+                self._safe_str(url).strip()
+                for url in source_urls[:5]
+                if self._safe_str(url).strip()
+            ]
+            self._last_web_sources = sources[:5] if isinstance(sources, list) else []
+        except Exception as exc:
+            exec_debug("WEB_FOLLOWUP_LAST_SOURCE_CACHE_FAILED:", exc)
+
+        try:
+            import json
+            from pathlib import Path
+
+            cache_path = Path(r"C:\Users\Owner\nova\data\nova_last_web_sources.json")
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+            cache_payload = {
+                "updated_at": datetime.now().isoformat(timespec="seconds"),
+                "session_id": self._safe_str(session_id),
+                "query": self._safe_str(query),
+                "source_urls": [
+                    self._safe_str(url).strip()
+                    for url in source_urls[:5]
+                    if self._safe_str(url).strip()
+                ],
+                "sources": sources[:5] if isinstance(sources, list) else [],
+            }
+
+            cache_path.write_text(
+                json.dumps(cache_payload, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            exec_debug("WEB_FOLLOWUP_DURABLE_SOURCE_CACHE_WRITE_FAILED:", exc)
 
         exec_debug("WEB_SOURCES_FINAL:", sources)
         exec_debug("WEB_SOURCE_URLS_FINAL:", source_urls)
@@ -13467,6 +13755,75 @@ Auto-fix result:
             priority = "high"
             confidence = 0.9
             reasons.append("error_signal")
+
+        # SOURCE_FOLLOWUP_BEFORE_FULL_FILE_INTENT_LOCK
+        elif (
+            any(verb in text_lc for verb in ("open", "show", "view", "click", "read"))
+            and any(marker in text_lc for marker in (
+                "first",
+                "second",
+                "third",
+                "fourth",
+                "fifth",
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "one",
+                "two",
+                "three",
+                "four",
+                "five",
+            ))
+        ):
+            intent = "web_fetch"
+            route = self.ROUTE_WEB_FETCH
+            strategy = "open_web_source_followup"
+            priority = "high"
+            confidence = 1.0
+            reasons.append("source_followup_forced_before_full_file")
+
+        # LATEST_NEWS_BEFORE_FULL_FILE_INTENT_LOCK
+        elif any(marker in text_lc for marker in (
+            "latest",
+            "fresh",
+            "breaking",
+            "news",
+            "today",
+            "current",
+            "right now",
+            "recent",
+            "update",
+            "updates",
+            "source",
+            "sources",
+            "top sources",
+            "look up",
+            "search",
+        )):
+            intent = "web_fetch"
+            route = self.ROUTE_WEB_FETCH
+            strategy = "fetch_current_sources"
+            priority = "high"
+            confidence = 1.0
+            reasons.append("latest_news_forced_before_full_file")
+
+        # SOURCE_FOLLOWUP_HARD_INSERT_LOCK
+        elif (
+            any(verb in text_lc for verb in ("open", "show", "view", "click", "read"))
+            and any(marker in text_lc for marker in (
+                "first", "second", "third", "fourth", "fifth",
+                "1", "2", "3", "4", "5",
+                "one", "two", "three", "four", "five",
+            ))
+        ):
+            intent = "web_fetch"
+            route = self.ROUTE_WEB_FETCH
+            strategy = "open_web_source_followup"
+            priority = "high"
+            confidence = 1.0
+            reasons.append("source_followup_forced_before_full_file")
 
         elif "smff" in text_lc or "full file" in text_lc or "full code" in text_lc:
             intent = "full_file_code"
