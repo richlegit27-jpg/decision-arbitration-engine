@@ -1321,7 +1321,8 @@ def _nova_read_project_state_store():
             return {"sessions": {}}
 
         import json
-        payload = json.loads(PROJECT_STATE_FILE.read_text(encoding="utf-8"))
+        # PROJECT_STATE_UTF8_SIG_LOCK
+        payload = json.loads(PROJECT_STATE_FILE.read_text(encoding="utf-8-sig"))
 
         if not isinstance(payload, dict):
             return {"sessions": {}}
@@ -1677,6 +1678,60 @@ def _nova_find_project_state_memory(session_id: str, kind: str) -> str:
     return ""
 
 
+# PROJECT_STATE_AUTO_INJECT_CONTEXT_LOCK
+def _nova_build_project_state_context(session_id):
+    state = _nova_get_project_state_session(session_id)
+
+    if not isinstance(state, dict) or not state:
+        return ""
+
+    lines = []
+
+    current_task = _nova_clean_project_state_value(state.get("current_task"))
+    blocker = _nova_clean_project_state_value(state.get("blocker"))
+    active_file = _nova_clean_project_state_value(state.get("active_file"))
+    last_checkpoint = _nova_clean_project_state_value(state.get("last_checkpoint"))
+
+    if current_task:
+        lines.append(f"Current task: {current_task}")
+
+    if blocker:
+        lines.append(f"Blocker: {blocker}")
+
+    if active_file:
+        lines.append(f"Active file: {active_file}")
+
+    if last_checkpoint:
+        lines.append(f"Last checkpoint: {last_checkpoint}")
+
+    if not lines:
+        return ""
+
+    return "\n".join(
+        [
+            "HIGH PRIORITY SESSION PROJECT STATE:",
+            *lines,
+            "",
+            "Use this session project state as the source of truth for what the user is working on.",
+            "Ignore unrelated stale persistent-memory instructions that conflict with this session project state.",
+        ]
+    )
+
+
+def _nova_inject_project_state_context(user_text, session_id):
+    context = _nova_build_project_state_context(session_id)
+
+    if not context:
+        return user_text
+
+    clean_user_text = str(user_text or "").strip()
+
+    if not clean_user_text:
+        return context
+
+    return f"{context}\n\nUser message:\n{clean_user_text}"
+
+
 def _nova_try_project_state_direct_recall(user_text, session_id):
     kinds = _nova_project_state_question_kinds(user_text)
 
@@ -1959,6 +2014,11 @@ def api_chat():
                 len(remembered_session_attachments),
                 session_id,
             )
+
+        user_text = _nova_inject_project_state_context(
+            user_text,
+            session_id,
+        )
 
         try:
             project_aware_context = _nova_build_project_aware_context(
