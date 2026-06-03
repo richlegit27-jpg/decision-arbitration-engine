@@ -1,15 +1,15 @@
 {
   "memory": [
     {
-      "content": "User identity/context: my name is richard",
-      "category": "profile",
+      "content": "User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note...\n- [user_fact] Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User identity/context: my...\n- [preference] remember I like code help in SMFF full-file style\n- [project_focus] Current project focus: backend intelligence context testing",
+      "category": "preference",
       "weight": 10.0,
       "text": "",
       "kind": "note",
       "id": "memory_731da8cc8ff14e7d81c1b9119b4695bf",
-      "updated_at": "2026-05-14T16:20:06.255049+00:00",
+      "updated_at": "2026-06-03T02:28:23.357536+00:00",
       "created_at": "2026-05-10T22:23:39.805870+00:00",
-      "count": 17,
+      "count": 26,
       "pinned": true
     },
     {
@@ -22,6 +22,38 @@
       "updated_at": "2026-04-29T05:09:55.911141+00:00",
       "created_at": "2026-04-29T05:09:55.911141+00:00",
       "count": 1
+    },
+    {
+      "text": "Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User identity/context: my name is richard\n- [preference] remember I like code help in SMFF full-file style\n- [u...\n- [user_fact] Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User identity/context: my name is richard\n- [preference] remember I like code help in SMFF full-file style\n- [user_fact] Say pong only.\n\nPr...\n- [preference] remember I like code help in SMFF full-file style",
+      "kind": "user_fact",
+      "session_id": "session_27d9a473876b43e5a6e719589203d73a",
+      "weight": 1.0,
+      "id": "memory_f55ce961d98442a986e76b3fe7190cf2",
+      "updated_at": "2026-06-03T02:27:21.437860+00:00",
+      "created_at": "2026-06-03T02:13:23.071353+00:00",
+      "count": 1
+    },
+    {
+      "text": "Current project focus: backend intelligence context testing",
+      "kind": "project_focus",
+      "source": "project_focus_direct",
+      "session_id": "project_focus_memory_test_001",
+      "weight": 1.0,
+      "id": "memory_fbed51740cbe4e7da203ef3b7cbd93cd",
+      "updated_at": "2026-06-03T02:27:42.698459+00:00",
+      "created_at": "2026-06-03T02:27:42.698459+00:00",
+      "count": 1
+    },
+    {
+      "text": "Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note...\n- [user_fact] Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User identity/context: my...\n- [preference] remember I like code help in SMFF full-file style\n- [project_focus] Current project focus: backend intelligence context testing",
+      "kind": "user_fact",
+      "session_id": "session_bb976cde37b74fbd93b32fe02c2d0165",
+      "weight": 10.0,
+      "id": "memory_f7284d14f423446ebc925b54adacc418",
+      "updated_at": "2026-06-03T02:29:18.086585+00:00",
+      "created_at": "2026-06-03T02:28:24.984488+00:00",
+      "count": 4,
+      "pinned": true
     }
   ]
 }

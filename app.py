@@ -766,6 +766,591 @@ def api_sessions():
         memory=memory_service.build_list_payload(),
     )
 
+
+# PROJECT_AWARE_MEMORY_CONTEXT_LOCK
+def _nova_pa_read_json_file(path):
+    try:
+        if not path.exists():
+            return None
+
+        json_module = __import__("json")
+        return json_module.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _nova_pa_compact_text(value, *, limit=500):
+    text = str(value or "").replace("\r", "\n").strip()
+
+    while "\n\n\n" in text:
+        text = text.replace("\n\n\n", "\n\n")
+
+    if len(text) > limit:
+        return text[:limit].rstrip() + "..."
+
+    return text
+
+
+def _nova_pa_memory_text(item):
+    if isinstance(item, str):
+        return item.strip()
+
+    if not isinstance(item, dict):
+        return ""
+
+    for key in (
+        "text",
+        "content",
+        "memory",
+        "summary",
+        "value",
+        "note",
+        "description",
+    ):
+        value = item.get(key)
+
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    return ""
+
+
+def _nova_pa_memory_kind(item):
+    if not isinstance(item, dict):
+        return "memory"
+
+    return str(
+        item.get("kind")
+        or item.get("type")
+        or item.get("category")
+        or "memory"
+    ).strip() or "memory"
+
+
+def _nova_pa_memory_priority(item):
+    if not isinstance(item, dict):
+        return 0
+
+    value = item.get("priority", 0)
+
+    try:
+        return int(value)
+    except Exception:
+        return 0
+
+
+def _nova_pa_extract_memory_items(payload):
+    if isinstance(payload, list):
+        return payload
+
+    if not isinstance(payload, dict):
+        return []
+
+    for key in (
+        "items",
+        "memories",
+        "memory",
+        "records",
+        "data",
+    ):
+        value = payload.get(key)
+
+        if isinstance(value, list):
+            return value
+
+    return []
+
+
+def _nova_pa_score_memory_item(item, query_words):
+    text = _nova_pa_memory_text(item)
+    lowered = text.lower()
+
+    overlap = sum(1 for word in query_words if word and word in lowered)
+    priority = _nova_pa_memory_priority(item)
+
+    return (overlap * 10) + priority
+
+
+def _nova_pa_get_memory_context(user_text, *, limit=12, char_limit=3500):
+    payload = _nova_pa_read_json_file(DATA_DIR / "nova_memory.json")
+    items = _nova_pa_extract_memory_items(payload)
+
+    if not items:
+        return []
+
+    query_words = {
+        word.strip(".,!?;:()[]{}\"'").lower()
+        for word in str(user_text or "").split()
+        if len(word.strip(".,!?;:()[]{}\"'")) >= 4
+    }
+
+    scored = []
+
+    for item in items:
+        text = _nova_pa_memory_text(item)
+
+        if not text:
+            continue
+
+        scored.append((
+            _nova_pa_score_memory_item(item, query_words),
+            _nova_pa_memory_priority(item),
+            text,
+            _nova_pa_memory_kind(item),
+        ))
+
+    scored.sort(key=lambda row: (row[0], row[1]), reverse=True)
+
+    lines = []
+    seen = set()
+    used = 0
+
+    for _score, _priority, text, kind in scored:
+        compact = _nova_pa_compact_text(text, limit=450)
+        key = compact.lower()[:120]
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+
+        line = f"- [{kind}] {compact}"
+
+        if used + len(line) > char_limit:
+            break
+
+        lines.append(line)
+        used += len(line)
+
+        if len(lines) >= limit:
+            break
+
+    return lines
+
+
+def _nova_pa_message_text(message):
+    if isinstance(message, str):
+        return message.strip()
+
+    if not isinstance(message, dict):
+        return ""
+
+    for key in (
+        "text",
+        "content",
+        "message",
+        "body",
+    ):
+        value = message.get(key)
+
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    return ""
+
+# ==============================
+# PROJECT-AWARE SESSION FIX
+# ==============================
+
+def _nova_pa_get_recent_session_context_fixed(session_id, *, limit=12, char_limit=3500):
+    """
+    Always fetch the last N user messages from the session, newest first,
+    and return them as compact context lines.
+    """
+    target_session_id = str(session_id or "").strip()
+    if not target_session_id:
+        return []
+
+    try:
+        session = session_service.get_session(target_session_id)
+    except Exception:
+        session = None
+
+    if not isinstance(session, dict):
+        return []
+
+    messages = session.get("messages") or []
+    if not isinstance(messages, list):
+        return []
+
+    lines = []
+    used = 0
+
+    # reverse so last messages are included first
+    for message in reversed(messages[-limit:]):
+        if not isinstance(message, dict):
+            continue
+
+        role = str(message.get("role") or "message").strip()
+        text = _nova_pa_message_text(message)
+        if not text:
+            continue
+
+        compact = _nova_pa_compact_text(text, limit=350)
+        line = f"- [{role}] {compact}"
+
+        if used + len(line) > char_limit:
+            break
+
+        lines.append(line)
+        used += len(line)
+
+    return list(reversed(lines))  # maintain chronological order
+
+# Patch _nova_build_project_aware_context to use the fixed recent session fetch
+
+
+# PROJECT_FOCUS_MEMORY_SAVE_RECALL_LOCK
+def _nova_project_focus_memory_text(focus):
+    focus_value = str(focus or "").strip()
+    if not focus_value:
+        return ""
+    return f"Current project focus: {focus_value}"
+
+
+def _nova_save_project_focus_memory(user_text, session_id):
+    focus = _nova_extract_project_focus_from_text(user_text)
+
+    if not focus:
+        return None
+
+    memory_text = _nova_project_focus_memory_text(focus)
+
+    if not memory_text:
+        return None
+
+    target_session_id = str(session_id or "").strip()
+
+    try:
+        for item in memory_service.all() or []:
+            if not isinstance(item, dict):
+                continue
+
+            item_text = str(item.get("text") or "").strip().lower()
+            item_session = str(item.get("session_id") or "").strip()
+
+            if (
+                item_text == memory_text.lower()
+                and item_session == target_session_id
+            ):
+                return item
+    except Exception:
+        app.logger.exception("[project-focus-memory] failed duplicate scan")
+
+    try:
+        item = memory_service.add_memory(
+            {
+                "text": memory_text,
+                "kind": "project_focus",
+                "source": "project_focus_direct",
+                "session_id": target_session_id,
+            }
+        )
+
+        app.logger.info(
+            "[project-focus-memory] saved focus session_id=%s focus=%s",
+            target_session_id,
+            focus,
+        )
+
+        return item
+
+    except Exception:
+        app.logger.exception("[project-focus-memory] failed saving focus")
+        return None
+
+
+def _nova_find_project_focus_memory(session_id):
+    target_session_id = str(session_id or "").strip()
+    candidates = []
+
+    try:
+        items = memory_service.all() or []
+    except Exception:
+        items = []
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        item_text = str(item.get("text") or "").strip()
+        item_session = str(item.get("session_id") or "").strip()
+        item_kind = str(item.get("kind") or "").strip().lower()
+        item_updated = str(item.get("updated_at") or item.get("created_at") or "")
+
+        if not item_text.lower().startswith("current project focus:"):
+            continue
+
+        if target_session_id and item_session and item_session != target_session_id:
+            continue
+
+        focus = item_text.split(":", 1)[1].strip() if ":" in item_text else ""
+
+        if not focus:
+            continue
+
+        score = 0
+        if item_session == target_session_id:
+            score += 100
+        if item_kind == "project_focus":
+            score += 25
+
+        candidates.append(
+            {
+                "score": score,
+                "updated_at": item_updated,
+                "focus": focus,
+                "item": item,
+            }
+        )
+
+    if not candidates:
+        return ""
+
+    candidates.sort(
+        key=lambda row: (
+            row.get("score", 0),
+            str(row.get("updated_at") or ""),
+        ),
+        reverse=True,
+    )
+
+    return str(candidates[0].get("focus") or "").strip()
+
+
+
+# PROJECT_FOCUS_DIRECT_RECALL_LOCK
+def _nova_is_project_focus_recall_question(user_text):
+    text_value = str(user_text or "").strip().lower()
+
+    if not text_value:
+        return False
+
+    project_terms = (
+        "project focus",
+        "current focus",
+        "focus right now",
+        "what was my focus",
+        "what is my focus",
+        "what's my focus",
+    )
+
+    personal_terms = (
+        "my ",
+        "i ",
+        "me",
+        "our ",
+        "nova",
+        "current",
+    )
+
+    return (
+        any(term in text_value for term in project_terms)
+        and any(term in text_value for term in personal_terms)
+    )
+
+
+def _nova_extract_project_focus_from_text(text_value):
+    raw = str(text_value or "").strip()
+
+    if not raw:
+        return ""
+
+    patterns = [
+        r"\bmy\s+current\s+project\s+focus\s+is\s+(.+?)(?:[.!?\n]|$)",
+        r"\bcurrent\s+project\s+focus\s+is\s+(.+?)(?:[.!?\n]|$)",
+        r"\bproject\s+focus\s+is\s+(.+?)(?:[.!?\n]|$)",
+        r"\bfocus\s+is\s+(.+?)(?:[.!?\n]|$)",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, raw, re.IGNORECASE)
+
+        if not match:
+            continue
+
+        focus = str(match.group(1) or "").strip()
+        focus = re.sub(r"\s+", " ", focus).strip(" .!?")
+
+        if focus:
+            return focus
+
+    return ""
+
+
+def _nova_find_recent_project_focus(session_id):
+    target_session_id = str(session_id or "").strip()
+
+    if not target_session_id:
+        return ""
+
+    try:
+        session = session_service.get_session(target_session_id)
+    except Exception:
+        session = None
+
+    if not isinstance(session, dict):
+        return ""
+
+    messages = session.get("messages") or []
+
+    if not isinstance(messages, list):
+        return ""
+
+    for message in reversed(messages):
+        if not isinstance(message, dict):
+            continue
+
+        role = str(message.get("role") or "").strip().lower()
+
+        if role not in {"user", "message"}:
+            continue
+
+        message_text = _nova_pa_message_text(message)
+        focus = _nova_extract_project_focus_from_text(message_text)
+
+        if focus:
+            return focus
+
+    return ""
+
+
+def _nova_try_project_focus_direct_recall(user_text, session_id):
+    if not _nova_is_project_focus_recall_question(user_text):
+        return None
+
+    focus = _nova_find_recent_project_focus(session_id)
+
+    if not focus:
+        focus = _nova_find_project_focus_memory(session_id)
+
+    if not focus:
+        return None
+
+    payload = build_common_state_payload(session_id=session_id)
+
+    payload.update(
+        {
+            "assistant_message": {
+                "role": "assistant",
+                "text": f"Your current project focus was {focus}.",
+            },
+            "active_session_id": session_id,
+            "debug": {
+                "direct_recall": "project_focus",
+                "focus": focus,
+            },
+        }
+    )
+
+    return json_ok(**payload)
+
+
+
+def _nova_build_project_aware_context(
+    user_text,
+    *,
+    session_id="",
+    requested_session_id="",
+):
+    import logging
+    context_lines = []
+
+    # persistent memory
+    memory_lines = _nova_pa_get_memory_context(user_text)
+    if memory_lines:
+        context_lines.append("Relevant persistent memory:")
+        context_lines.extend(memory_lines)
+
+    # recent session messages (fixed)
+    session_context_id = str(session_id or requested_session_id or "").strip()
+    recent_lines = _nova_pa_get_recent_session_context_fixed(session_context_id)
+    if recent_lines:
+        if context_lines:
+            context_lines.append("")
+        context_lines.append("Recent session context:")
+        context_lines.extend(recent_lines)
+
+    # log what is being returned for diagnostics
+    logging.getLogger("nova_diagnostics").info(
+        "[project-aware-fixed] user_text=%s session_id=%s requested_session_id=%s context_lines=%s",
+        user_text,
+        session_id,
+        requested_session_id,
+        context_lines,
+    )
+
+    if not context_lines:
+        return ""
+    return "\n".join([
+        "",
+        "Project-aware context for Nova:",
+        *context_lines,
+    ]).strip()
+
+def _nova_build_project_aware_context(
+    user_text,
+    *,
+    session_id="",
+    requested_session_id="",
+):
+    import logging
+    context_lines = []
+
+    # persistent memory
+    memory_lines = _nova_pa_get_memory_context(user_text)
+    if memory_lines:
+        context_lines.append("Relevant persistent memory:")
+        context_lines.extend(memory_lines)
+
+    # recent session messages
+    session_context_id = str(session_id or requested_session_id or "").strip()
+    recent_lines = _nova_pa_get_recent_session_context_fixed(session_context_id)
+    if recent_lines:
+        if context_lines:
+            context_lines.append("")
+        context_lines.append("Recent session context:")
+        context_lines.extend(recent_lines)
+
+    # log what is being returned for diagnostics
+    logging.getLogger("nova_diagnostics").info(
+        "[project-aware] user_text=%s session_id=%s requested_session_id=%s context_lines=%s",
+        user_text,
+        session_id,
+        requested_session_id,
+        context_lines,
+    )
+
+    if not context_lines:
+        return ""
+    return "\n".join([
+        "",
+        "Project-aware context for Nova:",
+        *context_lines,
+    ]).strip()
+
+# Inject into /api/chat flow
+try:
+    project_aware_context = _nova_build_project_aware_context(
+        user_text,
+        session_id=session_id,
+        requested_session_id=requested_session_id,
+    )
+except Exception:
+    project_aware_context = ""
+    app.logger.exception("[api_chat] failed to build project-aware memory context")
+
+if project_aware_context:
+    user_text = f"{user_text}\n\n{project_aware_context}" if user_text else project_aware_context
+    app.logger.info(
+        "[api_chat] DIAGNOSTIC injected project-aware context chars=%s session_id=%s requested_session_id=%s",
+        len(project_aware_context),
+        session_id,
+        requested_session_id,
+    )
+
+
+
 @app.post("/api/chat")
 def api_chat():
     data = request_json()
@@ -832,6 +1417,23 @@ def api_chat():
 
     if not user_text and not attachments:
         return json_error("Missing user_text or attachments", 400)
+
+    _nova_save_project_focus_memory(
+        user_text,
+        session_id,
+    )
+
+    direct_project_focus_response = _nova_try_project_focus_direct_recall(
+        user_text,
+        session_id,
+    )
+
+    if direct_project_focus_response is not None:
+        app.logger.info(
+            "[project-focus-direct-recall] answered from recent session context session_id=%s",
+            session_id,
+        )
+        return direct_project_focus_response
 
     try:
         # REAL_ATTACHMENT_MEMORY_BACKEND_LOCK
@@ -964,6 +1566,26 @@ def api_chat():
                 "[api_chat] injected project-aware attachment context count=%s session_id=%s",
                 len(remembered_session_attachments),
                 session_id,
+            )
+
+        try:
+            project_aware_context = _nova_build_project_aware_context(
+                user_text,
+                session_id=session_id,
+                requested_session_id=requested_session_id,
+            )
+        except Exception:
+            project_aware_context = ""
+            app.logger.exception("[api_chat] failed to build project-aware memory context")
+
+        if project_aware_context:
+            user_text = f"{user_text}\n\n{project_aware_context}" if user_text else project_aware_context
+
+            app.logger.info(
+                "[api_chat] injected project-aware memory context chars=%s session_id=%s requested_session_id=%s",
+                len(project_aware_context),
+                session_id,
+                requested_session_id,
             )
 
         app.logger.info(
