@@ -5,6 +5,7 @@
   // NOVA_REMAINING_COMPOSER_MOJIBAKE_LOCK
   // NOVA_FINAL_TTS_STOP_TEXT_LOCK
   // NOVA_TTS_STOP_LINE_DIRECT_LOCK
+  // NOVA_TTS_DEFAULT_OFF_LOCK
 
   function qs(selector, root) {
     return (root || document).querySelector(selector);
@@ -745,7 +746,7 @@ const state = {
   },
 
 tts: {
-  enabled: true,
+  enabled: false,
   playing: false,
   audio: null,
   lastAutoMessageId: "",
@@ -767,7 +768,7 @@ function updateTtsToggleUi() {
 
   if (!state.tts) {
     state.tts = {
-      enabled: true,
+      enabled: false,
       playing: false,
       audio: null,
       lastAutoMessageId: "",
@@ -4981,7 +4982,7 @@ function updateTtsToggleUi() {
 
   if (!state.tts) {
     state.tts = {
-      enabled: true,
+      enabled: false,
       playing: false,
       audio: null,
     };
@@ -5132,7 +5133,7 @@ async function playVoiceReplyFromText(text) {
 
   if (!state.tts) {
     state.tts = {
-      enabled: true,
+      enabled: false,
       playing: false,
       audio: null,
       lastAutoMessageId: "",
