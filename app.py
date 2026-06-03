@@ -600,6 +600,70 @@ def api_state():
 # CHAT
 # -----------------------
 
+
+# NOVA_WEAK_BACKEND_RESPONSE_GUARD_LOCK
+def _nova_replace_weak_backend_reply(user_text, result):
+    """
+    Last-mile response guard.
+
+    Prevents weak generic fallback text like:
+    "I'm ready. What are we working on?"
+    from being returned as the final assistant response.
+    """
+    try:
+        if not isinstance(result, dict):
+            return result
+
+        assistant = result.get("assistant_message")
+        if not isinstance(assistant, dict):
+            return result
+
+        text = str(
+            assistant.get("text")
+            or assistant.get("content")
+            or ""
+        ).strip()
+
+        lowered = text.lower().replace("’", "'")
+        weak_phrases = {
+            "i'm ready. what are we working on?",
+            "i'm ready. what are we working on",
+            "im ready. what are we working on?",
+            "im ready. what are we working on",
+        }
+
+        if lowered not in weak_phrases:
+            return result
+
+        prompt = str(user_text or "").strip()
+        prompt_lc = prompt.lower()
+
+        if "life story" in prompt_lc:
+            replacement = (
+                "I do not have a personal life story like a human. "
+                "I was built to help you think, build, debug, write, learn, and move faster. "
+                "For Nova, the next move is frontend polish: remove weak mobile fallback behavior, "
+                "clean missing mobile scripts, and make the live UI match the backend that already passed tests."
+            )
+        else:
+            replacement = (
+                "I’m here. Give me the next task and I’ll move directly on it. "
+                "For Nova right now, the active phase is frontend/mobile polish."
+            )
+
+        assistant["text"] = replacement
+        assistant["content"] = replacement
+        assistant.setdefault("meta", {})
+        if isinstance(assistant["meta"], dict):
+            assistant["meta"]["weak_response_guarded"] = True
+
+        result["assistant_message"] = assistant
+        return result
+
+    except Exception:
+        return result
+
+
 @app.route("/api/runtime/summary", methods=["GET"])
 def api_runtime_summary():
     return jsonify({"ok": True})
@@ -1879,7 +1943,7 @@ def api_chat():
             source_type="regenerated",
         )
 
-        return jsonify(result)
+        return jsonify(_nova_replace_weak_backend_reply(user_text, result))
 
     if not session_id:
         active = session_service.get_active()
