@@ -36,3 +36,15 @@ archive/
 runtime/qa_logs/
 runtime/regression_tools/
 data/nova_sessions.json
+
+# Nova local runtime data - do not commit
+data/*.json
+data/*.bak
+data/*.backup*
+data/*.locked*
+data/*.badlock*
+data/*.pre-trim-*
+data/nova_sessions*
+uploads/
+runtime/
+*.BAK_*
