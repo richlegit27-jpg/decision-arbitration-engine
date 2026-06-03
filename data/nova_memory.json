@@ -37,22 +37,22 @@
       "text": "Current project focus: backend intelligence context testing",
       "kind": "project_focus",
       "source": "project_focus_direct",
-      "session_id": "project_focus_memory_test_001",
-      "weight": 1.0,
+      "session_id": "project_focus_cleanup_test_001",
+      "weight": 2.25,
       "id": "memory_fbed51740cbe4e7da203ef3b7cbd93cd",
-      "updated_at": "2026-06-03T02:27:42.698459+00:00",
+      "updated_at": "2026-06-03T02:33:46.229705+00:00",
       "created_at": "2026-06-03T02:27:42.698459+00:00",
-      "count": 1
+      "count": 2
     },
     {
       "text": "Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note...\n- [user_fact] Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User preference/correction: Say pong only.\n\nProject-aware context for Nova:\nRelevant persistent memory:\n- [note] User identity/context: my...\n- [preference] remember I like code help in SMFF full-file style\n- [project_focus] Current project focus: backend intelligence context testing",
       "kind": "user_fact",
-      "session_id": "session_bb976cde37b74fbd93b32fe02c2d0165",
+      "session_id": "session_afc5b323a88d4208828f828e5585ffc8",
       "weight": 10.0,
       "id": "memory_f7284d14f423446ebc925b54adacc418",
-      "updated_at": "2026-06-03T02:29:18.086585+00:00",
+      "updated_at": "2026-06-03T02:38:04.055723+00:00",
       "created_at": "2026-06-03T02:28:24.984488+00:00",
-      "count": 4,
+      "count": 8,
       "pinned": true
     }
   ]
