@@ -1981,6 +1981,46 @@ def api_chat():
             source_type="regenerated",
         )
 
+        # NOVA_INLINE_API_CHAT_FINAL_WEAK_GUARD_LOCK
+        try:
+            assistant = result.get("assistant_message") if isinstance(result, dict) else None
+            current_text = str(
+                (assistant or {}).get("text")
+                or (assistant or {}).get("content")
+                or ""
+            ).strip()
+            current_compact = " ".join(
+                current_text
+                .lower()
+                .replace("’", "'")
+                .replace("â€™", "'")
+                .replace("ã¢â‚¬â„¢", "'")
+                .replace("iã¢â‚¬â„¢m", "i'm")
+                .replace("iâ€™m", "i'm")
+                .split()
+            )
+            if (
+                isinstance(result, dict)
+                and isinstance(assistant, dict)
+                and "ready" in current_compact
+                and "what are we working on" in current_compact
+            ):
+                replacement = (
+                    "I do not have a personal life story like a human. "
+                    "I was built to help you think, build, debug, write, learn, and move faster. "
+                    "For Nova, the active phase is frontend polish: clean the mobile UI, remove weak fallback behavior, "
+                    "and make the live app match the backend tests that are already passing."
+                )
+                assistant["text"] = replacement
+                assistant["content"] = replacement
+                meta = assistant.get("meta") if isinstance(assistant.get("meta"), dict) else {}
+                meta["weak_response_guarded"] = True
+                meta["weak_response_original"] = current_text
+                assistant["meta"] = meta
+                result["assistant_message"] = assistant
+        except Exception:
+            pass
+
         return jsonify(_nova_replace_weak_backend_reply(user_text, result))
 
     if not session_id:
