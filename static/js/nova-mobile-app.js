@@ -35,6 +35,29 @@
     },
   };
 
+  window.NovaMobileDebug = {
+    app,
+    getState() {
+      return app.state;
+    },
+    getMessages() {
+      return app.state.messages || [];
+    },
+    getLastMessage() {
+      const messages = app.state.messages || [];
+      return messages[messages.length - 1] || null;
+    },
+    getLastAssistant() {
+      const messages = app.state.messages || [];
+      for (let i = messages.length - 1; i >= 0; i -= 1) {
+        if (String(messages[i]?.role || "").toLowerCase() === "assistant") {
+          return messages[i];
+        }
+      }
+      return null;
+    },
+  };
+
   function byId(id) {
     return document.getElementById(id);
   }
@@ -329,6 +352,47 @@
     `;
   }
 
+  // MOBILE_SOURCE_CARDS_RENDER_LOCK
+  function renderMobileSourceCards(msg) {
+    const meta = msg && typeof msg.meta === "object" && msg.meta ? msg.meta : {};
+    const sources = Array.isArray(meta.sources)
+      ? meta.sources
+      : Array.isArray(msg?.sources)
+      ? msg.sources
+      : [];
+
+    if (!sources.length) return "";
+
+    const cards = sources.slice(0, 5).map((item, index) => {
+      const title = safeText(item.title || item.name || item.url || `Source ${index + 1}`);
+      const source = safeText(item.source || item.domain || item.publisher || "Source");
+      const snippet = safeText(item.snippet || item.description || "");
+      const url = safeText(item.url || item.href || item.link || "");
+
+      return `
+        <button
+          type="button"
+          class="mobile-source-card"
+          data-mobile-source-url="${escapeHtml(url)}"
+          data-mobile-source-title="${escapeHtml(title)}"
+        >
+          <div class="mobile-source-card-top">
+            <span class="mobile-source-number">${index + 1}</span>
+            <span class="mobile-source-domain">${escapeHtml(source)}</span>
+          </div>
+          <div class="mobile-source-title">${escapeHtml(title)}</div>
+          ${
+            snippet
+              ? `<div class="mobile-source-snippet">${escapeHtml(snippet)}</div>`
+              : ""
+          }
+        </button>
+      `;
+    }).join("");
+
+    return `<div class="mobile-source-list">${cards}</div>`;
+  }
+
   function renderMessages() {
     const container = byId("mobileChatMessages");
     if (!container) return;
@@ -347,12 +411,14 @@
         const content = escapeHtml(msg.content || "").replace(/\n/g, "<br>");
         const timeText = escapeHtml(formatTime(getMessageTimestamp(msg)));
         const isAssistant = role === "assistant";
+        const sourceCards = isAssistant ? renderMobileSourceCards(msg) : "";
 
         return `
           <div class="mobile-message-row ${role}">
             <div class="mobile-message-bubble">
               <div class="mobile-message-role">${escapeHtml(role)}</div>
               <div class="mobile-message-content">${content}</div>
+              ${sourceCards}
               <div class="mobile-message-time">${timeText}</div>
               ${
                 isAssistant
@@ -385,6 +451,14 @@
       btn.addEventListener("click", async () => {
         const index = Number(btn.getAttribute("data-regenerate-index"));
         await regenerateFromAssistantIndex(index);
+      });
+    });
+
+    container.querySelectorAll("[data-mobile-source-url]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const url = safeText(btn.getAttribute("data-mobile-source-url"));
+        if (!url) return;
+        window.open(url, "_blank", "noopener,noreferrer");
       });
     });
 

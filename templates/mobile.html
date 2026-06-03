@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta name="theme-color" content="#0b1020">
@@ -403,10 +403,9 @@
     </div>
 
 </main>
-<!-- NOVA_REMOVE_MISSING_MOBILE_SOURCE_DRAWER_LOCK -->
 
-<!-- NOVA_MOBILE_REMOVE_MISSING_MODULE_TAGS_LOCK -->
-<script src="/static/js/nova-mobile-app.js?v=mobile-final-payload-009"></script>
+
+<script src="/static/js/nova-mobile-app.js?v=mobile-send-restore-011"></script>
 
 <script>
 window.NovaOpenMobileSessions = function () {
@@ -693,19 +692,16 @@ window.NovaCloseMobileSessions = function () {
 </script>
 <!-- NOVA MOBILE PANEL HARD LOCK END -->
 
-
 <script>
-/* NOVA_MOBILE_SEND_FALLBACK_BRIDGE_LOCK */
-/* NOVA_MOBILE_REAL_THREAD_FALLBACK_LOCK */
-/* NOVA_MOBILE_SEND_FALLBACK_BRIDGE_V2_LAYOUT_FIX */
+/* MOBILE_RESTORE_SEND_BRIDGE_LOCK */
 (function () {
     "use strict";
 
-    if (window.__novaMobileFallbackBridgeV2Installed) {
+    if (window.__novaMobileSendRestoreInstalled) {
         return;
     }
 
-    window.__novaMobileFallbackBridgeV2Installed = true;
+    window.__novaMobileSendRestoreInstalled = true;
 
     function qs(selector) {
         return document.querySelector(selector);
@@ -713,85 +709,20 @@ window.NovaCloseMobileSessions = function () {
 
     function findInput() {
         return (
+            qs("#nova-mobile-input") ||
             qs("#mobileMessageInput") ||
             qs("#messageInput") ||
-            qs("#composerInput") ||
-            qs("#promptInput") ||
-            qs("#nova-mobile-input") ||
-            qs("[data-mobile-input]") ||
             document.querySelector("textarea") ||
             document.querySelector("input[type='text']")
         );
     }
 
-    function findComposer() {
-        return (
-            qs(".mobile-composer") ||
-            qs(".mobile-composer-wrap") ||
-            qs(".composer-wrap") ||
-            qs("form") ||
-            findInput()
-        );
-    }
-
-    function findShell() {
-        return (
-            qs(".mobile-shell") ||
-            qs("main") ||
-            document.body
-        );
-    }
-
     function findMessages() {
-        var selectors = [
-            "#mobileChatMessages",
-            "#mobileMessages",
-            "#messages",
-            "#chatMessages",
-            "#nova-mobile-messages",
-            "[data-mobile-messages]",
-            "[data-chat-messages]",
-            ".mobile-messages",
-            ".mobile-chat-messages",
-            ".mobile-chat-scroll",
-            ".chat-scroll",
-            ".messages",
-            ".chat-messages"
-        ];
-
-        for (var i = 0; i < selectors.length; i += 1) {
-            var el = qs(selectors[i]);
-            if (el) {
-                return el;
-            }
-        }
-
-        var existing = qs("#nova-mobile-fallback-thread");
-        if (existing) {
-            return existing;
-        }
-
-        var shell = findShell();
-        var composer = findComposer();
-
-        var thread = document.createElement("section");
-        thread.id = "nova-mobile-fallback-thread";
-        thread.setAttribute("data-mobile-messages", "fallback");
-        thread.style.flex = "1 1 auto";
-        thread.style.overflowY = "auto";
-        thread.style.padding = "12px 10px 120px";
-        thread.style.minHeight = "40vh";
-        thread.style.width = "100%";
-
-        if (composer && composer.parentNode) {
-            composer.parentNode.insertBefore(thread, composer);
-        } else if (shell && shell.appendChild) {
-            shell.appendChild(thread);
-        } else {
-            document.body.appendChild(thread);
-        }
-
-        return thread;
+        return (
+            qs("#mobileChatMessages") ||
+            qs("#mobileMessages") ||
+            qs("#messages")
+        );
     }
 
     function getSessionId() {
@@ -805,9 +736,7 @@ window.NovaCloseMobileSessions = function () {
         for (var i = 0; i < keys.length; i += 1) {
             try {
                 var value = localStorage.getItem(keys[i]) || "";
-                if (value && value.trim()) {
-                    return value.trim();
-                }
+                if (value.trim()) return value.trim();
             } catch (err) {}
         }
 
@@ -820,12 +749,57 @@ window.NovaCloseMobileSessions = function () {
         return generated;
     }
 
-    function addBubble(role, text, isError) {
-        var box = findMessages();
-        var bubble = document.createElement("div");
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
 
+    function renderSources(meta) {
+        var sources = meta && Array.isArray(meta.sources) ? meta.sources : [];
+
+        if (!sources.length) {
+            return "";
+        }
+
+        return (
+            '<div class="mobile-source-list" style="margin-top:12px;display:grid;gap:10px;">' +
+            sources.slice(0, 5).map(function (item, index) {
+                item = item || {};
+
+                var title = String(item.title || item.name || item.url || ("Source " + (index + 1))).trim();
+                var source = String(item.source || item.domain || item.publisher || "Source").trim();
+                var snippet = String(item.snippet || item.description || "").trim();
+                var url = String(item.url || item.href || item.link || "").trim();
+
+                return (
+                    '<button type="button" class="mobile-source-card" data-mobile-source-url="' + escapeHtml(url) + '" ' +
+                    'style="width:100%;text-align:left;border:1px solid rgba(255,255,255,0.16);border-radius:14px;padding:10px 12px;background:rgba(255,255,255,0.08);color:inherit;">' +
+                        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">' +
+                            '<span style="font-size:12px;opacity:.75;">' + (index + 1) + '</span>' +
+                            '<strong style="font-size:12px;">' + escapeHtml(source) + '</strong>' +
+                        '</div>' +
+                        '<div style="font-size:13px;font-weight:700;line-height:1.35;">' + escapeHtml(title) + '</div>' +
+                        (snippet ? '<div style="font-size:12px;opacity:.78;margin-top:5px;line-height:1.35;">' + escapeHtml(snippet) + '</div>' : '') +
+                    '</button>'
+                );
+            }).join("") +
+            '</div>'
+        );
+    }
+
+    function addBubble(role, text, meta, isError) {
+        var box = findMessages();
+
+        if (!box) {
+            return null;
+        }
+
+        var bubble = document.createElement("div");
         bubble.className = "nova-mobile-fallback-message nova-mobile-fallback-" + role + (isError ? " nova-mobile-fallback-error" : "");
-        bubble.textContent = text || "";
 
         bubble.style.display = "block";
         bubble.style.maxWidth = "92%";
@@ -835,15 +809,26 @@ window.NovaCloseMobileSessions = function () {
         bubble.style.whiteSpace = "pre-wrap";
         bubble.style.lineHeight = "1.45";
         bubble.style.border = "1px solid rgba(255,255,255,0.12)";
-        bubble.style.background = role === "user"
-            ? "rgba(124,92,255,0.20)"
-            : "rgba(255,255,255,0.08)";
+        bubble.style.background = role === "user" ? "rgba(124,92,255,0.20)" : "rgba(255,255,255,0.08)";
         bubble.style.color = "inherit";
         bubble.style.wordBreak = "break-word";
 
         if (isError) {
             bubble.style.borderColor = "rgba(255,92,122,0.55)";
             bubble.style.background = "rgba(255,92,122,0.12)";
+        }
+
+        if (role === "assistant") {
+            bubble.innerHTML = escapeHtml(text).replace(/\n/g, "<br>") + renderSources(meta || {});
+            bubble.querySelectorAll("[data-mobile-source-url]").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    var url = String(btn.getAttribute("data-mobile-source-url") || "").trim();
+                    if (!url) return;
+                    window.open(url, "_blank", "noopener,noreferrer");
+                });
+            });
+        } else {
+            bubble.textContent = text || "";
         }
 
         box.appendChild(bubble);
@@ -859,9 +844,8 @@ window.NovaCloseMobileSessions = function () {
         return bubble;
     }
 
-    /* NOVA_MOBILE_FALLBACK_ATTACHMENTS_LOCK */
-    async function uploadFallbackAttachments() {
-        var input = document.getElementById("nova-mobile-file-input");
+    async function uploadAttachments() {
+        var input = qs("#nova-mobile-file-input");
 
         if (!input || !input.files || !input.files.length) {
             return [];
@@ -902,15 +886,15 @@ window.NovaCloseMobileSessions = function () {
         return uploaded;
     }
 
-    async function fallbackSend() {
-        if (window.__novaMobileFallbackSending) {
+    async function sendMobileMessage() {
+        if (window.__novaMobileSendingNow) {
             return;
         }
 
         var input = findInput();
 
         if (!input) {
-            addBubble("assistant", "Mobile send fallback could not find the input box.", true);
+            addBubble("assistant", "Send failed: input box not found.", {}, true);
             return;
         }
 
@@ -920,15 +904,15 @@ window.NovaCloseMobileSessions = function () {
             return;
         }
 
-        window.__novaMobileFallbackSending = true;
+        window.__novaMobileSendingNow = true;
 
-        addBubble("user", text, false);
+        addBubble("user", text, {}, false);
         input.value = "";
 
-        var thinking = addBubble("assistant", "Thinking...", false);
+        var thinking = addBubble("assistant", "Thinking...", {}, false);
 
         try {
-            var fallbackAttachments = await uploadFallbackAttachments();
+            var attachments = await uploadAttachments();
 
             var response = await fetch("/api/chat", {
                 method: "POST",
@@ -938,20 +922,24 @@ window.NovaCloseMobileSessions = function () {
                 body: JSON.stringify({
                     user_text: text,
                     session_id: getSessionId(),
-                    attachments: fallbackAttachments
+                    attachments: attachments
                 })
             });
 
             var data = await response.json();
             var assistant = data.assistant_message || {};
-            var answer = assistant.text || assistant.content || data.error || "Nova could not produce a response for that request.";
+            var answer = assistant.text || assistant.content || data.error || "Nova could not produce a response.";
 
-            thinking.textContent = answer;
+            if (thinking) {
+                thinking.innerHTML = escapeHtml(answer).replace(/\n/g, "<br>") + renderSources(assistant.meta || {});
 
-            if (!response.ok || data.ok === false) {
-                thinking.classList.add("nova-mobile-fallback-error");
-                thinking.style.borderColor = "rgba(255,92,122,0.55)";
-                thinking.style.background = "rgba(255,92,122,0.12)";
+                thinking.querySelectorAll("[data-mobile-source-url]").forEach(function (btn) {
+                    btn.addEventListener("click", function () {
+                        var url = String(btn.getAttribute("data-mobile-source-url") || "").trim();
+                        if (!url) return;
+                        window.open(url, "_blank", "noopener,noreferrer");
+                    });
+                });
             }
 
             if (data.active_session_id) {
@@ -960,73 +948,44 @@ window.NovaCloseMobileSessions = function () {
                 } catch (err) {}
             }
         } catch (err) {
-            thinking.textContent = "Request failed: " + (err && err.message ? err.message : String(err));
-            thinking.style.borderColor = "rgba(255,92,122,0.55)";
-            thinking.style.background = "rgba(255,92,122,0.12)";
+            if (thinking) {
+                thinking.textContent = "Request failed: " + (err && err.message ? err.message : String(err));
+                thinking.style.borderColor = "rgba(255,92,122,0.55)";
+                thinking.style.background = "rgba(255,92,122,0.12)";
+            }
         } finally {
-            window.__novaMobileFallbackSending = false;
+            window.__novaMobileSendingNow = false;
         }
     }
-
-    function isSendButton(el) {
-        if (!el) {
-            return false;
-        }
-
-        var id = String(el.id || "").toLowerCase();
-        var cls = String(el.className || "").toLowerCase();
-        var txt = String(el.textContent || el.value || "").trim().toLowerCase();
-
-        return (
-            id.includes("send") ||
-            cls.includes("send") ||
-            txt === "send" ||
-            txt === "➤" ||
-            txt === "arrow_upward"
-        );
-    }
-
-    document.addEventListener("submit", function (event) {
-        var input = findInput();
-
-        if (input && event.target && event.target.contains && event.target.contains(input)) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            fallbackSend();
-        }
-    }, true);
 
     document.addEventListener("click", function (event) {
-        var button = event.target && event.target.closest
-            ? event.target.closest("button")
-            : null;
+        var button = event.target && event.target.closest ? event.target.closest("button") : null;
 
-        if (isSendButton(button)) {
+        if (!button) return;
+
+        var id = String(button.id || "").toLowerCase();
+        var text = String(button.textContent || "").trim().toLowerCase();
+
+        if (id === "nova-mobile-send" || text === "send" || text === "➤" || text === "âž¤") {
             event.preventDefault();
             event.stopImmediatePropagation();
-            fallbackSend();
+            sendMobileMessage();
         }
     }, true);
 
     document.addEventListener("keydown", function (event) {
         var input = findInput();
 
-        if (
-            input &&
-            event.target === input &&
-            event.key === "Enter" &&
-            !event.shiftKey
-        ) {
+        if (input && event.target === input && event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
             event.stopImmediatePropagation();
-            fallbackSend();
+            sendMobileMessage();
         }
     }, true);
 
-    console.log("[Nova Mobile] fallback send bridge V2 active");
+    console.log("[Nova Mobile] send restore bridge active");
 })();
 </script>
-
 
 </body>
 </html>
