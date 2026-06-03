@@ -859,6 +859,49 @@ window.NovaCloseMobileSessions = function () {
         return bubble;
     }
 
+    /* NOVA_MOBILE_FALLBACK_ATTACHMENTS_LOCK */
+    async function uploadFallbackAttachments() {
+        var input = document.getElementById("nova-mobile-file-input");
+
+        if (!input || !input.files || !input.files.length) {
+            return [];
+        }
+
+        var uploaded = [];
+
+        for (var i = 0; i < input.files.length; i += 1) {
+            var file = input.files[i];
+            var form = new FormData();
+
+            form.append("file", file);
+
+            var response = await fetch("/api/upload", {
+                method: "POST",
+                body: form
+            });
+
+            var data = await response.json();
+
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.error || "Upload failed.");
+            }
+
+            uploaded.push({
+                filename: data.filename || file.name,
+                original_filename: data.original_filename || file.name,
+                size: Number(data.size || file.size || 0),
+                mime_type: data.mime_type || file.type || "application/octet-stream",
+                url: data.url || data.file_url || "",
+                file_url: data.file_url || data.url || "",
+                status: "uploaded"
+            });
+        }
+
+        input.value = "";
+
+        return uploaded;
+    }
+
     async function fallbackSend() {
         if (window.__novaMobileFallbackSending) {
             return;
@@ -885,6 +928,8 @@ window.NovaCloseMobileSessions = function () {
         var thinking = addBubble("assistant", "Thinking...", false);
 
         try {
+            var fallbackAttachments = await uploadFallbackAttachments();
+
             var response = await fetch("/api/chat", {
                 method: "POST",
                 headers: {
@@ -893,7 +938,7 @@ window.NovaCloseMobileSessions = function () {
                 body: JSON.stringify({
                     user_text: text,
                     session_id: getSessionId(),
-                    attachments: []
+                    attachments: fallbackAttachments
                 })
             });
 
