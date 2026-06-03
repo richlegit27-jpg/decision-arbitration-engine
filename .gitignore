@@ -50,3 +50,4 @@ runtime/
 *.BAK_*
 data/nova_project_state.json
 data/nova_project_state.json
+data/nova_sessions*.json
