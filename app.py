@@ -284,51 +284,6 @@ def memory_exists_for_session(session_id: str, fact_text: str) -> bool:
 
     return False
 
-    if not decision.get("save_memory"):
-        return None
-
-    fact = extract_memory_fact(user_text)
-    if not fact:
-        return None
-
-    fact_text = str(fact["text"] or "").strip()
-
-    # phase 2 dominance:
-    # if this is a name memory, wipe competing same-session name memories
-    if extract_name_from_memory_text(fact_text):
-        cleanup_competing_name_memories(session_id=session_id, winning_text=fact_text)
-
-    if memory_exists_for_session(session_id, fact_text):
-        return {
-            "status": "duplicate_skipped",
-            "fact": fact,
-        }
-
-    item = memory_service.add_memory({
-        "text": fact_text,
-        "kind": fact["kind"],
-        "source": "router_auto",
-        "session_id": session_id,
-    })
-
-    try:
-        if isinstance(item, dict):
-            item["tags"] = fact.get("tags") or item.get("tags") or []
-            item["weight"] = fact.get("weight", item.get("weight", 1.0))
-    except Exception:
-        pass
-
-    return {
-        "status": "saved",
-        "fact": fact,
-        "item": item,
-    }
-
-    text = str(user_text or "").strip()
-    if not text:
-        return False
-    return any(pattern.search(text) for pattern in IDENTITY_QUESTION_PATTERNS)
-
 
 def extract_name_from_memory_text(text: str) -> str:
     raw = str(text or "").strip()
@@ -410,40 +365,6 @@ def find_best_name_memory(session_id: str) -> dict | None:
         reverse=True,
     )
     return candidates[0]
-
-
-    match = find_best_name_memory(session_id=session_id)
-
-    payload = build_common_state_payload(session_id=session_id)
-
-    if match:
-        name = match["name"]
-        item = match["item"]
-
-        payload.update(
-            {
-                "assistant_message": {
-                    "role": "assistant",
-                },
-                "debug": {
-                    "decision": decision,
-                },
-            }
-        )
-        return json_ok(**payload)
-
-    payload.update(
-        {
-            "assistant_message": {
-                "role": "assistant",
-                "text": 'I do not know your name yet. Tell me with "my name is ..." and I will remember it.',
-            },
-            "debug": {
-                "decision": decision,
-            },
-        },
-    )
-    return json_ok(**payload)
 
 # ==============================
 # ==============================
