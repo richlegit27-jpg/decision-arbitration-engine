@@ -1880,7 +1880,7 @@ def _nova_prevent_bad_exact_pong_response(assistant_text, user_text):
     if clean_user in allowed_pong_requests:
         return clean_answer
 
-    return "IÃ¢â‚¬â„¢m ready. What are we working on?"
+    return "I’m here. The active Nova phase is frontend/mobile polish. Give me the next task and I’ll move directly on it."
 
 
 def _nova_try_project_state_direct_recall(user_text, session_id):

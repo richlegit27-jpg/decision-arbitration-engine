@@ -321,8 +321,8 @@
       container.innerHTML = `
         <div class="mobile-empty-state">
           <div class="mobile-empty-card">
-            <div class="mobile-empty-title">Nova Mobile is ready</div>
-            <div class="mobile-empty-subtitle">Start a new message.</div>
+            <div class="mobile-empty-title">Nova is ready</div>
+            <div class="mobile-empty-subtitle">Send a message or continue your current workflow.</div>
           </div>
         </div>
       `;
