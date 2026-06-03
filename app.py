@@ -2032,6 +2032,19 @@ def _nova_filter_current_attachments_only(candidate_attachments, current_attachm
 
 
 # ACTUAL_BINARY_ATTACHMENT_ANALYZER_BLOCK_LOCK
+
+
+# STRIP_URLS_FROM_EXTRACTED_ATTACHMENT_CHAT_TEXT_LOCK
+def _nova_strip_urls_from_extracted_attachment_text(value):
+    try:
+        import re
+        text_value = str(value or "")
+        text_value = re.sub(r"https?://\S+", "[URL removed from extracted attachment text]", text_value)
+        text_value = re.sub(r"www\.\S+", "[URL removed from extracted attachment text]", text_value)
+        return text_value
+    except Exception:
+        return str(value or "")
+
 def _nova_analyze_binary_attachment_for_prompt(attachment_path, mime_type):
     try:
         from pathlib import Path as _NovaPath
@@ -2357,6 +2370,8 @@ def api_chat():
                             mime_type,
                         )
                         if extracted_attachment_text:
+                            # STRIP_URLS_FROM_EXTRACTED_ATTACHMENT_CHAT_TEXT_LOCK
+                            extracted_attachment_text = _nova_strip_urls_from_extracted_attachment_text(extracted_attachment_text)
                             content_snippet = extracted_attachment_text[:4000]
                             app.logger.info(
                                 "[AttachmentAnalyzer] extracted binary attachment content path=%s chars=%s mime_type=%s",
@@ -4558,6 +4573,142 @@ def api_attachment_summarize():
 
     except Exception as error:
         app.logger.exception("[AttachmentSummarizeEndpoint] failed")
+        return jsonify({
+            "ok": False,
+            "error": str(error),
+        }), 500
+
+
+
+
+# ATTACHMENT_KEYPOINTS_ENDPOINT_LOCK
+def _nova_attachment_keypoints_from_text(text, max_points=10):
+    raw = str(text or "")
+    points = []
+    seen = set()
+
+    skip_fragments = (
+        "sponsored",
+        "safesearch",
+        "create a new collection",
+        "saved images",
+        "saved to collections",
+        "related searches",
+        "more images on this site",
+        "go to site",
+        "http://",
+        "https://",
+        "www.",
+    )
+
+    for line in raw.splitlines():
+        cleaned = " ".join(str(line or "").strip().split())
+
+        if not cleaned:
+            continue
+
+        lowered = cleaned.lower()
+
+        if lowered in seen:
+            continue
+
+        if any(fragment in lowered for fragment in skip_fragments):
+            continue
+
+        if len(cleaned) < 8:
+            continue
+
+        seen.add(lowered)
+        points.append(cleaned)
+
+        if len(points) >= max_points:
+            break
+
+    return points
+
+
+@app.route("/api/attachment/keypoints", methods=["POST"])
+def api_attachment_keypoints():
+    """
+    Extract key points from an uploaded PDF/image without touching the chat pipeline.
+    Accepts JSON:
+      {
+        "url": "/api/uploads/file.pdf",
+        "path": "optional local path",
+        "mime_type": "application/pdf"
+      }
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+
+        upload_url = str(payload.get("url") or payload.get("file_url") or "").strip()
+        local_path = str(payload.get("path") or "").strip()
+        mime_type = str(payload.get("mime_type") or payload.get("type") or "").strip()
+
+        if not local_path and upload_url:
+            filename = upload_url.replace("\\", "/").split("/")[-1].strip()
+            if filename:
+                local_path = str(Path(UPLOADS_DIR) / filename)
+
+        if not local_path:
+            return jsonify({
+                "ok": False,
+                "error": "Missing url or path.",
+            }), 400
+
+        file_path = Path(local_path)
+
+        if not file_path.exists():
+            return jsonify({
+                "ok": False,
+                "error": f"File not found: {file_path}",
+            }), 404
+
+        if not mime_type:
+            suffix = file_path.suffix.lower()
+            if suffix == ".pdf":
+                mime_type = "application/pdf"
+            elif suffix in {".jpg", ".jpeg"}:
+                mime_type = "image/jpeg"
+            elif suffix == ".png":
+                mime_type = "image/png"
+            elif suffix == ".webp":
+                mime_type = "image/webp"
+            else:
+                mime_type = "application/octet-stream"
+
+        extracted_text = _nova_analyze_binary_attachment_for_prompt(
+            str(file_path),
+            mime_type,
+        )
+
+        key_points = _nova_attachment_keypoints_from_text(extracted_text, max_points=10)
+
+        summary = "No readable key points found."
+        if key_points:
+            summary = "Top attachment point: " + key_points[0]
+
+        app.logger.info(
+            "[AttachmentKeypointsEndpoint] extracted keypoints path=%s raw_chars=%s points=%s mime_type=%s",
+            str(file_path),
+            len(str(extracted_text or "")),
+            len(key_points),
+            mime_type,
+        )
+
+        return jsonify({
+            "ok": True,
+            "path": str(file_path),
+            "url": upload_url,
+            "mime_type": mime_type,
+            "raw_chars": len(str(extracted_text or "")),
+            "summary": summary,
+            "key_points": key_points,
+            "points_count": len(key_points),
+        })
+
+    except Exception as error:
+        app.logger.exception("[AttachmentKeypointsEndpoint] failed")
         return jsonify({
             "ok": False,
             "error": str(error),
