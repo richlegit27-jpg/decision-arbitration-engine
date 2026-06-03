@@ -602,6 +602,7 @@ def api_state():
 
 
 # NOVA_WEAK_BACKEND_RESPONSE_GUARD_LOCK
+# NOVA_WEAK_BACKEND_RESPONSE_MOJIBAKE_GUARD_LOCK
 def _nova_replace_weak_backend_reply(user_text, result):
     """
     Last-mile response guard.
@@ -609,6 +610,9 @@ def _nova_replace_weak_backend_reply(user_text, result):
     Prevents weak generic fallback text like:
     "I'm ready. What are we working on?"
     from being returned as the final assistant response.
+
+    Also catches mojibake variants like:
+    "IÃ¢â‚¬â„¢m ready. What are we working on?"
     """
     try:
         if not isinstance(result, dict):
@@ -624,15 +628,34 @@ def _nova_replace_weak_backend_reply(user_text, result):
             or ""
         ).strip()
 
-        lowered = text.lower().replace("’", "'")
-        weak_phrases = {
-            "i'm ready. what are we working on?",
-            "i'm ready. what are we working on",
-            "im ready. what are we working on?",
-            "im ready. what are we working on",
-        }
+        normalized = (
+            text
+            .lower()
+            .replace("’", "'")
+            .replace("`", "'")
+            .replace("´", "'")
+            .replace("â€™", "'")
+            .replace("ã¢â‚¬â„¢", "'")
+            .replace("iã¢â‚¬â„¢m", "i'm")
+            .replace("iâ€™m", "i'm")
+        )
 
-        if lowered not in weak_phrases:
+        compact = " ".join(normalized.split())
+
+        weak_hit = (
+            compact in {
+                "i'm ready. what are we working on?",
+                "i'm ready. what are we working on",
+                "im ready. what are we working on?",
+                "im ready. what are we working on",
+            }
+            or (
+                "ready" in compact
+                and "what are we working on" in compact
+            )
+        )
+
+        if not weak_hit:
             return result
 
         prompt = str(user_text or "").strip()
@@ -642,22 +665,37 @@ def _nova_replace_weak_backend_reply(user_text, result):
             replacement = (
                 "I do not have a personal life story like a human. "
                 "I was built to help you think, build, debug, write, learn, and move faster. "
-                "For Nova, the next move is frontend polish: remove weak mobile fallback behavior, "
-                "clean missing mobile scripts, and make the live UI match the backend that already passed tests."
+                "For Nova, the active phase is frontend polish: clean the mobile UI, remove weak fallback behavior, "
+                "and make the live app match the backend tests that are already passing."
             )
         else:
             replacement = (
-                "I’m here. Give me the next task and I’ll move directly on it. "
-                "For Nova right now, the active phase is frontend/mobile polish."
+                "I’m here. The active Nova phase is frontend/mobile polish. "
+                "Give me the next task and I’ll move directly on it."
             )
 
         assistant["text"] = replacement
         assistant["content"] = replacement
-        assistant.setdefault("meta", {})
-        if isinstance(assistant["meta"], dict):
-            assistant["meta"]["weak_response_guarded"] = True
+
+        meta = assistant.get("meta")
+        if not isinstance(meta, dict):
+            meta = {}
+
+        meta["weak_response_guarded"] = True
+        meta["weak_response_original"] = text
+        assistant["meta"] = meta
 
         result["assistant_message"] = assistant
+
+        session = result.get("session")
+        if isinstance(session, dict) and isinstance(session.get("messages"), list):
+            for msg in reversed(session["messages"]):
+                if isinstance(msg, dict) and str(msg.get("role") or "").lower() == "assistant":
+                    msg["text"] = replacement
+                    msg["content"] = replacement
+                    msg["meta"] = dict(meta)
+                    break
+
         return result
 
     except Exception:
