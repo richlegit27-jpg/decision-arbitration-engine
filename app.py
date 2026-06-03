@@ -1306,6 +1306,317 @@ def _nova_try_project_focus_direct_recall(user_text, session_id):
     return json_ok(**payload)
 
 
+# PROJECT_STATE_MEMORY_LOCK
+PROJECT_STATE_MEMORY_KINDS = {
+    "current_task": {
+        "label": "Current task",
+        "answer": "Your current task was {value}.",
+        "save_patterns": [
+            r"\bmy\s+current\s+task\s+is\s+(.+?)(?:[.!?\n]|$)",
+            r"\bcurrent\s+task\s+is\s+(.+?)(?:[.!?\n]|$)",
+            r"\btask\s*:\s*(.+?)(?:[.!?\n]|$)",
+            r"\bnext\s+move\s+is\s+(.+?)(?:[.!?\n]|$)",
+        ],
+        "recall_terms": [
+            "what is my current task",
+            "what's my current task",
+            "what was my current task",
+            "what are we doing",
+            "what are we working on",
+            "what is the next move",
+            "what's the next move",
+        ],
+    },
+    "blocker": {
+        "label": "Blocker",
+        "answer": "Your current blocker was {value}.",
+        "save_patterns": [
+            r"\bblocker\s*:\s*(.+?)(?:[.!?\n]|$)",
+            r"\bmy\s+blocker\s+is\s+(.+?)(?:[.!?\n]|$)",
+            r"\bcurrent\s+blocker\s+is\s+(.+?)(?:[.!?\n]|$)",
+            r"\bblocked\s+by\s+(.+?)(?:[.!?\n]|$)",
+        ],
+        "recall_terms": [
+            "what is blocking me",
+            "what's blocking me",
+            "what was blocking me",
+            "what is the blocker",
+            "what's the blocker",
+            "current blocker",
+        ],
+    },
+    "active_file": {
+        "label": "Active file",
+        "answer": "Your active file was {value}.",
+        "save_patterns": [
+            r"\bactive\s+file\s+is\s+(.+?)(?:[.!?\n]|$)",
+            r"\bcurrent\s+file\s+is\s+(.+?)(?:[.!?\n]|$)",
+            r"\bworking\s+on\s+file\s+(.+?)(?:[.!?\n]|$)",
+            r"\bfile\s*:\s*(.+?)(?:[.!?\n]|$)",
+        ],
+        "recall_terms": [
+            "what file am i working on",
+            "which file am i working on",
+            "what is the active file",
+            "what's the active file",
+            "current file",
+            "active file",
+        ],
+    },
+    "last_checkpoint": {
+        "label": "Last checkpoint",
+        "answer": "Your last checkpoint was {value}.",
+        "save_patterns": [
+            r"\blast\s+checkpoint\s+is\s+(.+?)(?:[.!?\n]|$)",
+            r"\bcheckpoint\s+is\s+(.+?)(?:[.!?\n]|$)",
+            r"\bcheckpointed\s+at\s+(.+?)(?:[.!?\n]|$)",
+            r"\blockpoint\s+is\s+(.+?)(?:[.!?\n]|$)",
+        ],
+        "recall_terms": [
+            "what was my last checkpoint",
+            "what is my last checkpoint",
+            "where did we checkpoint",
+            "last checkpoint",
+            "current checkpoint",
+            "lockpoint",
+        ],
+    },
+}
+
+
+def _nova_clean_project_state_value(value):
+    cleaned = str(value or "").strip()
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" .!?")
+
+    return cleaned
+
+
+def _nova_project_state_memory_text(kind, value):
+    config = PROJECT_STATE_MEMORY_KINDS.get(kind) or {}
+    label = str(config.get("label") or kind).strip()
+    clean_value = _nova_clean_project_state_value(value)
+
+    if not clean_value:
+        return ""
+
+    return f"{label}: {clean_value}"
+
+
+def _nova_extract_project_state_values(user_text):
+    raw = str(user_text or "").strip()
+    found = []
+
+    if not raw:
+        return found
+
+    for kind, config in PROJECT_STATE_MEMORY_KINDS.items():
+        for pattern in config.get("save_patterns") or []:
+            match = re.search(pattern, raw, re.IGNORECASE)
+
+            if not match:
+                continue
+
+            value = _nova_clean_project_state_value(match.group(1))
+
+            if value:
+                found.append(
+                    {
+                        "kind": kind,
+                        "value": value,
+                    }
+                )
+                break
+
+    return found
+
+
+def _nova_save_project_state_memories(user_text, session_id):
+    extracted = _nova_extract_project_state_values(user_text)
+    target_session_id = str(session_id or "").strip()
+    saved = []
+
+    if not extracted:
+        return saved
+
+    try:
+        existing_items = memory_service.all() or []
+    except Exception:
+        existing_items = []
+
+    for item in extracted:
+        kind = str(item.get("kind") or "").strip()
+        value = _nova_clean_project_state_value(item.get("value"))
+        memory_text = _nova_project_state_memory_text(kind, value)
+
+        if not kind or not memory_text:
+            continue
+
+        duplicate = False
+
+        for existing in existing_items:
+            if not isinstance(existing, dict):
+                continue
+
+            existing_text = str(existing.get("text") or "").strip().lower()
+            existing_session = str(existing.get("session_id") or "").strip()
+
+            if (
+                existing_text == memory_text.lower()
+                and existing_session == target_session_id
+            ):
+                duplicate = True
+                saved.append(existing)
+                break
+
+        if duplicate:
+            continue
+
+        try:
+            created = memory_service.add_memory(
+                {
+                    "text": memory_text,
+                    "kind": kind,
+                    "source": "project_state_direct",
+                    "session_id": target_session_id,
+                }
+            )
+            saved.append(created)
+
+            app.logger.info(
+                "[project-state-memory] saved kind=%s session_id=%s value=%s",
+                kind,
+                target_session_id,
+                value,
+            )
+        except Exception:
+            app.logger.exception(
+                "[project-state-memory] failed saving kind=%s session_id=%s",
+                kind,
+                target_session_id,
+            )
+
+    return saved
+
+
+def _nova_question_project_state_kind(user_text):
+    text_value = str(user_text or "").strip().lower()
+
+    if not text_value:
+        return ""
+
+    for kind, config in PROJECT_STATE_MEMORY_KINDS.items():
+        for term in config.get("recall_terms") or []:
+            if term in text_value:
+                return kind
+
+    return ""
+
+
+def _nova_find_project_state_memory(session_id, kind):
+    target_session_id = str(session_id or "").strip()
+    target_kind = str(kind or "").strip()
+    config = PROJECT_STATE_MEMORY_KINDS.get(target_kind) or {}
+    label = str(config.get("label") or "").strip().lower()
+
+    if not target_kind or not label:
+        return ""
+
+    try:
+        items = memory_service.all() or []
+    except Exception:
+        items = []
+
+    candidates = []
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        item_kind = str(item.get("kind") or "").strip()
+        item_text = str(item.get("text") or "").strip()
+        item_session = str(item.get("session_id") or "").strip()
+        item_updated = str(item.get("updated_at") or item.get("created_at") or "")
+
+        if item_kind != target_kind:
+            continue
+
+        if target_session_id and item_session and item_session != target_session_id:
+            continue
+
+        if ":" in item_text:
+            item_label, item_value = item_text.split(":", 1)
+        else:
+            item_label, item_value = "", item_text
+
+        if label and item_label.strip().lower() != label:
+            continue
+
+        clean_value = _nova_clean_project_state_value(item_value)
+
+        if not clean_value:
+            continue
+
+        score = 0
+
+        if item_session == target_session_id:
+            score += 100
+
+        candidates.append(
+            {
+                "score": score,
+                "updated_at": item_updated,
+                "value": clean_value,
+            }
+        )
+
+    if not candidates:
+        return ""
+
+    candidates.sort(
+        key=lambda row: (
+            row.get("score", 0),
+            str(row.get("updated_at") or ""),
+        ),
+        reverse=True,
+    )
+
+    return str(candidates[0].get("value") or "").strip()
+
+
+def _nova_try_project_state_direct_recall(user_text, session_id):
+    kind = _nova_question_project_state_kind(user_text)
+
+    if not kind:
+        return None
+
+    value = _nova_find_project_state_memory(session_id, kind)
+
+    if not value:
+        return None
+
+    config = PROJECT_STATE_MEMORY_KINDS.get(kind) or {}
+    answer_template = str(config.get("answer") or "{value}").strip()
+    answer_text = answer_template.format(value=value)
+
+    payload = build_common_state_payload(session_id=session_id)
+
+    payload.update(
+        {
+            "assistant_message": {
+                "role": "assistant",
+                "text": answer_text,
+            },
+            "active_session_id": session_id,
+            "debug": {
+                "direct_recall": kind,
+                "value": value,
+            },
+        }
+    )
+
+    return json_ok(**payload)
+
+
 @app.post("/api/chat")
 def api_chat():
     data = request_json()
@@ -1377,6 +1688,23 @@ def api_chat():
         user_text,
         session_id,
     )
+
+    _nova_save_project_state_memories(
+        user_text,
+        session_id,
+    )
+
+    direct_project_state_response = _nova_try_project_state_direct_recall(
+        user_text,
+        session_id,
+    )
+
+    if direct_project_state_response is not None:
+        app.logger.info(
+            "[project-state-direct-recall] answered from project state memory session_id=%s",
+            session_id,
+        )
+        return direct_project_state_response
 
     direct_project_focus_response = _nova_try_project_focus_direct_recall(
         user_text,
