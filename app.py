@@ -2206,6 +2206,9 @@ def api_chat():
                 result.get("active_session_id") if isinstance(result, dict) else None,
                 sorted(list(result.keys())) if isinstance(result, dict) else type(result).__name__,
             )
+            # NOVA_SAFE_API_CHAT_WEAK_GUARD_AFTER_HANDLE_LOCK
+            result = _nova_replace_weak_backend_reply(user_text, result)
+
 
             if isinstance(result, dict):
                 active_attachment_session_id = str(
