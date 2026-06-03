@@ -1498,18 +1498,54 @@ def _nova_save_project_state_memories(user_text, session_id):
     return saved
 
 
-def _nova_question_project_state_kind(user_text):
+# PROJECT_STATE_RECALL_OVERRIDE_LOCK
+def _nova_project_state_question_kinds(user_text):
     text_value = str(user_text or "").strip().lower()
+    kinds = []
 
     if not text_value:
-        return ""
+        return kinds
+
+    asks_next_or_state = any(
+        term in text_value
+        for term in (
+            "what's next",
+            "whats next",
+            "what is next",
+            "next move",
+            "current task",
+            "what are we doing",
+            "what are we working on",
+            "current project state",
+            "project state",
+            "task and blocker",
+            "current task and blocker",
+        )
+    )
+
+    if asks_next_or_state:
+        return list(PROJECT_STATE_MEMORY_KINDS.keys())
 
     for kind, config in PROJECT_STATE_MEMORY_KINDS.items():
         for term in config.get("recall_terms") or []:
-            if term in text_value:
-                return kind
+            if term in text_value and kind not in kinds:
+                kinds.append(kind)
 
-    return ""
+    if "blocker" in text_value and "blocker" not in kinds:
+        kinds.append("blocker")
+
+    if "checkpoint" in text_value and "last_checkpoint" not in kinds:
+        kinds.append("last_checkpoint")
+
+    if "active file" in text_value and "active_file" not in kinds:
+        kinds.append("active_file")
+
+    return kinds
+
+
+def _nova_question_project_state_kind(user_text):
+    kinds = _nova_project_state_question_kinds(user_text)
+    return kinds[0] if kinds else ""
 
 
 def _nova_find_project_state_memory(session_id, kind):
@@ -1582,21 +1618,34 @@ def _nova_find_project_state_memory(session_id, kind):
 
     return str(candidates[0].get("value") or "").strip()
 
-
 def _nova_try_project_state_direct_recall(user_text, session_id):
-    kind = _nova_question_project_state_kind(user_text)
+    kinds = _nova_project_state_question_kinds(user_text)
 
-    if not kind:
+    if not kinds:
         return None
 
-    value = _nova_find_project_state_memory(session_id, kind)
+    lines = []
 
-    if not value:
+    for kind in kinds:
+        value = _nova_find_project_state_memory(session_id, kind)
+
+        if not value:
+            continue
+
+        label = str(
+            (PROJECT_STATE_MEMORY_KINDS.get(kind) or {}).get("label")
+            or kind
+        ).strip()
+
+        clean_value = _nova_clean_project_state_value(value)
+
+        if not clean_value:
+            continue
+
+        lines.append(f"{label}: {clean_value}")
+
+    if not lines:
         return None
-
-    config = PROJECT_STATE_MEMORY_KINDS.get(kind) or {}
-    answer_template = str(config.get("answer") or "{value}").strip()
-    answer_text = answer_template.format(value=value)
 
     payload = build_common_state_payload(session_id=session_id)
 
@@ -1604,14 +1653,15 @@ def _nova_try_project_state_direct_recall(user_text, session_id):
         {
             "assistant_message": {
                 "role": "assistant",
-                "text": answer_text,
-            },
-            "active_session_id": session_id,
-            "debug": {
-                "direct_recall": kind,
-                "value": value,
-            },
+                "text": "\n".join(lines),
+            }
         }
+    )
+
+    app.logger.info(
+        "[project-state-recall-override] answered kinds=%s session_id=%s",
+        ",".join(kinds),
+        session_id,
     )
 
     return json_ok(**payload)
