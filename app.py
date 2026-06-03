@@ -1,19 +1,4 @@
-from __future__ import annotations
-<<<<<<< HEAD
-def update_execution_state(execution, status=None, current_step=None, last_action=None):
-    """
-    Consolidates repeated execution state assignments.
-    """
-    if status:
-        execution["status"] = status
-    if current_step:
-        execution["current_step"] = current_step
-    if last_action:
-        execution["last_action"] = last_action
-
-
-=======
->>>>>>> parent of b019700 (Consolidate execution_stream assignments with helper)
+﻿from __future__ import annotations
 
 import os
 import re
@@ -1793,7 +1778,7 @@ def _nova_prevent_bad_exact_pong_response(assistant_text, user_text):
     if clean_user in allowed_pong_requests:
         return clean_answer
 
-    return "Iâ€™m ready. What are we working on?"
+    return "IÃ¢â‚¬â„¢m ready. What are we working on?"
 
 
 def _nova_try_project_state_direct_recall(user_text, session_id):
@@ -3851,4 +3836,5 @@ if __name__ == "__main__":
     )
 
 # ATTACHMENT_MEMORY_SESSION_ALIAS_APP_LOCK
+
 
