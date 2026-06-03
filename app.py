@@ -1307,6 +1307,113 @@ def _nova_try_project_focus_direct_recall(user_text, session_id):
 
 
 # PROJECT_STATE_MEMORY_LOCK
+# PROJECT_STATE_DEDICATED_STORE_LOCK
+PROJECT_STATE_FILE = DATA_DIR / "nova_project_state.json"
+
+
+def _nova_project_state_now():
+    return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+
+def _nova_read_project_state_store():
+    try:
+        if not PROJECT_STATE_FILE.exists():
+            return {"sessions": {}}
+
+        import json
+        payload = json.loads(PROJECT_STATE_FILE.read_text(encoding="utf-8"))
+
+        if not isinstance(payload, dict):
+            return {"sessions": {}}
+
+        sessions = payload.get("sessions")
+
+        if not isinstance(sessions, dict):
+            payload["sessions"] = {}
+
+        return payload
+
+    except Exception:
+        app.logger.exception("[project-state-store] failed reading store")
+        return {"sessions": {}}
+
+
+def _nova_write_project_state_store(payload):
+    try:
+        import json
+
+        if not isinstance(payload, dict):
+            payload = {"sessions": {}}
+
+        if not isinstance(payload.get("sessions"), dict):
+            payload["sessions"] = {}
+
+        PROJECT_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        PROJECT_STATE_FILE.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        return True
+
+    except Exception:
+        app.logger.exception("[project-state-store] failed writing store")
+        return False
+
+
+def _nova_get_project_state_session(session_id):
+    store = _nova_read_project_state_store()
+    sessions = store.setdefault("sessions", {})
+    target_session_id = str(session_id or "").strip()
+
+    if not target_session_id:
+        return {}
+
+    session_state = sessions.get(target_session_id)
+
+    if not isinstance(session_state, dict):
+        return {}
+
+    return session_state
+
+
+def _nova_set_project_state_values(session_id, values):
+    target_session_id = str(session_id or "").strip()
+
+    if not target_session_id:
+        return {}
+
+    store = _nova_read_project_state_store()
+    sessions = store.setdefault("sessions", {})
+    session_state = sessions.get(target_session_id)
+
+    if not isinstance(session_state, dict):
+        session_state = {}
+
+    for item in values or []:
+        if not isinstance(item, dict):
+            continue
+
+        kind = str(item.get("kind") or "").strip()
+        value = _nova_clean_project_state_value(item.get("value"))
+
+        if not kind or kind not in PROJECT_STATE_MEMORY_KINDS:
+            continue
+
+        if not value:
+            continue
+
+        session_state[kind] = value
+
+    session_state["updated_at"] = _nova_project_state_now()
+    sessions[target_session_id] = session_state
+    store["sessions"] = sessions
+
+    _nova_write_project_state_store(store)
+
+    return session_state
+
+
 PROJECT_STATE_MEMORY_KINDS = {
     "current_task": {
         "label": "Current task",
@@ -1473,68 +1580,34 @@ def _nova_extract_project_state_values(user_text):
 
 def _nova_save_project_state_memories(user_text, session_id):
     extracted = _nova_extract_project_state_values(user_text)
-    target_session_id = str(session_id or "").strip()
-    saved = []
 
     if not extracted:
-        return saved
+        return []
 
-    try:
-        existing_items = memory_service.all() or []
-    except Exception:
-        existing_items = []
+    state = _nova_set_project_state_values(session_id, extracted)
+
+    saved = []
 
     for item in extracted:
         kind = str(item.get("kind") or "").strip()
         value = _nova_clean_project_state_value(item.get("value"))
-        memory_text = _nova_project_state_memory_text(kind, value)
 
-        if not kind or not memory_text:
-            continue
-
-        duplicate = False
-
-        for existing in existing_items:
-            if not isinstance(existing, dict):
-                continue
-
-            existing_text = str(existing.get("text") or "").strip().lower()
-            existing_session = str(existing.get("session_id") or "").strip()
-
-            if (
-                existing_text == memory_text.lower()
-                and existing_session == target_session_id
-            ):
-                duplicate = True
-                saved.append(existing)
-                break
-
-        if duplicate:
-            continue
-
-        try:
-            created = memory_service.add_memory(
+        if kind and value:
+            saved.append(
                 {
-                    "text": memory_text,
                     "kind": kind,
-                    "source": "project_state_direct",
-                    "session_id": target_session_id,
+                    "value": value,
+                    "session_id": str(session_id or "").strip(),
+                    "source": "project_state_dedicated_store",
+                    "state": state,
                 }
             )
-            saved.append(created)
 
-            app.logger.info(
-                "[project-state-memory] saved kind=%s session_id=%s value=%s",
-                kind,
-                target_session_id,
-                value,
-            )
-        except Exception:
-            app.logger.exception(
-                "[project-state-memory] failed saving kind=%s session_id=%s",
-                kind,
-                target_session_id,
-            )
+    app.logger.info(
+        "[project-state-store] saved kinds=%s session_id=%s",
+        ",".join([str(item.get("kind") or "") for item in extracted if isinstance(item, dict)]),
+        session_id,
+    )
 
     return saved
 
@@ -1590,62 +1663,19 @@ def _nova_question_project_state_kind(user_text):
 
 
 def _nova_find_project_state_memory(session_id: str, kind: str) -> str:
-    """
-    Retrieve the latest memory text for a given project-state kind in the session.
-    Ensures 'blocker' kind is always extracted if it exists.
-    """
-    target_session_id = str(session_id or "").strip()
     target_kind = str(kind or "").strip()
-    config = PROJECT_STATE_MEMORY_KINDS.get(target_kind) or {}
-    label = str(config.get("label") or "").strip().lower()
 
-    if not target_kind or not label:
+    if not target_kind or target_kind not in PROJECT_STATE_MEMORY_KINDS:
         return ""
 
-    try:
-        items = memory_service.all() or []
-    except Exception:
-        items = []
+    state = _nova_get_project_state_session(session_id)
+    value = _nova_clean_project_state_value(state.get(target_kind))
 
-    # candidates = all items matching kind + session
-    candidates = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        item_kind = str(item.get("kind") or "").strip()
-        item_text = str(item.get("text") or "").strip()
-        item_session = str(item.get("session_id") or "").strip()
-        item_updated = str(item.get("updated_at") or item.get("created_at") or "")
+    if value:
+        return value
 
-        if item_kind != target_kind:
-            continue
-        if target_session_id and item_session and item_session != target_session_id:
-            continue
-        candidates.append((item_updated, item_text))
+    return ""
 
-    if not candidates:
-        return ""
-
-    # sort by updated_at descending to get latest
-    candidates.sort(reverse=True, key=lambda x: x[0])
-    latest_text = candidates[0][1] if candidates else ""
-
-    # extra safety for blocker
-    if target_kind == "blocker" and not latest_text:
-        # try to extract from current_task text if it mentions blocker
-        task_text = _nova_find_project_state_memory(session_id, "current_task")
-        match = re.search(r"blocker\s*[:\-]\s*(.+)", task_text, flags=re.IGNORECASE)
-        if match:
-            latest_text = match.group(1).strip()
-
-    # PROJECT_STATE_CLEAN_VALUE_RECALL_LOCK
-    if ":" in latest_text:
-        prefix, possible_value = latest_text.split(":", 1)
-
-        if prefix.strip().lower() == label:
-            return _nova_clean_project_state_value(possible_value)
-
-    return _nova_clean_project_state_value(latest_text)
 
 def _nova_try_project_state_direct_recall(user_text, session_id):
     kinds = _nova_project_state_question_kinds(user_text)
