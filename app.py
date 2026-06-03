@@ -1,4 +1,4 @@
-
+﻿
 def update_execution_state(execution, status=None, current_step=None, last_action=None):
     """
     Consolidates repeated execution state assignments.
@@ -11,7 +11,7 @@ def update_execution_state(execution, status=None, current_step=None, last_actio
         execution["last_action"] = last_action
 
 
-﻿from __future__ import annotations
+ï»¿from __future__ import annotations
 
 import os
 import re
@@ -1780,7 +1780,7 @@ def _nova_prevent_bad_exact_pong_response(assistant_text, user_text):
     if clean_user in allowed_pong_requests:
         return clean_answer
 
-    return "I’m ready. What are we working on?"
+    return "Iâ€™m ready. What are we working on?"
 
 
 def _nova_try_project_state_direct_recall(user_text, session_id):
@@ -3838,3 +3838,4 @@ if __name__ == "__main__":
     )
 
 # ATTACHMENT_MEMORY_SESSION_ALIAS_APP_LOCK
+
