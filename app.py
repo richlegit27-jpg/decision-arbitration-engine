@@ -1928,7 +1928,165 @@ def _nova_try_project_state_direct_recall(user_text, session_id):
     )
 
 
+# ATTACHMENT_CURRENT_ONLY_BINARY_GUARD_LOCK
+def _nova_attachment_url_key(value):
+    try:
+        value = str(value or "").strip()
+    except Exception:
+        return ""
+    if not value:
+        return ""
+    value = value.replace("\\", "/")
+    if "/api/uploads/" in value:
+        return value[value.find("/api/uploads/"):]
+    return value
+
+
+def _nova_attachment_name_key(item):
+    if not isinstance(item, dict):
+        return ""
+    for key in ("url", "file_url", "path", "stored_name", "filename", "name", "original_filename"):
+        value = item.get(key)
+        cleaned = _nova_attachment_url_key(value)
+        if cleaned:
+            return cleaned
+    return ""
+
+
+def _nova_is_binary_or_container_attachment(item):
+    if not isinstance(item, dict):
+        return True
+
+    mime = str(item.get("mime_type") or item.get("mime") or "").lower()
+    name = str(
+        item.get("filename")
+        or item.get("original_filename")
+        or item.get("name")
+        or item.get("url")
+        or item.get("file_url")
+        or ""
+    ).lower()
+
+    binary_exts = (
+        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".ico",
+        ".mp3", ".wav", ".m4a", ".mp4", ".mov", ".avi", ".webm",
+        ".pdf", ".zip", ".rar", ".7z", ".exe", ".dll",
+    )
+
+    # DOCX is a zipped Office container. Only inject it if your extractor produced readable text elsewhere.
+    container_exts = (".docx", ".pptx", ".xlsx")
+
+    if any(name.endswith(ext) for ext in binary_exts + container_exts):
+        return True
+
+    if mime.startswith("image/") or mime.startswith("audio/") or mime.startswith("video/"):
+        return True
+
+    if mime in {
+        "application/pdf",
+        "application/zip",
+        "application/octet-stream",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }:
+        return True
+
+    return False
+
+
+def _nova_filter_current_attachments_only(candidate_attachments, current_attachments):
+    if not isinstance(candidate_attachments, list):
+        return []
+
+    if not isinstance(current_attachments, list) or not current_attachments:
+        return []
+
+    current_keys = set()
+    for item in current_attachments:
+        key = _nova_attachment_name_key(item)
+        if key:
+            current_keys.add(key)
+
+    if not current_keys:
+        return []
+
+    filtered = []
+    seen = set()
+
+    for item in candidate_attachments:
+        key = _nova_attachment_name_key(item)
+        if not key or key not in current_keys:
+            continue
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+        filtered.append(item)
+
+    return filtered
+
 @app.post("/api/chat")
+
+
+
+# ACTUAL_BINARY_ATTACHMENT_ANALYZER_BLOCK_LOCK
+def _nova_analyze_binary_attachment_for_prompt(attachment_path, mime_type):
+    try:
+        from pathlib import Path as _NovaPath
+
+        path_obj = _NovaPath(str(attachment_path or ""))
+        mime = str(mime_type or "").lower().strip()
+
+        if not path_obj.exists():
+            return ""
+
+        if mime == "application/pdf" or path_obj.suffix.lower() == ".pdf":
+            try:
+                import fitz
+            except Exception:
+                return "[PDF received, but PyMuPDF/fitz is not installed for text extraction.]"
+
+            pieces = []
+            doc = fitz.open(str(path_obj))
+            try:
+                max_pages = min(len(doc), 5)
+                for page_index in range(max_pages):
+                    page_text = doc[page_index].get_text("text") or ""
+                    page_text = page_text.strip()
+                    if page_text:
+                        pieces.append(f"[PDF page {page_index + 1}]\n{page_text[:2000]}")
+            finally:
+                doc.close()
+
+            extracted = "\n\n".join(pieces).strip()
+            if extracted:
+                return extracted
+
+            return "[PDF received, but no selectable text was found. It may be scanned/image-based.]"
+
+        if mime.startswith("image/") or path_obj.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".bmp"}:
+            try:
+                from PIL import Image
+                import pytesseract
+            except Exception:
+                return "[Image received, but OCR dependencies are not installed. Install pillow and pytesseract for text OCR.]"
+
+            image = Image.open(str(path_obj))
+            ocr_text = pytesseract.image_to_string(image) or ""
+            ocr_text = ocr_text.strip()
+
+            if ocr_text:
+                return f"[Image OCR text]\n{ocr_text[:3000]}"
+
+            return "[Image received. No readable OCR text was found.]"
+
+    except Exception as error:
+        return f"[Attachment analysis failed: {error}]"
+
+    return ""
+
 def api_chat():
     data = request_json()
 
@@ -2099,6 +2257,17 @@ def api_chat():
 
         # ATTACHMENT_CONTENT_INJECTION_FINAL_LOCK
         attachment_content_lines = []
+
+        # ATTACHMENT_INJECTION_LOOP_CURRENT_ONLY_LOCK
+        # When the user sends attachments with this request, inject ONLY those current files.
+        # Old session attachment memory can still be stored, but must not flood this prompt.
+        if attachments:
+            remembered_session_attachments = list(attachments)
+            app.logger.info(
+                "[AttachmentContentGate] forcing current request attachments only before injection count=%s session_id=%s",
+                len(remembered_session_attachments or []),
+                session_id,
+            )
         for attachment in remembered_session_attachments or []:
             attachment_filename = str(attachment.get("filename") or "").strip()
             attachment_original_filename = str(attachment.get("original_filename") or "").strip()
@@ -2180,17 +2349,28 @@ def api_chat():
                     )
 
                     if is_binary_attachment:
-                        content_snippet = (
-                            "[Binary attachment skipped from text injection. "
-                            f"name={attachment.get('original_filename') or attachment.get('filename') or '<unknown>'}; "
-                            f"type={attachment.get('mime_type') or ''}; "
-                            f"url={attachment.get('file_url') or attachment.get('url') or ''}]"
-                        )
-                        app.logger.info(
-                            "[AttachmentContent] skipped binary attachment text read path=%s mime_type=%s",
-                            str(file_path),
+                        # FIX_ATTACHMENT_ANALYZER_ROUTE_AND_CALL_LOCK
+                        attachment_path = str(file_path)
+                        mime_type = str(mime_type or "")
+                        extracted_attachment_text = _nova_analyze_binary_attachment_for_prompt(
+                            attachment_path,
                             mime_type,
                         )
+                        if extracted_attachment_text:
+                            content_snippet = extracted_attachment_text[:4000]
+                            app.logger.info(
+                                "[AttachmentAnalyzer] extracted binary attachment content path=%s chars=%s mime_type=%s",
+                                attachment_path,
+                                len(content_snippet),
+                                mime_type,
+                            )
+                        else:
+                            app.logger.info(
+                                "[AttachmentAnalyzer] skipped binary attachment prompt append path=%s mime_type=%s",
+                                attachment_path,
+                                mime_type,
+                            )
+                            continue
                     else:
                         content_snippet = file_path.read_text(
                             encoding="utf-8",
@@ -2215,6 +2395,46 @@ def api_chat():
                 f"{content_snippet if content_snippet else '[Attachment file was remembered, but readable text content was not available on disk.]'}"
             )
 
+        # GATE_REMEMBERED_ATTACHMENT_INJECTION_LOCK
+        attachment_gate_text = str(user_text or "").lower().strip()
+        current_request_attachments = attachments if isinstance(attachments, list) else []
+
+        attachment_intent_words = (
+            "attachment",
+            "attachments",
+            "attached",
+            "file",
+            "files",
+            "image",
+            "photo",
+            "picture",
+            "pic",
+            "screenshot",
+            "document",
+            "docx",
+            "pdf",
+            "analyze this",
+            "what is this",
+            "what's this",
+            "look at this",
+            "read this",
+            "summarize this file",
+        )
+
+        allow_remembered_attachment_injection = (
+            bool(current_request_attachments)
+            or any(word in attachment_gate_text for word in attachment_intent_words)
+        )
+
+        if not allow_remembered_attachment_injection:
+            attachment_content_lines = []
+            remembered_session_attachments = []
+            app.logger.info(
+                "[AttachmentContentGate] skipped remembered attachment injection for non-attachment message session_id=%s text_len=%s",
+                requested_session_id,
+                len(attachment_gate_text),
+            )
+
         if attachment_content_lines:
             attachment_content_text = "\n\n".join(attachment_content_lines)
             if user_text:
@@ -2228,7 +2448,25 @@ def api_chat():
                 requested_session_id,
             )
 
-        if remembered_session_attachments:
+        # SHORT_CHAT_SKIP_ATTACHMENT_MEMORY_LOCK
+        short_casual_text = str(user_text or "").strip().lower()
+        skip_remembered_attachment_context = (
+            len(short_casual_text) <= 12
+            and short_casual_text in {
+                "hi",
+                "yo",
+                "hey",
+                "hello",
+                "sup",
+                "k",
+                "ok",
+                "kk",
+                "test",
+            }
+            and not attachments
+        )
+
+        if remembered_session_attachments and not skip_remembered_attachment_context:
             attachment_context_lines = [
                 "",
                 "Session attachment memory:",
@@ -2317,6 +2555,27 @@ def api_chat():
                     client_session_id=requested_session_id,
                 )
 
+
+                # REAL_RESPONSE_ATTACHMENT_COUNT_LOCK
+                # Force returned attachment payload/count to current request only.
+                try:
+                    if isinstance(result, dict):
+                        result["session_attachments"] = list(attachments or [])
+                        result_session = result.get("session")
+                        if isinstance(result_session, dict):
+                            result_session["session_attachments"] = list(attachments or [])
+                            result_session["attachment_memory"] = list(attachments or [])
+                            result_session["attachments"] = list(attachments or [])
+                    app.logger.info(
+                        "[AttachmentContentGate] real response attachment payload forced current-only count=%s session_id=%s",
+                        len(attachments or []),
+                        requested_session_id,
+                    )
+                except Exception as _nova_real_response_attachment_error:
+                    app.logger.warning(
+                        "[AttachmentContentGate] real response attachment payload cleanup failed error=%s",
+                        _nova_real_response_attachment_error,
+                    )
                 app.logger.info(
                     "[api_chat] returned session attachment memory count=%s session_id=%s",
                     len(result.get("session_attachments") or []),
@@ -4025,6 +4284,19 @@ def create_startup_backup():
 # -----------------------
 # MAIN
 # -----------------------
+
+
+# FIX_ATTACHMENT_ANALYZER_ROUTE_AND_CALL_LOCK
+# Safety repair: make sure /api/chat points to api_chat, not helper functions.
+try:
+    if "api_chat" in globals():
+        for _nova_rule in app.url_map.iter_rules():
+            if str(_nova_rule.rule) == "/api/chat":
+                app.view_functions[_nova_rule.endpoint] = api_chat
+                print(f"[NOVA ROUTE REPAIR] /api/chat endpoint={_nova_rule.endpoint} rebound to api_chat")
+except Exception as _nova_route_repair_error:
+    print(f"[NOVA ROUTE REPAIR FAILED] {_nova_route_repair_error}")
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
