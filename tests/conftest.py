@@ -1,9 +1,36 @@
-# PYTEST_RESTORE_NOVA_MEMORY_LOCK
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def block_real_openai_clients(monkeypatch):
+    """
+    Test safety lock:
+    pytest should never create a real OpenAI client.
+
+    Individual tests should mock Nova service methods instead of hitting OpenAI.
+    """
+
+    try:
+        import openai
+    except Exception:
+        yield
+        return
+
+    class BlockedOpenAIClient:
+        def __init__(self, *args, **kwargs):
+            raise AssertionError(
+                "Blocked real OpenAI client during pytest. "
+                "Mock chat_service.handle() or the specific service method instead."
+            )
+
+    monkeypatch.setattr(openai, "OpenAI", BlockedOpenAIClient, raising=False)
+    monkeypatch.setattr(openai, "AsyncOpenAI", BlockedOpenAIClient, raising=False)
+
+    yield
 
 
 @pytest.fixture(autouse=True)
