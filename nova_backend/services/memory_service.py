@@ -59,7 +59,7 @@ class MemoryService:
             return item
 
         try:
-            from datetime import datetime, timezone
+            from datetime import datetime, UTC, timezone
 
             raw = updated_at.replace("Z", "+00:00")
             updated = datetime.fromisoformat(raw)
@@ -226,11 +226,11 @@ class MemoryService:
 
                 # 🔥 DECAY BEFORE BOOST
                 try:
-                    from datetime import datetime
+                    from datetime import datetime, UTC
                     created_at = existing.get("created_at")
                     if created_at:
                         created_ts = datetime.fromisoformat(created_at.replace("Z", ""))
-                        age_days = (datetime.utcnow() - created_ts).days
+                        age_days = (datetime.now(UTC) - created_ts).days
 
                         if age_days > 7:
                             existing_weight *= 0.85
