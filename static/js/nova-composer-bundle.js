@@ -4,6 +4,7 @@
   // NOVA_COMPOSER_VISUAL_TEXT_CLEANUP_LOCK
   // NOVA_REMAINING_COMPOSER_MOJIBAKE_LOCK
   // NOVA_FINAL_TTS_STOP_TEXT_LOCK
+  // NOVA_TTS_STOP_LINE_DIRECT_LOCK
 
   function qs(selector, root) {
     return (root || document).querySelector(selector);
@@ -780,7 +781,7 @@ function updateTtsToggleUi() {
   els.ttsToggleButton.classList.toggle("is-playing", playing);
 
   if (playing) {
-    els.ttsToggleButton.textContent = "â¹";
+    els.ttsToggleButton.textContent = "Stop";
     els.ttsToggleButton.setAttribute("aria-label", "Stop voice reply");
     els.ttsToggleButton.setAttribute("title", "Stop voice reply");
     return;
