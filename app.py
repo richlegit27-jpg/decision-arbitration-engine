@@ -11,7 +11,7 @@ def update_execution_state(execution, status=None, current_step=None, last_actio
         execution["last_action"] = last_action
 
 
-ï»¿from __future__ import annotations
+from __future__ import annotations
 
 import os
 import re
