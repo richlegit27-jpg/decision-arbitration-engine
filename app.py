@@ -2221,8 +2221,6 @@ def api_chat():
                 )
 
                 app.logger.info(
-                    # NOVA_FORCE_API_CHAT_WEAK_GUARD_BEFORE_RETURN_LOCK
-                    result = _nova_replace_weak_backend_reply(user_text, result)
                     "[api_chat] returned session attachment memory count=%s session_id=%s",
                     len(result.get("session_attachments") or []),
                     active_attachment_session_id,
