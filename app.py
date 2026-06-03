@@ -2270,15 +2270,43 @@ def api_chat():
 
 @app.get("/api/chat/<session_id>")
 def api_chat_session_compat(session_id: str):
-    session = session_service.get_session(session_id)
+    # MOBILE_MISSING_SESSION_SAFE_FALLBACK_LOCK
+    requested_session_id = str(session_id or "").strip()
+
+    session = session_service.get_session(requested_session_id)
+
     if not session:
-        return json_error("Session not found", 404)
+        session = {
+            "id": requested_session_id,
+            "title": "New Chat",
+            "messages": [],
+            "created_at": "",
+            "updated_at": "",
+            "pinned": False,
+            "working_state": {},
+            "execution_state": {},
+            "active_execution": None,
+            "missing": True,
+        }
+
+        return json_ok(
+            session=session,
+            sessions=session_service.get_all(),
+            active_session_id=requested_session_id,
+            messages=[],
+            missing_session=True,
+            mobile_fallback=True,
+        )
 
     return json_ok(
         session=session,
         sessions=session_service.get_all(),
         active_session_id=session_service.active_session_id,
+        messages=session.get("messages") or [],
+        missing_session=False,
+        mobile_fallback=False,
     )
+
 
 @app.get("/api/sessions/<session_id>")
 def api_session_by_id(session_id: str):
