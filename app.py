@@ -1810,6 +1810,45 @@ def _nova_inject_project_state_context(user_text, session_id):
     return f"{context}\n\nUser message:\n{clean_user_text}"
 
 
+# SLIM_DIRECT_RECALL_PAYLOAD_LOCK
+def _nova_slim_assistant_payload(text, session_id="", **extra):
+    payload = {
+        "ok": True,
+        "assistant_message": {
+            "role": "assistant",
+            "text": str(text or "").strip(),
+        },
+        "active_session_id": str(session_id or "").strip(),
+    }
+
+    for key, value in extra.items():
+        if value is not None:
+            payload[key] = value
+
+    return jsonify(payload)
+
+
+def _nova_prevent_bad_exact_pong_response(assistant_text, user_text):
+    clean_answer = str(assistant_text or "").strip()
+    clean_user = str(user_text or "").strip().lower()
+
+    if clean_answer.lower() != "pong":
+        return clean_answer
+
+    allowed_pong_requests = {
+        "pong",
+        "say pong",
+        "say pong only",
+        "reply pong",
+        "reply with pong",
+    }
+
+    if clean_user in allowed_pong_requests:
+        return clean_answer
+
+    return "I’m ready. What are we working on?"
+
+
 def _nova_try_project_state_direct_recall(user_text, session_id):
     kinds = _nova_project_state_question_kinds(user_text)
 
@@ -1839,16 +1878,7 @@ def _nova_try_project_state_direct_recall(user_text, session_id):
     if not lines:
         return None
 
-    payload = build_common_state_payload(session_id=session_id)
-
-    payload.update(
-        {
-            "assistant_message": {
-                "role": "assistant",
-                "text": "\n".join(lines),
-            }
-        }
-    )
+    answer_text = "\n".join(lines)
 
     app.logger.info(
         "[project-state-recall-override] answered kinds=%s session_id=%s",
@@ -1856,7 +1886,12 @@ def _nova_try_project_state_direct_recall(user_text, session_id):
         session_id,
     )
 
-    return json_ok(**payload)
+    return _nova_slim_assistant_payload(
+        answer_text,
+        session_id=session_id,
+        direct_recall="project_state",
+        kinds=kinds,
+    )
 
 
 @app.post("/api/chat")
@@ -2214,6 +2249,11 @@ def api_chat():
 
         if not assistant_text and result.get("ok", True):
             assistant_text = "Nova completed the request but returned an empty assistant response."
+
+        assistant_text = _nova_prevent_bad_exact_pong_response(
+            assistant_text,
+            user_text,
+        )
 
         assistant_message["text"] = assistant_text
 
