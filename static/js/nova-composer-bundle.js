@@ -1,6 +1,8 @@
 ﻿(function () {
   "use strict";
 
+  // NOVA_COMPOSER_VISUAL_TEXT_CLEANUP_LOCK
+
   function qs(selector, root) {
     return (root || document).querySelector(selector);
   }
@@ -26,7 +28,7 @@ window.finishStreamUi = window.finishStreamUi || function () {
 
   function log() {
     try {
-      console.log("[NovaComposerBundle]", ...arguments);
+
     } catch (_) {}
   }
 
@@ -107,7 +109,7 @@ function applyBackendSessionState(payload, explicitSessionId) {
     state.memory = data.memory;
   }
 
-  console.log("[NOVA SESSION HYDRATE]", {
+
     activeSessionId: state.activeSessionId,
     message_count: Array.isArray(state.messages) ? state.messages.length : -1,
     messages: (state.messages || []).map(function (msg) {
@@ -276,7 +278,7 @@ function showToast(message, kind) {
     const text = String(message || "").trim();
     if (!text) return;
 
-    console.log("[Toast]", kind || "info", text);
+
 
     // OPTIONAL: minimal visual (no render calls)
     const host = document.querySelector("[data-toast-host]") || document.body;
@@ -416,7 +418,7 @@ const mainText = text.trim();
     const text = normalizeText(value).trim();
     const max = Number(limit || 100);
     if (text.length <= max) return text;
-    return text.slice(0, Math.max(0, max - 1)).trimEnd() + "Ã¢â‚¬Â¦";
+    return text.slice(0, Math.max(0, max - 1)).trimEnd() + "...";
   }
 
   function isImageMime(mime) {
@@ -512,7 +514,7 @@ if (
     return null;
   }
 
-// ðŸ”¥ HARD META PRESERVE (fixed correctly)
+// HARD META PRESERVE
 const meta =
   (item && typeof item.meta === "object" && item.meta) ||
   (raw && typeof raw.meta === "object" && raw.meta) ||
@@ -630,7 +632,7 @@ function buildWorkingContextFromWorkingState(rawState) {
 function attachmentSummary(attachment) {
     const name = attachment.filename || attachment.name || "attachment";
     const size = formatBytes(attachment.size);
-    return size ? name + " Ã‚Â· " + size : name;
+    return size ? name + " · " + size : name;
   }
 
   const els = {
@@ -782,7 +784,7 @@ function updateTtsToggleUi() {
     return;
   }
 
-  els.ttsToggleButton.textContent = enabled ? "ðŸ”Š" : "ðŸ”‡";
+  els.ttsToggleButton.textContent = enabled ? "Voice" : "Muted";
   els.ttsToggleButton.setAttribute(
     "aria-label",
     enabled ? "Voice replies on" : "Voice replies muted"
@@ -1394,7 +1396,7 @@ if (els.sendButton) {
       event.stopPropagation();
     }
 
-    console.log("SEND BUTTON CLICKED");
+
     handleComposerSubmit(null);
   };
 }
@@ -1419,7 +1421,7 @@ if (els.sendButton) {
     event.preventDefault();
     event.stopPropagation();
 
-    console.log("SEND BUTTON CLICKED");
+
 
     handleComposerSubmit(event);
   };
@@ -1792,7 +1794,7 @@ state.messages = dedupeMessages(mergedMessages)
 }
 
 // ==============================
-// ðŸ”¥ UNIFIED SESSION SWITCH (LOCKED)
+// UNIFIED SESSION SWITCH LOCKED
 // ==============================
 
 window.openSessionFromBackend = async function (sessionId) {
@@ -1809,7 +1811,7 @@ window.openSessionFromBackend = async function (sessionId) {
 
 
 // ==============================
-// ðŸ”¥ ARTIFACT â†’ CHAT BRIDGE
+// ARTIFACT TO CHAT BRIDGE
 // ==============================
 
 window.NovaArtifactChatAction = function (text) {
@@ -1873,12 +1875,12 @@ window.NovaAnalyzeArtifactImage = async function (imageUrl, artifact) {
 };
 
 // ==============================
-// ðŸ”¥ COPY + REGENERATE FIX (PUT THIS HERE)
+// COPY + REGENERATE FIX
 // ==============================
 
 document.addEventListener("click", async function (event) {
 
-  // ðŸ”¥ MEMORY BADGE CLICK
+  // MEMORY BADGE CLICK
   const memoryBadge = event.target.closest("[data-memory-used]");
   if (memoryBadge) {
 
@@ -1992,7 +1994,7 @@ viewer.innerHTML = `
     return;
   }
 
-  // ðŸ”¥ COPY MESSAGE
+  // COPY MESSAGE
   const copyBtn = event.target.closest("[data-copy-message]");
   if (copyBtn) {
     const messageId = String(copyBtn.getAttribute("data-copy-message") || "").trim();
@@ -2140,7 +2142,7 @@ function renderAttachmentBlock(attachment) {
   if (mime) sub.push(mime);
   if (item.size) sub.push(formatBytes(item.size));
 
-  const subText = sub.join(" Ã‚Â· ");
+  const subText = sub.join(" · ");
 
   if (item.url && isImageMime(mime)) {
     return (
@@ -2731,7 +2733,7 @@ els.chatThread.__autoOpenedSource = "";
       return `
         <div class="nova-memory-item" data-id="${id}">
           <div>
-            <div>${item.pinned ? "ðŸ“Œ" : "ðŸ§ "} ${text}</div>
+            <div>${item.pinned ? "Pin" : "ðŸ§ "} ${text}</div>
             <small>${String(item.kind || "note")} Â· ${String(item.source || "manual")}</small>
           </div>
           <button class="nova-memory-pin" data-id="${id}">ðŸ“Œ</button>
@@ -2754,7 +2756,7 @@ els.chatThread.__autoOpenedSource = "";
 const data = await res.json();
 
 window.__lastResponse = data;
-console.log("FULL RESPONSE:", data);
+
 
 if (!data.ok) { 
            state.memory = data.memory || [];
@@ -4044,19 +4046,13 @@ if (!Array.isArray(state.messages)) {
     console.warn("[NovaComposerBundle] prevented message reset");
     return;
 }
-  console.log("[NOVA USER LOCAL APPEND]", {
-    id: userMessage.id,
-    role: userMessage.role,
-    text: userMessage.text,
-    count_before: state.messages.length,
-  });
+
+
 
   state.messages.push(userMessage);
 
-  console.log("[NOVA USER LOCAL APPENDED]", {
-    id: userMessage.id,
-    count_after: state.messages.length,
-  });
+
+
 
   renderChat();
   return userMessage;
@@ -4126,7 +4122,7 @@ throw new Error(message);
 }
 
 window.__lastResponse = data;
-console.log("FULL CHAT RESPONSE:", data);
+
 
 if (data && data.assistant_message && data.assistant_message.image_url) {
   try {
@@ -4448,10 +4444,8 @@ async function sendMessage() {
     return;
   }
 
-  console.log("sendMessage ENTERED", {
-    hasInput: !!inputEl,
-    text: text,
-  });
+
+
 
   await maybeAutoSaveMemoryFromChatText(text);
 
@@ -4666,7 +4660,7 @@ async function regenerateMessage(targetAssistantId) {
       attachments: safeArray(userMessage.attachments),
     });
 
-    console.log("ABOUT TO SEND /api/chat", payload);
+
 
     if (typeof consumeChatStreamStable === "function") {
       await consumeChatStreamStable(payload);
@@ -4850,7 +4844,7 @@ async function recordVoiceOnce() {
   });
 
   recorder.start();
-  showToast("ðŸŽ¤ Recording... click again to send", "info");
+  showToast("Recording... click again to send", "info");
 
   return new Promise(function (resolve, reject) {
     recorder.addEventListener("stop", function () {
@@ -4948,7 +4942,7 @@ const safeText = typeof text === "string" ? text : "";
   }
 
   showToast("Voice ready. Sending...", "success");
-  console.log("VOICE TRANSCRIPT =", text);
+
   await sendMessage();
 
   return text;
@@ -4995,7 +4989,7 @@ function updateTtsToggleUi() {
 
   els.ttsToggleButton.classList.toggle("is-muted", muted);
   els.ttsToggleButton.classList.toggle("is-playing", playing);
-  els.ttsToggleButton.textContent = muted ? "ðŸ”‡" : "ðŸ”Š";
+  els.ttsToggleButton.textContent = muted ? "Muted" : "Voice";
 
   if (muted) {
     els.ttsToggleButton.setAttribute("aria-label", "Voice replies muted");
@@ -5327,7 +5321,7 @@ function bindEvents() {
     });
   }
 
-  // ðŸ”¥ execution buttons
+  // execution buttons
   if (els.execRunStepButton) {
     els.execRunStepButton.addEventListener("click", function (event) {
       event.preventDefault();
@@ -5582,7 +5576,7 @@ window.fetchSourcePreviewIntoRail = function fetchSourcePreviewIntoRail(url, tit
       return response.json();
     })
     .then(function (data) {
-      console.log("SOURCE PREVIEW RESPONSE", data);
+
 
       const finalUrl = String((data && data.url) || url);
       const finalTitle = String((data && data.title) || title || "Source preview");
@@ -5697,7 +5691,7 @@ function renderWeb() {
   renderExecution();
 
   if (state.webPreviewOpen) {
-    console.log("renderWeb skipped: preview open");
+
     return;
   }
 
@@ -5851,7 +5845,7 @@ async function maybeAutoSaveMemoryFromChatText(userText) {
 
   const lower = text.toLowerCase();
 
-  // ðŸš« junk filter
+  // junk filter
   if (
     lower.length < 5 ||
     lower === "hi" ||
@@ -5902,7 +5896,7 @@ async function maybeAutoSaveMemoryFromChatText(userText) {
 
   if (exists) return;
 
-  // ðŸ”¥ IMPORTANCE SCORING
+  // IMPORTANCE SCORING
   let importance = 1; // default low
 
   if (/^my .+ is .+/i.test(memoryText)) importance = 3; // identity
@@ -5930,7 +5924,7 @@ async function maybeAutoSaveMemoryFromChatText(userText) {
       [];
 
     if (Array.isArray(memoryList)) {
-      // ðŸ”¥ SORT BY IMPORTANCE
+      // SORT BY IMPORTANCE
       const normalized = memoryList.map(normalizeMemoryItem);
 
       normalized.sort((a, b) => {
@@ -5956,7 +5950,7 @@ function wireMemoryControls() {
 
   window.__novaMemoryWired = true;
 
-  console.log("WIRE MEMORY CONTROLS ACTIVE");
+
 
   const addBtn = document.querySelector("[data-memory-add-button]");
   const input = document.querySelector("[data-memory-add-text]");
@@ -5988,7 +5982,7 @@ function wireMemoryControls() {
         });
 
         const data = await res.json();
-        console.log("MEMORY ADD RESPONSE", data);
+
 
         if (data && data.ok && data.data && Array.isArray(data.data.memory)) {
           state.memory = data.data.memory.map(normalizeMemoryItem);
@@ -6002,7 +5996,7 @@ function wireMemoryControls() {
     };
   }
 
-  // âœ… ENTER TO SAVE (no button needed)
+  // ENTER TO SAVE
   if (input && !input.__novaMemoryEnterWired) {
     input.__novaMemoryEnterWired = true;
 
@@ -6014,7 +6008,7 @@ function wireMemoryControls() {
     });
   }
 
-  // âœ… DELETE MEMORY
+  // DELETE MEMORY
   document.querySelectorAll("[data-memory-delete]").forEach(function (btn) {
     if (btn.__wired) return;
     btn.__wired = true;
@@ -6034,7 +6028,7 @@ function wireMemoryControls() {
         });
 
         const data = await res.json();
-        console.log("MEMORY DELETE RESPONSE", data);
+
 
         if (data && data.ok && data.data && Array.isArray(data.data.memory)) {
           state.memory = data.data.memory.map(normalizeMemoryItem);
@@ -6104,7 +6098,7 @@ function summarizeMemoryText(value, limit) {
   const max = typeof limit === "number" ? limit : 140;
   if (!text) return "";
   if (text.length <= max) return text;
-  return text.slice(0, max) + "Ã¢â‚¬Â¦";
+  return text.slice(0, max) + "...";
 }
 
 function findMemoryById(memoryId) {
@@ -6188,9 +6182,9 @@ function renderWorkingContextPanel() {
 
   const collapsedClass = wc.collapsed ? " is-collapsed" : "";
   const buttonLabel = wc.collapsed ? "Expand working context" : "Collapse working context";
-  const chevron = wc.collapsed ? "â–¸" : "â–¾";
+  const chevron = wc.collapsed ? ">" : "v";
 
-  console.log("renderWorkingContextPanel HTML", wc, items);
+
 
   return `
     <section class="nova-working-context-panel${collapsedClass}" data-working-context-panel>
@@ -6393,7 +6387,7 @@ function renderMemoryViewer(memoryList) {
   const container = document.querySelector(".nova-rail-content");
   if (!container) return;
 
-  // ðŸ”¥ normalize to array
+  // normalize to array
   if (!Array.isArray(memoryList)) {
     memoryList = memoryList ? [memoryList] : [];
   }
@@ -7230,7 +7224,7 @@ window.runExecutionAction = async function (action, extra) {
           return;
         }
 
-        console.log("[EXECUTION STREAM]", eventName, payload);
+
 
         if (eventName === "start" && typeof addMessage === "function") {
           addMessage({
