@@ -1299,3 +1299,252 @@
     });
   });
 })();
+
+
+// MOBILE_ATTACHMENT_SUMMARY_BUTTON_LOCK
+(function () {
+    function novaFindLatestAttachment() {
+        const candidates = [];
+
+        try {
+            if (window.lastUploadedAttachment) {
+                candidates.push(window.lastUploadedAttachment);
+            }
+
+            if (Array.isArray(window.uploadedAttachments)) {
+                candidates.push(...window.uploadedAttachments);
+            }
+
+            if (Array.isArray(window.stagedAttachments)) {
+                candidates.push(...window.stagedAttachments);
+            }
+
+            if (Array.isArray(window.pendingAttachments)) {
+                candidates.push(...window.pendingAttachments);
+            }
+
+            if (window.NovaMobileState && Array.isArray(window.NovaMobileState.attachments)) {
+                candidates.push(...window.NovaMobileState.attachments);
+            }
+        } catch (error) {
+            console.warn("[Nova Mobile] attachment scan failed", error);
+        }
+
+        const valid = candidates.filter(function (item) {
+            if (!item || typeof item !== "object") {
+                return false;
+            }
+
+            return Boolean(item.url || item.file_url || item.path || item.filename);
+        });
+
+        return valid.length ? valid[valid.length - 1] : null;
+    }
+
+    function novaAttachmentUrl(attachment) {
+        return String(
+            attachment.url ||
+            attachment.file_url ||
+            attachment.upload_url ||
+            ""
+        ).trim();
+    }
+
+    function novaAttachmentMime(attachment) {
+        return String(
+            attachment.mime_type ||
+            attachment.type ||
+            attachment.mime ||
+            ""
+        ).trim();
+    }
+
+    function novaToastAttachmentSummary(text) {
+        let box = document.getElementById("nova-attachment-summary-output");
+
+        if (!box) {
+            box = document.createElement("div");
+            box.id = "nova-attachment-summary-output";
+            box.style.position = "fixed";
+            box.style.left = "12px";
+            box.style.right = "12px";
+            box.style.bottom = "92px";
+            box.style.zIndex = "99999";
+            box.style.maxHeight = "45vh";
+            box.style.overflow = "auto";
+            box.style.padding = "12px";
+            box.style.borderRadius = "14px";
+            box.style.background = "rgba(20, 20, 28, 0.96)";
+            box.style.color = "white";
+            box.style.fontSize = "13px";
+            box.style.lineHeight = "1.35";
+            box.style.whiteSpace = "pre-wrap";
+            box.style.boxShadow = "0 8px 28px rgba(0,0,0,0.35)";
+            document.body.appendChild(box);
+        }
+
+        box.textContent = text;
+        box.hidden = false;
+    }
+
+    async function novaSummarizeLatestAttachment() {
+        const attachment = novaFindLatestAttachment();
+
+        if (!attachment) {
+            novaToastAttachmentSummary("No uploaded attachment found yet.");
+            return;
+        }
+
+        const url = novaAttachmentUrl(attachment);
+        const mimeType = novaAttachmentMime(attachment);
+
+        if (!url && !attachment.path) {
+            novaToastAttachmentSummary("Attachment found, but it has no usable URL/path.");
+            return;
+        }
+
+        novaToastAttachmentSummary("Extracting and summarizing attachment...");
+
+        try {
+            const response = await fetch("/api/attachment/summarize", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    url: url,
+                    path: attachment.path || "",
+                    mime_type: mimeType,
+                }),
+            });
+
+            const result = await response.json();
+
+            if (!result || !result.ok) {
+                novaToastAttachmentSummary("Attachment summary failed:\n" + JSON.stringify(result, null, 2));
+                return;
+            }
+
+            const points = Array.isArray(result.key_points)
+                ? result.key_points.slice(0, 10).map(function (point, index) {
+                    return (index + 1) + ". " + point;
+                }).join("\n")
+                : "";
+
+            novaToastAttachmentSummary(
+                "Summary:\n" +
+                String(result.summary || "").trim() +
+                "\n\nKey Points:\n" +
+                points +
+                "\n\nChars: raw=" + result.raw_chars + " clean=" + result.clean_chars
+            );
+        } catch (error) {
+            novaToastAttachmentSummary("Attachment summary request failed:\n" + String(error));
+        }
+    }
+
+    function novaInstallAttachmentSummaryButton() {
+        if (document.getElementById("nova-attachment-summary-btn")) {
+            return;
+        }
+
+        const button = document.createElement("button");
+        button.id = "nova-attachment-summary-btn";
+        button.type = "button";
+        button.textContent = "Summarize Attachment";
+        button.style.position = "fixed";
+        button.style.right = "12px";
+        button.style.bottom = "48px";
+        button.style.zIndex = "99999";
+        button.style.padding = "10px 12px";
+        button.style.borderRadius = "999px";
+        button.style.border = "0";
+        button.style.fontWeight = "700";
+        button.style.background = "#7c3aed";
+        button.style.color = "white";
+        button.style.boxShadow = "0 8px 22px rgba(0,0,0,0.28)";
+
+        button.addEventListener("click", novaSummarizeLatestAttachment);
+
+        document.body.appendChild(button);
+
+        console.log("[Nova Mobile] attachment summary button installed");
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", novaInstallAttachmentSummaryButton);
+    } else {
+        novaInstallAttachmentSummaryButton();
+    }
+
+    window.NovaSummarizeLatestAttachment = novaSummarizeLatestAttachment;
+})();
+
+
+// MOBILE_CAPTURE_LATEST_UPLOAD_LOCK
+(function () {
+    if (window.__novaUploadCaptureInstalled) {
+        return;
+    }
+
+    window.__novaUploadCaptureInstalled = true;
+
+    const originalFetch = window.fetch.bind(window);
+
+    window.fetch = async function novaFetchWithUploadCapture(input, init) {
+        const response = await originalFetch(input, init);
+
+        try {
+            const url = typeof input === "string"
+                ? input
+                : String((input && input.url) || "");
+
+            const method = String((init && init.method) || "GET").toUpperCase();
+
+            if (method === "POST" && url.includes("/api/upload")) {
+                const clone = response.clone();
+                const data = await clone.json();
+
+                if (data && data.ok !== false) {
+                    const attachment = {
+                        url: data.url || data.file_url || data.path || "",
+                        file_url: data.file_url || data.url || "",
+                        path: data.path || "",
+                        filename: data.filename || data.stored || data.name || "",
+                        original_filename: data.original_filename || data.original || data.filename || "",
+                        mime_type: data.mime_type || data.type || "",
+                        size: data.size || data.size_bytes || 0,
+                    };
+
+                    if (attachment.url || attachment.file_url || attachment.path) {
+                        window.lastUploadedAttachment = attachment;
+
+                        if (!Array.isArray(window.uploadedAttachments)) {
+                            window.uploadedAttachments = [];
+                        }
+
+                        window.uploadedAttachments.push(attachment);
+
+                        try {
+                            sessionStorage.setItem(
+                                "novaLastUploadedAttachment",
+                                JSON.stringify(attachment)
+                            );
+                        } catch (storageError) {
+                            console.warn("[Nova Mobile] could not store latest upload", storageError);
+                        }
+
+                        console.log("[Nova Mobile] captured latest upload for attachment tools", attachment);
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn("[Nova Mobile] upload capture failed", error);
+        }
+
+        return response;
+    };
+
+    console.log("[Nova Mobile] upload capture installed");
+})();
+
