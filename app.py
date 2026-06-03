@@ -2138,10 +2138,64 @@ def api_chat():
                     and file_path.exists()
                     and file_path.is_file()
                 ):
-                    content_snippet = file_path.read_text(
-                        encoding="utf-8",
-                        errors="replace",
-                    )[:4000]
+                    # SKIP_BINARY_ATTACHMENT_TEXT_INJECTION_LOCK
+                    mime_type = str(attachment.get("mime_type") or "").lower().strip()
+                    filename_for_type = str(
+                        attachment.get("original_filename")
+                        or attachment.get("filename")
+                        or ""
+                    ).lower().strip()
+
+                    binary_extensions = (
+                        ".jpg",
+                        ".jpeg",
+                        ".png",
+                        ".gif",
+                        ".webp",
+                        ".bmp",
+                        ".ico",
+                        ".pdf",
+                        ".zip",
+                        ".7z",
+                        ".rar",
+                        ".exe",
+                        ".dll",
+                        ".mp3",
+                        ".mp4",
+                        ".mov",
+                        ".wav",
+                        ".webm",
+                    )
+
+                    is_binary_attachment = (
+                        mime_type.startswith("image/")
+                        or mime_type.startswith("audio/")
+                        or mime_type.startswith("video/")
+                        or mime_type in {
+                            "application/pdf",
+                            "application/zip",
+                            "application/octet-stream",
+                        }
+                        or filename_for_type.endswith(binary_extensions)
+                    )
+
+                    if is_binary_attachment:
+                        content_snippet = (
+                            "[Binary attachment skipped from text injection. "
+                            f"name={attachment.get('original_filename') or attachment.get('filename') or '<unknown>'}; "
+                            f"type={attachment.get('mime_type') or ''}; "
+                            f"url={attachment.get('file_url') or attachment.get('url') or ''}]"
+                        )
+                        app.logger.info(
+                            "[AttachmentContent] skipped binary attachment text read path=%s mime_type=%s",
+                            str(file_path),
+                            mime_type,
+                        )
+                    else:
+                        content_snippet = file_path.read_text(
+                            encoding="utf-8",
+                            errors="replace",
+                        )[:4000]
                     app.logger.info(
                         "[AttachmentContent] loaded file content path=%s chars=%s",
                         str(file_path),
