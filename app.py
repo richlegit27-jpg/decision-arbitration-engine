@@ -16,6 +16,10 @@ from werkzeug.utils import secure_filename
 from nova_backend.routes.memory_panel_routes import register_memory_panel_routes
 from nova_backend.utils.api_response import ok_response, error_response
 from nova_backend.utils.request_utils import get_json_body, get_str, get_list, normalize_attachments
+from nova_backend.services.attachment_memory_service import (
+    persist_attachments_for_session,
+    summarize_attachments_for_session,
+)
 from nova_backend.utils.route_guard import guarded_json_route
 from nova_backend.config import (
     BASE_DIR,
@@ -767,8 +771,32 @@ def api_chat():
     data = request_json()
 
     user_text = str(data.get("user_text") or "").strip()
-    session_id = str(data.get("session_id") or "").strip()
+    requested_session_id = str(data.get("session_id") or "").strip()
+    session_id = requested_session_id
     attachments = normalize_attachments(data.get("attachments"))
+
+    # BACKEND_ATTACHMENT_DEBUG_LOG_LOCK
+    try:
+        app.logger.info(
+            "[api_chat] incoming request session_id=%s user_text_len=%s attachments_count=%s attachment_names=%s",
+            session_id or "<missing>",
+            len(user_text or ""),
+            len(attachments or []),
+            [
+                (
+                    item.get("original_filename")
+                    or item.get("filename")
+                    or item.get("name")
+                    or item.get("url")
+                    or item.get("file_url")
+                    or "<unnamed>"
+                )
+                for item in (attachments or [])
+                if isinstance(item, dict)
+            ],
+        )
+    except Exception:
+        app.logger.exception("[api_chat] failed while logging attachment debug info")
 
     regen_commands = {
         "regen",
@@ -806,11 +834,178 @@ def api_chat():
         return json_error("Missing user_text or attachments", 400)
 
     try:
+        # REAL_ATTACHMENT_MEMORY_BACKEND_LOCK
+        if attachments:
+            try:
+                added_attachment_memory = persist_attachments_for_session(
+                    attachments,
+                    session_id=session_id,
+                    client_session_id=requested_session_id,
+                )
+                app.logger.info(
+                    "[api_chat] persisted attachment memory count=%s session_id=%s",
+                    added_attachment_memory,
+                    session_id,
+                )
+            except Exception:
+                app.logger.exception("[api_chat] failed to persist attachment memory")
+
+        # PROJECT_AWARE_ATTACHMENT_CONTEXT_LOCK
+        try:
+            remembered_session_attachments = summarize_attachments_for_session(
+                session_id,
+                limit=25,
+                client_session_id=requested_session_id,
+            )
+        except Exception:
+            remembered_session_attachments = []
+            app.logger.exception("[api_chat] failed to load remembered session attachments")
+
+        # ATTACHMENT_CONTENT_INJECTION_FINAL_LOCK
+        attachment_content_lines = []
+        for attachment in remembered_session_attachments or []:
+            attachment_filename = str(attachment.get("filename") or "").strip()
+            attachment_original_filename = str(attachment.get("original_filename") or "").strip()
+
+            if attachment_filename == "<unknown>":
+                attachment_filename = ""
+
+            if attachment_original_filename == "<unknown>":
+                attachment_original_filename = ""
+
+            raw_attachment_name = (
+                attachment_filename
+                or attachment_original_filename
+                or Path(str(attachment.get("file_url") or "")).name
+                or Path(str(attachment.get("url") or "")).name
+                or ""
+            )
+            file_path = (UPLOADS_DIR / str(raw_attachment_name).strip().lstrip("/\\")).resolve()
+            content_snippet = ""
+            try:
+                if file_path.exists() and file_path.is_file() and str(file_path).startswith(str(UPLOADS_DIR.resolve())):
+                    content_snippet = file_path.read_text(encoding="utf-8", errors="replace")[:4000]
+                    app.logger.info(
+                        "[AttachmentContentFinal] loaded file content path=%s chars=%s",
+                        str(file_path),
+                        len(content_snippet),
+                    )
+                else:
+                    app.logger.warning("[AttachmentContentFinal] file unavailable path=%s exists=%s", str(file_path), file_path.exists())
+            except Exception as e:
+                app.logger.warning("[AttachmentContentFinal] failed reading %s: %s", str(file_path), e)
+            try:
+                uploads_root = UPLOADS_DIR.resolve()
+
+                if (
+                    str(file_path).startswith(str(uploads_root))
+                    and file_path.exists()
+                    and file_path.is_file()
+                ):
+                    content_snippet = file_path.read_text(
+                        encoding="utf-8",
+                        errors="replace",
+                    )[:4000]
+                    app.logger.info(
+                        "[AttachmentContent] loaded file content path=%s chars=%s",
+                        str(file_path),
+                        len(content_snippet),
+                    )
+                else:
+                    app.logger.warning(
+                        "[AttachmentContent] file unavailable path=%s exists=%s",
+                        str(file_path),
+                        file_path.exists(),
+                    )
+            except Exception as e:
+                app.logger.warning("[AttachmentContent] failed reading %s: %s", file_path, e)
+
+            attachment_content_lines.append(
+                f"Attachment {attachment.get('original_filename') or attachment.get('filename') or '<unknown>'} content:\n"
+                f"{content_snippet if content_snippet else '[Attachment file was remembered, but readable text content was not available on disk.]'}"
+            )
+
+        if attachment_content_lines:
+            attachment_content_text = "\n\n".join(attachment_content_lines)
+            if user_text:
+                user_text = f"{user_text}\n\n{attachment_content_text}"
+            else:
+                user_text = attachment_content_text
+
+            app.logger.info(
+                "[AttachmentContent] injected %s attachments content into user_text session_id=%s",
+                len(attachment_content_lines),
+                requested_session_id,
+            )
+
+        if remembered_session_attachments:
+            attachment_context_lines = [
+                "",
+                "Session attachment memory:",
+            ]
+
+            for index, item in enumerate(remembered_session_attachments, start=1):
+                attachment_context_lines.append(
+                    f"{index}. "
+                    f"name={item.get('original_filename') or item.get('filename') or '<unknown>'}; "
+                    f"url={item.get('file_url') or ''}; "
+                    f"type={item.get('mime_type') or ''}; "
+                    f"size={item.get('size') or 0}"
+                )
+
+            attachment_context = "\n".join(attachment_context_lines)
+
+            if user_text:
+                user_text = f"{user_text}\n\n{attachment_context}"
+            else:
+                user_text = attachment_context.strip()
+
+            app.logger.info(
+                "[api_chat] injected project-aware attachment context count=%s session_id=%s",
+                len(remembered_session_attachments),
+                session_id,
+            )
+
+        app.logger.info(
+            "[api_chat] calling chat_service.handle session_id=%s attachments_count=%s",
+            session_id,
+            len(attachments or []),
+        )
+
         result = chat_service.handle(
             user_text=user_text,
             session_id=session_id,
             attachments=attachments,
         )
+
+        try:
+            app.logger.info(
+                "[api_chat] chat_service.handle result ok=%s active_session_id=%s keys=%s",
+                result.get("ok") if isinstance(result, dict) else None,
+                result.get("active_session_id") if isinstance(result, dict) else None,
+                sorted(list(result.keys())) if isinstance(result, dict) else type(result).__name__,
+            )
+
+            if isinstance(result, dict):
+                active_attachment_session_id = str(
+                    result.get("active_session_id")
+                    or session_id
+                    or ""
+                ).strip()
+
+                result["session_attachments"] = summarize_attachments_for_session(
+                    active_attachment_session_id,
+                    limit=25,
+                    client_session_id=requested_session_id,
+                )
+
+                app.logger.info(
+                    "[api_chat] returned session attachment memory count=%s session_id=%s",
+                    len(result.get("session_attachments") or []),
+                    active_attachment_session_id,
+                )
+        except Exception:
+            app.logger.exception("[api_chat] failed while logging chat_service result")
 
         # TEMP DISABLED:
         # runtime_brain.run_cycle is crashing on undefined working_state.
@@ -873,6 +1068,27 @@ def api_chat():
         payload = {
             "ok": result.get("ok", True),
             "assistant_message": assistant_message,
+            # ATTACHMENT_CONTEXT_RESPONSE_FIX_LOCK
+            "session_attachments": (
+                result.get("session_attachments")
+                if isinstance(result, dict)
+                else []
+            ) or [],
+            "attachment_debug": {
+                "requested_session_id": requested_session_id,
+                "active_session_id": (
+                    result.get("active_session_id")
+                    if isinstance(result, dict)
+                    else session_id
+                ),
+                "session_attachments_count": len(
+                    (
+                        result.get("session_attachments")
+                        if isinstance(result, dict)
+                        else []
+                    ) or []
+                ),
+            },
             "active_session_id": (
                 result.get("active_session_id")
                 or result.get("session_id")
@@ -1370,6 +1586,15 @@ def api_upload():
 
         mime_type = getattr(file, "mimetype", None) or "application/octet-stream"
         size = save_path.stat().st_size if save_path.exists() else 0
+
+        app.logger.info(
+            "[api_upload] saved upload original=%s stored=%s mime_type=%s size=%s url=%s",
+            original_name,
+            final_name,
+            mime_type,
+            size,
+            f"/api/uploads/{final_name}",
+        )
 
         return jsonify({
             "ok": True,
@@ -2458,4 +2683,4 @@ if __name__ == "__main__":
         use_reloader=False,
     )
 
-
+# ATTACHMENT_MEMORY_SESSION_ALIAS_APP_LOCK
