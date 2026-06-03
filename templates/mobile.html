@@ -1,128 +1,1004 @@
-<!doctype html>
-<html lang="en" data-theme="dark">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Nova Mobile</title>
-  <link rel="stylesheet" href="/static/css/nova-mobile-app.css">
+<meta name="theme-color" content="#0b1020">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nova Mobile</title>
+
+<link rel="stylesheet" href="/static/css/nova-mobile.css?v=endgame-mobile-polish-20260530-001">
+<style>
+    html,
+    body,
+    *,
+    *::before,
+    *::after {
+        cursor: auto !important;
+    }
+
+    .cursor,
+    .custom-cursor,
+    .nova-cursor,
+    .cursor-ring,
+    .cursor-dot,
+    #cursor,
+    #customCursor,
+    #novaCursor,
+    #cursorRing,
+    #cursorDot,
+    #nova-mobile-scroll-bottom,
+    .mobile-scroll-bottom {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        animation: none !important;
+        box-shadow: none !important;
+    }
+
+    #nova-mobile-stop-generation,
+    #nova-mobile-stop-speech {
+        display: none;
+    }
+
+    #nova-mobile-stop-generation[data-active="true"],
+    #nova-mobile-stop-speech[data-active="true"] {
+        display: inline-flex;
+    }
+</style>
 </head>
+
 <body>
-  <div class="mobile-shell">
-    <header class="mobile-topbar">
-      <button id="mobileMenuBtn" class="mobile-icon-btn" type="button" aria-label="Open menu">☰</button>
+<main class="mobile-shell">
 
-      <div class="mobile-brand">
-        <div id="mobileChatTitle" class="mobile-title">Nova</div>
-        <div id="mobileChatSubtitle" class="mobile-subtitle">Mobile</div>
-      </div>
+    <header class="mobile-header">
+        <div class="mobile-header-title">Nova Mobile</div>
 
-      <button id="mobileMemoryBtn" class="mobile-icon-btn" type="button" aria-label="Open memory">Memory</button>
+        <div class="mobile-header-actions">
+            <button
+                id="nova-mobile-new-chat"
+                class="mobile-header-btn"
+                type="button"
+                onclick="window.location.href = '/mobile?new=' + Date.now();"
+            >New</button>
+
+            <button
+                id="nova-mobile-copy-chat"
+                class="mobile-header-btn"
+                type="button"
+            >Copy</button>
+
+            <button
+                id="nova-mobile-export-chat"
+                class="mobile-header-btn"
+                type="button"
+            >Export</button>
+
+            <button
+                id="nova-mobile-sessions-toggle"
+                class="mobile-header-btn"
+                type="button"
+                onclick="window.NovaOpenMobileSessions && window.NovaOpenMobileSessions();"
+            >Sessions</button>
+
+            <div class="mobile-status" aria-label="Nova online"></div>
+        </div>
     </header>
 
-    <main class="mobile-main">
-      <section class="mobile-chat">
-        <div id="mobileChatMessages" class="mobile-chat-messages">
-          <div class="mobile-empty-state">
-            <div class="mobile-empty-card">
-              <div class="mobile-empty-title">Nova Mobile is ready</div>
-              <div class="mobile-empty-subtitle">Clean chat for phone. Menu and Memory open as full-screen views.</div>
-            </div>
-          </div>
-        </div>
-      </section>
+    <div id="mobileChatMessages" class="mobile-chat-container"></div>
 
-      <section class="mobile-composer">
-        <div class="mobile-composer-box">
-          <div id="mobileAttachedFiles" class="mobile-attachments-bar"></div>
+<section
+    id="nova-mobile-sessions-panel"
+    class="hidden"
+    aria-label="Mobile sessions"
+    style="display:none;"
+>
 
-          <div class="mobile-composer-row">
-            <button id="mobileAttachBtn" class="mobile-action-btn" type="button">+</button>
+<button
+    type="button"
+    class="mobile-session-item"
+    onclick="window.NovaCloseMobileSessions && window.NovaCloseMobileSessions();"
+>Close Sessions</button>
 
-            <textarea
-              id="mobileMessageInput"
-              class="mobile-message-input"
-              rows="1"
-              placeholder="Message Nova..."
-              aria-label="Message Nova"
-            ></textarea>
+    <button
+        type="button"
+        class="mobile-session-item"
+        onclick="window.location.href = '/mobile?new=' + Date.now();"
+    >Start Fresh Chat</button>
 
-            <button id="mobileSendBtn" class="mobile-send-btn" type="button">Send</button>
-          </div>
+    <button
+        type="button"
+        class="mobile-session-item"
+        onclick="alert('Mobile session history is not fully wired yet. New Chat works. Full session switching still needs a backend/frontend session list lock.');"
+    >Session History Not Ready Yet</button>
+</section>
 
-          <div class="mobile-composer-footer">
-            <div id="mobileModelStatus">Model ready</div>
-          </div>
-        </div>
-      </section>
-    </main>
-  </div>
+<div class="mobile-quick-prompts">
+    <button
+        type="button"
+        data-quick-prompt="Continue"
+        onclick="
+            const input = document.getElementById('nova-mobile-input');
 
-  <!-- FULLSCREEN MENU -->
-  <section id="mobileMenuScreen" class="mobile-screen hidden" aria-hidden="true">
-    <div class="mobile-screen-header">
-      <div class="mobile-screen-title">Menu</div>
-      <button id="closeMobileMenuBtn" class="mobile-icon-btn" type="button">✕</button>
+            if (input) {
+                input.value = 'Continue from where we left off. Keep it direct and tell me the next move.';
+                input.focus();
+            }
+        "
+    >Continue</button>
+
+    <button
+        type="button"
+        data-quick-prompt="Summarize this"
+        onclick="
+            const input = document.getElementById('nova-mobile-input');
+
+            if (input) {
+                input.value = 'Summarize the current situation in plain English and tell me what matters most.';
+                input.focus();
+            }
+        "
+    >Summarize</button>
+
+    <button
+        type="button"
+        data-quick-prompt="Make this better"
+        onclick="
+            const input = document.getElementById('nova-mobile-input');
+
+            if (input) {
+                input.value = 'Improve this and make it cleaner, more direct, and more useful.';
+                input.focus();
+            }
+        "
+    >Improve</button>
+
+    <button
+        type="button"
+        data-quick-prompt="What should I do next?"
+        onclick="
+            const input = document.getElementById('nova-mobile-input');
+
+            if (input) {
+                input.value = 'What should I do next? Give me the best next step only.';
+                input.focus();
+            }
+        "
+    >Next</button>
+</div>
+<section
+    id="nova-mobile-tools-panel"
+    class="mobile-panel hidden"
+    aria-label="Mobile tools"
+    style="display:none;"
+>
+    <button
+        id="nova-mobile-memory-toggle"
+        type="button"
+        onclick="
+            const toolsPanel = document.getElementById('nova-mobile-tools-panel');
+            const memoryPanel = document.getElementById('nova-mobile-memory-panel');
+
+            if (toolsPanel) {
+                toolsPanel.classList.add('hidden');
+                toolsPanel.style.cssText = 'display:none !important;';
+            }
+
+            if (memoryPanel) {
+                memoryPanel.classList.remove('hidden');
+                memoryPanel.style.cssText = 'display:flex !important; position:fixed !important; left:10px !important; right:10px !important; top:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;';
+            }
+        "
+    >Memory</button>
+
+    <button
+        type="button"
+        data-mobile-tool="upload"
+        onclick="
+            const toolsPanel = document.getElementById('nova-mobile-tools-panel');
+            const input = document.getElementById('nova-mobile-file-input');
+
+            if (toolsPanel) {
+                toolsPanel.classList.add('hidden');
+                toolsPanel.style.cssText = 'display:none !important;';
+            }
+
+            if (input) {
+                input.click();
+            }
+        "
+    >Upload</button>
+
+    <button
+        type="button"
+        data-mobile-tool="execution"
+        onclick="
+            const toolsPanel = document.getElementById('nova-mobile-tools-panel');
+            const executionPanel = document.getElementById('nova-mobile-execution-panel');
+
+            if (toolsPanel) {
+                toolsPanel.classList.add('hidden');
+                toolsPanel.style.cssText = 'display:none !important;';
+            }
+
+            if (executionPanel) {
+                executionPanel.classList.remove('hidden');
+                executionPanel.style.cssText = 'display:flex !important; position:fixed !important; left:10px !important; right:10px !important; top:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;';
+            }
+        "
+    >Open Execution Panel</button>
+
+    <button
+        type="button"
+        onclick="
+            const panel = document.getElementById('nova-mobile-tools-panel');
+
+            if (panel) {
+                panel.classList.add('hidden');
+                panel.style.cssText = 'display:none !important;';
+            }
+        "
+    >Close</button>
+</section>
+
+<section id="nova-mobile-memory-panel" class="mobile-panel hidden" aria-label="Mobile memory">
+
+<button
+    id="nova-mobile-memory-close"
+    type="button"
+    onclick="
+        const panel = document.getElementById('nova-mobile-memory-panel');
+
+        if (panel) {
+            panel.classList.add('hidden');
+            panel.style.cssText = 'display:none !important;';
+        }
+    "
+>Close Memory</button>
+    <div class="mobile-panel-title">Memory</div>
+    <div id="nova-mobile-memory-status" class="mobile-panel-text">
+        Memory ready.
+    </div>
+</section>
+
+<section id="nova-mobile-execution-panel" class="mobile-panel hidden" aria-label="Mobile execution">
+<button
+    id="nova-mobile-execution-close"
+    type="button"
+    onclick="
+        const panel = document.getElementById('nova-mobile-execution-panel');
+
+        if (panel) {
+            panel.classList.add('hidden');
+            panel.style.cssText = 'display:none !important;';
+        }
+    "
+>Close Execution</button>
+    <div class="mobile-panel-title">Execution</div>
+<button
+    type="button"
+    data-mobile-tool="refresh_execution"
+>
+    Refresh Status
+</button>
+<div id="nova-mobile-execution-status" class="mobile-panel-text">
+    No active execution loaded.
+</div>
+
+<div class="mobile-execution-progress">
+    <div
+        id="nova-mobile-execution-progress-bar"
+        class="mobile-execution-progress-bar"
+        style="width: 0%;"
+    ></div>
+</div>
+
+<div
+    id="nova-mobile-execution-badge"
+    class="mobile-execution-badge"
+>
+    idle
+</div>
+
+<div
+    id="nova-mobile-execution-last-update"
+    class="mobile-panel-text"
+>
+    Last update: never
+</div>
+
+<button type="button" data-mobile-tool="run_step">Run Step</button>
+<button type="button" data-mobile-tool="run_all">Run All</button>
+</section>
+
+    <div class="mobile-composer">
+        <textarea
+            id="nova-mobile-input"
+            rows="1"
+            placeholder="Type a message..."
+        ></textarea>
+
+<button
+    id="nova-mobile-send"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Send"
+>
+    <span class="mobile-action-icon">➤</span>
+</button>
+
+<button
+    id="nova-mobile-stop-generation"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Stop generation"
+    data-active="false"
+>
+    <span class="mobile-action-icon">■</span>
+</button>
+
+<button
+    id="nova-mobile-voice"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Voice input"
+>
+    <span class="mobile-action-icon">🎙</span>
+</button>
+
+<button
+    id="nova-mobile-stop-speech"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Stop speech"
+    data-active="false"
+>
+    <span class="mobile-action-icon">🔇</span>
+</button>
+
+<button
+    id="nova-mobile-tts"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Read aloud"
+>
+    <span class="mobile-action-icon">🔊</span>
+</button>
+
+<button
+    id="nova-mobile-attach"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Attach file"
+>
+    <span class="mobile-action-icon">＋</span>
+</button>
+
+<button
+    id="nova-mobile-tools-toggle"
+    class="mobile-composer-btn mobile-icon-action mobile-animated-action"
+    type="button"
+    title="Tools"
+    onclick="
+        const panel = document.getElementById('nova-mobile-tools-panel');
+        if (panel) {
+            panel.classList.remove('hidden');
+            panel.style.cssText = 'display:flex !important; position:fixed !important; left:10px !important; right:10px !important; bottom:90px !important; z-index:999999 !important; flex-direction:column !important; gap:10px !important; padding:14px !important; background:#111827 !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important;';
+        }
+    "
+>
+    <span class="mobile-action-icon">⋯</span>
+</button>
+
+<input
+    id="nova-mobile-file-input"
+    type="file"
+    accept="image/*,.txt,.md,.pdf,.doc,.docx"
+    hidden
+    multiple
+/>
     </div>
 
-    <div class="mobile-screen-body">
-      <div class="mobile-section">
-        <div class="mobile-section-title">Chats</div>
-        <button id="mobileNewSessionBtn" class="mobile-block-btn" type="button">New Chat</button>
-        <div id="mobileSessionList" class="mobile-session-list"></div>
-      </div>
+</main>
 
-      <div class="mobile-section">
-        <div class="mobile-section-title">Appearance</div>
-        <button id="mobileThemeToggleBtn" class="mobile-block-btn" type="button">Theme</button>
-        <button id="mobileBackgroundBtn" class="mobile-block-btn" type="button">Background</button>
-      </div>
-    </div>
-  </section>
+<script src="/static/js/mobile-source-drawer.js?v=mobile-source-drawer-001"></script>
+<script src="/static/js/mobile/nova-mobile-bridge.js?v=mobile-bridge-003"></script>
+<script src="/static/js/mobile/nova-mobile-core.js?v=mobile-modular-001"></script>
+<script src="/static/js/mobile/nova-mobile-images.js?v=mobile-modular-001"></script>
+<script src="/static/js/mobile/nova-mobile-code-ui.js?v=mobile-modular-001"></script>
+<script src="/static/js/mobile/nova-mobile-chat-ui.js?v=mobile-modular-001"></script>
+<script src="/static/js/mobile/nova-mobile-message-actions.js?v=mobile-actions-fix-007"></script>
+<script src="/static/js/mobile/nova-mobile-webcards.js?v=mobile-webcards-dedupe-011"></script>
+<script src="/static/js/mobile/nova-mobile-upload.js?v=mobile-upload-rebind-012"></script>
+<script src="/static/js/mobile/nova-mobile-sessions.js?v=mobile-sessions-fix-20260527b"></script>
+<script src="/static/js/mobile/nova-mobile-ui-utils.js?v=mobile-ui-utils-fix-001"></script>
+<script src="/static/js/mobile/nova-mobile-voice.js?v=mobile-voice-endgame-002"></script>
+<script src="/static/js/mobile/nova-mobile-listeners.js?v=mobile-modular-001"></script>
+<script src="/static/js/mobile/nova-mobile-stream.js?v=mobile-final-payload-006"></script>
+<script src="/static/js/mobile/nova-mobile-storage.js?v=mobile-storage-003"></script>
+<script src="/static/js/mobile/nova-mobile-events.js?v=mobile-events-005"></script>
+<script src="/static/js/mobile/nova-mobile-state.js?v=mobile-state-002"></script>
 
-  <!-- FULLSCREEN MEMORY -->
-  <section id="mobileMemoryScreen" class="mobile-screen hidden" aria-hidden="true">
-    <div class="mobile-screen-header">
-      <div class="mobile-screen-title">Memory</div>
-      <button id="closeMobileMemoryBtn" class="mobile-icon-btn" type="button">✕</button>
-    </div>
+<script src="/static/js/nova-mobile-app.js?v=mobile-final-payload-008"></script>
 
-    <div class="mobile-screen-body">
-      <div class="mobile-section">
-        <div class="mobile-section-title">Status</div>
-        <div id="mobileMemoryStatus" class="mobile-card">Memory panel ready.</div>
-      </div>
+<script>
+window.NovaOpenMobileSessions = function () {
+    var panel = document.getElementById("nova-mobile-sessions-panel");
 
-      <div class="mobile-section">
-        <div class="mobile-section-title">Add Memory</div>
-        <form id="mobileMemoryForm" class="mobile-memory-form">
-          <select id="mobileMemoryKind" class="mobile-input">
-            <option value="preference">preference</option>
-            <option value="goal">goal</option>
-            <option value="project">project</option>
-            <option value="name">name</option>
-            <option value="memory">memory</option>
-          </select>
+    if (!panel) {
+        alert("Sessions panel not found.");
+        return;
+    }
 
-          <textarea
-            id="mobileMemoryValue"
-            class="mobile-input mobile-memory-textarea"
-            rows="3"
-            placeholder="Add something Nova should remember..."
-          ></textarea>
+    panel.classList.remove("hidden");
+    panel.style.cssText =
+        "display:flex !important;" +
+        "position:fixed !important;" +
+        "left:10px !important;" +
+        "right:10px !important;" +
+        "top:76px !important;" +
+        "z-index:999999 !important;" +
+        "flex-direction:column !important;" +
+        "gap:10px !important;" +
+        "padding:14px !important;" +
+        "background:#111827 !important;" +
+        "border:1px solid rgba(255,255,255,.18) !important;" +
+        "border-radius:18px !important;" +
+        "box-shadow:0 24px 80px rgba(0,0,0,.55) !important;";
+};
 
-          <button type="submit" class="mobile-send-btn">Save Memory</button>
-        </form>
-      </div>
+window.NovaCloseMobileSessions = function () {
+    var panel = document.getElementById("nova-mobile-sessions-panel");
 
-      <div class="mobile-section">
-        <div class="mobile-section-title">Items</div>
-        <div id="mobileMemoryList" class="mobile-memory-list"></div>
-      </div>
-    </div>
-  </section>
+    if (!panel) return;
 
-  <input id="mobileFileInput" type="file" multiple class="hidden">
+    panel.classList.add("hidden");
+    panel.style.cssText = "display:none !important;";
+};
+</script>
 
-  <script src="/static/js/nova-mobile-app.js"></script>
+<script>
+(function () {
+    "use strict";
+
+    function ready(fn) {
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", fn);
+            return;
+        }
+
+        fn();
+    }
+
+    ready(function () {
+        const toolsButton = document.getElementById("nova-mobile-tools-toggle");
+        const toolsPanel = document.getElementById("nova-mobile-tools-panel");
+
+        if (!toolsButton || !toolsPanel) {
+            console.warn("[Nova Mobile] tools menu fallback missing elements", {
+                toolsButton: !!toolsButton,
+                toolsPanel: !!toolsPanel,
+            });
+            return;
+        }
+
+        toolsButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            toolsPanel.classList.toggle("hidden");
+
+            const isOpen = !toolsPanel.classList.contains("hidden");
+            toolsButton.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        });
+
+        toolsButton.setAttribute("aria-controls", "nova-mobile-tools-panel");
+        toolsButton.setAttribute("aria-expanded", "false");
+
+        console.log("[Nova Mobile] tools menu fallback wired");
+    });
+})();
+</script>
+
+<!-- NOVA MOBILE PANEL HARD LOCK START -->
+<script>
+(function () {
+    "use strict";
+
+    function $(id) {
+        return document.getElementById(id);
+    }
+
+    function forceHide(panel) {
+        if (!panel) return;
+
+        panel.classList.add("hidden");
+        panel.setAttribute("aria-hidden", "true");
+        panel.style.setProperty("display", "none", "important");
+    }
+
+    function forceShow(panel, topOrBottom) {
+        if (!panel) return;
+
+        panel.classList.remove("hidden");
+        panel.setAttribute("aria-hidden", "false");
+
+        panel.style.setProperty("display", "flex", "important");
+        panel.style.setProperty("position", "fixed", "important");
+        panel.style.setProperty("left", "10px", "important");
+        panel.style.setProperty("right", "10px", "important");
+        panel.style.setProperty("z-index", "999999", "important");
+        panel.style.setProperty("flex-direction", "column", "important");
+        panel.style.setProperty("gap", "10px", "important");
+        panel.style.setProperty("padding", "14px", "important");
+        panel.style.setProperty("background", "#111827", "important");
+        panel.style.setProperty("border", "1px solid rgba(255,255,255,.18)", "important");
+        panel.style.setProperty("border-radius", "18px", "important");
+        panel.style.setProperty("box-shadow", "0 24px 80px rgba(0,0,0,.55)", "important");
+
+        if (topOrBottom === "bottom") {
+            panel.style.setProperty("bottom", "90px", "important");
+            panel.style.removeProperty("top");
+        } else {
+            panel.style.setProperty("top", "76px", "important");
+            panel.style.removeProperty("bottom");
+        }
+    }
+
+    function replaceButton(id) {
+        var oldButton = $(id);
+
+        if (!oldButton || !oldButton.parentNode) {
+            return null;
+        }
+
+        var newButton = oldButton.cloneNode(true);
+        newButton.removeAttribute("onclick");
+        oldButton.parentNode.replaceChild(newButton, oldButton);
+
+        return newButton;
+    }
+
+    function closeAllPanels() {
+        forceHide($("nova-mobile-sessions-panel"));
+        forceHide($("nova-mobile-tools-panel"));
+        forceHide($("nova-mobile-memory-panel"));
+        forceHide($("nova-mobile-execution-panel"));
+    }
+
+    function wire() {
+        var sessionsButton = replaceButton("nova-mobile-sessions-toggle");
+        var toolsButton = replaceButton("nova-mobile-tools-toggle");
+
+        var sessionsPanel = $("nova-mobile-sessions-panel");
+        var toolsPanel = $("nova-mobile-tools-panel");
+        var memoryPanel = $("nova-mobile-memory-panel");
+        var executionPanel = $("nova-mobile-execution-panel");
+
+        closeAllPanels();
+
+        window.NovaOpenMobileSessions = function () {
+            closeAllPanels();
+            forceShow(sessionsPanel, "top");
+        };
+
+        window.NovaCloseMobileSessions = function () {
+            forceHide(sessionsPanel);
+        };
+
+        window.NovaOpenMobileTools = function () {
+            closeAllPanels();
+            forceShow(toolsPanel, "bottom");
+        };
+
+        window.NovaCloseMobileTools = function () {
+            forceHide(toolsPanel);
+        };
+
+        window.NovaOpenMobileMemory = function () {
+            closeAllPanels();
+            forceShow(memoryPanel, "top");
+        };
+
+        window.NovaCloseMobileMemory = function () {
+            forceHide(memoryPanel);
+        };
+
+        window.NovaOpenMobileExecution = function () {
+            closeAllPanels();
+            forceShow(executionPanel, "top");
+        };
+
+        window.NovaCloseMobileExecution = function () {
+            forceHide(executionPanel);
+        };
+
+        if (sessionsButton) {
+            sessionsButton.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                window.NovaOpenMobileSessions();
+            });
+        }
+
+        if (toolsButton) {
+            toolsButton.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                window.NovaOpenMobileTools();
+            });
+        }
+
+        document.querySelectorAll("button").forEach(function (button) {
+            var text = (button.textContent || "").trim().toLowerCase();
+            var tool = button.getAttribute("data-mobile-tool");
+
+            if (text === "close sessions") {
+                button.removeAttribute("onclick");
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.NovaCloseMobileSessions();
+                });
+            }
+
+            if (text === "close") {
+                button.removeAttribute("onclick");
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.NovaCloseMobileTools();
+                });
+            }
+
+            if (text === "memory" || button.id === "nova-mobile-memory-toggle") {
+                button.removeAttribute("onclick");
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.NovaOpenMobileMemory();
+                });
+            }
+
+            if (text === "close memory" || button.id === "nova-mobile-memory-close") {
+                button.removeAttribute("onclick");
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.NovaCloseMobileMemory();
+                });
+            }
+
+            if (tool === "execution" || text === "open execution panel") {
+                button.removeAttribute("onclick");
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.NovaOpenMobileExecution();
+                });
+            }
+
+            if (text === "close execution" || button.id === "nova-mobile-execution-close") {
+                button.removeAttribute("onclick");
+                button.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    window.NovaCloseMobileExecution();
+                });
+            }
+        });
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                closeAllPanels();
+            }
+        });
+
+        console.log("[Nova Mobile] panel hard lock active");
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", wire);
+    } else {
+        wire();
+    }
+})();
+</script>
+<!-- NOVA MOBILE PANEL HARD LOCK END -->
+
+
+<script>
+/* NOVA_MOBILE_SEND_FALLBACK_BRIDGE_LOCK */
+/* NOVA_MOBILE_SEND_FALLBACK_BRIDGE_V2_LAYOUT_FIX */
+(function () {
+    "use strict";
+
+    if (window.__novaMobileFallbackBridgeV2Installed) {
+        return;
+    }
+
+    window.__novaMobileFallbackBridgeV2Installed = true;
+
+    function qs(selector) {
+        return document.querySelector(selector);
+    }
+
+    function findInput() {
+        return (
+            qs("#mobileMessageInput") ||
+            qs("#messageInput") ||
+            qs("#composerInput") ||
+            qs("#promptInput") ||
+            qs("#nova-mobile-input") ||
+            qs("[data-mobile-input]") ||
+            document.querySelector("textarea") ||
+            document.querySelector("input[type='text']")
+        );
+    }
+
+    function findComposer() {
+        return (
+            qs(".mobile-composer") ||
+            qs(".mobile-composer-wrap") ||
+            qs(".composer-wrap") ||
+            qs("form") ||
+            findInput()
+        );
+    }
+
+    function findShell() {
+        return (
+            qs(".mobile-shell") ||
+            qs("main") ||
+            document.body
+        );
+    }
+
+    function findMessages() {
+        var selectors = [
+            "#mobileMessages",
+            "#messages",
+            "#chatMessages",
+            "#nova-mobile-messages",
+            "[data-mobile-messages]",
+            "[data-chat-messages]",
+            ".mobile-messages",
+            ".mobile-chat-messages",
+            ".mobile-chat-scroll",
+            ".chat-scroll",
+            ".messages",
+            ".chat-messages"
+        ];
+
+        for (var i = 0; i < selectors.length; i += 1) {
+            var el = qs(selectors[i]);
+            if (el) {
+                return el;
+            }
+        }
+
+        var existing = qs("#nova-mobile-fallback-thread");
+        if (existing) {
+            return existing;
+        }
+
+        var shell = findShell();
+        var composer = findComposer();
+
+        var thread = document.createElement("section");
+        thread.id = "nova-mobile-fallback-thread";
+        thread.setAttribute("data-mobile-messages", "fallback");
+        thread.style.flex = "1 1 auto";
+        thread.style.overflowY = "auto";
+        thread.style.padding = "12px 10px 120px";
+        thread.style.minHeight = "40vh";
+        thread.style.width = "100%";
+
+        if (composer && composer.parentNode) {
+            composer.parentNode.insertBefore(thread, composer);
+        } else if (shell && shell.appendChild) {
+            shell.appendChild(thread);
+        } else {
+            document.body.appendChild(thread);
+        }
+
+        return thread;
+    }
+
+    function getSessionId() {
+        var keys = [
+            "nova_mobile_active_session",
+            "nova_active_session_id",
+            "active_session_id",
+            "nova_session_id"
+        ];
+
+        for (var i = 0; i < keys.length; i += 1) {
+            try {
+                var value = localStorage.getItem(keys[i]) || "";
+                if (value && value.trim()) {
+                    return value.trim();
+                }
+            } catch (err) {}
+        }
+
+        var generated = "mobile_" + Date.now();
+
+        try {
+            localStorage.setItem("nova_mobile_active_session", generated);
+        } catch (err) {}
+
+        return generated;
+    }
+
+    function addBubble(role, text, isError) {
+        var box = findMessages();
+        var bubble = document.createElement("div");
+
+        bubble.className = "nova-mobile-fallback-message nova-mobile-fallback-" + role + (isError ? " nova-mobile-fallback-error" : "");
+        bubble.textContent = text || "";
+
+        bubble.style.display = "block";
+        bubble.style.maxWidth = "92%";
+        bubble.style.margin = role === "user" ? "10px 8px 10px auto" : "10px auto 10px 8px";
+        bubble.style.padding = "12px 14px";
+        bubble.style.borderRadius = "16px";
+        bubble.style.whiteSpace = "pre-wrap";
+        bubble.style.lineHeight = "1.45";
+        bubble.style.border = "1px solid rgba(255,255,255,0.12)";
+        bubble.style.background = role === "user"
+            ? "rgba(124,92,255,0.20)"
+            : "rgba(255,255,255,0.08)";
+        bubble.style.color = "inherit";
+        bubble.style.wordBreak = "break-word";
+
+        if (isError) {
+            bubble.style.borderColor = "rgba(255,92,122,0.55)";
+            bubble.style.background = "rgba(255,92,122,0.12)";
+        }
+
+        box.appendChild(bubble);
+
+        try {
+            box.scrollTop = box.scrollHeight;
+        } catch (err) {
+            try {
+                bubble.scrollIntoView({ block: "end" });
+            } catch (err2) {}
+        }
+
+        return bubble;
+    }
+
+    async function fallbackSend() {
+        if (window.__novaMobileFallbackSending) {
+            return;
+        }
+
+        var input = findInput();
+
+        if (!input) {
+            addBubble("assistant", "Mobile send fallback could not find the input box.", true);
+            return;
+        }
+
+        var text = String(input.value || "").trim();
+
+        if (!text) {
+            return;
+        }
+
+        window.__novaMobileFallbackSending = true;
+
+        addBubble("user", text, false);
+        input.value = "";
+
+        var thinking = addBubble("assistant", "Thinking...", false);
+
+        try {
+            var response = await fetch("/api/chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    user_text: text,
+                    session_id: getSessionId(),
+                    attachments: []
+                })
+            });
+
+            var data = await response.json();
+            var assistant = data.assistant_message || {};
+            var answer = assistant.text || assistant.content || data.error || "Nova returned an empty response.";
+
+            thinking.textContent = answer;
+
+            if (!response.ok || data.ok === false) {
+                thinking.classList.add("nova-mobile-fallback-error");
+                thinking.style.borderColor = "rgba(255,92,122,0.55)";
+                thinking.style.background = "rgba(255,92,122,0.12)";
+            }
+
+            if (data.active_session_id) {
+                try {
+                    localStorage.setItem("nova_mobile_active_session", data.active_session_id);
+                } catch (err) {}
+            }
+        } catch (err) {
+            thinking.textContent = "Request failed: " + (err && err.message ? err.message : String(err));
+            thinking.style.borderColor = "rgba(255,92,122,0.55)";
+            thinking.style.background = "rgba(255,92,122,0.12)";
+        } finally {
+            window.__novaMobileFallbackSending = false;
+        }
+    }
+
+    function isSendButton(el) {
+        if (!el) {
+            return false;
+        }
+
+        var id = String(el.id || "").toLowerCase();
+        var cls = String(el.className || "").toLowerCase();
+        var txt = String(el.textContent || el.value || "").trim().toLowerCase();
+
+        return (
+            id.includes("send") ||
+            cls.includes("send") ||
+            txt === "send" ||
+            txt === "➤" ||
+            txt === "arrow_upward"
+        );
+    }
+
+    document.addEventListener("submit", function (event) {
+        var input = findInput();
+
+        if (input && event.target && event.target.contains && event.target.contains(input)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            fallbackSend();
+        }
+    }, true);
+
+    document.addEventListener("click", function (event) {
+        var button = event.target && event.target.closest
+            ? event.target.closest("button")
+            : null;
+
+        if (isSendButton(button)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            fallbackSend();
+        }
+    }, true);
+
+    document.addEventListener("keydown", function (event) {
+        var input = findInput();
+
+        if (
+            input &&
+            event.target === input &&
+            event.key === "Enter" &&
+            !event.shiftKey
+        ) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            fallbackSend();
+        }
+    }, true);
+
+    console.log("[Nova Mobile] fallback send bridge V2 active");
+})();
+</script>
+
+
 </body>
 </html>
+
+
+

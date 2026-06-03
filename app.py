@@ -900,6 +900,18 @@ def api_chat():
         traceback.print_exc()
         return json_error(str(exc), 500)
 
+@app.get("/api/chat/<session_id>")
+def api_chat_session_compat(session_id: str):
+    session = session_service.get_session(session_id)
+    if not session:
+        return json_error("Session not found", 404)
+
+    return json_ok(
+        session=session,
+        sessions=session_service.get_all(),
+        active_session_id=session_service.active_session_id,
+    )
+
 @app.get("/api/sessions/<session_id>")
 def api_session_by_id(session_id: str):
     session = session_service.get_session(session_id)
