@@ -1,3 +1,16 @@
+
+def update_execution_state(execution, status=None, current_step=None, last_action=None):
+    """
+    Consolidates repeated execution state assignments.
+    """
+    if status:
+        execution["status"] = status
+    if current_step:
+        execution["current_step"] = current_step
+    if last_action:
+        execution["last_action"] = last_action
+
+
 ﻿from __future__ import annotations
 
 import os
@@ -2903,7 +2916,7 @@ def execution_control():
 
         execution["steps"].append(step)
         execution["history"].append(f"run_step: {step_title}")
-        execution["status"] = "complete"
+        update_execution_state(execution, status="complete")
         execution["last_action"] = action
         execution["current_step"] = step_title
 
@@ -2923,7 +2936,7 @@ def execution_control():
             execution["steps"].append(step)
 
         execution["history"].append("run_all: added 3 completed steps")
-        execution["status"] = "complete"
+        update_execution_state(execution, status="complete")
         execution["last_action"] = action
         execution["current_step"] = "Run all complete"
 
@@ -2939,7 +2952,7 @@ def execution_control():
 
         execution["steps"].append(failed_step)
         execution["history"].append(f"test_fail: {step_title}")
-        execution["status"] = "error"
+        update_execution_state(execution, status="error")
         execution["last_action"] = action
         execution["current_step"] = step_title
 
@@ -2961,7 +2974,7 @@ def execution_control():
             failed_step["status"] = "running"
             failed_step["output"] = "Retrying failed step..."
 
-            execution["status"] = "running"
+            update_execution_state(execution, status="running")
             execution["last_action"] = "retry_failed"
             execution["current_step"] = failed_title
             execution["history"].append(f"retry_failed: {failed_title}")
@@ -2969,25 +2982,25 @@ def execution_control():
             failed_step["status"] = "done"
             failed_step["output"] = "Retry successful."
 
-            execution["status"] = "complete"
-            execution["current_step"] = "Retry complete"
+            update_execution_state(execution, status="complete")
+            update_execution_state(execution, current_step="Retry complete")
         else:
             execution["history"].append("retry_failed: no failed step found")
-            execution["status"] = "complete"
+            update_execution_state(execution, status="complete")
             execution["last_action"] = "retry_failed"
-            execution["current_step"] = "No failed step found"
+            update_execution_state(execution, current_step="No failed step found")
 
     elif action == "stop":
         execution["history"].append("stop")
         execution["status"] = "stopped"
         execution["last_action"] = action
-        execution["current_step"] = "Stopped"
+        update_execution_state(execution, current_step="Stopped")
 
     else:
         execution["history"].append(f"unknown action: {action}")
-        execution["status"] = "error"
+        update_execution_state(execution, status="error")
         execution["last_action"] = action
-        execution["current_step"] = "Unknown action"
+        update_execution_state(execution, current_step="Unknown action")
 
     chat_service._update_working_state(session_id, {
         "execution": execution,
@@ -3092,7 +3105,7 @@ def save_execution(execution):
             replay_step["output"] = {
                 "error": "Replay failed: no move stored on step.",
             }
-            execution["status"] = "error"
+            update_execution_state(execution, status="error")
             execution["current_step"] = f"Replay failed: {step_title}"
             return replay_step
 
@@ -3131,7 +3144,7 @@ def save_execution(execution):
                     }
                 )
 
-        execution["status"] = "complete" if replay_ok else "error"
+        update_execution_state(execution, status="complete") if replay_ok else "error"
         execution["current_step"] = "Replay complete" if replay_ok else f"Replay failed: {step_title}"
 
         return replay_step
@@ -3227,8 +3240,8 @@ def save_execution(execution):
                 },
             }
 
-            execution["status"] = "running"
-            execution["current_step"] = step["title"]
+            update_execution_state(execution, status="running")
+            update_execution_state(execution, current_step=step["title"])
             execution["last_action"] = action
             execution.setdefault("steps", []).append(step)
             save_execution(execution)
@@ -3249,8 +3262,8 @@ def save_execution(execution):
 
             step["status"] = "done" if ok else "failed"
             step["output"] = result.output or {"error": result.error}
-            execution["status"] = "complete" if ok else "error"
-            execution["current_step"] = "Fix applied" if ok else "Fix failed"
+            update_execution_state(execution, status="complete") if ok else "error"
+            update_execution_state(execution, current_step="Fix applied") if ok else "Fix failed"
             execution.setdefault("history", []).append(
                 f"fix_file: {'success' if ok else 'failed'}"
             )
@@ -3273,7 +3286,7 @@ def save_execution(execution):
             steps = execution.get("steps", [])
 
             if not steps:
-                execution["status"] = "complete"
+                update_execution_state(execution, status="complete")
                 execution["current_step"] = "No steps to run"
                 execution["last_action"] = action
                 save_execution(execution)
@@ -3288,7 +3301,7 @@ def save_execution(execution):
             current_index = int(execution.get("current_index") or 0)
 
             if current_index >= len(steps):
-                execution["status"] = "complete"
+                update_execution_state(execution, status="complete")
                 execution["current_step"] = "All steps completed"
                 execution["last_action"] = action
                 save_execution(execution)
@@ -3303,7 +3316,7 @@ def save_execution(execution):
             step = steps[current_index]
             step["status"] = "done"
 
-            execution["status"] = "running"
+            update_execution_state(execution, status="running")
             execution["current_step"] = step.get("title") or f"Step {current_index + 1}"
             execution["current_index"] = current_index + 1
             execution["last_action"] = action
@@ -3320,7 +3333,7 @@ def save_execution(execution):
             })
 
             if execution["current_index"] >= len(steps):
-                execution["status"] = "complete"
+                update_execution_state(execution, status="complete")
                 save_execution(execution)
 
             yield send_event("done", {
@@ -3375,7 +3388,7 @@ def save_execution(execution):
                 )
 
                 execution["current_step"] = step_title
-                execution["status"] = "running"
+                update_execution_state(execution, status="running")
                 execution["last_action"] = action
 
                 yield send_event("step_start", {
@@ -3411,7 +3424,7 @@ def save_execution(execution):
                     "done": False,
                 })
 
-            execution["status"] = "complete"
+            update_execution_state(execution, status="complete")
             execution["current_step"] = "Done"
 
         elif action == "test_fail":
@@ -3434,7 +3447,7 @@ def save_execution(execution):
 
             execution["steps"].append(failed_step)
             execution["history"].append(f"test_fail: {step_title}")
-            execution["status"] = "error"
+            update_execution_state(execution, status="error")
             execution["last_action"] = action
             execution["current_step"] = step_title
 
@@ -3447,7 +3460,7 @@ def save_execution(execution):
         elif action == "replay_last":
             if not execution["steps"]:
                 execution["history"].append("replay_last: no step found")
-                execution["status"] = "complete"
+                update_execution_state(execution, status="complete")
                 execution["last_action"] = action
                 execution["current_step"] = "No step found"
             else:
@@ -3455,7 +3468,7 @@ def save_execution(execution):
                 step_title = replay_step.get("title", "Last step")
 
                 execution["current_step"] = step_title
-                execution["status"] = "running"
+                update_execution_state(execution, status="running")
                 execution["last_action"] = action
 
                 yield send_event("step_start", {
@@ -3480,7 +3493,7 @@ def save_execution(execution):
                         "error": f"Replay executor crashed: {exc}",
                     }
                     execution["history"].append(f"replay_last_exception: {step_title}")
-                    execution["status"] = "error"
+                    update_execution_state(execution, status="error")
                     execution["current_step"] = f"Replay failed: {step_title}"
 
                 yield send_event("step_done", {
@@ -3492,7 +3505,7 @@ def save_execution(execution):
         elif action == "replay_step":
             if step_index is None or step_index < 0 or step_index >= len(execution["steps"]):
                 execution["history"].append(f"replay_step: invalid index {step_index}")
-                execution["status"] = "error"
+                update_execution_state(execution, status="error")
                 execution["last_action"] = action
                 execution["current_step"] = "Invalid step index"
             else:
@@ -3500,7 +3513,7 @@ def save_execution(execution):
                 step_title = replay_step.get("title", f"Step {step_index + 1}")
 
                 execution["current_step"] = step_title
-                execution["status"] = "running"
+                update_execution_state(execution, status="running")
                 execution["last_action"] = action
 
                 yield send_event("step_start", {
@@ -3525,7 +3538,7 @@ def save_execution(execution):
                         "error": f"Replay executor crashed: {exc}",
                     }
                     execution["history"].append(f"replay_step_exception: {step_title}")
-                    execution["status"] = "error"
+                    update_execution_state(execution, status="error")
                     execution["current_step"] = f"Replay failed: {step_title}"
 
                 yield send_event("step_done", {
@@ -3550,7 +3563,7 @@ def save_execution(execution):
                 step_title = failed_step.get("title", f"Step {failed_index + 1}")
 
                 execution["current_step"] = step_title
-                execution["status"] = "running"
+                update_execution_state(execution, status="running")
                 execution["last_action"] = action
 
                 yield send_event("step_start", {
@@ -3574,7 +3587,7 @@ def save_execution(execution):
                         "error": f"Retry executor crashed: {exc}",
                     }
                     execution["history"].append(f"retry_failed_exception: {step_title}")
-                    execution["status"] = "error"
+                    update_execution_state(execution, status="error")
                     execution["current_step"] = f"Retry failed: {step_title}"
 
                 yield send_event("step_done", {
@@ -3584,21 +3597,21 @@ def save_execution(execution):
                 })
             else:
                 execution["history"].append("retry_failed: no failed step found")
-                execution["status"] = "complete"
+                update_execution_state(execution, status="complete")
                 execution["last_action"] = action
-                execution["current_step"] = "No failed step found"
+                update_execution_state(execution, current_step="No failed step found")
 
         elif action == "stop":
             execution["history"].append("stop")
             execution["status"] = "stopped"
             execution["last_action"] = action
-            execution["current_step"] = "Stopped"
+            update_execution_state(execution, current_step="Stopped")
 
         else:
             execution["history"].append(f"unknown action: {action}")
-            execution["status"] = "error"
+            update_execution_state(execution, status="error")
             execution["last_action"] = action
-            execution["current_step"] = "Unknown action"
+            update_execution_state(execution, current_step="Unknown action")
 
         save_execution(execution)
 
