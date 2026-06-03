@@ -3,6 +3,7 @@
 
   // NOVA_COMPOSER_VISUAL_TEXT_CLEANUP_LOCK
   // NOVA_REMAINING_COMPOSER_MOJIBAKE_LOCK
+  // NOVA_FINAL_TTS_STOP_TEXT_LOCK
 
   function qs(selector, root) {
     return (root || document).querySelector(selector);
