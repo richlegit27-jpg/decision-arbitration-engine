@@ -1,46 +1,55 @@
-import pytest
+﻿from __future__ import annotations
+
 from pathlib import Path
-from app import app, UPLOADS_DIR, persist_attachments_for_session, summarize_attachments_for_session
 
-@pytest.fixture(autouse=True)
-def mock_openai(monkeypatch):
-    """Prevent real OpenAI calls during pytest"""
-    from nova_backend.services.chat_service import ChatService
-
-    def fake_handle(self, *args, **kwargs):
-        return {
-            "ok": True,
-            "assistant_message": {"role": "assistant", "text": "mocked response"},
-        }
-
-    monkeypatch.setattr(ChatService, "handle", fake_handle)
 
 def test_attachment_persistence_and_summarize():
-    session_id = "pytest_session_001"
+    from app import (
+        UPLOADS_DIR,
+        persist_attachments_for_session,
+        summarize_attachments_for_session,
+    )
 
-    # Create a temp attachment
+    session_id = "pytest_attachment_session_001"
+
     attachment_name = "pytest_attachment.txt"
     attachment_bytes = b"Attachment test content"
-    temp_path = UPLOADS_DIR / attachment_name
+    temp_path = Path(UPLOADS_DIR) / attachment_name
     temp_path.write_bytes(attachment_bytes)
 
-    attachments = [{
-        "filename": attachment_name,
-        "original_filename": attachment_name,
-        "size": len(attachment_bytes),
-        "mime_type": "text/plain",
-        "url": f"/api/uploads/{attachment_name}",
-    }]
+    attachments = [
+        {
+            "filename": attachment_name,
+            "original_filename": attachment_name,
+            "size": len(attachment_bytes),
+            "mime_type": "text/plain",
+            "url": f"/api/uploads/{attachment_name}",
+            "file_url": f"/api/uploads/{attachment_name}",
+        }
+    ]
 
-    # Persist attachments into session memory
-    persist_attachments_for_session(session_id, attachments)
+    try:
+        added = persist_attachments_for_session(
+            attachments,
+            session_id=session_id,
+            client_session_id=session_id,
+        )
 
-    # Summarize for project-aware context
-    summary = summarize_attachments_for_session(session_id)
-    assert attachment_name in summary
-    assert "Attachment test content" in summary
+        assert int(added or 0) >= 1
 
-    # Cleanup
-    saved_path = UPLOADS_DIR / attachment_name
-    if saved_path.exists():
-        saved_path.unlink()
+        summary = summarize_attachments_for_session(
+            session_id,
+            limit=25,
+            client_session_id=session_id,
+        )
+
+        assert isinstance(summary, list)
+        assert any(
+            item.get("filename") == attachment_name
+            or item.get("original_filename") == attachment_name
+            for item in summary
+            if isinstance(item, dict)
+        )
+
+    finally:
+        temp_path.unlink(missing_ok=True)
