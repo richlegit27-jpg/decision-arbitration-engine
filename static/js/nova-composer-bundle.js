@@ -2,6 +2,7 @@
   "use strict";
 
   // NOVA_COMPOSER_VISUAL_TEXT_CLEANUP_LOCK
+  // NOVA_REMAINING_COMPOSER_MOJIBAKE_LOCK
 
   function qs(selector, root) {
     return (root || document).querySelector(selector);
@@ -2084,12 +2085,12 @@ viewer.innerHTML = `
     const removeButton = removable
       ? '<button type="button" class="nova-upload-chip__remove" data-upload-remove="' +
         escapeHtml(item.id) +
-        '" aria-label="Remove attachment">Ãƒâ€”</button>'
+        '" aria-label="Remove attachment">×</button>'
       : "";
 
     const statusHtml =
       status === "uploading"
-        ? '<span class="nova-upload-chip__status">UploadingÃ¢â‚¬Â¦</span>'
+        ? '<span class="nova-upload-chip__status">Uploading...</span>'
         : status === "error"
         ? '<span class="nova-upload-chip__status nova-upload-chip__status--error">' +
           escapeHtml(error || "Upload failed") +
@@ -2231,7 +2232,7 @@ function renderAttachmentBlock(attachment) {
     '<a href="' +
     escapeHtml(href || "#") +
     '" target="_blank" rel="noopener noreferrer" class="message-attachment__file-link">' +
-    '<div class="message-attachment__icon">ðŸ“Ž</div>' +
+    '<div class="message-attachment__icon">File</div>' +
     '<div class="message-attachment__footer">' +
     '<div class="message-attachment__name">' +
     escapeHtml(name) +
@@ -2733,10 +2734,10 @@ els.chatThread.__autoOpenedSource = "";
       return `
         <div class="nova-memory-item" data-id="${id}">
           <div>
-            <div>${item.pinned ? "Pin" : "ðŸ§ "} ${text}</div>
-            <small>${String(item.kind || "note")} Â· ${String(item.source || "manual")}</small>
+            <div>${item.pinned ? "Pin" : "Note "} ${text}</div>
+            <small>${String(item.kind || "note")} · ${String(item.source || "manual")}</small>
           </div>
-          <button class="nova-memory-pin" data-id="${id}">ðŸ“Œ</button>
+          <button class="nova-memory-pin" data-id="${id}">Pin</button>
           <button class="nova-memory-delete" data-id="${id}">Remove</button>
         </div>
       `;
@@ -5889,7 +5890,7 @@ async function maybeAutoSaveMemoryFromChatText(userText) {
     memoryText = text;
   }
 
-  // ðŸ§  DEDUPE
+  // Note  DEDUPE
   const exists = (state.memory || []).some((m) => {
     return String(m.text || "").toLowerCase() === memoryText.toLowerCase();
   });
