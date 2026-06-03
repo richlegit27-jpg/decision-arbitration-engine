@@ -815,6 +815,76 @@ def _nova_pa_memory_text(item):
     return ""
 
 
+# MEMORY_HYGIENE_CONTEXT_FILTER_LOCK
+def _nova_memory_hygiene_normalize_key(value):
+    text_value = str(value or "").strip().lower()
+    text_value = re.sub(r"\s+", " ", text_value)
+    return text_value[:500]
+
+
+def _nova_memory_hygiene_is_junk(text_value, kind=""):
+    raw = str(text_value or "").strip()
+    lowered = raw.lower()
+    item_kind = str(kind or "").strip().lower()
+
+    if not lowered:
+        return True
+
+    junk_markers = (
+        "project-aware context for nova:",
+        "relevant persistent memory:",
+        "session attachment memory:",
+    )
+
+    # If memory accidentally swallowed generated context blocks, stop injecting it again.
+    if sum(lowered.count(marker) for marker in junk_markers) >= 2:
+        return True
+
+    stale_project_markers = (
+        "remote push is still finishing",
+        "expanding project-aware memory",
+        "project focus recall cleanup committed",
+        "backend intelligence context testing",
+    )
+
+    if item_kind in {"note", "user_fact", "project_focus"}:
+        if any(marker in lowered for marker in stale_project_markers):
+            return True
+
+    # Old test instruction that previously overpowered normal answers.
+    if lowered.strip() in {
+        "say pong only",
+        "user preference/correction: say pong only",
+    }:
+        return True
+
+    if lowered.count("say pong only") >= 2:
+        return True
+
+    if lowered.count("what is my current task") >= 2:
+        return True
+
+    return False
+
+
+def _nova_memory_hygiene_score_penalty(text_value, kind=""):
+    lowered = str(text_value or "").strip().lower()
+    item_kind = str(kind or "").strip().lower()
+    penalty = 0
+
+    if item_kind in {"project_focus", "user_fact", "note"}:
+        if "current task is" in lowered or "blocker:" in lowered:
+            penalty += 200
+
+    if "project-aware context for nova:" in lowered:
+        penalty += 500
+
+    if "say pong only" in lowered:
+        penalty += 1000
+
+    return penalty
+
+
 def _nova_pa_memory_kind(item):
     if not isinstance(item, dict):
         return "memory"
@@ -897,12 +967,20 @@ def _nova_pa_get_memory_context(user_text, *, limit=12, char_limit=3500):
         if not text_value:
             continue
 
+        kind = _nova_pa_memory_kind(item)
+
+        if _nova_memory_hygiene_is_junk(text_value, kind):
+            continue
+
+        score = _nova_pa_score_memory_item(item, query_words)
+        score = score - _nova_memory_hygiene_score_penalty(text_value, kind)
+
         scored.append(
             (
-                _nova_pa_score_memory_item(item, query_words),
+                score,
                 _nova_pa_memory_priority(item),
                 text_value,
-                _nova_pa_memory_kind(item),
+                kind,
             )
         )
 
@@ -920,7 +998,7 @@ def _nova_pa_get_memory_context(user_text, *, limit=12, char_limit=3500):
 
     for _score, _priority, text_value, kind in scored:
         compact = _nova_pa_compact_text(text_value, limit=450)
-        key = compact.lower()[:120]
+        key = _nova_memory_hygiene_normalize_key(compact)
 
         if key in seen:
             continue
