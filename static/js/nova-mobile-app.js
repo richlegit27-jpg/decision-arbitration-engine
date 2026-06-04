@@ -1980,3 +1980,317 @@ document.addEventListener("DOMContentLoaded", () => {
     window.NovaGetLatestAttachmentKeypoints = novaGetLatestAttachmentKeypoints;
 })();
 
+
+// MOBILE_LATEST_ATTACHMENT_ONLY_LOCK_20260603
+(function () {
+    "use strict";
+
+    function novaLatestAttachmentLog() {
+        try {
+            console.log.apply(console, ["[Nova Mobile Latest Attachment]"].concat(Array.from(arguments)));
+        } catch (error) {
+            // no-op
+        }
+    }
+
+    function getNovaState() {
+        try {
+            if (window.NovaMobileState && typeof window.NovaMobileState === "object") {
+                return window.NovaMobileState;
+            }
+
+            if (window.NovaMobile && window.NovaMobile.state) {
+                return window.NovaMobile.state;
+            }
+
+            if (window.__novaMobileState && typeof window.__novaMobileState === "object") {
+                return window.__novaMobileState;
+            }
+        } catch (error) {
+            // no-op
+        }
+
+        return null;
+    }
+
+    function normalizeAttachment(item) {
+        if (!item || typeof item !== "object") {
+            return null;
+        }
+
+        var filename = String(
+            item.filename ||
+            item.stored_filename ||
+            item.name ||
+            ""
+        ).trim();
+
+        var originalFilename = String(
+            item.original_filename ||
+            item.original_name ||
+            item.name ||
+            filename ||
+            ""
+        ).trim();
+
+        var fileUrl = String(
+            item.file_url ||
+            item.url ||
+            ""
+        ).trim();
+
+        var url = String(
+            item.url ||
+            item.file_url ||
+            ""
+        ).trim();
+
+        if (!filename && fileUrl) {
+            filename = fileUrl.replace(/\\/g, "/").split("/").pop();
+        }
+
+        if (!originalFilename) {
+            originalFilename = filename;
+        }
+
+        if (!filename && !originalFilename && !fileUrl && !url) {
+            return null;
+        }
+
+        var clean = Object.assign({}, item);
+        clean.filename = filename;
+        clean.original_filename = originalFilename;
+        clean.file_url = fileUrl || url;
+        clean.url = url || fileUrl;
+        clean.name = clean.name || originalFilename || filename;
+
+        return clean;
+    }
+
+    function clearStagedAttachments(reason) {
+        var state = getNovaState();
+
+        try {
+            if (state) {
+                state.stagedAttachments = [];
+                state.pendingAttachments = [];
+                state.attachments = [];
+                state.selectedAttachments = [];
+                state.uploadQueue = [];
+                state.lastAttachmentPayload = null;
+                state.lastUploadedAttachment = null;
+                state.latestUploadedAttachment = null;
+            }
+
+            window.__novaLatestUploadedAttachment = null;
+            window.__novaCurrentUploadAttachment = null;
+            window.__novaStagedAttachments = [];
+
+            localStorage.removeItem("nova_mobile_staged_attachments");
+            localStorage.removeItem("nova_staged_attachments");
+            localStorage.removeItem("nova_mobile_attachments");
+            sessionStorage.removeItem("nova_mobile_staged_attachments");
+            sessionStorage.removeItem("nova_staged_attachments");
+            sessionStorage.removeItem("nova_mobile_attachments");
+
+            novaLatestAttachmentLog("cleared staged attachments", reason || "");
+        } catch (error) {
+            novaLatestAttachmentLog("clear failed", error);
+        }
+    }
+
+    function setLatestAttachment(item, reason) {
+        var clean = normalizeAttachment(item);
+
+        if (!clean) {
+            return null;
+        }
+
+        var state = getNovaState();
+
+        try {
+            if (state) {
+                state.stagedAttachments = [clean];
+                state.pendingAttachments = [clean];
+                state.attachments = [clean];
+                state.selectedAttachments = [clean];
+                state.lastAttachmentPayload = clean;
+                state.lastUploadedAttachment = clean;
+                state.latestUploadedAttachment = clean;
+            }
+
+            window.__novaLatestUploadedAttachment = clean;
+            window.__novaCurrentUploadAttachment = clean;
+            window.__novaStagedAttachments = [clean];
+
+            novaLatestAttachmentLog(
+                "latest attachment set",
+                reason || "",
+                clean.original_filename || clean.filename || clean.url
+            );
+        } catch (error) {
+            novaLatestAttachmentLog("set latest failed", error);
+        }
+
+        return clean;
+    }
+
+    function getLatestAttachmentOnly() {
+        var state = getNovaState();
+        var candidates = [];
+
+        try {
+            if (window.__novaLatestUploadedAttachment) {
+                candidates.push(window.__novaLatestUploadedAttachment);
+            }
+
+            if (window.__novaCurrentUploadAttachment) {
+                candidates.push(window.__novaCurrentUploadAttachment);
+            }
+
+            if (state) {
+                candidates.push(state.latestUploadedAttachment);
+                candidates.push(state.lastUploadedAttachment);
+                candidates.push(state.lastAttachmentPayload);
+
+                [
+                    state.stagedAttachments,
+                    state.pendingAttachments,
+                    state.selectedAttachments,
+                    state.attachments
+                ].forEach(function (list) {
+                    if (Array.isArray(list) && list.length) {
+                        candidates.push(list[list.length - 1]);
+                    }
+                });
+            }
+
+            for (var index = 0; index < candidates.length; index += 1) {
+                var clean = normalizeAttachment(candidates[index]);
+
+                if (clean) {
+                    return [clean];
+                }
+            }
+        } catch (error) {
+            novaLatestAttachmentLog("get latest failed", error);
+        }
+
+        return [];
+    }
+
+    window.NovaMobileLatestAttachment = {
+        clear: clearStagedAttachments,
+        set: setLatestAttachment,
+        getOnly: getLatestAttachmentOnly
+    };
+
+    // Clear stale attachment state whenever user selects a new file.
+    document.addEventListener("change", function (event) {
+        var target = event.target;
+
+        if (!target || target.type !== "file") {
+            return;
+        }
+
+        clearStagedAttachments("file input changed");
+    }, true);
+
+    // Watch upload responses and capture the newest upload payload.
+    var originalFetch = window.fetch;
+
+    if (typeof originalFetch === "function") {
+        window.fetch = function () {
+            var args = arguments;
+
+            return originalFetch.apply(this, args).then(function (response) {
+                try {
+                    var url = "";
+
+                    if (args && args[0]) {
+                        url = typeof args[0] === "string" ? args[0] : String(args[0].url || "");
+                    }
+
+                    if (url.indexOf("/api/upload") !== -1) {
+                        response.clone().json().then(function (payload) {
+                            if (payload && payload.ok) {
+                                setLatestAttachment(payload, "upload response");
+                            }
+                        }).catch(function () {
+                            // no-op
+                        });
+                    }
+                } catch (error) {
+                    novaLatestAttachmentLog("upload response hook failed", error);
+                }
+
+                return response;
+            });
+        };
+    }
+
+    // Before /api/chat send, force body.attachments to newest upload only.
+    if (typeof originalFetch === "function") {
+        var currentFetch = window.fetch;
+
+        window.fetch = function () {
+            var args = Array.from(arguments);
+
+            try {
+                var url = "";
+
+                if (args && args[0]) {
+                    url = typeof args[0] === "string" ? args[0] : String(args[0].url || "");
+                }
+
+                var options = args[1];
+
+                if (
+                    url.indexOf("/api/chat") !== -1 &&
+                    options &&
+                    typeof options === "object" &&
+                    typeof options.body === "string"
+                ) {
+                    var body = JSON.parse(options.body);
+                    var latestOnly = getLatestAttachmentOnly();
+
+                    if (latestOnly.length) {
+                        body.attachments = latestOnly;
+                        options.body = JSON.stringify(body);
+
+                        novaLatestAttachmentLog(
+                            "forced chat attachments latest-only",
+                            latestOnly[0].original_filename || latestOnly[0].filename || latestOnly[0].url
+                        );
+                    }
+
+                    args[1] = options;
+                }
+            } catch (error) {
+                novaLatestAttachmentLog("chat payload hook failed", error);
+            }
+
+            return currentFetch.apply(this, args).then(function (response) {
+                try {
+                    var url = "";
+
+                    if (args && args[0]) {
+                        url = typeof args[0] === "string" ? args[0] : String(args[0].url || "");
+                    }
+
+                    if (url.indexOf("/api/chat") !== -1) {
+                        clearStagedAttachments("chat sent");
+                    }
+                } catch (error) {
+                    novaLatestAttachmentLog("post-chat clear failed", error);
+                }
+
+                return response;
+            });
+        };
+    }
+
+    novaLatestAttachmentLog("latest attachment guard active");
+}());
+
+
