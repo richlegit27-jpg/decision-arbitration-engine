@@ -1291,7 +1291,271 @@
     setStatus("Model ready");
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
+  
+// MOBILE_ATTACHMENT_QUICK_PROMPTS_LOCK
+function getMobileAttachmentContextForPrompt() {
+    const parts = [];
+
+    try {
+        const stateAttachments = Array.isArray(state?.attachments) ? state.attachments : [];
+        const pendingAttachments = Array.isArray(state?.pendingAttachments) ? state.pendingAttachments : [];
+        const stagedAttachments = Array.isArray(window.NovaMobileState?.attachments) ? window.NovaMobileState.attachments : [];
+
+        const all = []
+            .concat(stateAttachments)
+            .concat(pendingAttachments)
+            .concat(stagedAttachments)
+            .filter(Boolean);
+
+        const seen = new Set();
+
+        for (const item of all) {
+            const name = String(
+                item.original_filename ||
+                item.filename ||
+                item.name ||
+                item.title ||
+                ""
+            ).trim();
+
+            const extracted = String(
+                item.extracted_text ||
+                item.text ||
+                item.content ||
+                item.summary ||
+                item.description ||
+                ""
+            ).trim();
+
+            const url = String(
+                item.file_url ||
+                item.url ||
+                ""
+            ).trim();
+
+            const key = `${name}|${url}|${extracted.slice(0, 80)}`;
+            if (seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+
+            if (name) {
+                parts.push(`Attachment: ${name}`);
+            }
+
+            if (extracted) {
+                parts.push(`Extracted attachment text:\n${extracted}`);
+            } else if (url) {
+                parts.push(`Attachment URL: ${url}`);
+            }
+        }
+    } catch (err) {
+        console.warn("[Nova Mobile] attachment context prompt helper failed", err);
+    }
+
+    return parts.join("\n\n").trim();
+}
+
+function buildMobileAttachmentAwarePrompt(actionText) {
+    const action = String(actionText || "").trim();
+    const typed = String(
+        getComposerText?.() ||
+        document.querySelector("#mobile-input")?.value ||
+        document.querySelector("#composer-input")?.value ||
+        document.querySelector("textarea")?.value ||
+        ""
+    ).trim();
+
+    const attachmentContext = getMobileAttachmentContextForPrompt();
+
+    const lines = [];
+
+    if (action) {
+        lines.push(action);
+    }
+
+    if (typed) {
+        lines.push(`User typed text:\n${typed}`);
+    }
+
+    if (attachmentContext) {
+        lines.push(`Use the uploaded attachment context below. Do not say you cannot see the attachment if extracted text is present.\n\n${attachmentContext}`);
+    }
+
+    return lines.join("\n\n").trim() || action || typed;
+}
+
+
+
+// MOBILE_QUICK_ACTION_FULL_CONTEXT_LOCK
+function novaMobileReadComposerText() {
+    const selectors = [
+        "#mobile-input",
+        "#composer-input",
+        "#nova-mobile-input",
+        "#chat-input",
+        "textarea",
+        "[contenteditable='true']"
+    ];
+
+    for (const selector of selectors) {
+        const el = document.querySelector(selector);
+        if (!el) {
+            continue;
+        }
+
+        const value = String(el.value || el.innerText || el.textContent || "").trim();
+        if (value) {
+            return value;
+        }
+    }
+
+    return "";
+}
+
+function novaMobileCollectAttachmentContext() {
+    const buckets = [];
+
+    try {
+        if (window.NovaMobileState && Array.isArray(window.NovaMobileState.attachments)) {
+            buckets.push(...window.NovaMobileState.attachments);
+        }
+
+        if (window.NovaMobileStorage && Array.isArray(window.NovaMobileStorage.attachments)) {
+            buckets.push(...window.NovaMobileStorage.attachments);
+        }
+
+        if (typeof state !== "undefined" && state) {
+            if (Array.isArray(state.attachments)) {
+                buckets.push(...state.attachments);
+            }
+
+            if (Array.isArray(state.pendingAttachments)) {
+                buckets.push(...state.pendingAttachments);
+            }
+
+            if (Array.isArray(state.uploads)) {
+                buckets.push(...state.uploads);
+            }
+        }
+    } catch (err) {
+        console.warn("[Nova Mobile] attachment bucket read failed", err);
+    }
+
+    const seen = new Set();
+    const lines = [];
+
+    for (const item of buckets) {
+        if (!item) {
+            continue;
+        }
+
+        const name = String(
+            item.original_filename ||
+            item.filename ||
+            item.name ||
+            item.title ||
+            ""
+        ).trim();
+
+        const mime = String(
+            item.mime_type ||
+            item.type ||
+            ""
+        ).trim();
+
+        const extracted = String(
+            item.extracted_text ||
+            item.extractedText ||
+            item.ocr_text ||
+            item.ocrText ||
+            item.text ||
+            item.content ||
+            item.summary ||
+            item.description ||
+            ""
+        ).trim();
+
+        const url = String(
+            item.file_url ||
+            item.fileUrl ||
+            item.url ||
+            item.src ||
+            ""
+        ).trim();
+
+        const key = `${name}|${mime}|${url}|${extracted.slice(0, 120)}`;
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+
+        if (name) {
+            lines.push(`Attachment filename: ${name}`);
+        }
+
+        if (mime) {
+            lines.push(`Attachment type: ${mime}`);
+        }
+
+        if (url) {
+            lines.push(`Attachment URL: ${url}`);
+        }
+
+        if (extracted) {
+            lines.push(`Extracted attachment text:\n${extracted}`);
+        }
+
+        if (name || mime || url || extracted) {
+            lines.push("---");
+        }
+    }
+
+    return lines.join("\n").trim();
+}
+
+function novaMobileBuildQuickActionPrompt(rawAction) {
+    const action = String(rawAction || "").trim();
+    const typedText = novaMobileReadComposerText();
+    const attachmentContext = novaMobileCollectAttachmentContext();
+
+    let instruction = action;
+
+    const lower = action.toLowerCase();
+
+    if (lower.includes("summarize")) {
+        instruction = "Summarize the uploaded attachment content. If typed text is present, include it as extra user context.";
+    } else if (lower.includes("keypoint") || lower.includes("key point")) {
+        instruction = "Give the key points from the uploaded attachment content. If typed text is present, include it as extra user context.";
+    } else if (lower.includes("improve")) {
+        instruction = "Improve the uploaded attachment content or typed text while preserving the meaning.";
+    } else if (lower.includes("continue")) {
+        instruction = "Continue from the uploaded attachment content or typed text.";
+    } else if (lower === "next" || lower.includes("next")) {
+        instruction = "Give the next best action based on the uploaded attachment content or typed text.";
+    }
+
+    const parts = [
+        "[MOBILE QUICK ACTION ATTACHMENT CONTEXT ACTIVE]",
+        instruction
+    ];
+
+    if (typedText) {
+        parts.push(`Typed user text:\n${typedText}`);
+    }
+
+    if (attachmentContext) {
+        parts.push(
+            "Uploaded attachment context below. Use this directly. Do not say you cannot see the attachment when extracted text, filename, or URL is present.\n\n" +
+            attachmentContext
+        );
+    }
+
+    return parts.join("\n\n").trim();
+}
+
+
+document.addEventListener("DOMContentLoaded", () => {
     bootstrap().catch((err) => {
       console.error("Mobile bootstrap failed:", err);
       setStatus("Bootstrap failed");
@@ -1546,5 +1810,173 @@
     };
 
     console.log("[Nova Mobile] upload capture installed");
+})();
+
+
+// MOBILE_ATTACHMENT_KEYPOINTS_BUTTON_LOCK
+(function () {
+    function novaFindLatestAttachmentForKeypoints() {
+        const candidates = [];
+
+        try {
+            if (window.lastUploadedAttachment) {
+                candidates.push(window.lastUploadedAttachment);
+            }
+
+            if (Array.isArray(window.uploadedAttachments)) {
+                candidates.push(...window.uploadedAttachments);
+            }
+
+            if (Array.isArray(window.stagedAttachments)) {
+                candidates.push(...window.stagedAttachments);
+            }
+
+            if (Array.isArray(window.pendingAttachments)) {
+                candidates.push(...window.pendingAttachments);
+            }
+
+            try {
+                const saved = sessionStorage.getItem("novaLastUploadedAttachment");
+                if (saved) {
+                    candidates.push(JSON.parse(saved));
+                }
+            } catch (storageError) {
+                console.warn("[Nova Mobile] latest upload storage read failed", storageError);
+            }
+        } catch (error) {
+            console.warn("[Nova Mobile] keypoints attachment scan failed", error);
+        }
+
+        const valid = candidates.filter(function (item) {
+            if (!item || typeof item !== "object") {
+                return false;
+            }
+
+            return Boolean(item.url || item.file_url || item.path || item.filename);
+        });
+
+        return valid.length ? valid[valid.length - 1] : null;
+    }
+
+    function novaShowAttachmentKeypoints(text) {
+        let box = document.getElementById("nova-attachment-summary-output");
+
+        if (!box) {
+            box = document.createElement("div");
+            box.id = "nova-attachment-summary-output";
+            box.style.position = "fixed";
+            box.style.left = "12px";
+            box.style.right = "12px";
+            box.style.bottom = "92px";
+            box.style.zIndex = "99999";
+            box.style.maxHeight = "45vh";
+            box.style.overflow = "auto";
+            box.style.padding = "12px";
+            box.style.borderRadius = "14px";
+            box.style.background = "rgba(20, 20, 28, 0.96)";
+            box.style.color = "white";
+            box.style.fontSize = "13px";
+            box.style.lineHeight = "1.35";
+            box.style.whiteSpace = "pre-wrap";
+            box.style.boxShadow = "0 8px 28px rgba(0,0,0,0.35)";
+            document.body.appendChild(box);
+        }
+
+        box.textContent = text;
+        box.hidden = false;
+    }
+
+    async function novaGetLatestAttachmentKeypoints() {
+        const attachment = novaFindLatestAttachmentForKeypoints();
+
+        if (!attachment) {
+            novaShowAttachmentKeypoints("No uploaded attachment found yet.");
+            return;
+        }
+
+        const url = String(attachment.url || attachment.file_url || attachment.upload_url || "").trim();
+        const mimeType = String(attachment.mime_type || attachment.type || attachment.mime || "").trim();
+
+        if (!url && !attachment.path) {
+            novaShowAttachmentKeypoints("Attachment found, but it has no usable URL/path.");
+            return;
+        }
+
+        novaShowAttachmentKeypoints("Extracting key points...");
+
+        try {
+            const response = await fetch("/api/attachment/keypoints", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    url: url,
+                    path: attachment.path || "",
+                    mime_type: mimeType,
+                }),
+            });
+
+            const result = await response.json();
+
+            if (!result || !result.ok) {
+                novaShowAttachmentKeypoints("Key points failed:\n" + JSON.stringify(result, null, 2));
+                return;
+            }
+
+            const points = Array.isArray(result.key_points)
+                ? result.key_points.slice(0, 10).map(function (point, index) {
+                    return (index + 1) + ". " + point;
+                }).join("\n")
+                : "";
+
+            novaShowAttachmentKeypoints(
+                "Key Points:\n" +
+                points +
+                "\n\nSummary:\n" +
+                String(result.summary || "").trim() +
+                "\n\nPoints: " + result.points_count +
+                "\nRaw chars: " + result.raw_chars
+            );
+        } catch (error) {
+            novaShowAttachmentKeypoints("Key points request failed:\n" + String(error));
+        }
+    }
+
+    function novaInstallAttachmentKeypointsButton() {
+        if (document.getElementById("nova-attachment-keypoints-btn")) {
+            return;
+        }
+
+        const button = document.createElement("button");
+        button.id = "nova-attachment-keypoints-btn";
+        button.type = "button";
+        button.textContent = "Key Points";
+        button.style.position = "fixed";
+        button.style.left = "12px";
+        button.style.bottom = "48px";
+        button.style.zIndex = "99999";
+        button.style.padding = "10px 12px";
+        button.style.borderRadius = "999px";
+        button.style.border = "0";
+        button.style.fontWeight = "700";
+        button.style.background = "#4f46e5";
+        button.style.color = "white";
+        button.style.boxShadow = "0 8px 22px rgba(0,0,0,0.28)";
+
+        button.addEventListener("click", novaGetLatestAttachmentKeypoints);
+
+        document.body.appendChild(button);
+
+        console.log("[Nova Mobile] attachment keypoints button installed");
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", novaInstallAttachmentKeypointsButton);
+    } else {
+        novaInstallAttachmentKeypointsButton();
+    }
+
+    window.NovaGetLatestAttachmentKeypoints = novaGetLatestAttachmentKeypoints;
 })();
 
