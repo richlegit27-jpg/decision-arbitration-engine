@@ -2395,11 +2395,48 @@ def api_chat():
             app.logger.exception("[api_chat] failed to load remembered session attachments")
 
         # ATTACHMENT_CONTENT_INJECTION_FINAL_LOCK
+        # HARD_BYPASS_CASUAL_GREETINGS_LOCK
+        # Tiny casual messages should not enter project-aware memory, attachment memory,
+        # web routing, or task-mode responses.
+        _nova_clean_casual_text = str(user_text or "").strip().lower()
+        _nova_casual_greetings = {
+            "hi",
+            "hey",
+            "yo",
+            "hello",
+            "sup",
+        }
+
+        if not attachments and _nova_clean_casual_text in _nova_casual_greetings:
+            app.logger.info(
+                "[api_chat] hard bypass casual greeting session_id=%s text=%r",
+                session_id,
+                user_text,
+            )
+
+            return jsonify({
+                "ok": True,
+                "session_id": session_id,
+                "active_session_id": session_id,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": "Hey.",
+                },
+                "attachments": [],
+                "session_attachments": [],
+                "skip_post_processing": True,
+                "skip_rewrite": True,
+                "meta": {
+                    "strategy": "hard_bypass_casual_greeting",
+                },
+            })
+
         attachment_content_lines = []
 
         # ATTACHMENT_INJECTION_LOOP_CURRENT_ONLY_LOCK
         # When the user sends attachments with this request, inject ONLY those current files.
         # Old session attachment memory can still be stored, but must not flood this prompt.
+        # ACTUAL_STOP_STALE_ATTACHMENT_MEMORY_LOCK
         if attachments:
             remembered_session_attachments = list(attachments)
             app.logger.info(
@@ -2407,6 +2444,23 @@ def api_chat():
                 len(remembered_session_attachments or []),
                 session_id,
             )
+        else:
+            remembered_session_attachments = []
+            app.logger.info(
+                "[AttachmentContentGate] no current attachments; stale session attachment injection disabled session_id=%s",
+                session_id,
+            )
+
+        # KILL_STALE_ATTACHMENT_LOOP_DIRECT_LOCK
+        # Hard stop: never loop old remembered attachments when this request has no current upload.
+        if not attachments:
+            remembered_session_attachments = []
+            attachment_content_lines = []
+            app.logger.info(
+                "[AttachmentContentGate] direct stale attachment loop killed because current request has no attachments session_id=%s",
+                session_id,
+            )
+
         for attachment in remembered_session_attachments or []:
             attachment_filename = str(attachment.get("filename") or "").strip()
             attachment_original_filename = str(attachment.get("original_filename") or "").strip()
@@ -2635,13 +2689,44 @@ def api_chat():
                 session_id,
             )
 
-        user_text = _nova_inject_project_state_context(
-            user_text,
-            session_id,
+        # SKIP_PROJECT_CONTEXT_FOR_CASUAL_SHORT_MESSAGES_LOCK
+        _nova_original_user_text_before_project_context = str(user_text or "").strip()
+        _nova_short_casual_messages = {
+            "hi",
+            "hey",
+            "yo",
+            "hello",
+            "sup",
+            "ok",
+            "okay",
+            "k",
+            "yes",
+            "no",
+            "thanks",
+            "thank you",
+        }
+        _nova_skip_project_context = (
+            len(_nova_original_user_text_before_project_context) <= 16
+            and _nova_original_user_text_before_project_context.lower() in _nova_short_casual_messages
         )
 
+        if _nova_skip_project_context:
+            app.logger.info(
+                "[project-aware] skipped project context for short casual message session_id=%s text=%r",
+                session_id,
+                _nova_original_user_text_before_project_context,
+            )
+        else:
+            user_text = _nova_inject_project_state_context(
+                user_text,
+                session_id,
+            )
+
         try:
-            project_aware_context = _nova_build_project_aware_context(
+            if _nova_skip_project_context:
+                project_aware_context = ""
+            else:
+                project_aware_context = _nova_build_project_aware_context(
                 user_text,
                 session_id=session_id,
                 requested_session_id=requested_session_id,
@@ -2972,11 +3057,121 @@ def api_chat():
                 _attachment_prehandle_exc,
             )
 
+        # IMAGE_ATTACHMENT_PREHANDLE_LOCK
+        # Current image attachments must beat web/source-open routing.
+        try:
+            current_attachments = list(attachments or [])
+            image_attachments = []
+
+            for item in current_attachments:
+                if not isinstance(item, dict):
+                    continue
+
+                mime = str(
+                    item.get("mime_type")
+                    or item.get("type")
+                    or item.get("mime")
+                    or ""
+                ).lower().strip()
+
+                name = str(
+                    item.get("original_filename")
+                    or item.get("filename")
+                    or item.get("name")
+                    or item.get("url")
+                    or item.get("file_url")
+                    or "image attachment"
+                ).strip()
+
+                url = str(item.get("file_url") or item.get("url") or "").strip()
+
+                if mime.startswith("image/") or name.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".gif")):
+                    image_attachments.append({
+                        "name": name,
+                        "mime": mime or "image/*",
+                        "url": url,
+                    })
+
+            if image_attachments:
+                lines = ["Image attachment received."]
+
+                for index, item in enumerate(image_attachments[:5], start=1):
+                    label = item.get("name") or "image attachment"
+                    mime = item.get("mime") or "image/*"
+                    url = item.get("url") or ""
+
+                    line = f"{index}. {label} ({mime})"
+                    if url:
+                        line += f" — {url}"
+                    lines.append(line)
+
+                lines.append("")
+                lines.append("I can analyze this image, describe what is visible, or answer a question about it. The image attachment is now being handled as an attachment, not as a previous web source.")
+
+                reply_text = "\n".join(lines).strip()
+
+                app.logger.info(
+                    "[ImageAttachmentPreHandle] answered before chat_service.handle session_id=%s images=%s",
+                    session_id,
+                    len(image_attachments),
+                )
+
+                return jsonify({
+                    "ok": True,
+                    "session_id": session_id,
+                    "active_session_id": session_id,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": reply_text,
+                    },
+                    "session_attachments": current_attachments,
+                    "attachments": current_attachments,
+                    "skip_post_processing": True,
+                    "skip_rewrite": True,
+                    "meta": {
+                        "strategy": "image_attachment_prehandle",
+                        "image_count": len(image_attachments),
+                    },
+                })
+        except Exception as _image_attachment_prehandle_error:
+            app.logger.warning(
+                "[ImageAttachmentPreHandle] failed; falling through to chat_service.handle: %s",
+                _image_attachment_prehandle_error,
+            )
+
         app.logger.info(
             "[api_chat] calling chat_service.handle session_id=%s attachments_count=%s",
             session_id,
             len(attachments_for_chat_service or []),
         )
+
+        # CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK
+        _nova_pre_chat_user_text = str(user_text or "")
+        _nova_pre_chat_lower = _nova_pre_chat_user_text.lower().strip()
+        _nova_image_prompt_starters = (
+            "generate an image",
+            "create an image",
+            "make an image",
+            "draw an image",
+            "generate a picture",
+            "create a picture",
+            "make a picture",
+            "draw a picture",
+        )
+
+        if any(_nova_pre_chat_lower.startswith(_starter) for _starter in _nova_image_prompt_starters):
+            if "\n\nProject-aware context for Nova:" in _nova_pre_chat_user_text:
+                user_text = _nova_pre_chat_user_text.split("\n\nProject-aware context for Nova:", 1)[0].strip()
+            elif "\nProject-aware context for Nova:" in _nova_pre_chat_user_text:
+                user_text = _nova_pre_chat_user_text.split("\nProject-aware context for Nova:", 1)[0].strip()
+            else:
+                user_text = _nova_pre_chat_user_text.strip()
+
+            app.logger.info(
+                "[api_chat] cleaned project-aware context from image-generation prompt session_id=%s cleaned_len=%s",
+                session_id,
+                len(user_text),
+            )
 
         result = chat_service.handle(
             user_text=user_text,
@@ -6118,3 +6313,13 @@ if __name__ == "__main__":
 
 
 # ATTACHMENT_UI_JUNK_FILTER_LOCK
+
+# ACTUAL_STOP_STALE_ATTACHMENT_MEMORY_LOCK
+
+# KILL_STALE_ATTACHMENT_LOOP_DIRECT_LOCK
+
+# SKIP_PROJECT_CONTEXT_FOR_CASUAL_SHORT_MESSAGES_LOCK
+
+# HARD_BYPASS_CASUAL_GREETINGS_LOCK
+
+# CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK

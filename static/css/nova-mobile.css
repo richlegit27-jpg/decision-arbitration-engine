@@ -9003,3 +9003,202 @@ html::after,
             rgba(124, 92, 255, 0.90)
         );
 }
+
+
+
+/* MOBILE_EMERGENCY_VISUAL_RESET_LOCK */
+/* Emergency visual quarantine after attachment/image routing regression. */
+/* Goal: make chat readable again without touching backend logic. */
+
+html,
+body {
+    min-height: 100%;
+    overflow-x: hidden;
+}
+
+body {
+    background: #050509 !important;
+}
+
+.nova-mobile-shell,
+.mobile-shell,
+.app-shell,
+#app,
+#mobileApp {
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+}
+
+.chat,
+.chat-panel,
+.chat-scroll,
+.chat-messages,
+.messages,
+#messages,
+#chatMessages,
+#messageList {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding-bottom: 140px !important;
+    box-sizing: border-box !important;
+}
+
+.message,
+.chat-message,
+.message-row,
+.bubble-row,
+.nova-message,
+[data-role="user"],
+[data-role="assistant"] {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.message:empty,
+.chat-message:empty,
+.message-row:empty,
+.bubble-row:empty,
+.nova-message:empty {
+    display: none !important;
+}
+
+.bubble,
+.message-bubble,
+.chat-bubble,
+.assistant-bubble,
+.user-bubble,
+.nova-bubble,
+[data-message-bubble] {
+    position: relative !important;
+    display: block !important;
+    width: fit-content !important;
+    max-width: calc(100vw - 34px) !important;
+    min-height: 0 !important;
+    height: auto !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    z-index: 1 !important;
+}
+
+.assistant-bubble,
+[data-role="assistant"] .bubble,
+[data-role="assistant"] .message-bubble {
+    margin-right: auto !important;
+}
+
+.user-bubble,
+[data-role="user"] .bubble,
+[data-role="user"] .message-bubble {
+    margin-left: auto !important;
+}
+
+/* Stop floating source/news strips from sitting across the middle of chat. */
+.source-strip,
+.sources-strip,
+.news-strip,
+.web-strip,
+.source-row,
+.sources-row,
+.web-sources,
+.news-sources,
+.search-results,
+.source-cards,
+.sources,
+[data-sources],
+[data-source-strip] {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    z-index: 1 !important;
+}
+
+/* Quarantine duplicated message action controls that were floating in bubbles. */
+.message-actions,
+.bubble-actions,
+.assistant-actions,
+.response-actions,
+.copy-regenerate-row,
+.copy-regen-row,
+.regen-copy-row,
+.action-row,
+[data-message-actions],
+[data-bubble-actions] {
+    position: static !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    margin-top: 8px !important;
+    opacity: 0.75 !important;
+    transform: none !important;
+    z-index: 2 !important;
+}
+
+/* If action rows stack too aggressively, keep them tiny instead of covering text. */
+.message-actions button,
+.bubble-actions button,
+.assistant-actions button,
+.response-actions button,
+.copy-regenerate-row button,
+.copy-regen-row button,
+.regen-copy-row button,
+.action-row button,
+[data-message-actions] button,
+[data-bubble-actions] button {
+    min-width: 28px !important;
+    min-height: 28px !important;
+    max-height: 32px !important;
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    line-height: 1 !important;
+}
+
+/* Keep composer locked at bottom and above corrupted rows. */
+.composer,
+.mobile-composer,
+.chat-composer,
+#composer,
+#mobileComposer {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 50 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    background: rgba(5, 5, 9, 0.96) !important;
+    backdrop-filter: blur(14px) !important;
+}
+
+/* Prevent old attachment garbage from visually becoming giant broken blocks. */
+.bubble:has(+ .message-actions),
+.message-bubble:has(+ .message-actions),
+.chat-bubble:has(+ .message-actions) {
+    margin-bottom: 4px !important;
+}
+
+/* END MOBILE_EMERGENCY_VISUAL_RESET_LOCK */
+
