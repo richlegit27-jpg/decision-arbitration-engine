@@ -5097,6 +5097,153 @@ def _nova_local_summary_from_text(text):
     }
 
 
+# ATTACHMENT_SUMMARY_CLEAN_RETURN_LOCK
+def _nova_clean_attachment_endpoint_text(value: object) -> str:
+    import re
+
+    text_value = str(value or "")
+    text_value = text_value.replace("\ufeff", "")
+    text_value = text_value.replace("\r\n", "\n").replace("\r", "\n")
+
+    bad_phrases = (
+        "This attachment appears to contain image/search/PDF extraction text about:",
+        "This attachment appears to contain extracted image/PDF content about:",
+        "This attachment appears to be about:",
+    )
+
+    for phrase in bad_phrases:
+        text_value = text_value.replace(phrase, "")
+
+    text_value = re.sub(
+        r"\[Attachment analysis failed:\s*tesseract is not installed[^\]]*\]\.?",
+        "",
+        text_value,
+        flags=re.IGNORECASE,
+    )
+
+    text_value = re.sub(
+        r"Attachment analysis failed:\s*tesseract is not installed[^\n.]*(\.|\n)?",
+        "",
+        text_value,
+        flags=re.IGNORECASE,
+    )
+
+    text_value = re.sub(r"\bKey points:\s*;\s*", "", text_value, flags=re.IGNORECASE)
+    text_value = re.sub(r"\bPreview:\s*;\s*", "", text_value, flags=re.IGNORECASE)
+    text_value = re.sub(r";\s*Attachment\s+", "\nAttachment ", text_value)
+    text_value = re.sub(r"\s*;\s*", "\n", text_value)
+
+    lines = []
+    seen = set()
+
+    for raw_line in text_value.splitlines():
+        line = str(raw_line or "").strip()
+        line = re.sub(r"^\s*\d+\.\s*", "", line).strip()
+        line = re.sub(r"\s+", " ", line).strip()
+
+        if not line:
+            continue
+
+        low = line.lower()
+
+        if low in {
+            "attachment analysis:",
+            "key points:",
+            "preview:",
+            "summary:",
+            "attachment content:",
+            "uploaded attachment content:",
+        }:
+            continue
+
+        if low.startswith("this attachment appears"):
+            continue
+
+        if "tesseract is not installed" in low:
+            continue
+
+        key = re.sub(r"[^a-z0-9]+", " ", low).strip()[:180]
+
+        if not key or key in seen:
+            continue
+
+        seen.add(key)
+        lines.append(line)
+
+        if len(lines) >= 12:
+            break
+
+    return "\n".join(lines).strip()
+
+
+def _nova_clean_attachment_endpoint_payload(local_summary: dict, cleaned_text: object) -> dict:
+    import re
+
+    clean_text_value = _nova_clean_attachment_endpoint_text(cleaned_text)
+
+    source_lines = []
+
+    if clean_text_value:
+        source_lines.extend(clean_text_value.splitlines())
+
+    for item in list((local_summary or {}).get("key_points") or []):
+        cleaned = _nova_clean_attachment_endpoint_text(item)
+        if cleaned:
+            source_lines.extend(cleaned.splitlines())
+
+    summary_clean = _nova_clean_attachment_endpoint_text((local_summary or {}).get("summary"))
+    preview_clean = _nova_clean_attachment_endpoint_text((local_summary or {}).get("preview"))
+
+    if summary_clean:
+        source_lines.extend(summary_clean.splitlines())
+
+    if preview_clean:
+        source_lines.extend(preview_clean.splitlines())
+
+    final_lines = []
+    seen = set()
+
+    for raw_line in source_lines:
+        line = str(raw_line or "").strip()
+        if not line:
+            continue
+
+        low = line.lower()
+        key = re.sub(r"[^a-z0-9]+", " ", low).strip()[:180]
+
+        if not key or key in seen:
+            continue
+
+        if low.startswith("this attachment appears"):
+            continue
+
+        if "tesseract is not installed" in low:
+            continue
+
+        seen.add(key)
+        final_lines.append(line)
+
+        if len(final_lines) >= 10:
+            break
+
+    if not final_lines:
+        return {
+            "summary": "Attachment analysis:\nThe attachment was processed, but no clean readable text was found.",
+            "key_points": [],
+            "preview": "",
+        }
+
+    summary = "Attachment analysis:\n\n" + "\n".join(final_lines[:6])
+    preview = "\n".join(final_lines[:8])[:1200]
+
+    return {
+        "summary": summary.strip(),
+        "key_points": final_lines[:10],
+        "preview": preview.strip(),
+    }
+
+
+
 @app.route("/api/attachment/summarize", methods=["POST"])
 def api_attachment_summarize():
     """
@@ -5163,6 +5310,185 @@ def api_attachment_summarize():
             mime_type,
         )
 
+        # ATTACHMENT_SUMMARIZE_ENDPOINT_FILTER_LOCK
+        # Final endpoint-level cleanup for noisy PDF/image search-page extraction.
+        import re as _nova_endpoint_re
+
+        def _nova_endpoint_keep_attachment_line(value):
+            line = str(value or "").strip()
+            line = line.replace("", "").strip()
+            line = _nova_endpoint_re.sub(r"^\\s*\\d+\\.\\s*", "", line).strip()
+            line = _nova_endpoint_re.sub(r"\\s+", " ", line).strip()
+
+            if not line:
+                return ""
+
+            low = line.lower().strip(" :;-•*|")
+            compact = _nova_endpoint_re.sub(r"[^a-z0-9]+", " ", low).strip()
+
+            bad_exact = {
+                "pdf page 1",
+                "search",
+                "images",
+                "videos",
+                "maps",
+                "create",
+                "inspiration",
+                "all",
+                "shopping",
+                "news",
+                "books",
+                "flights",
+                "finance",
+                "keypoints",
+                "continue",
+                "summarize",
+                "summary",
+                "preview",
+                "cop",
+                "filt",
+                "moderate",
+                "bath",
+                "amazon",
+                "related content",
+                "furniture décor",
+                "kitchen appliances",
+            }
+
+            bad_contains = (
+                "wayfair",
+                "save big",
+                "prices you'll love",
+                "eye-catching prints",
+                "love, horror and more themes",
+                "free_shipping",
+                "url removed from extracted attachment text",
+                "plain field in front of mountain peak",
+                "free stock photo",
+                "https://www.amazon.",
+                "https://www.wayfair.",
+                "› shop ›",
+                "› wall art ›",
+            )
+
+            if low in bad_exact or compact in bad_exact:
+                return ""
+
+            if any(bad in low for bad in bad_contains):
+                return ""
+
+            if line.startswith("http://") or line.startswith("https://"):
+                return ""
+
+            if line.isdigit():
+                return ""
+
+            if len(line) <= 2:
+                return ""
+
+            return line
+
+        _endpoint_lines = []
+        _endpoint_seen = set()
+
+        for _raw_point in list(local_summary.get("key_points") or []):
+            _line = _nova_endpoint_keep_attachment_line(_raw_point)
+            if not _line:
+                continue
+
+            _key = _nova_endpoint_re.sub(r"[^a-z0-9]+", " ", _line.lower()).strip()[:180]
+            if not _key or _key in _endpoint_seen:
+                continue
+
+            _endpoint_seen.add(_key)
+            _endpoint_lines.append(_line)
+
+        # If key_points were mostly junk, fall back to cleaned_text lines.
+        if not _endpoint_lines:
+            for _raw_line in str(cleaned_text or "").splitlines():
+                _line = _nova_endpoint_keep_attachment_line(_raw_line)
+                if not _line:
+                    continue
+
+                _key = _nova_endpoint_re.sub(r"[^a-z0-9]+", " ", _line.lower()).strip()[:180]
+                if not _key or _key in _endpoint_seen:
+                    continue
+
+                _endpoint_seen.add(_key)
+                _endpoint_lines.append(_line)
+
+                if len(_endpoint_lines) >= 10:
+                    break
+
+        if _endpoint_lines:
+            local_summary["key_points"] = _endpoint_lines[:10]
+            local_summary["summary"] = "This attachment appears to be about: " + "; ".join(_endpoint_lines[:5]) + "."
+            local_summary["preview"] = "\\n".join(_endpoint_lines[:6])[:1200]
+        else:
+            local_summary["key_points"] = []
+            local_summary["summary"] = "The attachment was processed, but the extracted text was mostly search/navigation noise."
+            local_summary["preview"] = ""
+
+        # DIRECT_TEXT_ATTACHMENT_SUMMARY_LOCK
+        direct_text_suffixes = {
+            ".txt",
+            ".md",
+            ".markdown",
+            ".py",
+            ".js",
+            ".css",
+            ".html",
+            ".htm",
+            ".json",
+            ".csv",
+            ".log",
+        }
+
+        file_suffix = str(file_path.suffix or "").lower().strip()
+        mime_lower = str(mime_type or "").lower().strip()
+
+        if file_suffix in direct_text_suffixes or mime_lower.startswith("text/") or "markdown" in mime_lower or "json" in mime_lower:
+            try:
+                direct_text = file_path.read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                direct_text = str(cleaned_text or "")
+
+            direct_lines = []
+            direct_seen = set()
+
+            for raw_line in str(direct_text or "").replace("\r\n", "\n").replace("\r", "\n").splitlines():
+                line = str(raw_line or "").replace("\ufeff", "").strip()
+
+                if not line:
+                    continue
+
+                key = line.lower().strip()
+
+                if key in direct_seen:
+                    continue
+
+                direct_seen.add(key)
+                direct_lines.append(line)
+
+                if len(direct_lines) >= 12:
+                    break
+
+            if direct_lines:
+                direct_preview = "\n".join(direct_lines[:12])[:1200]
+                cleaned_endpoint_summary = {
+                    "summary": "Attachment analysis:\n\n" + direct_preview,
+                    "key_points": direct_lines[:10],
+                    "preview": direct_preview,
+                }
+            else:
+                cleaned_endpoint_summary = {
+                    "summary": "Attachment analysis:\nThe text attachment was received, but no readable lines were found.",
+                    "key_points": [],
+                    "preview": "",
+                }
+        else:
+            cleaned_endpoint_summary = _nova_clean_attachment_endpoint_payload(local_summary, cleaned_text)
+
         return jsonify({
             "ok": True,
             "path": str(file_path),
@@ -5170,10 +5496,10 @@ def api_attachment_summarize():
             "mime_type": mime_type,
             "raw_chars": len(str(extracted_text or "")),
             "clean_chars": len(cleaned_text),
-            "summary": local_summary["summary"],
-            "key_points": local_summary["key_points"],
-            "preview": local_summary["preview"],
-            "clean_text": cleaned_text,
+            "summary": cleaned_endpoint_summary["summary"],
+            "key_points": cleaned_endpoint_summary["key_points"],
+            "preview": cleaned_endpoint_summary["preview"],
+            "clean_text": cleaned_endpoint_summary["preview"] or cleaned_text,
         })
 
     except Exception as error:

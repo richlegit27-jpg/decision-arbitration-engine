@@ -2294,3 +2294,575 @@ document.addEventListener("DOMContentLoaded", () => {
 }());
 
 
+/* MOBILE_APP_FORCE_COPY_REGEN_LOCK */
+(function () {
+    "use strict";
+
+    if (window.__novaMobileAppForceCopyRegen) {
+        return;
+    }
+
+    window.__novaMobileAppForceCopyRegen = true;
+
+    function qs(selector, root) {
+        return (root || document).querySelector(selector);
+    }
+
+    function qsa(selector, root) {
+        return Array.prototype.slice.call((root || document).querySelectorAll(selector));
+    }
+
+    function textOf(node) {
+        return String((node && (node.innerText || node.textContent)) || "").trim();
+    }
+
+    function findInput() {
+        return (
+            qs("#nova-mobile-input") ||
+            qs("#mobile-input") ||
+            qs("textarea") ||
+            qs("input[type='text']")
+        );
+    }
+
+    function getChatBox() {
+        return (
+            qs("#mobileChatMessages") ||
+            qs("#mobileMessages") ||
+            qs("#messages") ||
+            qs(".mobile-chat-container")
+        );
+    }
+
+    function isUserNode(node) {
+        var cls = String(node.className || "").toLowerCase();
+        var role = String(node.getAttribute && (
+            node.getAttribute("data-role") ||
+            node.getAttribute("data-message-role") ||
+            ""
+        )).toLowerCase();
+
+        return role === "user" || cls.indexOf("user") !== -1;
+    }
+
+    function isAssistantNode(node) {
+        if (!node || !node.appendChild) {
+            return false;
+        }
+
+        if (node.querySelector("[data-mobile-copy-answer], [data-mobile-regen-answer]")) {
+            return false;
+        }
+
+        if (node.querySelector("textarea, input, select")) {
+            return false;
+        }
+
+        if (node.closest("form, footer, header, nav, .mobile-composer, .composer")) {
+            return false;
+        }
+
+        if (isUserNode(node)) {
+            return false;
+        }
+
+        var text = textOf(node);
+
+        if (!text || text === "Thinking..." || text.length < 2) {
+            return false;
+        }
+
+        var cls = String(node.className || "").toLowerCase();
+        var role = String(node.getAttribute && (
+            node.getAttribute("data-role") ||
+            node.getAttribute("data-message-role") ||
+            ""
+        )).toLowerCase();
+
+        if (role === "assistant") {
+            return true;
+        }
+
+        if (
+            cls.indexOf("assistant") !== -1 ||
+            cls.indexOf("nova") !== -1 ||
+            cls.indexOf("message") !== -1 ||
+            cls.indexOf("bubble") !== -1 ||
+            cls.indexOf("fallback") !== -1
+        ) {
+            return true;
+        }
+
+        return true;
+    }
+
+    function makeActions() {
+        var wrap = document.createElement("div");
+        wrap.className = "mobile-message-actions nova-mobile-forced-copy-regen";
+        wrap.setAttribute("data-forced-copy-regen", "1");
+        wrap.style.cssText = [
+            "display:flex !important",
+            "gap:8px !important",
+            "margin-top:10px !important",
+            "visibility:visible !important",
+            "opacity:1 !important",
+            "pointer-events:auto !important",
+            "position:relative !important",
+            "z-index:999999 !important"
+        ].join(";");
+
+        wrap.innerHTML =
+            '<button type="button" data-mobile-copy-answer="1" style="display:inline-flex !important;visibility:visible !important;opacity:1 !important;padding:6px 10px !important;border-radius:10px !important;border:1px solid rgba(255,255,255,.22) !important;background:rgba(255,255,255,.10) !important;color:inherit !important;font-size:12px !important;">Copy</button>' +
+            '<button type="button" data-mobile-regen-answer="1" style="display:inline-flex !important;visibility:visible !important;opacity:1 !important;padding:6px 10px !important;border-radius:10px !important;border:1px solid rgba(255,255,255,.22) !important;background:rgba(255,255,255,.10) !important;color:inherit !important;font-size:12px !important;">Regenerate</button>';
+
+        return wrap;
+    }
+
+    function ensureActions() {
+        var box = getChatBox();
+
+        if (!box) {
+            return;
+        }
+
+        Array.prototype.slice.call(box.children || []).forEach(function (node) {
+            if (isAssistantNode(node)) {
+                node.appendChild(makeActions());
+            }
+        });
+    }
+
+    document.addEventListener("click", async function (event) {
+        var copyBtn = event.target.closest("[data-mobile-copy-answer]");
+        var regenBtn = event.target.closest("[data-mobile-regen-answer]");
+
+        if (copyBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            var bubble = copyBtn.closest("#mobileChatMessages > *, #mobileMessages > *, #messages > *, .mobile-chat-container > *") || copyBtn.parentElement.parentElement;
+            var clone = bubble ? bubble.cloneNode(true) : null;
+
+            if (clone) {
+                qsa(".mobile-message-actions, [data-forced-copy-regen]", clone).forEach(function (node) {
+                    node.remove();
+                });
+            }
+
+            var answer = textOf(clone || bubble || document.body);
+
+            try {
+                await navigator.clipboard.writeText(answer || "");
+                copyBtn.textContent = "Copied";
+            } catch (err) {
+                copyBtn.textContent = "Failed";
+            }
+
+            setTimeout(function () {
+                copyBtn.textContent = "Copy";
+            }, 900);
+
+            return;
+        }
+
+        if (regenBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            var input = findInput();
+            var last = String(window.__novaMobileLastUserText || "").trim();
+
+            if (!last) {
+                var box = getChatBox();
+                var userNodes = box ? Array.prototype.slice.call(box.children || []).filter(isUserNode) : [];
+                var lastUser = userNodes[userNodes.length - 1];
+                last = textOf(lastUser);
+            }
+
+            if (!input || !last) {
+                regenBtn.textContent = "!";
+                setTimeout(function () {
+                    regenBtn.textContent = "Regenerate";
+                }, 900);
+                return;
+            }
+
+            input.value = last;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.focus();
+
+            var sendBtn = qs("#nova-mobile-send");
+
+            if (sendBtn) {
+                sendBtn.click();
+            }
+        }
+    }, true);
+
+    var observer = new MutationObserver(function () {
+        ensureActions();
+    });
+
+    function boot() {
+        ensureActions();
+
+        if (document.body) {
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                characterData: true
+            });
+        }
+
+        setInterval(ensureActions, 750);
+
+        console.log("[Nova Mobile] app force copy/regen active");
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot);
+    } else {
+        boot();
+    }
+})();
+
+
+/* MOBILE_ATTACHMENT_PAYLOAD_GUARD_LOCK */
+(function () {
+    "use strict";
+
+    if (window.__novaMobileAttachmentPayloadGuard) {
+        return;
+    }
+
+    window.__novaMobileAttachmentPayloadGuard = true;
+
+    var originalFetch = window.fetch;
+
+    function safeJsonParse(value, fallback) {
+        try {
+            return JSON.parse(value);
+        } catch (error) {
+            return fallback;
+        }
+    }
+
+    function normalizeAttachment(item) {
+        item = item || {};
+
+        var url = String(item.url || item.file_url || item.path || "").trim();
+        var fileUrl = String(item.file_url || item.url || item.path || "").trim();
+        var filename = String(item.filename || item.original_filename || item.name || "").trim();
+
+        if (!url && !fileUrl && !filename) {
+            return null;
+        }
+
+        return {
+            filename: filename || "attachment",
+            original_filename: String(item.original_filename || item.filename || item.name || filename || "attachment").trim(),
+            size: Number(item.size || item.size_bytes || 0),
+            mime_type: String(item.mime_type || item.type || "application/octet-stream").trim(),
+            url: url || fileUrl,
+            file_url: fileUrl || url,
+            status: String(item.status || "uploaded").trim()
+        };
+    }
+
+    function getStagedAttachments() {
+        var attachments = [];
+
+        [
+            "nova_mobile_attachments",
+            "nova_mobile_latest_attachment",
+            "nova_latest_attachment"
+        ].forEach(function (key) {
+            try {
+                var raw = sessionStorage.getItem(key) || localStorage.getItem(key) || "";
+
+                if (!raw) {
+                    return;
+                }
+
+                var parsed = safeJsonParse(raw, null);
+
+                if (Array.isArray(parsed)) {
+                    parsed.forEach(function (item) {
+                        var normalized = normalizeAttachment(item);
+
+                        if (normalized) {
+                            attachments.push(normalized);
+                        }
+                    });
+                    return;
+                }
+
+                var normalized = normalizeAttachment(parsed);
+
+                if (normalized) {
+                    attachments.push(normalized);
+                }
+            } catch (error) {}
+        });
+
+        var seen = {};
+        return attachments.filter(function (item) {
+            var key = String(item.file_url || item.url || item.filename || "").trim();
+
+            if (!key || seen[key]) {
+                return false;
+            }
+
+            seen[key] = true;
+            return true;
+        });
+    }
+
+    function shouldPatchChatRequest(resource, init) {
+        var url = "";
+
+        if (typeof resource === "string") {
+            url = resource;
+        } else if (resource && resource.url) {
+            url = resource.url;
+        }
+
+        var method = String((init && init.method) || "GET").toUpperCase();
+
+        return method === "POST" && url.indexOf("/api/chat") !== -1;
+    }
+
+    window.fetch = function (resource, init) {
+        init = init || {};
+
+        if (shouldPatchChatRequest(resource, init) && init.body) {
+            var bodyText = typeof init.body === "string" ? init.body : "";
+            var payload = safeJsonParse(bodyText, null);
+
+            if (payload && typeof payload === "object") {
+                var staged = getStagedAttachments();
+
+                if ((!Array.isArray(payload.attachments) || payload.attachments.length === 0) && staged.length > 0) {
+                    payload.attachments = staged;
+                    init = Object.assign({}, init, {
+                        body: JSON.stringify(payload)
+                    });
+
+                    console.log("[Nova Mobile Attachment Payload Guard] injected staged attachments into chat payload", staged);
+                } else {
+                    console.log("[Nova Mobile Attachment Payload Guard] chat payload attachments", Array.isArray(payload.attachments) ? payload.attachments.length : 0);
+                }
+            }
+        }
+
+        return originalFetch.call(this, resource, init);
+    };
+
+    console.log("[Nova Mobile Attachment Payload Guard] active");
+})();
+
+
+/* MOBILE_CLEAN_ATTACHMENT_CONTEXT_LOCK */
+(function () {
+    "use strict";
+
+    if (window.__novaMobileCleanAttachmentContext) {
+        return;
+    }
+
+    window.__novaMobileCleanAttachmentContext = true;
+
+    function safeRemoveStorage(key) {
+        try {
+            sessionStorage.removeItem(key);
+        } catch (error) {}
+
+        try {
+            localStorage.removeItem(key);
+        } catch (error) {}
+    }
+
+    function cleanOldAttachmentState() {
+        [
+            "nova_mobile_latest_attachment",
+            "nova_latest_attachment",
+            "nova_mobile_attachments"
+        ].forEach(safeRemoveStorage);
+
+        console.log("[Nova Mobile Clean Attachment Context] stale attachment storage cleared");
+    }
+
+    function cleanBadAttachmentText(text) {
+        return String(text || "")
+            .replace(/\[Attachment analysis failed:\s*tesseract is not installed[^\]]*\]\.?/gi, "")
+            .replace(/Attachment analysis failed:\s*tesseract is not installed[^\n.]*(\.|\n)?/gi, "")
+            .replace(/This attachment appears to contain image\/search\/PDF extraction text about:\s*/gi, "Attachment analysis:\n")
+            .replace(/This attachment appears to contain extracted image\/PDF content about:\s*/gi, "")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+    }
+
+    var originalFetch = window.fetch;
+
+    window.fetch = function (resource, init) {
+        return originalFetch.call(this, resource, init).then(function (response) {
+            var url = "";
+
+            if (typeof resource === "string") {
+                url = resource;
+            } else if (resource && resource.url) {
+                url = resource.url;
+            }
+
+            if (url.indexOf("/api/chat") === -1 && url.indexOf("/api/attachment") === -1) {
+                return response;
+            }
+
+            var clone = response.clone();
+
+            clone.json().then(function (payload) {
+                if (!payload || typeof payload !== "object") {
+                    return;
+                }
+
+                if (payload.summary) {
+                    payload.summary = cleanBadAttachmentText(payload.summary);
+                }
+
+                if (payload.preview) {
+                    payload.preview = cleanBadAttachmentText(payload.preview);
+                }
+
+                if (Array.isArray(payload.key_points)) {
+                    payload.key_points = payload.key_points
+                        .map(cleanBadAttachmentText)
+                        .filter(Boolean);
+                }
+
+                if (payload.assistant_message && payload.assistant_message.text) {
+                    payload.assistant_message.text = cleanBadAttachmentText(payload.assistant_message.text);
+                }
+            }).catch(function () {});
+
+            return response;
+        });
+    };
+
+    document.addEventListener("change", function (event) {
+        if (event.target && event.target.id === "nova-mobile-file-input") {
+            cleanOldAttachmentState();
+        }
+    }, true);
+
+    console.log("[Nova Mobile Clean Attachment Context] active");
+})();
+
+
+/* MOBILE_ATTACHMENT_RESPONSE_REWRITE_LOCK */
+(function () {
+    "use strict";
+
+    if (window.__novaMobileAttachmentResponseRewrite) {
+        return;
+    }
+
+    window.__novaMobileAttachmentResponseRewrite = true;
+
+    var originalFetch = window.fetch;
+
+    function cleanText(value) {
+        var text = String(value || "");
+
+        text = text
+            .replace(/\ufeff/g, "")
+            .replace(/This attachment appears to contain image\/search\/PDF extraction text about:\s*/gi, "")
+            .replace(/This attachment appears to contain extracted image\/PDF content about:\s*/gi, "")
+            .replace(/Key points:\s*;\s*/gi, "")
+            .replace(/Attachment ([^:\n]+) content:\s*;\s*/gi, "Attachment $1 content:\n")
+            .replace(/;\s*Attachment ([^:\n]+) content:/gi, "\nAttachment $1 content:")
+            .replace(/\[Attachment analysis failed:\s*tesseract is not installed[^\]]*\]\.?/gi, "")
+            .replace(/Attachment analysis failed:\s*tesseract is not installed[^\n.]*(\.|\n)?/gi, "")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+
+        return text;
+    }
+
+    function cleanPayload(payload) {
+        if (!payload || typeof payload !== "object") {
+            return payload;
+        }
+
+        if (payload.summary) {
+            payload.summary = cleanText(payload.summary);
+        }
+
+        if (payload.preview) {
+            payload.preview = cleanText(payload.preview);
+        }
+
+        if (Array.isArray(payload.key_points)) {
+            payload.key_points = payload.key_points
+                .map(cleanText)
+                .filter(function (item) {
+                    return item && item.length > 0;
+                });
+        }
+
+        if (payload.assistant_message && payload.assistant_message.text) {
+            payload.assistant_message.text = cleanText(payload.assistant_message.text);
+        }
+
+        return payload;
+    }
+
+    function shouldRewrite(resource) {
+        var url = "";
+
+        if (typeof resource === "string") {
+            url = resource;
+        } else if (resource && resource.url) {
+            url = resource.url;
+        }
+
+        return (
+            url.indexOf("/api/attachment") !== -1 ||
+            url.indexOf("/api/chat") !== -1
+        );
+    }
+
+    window.fetch = function (resource, init) {
+        return originalFetch.call(this, resource, init).then(function (response) {
+            if (!shouldRewrite(resource)) {
+                return response;
+            }
+
+            var contentType = response.headers.get("content-type") || "";
+
+            if (contentType.indexOf("application/json") === -1) {
+                return response;
+            }
+
+            return response.clone().json().then(function (payload) {
+                var cleaned = cleanPayload(payload);
+                var body = JSON.stringify(cleaned);
+
+                var headers = new Headers(response.headers);
+                headers.set("content-type", "application/json");
+
+                console.log("[Nova Mobile Attachment Response Rewrite] cleaned attachment/chat response");
+
+                return new Response(body, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: headers
+                });
+            }).catch(function () {
+                return response;
+            });
+        });
+    };
+
+    console.log("[Nova Mobile Attachment Response Rewrite] active");
+})();
+

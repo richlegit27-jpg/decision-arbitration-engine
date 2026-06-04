@@ -405,7 +405,7 @@
 </main>
 
 
-<script src="/static/js/nova-mobile-app.js?v=mobile-send-restore-011"></script>
+<script src="/static/js/nova-mobile-app.js?v=mobile-attachment-response-rewrite-001"></script>
 
 <script>
 window.NovaOpenMobileSessions = function () {
@@ -1057,7 +1057,15 @@ window.NovaCloseMobileSessions = function () {
             var answer = assistant.text || assistant.content || data.error || "Nova could not produce a response.";
 
             if (thinking) {
-                thinking.innerHTML = escapeHtml(answer).replace(/\n/g, "<br>") + renderSources(assistant.meta || {});
+                thinking.innerHTML =
+                    '<div class="nova-mobile-fallback-answer">' +
+                    escapeHtml(answer).replace(/\n/g, "<br>") +
+                    '</div>' +
+                    renderSources(assistant.meta || {}) +
+                    '<div class="mobile-message-actions" style="display:flex;gap:8px;margin-top:10px;">' +
+                        '<button type="button" class="mobile-inline-action" data-mobile-copy-answer="1" style="font-size:12px;padding:6px 9px;border-radius:10px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);color:inherit;">Copy</button>' +
+                        '<button type="button" class="mobile-inline-action" data-mobile-regen-answer="1" style="font-size:12px;padding:6px 9px;border-radius:10px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);color:inherit;">Regenerate</button>' +
+                    '</div>';
 
                 thinking.querySelectorAll("[data-mobile-source-url]").forEach(function (btn) {
                     btn.addEventListener("click", function () {
@@ -1066,6 +1074,44 @@ window.NovaCloseMobileSessions = function () {
                         window.open(url, "_blank", "noopener,noreferrer");
                     });
                 });
+
+                var copyBtn = thinking.querySelector("[data-mobile-copy-answer]");
+                if (copyBtn) {
+                    copyBtn.addEventListener("click", async function () {
+                        try {
+                            await navigator.clipboard.writeText(answer || "");
+                            copyBtn.textContent = "Copied";
+                            setTimeout(function () {
+                                copyBtn.textContent = "Copy";
+                            }, 900);
+                        } catch (err) {
+                            copyBtn.textContent = "Failed";
+                            setTimeout(function () {
+                                copyBtn.textContent = "Copy";
+                            }, 900);
+                        }
+                    });
+                }
+
+                var regenBtn = thinking.querySelector("[data-mobile-regen-answer]");
+                if (regenBtn) {
+                    regenBtn.addEventListener("click", function () {
+                        var input = findInput();
+                        var last = String(window.__novaMobileLastUserText || "").trim();
+
+                        if (!input || !last) {
+                            regenBtn.textContent = "!";
+                            setTimeout(function () {
+                                regenBtn.textContent = "Regenerate";
+                            }, 900);
+                            return;
+                        }
+
+                        input.value = last;
+                        input.dispatchEvent(new Event("input", { bubbles: true }));
+                        input.focus();
+                    });
+                }
             }
 
             if (data.active_session_id) {
@@ -1129,9 +1175,17 @@ window.NovaCloseMobileSessions = function () {
     console.log("[Nova Mobile] send restore bridge active");
 })();
 </script>
-
 </body>
 </html>
 
 
 
+
+<!-- MOBILE_MESSAGE_BAR_ACTIONS_REMOVED_LOCK -->
+
+<!-- MOBILE_THINKING_ACTIONS_LOCK -->
+
+
+<!-- MOBILE_DUPLICATE_ACTIONS_CLEANUP_LOCK -->
+
+<!-- MOBILE_HARD_VERSION_CLEANUP_LOCK -->
