@@ -9,7 +9,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nova Mobile</title>
 
-<link rel="stylesheet" href="/static/css/nova-mobile.css?v=endgame-mobile-polish-20260530-001">
+<link rel="stylesheet" href="/static/css/nova-mobile.css?v=mobile-css-quick-not-blocking-005">
 <style>
     html,
     body,
@@ -116,59 +116,6 @@
     >Session History Not Ready Yet</button>
 </section>
 
-<div class="mobile-quick-prompts">
-    <button
-        type="button"
-        data-quick-prompt="Continue"
-        onclick="
-            const input = document.getElementById('nova-mobile-input');
-
-            if (input) {
-                input.value = 'Continue from where we left off. Keep it direct and tell me the next move.';
-                input.focus();
-            }
-        "
-    >Continue</button>
-
-    <button
-        type="button"
-        data-quick-prompt="Summarize this"
-        onclick="
-            const input = document.getElementById('nova-mobile-input');
-
-            if (input) {
-                input.value = 'Summarize the current situation in plain English and tell me what matters most.';
-                input.focus();
-            }
-        "
-    >Summarize</button>
-
-    <button
-        type="button"
-        data-quick-prompt="Make this better"
-        onclick="
-            const input = document.getElementById('nova-mobile-input');
-
-            if (input) {
-                input.value = 'Improve this and make it cleaner, more direct, and more useful.';
-                input.focus();
-            }
-        "
-    >Improve</button>
-
-    <button
-        type="button"
-        data-quick-prompt="What should I do next?"
-        onclick="
-            const input = document.getElementById('nova-mobile-input');
-
-            if (input) {
-                input.value = 'What should I do next? Give me the best next step only.';
-                input.focus();
-            }
-        "
-    >Next</button>
-</div>
 <section
     id="nova-mobile-tools-panel"
     class="mobile-panel hidden"
@@ -314,7 +261,15 @@
 <button type="button" data-mobile-tool="run_all">Run All</button>
 </section>
 
-    <div class="mobile-composer">
+    <!-- MOBILE_QUICK_ACTIONS_CLEAN_FINAL_LOCK -->
+<div class="mobile-quick-actions mobile-quick-actions-final" data-mobile-quick-actions>
+    <button type="button" class="mobile-quick-action" data-quick-prompt="continue">Continue</button>
+    <button type="button" class="mobile-quick-action" data-quick-prompt="summarize">Summarize</button>
+    <button type="button" class="mobile-quick-action" data-quick-prompt="improve">Improve</button>
+    <button type="button" class="mobile-quick-action" data-quick-prompt="next">Next</button>
+</div>
+
+<div class="mobile-composer">
         <textarea
             id="nova-mobile-input"
             rows="1"
@@ -1001,14 +956,14 @@ window.NovaCloseMobileSessions = function () {
 <script src="/static/js/mobile/nova-mobile-webcards.js?v=mobile-webcards-dedupe-011"></script>
 <script src="/static/js/mobile/nova-mobile-upload.js?v=mobile-upload-rebind-012"></script>
 <script src="/static/js/mobile/nova-mobile-sessions.js?v=mobile-sessions-fix-20260527b"></script>
-<script src="/static/js/mobile/nova-mobile-ui-utils.js?v=mobile-ui-utils-fix-001"></script>
+<script src="/static/js/mobile/nova-mobile-ui-utils.js?v=mobile-ui-utils-clean-quick-004"></script>
 <script src="/static/js/mobile/nova-mobile-voice.js?v=mobile-voice-endgame-002"></script>
 <script src="/static/js/mobile/nova-mobile-listeners.js?v=mobile-modular-001"></script>
 <script src="/static/js/mobile/nova-mobile-stream.js?v=mobile-stream-full-clean-20260604-001"></script>
 <script src="/static/js/mobile/nova-mobile-storage.js?v=mobile-storage-003"></script>
 <script src="/static/js/mobile/nova-mobile-events.js?v=mobile-events-005"></script>
 <script src="/static/js/mobile/nova-mobile-state.js?v=mobile-state-002"></script>
-<script src="/static/js/nova-mobile-app.js?v=mobile-force-image-render-20260604-001"></script>
+<script src="/static/js/nova-mobile-app.js?v=mobile-app-clean-quick-004"></script>
 </body>
 </html>
 

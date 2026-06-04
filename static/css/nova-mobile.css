@@ -4251,7 +4251,7 @@ img {
 
     transform:
         translateY(1px)
-        scale(0.988);next
+        scale(0.988);
 }
 
 .mobile-web-card-inner::after {
@@ -5933,7 +5933,7 @@ body::after {
     100% {
         transform: translateX(260%);
     }
-}next
+}
 
 /* === PREMIUM CODE BLOCKS === */
 
@@ -9202,3 +9202,114 @@ body {
 
 /* END MOBILE_EMERGENCY_VISUAL_RESET_LOCK */
 
+
+
+/* FORCE_MOBILE_QUICK_ACTIONS_CSS_LOCK */
+.force-mobile-quick-actions,
+.mobile-quick-actions[data-mobile-quick-actions] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    gap: 8px !important;
+    padding: 8px 10px !important;
+    margin: 6px 8px !important;
+    overflow-x: auto !important;
+    position: relative !important;
+    z-index: 50 !important;
+}
+
+.force-mobile-quick-actions .mobile-quick-action,
+.mobile-quick-actions[data-mobile-quick-actions] .mobile-quick-action {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 34px !important;
+    padding: 7px 12px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: inherit !important;
+    font-size: 13px !important;
+    white-space: nowrap !important;
+}
+
+
+/* MOBILE_QUICK_ACTIONS_CLEAN_FINAL_CSS_LOCK */
+.mobile-quick-actions-final,
+.mobile-quick-actions[data-mobile-quick-actions] {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+    width: auto !important;
+    max-width: calc(100vw - 16px) !important;
+    min-height: 42px !important;
+    margin: 8px 8px 6px 8px !important;
+    padding: 6px 4px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    position: relative !important;
+    z-index: 9999 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+.mobile-quick-actions-final .mobile-quick-action,
+.mobile-quick-actions[data-mobile-quick-actions] .mobile-quick-action {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 34px !important;
+    padding: 7px 12px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    background: rgba(255, 255, 255, 0.09) !important;
+    color: #f7f7ff !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+}
+
+
+/* MOBILE_QUICK_ACTIONS_NOT_BLOCKING_CSS_LOCK */
+.mobile-quick-actions-final,
+.mobile-quick-actions[data-mobile-quick-actions] {
+    position: static !important;
+    z-index: 2 !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    max-width: calc(100vw - 18px) !important;
+    min-height: 38px !important;
+    margin: 4px 8px 4px 8px !important;
+    padding: 2px 0 !important;
+    pointer-events: auto !important;
+}
+
+.mobile-quick-actions-final .mobile-quick-action,
+.mobile-quick-actions[data-mobile-quick-actions] .mobile-quick-action {
+    flex: 0 0 auto !important;
+    min-height: 30px !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    pointer-events: auto !important;
+}
+
+/* Keep composer/buttons above quick-action row if they overlap. */
+.mobile-composer,
+.mobile-composer *,
+#nova-mobile-input,
+#nova-mobile-send,
+#nova-mobile-attach,
+#nova-mobile-voice,
+#nova-mobile-stop,
+button {
+    position: relative !important;
+    z-index: 20 !important;
+}
