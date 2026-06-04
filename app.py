@@ -702,6 +702,129 @@ def _nova_replace_weak_backend_reply(user_text, result):
         return result
 
 
+
+
+# SAFE_ATTACHMENT_TEXT_CLEANUP_LOCK
+def _nova_safe_clean_attachment_text(raw_text, max_chars=6000):
+    """Clean noisy PDF/OCR/browser extraction before Nova summarizes it."""
+    text_value = str(raw_text or "").replace("\r\n", "\n").replace("\r", "\n")
+
+    noisy_exact = {
+        "search",
+        "images",
+        "videos",
+        "shopping",
+        "news",
+        "maps",
+        "books",
+        "flights",
+        "finance",
+        "all",
+        "create",
+        "inspiration",
+        "keypoints",
+        "continue",
+        "summarize",
+        "improve",
+        "next",
+        "menu",
+        "home",
+        "sign in",
+        "login",
+        "privacy",
+        "terms",
+        "settings",
+        "tools",
+        "feedback",
+        "cached",
+        "similar",
+        "share",
+        "save",
+        "more",
+        "view all",
+    }
+
+    noisy_contains = (
+        "url removed from extracted attachment text",
+        "wayfair.ca",
+        "sponsored",
+        "ad ·",
+        "ads ·",
+        "shop ›",
+        "wall art ›",
+        "free_shipping",
+        "furniture & décor",
+        "kitchen appliances",
+        "prices you'll love",
+        "eye-catching prints",
+        "google",
+        "bing",
+        "search images",
+    )
+
+    cleaned_lines = []
+    seen = set()
+
+    for raw_line in text_value.split("\n"):
+        line = re.sub(r"\s+", " ", str(raw_line or "")).strip()
+        if not line:
+            continue
+
+        low = line.lower().strip(" :;-•*|")
+        low_compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
+
+        if low_compact in noisy_exact:
+            continue
+
+        if any(bad in low for bad in noisy_contains):
+            continue
+
+        if low.startswith("[pdf page") and len(line) < 25:
+            continue
+
+        if low.startswith("attachment <unknown> content"):
+            continue
+
+        if low.startswith("attachment content:"):
+            continue
+
+        if line.startswith("http://") or line.startswith("https://"):
+            continue
+
+        if len(line) <= 2:
+            continue
+
+        dedupe_key = low_compact[:180]
+        if dedupe_key in seen:
+            continue
+
+        seen.add(dedupe_key)
+        cleaned_lines.append(line)
+
+    cleaned = "\n".join(cleaned_lines).strip()
+
+    if not cleaned:
+        cleaned = text_value.strip()
+
+    return cleaned[:max_chars].strip()
+
+
+def _nova_safe_attachment_name(attachment, fallback="uploaded attachment"):
+    """Return a readable attachment name instead of <unknown>."""
+    if isinstance(attachment, dict):
+        for key in ("original_filename", "filename", "name", "title", "stored", "file_name"):
+            value = str(attachment.get(key) or "").strip()
+            if value:
+                return value
+
+        for key in ("file_url", "url", "src"):
+            value = str(attachment.get(key) or "").strip()
+            if value:
+                return value.rsplit("/", 1)[-1] or fallback
+
+    return fallback
+
+
 @app.route("/api/runtime/summary", methods=["GET"])
 def api_runtime_summary():
     return jsonify({"ok": True})
@@ -2041,7 +2164,7 @@ def _nova_strip_urls_from_extracted_attachment_text(value):
         text_value = str(value or "")
         text_value = re.sub(r"https?://\S+", "[URL removed from extracted attachment text]", text_value)
         text_value = re.sub(r"www\.\S+", "[URL removed from extracted attachment text]", text_value)
-        return text_value
+        return _nova_safe_clean_attachment_text(text_value)
     except Exception:
         return str(value or "")
 
@@ -2546,6 +2669,300 @@ def api_chat():
                 session_id,
                 len(attachment_content_lines),
             )
+        # APP_ATTACHMENT_PREHANDLE_REAL_ANCHOR_LOCK
+        # Attachment requests are answered here after extracted text is injected,
+        # but before chat_service/web routing can hijack the prompt.
+        try:
+            import re as _nova_prehandle_re
+
+            _nova_prehandle_text = str(user_text or "")
+            _nova_prehandle_lower = _nova_prehandle_text.lower()
+
+            _nova_has_attachment_text = (
+                "attachment content:" in _nova_prehandle_lower
+                or "uploaded attachment context below" in _nova_prehandle_lower
+                or "extracted attachment text" in _nova_prehandle_lower
+                or "[mobile quick action attachment context active]" in _nova_prehandle_lower
+            )
+
+            _nova_attachment_intent = (
+                "summarize" in _nova_prehandle_lower
+                or "summary" in _nova_prehandle_lower
+                or "keypoint" in _nova_prehandle_lower
+                or "key point" in _nova_prehandle_lower
+                or "continue" in _nova_prehandle_lower
+                or "uploaded pdf attachment" in _nova_prehandle_lower
+                or "uploaded attachment" in _nova_prehandle_lower
+            )
+
+            if _nova_has_attachment_text and _nova_attachment_intent:
+                _nova_noise_exact = {
+                    "attachment <unknown> content:",
+                    "attachment content:",
+                    "uploaded attachment content:",
+                    "[pdf page 1]",
+                    "search",
+                    "images",
+                    "videos",
+                    "create",
+                    "inspiration",
+                    "keypoints",
+                    "continue",
+                    "summarize",
+                    "summary",
+                    "cop",
+                    "filt",
+                    "moderate",
+                    "amazon",
+                    "bath",
+                    "related content",
+                }
+
+                _nova_noise_contains = (
+                    "wayfair",
+                    "save big",
+                    "prices you'll love",
+                    "eye-catching prints",
+                    "url removed from extracted attachment text",
+                    "free_shipping",
+                    "furniture & décor",
+                    "kitchen appliances",
+                    "love, horror and more themes",
+                    "plain field in front of mountain peak",
+                    "free stock photo",
+                    "google news",
+                    "direct_url_patch_hit",
+                )
+
+                _nova_lines = []
+                _nova_seen = set()
+
+                for _nova_raw_line in _nova_prehandle_text.splitlines():
+                    _nova_line = _nova_prehandle_re.sub(r"^\s*\d+\.\s*", "", str(_nova_raw_line or "")).strip()
+                    _nova_line = _nova_line.replace("Attachment <unknown>", "uploaded attachment")
+                    _nova_line = _nova_line.replace("Attachment content:", "").strip()
+                    _nova_line = _nova_prehandle_re.sub(r"\s+", " ", _nova_line).strip()
+
+                    if not _nova_line:
+                        continue
+
+                    _nova_low = _nova_line.lower().strip(" :;-•*|")
+                    _nova_low_compact = _nova_prehandle_re.sub(r"[^a-z0-9]+", " ", _nova_low).strip()
+
+                    if _nova_low_compact in _nova_noise_exact:
+                        continue
+
+                    if any(_nova_bad in _nova_low for _nova_bad in _nova_noise_contains):
+                        continue
+
+                    if _nova_line.startswith("http://") or _nova_line.startswith("https://"):
+                        continue
+
+                    if len(_nova_line) <= 2:
+                        continue
+
+                    if _nova_low.startswith("typed user text"):
+                        continue
+
+                    if _nova_low.startswith("uploaded attachment context below"):
+                        continue
+
+                    if _nova_low.startswith("extracted attachment text"):
+                        continue
+
+                    if _nova_low.startswith("[mobile quick action attachment context active]"):
+                        continue
+
+                    _nova_key = _nova_low_compact[:160]
+                    if not _nova_key or _nova_key in _nova_seen:
+                        continue
+
+                    _nova_seen.add(_nova_key)
+                    _nova_lines.append(_nova_line)
+
+                _nova_top = _nova_lines[:8]
+
+                if _nova_top:
+                    _nova_topic = "; ".join(_nova_top[:3])
+                    _nova_reply = "Attachment analysis:\n"
+                    _nova_reply += f"This attachment appears to contain extracted image/PDF content about: {_nova_topic}.\n\n"
+                    _nova_reply += "Key points:\n"
+                    for _nova_index, _nova_item in enumerate(_nova_top, start=1):
+                        _nova_reply += f"{_nova_index}. {_nova_item}\n"
+                    _nova_reply += "\nPreview:\n" + "\n".join(_nova_top[:6])
+                else:
+                    _nova_reply = (
+                        "Attachment analysis:\n"
+                        "The attachment was received and text was extracted, but the available extraction looks too noisy to summarize cleanly."
+                    )
+
+                app.logger.info(
+                    "[AttachmentPreHandle] answered before chat_service to block web/news hijack session_id=%s lines=%s",
+                    session_id,
+                    len(_nova_top),
+                )
+
+                return jsonify({
+                    "ok": True,
+                    "session_id": session_id,
+                    "active_session_id": session_id,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": _nova_reply.strip(),
+                    },
+                    "debug": {
+                        "route": "attachment_prehandle_response",
+                        "blocked_web_hijack": True,
+                    },
+                })
+
+        except Exception as _nova_prehandle_exc:
+            app.logger.warning(
+                "[AttachmentPreHandle] failed; falling through to chat_service: %s",
+                _nova_prehandle_exc,
+            )
+
+
+        # APP_ATTACHMENT_LINES_PREHANDLE_LOCK
+        # Attachment text is already extracted in app.py. Answer before chat_service.handle,
+        # because chat_service may route short mobile quick-actions to cached web/news URLs.
+        try:
+            import re as _nova_attach_re
+
+            _attachment_lines = attachment_content_lines if isinstance(attachment_content_lines, list) else []
+            _request_attachments = attachments if isinstance(attachments, list) else []
+            _has_current_attachment = bool(_attachment_lines or _request_attachments)
+
+            _intent_text = str(user_text or "").lower()
+            _is_attachment_action = (
+                "summarize" in _intent_text
+                or "summary" in _intent_text
+                or "keypoint" in _intent_text
+                or "key point" in _intent_text
+                or "continue" in _intent_text
+                or "improve" in _intent_text
+                or "next" in _intent_text
+                or len(_intent_text.strip()) <= 40
+            )
+
+            if _has_current_attachment and _is_attachment_action:
+                _raw_text = "\n".join(str(x or "") for x in _attachment_lines).strip()
+                if not _raw_text:
+                    _raw_text = str(user_text or "").strip()
+
+                _noise_exact = {
+                    "attachment <unknown> content:",
+                    "attachment content:",
+                    "uploaded attachment content:",
+                    "[pdf page 1]",
+                    "search",
+                    "images",
+                    "videos",
+                    "create",
+                    "inspiration",
+                    "keypoints",
+                    "continue",
+                    "summarize",
+                    "summary",
+                    "cop",
+                    "filt",
+                    "moderate",
+                    "amazon",
+                    "bath",
+                    "related content",
+                }
+
+                _noise_contains = (
+                    "wayfair",
+                    "save big",
+                    "prices you'll love",
+                    "eye-catching prints",
+                    "url removed from extracted attachment text",
+                    "free_shipping",
+                    "furniture & décor",
+                    "kitchen appliances",
+                    "love, horror and more themes",
+                    "plain field in front of mountain peak",
+                    "free stock photo",
+                    "news.google.com",
+                    "direct_url_patch_hit",
+                )
+
+                _lines = []
+                _seen = set()
+
+                for _raw in _raw_text.splitlines():
+                    _line = _nova_attach_re.sub(r"^\s*\d+\.\s*", "", str(_raw or "")).strip()
+                    _line = _line.replace("Attachment <unknown>", "uploaded attachment")
+                    _line = _line.replace("Attachment content:", "").strip()
+                    _line = _nova_attach_re.sub(r"\s+", " ", _line).strip()
+
+                    if not _line:
+                        continue
+
+                    _low = _line.lower().strip(" :;-•*|")
+                    _compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _low).strip()
+
+                    if _compact in _noise_exact:
+                        continue
+
+                    if any(_bad in _low for _bad in _noise_contains):
+                        continue
+
+                    if _line.startswith("http://") or _line.startswith("https://"):
+                        continue
+
+                    if len(_line) <= 2:
+                        continue
+
+                    if not _compact or _compact in _seen:
+                        continue
+
+                    _seen.add(_compact)
+                    _lines.append(_line)
+
+                _top = _lines[:8]
+
+                if _top:
+                    _topic = "; ".join(_top[:3])
+                    _reply = "Attachment analysis:\n"
+                    _reply += f"This attachment appears to contain extracted image/PDF content about: {_topic}.\n\n"
+                    _reply += "Key points:\n"
+                    for _i, _item in enumerate(_top, start=1):
+                        _reply += f"{_i}. {_item}\n"
+                    _reply += "\nPreview:\n" + "\n".join(_top[:6])
+                else:
+                    _reply = (
+                        "Attachment analysis:\n"
+                        "The attachment was received and processed, but the extracted text is too limited or noisy to summarize cleanly."
+                    )
+
+                app.logger.info(
+                    "[AttachmentLinesPreHandle] answered before chat_service.handle session_id=%s lines=%s",
+                    session_id,
+                    len(_top),
+                )
+
+                return jsonify({
+                    "ok": True,
+                    "session_id": session_id,
+                    "active_session_id": session_id,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": _reply.strip(),
+                    },
+                    "debug": {
+                        "route": "app_attachment_lines_prehandle",
+                        "blocked_web_hijack": True,
+                    },
+                })
+
+        except Exception as _attachment_prehandle_exc:
+            app.logger.warning(
+                "[AttachmentLinesPreHandle] failed; falling through to chat_service.handle: %s",
+                _attachment_prehandle_exc,
+            )
+
         app.logger.info(
             "[api_chat] calling chat_service.handle session_id=%s attachments_count=%s",
             session_id,
@@ -2567,6 +2984,194 @@ def api_chat():
             )
             # NOVA_SAFE_API_CHAT_WEAK_GUARD_AFTER_HANDLE_LOCK
             result = _nova_replace_weak_backend_reply(user_text, result)
+
+            # AFTER_WEAK_GUARD_ATTACHMENT_SUMMARY_LOCK
+            # Final safety: if attachment text was extracted but the reply is still the old canned
+            # attachment response, replace it with a local summary after weak-reply cleanup.
+            try:
+                if attachment_content_lines and isinstance(result, dict):
+                    assistant_message = result.get("assistant_message")
+                    if isinstance(assistant_message, dict):
+                        current_reply = str(
+                            assistant_message.get("text")
+                            or assistant_message.get("content")
+                            or ""
+                        ).strip()
+            
+                        lower_reply = current_reply.lower()
+                        is_canned_attachment_reply = (
+                            "i received the attachment" in lower_reply
+                            and "instead of generating an image" in lower_reply
+                        )
+            
+                        if is_canned_attachment_reply:
+                            extracted_text = "\n\n".join(str(item or "") for item in attachment_content_lines).strip()
+            
+                            try:
+                                summary_payload = _nova_local_summary_from_text(extracted_text)
+                            except Exception:
+                                summary_payload = None
+            
+                            if isinstance(summary_payload, dict):
+                                summary = str(summary_payload.get("summary") or "").strip()
+                                key_points = summary_payload.get("key_points") or []
+                                preview = str(summary_payload.get("preview") or "").strip()
+                            else:
+                                summary = "I extracted readable text from the attachment."
+                                key_points = []
+                                seen = set()
+                                for raw_line in extracted_text.splitlines():
+                                    cleaned = " ".join(str(raw_line or "").strip().split())
+                                    lowered = cleaned.lower()
+                                    if not cleaned or lowered in seen or len(cleaned) < 8:
+                                        continue
+                                    seen.add(lowered)
+                                    key_points.append(cleaned)
+                                    if len(key_points) >= 10:
+                                        break
+                                preview = "\n".join(key_points[:6])
+            
+                            # WEAK_GUARD_CLEAN_BEFORE_FORMAT_LOCK
+                            # Clean weak-guard attachment text before formatting final response.
+                            # Prevents double summaries like:
+                            # "This attachment appears... This attachment appears... Key points..."
+                            import re as _nova_weak_guard_re
+
+                            def _nova_weak_guard_clean_line(value):
+                                line = str(value or "").strip()
+                                line = _nova_weak_guard_re.sub(r"^\\s*\\d+\\.\\s*", "", line).strip()
+                                line = line.replace("", "").strip()
+                                line = line.replace("Attachment <unknown>", "uploaded attachment")
+                                line = _nova_weak_guard_re.sub(r"\\s+", " ", line).strip()
+                                return line
+
+                            _nova_weak_bad_exact = {
+                                "attachment analysis:",
+                                "key points:",
+                                "preview:",
+                                "uploaded attachment content:",
+                                "attachment content:",
+                                "attachment <unknown> content:",
+                                "keypoints",
+                                "summarize",
+                                "summary",
+                                "continue",
+                            }
+
+                            _nova_weak_bad_starts = (
+                                "this attachment appears to contain extracted image/pdf content about:",
+                                "this attachment appears to contain image/search/pdf extraction text about:",
+                                "this attachment appears to be about:",
+                            )
+
+                            _nova_weak_bad_contains = (
+                                "uploaded attachment content:",
+                                "attachment <unknown> content:",
+                                "key points:;",
+                                "preview:;",
+                            )
+
+                            def _nova_weak_keep_line(value):
+                                line = _nova_weak_guard_clean_line(value)
+                                if not line:
+                                    return ""
+
+                                low = line.lower().strip(" :;-•*|")
+                                compact = _nova_weak_guard_re.sub(r"[^a-z0-9]+", " ", low).strip()
+
+                                if low in _nova_weak_bad_exact or compact in _nova_weak_bad_exact:
+                                    return ""
+
+                                if any(low.startswith(prefix) for prefix in _nova_weak_bad_starts):
+                                    return ""
+
+                                if any(bad in low for bad in _nova_weak_bad_contains):
+                                    return ""
+
+                                if line.isdigit():
+                                    return ""
+
+                                if len(line) <= 2:
+                                    return ""
+
+                                return line
+
+                            cleaned_key_points = []
+                            seen_weak_points = set()
+
+                            if isinstance(key_points, list):
+                                for raw_point in key_points:
+                                    clean_point = _nova_weak_keep_line(raw_point)
+                                    if not clean_point:
+                                        continue
+
+                                    key = _nova_weak_guard_re.sub(
+                                        r"[^a-z0-9]+",
+                                        " ",
+                                        clean_point.lower(),
+                                    ).strip()[:160]
+
+                                    if not key or key in seen_weak_points:
+                                        continue
+
+                                    seen_weak_points.add(key)
+                                    cleaned_key_points.append(clean_point)
+
+                                    if len(cleaned_key_points) >= 10:
+                                        break
+
+                            key_points = cleaned_key_points
+
+                            cleaned_preview_lines = []
+                            for raw_preview_line in str(preview or "").splitlines():
+                                clean_preview_line = _nova_weak_keep_line(raw_preview_line)
+                                if clean_preview_line:
+                                    cleaned_preview_lines.append(clean_preview_line)
+
+                            preview = "\n".join(cleaned_preview_lines[:6])
+
+                            if key_points:
+                                summary = (
+                                    "This attachment appears to contain extracted image/PDF content about: "
+                                    + "; ".join(key_points[:3])
+                                    + "."
+                                )
+                            else:
+                                summary = "The attachment was received and processed, but the extracted text is too limited or noisy to summarize cleanly."
+
+                            points_text = ""
+                            if isinstance(key_points, list) and key_points:
+                                points_text = "\n".join(
+                                    f"{index + 1}. {point}"
+                                    for index, point in enumerate(key_points[:10])
+                                )
+            
+                            replacement_text = (
+                                "Attachment analysis:\n"
+                                + (summary or "I extracted readable text from the attachment.")
+                                + ("\n\nKey points:\n" + points_text if points_text else "")
+                                + ("\n\nPreview:\n" + preview[:1200] if preview else "")
+                            ).strip()
+            
+                            assistant_message["text"] = replacement_text
+                            assistant_message["content"] = replacement_text
+                            result["assistant_message"] = assistant_message
+                            result["skip_cleanup"] = True
+                            result["skip_post_processing"] = True
+                            result["skip_rewrite"] = True
+            
+                            app.logger.info(
+                                "[AttachmentContentGate] after weak guard replaced canned attachment reply chars=%s key_points=%s session_id=%s",
+                                len(replacement_text),
+                                len(key_points or []),
+                                session_id,
+                            )
+            except Exception as _nova_after_weak_guard_attachment_error:
+                app.logger.warning(
+                    "[AttachmentContentGate] after weak guard attachment summary failed error=%s",
+                    _nova_after_weak_guard_attachment_error,
+                )
+
 
 
             if isinstance(result, dict):
@@ -4713,6 +5318,405 @@ def api_attachment_keypoints():
             "ok": False,
             "error": str(error),
         }), 500
+
+
+
+
+# CHAT_ATTACHMENT_RESPONSE_CLEANUP_LOCK
+@app.after_request
+def _nova_clean_attachment_analysis_response(response):
+    """Final cleanup for canned attachment-analysis replies before mobile sees them."""
+    try:
+        from flask import request
+        import json
+        import re
+
+        if request.path != "/api/chat":
+            return response
+
+        content_type = str(response.headers.get("Content-Type") or "").lower()
+        if "application/json" not in content_type:
+            return response
+
+        data = response.get_json(silent=True)
+        if not isinstance(data, dict):
+            return response
+
+        assistant_message = data.get("assistant_message")
+        if not isinstance(assistant_message, dict):
+            return response
+
+        text_value = str(assistant_message.get("text") or "")
+
+        if "Attachment analysis:" not in text_value:
+            return response
+
+        noisy_exact = {
+            "attachment <unknown> content:",
+            "attachment content:",
+            "[pdf page 1]",
+            "search",
+            "images",
+            "videos",
+            "create",
+            "inspiration",
+            "keypoints",
+            "continue",
+            "cop",
+            "filt",
+            "moderate",
+            "amazon",
+            "bath",
+            "related content",
+        }
+
+        noisy_contains = (
+            "wayfair",
+            "save big",
+            "prices you'll love",
+            "eye-catching prints",
+            "url removed from extracted attachment text",
+            "free_shipping",
+            "furniture & décor",
+            "kitchen appliances",
+            "love, horror and more themes",
+            "plain field in front of mountain peak",
+            "free stock photo",
+            "6000 ×",
+            "jpeg",
+        )
+
+        def clean_line(line):
+            line = re.sub(r"^\s*\d+\.\s*", "", str(line or "")).strip()
+            line = line.replace("Attachment <unknown>", "uploaded attachment")
+            line = line.replace("Attachment content:", "").strip()
+            line = re.sub(r"\s+", " ", line).strip()
+            return line
+
+        raw_lines = []
+        for line in text_value.splitlines():
+            cleaned = clean_line(line)
+            if not cleaned:
+                continue
+
+            low = cleaned.lower().strip(" :;-•*|")
+            low_compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
+
+            if low_compact in noisy_exact:
+                continue
+
+            if any(bad in low for bad in noisy_contains):
+                continue
+
+            if len(cleaned) <= 2:
+                continue
+
+            raw_lines.append(cleaned)
+
+        useful = []
+        seen = set()
+
+        skip_prefixes = (
+            "attachment analysis",
+            "this attachment appears to be about",
+            "key points",
+            "preview",
+        )
+
+        for line in raw_lines:
+            low = line.lower()
+            if any(low.startswith(prefix) for prefix in skip_prefixes):
+                continue
+
+            key = re.sub(r"[^a-z0-9]+", " ", low).strip()[:160]
+            if not key or key in seen:
+                continue
+
+            seen.add(key)
+            useful.append(line)
+
+        if useful:
+            top = useful[:8]
+            topic = "; ".join(top[:3])
+            cleaned_text = "Attachment analysis:\n"
+            cleaned_text += f"This attachment appears to contain image/search/PDF extraction text about: {topic}.\n\n"
+            cleaned_text += "Key points:\n"
+            for index, item in enumerate(top, start=1):
+                cleaned_text += f"{index}. {item}\n"
+
+            cleaned_text += "\nPreview:\n"
+            cleaned_text += "\n".join(top[:6])
+        else:
+            cleaned_text = (
+                "Attachment analysis:\n"
+                "The attachment was received and text was extracted, but most of the extracted text looks like noisy search-page/navigation content rather than a clean document body."
+            )
+
+        assistant_message["text"] = cleaned_text.strip()
+        data["assistant_message"] = assistant_message
+
+        payload = json.dumps(data)
+        response.set_data(payload)
+        response.headers["Content-Length"] = str(len(payload.encode("utf-8")))
+
+        return response
+
+    except Exception:
+        return response
+
+
+
+
+# ATTACHMENT_OUTPUT_NOISE_CLEANUP_LOCK
+@app.after_request
+def _nova_final_attachment_output_noise_cleanup(response):
+    """Final cosmetic cleanup for attachment-analysis text."""
+    try:
+        from flask import request
+        import json
+        import re
+
+        if request.path != "/api/chat":
+            return response
+
+        content_type = str(response.headers.get("Content-Type") or "").lower()
+        if "application/json" not in content_type:
+            return response
+
+        data = response.get_json(silent=True)
+        if not isinstance(data, dict):
+            return response
+
+        assistant_message = data.get("assistant_message")
+        if not isinstance(assistant_message, dict):
+            return response
+
+        text_value = str(assistant_message.get("text") or "")
+        if "Attachment analysis:" not in text_value:
+            return response
+
+        bad_exact = {
+            "uploaded attachment content:",
+            "attachment content:",
+            "attachment <unknown> content:",
+            "keypoints",
+            "continue",
+            "summarize",
+            "summary",
+            "preview:",
+            "key points:",
+        }
+
+        bad_contains = (
+            "love, horror and more themes",
+            "wayfair",
+            "save big",
+            "prices you'll love",
+            "eye-catching prints",
+            "url removed from extracted attachment text",
+            "free_shipping",
+            "furniture & décor",
+            "kitchen appliances",
+            "related content",
+        )
+
+        useful = []
+        seen = set()
+
+        for raw_line in text_value.splitlines():
+            line = re.sub(r"^\s*\d+\.\s*", "", str(raw_line or "")).strip()
+            line = line.replace("", "").strip()
+            line = line.replace("Attachment <unknown>", "uploaded attachment")
+            line = re.sub(r"\s+", " ", line).strip()
+
+            if not line:
+                continue
+
+            low = line.lower().strip(" :;-•*|")
+            compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
+
+            if low.startswith("attachment analysis"):
+                continue
+
+            if low.startswith("this attachment appears"):
+                continue
+
+            if low in bad_exact or compact in bad_exact:
+                continue
+
+            if any(bad in low for bad in bad_contains):
+                continue
+
+            if line.isdigit():
+                continue
+
+            if len(line) <= 2:
+                continue
+
+            key = compact[:160]
+            if not key or key in seen:
+                continue
+
+            seen.add(key)
+            useful.append(line)
+
+        top = useful[:8]
+
+        if top:
+            topic = "; ".join(top[:3])
+            cleaned = "Attachment analysis:\n"
+            cleaned += f"This attachment appears to contain extracted image/PDF content about: {topic}.\n\n"
+            cleaned += "Key points:\n"
+
+            for index, item in enumerate(top, start=1):
+                cleaned += f"{index}. {item}\n"
+
+            cleaned += "\nPreview:\n"
+            cleaned += "\n".join(top[:6])
+        else:
+            cleaned = (
+                "Attachment analysis:\n"
+                "The attachment was received and processed, but the extracted text is too limited or noisy to summarize cleanly."
+            )
+
+        assistant_message["text"] = cleaned.strip()
+        data["assistant_message"] = assistant_message
+
+        payload = json.dumps(data, ensure_ascii=False)
+        response.set_data(payload)
+        response.headers["Content-Length"] = str(len(payload.encode("utf-8")))
+
+        return response
+
+    except Exception:
+        return response
+
+
+
+
+# ATTACHMENT_DOUBLE_SUMMARY_CLEANUP_LOCK
+@app.after_request
+def _nova_attachment_double_summary_cleanup(response):
+    """Remove repeated attachment-analysis template lines from final output."""
+    try:
+        from flask import request
+        import json
+        import re
+
+        if request.path != "/api/chat":
+            return response
+
+        content_type = str(response.headers.get("Content-Type") or "").lower()
+        if "application/json" not in content_type:
+            return response
+
+        data = response.get_json(silent=True)
+        if not isinstance(data, dict):
+            return response
+
+        assistant_message = data.get("assistant_message")
+        if not isinstance(assistant_message, dict):
+            return response
+
+        text_value = str(assistant_message.get("text") or "")
+        if "Attachment analysis:" not in text_value:
+            return response
+
+        lines = []
+        seen = set()
+
+        bad_exact = {
+            "attachment analysis:",
+            "key points:",
+            "preview:",
+            "uploaded attachment content:",
+            "attachment content:",
+            "attachment <unknown> content:",
+            "keypoints",
+            "summarize",
+            "summary",
+            "continue",
+        }
+
+        bad_starts = (
+            "this attachment appears to contain extracted image/pdf content about:",
+            "this attachment appears to contain image/search/pdf extraction text about:",
+            "this attachment appears to be about:",
+            "key points:",
+            "preview:",
+        )
+
+        bad_contains = (
+            "uploaded attachment content:",
+            "attachment <unknown> content:",
+            "key points:;",
+            "preview:;",
+        )
+
+        for raw_line in text_value.splitlines():
+            line = str(raw_line or "").strip()
+            line = re.sub(r"^\s*\d+\.\s*", "", line).strip()
+            line = line.replace("", "").strip()
+            line = re.sub(r"\s+", " ", line).strip()
+
+            if not line:
+                continue
+
+            low = line.lower().strip(" :;-•*|")
+            compact = re.sub(r"[^a-z0-9]+", " ", low).strip()
+
+            if low in bad_exact or compact in bad_exact:
+                continue
+
+            if any(low.startswith(prefix) for prefix in bad_starts):
+                continue
+
+            if any(bad in low for bad in bad_contains):
+                continue
+
+            if line.isdigit():
+                continue
+
+            if len(line) <= 2:
+                continue
+
+            key = compact[:160]
+            if not key or key in seen:
+                continue
+
+            seen.add(key)
+            lines.append(line)
+
+        top = lines[:8]
+
+        if top:
+            topic = "; ".join(top[:3])
+            cleaned = "Attachment analysis:\n"
+            cleaned += f"This attachment appears to contain extracted image/PDF content about: {topic}.\n\n"
+            cleaned += "Key points:\n"
+
+            for index, item in enumerate(top, start=1):
+                cleaned += f"{index}. {item}\n"
+
+            cleaned += "\nPreview:\n"
+            cleaned += "\n".join(top[:6])
+        else:
+            cleaned = (
+                "Attachment analysis:\n"
+                "The attachment was received and processed, but the extracted text is too limited or noisy to summarize cleanly."
+            )
+
+        assistant_message["text"] = cleaned.strip()
+        data["assistant_message"] = assistant_message
+
+        payload = json.dumps(data, ensure_ascii=False)
+        response.set_data(payload)
+        response.headers["Content-Length"] = str(len(payload.encode("utf-8")))
+
+        return response
+
+    except Exception:
+        return response
 
 
 if __name__ == "__main__":

@@ -285,6 +285,41 @@ class ChatService:
         lower = text.lower()
         attachments = attachments if isinstance(attachments, list) else []
 
+        # EXECUTE_WEB_FETCH_ATTACHMENT_CHOKE_LOCK route guard
+        injected_attachment_markers = (
+            "attachment content:",
+            "uploaded attachment context below",
+            "extracted attachment text",
+            "[mobile quick action attachment context active]",
+            "uploaded pdf attachment",
+            "uploaded attachment",
+        )
+        if any(marker in lower for marker in injected_attachment_markers):
+            return {
+                "route": self.ROUTE_ATTACHMENT_ANALYSIS,
+                "mode": "attachment_text_injected",
+                "confidence": 0.99,
+                "reasons": ["injected_attachment_text_blocks_web_route"],
+                "save_artifact": False,
+                "save_memory": True,
+                "use_memory": True,
+            }
+
+        # SHORT_CHAT_SKIP_WEB_ROUTE_LOCK
+        if (
+            not attachments
+            and lower in {"hi", "yo", "hey", "hello", "sup", "k", "ok", "kk", "test"}
+        ):
+            return {
+                "route": self.ROUTE_GENERAL_CHAT,
+                "mode": "chat",
+                "confidence": 0.95,
+                "reasons": ["short_casual_message_skip_web"],
+                "save_artifact": False,
+                "save_memory": True,
+                "use_memory": True,
+            }
+
         def base(route, mode="chat", confidence=0.8, reasons=None, save_artifact=False, save_memory=True, use_memory=True, **extra):
             decision = {
                 "route": route,
@@ -2813,7 +2848,8 @@ def subtract(a, b):
     return a - b
 
 
-if __name__ == "__main__":
+# NO_IMAGE_GENERATION_WHEN_ATTACHMENT_PRESENT_LOCK: attachment analysis must not be hijacked by image generation.
+if (not attachments) and (__name__ == "__main__"):
     print("Calculator app created.")
     print("2 + 3 =", add(2, 3))
 '''.strip()
@@ -4254,7 +4290,8 @@ if __name__ == "__main__":
                 source_urls_for_cache = meta.get("source_urls")
                 sources_for_cache = meta.get("sources")
 
-                if isinstance(source_urls_for_cache, list) and source_urls_for_cache:
+                # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+                if (not attachments) and (isinstance(source_urls_for_cache, list) and source_urls_for_cache):
                     import json
                     from pathlib import Path
                     from datetime import datetime
@@ -8376,8 +8413,147 @@ if __name__ == "__main__":
         text = str(user_text or "").strip()
         user_msg = self._build_user_message(user_text, attachments=attachments)
 
+        # EXECUTE_WEB_FETCH_ATTACHMENT_CHOKE_LOCK
+        # app.py injects attachment text into user_text, then suppresses raw attachments before chat_service.
+        # That means attachments can be empty here even though this is an attachment request.
+        # If attachment-injected text reaches the web fetch lane, answer from the attachment text instead
+        # of opening cached Google News / direct URLs.
+        try:
+            import re as _nova_attach_re
+
+            _attach_text = str(user_text or "")
+            _attach_lower = _attach_text.lower()
+
+            _has_injected_attachment = (
+                "attachment content:" in _attach_lower
+                or "uploaded attachment context below" in _attach_lower
+                or "extracted attachment text" in _attach_lower
+                or "[mobile quick action attachment context active]" in _attach_lower
+                or "uploaded pdf attachment" in _attach_lower
+                or "uploaded attachment" in _attach_lower
+            )
+
+            if _has_injected_attachment:
+                _noise_exact = {
+                    "attachment <unknown> content:",
+                    "attachment content:",
+                    "uploaded attachment content:",
+                    "[pdf page 1]",
+                    "search",
+                    "images",
+                    "videos",
+                    "create",
+                    "inspiration",
+                    "keypoints",
+                    "continue",
+                    "summarize",
+                    "summary",
+                    "cop",
+                    "filt",
+                    "moderate",
+                    "amazon",
+                    "bath",
+                    "related content",
+                }
+
+                _noise_contains = (
+                    "wayfair",
+                    "save big",
+                    "prices you'll love",
+                    "eye-catching prints",
+                    "url removed from extracted attachment text",
+                    "free_shipping",
+                    "furniture & décor",
+                    "kitchen appliances",
+                    "love, horror and more themes",
+                    "plain field in front of mountain peak",
+                    "free stock photo",
+                    "news.google.com",
+                    "direct_url_patch_hit",
+                )
+
+                _lines = []
+                _seen = set()
+
+                for _raw in _attach_text.splitlines():
+                    _line = _nova_attach_re.sub(r"^\s*\d+\.\s*", "", str(_raw or "")).strip()
+                    _line = _line.replace("Attachment <unknown>", "uploaded attachment")
+                    _line = _line.replace("Attachment content:", "").strip()
+                    _line = _nova_attach_re.sub(r"\s+", " ", _line).strip()
+
+                    if not _line:
+                        continue
+
+                    _low = _line.lower().strip(" :;-•*|")
+                    _compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _low).strip()
+
+                    if _compact in _noise_exact:
+                        continue
+
+                    if any(_bad in _low for _bad in _noise_contains):
+                        continue
+
+                    if _line.startswith("http://") or _line.startswith("https://"):
+                        continue
+
+                    if len(_line) <= 2:
+                        continue
+
+                    if _low.startswith("typed user text"):
+                        continue
+
+                    if _low.startswith("uploaded attachment context below"):
+                        continue
+
+                    if _low.startswith("extracted attachment text"):
+                        continue
+
+                    if _low.startswith("[mobile quick action attachment context active]"):
+                        continue
+
+                    if not _compact or _compact in _seen:
+                        continue
+
+                    _seen.add(_compact)
+                    _lines.append(_line)
+
+                _top = _lines[:8]
+
+                if _top:
+                    _topic = "; ".join(_top[:3])
+                    _reply = "Attachment analysis:\n"
+                    _reply += f"This attachment appears to contain extracted image/PDF content about: {_topic}.\n\n"
+                    _reply += "Key points:\n"
+                    for _i, _item in enumerate(_top, start=1):
+                        _reply += f"{_i}. {_item}\n"
+                    _reply += "\nPreview:\n" + "\n".join(_top[:6])
+                else:
+                    _reply = (
+                        "Attachment analysis:\n"
+                        "The attachment was received and text was extracted, but the available extraction looks too noisy to summarize cleanly."
+                    )
+
+                return {
+                    "ok": True,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": _reply.strip(),
+                    },
+                    "debug": {
+                        "route": "execute_web_fetch_attachment_choke",
+                        "blocked_web_hijack": True,
+                    },
+                    "skip_cleanup": True,
+                    "skip_post_processing": True,
+                    "skip_rewrite": True,
+                }
+
+        except Exception:
+            pass
+
         # OPEN_WEB_SOURCE_FOLLOWUP_HANDLER_LOCK
-        if self._safe_str(decision.get("strategy")).strip().lower() == "open_web_source_followup":
+        # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+        if (not attachments) and (self._safe_str(decision.get("strategy")).strip().lower() == "open_web_source_followup"):
             import re
 
             source_index = 0
@@ -8432,20 +8608,23 @@ if __name__ == "__main__":
             except Exception as exc:
                 exec_debug("OPEN_WEB_SOURCE_FOLLOWUP_LOOKUP_FAILED:", exc)
 
-            if (not prior_urls or source_index >= len(prior_urls)) and isinstance(getattr(self, "_last_web_source_urls", None), list):
+            # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+            if (not attachments) and ((not prior_urls or source_index >= len(prior_urls)) and isinstance(getattr(self, "_last_web_source_urls", None), list)):
                 cached_urls = [
                     self._safe_str(url).strip()
                     for url in getattr(self, "_last_web_source_urls", [])
                     if self._safe_str(url).strip()
                 ]
 
-                if cached_urls:
+                # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+                if (not attachments) and (cached_urls):
                     prior_urls = cached_urls
                     cached_sources = getattr(self, "_last_web_sources", [])
                     prior_sources = cached_sources if isinstance(cached_sources, list) else []
 
             # WEB_FOLLOWUP_DURABLE_SOURCE_CACHE_LOCK
-            if not prior_urls or source_index >= len(prior_urls):
+            # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+            if (not attachments) and (not prior_urls or source_index >= len(prior_urls)):
                 try:
                     import json
                     from pathlib import Path
@@ -8467,7 +8646,8 @@ if __name__ == "__main__":
                 except Exception as exc:
                     exec_debug("WEB_FOLLOWUP_DURABLE_SOURCE_CACHE_READ_FAILED:", exc)
 
-            if not prior_urls or source_index >= len(prior_urls):
+            # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+            if (not attachments) and (not prior_urls or source_index >= len(prior_urls)):
                 assistant_msg = self._build_assistant_message(
                     "I could not find a previous source to open. Run a fresh web search first.",
                     meta={
@@ -8494,7 +8674,20 @@ if __name__ == "__main__":
             text = selected_url
 
 
-        if text.startswith("http://") or text.startswith("https://"):
+        # DIRECT_URL_TRUE_REASON_ONLY_LOCK
+        # Only run direct URL fetch when route decision originally classified the USER input as a direct URL.
+        # Cached source URLs / Google News URLs can also get copied into `text`, but they must not hijack
+        # attachment quick actions like Summarize / Keypoints / Continue.
+        original_user_text_for_direct_url = self._safe_str(user_text).strip()
+        direct_url_reasons = decision.get("reasons") if isinstance(decision, dict) else []
+        direct_url_reasons = direct_url_reasons if isinstance(direct_url_reasons, list) else []
+
+        if (
+            (not attachments)
+            and ("direct_url" in direct_url_reasons)
+            and (original_user_text_for_direct_url.startswith("http://") or original_user_text_for_direct_url.startswith("https://"))
+            and (text.startswith("http://") or text.startswith("https://"))
+        ):
             print("DIRECT_URL_PATCH_HIT =", text)
 
             web_result = {}
@@ -8754,7 +8947,8 @@ if __name__ == "__main__":
         exec_debug("WEB_FETCH_RESULT:", web_result)
 
         raw_results = web_result.get("results", []) if isinstance(web_result, dict) else []
-        if not isinstance(raw_results, list):
+        # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+        if (not attachments) and (not isinstance(raw_results, list)):
             raw_results = []
 
         cleaned_sources = self._clean_web_results(raw_results)
@@ -8951,14 +9145,16 @@ if __name__ == "__main__":
                 exc,
             )
 
-        if not body and sources:
+        # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+        if (not attachments) and (not body and sources):
             body = "\n".join(
                 item.get("title", "")
                 for item in sources
                 if isinstance(item, dict) and item.get("title")
             )
 
-        if not body:
+        # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+        if (not attachments) and (not body):
             assistant_text = (
                 "No verified fresh web results were retrieved.\n\n"
                 "Try a more specific query with a team, person, date, or source."
@@ -10136,7 +10332,227 @@ if __name__ == "__main__":
                 )
             }
 
+
+    # ATTACHMENT_BLOCKS_WEB_ROUTE_LOCK
+    def _nova_current_text_has_attachment_context(self, text: str) -> bool:
+        """Detect attachment-injected prompts so web/news routing does not hijack them."""
+        value = str(text or "").lower()
+        markers = (
+            "uploaded attachment context below",
+            "attachment content:",
+            "uploaded attachment",
+            "extracted attachment text",
+            "[mobile quick action attachment context active]",
+            "summarize this uploaded pdf attachment",
+            "summarize the uploaded attachment",
+            "key points from the uploaded attachment",
+            "continue from the uploaded attachment",
+            "uploaded pdf attachment",
+        )
+        return any(marker in value for marker in markers)
+
     def handle(self, user_text: str, session_id: str = "", attachments=None):
+
+        # CHAT_SERVICE_HARD_ATTACHMENT_FINAL_LOCK
+        try:
+            _txt = str(user_text or "").lower()
+            _has_attachment_context = any(
+                marker in _txt
+                for marker in [
+                    "attachment content:",
+                    "uploaded attachment context below",
+                    "extracted attachment text",
+                    "[mobile quick action attachment context active]",
+                    "uploaded pdf attachment",
+                    "uploaded attachment"
+                ]
+            )
+            _attachment_intent = any(
+                keyword in _txt
+                for keyword in ["summarize","summary","keypoint","key point","continue"]
+            )
+            if _has_attachment_context and _attachment_intent:
+                _lines = []
+                _seen = set()
+                for line in user_text.splitlines():
+                    clean = line.strip()
+                    if not clean or clean.lower().startswith("typed user text"):
+                        continue
+                    key = clean.lower()[:160]
+                    if key in _seen:
+                        continue
+                    _seen.add(key)
+                    _lines.append(clean)
+                top = _lines[:8]
+                if top:
+                    topic = "; ".join(top[:3])
+                    reply = "Attachment analysis:\\n"
+                    reply += f"This attachment appears to contain extracted image/PDF content about: {topic}.\\n\\n"
+                    reply += "Key points:\\n"
+                    for i,l in enumerate(top,start=1):
+                        reply += f"{i}. {l}\\n"
+                    reply += "\\nPreview:\\n" + "\\n".join(top[:6])
+                else:
+                    reply = "Attachment analysis:\\nThe attachment was received and text was extracted, but it is too noisy to summarize cleanly."
+                return {
+                    "ok": True,
+                    "assistant_message": {"role":"assistant","text":reply.strip()},
+                    "debug":{"route":"chat_service_hard_attachment_final","blocked_web_hijack":True},
+                    "skip_cleanup":True,
+                    "skip_post_processing":True,
+                    "skip_rewrite":True,
+                }
+        except Exception:
+            pass
+
+        # CHAT_SERVICE_HARD_ATTACHMENT_GUARD_LOCK
+        # Hard stop: if app.py injected attachment text into user_text, do not let
+        # direct URL / Google News / web routing hijack this request.
+        try:
+            import re as _nova_attach_re
+
+            _nova_attach_text = str(user_text or "")
+            _nova_attach_lower = _nova_attach_text.lower()
+
+            _nova_has_attachment_context = (
+                "attachment content:" in _nova_attach_lower
+                or "uploaded attachment context below" in _nova_attach_lower
+                or "extracted attachment text" in _nova_attach_lower
+                or "[mobile quick action attachment context active]" in _nova_attach_lower
+            )
+
+            _nova_attachment_intent = (
+                "summarize" in _nova_attach_lower
+                or "summary" in _nova_attach_lower
+                or "keypoint" in _nova_attach_lower
+                or "key point" in _nova_attach_lower
+                or "continue" in _nova_attach_lower
+                or "uploaded pdf attachment" in _nova_attach_lower
+                or "uploaded attachment" in _nova_attach_lower
+                or "image" in _nova_attach_lower
+                or "pdf" in _nova_attach_lower
+            )
+
+            if _nova_has_attachment_context and _nova_attachment_intent:
+                _nova_noise_exact = {
+                    "attachment <unknown> content:",
+                    "attachment content:",
+                    "uploaded attachment content:",
+                    "[pdf page 1]",
+                    "search",
+                    "images",
+                    "videos",
+                    "create",
+                    "inspiration",
+                    "keypoints",
+                    "continue",
+                    "summarize",
+                    "summary",
+                    "cop",
+                    "filt",
+                    "moderate",
+                    "amazon",
+                    "bath",
+                    "related content",
+                }
+
+                _nova_noise_contains = (
+                    "wayfair",
+                    "save big",
+                    "prices you'll love",
+                    "eye-catching prints",
+                    "url removed from extracted attachment text",
+                    "free_shipping",
+                    "furniture & décor",
+                    "kitchen appliances",
+                    "love, horror and more themes",
+                    "plain field in front of mountain peak",
+                    "free stock photo",
+                    "google news",
+                    "direct_url_patch_hit",
+                    "news.google.com",
+                )
+
+                _nova_lines = []
+                _nova_seen = set()
+
+                for _nova_raw_line in _nova_attach_text.splitlines():
+                    _nova_line = _nova_attach_re.sub(r"^\s*\d+\.\s*", "", str(_nova_raw_line or "")).strip()
+                    _nova_line = _nova_line.replace("Attachment <unknown>", "uploaded attachment")
+                    _nova_line = _nova_line.replace("Attachment content:", "").strip()
+                    _nova_line = _nova_attach_re.sub(r"\s+", " ", _nova_line).strip()
+
+                    if not _nova_line:
+                        continue
+
+                    _nova_low = _nova_line.lower().strip(" :;-•*|")
+                    _nova_low_compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _nova_low).strip()
+
+                    if _nova_low_compact in _nova_noise_exact:
+                        continue
+
+                    if any(_nova_bad in _nova_low for _nova_bad in _nova_noise_contains):
+                        continue
+
+                    if _nova_line.startswith("http://") or _nova_line.startswith("https://"):
+                        continue
+
+                    if len(_nova_line) <= 2:
+                        continue
+
+                    if _nova_low.startswith("typed user text"):
+                        continue
+
+                    if _nova_low.startswith("uploaded attachment context below"):
+                        continue
+
+                    if _nova_low.startswith("extracted attachment text"):
+                        continue
+
+                    if _nova_low.startswith("[mobile quick action attachment context active]"):
+                        continue
+
+                    _nova_key = _nova_low_compact[:160]
+                    if not _nova_key or _nova_key in _nova_seen:
+                        continue
+
+                    _nova_seen.add(_nova_key)
+                    _nova_lines.append(_nova_line)
+
+                _nova_top = _nova_lines[:8]
+
+                if _nova_top:
+                    _nova_topic = "; ".join(_nova_top[:3])
+                    _nova_reply = "Attachment analysis:\n"
+                    _nova_reply += f"This attachment appears to contain extracted image/PDF content about: {_nova_topic}.\n\n"
+                    _nova_reply += "Key points:\n"
+                    for _nova_index, _nova_item in enumerate(_nova_top, start=1):
+                        _nova_reply += f"{_nova_index}. {_nova_item}\n"
+                    _nova_reply += "\nPreview:\n" + "\n".join(_nova_top[:6])
+                else:
+                    _nova_reply = (
+                        "Attachment analysis:\n"
+                        "The attachment was received and text was extracted, but the available extraction looks too noisy to summarize cleanly."
+                    )
+
+                return {
+                    "ok": True,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": _nova_reply.strip(),
+                    },
+                    "debug": {
+                        "route": "chat_service_hard_attachment_guard",
+                        "blocked_web_hijack": True,
+                    },
+                    "skip_cleanup": True,
+                    "skip_post_processing": True,
+                    "skip_rewrite": True,
+                }
+
+        except Exception:
+            pass
+
         exec_debug("HANDLE IS BEING CALLED")
         # REMOVE_CHAT_HANDLE_DEBUG_PRINT_LOCK
 
@@ -19878,6 +20294,50 @@ def _nova_runtime_handle_image_generation(
     parent_artifact_id: str = "",
     source_type: str = "generated",
 ) -> dict:
+    # IMAGE_GENERATION_PROMPT_ATTACHMENT_GUARD_LOCK
+    try:
+        _nova_image_prompt_text = str(user_text or prompt or text or "").lower()
+    except Exception:
+        _nova_image_prompt_text = ""
+    
+    if (
+        "attachment " in _nova_image_prompt_text
+        or "attachment images_" in _nova_image_prompt_text
+        or "binary attachment skipped" in _nova_image_prompt_text
+        or "session attachment memory" in _nova_image_prompt_text
+        or "/api/uploads/" in _nova_image_prompt_text
+    ):
+        return {
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "I received the attachment, but I should analyze it instead of generating an image from it.",
+            },
+            "skip_cleanup": True,
+            "skip_post_processing": True,
+            "skip_rewrite": True,
+        }
+    
+    # RUNTIME_IMAGE_HIT_DIRECT_ATTACHMENT_GUARD_LOCK
+    _nova_prompt_guard_text = str(prompt or "").lower()
+
+    if (
+        "attachment " in _nova_prompt_guard_text
+        or "binary attachment skipped" in _nova_prompt_guard_text
+        or "session attachment memory" in _nova_prompt_guard_text
+        or "/api/uploads/" in _nova_prompt_guard_text
+    ):
+        return {
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "I received the attachment. I should analyze the uploaded file instead of generating an image from it.",
+            },
+            "skip_cleanup": True,
+            "skip_post_processing": True,
+            "skip_rewrite": True,
+        }
+
     print("RUNTIME IMAGE HIT PROMPT =", repr(prompt))
 
     saved_artifact = None
