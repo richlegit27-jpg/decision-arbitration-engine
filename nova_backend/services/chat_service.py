@@ -3636,7 +3636,34 @@ if (not attachments) and (__name__ == "__main__"):
         # CORE CLIENTS
         # =========================
 
-        self.client = OpenAI()
+        # FORCE_CHAT_SERVICE_OPENAI_KEY_LOCK
+        # Load the exact Nova .env key before creating the OpenAI client.
+        env_key = str(os.getenv("OPENAI_API_KEY") or "").strip().strip("\"").strip("'")
+
+        if not env_key:
+            env_path = Path(os.getcwd()) / ".env"
+
+            if env_path.exists():
+                for raw_line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    line = raw_line.strip()
+
+                    if not line or line.startswith("#"):
+                        continue
+
+                    if line.startswith("OPENAI_API_KEY="):
+                        env_key = line.split("=", 1)[1].strip().strip("\"").strip("'")
+                        break
+
+        if env_key:
+            os.environ["OPENAI_API_KEY"] = env_key
+            print(
+                "[Nova OpenAI Key] loaded",
+                env_key[:10] + "..." + env_key[-4:],
+            )
+            self.client = OpenAI(api_key=env_key)
+        else:
+            print("[Nova OpenAI Key] WARNING: OPENAI_API_KEY missing")
+            self.client = OpenAI()
         self.agent = AgentService()
         self.memory_ranker = MemoryRankerService()
         self.tools = ToolService(
@@ -8647,6 +8674,51 @@ if (not attachments) and (__name__ == "__main__"):
                     exec_debug("WEB_FOLLOWUP_DURABLE_SOURCE_CACHE_READ_FAILED:", exc)
 
             # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
+            # CHAT_SERVICE_ATTACHMENT_SOURCE_GUARD_LOCK
+            attachment_language = any(
+                phrase in str(user_text or "").lower()
+                for phrase in (
+                    "attachment",
+                    "attached",
+                    "upload",
+                    "uploaded",
+                    "image",
+                    "picture",
+                    "photo",
+                    "file",
+                    "pdf",
+                    "screenshot",
+                    "what is in this",
+                    "what's in this",
+                    "analyze this",
+                    "describe this",
+                    "summarize this",
+                )
+            )
+
+            if attachment_language and (not prior_urls or source_index >= len(prior_urls)):
+                assistant_msg = self._build_assistant_message(
+                    "I see you are asking about an uploaded attachment, but I did not receive usable attachment data in this chat request. Re-upload the image/file, then send the question again.",
+                    meta={
+                        "strategy": "attachment_expected_but_missing",
+                        "source_index": source_index,
+                        "source_urls": prior_urls,
+                        "sources": prior_sources[:5] if isinstance(prior_sources, list) else [],
+                    },
+                )
+
+                return self._finalize_response(
+                    session_id=session_id,
+                    user_text=user_text,
+                    user_msg=user_msg,
+                    assistant_msg=assistant_msg,
+                    messages=messages,
+                    memory_items=memory_items,
+                    started_at=started_at,
+                    route="attachment_expected_but_missing",
+                    intent="attachment",
+                )
+
             if (not attachments) and (not prior_urls or source_index >= len(prior_urls)):
                 assistant_msg = self._build_assistant_message(
                     "I could not find a previous source to open. Run a fresh web search first.",

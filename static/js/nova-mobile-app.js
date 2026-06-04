@@ -393,6 +393,58 @@
     return `<div class="mobile-source-list">${cards}</div>`;
   }
 
+  // MOBILE_FINAL_RESPONSE_IMAGE_RENDER_LOCK
+  function getFinalResponseImageUrl(item) {
+    if (!item || typeof item !== "object") return "";
+
+    if (item.image_url) return String(item.image_url);
+    if (item.imageUrl) return String(item.imageUrl);
+    if (item.preview) return String(item.preview);
+
+    const assistant = item.assistant_message;
+    if (assistant && typeof assistant === "object") {
+      if (assistant.image_url) return String(assistant.image_url);
+      if (assistant.imageUrl) return String(assistant.imageUrl);
+      if (assistant.preview) return String(assistant.preview);
+      if (assistant.url) return String(assistant.url);
+    }
+
+    const artifact = item.saved_artifact || item.artifact;
+    if (artifact && typeof artifact === "object") {
+      if (artifact.image_url) return String(artifact.image_url);
+      if (artifact.imageUrl) return String(artifact.imageUrl);
+      if (artifact.preview) return String(artifact.preview);
+      if (artifact.url) return String(artifact.url);
+
+      if (artifact.meta && artifact.meta.image_url) {
+        return String(artifact.meta.image_url);
+      }
+
+      if (artifact.viewer && artifact.viewer.image_url) {
+        return String(artifact.viewer.image_url);
+      }
+    }
+
+    return "";
+  }
+
+  function renderFinalResponseImage(item) {
+    const imageUrl = getFinalResponseImageUrl(item);
+
+    if (!imageUrl) return "";
+
+    return `
+      <div class="mobile-generated-image-wrap">
+        <img
+          class="mobile-generated-image"
+          src="${escapeHtml(imageUrl)}"
+          alt="Generated image"
+          loading="lazy"
+        />
+      </div>
+    `;
+  }
+
   function renderMessages() {
     const container = byId("mobileChatMessages");
     if (!container) return;
@@ -412,12 +464,14 @@
         const timeText = escapeHtml(formatTime(getMessageTimestamp(msg)));
         const isAssistant = role === "assistant";
         const sourceCards = isAssistant ? renderMobileSourceCards(msg) : "";
+        const generatedImage = isAssistant ? renderFinalResponseImage(msg) : "";
 
         return `
           <div class="mobile-message-row ${role}">
             <div class="mobile-message-bubble">
               <div class="mobile-message-role">${escapeHtml(role)}</div>
               <div class="mobile-message-content">${content}</div>
+              ${generatedImage}
               ${sourceCards}
               <div class="mobile-message-time">${timeText}</div>
               ${
@@ -526,6 +580,93 @@
     ).replace(/\n/g, "<br>");
 
     scrollMessagesToBottom("smooth");
+  }
+
+  function extractFinalAssistantText(payload, fallbackText) {
+    if (!payload || typeof payload !== "object") return String(fallbackText || "");
+
+    const assistant = payload.assistant_message;
+
+    if (assistant && typeof assistant === "object") {
+      return String(
+        assistant.text ||
+        assistant.content ||
+        assistant.message ||
+        fallbackText ||
+        ""
+      );
+    }
+
+    return String(
+      payload.text ||
+      payload.content ||
+      payload.message ||
+      fallbackText ||
+      ""
+    );
+  }
+
+  function persistFinalResponseMessage(payload, fallbackText) {
+    if (!payload || typeof payload !== "object") return;
+
+    const text = extractFinalAssistantText(payload, fallbackText);
+    const imageUrl = getFinalResponseImageUrl(payload);
+
+    if (!text && !imageUrl) return;
+
+    const assistant = payload.assistant_message && typeof payload.assistant_message === "object"
+      ? payload.assistant_message
+      : {};
+
+    const message = {
+      role: "assistant",
+      text: text,
+      content: text,
+      created_at: nowUnix(),
+    };
+
+    if (imageUrl) {
+      message.image_url = imageUrl;
+      message.imageUrl = imageUrl;
+      message.preview = imageUrl;
+      message.assistant_message = Object.assign({}, assistant, {
+        image_url: imageUrl,
+      });
+    }
+
+    if (payload.saved_artifact) {
+      message.saved_artifact = payload.saved_artifact;
+    }
+
+    app.state.messages = Array.isArray(app.state.messages) ? app.state.messages : [];
+
+    const last = app.state.messages[app.state.messages.length - 1];
+    const lastText = String((last && (last.text || last.content)) || "");
+
+    if (last && last.role === "assistant" && lastText === text) {
+      if (imageUrl) {
+        last.image_url = imageUrl;
+        last.imageUrl = imageUrl;
+        last.preview = imageUrl;
+        last.assistant_message = message.assistant_message;
+      }
+
+      if (payload.saved_artifact) {
+        last.saved_artifact = payload.saved_artifact;
+      }
+    } else {
+      app.state.messages.push(message);
+    }
+
+    if (payload.session_id || payload.active_session_id) {
+      app.state.activeSessionId = payload.session_id || payload.active_session_id;
+
+      try {
+        localStorage.setItem("novaMobileActiveSessionId", app.state.activeSessionId);
+      } catch (_) {}
+    }
+
+    app.state.__skipPostSendSessionReload = true;
   }
 
   function finalizeStreamingAssistantBubble(finalText = "") {
@@ -1086,6 +1227,7 @@
               }
 
               localAssistantText = finalText || localAssistantText;
+              persistFinalResponseMessage(data, localAssistantText);
               finalizeStreamingAssistantBubble(localAssistantText);
               finishStreamingAssistantBubble();
               streamFinished = true;
@@ -1120,6 +1262,7 @@
               }
 
               localAssistantText = finalText || localAssistantText;
+              persistFinalResponseMessage(data, localAssistantText);
               finalizeStreamingAssistantBubble(localAssistantText);
               finishStreamingAssistantBubble();
               streamFinished = true;
@@ -1135,12 +1278,21 @@
         }
       }
 
-      await loadState();
-      await loadSession(app.state.activeSessionId || activeSessionIdBeforeSend);
-      await loadMemory();
-      renderMessages();
-      renderSessions();
-      renderMemory();
+      if (app.state.__skipPostSendSessionReload) {
+        delete app.state.__skipPostSendSessionReload;
+
+        await loadMemory().catch(function () {});
+        renderMessages();
+        renderSessions();
+        renderMemory();
+      } else {
+        await loadState();
+        await loadSession(app.state.activeSessionId || activeSessionIdBeforeSend);
+        await loadMemory();
+        renderMessages();
+        renderSessions();
+        renderMemory();
+      }
 
       setStatus(isRegenerate ? "Regenerated" : "Model ready");
     } catch (err) {
@@ -2704,6 +2856,198 @@ document.addEventListener("DOMContentLoaded", () => {
 
     var originalFetch = window.fetch;
 
+    // MOBILE_ACTIVE_RESPONSE_REWRITE_IMAGE_APPEND_LOCK
+    function novaExtractGeneratedImageUrl(payload) {
+        if (!payload || typeof payload !== "object") {
+            return "";
+        }
+
+        if (payload.image_url) return String(payload.image_url);
+        if (payload.imageUrl) return String(payload.imageUrl);
+        if (payload.preview) return String(payload.preview);
+
+        var assistant = payload.assistant_message;
+
+        if (assistant && typeof assistant === "object") {
+            if (assistant.image_url) return String(assistant.image_url);
+            if (assistant.imageUrl) return String(assistant.imageUrl);
+            if (assistant.preview) return String(assistant.preview);
+            if (assistant.url) return String(assistant.url);
+        }
+
+        var artifact = payload.saved_artifact || payload.artifact;
+
+        if (artifact && typeof artifact === "object") {
+            if (artifact.image_url) return String(artifact.image_url);
+            if (artifact.imageUrl) return String(artifact.imageUrl);
+            if (artifact.preview) return String(artifact.preview);
+            if (artifact.url) return String(artifact.url);
+
+            if (artifact.meta && artifact.meta.image_url) {
+                return String(artifact.meta.image_url);
+            }
+
+            if (artifact.viewer && artifact.viewer.image_url) {
+                return String(artifact.viewer.image_url);
+            }
+        }
+
+        return "";
+    }
+
+    function novaExtractGeneratedAssistantText(payload) {
+        if (!payload || typeof payload !== "object") {
+            return "";
+        }
+
+        var assistant = payload.assistant_message;
+
+        if (assistant && typeof assistant === "object") {
+            return String(
+                assistant.text ||
+                assistant.content ||
+                assistant.message ||
+                ""
+            );
+        }
+
+        if (payload.saved_artifact && payload.saved_artifact.summary) {
+            return String(payload.saved_artifact.summary);
+        }
+
+        return String(payload.text || payload.content || payload.message || "");
+    }
+
+    function novaPreserveGeneratedImagePayload(cleaned, originalPayload) {
+        var imageUrl =
+            novaExtractGeneratedImageUrl(cleaned) ||
+            novaExtractGeneratedImageUrl(originalPayload);
+
+        if (!imageUrl) {
+            return cleaned;
+        }
+
+        cleaned = cleaned && typeof cleaned === "object" ? cleaned : {};
+
+        cleaned.image_url = imageUrl;
+        cleaned.imageUrl = imageUrl;
+        cleaned.preview = cleaned.preview || imageUrl;
+
+        if (!cleaned.assistant_message || typeof cleaned.assistant_message !== "object") {
+            cleaned.assistant_message = {};
+        }
+
+        cleaned.assistant_message.image_url = imageUrl;
+        cleaned.assistant_message.imageUrl = imageUrl;
+
+        var text =
+            novaExtractGeneratedAssistantText(cleaned) ||
+            novaExtractGeneratedAssistantText(originalPayload);
+
+        if (text) {
+            cleaned.assistant_message.text = text;
+            cleaned.assistant_message.content = text;
+        }
+
+        if (!cleaned.saved_artifact && originalPayload && originalPayload.saved_artifact) {
+            cleaned.saved_artifact = originalPayload.saved_artifact;
+        }
+
+        return cleaned;
+    }
+
+    function novaAppendGeneratedImageToLatestBubble(imageUrl) {
+        if (!imageUrl) {
+            return;
+        }
+
+        try {
+            var bubbles = Array.from(document.querySelectorAll(
+                ".mobile-message-row.assistant .mobile-message-bubble, .mobile-message-bubble"
+            ));
+
+            if (!bubbles.length) {
+                return;
+            }
+
+            var bubble = bubbles[bubbles.length - 1];
+
+            if (!bubble || bubble.querySelector("[data-nova-generated-image-url]")) {
+                return;
+            }
+
+            var wrap = document.createElement("div");
+            wrap.className = "mobile-generated-image-wrap";
+            wrap.setAttribute("data-nova-generated-image-url", imageUrl);
+
+            var img = document.createElement("img");
+            img.className = "mobile-generated-image";
+            img.src = imageUrl;
+            img.alt = "Generated image";
+            img.loading = "lazy";
+
+            wrap.appendChild(img);
+            bubble.appendChild(wrap);
+
+            console.log("[Nova Mobile Image Render] appended generated image", imageUrl);
+        } catch (error) {
+            console.warn("[Nova Mobile Image Render] append failed", error);
+        }
+    }
+
+    function novaSaveGeneratedImageToDebugState(payload) {
+        try {
+            var debug = window.NovaMobileDebug;
+            var app = debug && debug.app;
+            var state = app && app.state;
+
+            if (!state) {
+                return;
+            }
+
+            state.messages = Array.isArray(state.messages) ? state.messages : [];
+
+            var imageUrl = novaExtractGeneratedImageUrl(payload);
+            var text = novaExtractGeneratedAssistantText(payload);
+
+            if (!imageUrl && !text) {
+                return;
+            }
+
+            var message = {
+                role: "assistant",
+                text: text,
+                content: text,
+                image_url: imageUrl || undefined,
+                preview: imageUrl || undefined,
+                assistant_message: {
+                    text: text,
+                    image_url: imageUrl || undefined
+                },
+                saved_artifact: payload.saved_artifact
+            };
+
+            var last = state.messages[state.messages.length - 1];
+            var lastText = String((last && (last.text || last.content)) || "");
+
+            if (last && last.role === "assistant" && lastText === text) {
+                if (imageUrl) {
+                    last.image_url = imageUrl;
+                    last.preview = imageUrl;
+                    last.assistant_message = message.assistant_message;
+                }
+
+                if (payload.saved_artifact) {
+                    last.saved_artifact = payload.saved_artifact;
+                }
+            } else {
+                state.messages.push(message);
+            }
+        } catch (error) {
+            console.warn("[Nova Mobile Image Render] state save failed", error);
+        }
+    }
+
     window.fetch = function (resource, init) {
         return originalFetch.call(this, resource, init).then(function (response) {
             var url = "";
@@ -2845,6 +3189,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
             return response.clone().json().then(function (payload) {
                 var cleaned = cleanPayload(payload);
+                cleaned = novaPreserveGeneratedImagePayload(cleaned, payload);
+
+                var imageUrl = novaExtractGeneratedImageUrl(cleaned);
+
+                if (imageUrl) {
+                    novaSaveGeneratedImageToDebugState(cleaned);
+
+                    setTimeout(function () {
+                        novaAppendGeneratedImageToLatestBubble(imageUrl);
+                    }, 50);
+                }
+
                 var body = JSON.stringify(cleaned);
 
                 var headers = new Headers(response.headers);
@@ -2864,5 +3220,335 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     console.log("[Nova Mobile Attachment Response Rewrite] active");
+})();
+
+
+// MOBILE_FINAL_RESPONSE_IMAGE_RENDER_LOCK
+
+// MOBILE_ACTIVE_RESPONSE_REWRITE_IMAGE_APPEND_LOCK
+
+
+/* MOBILE_IMAGE_RESPONSE_NORMALIZER_LOCK */
+(() => {
+    if (window.__novaMobileImageResponseNormalizerActive) return;
+    window.__novaMobileImageResponseNormalizerActive = true;
+
+    const originalFetch = window.fetch ? window.fetch.bind(window) : null;
+    if (!originalFetch) {
+        console.warn("[Nova Mobile] fetch not available for image response normalizer");
+        return;
+    }
+
+    function pickImageUrl(payload) {
+        const candidates = [
+            payload?.image_url,
+            payload?.assistant_message?.image_url,
+            payload?.assistant_message?.preview,
+            payload?.saved_artifact?.image_url,
+            payload?.saved_artifact?.preview,
+            payload?.saved_artifact?.viewer?.image_url,
+        ];
+
+        for (const value of candidates) {
+            if (typeof value === "string" && value.trim()) {
+                return value.trim();
+            }
+        }
+
+        return "";
+    }
+
+    function promoteImageFields(payload) {
+        if (!payload || typeof payload !== "object") return payload;
+
+        const imageUrl = pickImageUrl(payload);
+        if (!imageUrl) return payload;
+
+        if (!payload.image_url) payload.image_url = imageUrl;
+        if (!payload.preview) payload.preview = imageUrl;
+
+        if (!payload.assistant_message || typeof payload.assistant_message !== "object") {
+            payload.assistant_message = {
+                role: "assistant",
+                text: String(payload?.assistant_message?.text || payload?.text || "").trim(),
+            };
+        }
+
+        if (!payload.assistant_message.image_url) payload.assistant_message.image_url = imageUrl;
+        if (!payload.assistant_message.preview) payload.assistant_message.preview = imageUrl;
+
+        if (payload.saved_artifact && typeof payload.saved_artifact === "object") {
+            if (!payload.saved_artifact.image_url) payload.saved_artifact.image_url = imageUrl;
+            if (!payload.saved_artifact.preview) payload.saved_artifact.preview = imageUrl;
+        }
+
+        return payload;
+    }
+
+    window.fetch = async function (...args) {
+        const response = await originalFetch(...args);
+
+        try {
+            const url = String(
+                typeof args[0] === "string"
+                    ? args[0]
+                    : args[0]?.url || ""
+            );
+
+            if (!url.includes("/api/chat")) {
+                return response;
+            }
+
+            const contentType = String(response.headers.get("content-type") || "").lower?.() || String(response.headers.get("content-type") || "").toLowerCase();
+            if (!contentType.includes("application/json")) {
+                return response;
+            }
+
+            const cloned = response.clone();
+            const payload = await cloned.json();
+
+            if (!payload || typeof payload !== "object") {
+                return response;
+            }
+
+            promoteImageFields(payload);
+
+            const promotedImage = pickImageUrl(payload);
+            if (promotedImage) {
+                console.log("[Nova Mobile] image response normalized", {
+                    image_url: promotedImage,
+                    session_id: payload.session_id || payload.active_session_id || "",
+                });
+            }
+
+            return new Response(
+                JSON.stringify(payload),
+                {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: response.headers,
+                }
+            );
+        } catch (error) {
+            console.warn("[Nova Mobile] image response normalizer fallback", error);
+            return response;
+        }
+    };
+
+    console.log("[Nova Mobile] image response normalizer active");
+})();
+
+
+// ACTIVE_MOBILE_APP_FORCE_IMAGE_RENDER_LOCK
+(function () {
+    if (window.__novaActiveImageRenderHookInstalled) {
+        return;
+    }
+
+    window.__novaActiveImageRenderHookInstalled = true;
+
+    function pickImageUrl(payload) {
+        if (!payload || typeof payload !== "object") return "";
+
+        if (payload.image_url) return String(payload.image_url);
+        if (payload.imageUrl) return String(payload.imageUrl);
+        if (payload.preview) return String(payload.preview);
+
+        var assistant = payload.assistant_message;
+        if (assistant && typeof assistant === "object") {
+            if (assistant.image_url) return String(assistant.image_url);
+            if (assistant.imageUrl) return String(assistant.imageUrl);
+            if (assistant.preview) return String(assistant.preview);
+            if (assistant.url) return String(assistant.url);
+        }
+
+        var artifact = payload.saved_artifact || payload.artifact;
+        if (artifact && typeof artifact === "object") {
+            if (artifact.image_url) return String(artifact.image_url);
+            if (artifact.imageUrl) return String(artifact.imageUrl);
+            if (artifact.preview) return String(artifact.preview);
+            if (artifact.url) return String(artifact.url);
+
+            if (artifact.viewer && artifact.viewer.image_url) {
+                return String(artifact.viewer.image_url);
+            }
+
+            if (artifact.meta && artifact.meta.image_url) {
+                return String(artifact.meta.image_url);
+            }
+        }
+
+        return "";
+    }
+
+    function appendDirectImageBubble(imageUrl, payload) {
+        try {
+            var container =
+                document.getElementById("mobileChatMessages") ||
+                document.getElementById("chatMessages") ||
+                document.getElementById("messageList") ||
+                document.getElementById("messages");
+
+            if (!container) return false;
+
+            var existing = container.querySelector('[data-nova-direct-image="' + imageUrl.replace(/"/g, '&quot;') + '"]');
+            if (existing) return true;
+
+            var bubble = document.createElement("div");
+            bubble.className = "message assistant";
+            bubble.setAttribute("data-nova-direct-image", imageUrl);
+
+            var text =
+                (payload &&
+                 payload.assistant_message &&
+                 (payload.assistant_message.text || payload.assistant_message.content)) ||
+                "Generated image";
+
+            bubble.innerHTML =
+                '<div class="mobile-message-content">' +
+                    '<div class="message-text"></div>' +
+                    '<img src="' + imageUrl + '" alt="Generated image" style="max-width:100%;border-radius:12px;display:block;margin-top:10px;" />' +
+                '</div>';
+
+            var textNode = bubble.querySelector(".message-text");
+            if (textNode) {
+                textNode.textContent = text || "Generated image";
+            }
+
+            container.appendChild(bubble);
+
+            return true;
+        } catch (error) {
+            console.warn("[Nova Mobile] direct image bubble append failed", error);
+            return false;
+        }
+    }
+
+    function pushIntoDebugState(imageUrl, payload) {
+        try {
+            var debug = window.NovaMobileDebug;
+            var app = debug && debug.app;
+            var state = app && app.state;
+
+            if (!state) return false;
+
+            if (!Array.isArray(state.messages)) {
+                state.messages = [];
+            }
+
+            var messages = state.messages;
+            var last = messages.length ? messages[messages.length - 1] : null;
+
+            if (last && last.role === "assistant") {
+                last.image_url = imageUrl;
+                last.imageUrl = imageUrl;
+                last.preview = imageUrl;
+
+                if (!last.assistant_message || typeof last.assistant_message !== "object") {
+                    last.assistant_message = {};
+                }
+
+                if (!last.assistant_message.image_url) {
+                    last.assistant_message.image_url = imageUrl;
+                }
+
+                if (!last.assistant_message.preview) {
+                    last.assistant_message.preview = imageUrl;
+                }
+            } else {
+                messages.push({
+                    role: "assistant",
+                    text:
+                        (payload &&
+                         payload.assistant_message &&
+                         (payload.assistant_message.text || payload.assistant_message.content)) ||
+                        "Generated image",
+                    image_url: imageUrl,
+                    imageUrl: imageUrl,
+                    preview: imageUrl,
+                    assistant_message: {
+                        image_url: imageUrl,
+                        preview: imageUrl
+                    }
+                });
+            }
+
+            if (typeof app.renderMessages === "function") {
+                app.renderMessages();
+            } else if (typeof window.renderMessages === "function") {
+                window.renderMessages();
+            }
+
+            return true;
+        } catch (error) {
+            console.warn("[Nova Mobile] debug state image push failed", error);
+            return false;
+        }
+    }
+
+    function renderImageFromPayload(payload) {
+        var imageUrl = pickImageUrl(payload);
+
+        if (!imageUrl) {
+            return;
+        }
+
+        var rendered = false;
+
+        rendered = pushIntoDebugState(imageUrl, payload) || rendered;
+
+        if (
+            window.NovaMobileImages &&
+            typeof window.NovaMobileImages.appendImage === "function"
+        ) {
+            try {
+                window.NovaMobileImages.appendImage(imageUrl, "Generated image");
+                rendered = true;
+            } catch (error) {
+                console.warn("[Nova Mobile] NovaMobileImages.appendImage failed", error);
+            }
+        }
+
+        rendered = appendDirectImageBubble(imageUrl, payload) || rendered;
+
+        console.log("[Nova Mobile] forced generated image render", {
+            image_url: imageUrl,
+            rendered: rendered
+        });
+    }
+
+    var originalFetch = window.fetch ? window.fetch.bind(window) : null;
+
+    if (!originalFetch) {
+        console.warn("[Nova Mobile] fetch unavailable for forced image render hook");
+        return;
+    }
+
+    window.fetch = async function () {
+        var response = await originalFetch.apply(this, arguments);
+
+        try {
+            var resource = arguments[0];
+            var url = String(
+                typeof resource === "string"
+                    ? resource
+                    : resource && resource.url
+                        ? resource.url
+                        : ""
+            );
+
+            if (url.indexOf("/api/chat") !== -1) {
+                response.clone().json().then(function (payload) {
+                    renderImageFromPayload(payload);
+                }).catch(function () {});
+            }
+        } catch (error) {
+            console.warn("[Nova Mobile] forced image render hook failed", error);
+        }
+
+        return response;
+    };
+
+    console.log("[Nova Mobile] forced image render hook active");
 })();
 
