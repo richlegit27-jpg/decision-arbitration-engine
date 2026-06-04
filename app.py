@@ -723,6 +723,9 @@ def _nova_safe_clean_attachment_text(raw_text, max_chars=6000):
         "create",
         "inspiration",
         "keypoints",
+            "copy",
+            "regen",
+            "regenerate",
         "continue",
         "summarize",
         "improve",
@@ -2707,6 +2710,9 @@ def api_chat():
                     "create",
                     "inspiration",
                     "keypoints",
+            "copy",
+            "regen",
+            "regenerate",
                     "continue",
                     "summarize",
                     "summary",
@@ -2861,6 +2867,9 @@ def api_chat():
                     "create",
                     "inspiration",
                     "keypoints",
+            "copy",
+            "regen",
+            "regenerate",
                     "continue",
                     "summarize",
                     "summary",
@@ -3049,10 +3058,16 @@ def api_chat():
                                 "attachment analysis:",
                                 "key points:",
                                 "preview:",
+            "copy",
+            "regen",
+            "regenerate",
                                 "uploaded attachment content:",
                                 "attachment content:",
                                 "attachment <unknown> content:",
                                 "keypoints",
+            "copy",
+            "regen",
+            "regenerate",
                                 "summarize",
                                 "summary",
                                 "continue",
@@ -5150,6 +5165,9 @@ def _nova_clean_attachment_endpoint_text(value: object) -> str:
             "attachment analysis:",
             "key points:",
             "preview:",
+            "copy",
+            "regen",
+            "regenerate",
             "summary:",
             "attachment content:",
             "uploaded attachment content:",
@@ -5160,6 +5178,12 @@ def _nova_clean_attachment_endpoint_text(value: object) -> str:
             continue
 
         if "tesseract is not installed" in low:
+            continue
+
+        if low in {"copy", "regen", "regenerate", "copied", "failed"}:
+            continue
+
+        if low.startswith("copyregen"):
             continue
 
         key = re.sub(r"[^a-z0-9]+", " ", low).strip()[:180]
@@ -5218,6 +5242,12 @@ def _nova_clean_attachment_endpoint_payload(local_summary: dict, cleaned_text: o
             continue
 
         if "tesseract is not installed" in low:
+            continue
+
+        if low in {"copy", "regen", "regenerate", "copied", "failed"}:
+            continue
+
+        if low.startswith("copyregen"):
             continue
 
         seen.add(key)
@@ -5341,6 +5371,9 @@ def api_attachment_summarize():
                 "flights",
                 "finance",
                 "keypoints",
+            "copy",
+            "regen",
+            "regenerate",
                 "continue",
                 "summarize",
                 "summary",
@@ -5460,6 +5493,14 @@ def api_attachment_summarize():
                 line = str(raw_line or "").replace("\ufeff", "").strip()
 
                 if not line:
+                    continue
+
+                low_line = line.lower().strip()
+
+                if low_line in {"copy", "regen", "regenerate", "copied", "failed"}:
+                    continue
+
+                if low_line.startswith("copyregen"):
                     continue
 
                 key = line.lower().strip()
@@ -5687,6 +5728,9 @@ def _nova_clean_attachment_analysis_response(response):
             "create",
             "inspiration",
             "keypoints",
+            "copy",
+            "regen",
+            "regenerate",
             "continue",
             "cop",
             "filt",
@@ -5826,10 +5870,16 @@ def _nova_final_attachment_output_noise_cleanup(response):
             "attachment content:",
             "attachment <unknown> content:",
             "keypoints",
+            "copy",
+            "regen",
+            "regenerate",
             "continue",
             "summarize",
             "summary",
             "preview:",
+            "copy",
+            "regen",
+            "regenerate",
             "key points:",
         }
 
@@ -5955,10 +6005,16 @@ def _nova_attachment_double_summary_cleanup(response):
             "attachment analysis:",
             "key points:",
             "preview:",
+            "copy",
+            "regen",
+            "regenerate",
             "uploaded attachment content:",
             "attachment content:",
             "attachment <unknown> content:",
             "keypoints",
+            "copy",
+            "regen",
+            "regenerate",
             "summarize",
             "summary",
             "continue",
@@ -5970,6 +6026,9 @@ def _nova_attachment_double_summary_cleanup(response):
             "this attachment appears to be about:",
             "key points:",
             "preview:",
+            "copy",
+            "regen",
+            "regenerate",
         )
 
         bad_contains = (
@@ -6057,3 +6116,5 @@ if __name__ == "__main__":
 # ATTACHMENT_MEMORY_SESSION_ALIAS_APP_LOCK
 
 
+
+# ATTACHMENT_UI_JUNK_FILTER_LOCK
