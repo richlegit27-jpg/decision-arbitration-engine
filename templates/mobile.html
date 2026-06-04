@@ -109,6 +109,13 @@
         onclick="window.location.href = '/mobile?new=' + Date.now();"
     >Start Fresh Chat</button>
 
+    <div
+        id="nova-mobile-session-list"
+        style="display:flex;flex-direction:column;gap:8px;width:100%;"
+    >
+        <button type="button" class="mobile-session-item">Loading sessions...</button>
+    </div>
+
     <button
         type="button"
         class="mobile-session-item"
@@ -1175,6 +1182,261 @@ window.NovaCloseMobileSessions = function () {
     console.log("[Nova Mobile] send restore bridge active");
 })();
 </script>
+
+<script>
+/* MOBILE_REAL_SESSION_HISTORY_LOCK */
+(function () {
+    "use strict";
+
+    if (window.__novaMobileRealSessionHistory) {
+        return;
+    }
+
+    window.__novaMobileRealSessionHistory = true;
+
+    function qs(selector) {
+        return document.querySelector(selector);
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function forceShow(panel) {
+        if (!panel) return;
+
+        panel.classList.remove("hidden");
+        panel.setAttribute("aria-hidden", "false");
+
+        panel.style.setProperty("display", "flex", "important");
+        panel.style.setProperty("position", "fixed", "important");
+        panel.style.setProperty("left", "10px", "important");
+        panel.style.setProperty("right", "10px", "important");
+        panel.style.setProperty("top", "76px", "important");
+        panel.style.setProperty("z-index", "999999", "important");
+        panel.style.setProperty("flex-direction", "column", "important");
+        panel.style.setProperty("gap", "10px", "important");
+        panel.style.setProperty("padding", "14px", "important");
+        panel.style.setProperty("background", "#111827", "important");
+        panel.style.setProperty("border", "1px solid rgba(255,255,255,.18)", "important");
+        panel.style.setProperty("border-radius", "18px", "important");
+        panel.style.setProperty("box-shadow", "0 24px 80px rgba(0,0,0,.55)", "important");
+        panel.style.setProperty("max-height", "75vh", "important");
+        panel.style.setProperty("overflow", "auto", "important");
+    }
+
+    function forceHide(panel) {
+        if (!panel) return;
+
+        panel.classList.add("hidden");
+        panel.setAttribute("aria-hidden", "true");
+        panel.style.setProperty("display", "none", "important");
+    }
+
+    function getMessagesBox() {
+        return qs("#mobileChatMessages") || qs("#mobileMessages") || qs("#messages");
+    }
+
+    function messageText(message) {
+        return String(
+            message.text ||
+            message.content ||
+            message.message ||
+            ""
+        ).trim();
+    }
+
+    function messageRole(message) {
+        return String(message.role || message.type || "assistant").toLowerCase().trim();
+    }
+
+    function renderMessages(messages) {
+        var box = getMessagesBox();
+
+        if (!box) {
+            return;
+        }
+
+        box.innerHTML = "";
+
+        (Array.isArray(messages) ? messages : []).forEach(function (message) {
+            var role = messageRole(message);
+            var text = messageText(message);
+
+            if (!text) {
+                return;
+            }
+
+            var bubble = document.createElement("div");
+
+            bubble.className = "nova-mobile-fallback-message nova-mobile-fallback-" + role;
+            bubble.style.display = "block";
+            bubble.style.maxWidth = "92%";
+            bubble.style.margin = role === "user" ? "10px 8px 10px auto" : "10px auto 10px 8px";
+            bubble.style.padding = "12px 14px";
+            bubble.style.borderRadius = "16px";
+            bubble.style.whiteSpace = "pre-wrap";
+            bubble.style.lineHeight = "1.45";
+            bubble.style.border = "1px solid rgba(255,255,255,0.12)";
+            bubble.style.background = role === "user" ? "rgba(124,92,255,0.20)" : "rgba(255,255,255,0.08)";
+            bubble.style.color = "inherit";
+            bubble.style.wordBreak = "break-word";
+            bubble.textContent = text;
+
+            box.appendChild(bubble);
+        });
+
+        try {
+            box.scrollTop = box.scrollHeight;
+        } catch (error) {}
+    }
+
+    function sessionTitle(session) {
+        return String(
+            session.title ||
+            session.name ||
+            session.last_message_preview ||
+            session.id ||
+            "Untitled session"
+        ).trim();
+    }
+
+    function sessionPreview(session) {
+        return String(
+            session.last_message_preview ||
+            session.preview ||
+            ""
+        ).trim();
+    }
+
+    function sessionId(session) {
+        return String(session.id || session.session_id || "").trim();
+    }
+
+    async function apiJson(url, options) {
+        var response = await fetch(url, options || {});
+        var data = await response.json().catch(function () {
+            return {};
+        });
+
+        if (!response.ok || data.ok === false) {
+            throw new Error(data.error || "Request failed.");
+        }
+
+        return data;
+    }
+
+    async function loadMobileSession(sessionIdValue) {
+        if (!sessionIdValue) {
+            return;
+        }
+
+        await apiJson("/api/sessions/switch", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                session_id: sessionIdValue
+            })
+        }).catch(function () {});
+
+        var data = await apiJson("/api/chat/" + encodeURIComponent(sessionIdValue));
+
+        try {
+            localStorage.setItem("nova_mobile_active_session", sessionIdValue);
+            localStorage.setItem("nova_active_session_id", sessionIdValue);
+            localStorage.setItem("active_session_id", sessionIdValue);
+        } catch (error) {}
+
+        renderMessages(data.messages || (data.session && data.session.messages) || []);
+
+        forceHide(qs("#nova-mobile-sessions-panel"));
+
+        console.log("[Nova Mobile Sessions] loaded session", sessionIdValue);
+    }
+
+    async function refreshMobileSessionList() {
+        var list = qs("#nova-mobile-session-list");
+
+        if (!list) {
+            return;
+        }
+
+        list.innerHTML = '<button type="button" class="mobile-session-item">Loading sessions...</button>';
+
+        try {
+            var data = await apiJson("/api/sessions");
+            var sessions = Array.isArray(data.sessions) ? data.sessions : [];
+            var activeId = String(data.active_session_id || "").trim();
+
+            if (!sessions.length) {
+                list.innerHTML = '<button type="button" class="mobile-session-item">No sessions found.</button>';
+                return;
+            }
+
+            list.innerHTML = sessions.slice(0, 30).map(function (session) {
+                var id = sessionId(session);
+                var title = sessionTitle(session);
+                var preview = sessionPreview(session);
+                var active = id && id === activeId;
+
+                return (
+                    '<button type="button" class="mobile-session-item" data-mobile-load-session="' + escapeHtml(id) + '" ' +
+                    'style="text-align:left;display:block;width:100%;padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:' +
+                    (active ? 'rgba(124,92,255,.22)' : 'rgba(255,255,255,.07)') +
+                    ';color:inherit;">' +
+                        '<div style="font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+                            escapeHtml(title) +
+                        '</div>' +
+                        (preview ? '<div style="font-size:11px;opacity:.72;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(preview) + '</div>' : '') +
+                    '</button>'
+                );
+            }).join("");
+
+            list.querySelectorAll("[data-mobile-load-session]").forEach(function (button) {
+                button.addEventListener("click", function () {
+                    var id = String(button.getAttribute("data-mobile-load-session") || "").trim();
+                    loadMobileSession(id).catch(function (error) {
+                        alert("Session load failed: " + (error && error.message ? error.message : String(error)));
+                    });
+                });
+            });
+        } catch (error) {
+            list.innerHTML = '<button type="button" class="mobile-session-item">Session load failed.</button>';
+            console.error("[Nova Mobile Sessions] refresh failed", error);
+        }
+    }
+
+    var previousOpen = window.NovaOpenMobileSessions;
+
+    window.NovaOpenMobileSessions = function () {
+        var panel = qs("#nova-mobile-sessions-panel");
+
+        if (typeof previousOpen === "function") {
+            try {
+                previousOpen();
+            } catch (error) {}
+        } else {
+            forceShow(panel);
+        }
+
+        forceShow(panel);
+        refreshMobileSessionList();
+    };
+
+    window.NovaLoadMobileSession = loadMobileSession;
+    window.NovaRefreshMobileSessions = refreshMobileSessionList;
+
+    console.log("[Nova Mobile Sessions] real session history active");
+})();
+</script>
+
 </body>
 </html>
 
