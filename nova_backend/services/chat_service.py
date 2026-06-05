@@ -1,4 +1,6 @@
-﻿from __future__ import annotations
+from __future__ import annotations
+
+# FINALIZE_RESPONSE_KWARGS_LOCK_20260604
 
 import base64
 import os
@@ -93,9 +95,7 @@ class ChatService:
 
     def _is_control_command_value(self, value):
 
-        text = self._safe_str(
-            value
-        ).strip().lower()
+        text = self._safe_str(value).strip().lower()
 
         blocked = {
             "run_step",
@@ -182,10 +182,7 @@ class ChatService:
 
                 normalized_value = self._safe_str(value).lower().strip()
 
-                if (
-                    key == "checkpoint"
-                    and normalized_value == "execution_plan_created"
-                ):
+                if key == "checkpoint" and normalized_value == "execution_plan_created":
 
                     execution_state = (
                         self._get_session_meta(
@@ -195,10 +192,7 @@ class ChatService:
                         or {}
                     )
 
-                    steps = (
-                        execution_state.get("steps")
-                        or []
-                    )
+                    steps = execution_state.get("steps") or []
 
                     if not steps:
                         continue
@@ -238,7 +232,6 @@ class ChatService:
             exec_debug("UPDATE WORKING STATE FAILED:", e)
             return {}
 
-
     def _normalize_working_state(self, working_state):
         if isinstance(working_state, dict):
             return working_state
@@ -247,6 +240,7 @@ class ChatService:
         if isinstance(working_state, str):
             try:
                 import json
+
                 parsed = json.loads(working_state)
                 return parsed if isinstance(parsed, dict) else {}
             except Exception:
@@ -278,8 +272,14 @@ class ChatService:
 
         return "Working context:\n" + "\n".join(lines)
 
-
-    def _decide_route(self, user_text="", attachments=None, memory_context="", working_context_block="", session_id=""):
+    def _decide_route(
+        self,
+        user_text="",
+        attachments=None,
+        memory_context="",
+        working_context_block="",
+        session_id="",
+    ):
         # WEB_SOURCE_CARD_ROUTE_LOCK
         text = str(user_text or "").strip()
         lower = text.lower()
@@ -306,10 +306,17 @@ class ChatService:
             }
 
         # SHORT_CHAT_SKIP_WEB_ROUTE_LOCK
-        if (
-            not attachments
-            and lower in {"hi", "yo", "hey", "hello", "sup", "k", "ok", "kk", "test"}
-        ):
+        if not attachments and lower in {
+            "hi",
+            "yo",
+            "hey",
+            "hello",
+            "sup",
+            "k",
+            "ok",
+            "kk",
+            "test",
+        }:
             return {
                 "route": self.ROUTE_GENERAL_CHAT,
                 "mode": "chat",
@@ -320,7 +327,16 @@ class ChatService:
                 "use_memory": True,
             }
 
-        def base(route, mode="chat", confidence=0.8, reasons=None, save_artifact=False, save_memory=True, use_memory=True, **extra):
+        def base(
+            route,
+            mode="chat",
+            confidence=0.8,
+            reasons=None,
+            save_artifact=False,
+            save_memory=True,
+            use_memory=True,
+            **extra,
+        ):
             decision = {
                 "route": route,
                 "mode": mode,
@@ -428,7 +444,9 @@ class ChatService:
             use_memory=True,
         )
 
-    def _build_memory_context_for_chat(self, user_text="", decision=None, session_id=""):
+    def _build_memory_context_for_chat(
+        self, user_text="", decision=None, session_id=""
+    ):
         decision = decision if isinstance(decision, dict) else {}
 
         if decision.get("use_memory") is False:
@@ -455,9 +473,7 @@ class ChatService:
                     kind = self._safe_str(item.get("kind") or "memory").strip()
                     source = self._safe_str(item.get("source") or "").strip()
                     text = self._safe_str(
-                        item.get("text")
-                        or item.get("content")
-                        or ""
+                        item.get("text") or item.get("content") or ""
                     ).strip()
 
                     if not text:
@@ -542,25 +558,14 @@ class ChatService:
             "Use it quietly to stay aligned."
         )
 
-        if (
-            decision
-            and isinstance(decision, dict)
-        ):
+        if decision and isinstance(decision, dict):
 
-            mode = (
-                decision.get("mode")
-                or ""
-            ).strip()
+            mode = (decision.get("mode") or "").strip()
 
             if mode:
-                parts.append(
-                    f"Current operating mode: "
-                    f"{mode}."
-                )
+                parts.append(f"Current operating mode: " f"{mode}.")
 
-        intent = self._safe_str(
-            (decision or {}).get("intent")
-        ).lower()
+        intent = self._safe_str((decision or {}).get("intent")).lower()
 
         if intent == "debugging":
 
@@ -581,37 +586,27 @@ class ChatService:
                 "endgame, no filler."
             )
 
-        return "\n\n".join(
-            [p for p in parts if p]
-        ).strip()
+        return "\n\n".join([p for p in parts if p]).strip()
 
     def _auto_advance_execution(self, session_id):
         return None
-
 
     def _execute_step_logic(self, session_id, step):
         try:
             step["status"] = "running"
 
-            step_action = self._safe_str(
-                step.get("action")
-            ).lower()
+            step_action = self._safe_str(step.get("action")).lower()
 
             print(
                 "STEP ACTION =",
                 repr(step_action),
             )
 
-            target_file = self._safe_str(
-                step.get("target_file")
-            )
+            target_file = self._safe_str(step.get("target_file"))
 
             python_result = None
 
-            if (
-                step_action == "implement"
-                and target_file
-            ):
+            if step_action == "implement" and target_file:
 
                 Path(target_file).parent.mkdir(
                     parents=True,
@@ -619,7 +614,7 @@ class ChatService:
                 )
 
                 Path(target_file).write_text(
-                    '''
+                    """
 def add(a, b):
     return a + b
 
@@ -631,19 +626,17 @@ def subtract(a, b):
 if __name__ == "__main__":
     print("Calculator app created.")
     print("2 + 3 =", add(2, 3))
-'''.strip()
-                    + "\n",
+""".strip() + "\n",
                     encoding="utf-8",
                 )
 
-                step["result"] = (
-                    f"Created file: {target_file}"
-                )
+                step["result"] = f"Created file: {target_file}"
 
                 step["error"] = None
 
             elif (
-                step_action in {
+                step_action
+                in {
                     "test",
                     "run",
                     "execute",
@@ -652,11 +645,7 @@ if __name__ == "__main__":
                 and hasattr(self, "python_runner")
             ):
 
-                python_result = (
-                    self.python_runner.run_file(
-                        target_file
-                    )
-                )
+                python_result = self.python_runner.run_file(target_file)
 
                 result = (
                     f"STDOUT="
@@ -669,17 +658,11 @@ if __name__ == "__main__":
 
                 step["result"] = result
 
-                step["error"] = (
-                    None
-                    if python_result.get("ok")
-                    else result
-                )
+                step["error"] = None if python_result.get("ok") else result
 
             else:
 
-                step["result"] = (
-                    "step executed"
-                )
+                step["result"] = "step executed"
 
                 step["error"] = None
 
@@ -903,7 +886,9 @@ Rules:
         except Exception:
             return ""
 
-    def _store_pending_fix(self, session_id: str, file_path: str, fixed_code: str) -> bool:
+    def _store_pending_fix(
+        self, session_id: str, file_path: str, fixed_code: str
+    ) -> bool:
         session_id = str(session_id or "").strip()
         file_path = str(file_path or "").strip()
         fixed_code = str(fixed_code or "")
@@ -946,15 +931,13 @@ Rules:
         execution = {}
 
         try:
-            if (
-                hasattr(self, "execution_handler")
-                and hasattr(self.execution_handler, "states")
+            if hasattr(self, "execution_handler") and hasattr(
+                self.execution_handler, "states"
             ):
                 execution = self.execution_handler.states.get(session_id) or {}
 
-            elif (
-                hasattr(self, "execution_handler")
-                and hasattr(self.execution_handler, "get_state")
+            elif hasattr(self, "execution_handler") and hasattr(
+                self.execution_handler, "get_state"
             ):
                 execution = self.execution_handler.get_state(session_id) or {}
 
@@ -970,9 +953,7 @@ Rules:
             session = self._get_session_payload(session_id)
 
             working_state = (
-                session.get("working_state", {})
-                if isinstance(session, dict)
-                else {}
+                session.get("working_state", {}) if isinstance(session, dict) else {}
             )
 
             mission = (
@@ -1054,9 +1035,7 @@ Rules:
                 or {}
             )
 
-            session = self.session_service.get_session(
-                session_id
-            )
+            session = self.session_service.get_session(session_id)
 
             if not isinstance(
                 session,
@@ -1065,12 +1044,8 @@ Rules:
                 session = {}
 
             execution_state = (
-                session.get(
-                    "execution_state"
-                )
-                or session.get(
-                    "active_execution"
-                )
+                session.get("execution_state")
+                or session.get("active_execution")
                 or execution_state
                 or {}
             )
@@ -1082,9 +1057,7 @@ Rules:
 
             steps = execution_state.get("steps") or []
 
-            current = int(
-                execution_state.get("current_step", 0) or 0
-            )
+            current = int(execution_state.get("current_step", 0) or 0)
 
             total = len(steps)
 
@@ -1140,25 +1113,28 @@ Current step:
                 "session": self._get_session_payload(session_id),
             }
 
-
     def _save_mission_state(self, session_id: str, mission: dict) -> None:
         if not session_id or not isinstance(mission, dict):
             return
 
         try:
             existing = self._get_session_payload(session_id)
-            working_state = existing.get("working_state", {}) if isinstance(existing, dict) else {}
+            working_state = (
+                existing.get("working_state", {}) if isinstance(existing, dict) else {}
+            )
 
             if not isinstance(working_state, dict):
                 working_state = {}
 
-            has_real_execution = any([
-                working_state.get("active_task"),
-                working_state.get("current_file"),
-                working_state.get("current_bug"),
-                working_state.get("next_move"),
-                working_state.get("checkpoint"),
-            ])
+            has_real_execution = any(
+                [
+                    working_state.get("active_task"),
+                    working_state.get("current_file"),
+                    working_state.get("current_bug"),
+                    working_state.get("next_move"),
+                    working_state.get("checkpoint"),
+                ]
+            )
 
             if has_real_execution:
                 working_state["mission"] = mission
@@ -1176,29 +1152,20 @@ Current step:
 
         session = self._get_session_payload(session_id)
         working_state = (
-            session.get("working_state", {})
-            if isinstance(session, dict)
-            else {}
+            session.get("working_state", {}) if isinstance(session, dict) else {}
         )
 
         if not isinstance(working_state, dict):
             working_state = {}
 
         mission = (
-            working_state.get("mission", {})
-            if isinstance(working_state, dict)
-            else {}
+            working_state.get("mission", {}) if isinstance(working_state, dict) else {}
         )
 
         if not isinstance(mission, dict):
             mission = {}
 
-        execution_state = (
-            self._load_execution_state(
-                session_id
-            )
-            or {}
-        )
+        execution_state = self._load_execution_state(session_id) or {}
 
         if not isinstance(
             execution_state,
@@ -1206,10 +1173,7 @@ Current step:
         ):
             execution_state = {}
 
-        steps = (
-            execution_state.get("steps")
-            or []
-        )
+        steps = execution_state.get("steps") or []
 
         current_index = int(
             execution_state.get(
@@ -1237,12 +1201,8 @@ Current step:
                 "command": user_text,
                 "current_index": current_index,
                 "steps_len": len(steps),
-                "status": execution_state.get(
-                    "status"
-                ),
-                "current_step": execution_state.get(
-                    "current_step"
-                ),
+                "status": execution_state.get("status"),
+                "current_step": execution_state.get("current_step"),
             },
         )
 
@@ -1253,9 +1213,7 @@ Current step:
 
         if not steps:
 
-            execution_state["status"] = (
-                "idle"
-            )
+            execution_state["status"] = "idle"
 
             execution_state["current_step"] = ""
 
@@ -1266,10 +1224,7 @@ Current step:
                 execution_state,
             )
 
-        working_state = (
-            self._get_working_state(session_id)
-            or {}
-        )
+        working_state = self._get_working_state(session_id) or {}
 
         # SHORT_COMMAND_K_BRAIN_LOCK
         if text in {"next", "nex", "k", "kk", "continue", "resume"}:
@@ -1288,9 +1243,7 @@ Current step:
                 [
                     bool(execution_state.get("steps")),
                     execution_state.get("current_step"),
-                    self._safe_str(
-                        execution_state.get("status")
-                    ).lower().strip()
+                    self._safe_str(execution_state.get("status")).lower().strip()
                     == "running",
                 ]
             )
@@ -1308,9 +1261,7 @@ Current step:
                     "type": "empty_next_guard",
                     "next_action": "none",
                     "mission": {},
-                    "assistant_message": self._build_assistant_message(
-                        message
-                    ),
+                    "assistant_message": self._build_assistant_message(message),
                     "execution": execution_state,
                 }
 
@@ -1321,9 +1272,7 @@ Current step:
                 "mission": mission,
                 "next_action": (
                     "retry_failed"
-                    if self._safe_str(
-                        mission.get("status")
-                    ).lower().strip()
+                    if self._safe_str(mission.get("status")).lower().strip()
                     in {"error", "failed"}
                     else mission.get("next_action") or "run_step"
                 ),
@@ -1400,18 +1349,14 @@ Current step:
         if not isinstance(mission_command, dict):
             return None
 
-        mission_type = self._safe_str(
-            mission_command.get("type")
-        ).lower().strip()
+        mission_type = self._safe_str(mission_command.get("type")).lower().strip()
 
         if mission_type == "empty_next_guard":
             return {
                 "ok": True,
                 "assistant_message": (
                     mission_command.get("assistant_message")
-                    or self._build_assistant_message(
-                        "No active execution to continue."
-                    )
+                    or self._build_assistant_message("No active execution to continue.")
                 ),
                 "execution": mission_command.get("execution") or {},
                 "session": self._get_session_payload(session_id),
@@ -1423,32 +1368,21 @@ Current step:
         if mission_command.get("is_mission") is not True:
             return None
 
-        next_action = self._safe_str(
-            mission_command.get("next_action")
-        ).lower().strip()
+        next_action = self._safe_str(mission_command.get("next_action")).lower().strip()
 
         execution_state = mission_command.get("execution") or {}
 
         if mission_type in {"continue", "execute"}:
 
-            persisted_execution_state = (
-                self._load_execution_state(
-                    session_id
-                )
-                or {}
-            )
+            persisted_execution_state = self._load_execution_state(session_id) or {}
 
             selected_execution_state = (
                 persisted_execution_state
-                if persisted_execution_state.get(
-                    "steps"
-                )
+                if persisted_execution_state.get("steps")
                 else execution_state
             )
 
-            selected_execution_state[
-                "_execution_dispatch_handled"
-            ] = True
+            selected_execution_state["_execution_dispatch_handled"] = True
 
             return self._process_execution_command(
                 command=next_action or "run_step",
@@ -1478,9 +1412,7 @@ Current step:
         self,
         session_id="",
     ):
-        session_id = self._safe_str(
-            session_id
-        ).strip()
+        session_id = self._safe_str(session_id).strip()
 
         if not session_id:
             return {}
@@ -1491,16 +1423,9 @@ Current step:
             {},
         )
 
-        fallback_state = (
-            cache.get(session_id)
-            or {}
-        )
+        fallback_state = cache.get(session_id) or {}
 
-        return (
-            fallback_state
-            if isinstance(fallback_state, dict)
-            else {}
-        )
+        return fallback_state if isinstance(fallback_state, dict) else {}
 
     def _save_execution_state(
         self,
@@ -1512,19 +1437,12 @@ Current step:
         if not session_id:
             return {}
 
-        execution_state = (
-            execution_state
-            if isinstance(execution_state, dict)
-            else {}
-        )
+        execution_state = execution_state if isinstance(execution_state, dict) else {}
 
         execution_state["_execution_processing"] = False
         execution_state["lock"] = False
 
-        working_state = (
-            self._get_working_state(session_id)
-            or {}
-        )
+        working_state = self._get_working_state(session_id) or {}
 
         working_state["execution_state"] = execution_state
 
@@ -1533,16 +1451,13 @@ Current step:
             working_state,
         )
 
-
         self._execution_state_cache = getattr(
             self,
             "_execution_state_cache",
             {},
         )
 
-        self._execution_state_cache[
-            session_id
-        ] = execution_state
+        self._execution_state_cache[session_id] = execution_state
 
         self._set_session_meta(
             session_id,
@@ -1571,9 +1486,7 @@ Current step:
                 if (
                     isinstance(execution_state, dict)
                     and execution_state.get("steps")
-                    and self._safe_str(
-                        execution_state.get("status")
-                    ).lower()
+                    and self._safe_str(execution_state.get("status")).lower()
                     not in {
                         "complete",
                         "completed",
@@ -1784,66 +1697,46 @@ Current step:
             payload["meta"] = meta
 
         live_execution = (
-            payload.get(
-                "active_execution"
-            )
-            or payload.get(
-                "execution_state"
-            )
-            or {}
+            payload.get("active_execution") or payload.get("execution_state") or {}
         )
 
         # HARD BLOCK RESURRECTION FROM PAYLOAD
 
-        payload["active_execution"] = (
-            live_execution
-        )
+        payload["active_execution"] = live_execution
 
-        payload["execution_state"] = (
-            live_execution
-        )
+        payload["execution_state"] = live_execution
         # =========================
         # INVALID EXECUTION SANITIZER
         # =========================
 
-        goal_text = self._safe_str(
-            live_execution.get("goal")
-        ).lower().strip()
+        goal_text = self._safe_str(live_execution.get("goal")).lower().strip()
 
-        invalid_goal = (
-            "respond normally" in goal_text
-            or (
-                isinstance(live_execution.get("goal"), dict)
-                and self._safe_str(
-                    live_execution["goal"].get("goal")
-                ).lower().strip() == "respond normally"
-            )
+        invalid_goal = "respond normally" in goal_text or (
+            isinstance(live_execution.get("goal"), dict)
+            and self._safe_str(live_execution["goal"].get("goal")).lower().strip()
+            == "respond normally"
         )
 
         invalid_general_execution = (
             invalid_goal
-            or self._safe_str(
-                live_execution.get("original_user_text")
-            ).lower().strip() == "run_step"
+            or self._safe_str(live_execution.get("original_user_text")).lower().strip()
+            == "run_step"
         )
 
         if invalid_general_execution:
 
-            print(
-                "SANITIZER CLEARED INVALID EXECUTION"
-            )
+            print("SANITIZER CLEARED INVALID EXECUTION")
 
             live_execution = {}
 
             meta["active_execution"] = {}
             meta["execution_state"] = {}
 
-        execution_status = self._safe_str(
-            live_execution.get("status")
-        ).lower()
+        execution_status = self._safe_str(live_execution.get("status")).lower()
 
         execution_complete = (
-            execution_status in {
+            execution_status
+            in {
                 "complete",
                 "completed",
                 "done",
@@ -1864,11 +1757,7 @@ Current step:
     def _ensure_session_id(self, session_id: str = "") -> str:
         sid = self._safe_str(session_id).strip()
 
-        if (
-            sid.startswith("session_")
-            and " " not in sid
-            and len(sid) >= 20
-        ):
+        if sid.startswith("session_") and " " not in sid and len(sid) >= 20:
             return sid
 
         created = None
@@ -1881,9 +1770,7 @@ Current step:
 
         if isinstance(created, dict):
 
-            created_id = self._safe_str(
-                created.get("id")
-            ).strip()
+            created_id = self._safe_str(created.get("id")).strip()
 
             if (
                 created_id.startswith("session_")
@@ -1896,7 +1783,9 @@ Current step:
 
         return f"session_{uuid.uuid4().hex}"
 
-    def _analyze_execution_state(self, execution_state=None, last_error: str = "") -> dict:
+    def _analyze_execution_state(
+        self, execution_state=None, last_error: str = ""
+    ) -> dict:
         execution_state = self._safe_dict(execution_state)
         last_error = self._safe_str(last_error).strip()
 
@@ -1910,7 +1799,11 @@ Current step:
         if last_error:
             lowered_error = last_error.lower()
 
-            if "syntaxerror" in lowered_error or "indentationerror" in lowered_error or "taberror" in lowered_error:
+            if (
+                "syntaxerror" in lowered_error
+                or "indentationerror" in lowered_error
+                or "taberror" in lowered_error
+            ):
                 return {
                     "status": "failed",
                     "problem_type": "python_compile_error",
@@ -1992,21 +1885,12 @@ Current step:
         user_text = self._safe_str(user_text).strip()
         last_error = self._safe_str(last_error).strip()
 
-        execution_state = (
-            execution_state
-            if isinstance(execution_state, dict)
-            else {}
-        )
+        execution_state = execution_state if isinstance(execution_state, dict) else {}
 
-        status = self._safe_str(
-            execution_state.get("status")
-        ).lower().strip()
+        status = self._safe_str(execution_state.get("status")).lower().strip()
 
         steps = execution_state.get("steps") or []
-        current_index = int(
-            execution_state.get("current_index")
-            or 0
-        )
+        current_index = int(execution_state.get("current_index") or 0)
 
         failed_steps = [
             step
@@ -2050,16 +1934,17 @@ Current step:
         self._update_working_state(
             session_id,
             {
-                "last_reflection_action": reflection.get(
-                    "recommended_action"
-                ),
+                "last_reflection_action": reflection.get("recommended_action"),
                 "last_reflection_reason": reflection.get("reason"),
                 "last_reflection_risk": reflection.get("risk"),
             },
         )
 
         return reflection
-    def _choose_execution_recovery_strategy(self, session_id: str, command: str, status: str, error_text: str = ""):
+
+    def _choose_execution_recovery_strategy(
+        self, session_id: str, command: str, status: str, error_text: str = ""
+    ):
         session_id = self._safe_str(session_id).strip()
         command = self._safe_str(command).strip().lower()
         status = self._safe_str(status).strip().lower()
@@ -2080,15 +1965,9 @@ Current step:
             last_error=error_text,
         )
 
-        failure_count = int(
-            working_state.get("execution_failure_count")
-            or 0
-        )
+        failure_count = int(working_state.get("execution_failure_count") or 0)
 
-        score = int(
-            working_state.get("execution_reward_score")
-            or 0
-        )
+        score = int(working_state.get("execution_reward_score") or 0)
 
         if reflection.get("recommended_action") == "stop":
             strategy = "stop_completed_execution"
@@ -2133,9 +2012,7 @@ Current step:
                 "last_strategy_command": command,
                 "last_strategy_status": status,
                 "last_strategy_error": error_text,
-                "last_reflection_action": reflection.get(
-                    "recommended_action"
-                ),
+                "last_reflection_action": reflection.get("recommended_action"),
                 "last_reflection_reason": reflection.get("reason"),
                 "last_reflection_risk": reflection.get("risk"),
             },
@@ -2143,7 +2020,9 @@ Current step:
 
         return strategy
 
-    def _record_execution_reward(self, session_id: str, command: str, status: str, error_text: str = ""):
+    def _record_execution_reward(
+        self, session_id: str, command: str, status: str, error_text: str = ""
+    ):
         session_id = self._safe_str(session_id).strip()
         command = self._safe_str(command).strip().lower()
         status = self._safe_str(status).strip().lower()
@@ -2162,10 +2041,7 @@ Current step:
 
         working_state = self._get_working_state(session_id) or {}
 
-        current_score = int(
-            working_state.get("execution_reward_score")
-            or 0
-        )
+        current_score = int(working_state.get("execution_reward_score") or 0)
 
         new_score = current_score + reward
 
@@ -2200,15 +2076,15 @@ Current step:
             else {}
         )
 
-        command = self._safe_str(
-            command
-        ).strip().lower()
+        command = self._safe_str(command).strip().lower()
 
-        intelligence_intent = self._safe_str(
-            execution_state.get("intent")
-            or execution_state.get("mode")
-            or ""
-        ).strip().lower()
+        intelligence_intent = (
+            self._safe_str(
+                execution_state.get("intent") or execution_state.get("mode") or ""
+            )
+            .strip()
+            .lower()
+        )
 
         if intelligence_intent in {
             "resume_execution",
@@ -2225,50 +2101,27 @@ Current step:
         elif intelligence_intent == "cancel_execution":
             command = "cancel"
 
-        working_state = (
-            self._get_working_state(session_id)
-            or {}
-        )
+        working_state = self._get_working_state(session_id) or {}
 
-        persisted_execution_state = (
-            self._load_execution_state(
-                session_id
-            )
-            or {}
-        )
+        persisted_execution_state = self._load_execution_state(session_id) or {}
 
-        persisted_has_state = bool(
-            persisted_execution_state.get(
-                "steps"
-            )
-        )
+        persisted_has_state = bool(persisted_execution_state.get("steps"))
 
-        incoming_has_state = bool(
-            execution_state.get(
-                "steps"
-            )
-        )
+        incoming_has_state = bool(execution_state.get("steps"))
 
         if persisted_has_state:
 
-            execution_state = (
-                persisted_execution_state
-            )
+            execution_state = persisted_execution_state
 
         elif incoming_has_state:
 
-            execution_state = (
-                execution_state
-            )
+            execution_state = execution_state
 
         else:
 
             execution_state = {}
 
-        steps = (
-            execution_state.get("steps")
-            or []
-        )
+        steps = execution_state.get("steps") or []
 
         current_index = int(
             execution_state.get(
@@ -2296,12 +2149,8 @@ Current step:
                 "command": command,
                 "current_index": current_index,
                 "steps_len": len(steps),
-                "status": execution_state.get(
-                    "status"
-                ),
-                "current_step": execution_state.get(
-                    "current_step"
-                ),
+                "status": execution_state.get("status"),
+                "current_step": execution_state.get("current_step"),
             },
         )
 
@@ -2326,13 +2175,9 @@ Current step:
                 or 0
             )
 
-            execution_state["current_index"] = (
-                current_index
-            )
+            execution_state["current_index"] = current_index
 
-            execution_state["status"] = (
-                "running"
-            )
+            execution_state["status"] = "running"
 
             execution_state["waiting"] = False
 
@@ -2353,25 +2198,13 @@ Current step:
 
             if not steps:
 
-                persisted_execution = (
-                    self._load_execution_state(
-                        session_id
-                    )
-                    or {}
-                )
+                persisted_execution = self._load_execution_state(session_id) or {}
 
-                if (
-                    isinstance(
-                        persisted_execution,
-                        dict,
-                    )
-                    and persisted_execution.get(
-                        "steps"
-                    )
-                ):
-                    execution_state = (
-                        persisted_execution
-                    )
+                if isinstance(
+                    persisted_execution,
+                    dict,
+                ) and persisted_execution.get("steps"):
+                    execution_state = persisted_execution
 
                     current_index = int(
                         execution_state.get(
@@ -2381,11 +2214,9 @@ Current step:
                         or 0
                     )
 
-                    steps = (
-                        execution_state.get(
-                            "steps",
-                            [],
-                        )
+                    steps = execution_state.get(
+                        "steps",
+                        [],
                     )
 
                     current_index = int(
@@ -2418,29 +2249,19 @@ Current step:
                 execution_state["current_step"] = ""
                 execution_state["current_step_title"] = ""
 
-            while (
-                current_index < len(steps)
-                and self._safe_str(
-                    steps[current_index].get(
-                        "status"
-                    )
-                ).lower().strip()
-                in {
-                    "completed",
-                    "done",
-                }
-            ):
+            while current_index < len(steps) and self._safe_str(
+                steps[current_index].get("status")
+            ).lower().strip() in {
+                "completed",
+                "done",
+            }:
                 current_index += 1
 
-            execution_state["current_index"] = (
-                current_index
-            )
+            execution_state["current_index"] = current_index
 
             if current_index >= len(steps):
 
-                execution_state["status"] = (
-                    "complete"
-                )
+                execution_state["status"] = "complete"
 
                 execution_state["next_moves"] = []
 
@@ -2450,9 +2271,7 @@ Current step:
 
                 execution_state["current_step"] = ""
 
-                execution_state[
-                    "current_step_title"
-                ] = ""
+                execution_state["current_step_title"] = ""
 
                 self._save_execution_state(
                     session_id,
@@ -2463,45 +2282,26 @@ Current step:
                     "ok": True,
                     "assistant_message": {
                         "role": "assistant",
-                        "text": (
-                            "All execution steps completed."
-                        ),
+                        "text": ("All execution steps completed."),
                     },
                     "execution": execution_state,
                 }
 
             refreshed_execution = (
-                self._load_execution_state(
-                    session_id
-                )
-                or execution_state
+                self._load_execution_state(session_id) or execution_state
             )
 
-            refreshed_steps = (
-                refreshed_execution.get(
-                    "steps"
-                )
-                or []
-            )
+            refreshed_steps = refreshed_execution.get("steps") or []
 
-            if (
-                not isinstance(
-                    refreshed_steps,
-                    list,
-                )
-                or current_index >= len(
-                    refreshed_steps
-                )
-            ):
+            if not isinstance(
+                refreshed_steps,
+                list,
+            ) or current_index >= len(refreshed_steps):
                 refreshed_steps = steps
 
-            step = refreshed_steps[
-                current_index
-            ]
+            step = refreshed_steps[current_index]
 
-            execution_state = (
-                refreshed_execution
-            )
+            execution_state = refreshed_execution
 
             steps = refreshed_steps
             execution_state["current_index"] = current_index
@@ -2520,44 +2320,29 @@ Current step:
                 )
 
                 return {
-
-                        "ok": True,
-                        "assistant_message": {
-                            "role": "assistant",
-                            "text": "All execution steps completed.",
-                        },
-                        "execution": execution_state,
-                    }
+                    "ok": True,
+                    "assistant_message": {
+                        "role": "assistant",
+                        "text": "All execution steps completed.",
+                    },
+                    "execution": execution_state,
+                }
 
             refreshed_execution = (
-                self._load_execution_state(
-                    session_id
-                )
-                or execution_state
+                self._load_execution_state(session_id) or execution_state
             )
 
-            refreshed_steps = (
-                refreshed_execution.get(
-                    "steps"
-                )
-                or []
-            )
+            refreshed_steps = refreshed_execution.get("steps") or []
 
-            if (
-                not isinstance(
-                    refreshed_steps,
-                    list,
-                )
-                or current_index >= len(
-                    refreshed_steps
-                )
-            ):
+            if not isinstance(
+                refreshed_steps,
+                list,
+            ) or current_index >= len(refreshed_steps):
                 refreshed_steps = steps
 
             original_step = (
                 steps[current_index]
-                if current_index < len(steps)
-                and isinstance(steps[current_index], dict)
+                if current_index < len(steps) and isinstance(steps[current_index], dict)
                 else {}
             )
 
@@ -2573,37 +2358,26 @@ Current step:
                 **refreshed_step,
             }
 
-            execution_state = (
-                refreshed_execution
-            )
+            execution_state = refreshed_execution
             steps = refreshed_steps
 
             step["status"] = "running"
 
             execution_state["status"] = "running"
-            execution_state["current_step"] = (
-                step.get("title")
-                or ""
-            )
-            execution_state["current_step_title"] = (
-                step.get("title")
-                or ""
-            )
+            execution_state["current_step"] = step.get("title") or ""
+            execution_state["current_step_title"] = step.get("title") or ""
 
             result = self._execute_step_logic(
                 session_id=session_id,
                 step=step,
             )
 
-
             step["status"] = "completed"
 
             if result:
                 step["result"] = result
 
-            execution_state["steps"][
-                current_index
-            ] = dict(step)
+            execution_state["steps"][current_index] = dict(step)
 
             steps = execution_state["steps"]
 
@@ -2612,26 +2386,15 @@ Current step:
                 "",
             )
 
-            execution_state["history"] = (
-                execution_state.get("history")
-                or []
-            )
+            execution_state["history"] = execution_state.get("history") or []
 
-            execution_state["history"].append(
-                f"completed: {step.get('title')}"
-            )
+            execution_state["history"].append(f"completed: {step.get('title')}")
 
-            execution_state["current_index"] = (
-                current_index + 1
-            )
+            execution_state["current_index"] = current_index + 1
 
-            execution_state["current_step_index"] = (
-                current_index + 1
-            )
+            execution_state["current_step_index"] = current_index + 1
 
-            execution_state["progress"] = (
-                current_index + 1
-            )
+            execution_state["progress"] = current_index + 1
 
             execution_state["waiting"] = True
 
@@ -2645,15 +2408,9 @@ Current step:
             if next_index < len(steps):
                 next_step = steps[next_index]
 
-                execution_state["current_step"] = (
-                    next_step.get("title")
-                    or ""
-                )
+                execution_state["current_step"] = next_step.get("title") or ""
 
-                execution_state["current_step_title"] = (
-                    next_step.get("title")
-                    or ""
-                )
+                execution_state["current_step_title"] = next_step.get("title") or ""
             execution_state["_execution_processing"] = False
 
             next_index = execution_state["current_index"]
@@ -2661,39 +2418,22 @@ Current step:
             if next_index < len(steps):
                 next_step = steps[next_index]
 
-                execution_state["current_step"] = (
-                    next_step.get("title")
-                    or ""
-                )
+                execution_state["current_step"] = next_step.get("title") or ""
 
-                execution_state["current_step_title"] = (
-                    next_step.get("title")
-                    or ""
-                )
+                execution_state["current_step_title"] = next_step.get("title") or ""
 
-            if (
-                execution_state["current_index"]
-                >= len(steps)
-            ):
-                execution_state["status"] = (
-                    "complete"
-                )
+            if execution_state["current_index"] >= len(steps):
+                execution_state["status"] = "complete"
 
                 execution_state["next_moves"] = []
 
-                execution_state["waiting"] = (
-                    False
-                )
+                execution_state["waiting"] = False
 
-                execution_state["complete"] = (
-                    True
-                )
+                execution_state["complete"] = True
 
                 execution_state["current_step"] = ""
 
-                execution_state[
-                    "current_step_title"
-                ] = ""
+                execution_state["current_step_title"] = ""
 
             self._save_execution_state(
                 session_id,
@@ -2709,10 +2449,7 @@ Current step:
                 "ok": True,
                 "assistant_message": {
                     "role": "assistant",
-                    "text": (
-                        f"Completed step: "
-                        f"{step.get('title')}"
-                    ),
+                    "text": (f"Completed step: " f"{step.get('title')}"),
                 },
                 "execution": execution_state,
                 "step_output": result,
@@ -2739,10 +2476,7 @@ Current step:
                         "execution": execution_state,
                     }
 
-                current_index = int(
-                    execution_state.get("current_index", 0)
-                    or 0
-                )
+                current_index = int(execution_state.get("current_index", 0) or 0)
 
                 if current_index >= len(steps):
                     execution_state["status"] = "complete"
@@ -2758,19 +2492,11 @@ Current step:
 
                 step["status"] = "running"
 
-                execution_state["steps"][
-                    current_index
-                ] = dict(step)
+                execution_state["steps"][current_index] = dict(step)
 
                 execution_state["status"] = "running"
-                execution_state["current_step"] = (
-                    step.get("title")
-                    or ""
-                )
-                execution_state["current_step_title"] = (
-                    step.get("title")
-                    or ""
-                )
+                execution_state["current_step"] = step.get("title") or ""
+                execution_state["current_step_title"] = step.get("title") or ""
                 execution_state["_execution_processing"] = False
 
                 self._save_active_execution(
@@ -2798,9 +2524,7 @@ Current step:
                 if result:
                     step["result"] = result
 
-                execution_state["steps"][
-                    current_index
-                ] = dict(step)
+                execution_state["steps"][current_index] = dict(step)
 
                 steps = execution_state["steps"]
 
@@ -2809,29 +2533,17 @@ Current step:
                     execution_state.get("steps"),
                 )
 
-                execution_state["history"] = (
-                    execution_state.get("history")
-                    or []
-                )
+                execution_state["history"] = execution_state.get("history") or []
 
-                step_title = self._safe_str(
-                    step.get("title")
-                )
+                step_title = self._safe_str(step.get("title"))
 
-                step_action = self._safe_str(
-                    step.get("action")
-                ).lower()
+                step_action = self._safe_str(step.get("action")).lower()
 
-                target_file = self._safe_str(
-                    step.get("target_file")
-                )
+                target_file = self._safe_str(step.get("target_file"))
 
                 python_result = None
 
-                if (
-                    step_action == "implement"
-                    and target_file
-                ):
+                if step_action == "implement" and target_file:
 
                     Path(target_file).parent.mkdir(
                         parents=True,
@@ -2839,7 +2551,7 @@ Current step:
                     )
 
                     Path(target_file).write_text(
-                        '''
+                        """
 def add(a, b):
     return a + b
 
@@ -2852,19 +2564,17 @@ def subtract(a, b):
 if (not attachments) and (__name__ == "__main__"):
     print("Calculator app created.")
     print("2 + 3 =", add(2, 3))
-'''.strip()
-                        + "\n",
+""".strip() + "\n",
                         encoding="utf-8",
                     )
 
-                    step["result"] = (
-                        f"Created file: {target_file}"
-                    )
+                    step["result"] = f"Created file: {target_file}"
 
                     step["error"] = None
 
                 elif (
-                    step_action in {
+                    step_action
+                    in {
                         "test",
                         "run",
                         "execute",
@@ -2873,11 +2583,7 @@ if (not attachments) and (__name__ == "__main__"):
                     and hasattr(self, "python_runner")
                 ):
 
-                    python_result = (
-                        self.python_runner.run_file(
-                            target_file
-                        )
-                    )
+                    python_result = self.python_runner.run_file(target_file)
 
                     step["result"] = (
                         python_result.get("stdout")
@@ -2886,35 +2592,21 @@ if (not attachments) and (__name__ == "__main__"):
                         or "python executed"
                     )
 
-                    step["error"] = (
-                        None
-                        if python_result.get("ok")
-                        else step["result"]
-                    )
+                    step["error"] = None if python_result.get("ok") else step["result"]
 
                 else:
 
-                    step["result"] = (
-                        "step executed"
-                    )
+                    step["result"] = "step executed"
 
                     step["error"] = None
 
-                execution_state["history"].append(
-                    f"completed: {step_title}"
-                )
+                execution_state["history"].append(f"completed: {step_title}")
 
-                execution_state["current_index"] = (
-                    current_index + 1
-                )
+                execution_state["current_index"] = current_index + 1
 
-                execution_state["progress"] = (
-                    current_index + 1
-                )
+                execution_state["progress"] = current_index + 1
 
-                outputs.append(
-                    f"Completed step: {step_title}"
-                )
+                outputs.append(f"Completed step: {step_title}")
 
                 if execution_state["current_index"] >= len(steps):
                     execution_state["status"] = "complete"
@@ -2924,7 +2616,6 @@ if (not attachments) and (__name__ == "__main__"):
                     execution_state["current_step"] = ""
                     execution_state["current_step_title"] = ""
                     break
-
 
             self._save_active_execution(
                 session_id,
@@ -2945,10 +2636,9 @@ if (not attachments) and (__name__ == "__main__"):
         # =========================
         if command == "retry_failed":
 
-            execution_state["failure_count"] = int(
-                execution_state.get("failure_count")
-                or 0
-            ) + 1
+            execution_state["failure_count"] = (
+                int(execution_state.get("failure_count") or 0) + 1
+            )
 
             failed_index = None
 
@@ -2969,23 +2659,16 @@ if (not attachments) and (__name__ == "__main__"):
 
             execution_state["current_index"] = failed_index
 
-            failure_count = int(
-                execution_state.get("failure_count")
-                or 0
-            )
+            failure_count = int(execution_state.get("failure_count") or 0)
 
             if failure_count == 1:
                 execution_state["retry_strategy"] = "retry_step"
 
             elif failure_count == 2:
-                execution_state["retry_strategy"] = (
-                    "retry_with_smaller_scope"
-                )
+                execution_state["retry_strategy"] = "retry_with_smaller_scope"
 
             elif failure_count == 3:
-                execution_state["retry_strategy"] = (
-                    "retry_with_file_scope"
-                )
+                execution_state["retry_strategy"] = "retry_with_file_scope"
 
             else:
                 execution_state["retry_strategy"] = "change_strategy"
@@ -3035,11 +2718,7 @@ if (not attachments) and (__name__ == "__main__"):
         # =========================
         # EXECUTION COMPLETE FALLBACK
         # =========================
-        if (
-            False
-            and steps
-            and current_index >= len(steps)
-        ):
+        if False and steps and current_index >= len(steps):
 
             execution_state["status"] = "complete"
             execution_state["next_moves"] = []
@@ -3077,10 +2756,7 @@ if (not attachments) and (__name__ == "__main__"):
             "ok": False,
             "assistant_message": {
                 "role": "assistant",
-                "text": (
-                    f"Unknown execution command: "
-                    f"{command}"
-                ),
+                "text": (f"Unknown execution command: " f"{command}"),
             },
             "execution": execution_state,
         }
@@ -3091,32 +2767,33 @@ if (not attachments) and (__name__ == "__main__"):
 
         return {
             "input": user_text,
-
             "execution": execution_state or {},
             "working": working_state or {},
             "session_id": session,
-
             "memory": memory[-10:],
             "memory_size": len(memory),
-
             "signals": {
                 "has_memory": len(memory) > 0,
-                "is_continuation": user_text.lower() in {
-                    "next", "continue", "keep going", "run next",
-                    "what next", "what now"
+                "is_continuation": user_text.lower()
+                in {
+                    "next",
+                    "continue",
+                    "keep going",
+                    "run next",
+                    "what next",
+                    "what now",
                 },
                 "is_failure_state": (execution_state or {}).get("status") == "failed",
             },
-
             "tool_state": {
                 "strategy": "default",
                 "available_tools": [
                     "run_step",
                     "run_all",
                     "retry_failed",
-                    "apply_auto_fix"
-                ]
-            }
+                    "apply_auto_fix",
+                ],
+            },
         }
 
     def _select_strategy(self, brain_state):
@@ -3171,7 +2848,6 @@ if (not attachments) and (__name__ == "__main__"):
 
         return "chat"
 
-
     def _reflect(self, brain_state, execution_result):
 
         reflection = {
@@ -3180,7 +2856,7 @@ if (not attachments) and (__name__ == "__main__"):
             "status": execution_result.get("status"),
             "success": execution_result.get("status") == "complete",
             "failed": execution_result.get("status") == "failed",
-            "lesson_weight": 0
+            "lesson_weight": 0,
         }
 
         # -------------------------
@@ -3229,9 +2905,9 @@ if (not attachments) and (__name__ == "__main__"):
         if status == "failed":
 
             # insert recovery step right after failed point
-            plan.insert(current_index + 1, {
-                "step": "auto-retry failed step with correction"
-            })
+            plan.insert(
+                current_index + 1, {"step": "auto-retry failed step with correction"}
+            )
 
         # -------------------------
         # COMPLETION EXPANSION
@@ -3261,14 +2937,14 @@ if (not attachments) and (__name__ == "__main__"):
             return [
                 {"step": "design login flow"},
                 {"step": "implement authentication"},
-                {"step": "test login system"}
+                {"step": "test login system"},
             ]
 
         if "build" in text:
             return [
                 {"step": "design structure"},
                 {"step": "implement core logic"},
-                {"step": "test system"}
+                {"step": "test system"},
             ]
 
         if existing_plan:
@@ -3335,6 +3011,7 @@ if (not attachments) and (__name__ == "__main__"):
             if "duckduckgo.com" in low_url:
                 try:
                     from urllib.parse import parse_qs, unquote, urlparse
+
                     parsed = urlparse(url)
                     qs = parse_qs(parsed.query)
                     if "uddg" in qs:
@@ -3345,6 +3022,7 @@ if (not attachments) and (__name__ == "__main__"):
 
             try:
                 from urllib.parse import urlparse
+
                 domain = urlparse(url).netloc.lower().replace("www.", "")
             except Exception:
                 domain = ""
@@ -3356,12 +3034,14 @@ if (not attachments) and (__name__ == "__main__"):
             if domain:
                 seen_domains.add(domain)
 
-            cleaned.append({
-                "title": title,
-                "snippet": snippet,
-                "content": snippet,
-                "url": url,
-            })
+            cleaned.append(
+                {
+                    "title": title,
+                    "snippet": snippet,
+                    "content": snippet,
+                    "url": url,
+                }
+            )
 
         cleaned = sorted(
             cleaned,
@@ -3384,9 +3064,7 @@ if (not attachments) and (__name__ == "__main__"):
         from urllib.parse import quote_plus
         from xml.etree import ElementTree as ET
 
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
+        headers = {"User-Agent": "Mozilla/5.0"}
 
         all_results = []
 
@@ -3403,15 +3081,15 @@ if (not attachments) and (__name__ == "__main__"):
             for match in re.finditer(
                 r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
                 html,
-                re.S
+                re.S,
             ):
                 link = match.group(1).replace("&amp;", "&")
                 title = re.sub(r"<.*?>", "", match.group(2)).strip()
 
                 snippet_match = re.search(
                     r'class="result__snippet"[^>]*>(.*?)</',
-                    html[match.end():match.end() + 500],
-                    re.S
+                    html[match.end() : match.end() + 500],
+                    re.S,
                 )
 
                 snippet = ""
@@ -3427,6 +3105,7 @@ if (not attachments) and (__name__ == "__main__"):
                 if "duckduckgo.com" in link:
                     try:
                         from urllib.parse import parse_qs, unquote, urlparse
+
                         parsed = urlparse(link)
                         qs = parse_qs(parsed.query)
                         if "uddg" in qs:
@@ -3434,12 +3113,14 @@ if (not attachments) and (__name__ == "__main__"):
                     except Exception:
                         continue
 
-                results.append({
-                    "title": title,
-                    "snippet": snippet,
-                    "content": snippet,
-                    "url": link,
-                })
+                results.append(
+                    {
+                        "title": title,
+                        "snippet": snippet,
+                        "content": snippet,
+                        "url": link,
+                    }
+                )
 
                 if len(results) >= 5:
                     break
@@ -3462,9 +3143,7 @@ if (not attachments) and (__name__ == "__main__"):
             results = []
 
             for match in re.finditer(
-                r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
-                html,
-                re.S
+                r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', html, re.S
             ):
                 link = match.group(1)
                 title = re.sub(r"<.*?>", "", match.group(2))
@@ -3479,12 +3158,14 @@ if (not attachments) and (__name__ == "__main__"):
                 if "duckduckgo.com" in link:
                     continue
 
-                results.append({
-                    "title": title,
-                    "snippet": "",
-                    "content": "",
-                    "url": link,
-                })
+                results.append(
+                    {
+                        "title": title,
+                        "snippet": "",
+                        "content": "",
+                        "url": link,
+                    }
+                )
 
                 if len(results) >= 5:
                     break
@@ -3517,12 +3198,14 @@ if (not attachments) and (__name__ == "__main__"):
                 if "news.google.com" in link.lower():
                     continue
 
-                results.append({
-                    "title": title,
-                    "snippet": description,
-                    "content": description,
-                    "url": link,
-                })
+                results.append(
+                    {
+                        "title": title,
+                        "snippet": description,
+                        "content": description,
+                        "url": link,
+                    }
+                )
 
                 if len(results) >= 5:
                     break
@@ -3638,20 +3321,22 @@ if (not attachments) and (__name__ == "__main__"):
 
         # FORCE_CHAT_SERVICE_OPENAI_KEY_LOCK
         # Load the exact Nova .env key before creating the OpenAI client.
-        env_key = str(os.getenv("OPENAI_API_KEY") or "").strip().strip("\"").strip("'")
+        env_key = str(os.getenv("OPENAI_API_KEY") or "").strip().strip('"').strip("'")
 
         if not env_key:
             env_path = Path(os.getcwd()) / ".env"
 
             if env_path.exists():
-                for raw_line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                for raw_line in env_path.read_text(
+                    encoding="utf-8", errors="ignore"
+                ).splitlines():
                     line = raw_line.strip()
 
                     if not line or line.startswith("#"):
                         continue
 
                     if line.startswith("OPENAI_API_KEY="):
-                        env_key = line.split("=", 1)[1].strip().strip("\"").strip("'")
+                        env_key = line.split("=", 1)[1].strip().strip('"').strip("'")
                         break
 
         if env_key:
@@ -3666,9 +3351,7 @@ if (not attachments) and (__name__ == "__main__"):
             self.client = OpenAI()
         self.agent = AgentService()
         self.memory_ranker = MemoryRankerService()
-        self.tools = ToolService(
-            base_dir=os.getcwd()
-        )
+        self.tools = ToolService(base_dir=os.getcwd())
 
         # =========================
         # RESPONSE / INTENT SERVICES
@@ -3682,9 +3365,7 @@ if (not attachments) and (__name__ == "__main__"):
         # RUNTIME COGNITION
         # =========================
 
-        self.runtime_cognitive_injection = (
-            RuntimeCognitiveInjectionService()
-        )
+        self.runtime_cognitive_injection = RuntimeCognitiveInjectionService()
 
         self.runtime_brain = None
 
@@ -3692,13 +3373,9 @@ if (not attachments) and (__name__ == "__main__"):
         # EXECUTION ENGINE
         # =========================
 
-        self.execution_handler = ExecutionHandler(
-            default_executor
-        )
+        self.execution_handler = ExecutionHandler(default_executor)
 
-        self.runtime = RuntimeBootstrap.build(
-            chat_service=self
-        )
+        self.runtime = RuntimeBootstrap.build(chat_service=self)
 
         self.execution_loop = ExecutionLoopService(
             execution_handler=self.execution_handler,
@@ -3810,23 +3487,19 @@ if (not attachments) and (__name__ == "__main__"):
 
         for t in tests:
 
-            result = self.handle(
-                user_text=t,
-                session_id=session_id
-            )
+            result = self.handle(user_text=t, session_id=session_id)
 
-            results.append({
-                "input": t,
-                "output": result.get("debug", {}),
-                "status": result.get("execution", {}).get("status"),
-            })
+            results.append(
+                {
+                    "input": t,
+                    "output": result.get("debug", {}),
+                    "status": result.get("execution", {}).get("status"),
+                }
+            )
 
             exec_debug("TEST RUN:", t, "?", result.get("execution", {}).get("status"))
 
-        return {
-            "ok": True,
-            "results": results
-        }
+        return {"ok": True, "results": results}
 
     def _auto_diagnose(self, user_text, brain_state, execution_state, error=None):
 
@@ -3837,7 +3510,7 @@ if (not attachments) and (__name__ == "__main__"):
             "decision": brain_state.get("decision"),
             "error": str(error) if error else None,
             "root_cause": None,
-            "fix_suggestion": None
+            "fix_suggestion": None,
         }
 
         # -------------------------
@@ -3848,7 +3521,9 @@ if (not attachments) and (__name__ == "__main__"):
             diagnosis["root_cause"] = "execution step failed during runtime"
 
             if execution_state.get("current_index") is not None:
-                diagnosis["root_cause"] += f" at step {execution_state.get('current_index')}"
+                diagnosis[
+                    "root_cause"
+                ] += f" at step {execution_state.get('current_index')}"
 
             diagnosis["fix_suggestion"] = "retry step or adjust plan mutation logic"
 
@@ -3857,7 +3532,9 @@ if (not attachments) and (__name__ == "__main__"):
         # -------------------------
         elif execution_state.get("status") is None:
 
-            diagnosis["root_cause"] = "execution state not updated (possible routing issue)"
+            diagnosis["root_cause"] = (
+                "execution state not updated (possible routing issue)"
+            )
             diagnosis["fix_suggestion"] = "check decision ? executor wiring"
 
         # -------------------------
@@ -3903,7 +3580,7 @@ if (not attachments) and (__name__ == "__main__"):
         try:
             self._reflect(
                 brain_state=getattr(self, "_last_intelligence_state", {}) or {},
-                execution_result={}
+                execution_result={},
             )
         except Exception:
             pass
@@ -3948,8 +3625,9 @@ if (not attachments) and (__name__ == "__main__"):
 
         return assistant_msg
 
-
-    def _safe_return(self, assistant_msg=None, fallback_text="Execution complete.", **meta):
+    def _safe_return(
+        self, assistant_msg=None, fallback_text="Execution complete.", **meta
+    ):
         """
         Hard enforcement return gate.
         Every response MUST pass through here.
@@ -4083,11 +3761,7 @@ if (not attachments) and (__name__ == "__main__"):
 
     def _run_next_step(self, execution_state: dict):
 
-        execution_state = (
-            execution_state
-            if isinstance(execution_state, dict)
-            else {}
-        )
+        execution_state = execution_state if isinstance(execution_state, dict) else {}
 
         # =========================
         # RUNTIME INFLUENCE LAYER
@@ -4122,9 +3796,7 @@ if (not attachments) and (__name__ == "__main__"):
         if not isinstance(steps, list):
             steps = []
 
-        current = self._execution_current_index(
-            execution_state
-        )
+        current = self._execution_current_index(execution_state)
 
         runtime = getattr(self, "runtime", None)
 
@@ -4159,27 +3831,33 @@ if (not attachments) and (__name__ == "__main__"):
 
             if signal == "runtime_requested_failure_inspection":
 
-                steps.append({
-                    "title": "runtime_recovery_step",
-                    "action": "inspect",
-                    "status": "pending",
-                })
+                steps.append(
+                    {
+                        "title": "runtime_recovery_step",
+                        "action": "inspect",
+                        "status": "pending",
+                    }
+                )
 
             elif signal == "runtime_idle":
 
-                steps.append({
-                    "title": "runtime_stabilization_step",
-                    "action": "wait",
-                    "status": "pending",
-                })
+                steps.append(
+                    {
+                        "title": "runtime_stabilization_step",
+                        "action": "wait",
+                        "status": "pending",
+                    }
+                )
 
             elif signal == "runtime_stabilized_success":
 
-                steps.append({
-                    "title": "runtime_acceleration_step",
-                    "action": "optimize",
-                    "status": "pending",
-                })
+                steps.append(
+                    {
+                        "title": "runtime_acceleration_step",
+                        "action": "optimize",
+                        "status": "pending",
+                    }
+                )
 
             execution_state["steps"] = steps
 
@@ -4254,30 +3932,22 @@ if (not attachments) and (__name__ == "__main__"):
                 "current_step",
                 "",
             )
-            execution_state = (
-                self._mark_execution_running(
-                    execution_state,
-                    step_index=current,
-                    current_step=(
-                        execution_state.get(
-                            "current_step",
-                            "",
-                        )
-                    ),
-                    waiting=(
-                        not execution_state.get(
-                            "auto_mode"
-                        )
-                    ),
-                )
+            execution_state = self._mark_execution_running(
+                execution_state,
+                step_index=current,
+                current_step=(
+                    execution_state.get(
+                        "current_step",
+                        "",
+                    )
+                ),
+                waiting=(not execution_state.get("auto_mode")),
             )
 
         else:
 
-            execution_state = (
-                self._mark_execution_complete(
-                    execution_state,
-                )
+            execution_state = self._mark_execution_complete(
+                execution_state,
             )
 
         return execution_state
@@ -4285,7 +3955,6 @@ if (not attachments) and (__name__ == "__main__"):
     def _finalize_response(
         self,
         session_id: str = "",
-
         user_text: str = "",
         user_msg=None,
         assistant_msg=None,
@@ -4293,6 +3962,7 @@ if (not attachments) and (__name__ == "__main__"):
         saved_artifact=None,
         working_context_payload=None,
         should_inject_working_context=False,
+        **extra,
     ) -> dict:
 
         decision = decision if isinstance(decision, dict) else {}
@@ -4318,12 +3988,16 @@ if (not attachments) and (__name__ == "__main__"):
                 sources_for_cache = meta.get("sources")
 
                 # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
-                if (not attachments) and (isinstance(source_urls_for_cache, list) and source_urls_for_cache):
+                if (not attachments) and (
+                    isinstance(source_urls_for_cache, list) and source_urls_for_cache
+                ):
                     import json
                     from pathlib import Path
                     from datetime import datetime
 
-                    cache_path = Path(r"C:\Users\Owner\nova\data\nova_last_web_sources.json")
+                    cache_path = Path(
+                        r"C:\Users\Owner\nova\data\nova_last_web_sources.json"
+                    )
                     cache_path.parent.mkdir(parents=True, exist_ok=True)
 
                     cache_payload = {
@@ -4334,7 +4008,11 @@ if (not attachments) and (__name__ == "__main__"):
                             for url in source_urls_for_cache[:5]
                             if self._safe_str(url).strip()
                         ],
-                        "sources": sources_for_cache[:5] if isinstance(sources_for_cache, list) else [],
+                        "sources": (
+                            sources_for_cache[:5]
+                            if isinstance(sources_for_cache, list)
+                            else []
+                        ),
                     }
 
                     cache_path.write_text(
@@ -4348,9 +4026,7 @@ if (not attachments) and (__name__ == "__main__"):
                 import re
 
                 assistant_text = self._safe_str(
-                    assistant_msg.get("text")
-                    or assistant_msg.get("content")
-                    or ""
+                    assistant_msg.get("text") or assistant_msg.get("content") or ""
                 )
 
                 found_urls = re.findall(r"https?://[^\s\)\]\}<>\"']+", assistant_text)
@@ -4363,9 +4039,13 @@ if (not attachments) and (__name__ == "__main__"):
                     if not clean_url:
                         continue
 
-                    domain = clean_url.split("/")[2] if "://" in clean_url else clean_url
+                    domain = (
+                        clean_url.split("/")[2] if "://" in clean_url else clean_url
+                    )
                     slug = clean_url.rstrip("/").split("/")[-1]
-                    clean_title = slug.replace("-", " ").replace("_", " ").strip().title()
+                    clean_title = (
+                        slug.replace("-", " ").replace("_", " ").strip().title()
+                    )
                     clean_domain = domain.replace("www.", "")
                     clean_homepage = clean_url.rstrip("/").lower()
 
@@ -4377,15 +4057,21 @@ if (not attachments) and (__name__ == "__main__"):
                     }:
                         clean_title = clean_domain
 
-                    if not clean_title or clean_title.lower() in {"news", "changelog", "docs"}:
+                    if not clean_title or clean_title.lower() in {
+                        "news",
+                        "changelog",
+                        "docs",
+                    }:
                         clean_title = clean_domain
 
-                    parsed_sources.append({
-                        "title": clean_title or clean_url,
-                        "url": clean_url,
-                        "source": domain.replace("www.", ""),
-                        "snippet": "",
-                    })
+                    parsed_sources.append(
+                        {
+                            "title": clean_title or clean_url,
+                            "url": clean_url,
+                            "source": domain.replace("www.", ""),
+                            "snippet": "",
+                        }
+                    )
 
                 if parsed_sources:
                     meta["sources"] = parsed_sources
@@ -4443,8 +4129,7 @@ if (not attachments) and (__name__ == "__main__"):
             user_id = str(user_msg.get("id", "")).strip()
 
             already_has_user = any(
-                isinstance(m, dict) and
-                str(m.get("id", "")).strip() == user_id
+                isinstance(m, dict) and str(m.get("id", "")).strip() == user_id
                 for m in messages
             )
 
@@ -4454,15 +4139,13 @@ if (not attachments) and (__name__ == "__main__"):
         if isinstance(assistant_msg, dict):
 
             assistant_id = str(
-                assistant_msg.get("id")
-                or f"msg_{uuid.uuid4().hex}"
+                assistant_msg.get("id") or f"msg_{uuid.uuid4().hex}"
             ).strip()
 
             assistant_msg["id"] = assistant_id
 
             already_has_assistant = any(
-                isinstance(m, dict) and
-                str(m.get("id", "")).strip() == assistant_id
+                isinstance(m, dict) and str(m.get("id", "")).strip() == assistant_id
                 for m in messages
             )
 
@@ -4476,15 +4159,11 @@ if (not attachments) and (__name__ == "__main__"):
             existing = self.sessions.get_session(session_id)
 
             existing_messages = (
-                existing.get("messages", [])
-                if isinstance(existing, dict)
-                else []
+                existing.get("messages", []) if isinstance(existing, dict) else []
             )
 
             existing_count = (
-                len(existing_messages)
-                if isinstance(existing_messages, list)
-                else 0
+                len(existing_messages) if isinstance(existing_messages, list) else 0
             )
 
             exec_debug(
@@ -4506,9 +4185,7 @@ if (not attachments) and (__name__ == "__main__"):
             assistant_text_for_tracking = ""
 
             if isinstance(assistant_msg, dict):
-                assistant_text_for_tracking = self._safe_str(
-                    assistant_msg.get("text")
-                )
+                assistant_text_for_tracking = self._safe_str(assistant_msg.get("text"))
 
             self._auto_track_working_state(
                 session_id=session_id,
@@ -4520,7 +4197,6 @@ if (not attachments) and (__name__ == "__main__"):
             exec_debug("AUTO_TRACK_WORKING_STATE_ERROR:", e)
 
         return {
-
             "ok": True,
             "assistant_message": assistant_msg,
             "session": {
@@ -4534,9 +4210,7 @@ if (not attachments) and (__name__ == "__main__"):
                 "decision": decision,
                 "route": "chat_service.handle",
                 "route_taken": (
-                    decision.get("route")
-                    if isinstance(decision, dict)
-                    else ""
+                    decision.get("route") if isinstance(decision, dict) else ""
                 ),
             },
         }
@@ -4583,7 +4257,9 @@ if (not attachments) and (__name__ == "__main__"):
             )
 
         file_path = path.strip()
-        pending_fix_mode = self._get_session_meta(session_id, "pending_fix_mode") or "file"
+        pending_fix_mode = (
+            self._get_session_meta(session_id, "pending_fix_mode") or "file"
+        )
 
         if "_process_execution_command" in user_text:
             pending_fix_mode = "function"
@@ -4599,13 +4275,15 @@ if (not attachments) and (__name__ == "__main__"):
             )
 
         traceback_func_match = re.findall(
-            r'in\s+([A-Za-z_][A-Za-z0-9_]*)',
+            r"in\s+([A-Za-z_][A-Za-z0-9_]*)",
             user_text,
         )
         traceback_func_name = traceback_func_match[-1] if traceback_func_match else ""
 
         if pending_fix_mode == "function" and traceback_func_name:
-            self._set_session_meta(session_id, "pending_fix_func_name", traceback_func_name)
+            self._set_session_meta(
+                session_id, "pending_fix_func_name", traceback_func_name
+            )
 
         if "```" in file_path:
             file_path = file_path.split("```", 1)[0].strip()
@@ -4661,7 +4339,9 @@ if (not attachments) and (__name__ == "__main__"):
             )
 
         if pending_fix_mode == "function":
-            func_name = self._get_session_meta(session_id, "pending_fix_func_name") or ""
+            func_name = (
+                self._get_session_meta(session_id, "pending_fix_func_name") or ""
+            )
 
             pattern = rf"(def\s+{re.escape(func_name)}\s*\(.*?\):\n(?:\s+.*\n)*)"
             match = re.search(pattern, raw_code, re.DOTALL)
@@ -4672,14 +4352,10 @@ if (not attachments) and (__name__ == "__main__"):
                 "Return ONLY the corrected function.\n"
                 "Do NOT return the full file.\n"
                 "No markdown. No explanation.\n\n"
-
                 f"ERROR CONTEXT:\n{user_text}\n\n"
-
                 f"TARGET FUNCTION:\n{func_name}\n\n"
-
                 "FUNCTION CODE:\n"
                 f"{extracted_function}\n\n"
-
                 "Fix the root cause of the error. Do not rewrite unrelated logic."
             )
         else:
@@ -4687,14 +4363,10 @@ if (not attachments) and (__name__ == "__main__"):
                 "You are fixing a Python file.\n"
                 "Return ONLY the complete corrected Python file.\n"
                 "No markdown. No explanation. No code fences.\n\n"
-
                 f"ERROR CONTEXT:\n{user_text}\n\n"
-
                 f"FILE PATH:\n{file_path}\n\n"
-
                 "CURRENT FILE CONTENT:\n"
                 f"{raw_code}\n\n"
-
                 "Fix the root cause of the error. Preserve architecture."
             )
 
@@ -4721,7 +4393,9 @@ if (not attachments) and (__name__ == "__main__"):
             fixed_code = self._safe_str(model_response.output_text).strip()
 
             if fixed_code.startswith("```"):
-                fixed_code = re.sub(r"^```(?:python|py)?\s*", "", fixed_code, flags=re.IGNORECASE)
+                fixed_code = re.sub(
+                    r"^```(?:python|py)?\s*", "", fixed_code, flags=re.IGNORECASE
+                )
                 fixed_code = re.sub(r"\s*```$", "", fixed_code).strip()
 
             if not fixed_code:
@@ -4755,9 +4429,7 @@ if (not attachments) and (__name__ == "__main__"):
 
                 route = "auto_fix_model_failed"
 
-            assistant_msg = self._build_assistant_message(
-                text=assistant_text
-            )
+            assistant_msg = self._build_assistant_message(text=assistant_text)
 
             return self._finalize_response(
                 session_id=session_id,
@@ -4879,11 +4551,7 @@ if (not attachments) and (__name__ == "__main__"):
             }
 
         except Exception as e:
-            assistant_text = (
-                "Auto-fix failed.\n\n"
-                f"File: {file_path}\n"
-                f"Error: {e}"
-            )
+            assistant_text = "Auto-fix failed.\n\n" f"File: {file_path}\n" f"Error: {e}"
 
             return {
                 "assistant_message": {"text": assistant_text},
@@ -4916,9 +4584,7 @@ if (not attachments) and (__name__ == "__main__"):
         decision = decision if isinstance(decision, dict) else {}
         attachments = attachments or []
 
-        original_user_text = self._safe_str(
-            user_text
-        )
+        original_user_text = self._safe_str(user_text)
 
         text_lc = original_user_text.lower().strip()
 
@@ -4942,31 +4608,21 @@ if (not attachments) and (__name__ == "__main__"):
                 "never ",
             ]
 
-            if any(
-                pattern in text_lc
-                for pattern in identity_patterns
-            ):
+            if any(pattern in text_lc for pattern in identity_patterns):
 
                 self._reinforce_memory(
                     session_id=session_id,
-                    memory_text=(
-                        f"User identity/context: "
-                        f"{original_user_text}"
-                    ),
+                    memory_text=(f"User identity/context: " f"{original_user_text}"),
                     category="profile",
                     amount=3,
                 )
 
-            if any(
-                pattern in text_lc
-                for pattern in preference_patterns
-            ):
+            if any(pattern in text_lc for pattern in preference_patterns):
 
                 self._reinforce_memory(
                     session_id=session_id,
                     memory_text=(
-                        f"User preference/correction: "
-                        f"{original_user_text}"
+                        f"User preference/correction: " f"{original_user_text}"
                     ),
                     category="preference",
                     amount=3,
@@ -5006,9 +4662,7 @@ if (not attachments) and (__name__ == "__main__"):
 
                 if match:
 
-                    detected_file = (
-                        match.group(0).strip()
-                    )
+                    detected_file = match.group(0).strip()
 
                     break
 
@@ -5020,9 +4674,7 @@ if (not attachments) and (__name__ == "__main__"):
 
             if traceback_match:
 
-                detected_file = str(
-                    traceback_match.group(1)
-                ).strip()
+                detected_file = str(traceback_match.group(1)).strip()
 
             bug_markers = [
                 "traceback",
@@ -5037,57 +4689,31 @@ if (not attachments) and (__name__ == "__main__"):
                 "failed",
             ]
 
-            if any(
-                marker in text_lc
-                for marker in bug_markers
-            ):
+            if any(marker in text_lc for marker in bug_markers):
 
-                detected_bug = (
-                    original_user_text[:1200]
-                    .strip()
-                )
+                detected_bug = original_user_text[:1200].strip()
 
             if detected_file:
 
-                ws = (
-                    self._get_working_state(
-                        session_id
-                    )
-                    or {}
-                )
+                ws = self._get_working_state(session_id) or {}
 
                 self._update_working_state(
                     session_id,
                     {
-                        "current_file":
-                            detected_file,
-
-                        "active_task":
-                            (
-                                ws.get(
-                                    "active_task"
-                                )
-                                or "active debugging"
-                            ),
-
-                        "current_bug":
-                            detected_bug,
-
-                        "checkpoint":
-                            (
-                                "auto_bug_detected"
-                                if detected_bug
-                                else "auto_file_detected"
-                            ),
+                        "current_file": detected_file,
+                        "active_task": (ws.get("active_task") or "active debugging"),
+                        "current_bug": detected_bug,
+                        "checkpoint": (
+                            "auto_bug_detected"
+                            if detected_bug
+                            else "auto_file_detected"
+                        ),
                     },
                 )
 
                 self._reinforce_memory(
                     session_id=session_id,
-                    memory_text=(
-                        f"Current file: "
-                        f"{detected_file}"
-                    ),
+                    memory_text=(f"Current file: " f"{detected_file}"),
                     category="operational",
                     amount=2,
                 )
@@ -5096,10 +4722,7 @@ if (not attachments) and (__name__ == "__main__"):
 
                     self._reinforce_memory(
                         session_id=session_id,
-                        memory_text=(
-                            f"Current bug: "
-                            f"{detected_bug[:500]}"
-                        ),
+                        memory_text=(f"Current bug: " f"{detected_bug[:500]}"),
                         category="correction",
                         amount=2,
                     )
@@ -5122,30 +4745,16 @@ if (not attachments) and (__name__ == "__main__"):
             "what file",
         }:
 
-            ws = (
-                self._get_working_state(
-                    session_id
-                )
-                or {}
-            )
+            ws = self._get_working_state(session_id) or {}
 
-            current_file = str(
-                ws.get("current_file") or ""
-            ).strip()
+            current_file = str(ws.get("current_file") or "").strip()
 
             if not current_file:
 
-                current_file = (
-                    "No active file is currently tracked."
-                )
+                current_file = "No active file is currently tracked."
 
-            assistant_msg = (
-                self._build_assistant_message(
-                    text=(
-                        f"Current file:\n"
-                        f"{current_file}"
-                    )
-                )
+            assistant_msg = self._build_assistant_message(
+                text=(f"Current file:\n" f"{current_file}")
             )
 
             return self._finalize_response(
@@ -5167,30 +4776,16 @@ if (not attachments) and (__name__ == "__main__"):
             "what are we doing",
         }:
 
-            ws = (
-                self._get_working_state(
-                    session_id
-                )
-                or {}
-            )
+            ws = self._get_working_state(session_id) or {}
 
-            active_task = str(
-                ws.get("active_task") or ""
-            ).strip()
+            active_task = str(ws.get("active_task") or "").strip()
 
             if not active_task:
 
-                active_task = (
-                    "No active task is currently tracked."
-                )
+                active_task = "No active task is currently tracked."
 
-            assistant_msg = (
-                self._build_assistant_message(
-                    text=(
-                        f"Active task:\n"
-                        f"{active_task}"
-                    )
-                )
+            assistant_msg = self._build_assistant_message(
+                text=(f"Active task:\n" f"{active_task}")
             )
 
             return self._finalize_response(
@@ -5219,41 +4814,26 @@ if (not attachments) and (__name__ == "__main__"):
             session_messages = []
 
             for s in all_sessions:
-                if (
-                    isinstance(s, dict)
-                    and str(s.get("id")) == str(session_id)
-                ):
-                    session_messages = s.get(
-                        "messages",
-                        []
-                    )
+                if isinstance(s, dict) and str(s.get("id")) == str(session_id):
+                    session_messages = s.get("messages", [])
                     break
 
             previous_user = ""
 
             user_messages = [
-                m for m in session_messages
-                if isinstance(m, dict)
-                and m.get("role") == "user"
+                m
+                for m in session_messages
+                if isinstance(m, dict) and m.get("role") == "user"
             ]
 
             if len(user_messages) >= 2:
-                previous_user = str(
-                    user_messages[-2].get("text", "")
-                ).strip()
+                previous_user = str(user_messages[-2].get("text", "")).strip()
 
             if not previous_user:
-                previous_user = (
-                    "I could not find a previous message."
-                )
+                previous_user = "I could not find a previous message."
 
-            assistant_msg = (
-                self._build_assistant_message(
-                    text=(
-                        f'Your previous message was: '
-                        f'"{previous_user}"'
-                    )
-                )
+            assistant_msg = self._build_assistant_message(
+                text=(f"Your previous message was: " f'"{previous_user}"')
             )
 
             return self._finalize_response(
@@ -5285,9 +4865,7 @@ if (not attachments) and (__name__ == "__main__"):
         assistant_text = ""
         assistant_msg = None
 
-        route = self._safe_str(
-            decision.get("route")
-        ).lower()
+        route = self._safe_str(decision.get("route")).lower()
 
         try:
             ws = self._get_working_state(session_id) or {}
@@ -5306,9 +4884,7 @@ if (not attachments) and (__name__ == "__main__"):
                 value = ws.get(key)
 
                 if value:
-                    memory_brain.append(
-                        f"{label}: {value}"
-                    )
+                    memory_brain.append(f"{label}: {value}")
 
             execution_keywords = {
                 "next",
@@ -5326,8 +4902,7 @@ if (not attachments) and (__name__ == "__main__"):
             }
 
             should_attach_operational_context = any(
-                x in text_lc
-                for x in execution_keywords
+                x in text_lc for x in execution_keywords
             )
 
             if memory_brain and should_attach_operational_context:
@@ -5373,10 +4948,13 @@ if (not attachments) and (__name__ == "__main__"):
             "make another",
             "another image",
         }:
-            last_prompt = self._get_session_meta(
-                session_id,
-                "last_image_prompt",
-            ) or "generate an image"
+            last_prompt = (
+                self._get_session_meta(
+                    session_id,
+                    "last_image_prompt",
+                )
+                or "generate an image"
+            )
 
             return self._handle_image_generation(
                 prompt=last_prompt,
@@ -5394,10 +4972,13 @@ if (not attachments) and (__name__ == "__main__"):
         }
 
         if text_lc.strip() in regen_commands:
-            last_prompt = self._get_session_meta(
-                session_id,
-                "last_image_prompt",
-            ) or ""
+            last_prompt = (
+                self._get_session_meta(
+                    session_id,
+                    "last_image_prompt",
+                )
+                or ""
+            )
 
             last_prompt = self._safe_str(last_prompt).strip()
 
@@ -5416,9 +4997,7 @@ if (not attachments) and (__name__ == "__main__"):
                 prompt=user_text,
                 session_id=session_id,
                 parent_artifact_id=(
-                    parent_artifact_id
-                    if "parent_artifact_id" in locals()
-                    else ""
+                    parent_artifact_id if "parent_artifact_id" in locals() else ""
                 ),
             )
 
@@ -5449,11 +5028,7 @@ if (not attachments) and (__name__ == "__main__"):
             "cancel",
         }
 
-        lowered = (
-            str(user_text or "")
-            .strip()
-            .lower()
-        )
+        lowered = str(user_text or "").strip().lower()
 
         planner_prefixes = (
             "auto-plan",
@@ -5485,11 +5060,9 @@ if (not attachments) and (__name__ == "__main__"):
                 lowered,
             )
 
-            execution_state = (
-                self._process_goal_and_plan(
-                    user_text,
-                    session_id,
-                )
+            execution_state = self._process_goal_and_plan(
+                user_text,
+                session_id,
             )
 
             exec_debug(
@@ -5505,10 +5078,7 @@ if (not attachments) and (__name__ == "__main__"):
                 )
 
                 try:
-                    session_obj = (
-                        self.sessions.get_session(session_id)
-                        or {}
-                    )
+                    session_obj = self.sessions.get_session(session_id) or {}
 
                     session_obj["execution_state"] = execution_state
 
@@ -5517,9 +5087,8 @@ if (not attachments) and (__name__ == "__main__"):
                         if (
                             isinstance(execution_state, dict)
                             and execution_state.get("steps")
-                            and self._safe_str(
-                                execution_state.get("status")
-                            ).lower() != "complete"
+                            and self._safe_str(execution_state.get("status")).lower()
+                            != "complete"
                         )
                         else {}
                     )
@@ -5542,15 +5111,10 @@ if (not attachments) and (__name__ == "__main__"):
                     execution_state,
                 )
 
-            working_state = (
-                self._get_working_state(session_id)
-                or {}
-            )
+            working_state = self._get_working_state(session_id) or {}
 
             execution_state = (
-                execution_state
-                if isinstance(execution_state, dict)
-                else {}
+                execution_state if isinstance(execution_state, dict) else {}
             )
 
             mission_state = self._build_mission_state(
@@ -5558,31 +5122,21 @@ if (not attachments) and (__name__ == "__main__"):
                 execution_state=execution_state,
             )
 
-            if (
-                execution_state.get("steps")
-                and self._safe_str(
-                    execution_state.get("status")
-                ).lower()
-                in {
-                    "running",
-                    "adapting",
-                    "waiting",
-                }
-            ):
+            if execution_state.get("steps") and self._safe_str(
+                execution_state.get("status")
+            ).lower() in {
+                "running",
+                "adapting",
+                "waiting",
+            }:
 
                 self._update_working_state(
                     session_id,
                     {
                         "mission": mission_state,
-
                         "active_task": user_text,
-
                         "next_move": "run_step",
-
-                        "checkpoint": (
-                            "execution_plan_created"
-                        ),
-
+                        "checkpoint": ("execution_plan_created"),
                         "execution_status": "running",
                     },
                 )
@@ -5638,18 +5192,17 @@ if (not attachments) and (__name__ == "__main__"):
 
         if text_lc in operational_queries:
 
-            working_state = (
-                self._get_working_state(session_id)
-                or {}
-            )
+            working_state = self._get_working_state(session_id) or {}
 
-            has_real_state = any([
-                working_state.get("active_task"),
-                working_state.get("current_file"),
-                working_state.get("current_bug"),
-                working_state.get("next_move"),
-                working_state.get("checkpoint"),
-            ])
+            has_real_state = any(
+                [
+                    working_state.get("active_task"),
+                    working_state.get("current_file"),
+                    working_state.get("current_bug"),
+                    working_state.get("next_move"),
+                    working_state.get("checkpoint"),
+                ]
+            )
 
             if not has_real_state:
 
@@ -5658,10 +5211,7 @@ if (not attachments) and (__name__ == "__main__"):
                 dominant_memory = (
                     self._rank_memory_context(
                         user_text=user_text,
-                        memories=(
-                            self.memories.all()
-                            or []
-                        ),
+                        memories=(self.memories.all() or []),
                         working_state=working_state,
                         execution_state={},
                         limit=5,
@@ -5687,8 +5237,7 @@ if (not attachments) and (__name__ == "__main__"):
                         continue
 
                     text = self._safe_str(
-                        item.get("text")
-                        or item.get("content")
+                        item.get("text") or item.get("content")
                     ).strip()
 
                     if not text:
@@ -5696,10 +5245,7 @@ if (not attachments) and (__name__ == "__main__"):
 
                     text_lower = text.lower()
 
-                    if any(
-                        phrase in text_lower
-                        for phrase in blocked_internal_phrases
-                    ):
+                    if any(phrase in text_lower for phrase in blocked_internal_phrases):
                         continue
 
                     normalized = text_lower.strip()
@@ -5709,9 +5255,7 @@ if (not attachments) and (__name__ == "__main__"):
 
                     seen_memory.add(normalized)
 
-                    memory_lines.append(
-                        f"- {text}"
-                    )
+                    memory_lines.append(f"- {text}")
 
                 if memory_lines:
 
@@ -5737,22 +5281,14 @@ if (not attachments) and (__name__ == "__main__"):
                     if not line_str:
                         continue
 
-                    if (
-                        "Recovered operational context"
-                        in line_str
-                    ):
+                    if "Recovered operational context" in line_str:
                         continue
 
                     clean_fallback.append(line_str)
 
-                assistant_msg = (
-                    self._build_assistant_message(
-                        text="\n".join(clean_fallback)
-                        or (
-                            "No active working state "
-                            "is currently tracked."
-                        )
-                    )
+                assistant_msg = self._build_assistant_message(
+                    text="\n".join(clean_fallback)
+                    or ("No active working state " "is currently tracked.")
                 )
 
                 return self._finalize_response(
@@ -5767,19 +5303,13 @@ if (not attachments) and (__name__ == "__main__"):
                     assistant_msg=assistant_msg,
                 )
 
-            working_state = (
-                self._get_working_state(session_id)
-                or {}
-            )
+            working_state = self._get_working_state(session_id) or {}
 
-            persisted_execution_state = self._load_execution_state(
-                session_id
-            )
+            persisted_execution_state = self._load_execution_state(session_id)
 
-            if (
-                isinstance(persisted_execution_state, dict)
-                and persisted_execution_state.get("steps")
-            ):
+            if isinstance(
+                persisted_execution_state, dict
+            ) and persisted_execution_state.get("steps"):
                 execution_state = persisted_execution_state
             else:
                 execution_state = {}
@@ -5790,24 +5320,16 @@ if (not attachments) and (__name__ == "__main__"):
                 execution_state=execution_state,
             )
 
-            working_state = (
-                reconciled.get("working_state")
-                or {}
-            )
+            working_state = reconciled.get("working_state") or {}
 
-            execution_state = (
-                reconciled.get("execution_state")
-                or {}
-            )
+            execution_state = reconciled.get("execution_state") or {}
 
             mission_state = self._build_mission_state(
                 working_state=working_state,
                 execution_state=execution_state,
             )
 
-            assistant_text = self._format_mission_state(
-                mission_state
-            ) 
+            assistant_text = self._format_mission_state(mission_state)
 
             return {
                 "ok": True,
@@ -5816,21 +5338,15 @@ if (not attachments) and (__name__ == "__main__"):
                         "No active working state is currently tracked."
                     )
                 ),
-                "session": self._get_session_payload(
-                    session_id
-                ),
+                "session": self._get_session_payload(session_id),
                 "saved_artifact": None,
                 "artifacts": [],
                 "debug": {
-                    "route_taken": (
-                        "mission_state_continuity_suppressed"
-                    ),
+                    "route_taken": ("mission_state_continuity_suppressed"),
                 },
             }
 
-        route = self._safe_str(
-            decision.get("route")
-        ).lower()
+        route = self._safe_str(decision.get("route")).lower()
 
         isolated_routes = {
             self.ROUTE_WEB_FETCH,
@@ -5843,9 +5359,9 @@ if (not attachments) and (__name__ == "__main__"):
 
         if route == "runtime":
 
-            runtime_command = self._safe_str(
-                decision.get("runtime_command")
-            ).strip().lower()
+            runtime_command = (
+                self._safe_str(decision.get("runtime_command")).strip().lower()
+            )
 
             execution_state = (
                 self._get_session_meta(
@@ -5893,9 +5409,7 @@ if (not attachments) and (__name__ == "__main__"):
                         ),
                     }
 
-                    return self._build_assistant_message(
-                        text=str(runtime_result)
-                    )
+                    return self._build_assistant_message(text=str(runtime_result))
 
                 elif text_lc in {
                     "/runtime replays",
@@ -5909,20 +5423,15 @@ if (not attachments) and (__name__ == "__main__"):
                         None,
                     )
 
-                    if (
-                        not runtime
-                        or not hasattr(
-                            runtime,
-                            "get_recent_replays",
-                        )
+                    if not runtime or not hasattr(
+                        runtime,
+                        "get_recent_replays",
                     ):
                         return self._build_assistant_message(
                             text=str(
                                 {
                                     "ok": False,
-                                    "error": (
-                                        "runtime_replay_unavailable"
-                                    ),
+                                    "error": ("runtime_replay_unavailable"),
                                 }
                             )
                         )
@@ -5940,9 +5449,7 @@ if (not attachments) and (__name__ == "__main__"):
                         )
                     )
 
-                elif text_lc.startswith(
-                    "/runtime replay explain"
-                ):
+                elif text_lc.startswith("/runtime replay explain"):
 
                     runtime = getattr(
                         self,
@@ -5955,20 +5462,15 @@ if (not attachments) and (__name__ == "__main__"):
                         1,
                     ).strip()
 
-                    if (
-                        not runtime
-                        or not hasattr(
-                            runtime,
-                            "explain_replay",
-                        )
+                    if not runtime or not hasattr(
+                        runtime,
+                        "explain_replay",
                     ):
                         return self._build_assistant_message(
                             text=str(
                                 {
                                     "ok": False,
-                                    "error": (
-                                        "runtime_replay_unavailable"
-                                    ),
+                                    "error": ("runtime_replay_unavailable"),
                                 }
                             )
                         )
@@ -5983,14 +5485,11 @@ if (not attachments) and (__name__ == "__main__"):
 
                 else:
 
-                    runtime_result = (
-                        self.runtime.run_cycle(
-
-                            execution_state=execution_state,
-                            world_state={},
-                            scheduler_state={},
-                            knowledge_graph=None,
-                        )
+                    runtime_result = self.runtime.run_cycle(
+                        execution_state=execution_state,
+                        world_state={},
+                        scheduler_state={},
+                        knowledge_graph=None,
                     )
 
             except Exception as e:
@@ -6001,9 +5500,7 @@ if (not attachments) and (__name__ == "__main__"):
                     "message": str(e),
                 }
 
-            assistant_msg = self._build_assistant_message(
-                text=str(runtime_result)
-            )
+            assistant_msg = self._build_assistant_message(text=str(runtime_result))
 
             return self._finalize_response(
                 session_id=session_id,
@@ -6058,12 +5555,7 @@ if (not attachments) and (__name__ == "__main__"):
 
             used_memories = []
 
-        working_state = (
-            self._get_working_state(
-                session_id
-            )
-            or {}
-        )
+        working_state = self._get_working_state(session_id) or {}
 
         execution_state = (
             self._get_session_meta(
@@ -6075,42 +5567,38 @@ if (not attachments) and (__name__ == "__main__"):
 
         try:
 
-            has_real_state = any([
-                (
-                    working_state.get("active_task")
-                    and not self._is_control_command_value(
+            has_real_state = any(
+                [
+                    (
                         working_state.get("active_task")
-                    )
-                ),
-
-                working_state.get("current_file"),
-
-                working_state.get("current_bug"),
-
-                (
-                    working_state.get("next_move")
-                    and not self._is_control_command_value(
+                        and not self._is_control_command_value(
+                            working_state.get("active_task")
+                        )
+                    ),
+                    working_state.get("current_file"),
+                    working_state.get("current_bug"),
+                    (
                         working_state.get("next_move")
-                    )
-                ),
+                        and not self._is_control_command_value(
+                            working_state.get("next_move")
+                        )
+                    ),
+                    (
+                        working_state.get("checkpoint")
+                        and working_state.get("checkpoint") != "execution_plan_created"
+                    ),
+                ]
+            )
 
-                (
-                    working_state.get("checkpoint")
-                    and working_state.get("checkpoint")
-                    != "execution_plan_created"
-                ),
-            ])
+            has_real_execution = any(
+                [
+                    execution_state.get("steps"),
+                    execution_state.get("current_step"),
+                    execution_state.get("status") == "running",
+                ]
+            )
 
-            has_real_execution = any([
-                execution_state.get("steps"),
-                execution_state.get("current_step"),
-                execution_state.get("status") == "running",
-            ])
-
-            if (
-                not has_real_state
-                and not has_real_execution
-            ):
+            if not has_real_state and not has_real_execution:
                 used_memories = []
                 dominant_memory = []
                 memory_dominance_debug = []
@@ -6130,10 +5618,7 @@ if (not attachments) and (__name__ == "__main__"):
                 if isinstance(mem, dict):
 
                     text = str(
-                        mem.get("content")
-                        or mem.get("text")
-                        or mem.get("memory")
-                        or ""
+                        mem.get("content") or mem.get("text") or mem.get("memory") or ""
                     ).strip()
 
                 else:
@@ -6141,17 +5626,9 @@ if (not attachments) and (__name__ == "__main__"):
 
                 if text:
 
-                    dominant_memory.append(
-                        f"- {text}"
-                    )
+                    dominant_memory.append(f"- {text}")
 
-
-
-
-
-                    memory_dominance_debug.append(
-                        text[:300]
-                    )
+                    memory_dominance_debug.append(text[:300])
 
         except Exception as e:
 
@@ -6176,10 +5653,7 @@ if (not attachments) and (__name__ == "__main__"):
             "checkpoint",
         ]
 
-        should_apply_dominance = any(
-            q in text_lc
-            for q in continuity_queries
-        )
+        should_apply_dominance = any(q in text_lc for q in continuity_queries)
 
         if dominant_memory and should_apply_dominance:
             dominance_block = (
@@ -6201,7 +5675,9 @@ if (not attachments) and (__name__ == "__main__"):
         }.get(answer_depth, "Answer briefly unless more detail is needed.")
 
         if memory_context:
-            memory_context = f"{memory_context}\n\nAnswer depth instruction:\n{depth_instruction}"
+            memory_context = (
+                f"{memory_context}\n\nAnswer depth instruction:\n{depth_instruction}"
+            )
         else:
             memory_context = f"Answer depth instruction:\n{depth_instruction}"
 
@@ -6237,9 +5713,7 @@ if (not attachments) and (__name__ == "__main__"):
         }:
 
             session_messages = (
-                session.get("messages", [])
-                if isinstance(session, dict)
-                else []
+                session.get("messages", []) if isinstance(session, dict) else []
             )
 
             previous_user = ""
@@ -6274,28 +5748,20 @@ if (not attachments) and (__name__ == "__main__"):
                 break
 
             user_messages = [
-                m for m in session_messages
-                if isinstance(m, dict)
-                and m.get("role") == "user"
+                m
+                for m in session_messages
+                if isinstance(m, dict) and m.get("role") == "user"
             ]
 
             if len(user_messages) >= 2:
-                previous_user = str(
-                    user_messages[-2].get("text", "")
-                ).strip()
+                previous_user = str(user_messages[-2].get("text", "")).strip()
 
             if not previous_user:
-                previous_user = (
-                    "I could not find a previous user message."
-                )
+                previous_user = "I could not find a previous user message."
 
-            assistant_text = (
-                f'Your previous message was: "{previous_user}"'
-            )
+            assistant_text = f'Your previous message was: "{previous_user}"'
 
-            assistant_msg = self._build_assistant_message(
-                text=assistant_text
-            )
+            assistant_msg = self._build_assistant_message(text=assistant_text)
 
             return self._finalize_response(
                 session_id=session_id,
@@ -6305,13 +5771,19 @@ if (not attachments) and (__name__ == "__main__"):
                 saved_artifact=None,
             )
 
-        is_memory_request = original_user_text.lower().strip().startswith((
-            "remember ",
-            "remember:",
-            "save this",
-            "store this",
-            "note that",
-        ))
+        is_memory_request = (
+            original_user_text.lower()
+            .strip()
+            .startswith(
+                (
+                    "remember ",
+                    "remember:",
+                    "save this",
+                    "store this",
+                    "note that",
+                )
+            )
+        )
 
         if mission_mode == "full_file" and not is_memory_request:
 
@@ -6346,7 +5818,8 @@ if (not attachments) and (__name__ == "__main__"):
             ws.get("active_task")
             and ws.get("next_move")
             and execution_state
-            and execution_state.get("status") not in {
+            and execution_state.get("status")
+            not in {
                 "complete",
                 "completed",
                 "idle",
@@ -6375,11 +5848,7 @@ if (not attachments) and (__name__ == "__main__"):
 
         ws = self._get_working_state(session_id) or {}
 
-        if (
-            ws.get("active_task")
-            and ws.get("next_move")
-            and assistant_text
-        ):
+        if ws.get("active_task") and ws.get("next_move") and assistant_text:
             assistant_text = (
                 assistant_text.strip()
                 + "\n\n(I m tracking this and continuing in the background.)"
@@ -6416,8 +5885,7 @@ if (not attachments) and (__name__ == "__main__"):
                 )
             else:
                 assistant_text = (
-                    "General chat failed.\n\n"
-                    f"{type(e).__name__}: {str(e)}"
+                    "General chat failed.\n\n" f"{type(e).__name__}: {str(e)}"
                 )
 
         if not assistant_text:
@@ -6438,9 +5906,7 @@ if (not attachments) and (__name__ == "__main__"):
         )
 
         intelligence_result = (
-            intelligence_result
-            if isinstance(intelligence_result, dict)
-            else {}
+            intelligence_result if isinstance(intelligence_result, dict) else {}
         )
 
         # lock tool outputs (prevent conversational overwrite)
@@ -6464,21 +5930,14 @@ if (not attachments) and (__name__ == "__main__"):
                 "your name is richard.",
             }
 
-            current_text_lc = (
-                assistant_text.lower().strip()
-            )
+            current_text_lc = assistant_text.lower().strip()
 
-            rewritten_text_lc = (
-                rewritten_text.lower().strip()
-            )
+            rewritten_text_lc = rewritten_text.lower().strip()
 
             if current_text_lc in protected_memory_answers:
                 pass
 
-            elif (
-                rewritten_text
-                and len(rewritten_text.split()) >= 3
-            ):
+            elif rewritten_text and len(rewritten_text.split()) >= 3:
                 assistant_text = rewritten_text
 
         intelligence = intelligence_result.get("intelligence", {})
@@ -6504,11 +5963,13 @@ if (not attachments) and (__name__ == "__main__"):
 
         used_memory_items = getattr(self, "_last_used_memory_items", []) or []
 
-        memory_text = " ".join([
-            self._safe_str(m.get("text"))
-            for m in used_memory_items
-            if isinstance(m, dict)
-        ]).lower()
+        memory_text = " ".join(
+            [
+                self._safe_str(m.get("text"))
+                for m in used_memory_items
+                if isinstance(m, dict)
+            ]
+        ).lower()
 
         if "name is richard" in memory_text:
             text_lc = (assistant_text or "").lower()
@@ -6536,15 +5997,9 @@ if (not attachments) and (__name__ == "__main__"):
 
         if decision.get("route") == self.ROUTE_GENERAL_CHAT:
 
-            working_state = (
-                self._get_working_state(session_id)
-                or {}
-            )
+            working_state = self._get_working_state(session_id) or {}
 
-            if (
-                working_state.get("checkpoint")
-                == "runtime_error_detected"
-            ):
+            if working_state.get("checkpoint") == "runtime_error_detected":
                 working_state["active_task"] = ""
                 working_state["current_bug"] = ""
                 working_state["next_move"] = ""
@@ -6561,21 +6016,15 @@ if (not attachments) and (__name__ == "__main__"):
                 "mission",
             ]:
 
-                value = self._safe_str(
-                    working_state.get(key)
-                ).strip()
+                value = self._safe_str(working_state.get(key)).strip()
 
                 if self._is_control_command_value(value):
                     working_state[key] = ""
 
-            if self._is_control_command_value(
-                working_state.get("active_task")
-            ):
+            if self._is_control_command_value(working_state.get("active_task")):
                 working_state["active_task"] = ""
 
-            if self._is_control_command_value(
-                working_state.get("next_move")
-            ):
+            if self._is_control_command_value(working_state.get("next_move")):
                 working_state["next_move"] = ""
 
             self._update_working_state(
@@ -6596,9 +6045,7 @@ if (not attachments) and (__name__ == "__main__"):
         ]
 
         decision_mission = (
-            decision.get("mission", {})
-            if isinstance(decision, dict)
-            else {}
+            decision.get("mission", {}) if isinstance(decision, dict) else {}
         )
 
         if isinstance(decision_mission, dict):
@@ -6619,7 +6066,7 @@ if (not attachments) and (__name__ == "__main__"):
             decision_mission = sanitized_mission
 
         else:
-            decision_mission = {}     
+            decision_mission = {}
 
         meta_payload = {
             "memory_dominance": {
@@ -6627,26 +6074,19 @@ if (not attachments) and (__name__ == "__main__"):
                 "used_count": len(used_memory_full),
                 "top_memory": memory_dominance_debug[:5],
             },
-
             # === CHAT POLISH: STRATEGY / MISSION FEED ===
             "mission": (
                 decision_mission
-                if not self._is_control_command_value(
-                    decision_mission.get("mission")
-                )
+                if not self._is_control_command_value(decision_mission.get("mission"))
                 else {}
             ),
             "strategy": (
-                decision.get("strategy", "")
-                if isinstance(decision, dict)
-                else ""
+                decision.get("strategy", "") if isinstance(decision, dict) else ""
             ),
-
             # === MEMORY ===
             "used_memory": used_memory_full,
             "used_memory_count": len(used_memory_full),
             "memory_confidence": 1.0,
-
             # === EXECUTION STATE ===
             "execution_mode": bool(is_execution),
             "active_task": (
@@ -6655,7 +6095,6 @@ if (not attachments) and (__name__ == "__main__"):
                 and not self._is_control_command_value(original_user_text)
                 else ""
             ),
-
             "next_step": next_step_out,
         }
 
@@ -6682,7 +6121,9 @@ if (not attachments) and (__name__ == "__main__"):
             saved_artifact=None,
         )
 
-    def _resolve_answer_length_preference(self, user_text: str, memory_items: list) -> str:
+    def _resolve_answer_length_preference(
+        self, user_text: str, memory_items: list
+    ) -> str:
         """
         Returns: "short" | "long" | "normal"
         Priority:
@@ -6694,24 +6135,30 @@ if (not attachments) and (__name__ == "__main__"):
         user_text_lc = str(user_text or "").lower().strip()
 
         # ðŸ”¥ 1. HARD USER OVERRIDE (strongest)
-        if any(p in user_text_lc for p in [
-            "don't give short",
-            "dont give short",
-            "no short answers",
-            "long answers",
-            "full answers",
-            "more detail",
-            "explain more",
-        ]):
+        if any(
+            p in user_text_lc
+            for p in [
+                "don't give short",
+                "dont give short",
+                "no short answers",
+                "long answers",
+                "full answers",
+                "more detail",
+                "explain more",
+            ]
+        ):
             return "long"
 
-        if any(p in user_text_lc for p in [
-            "short answers",
-            "keep it short",
-            "be concise",
-            "quick answer",
-            "one sentence",
-        ]):
+        if any(
+            p in user_text_lc
+            for p in [
+                "short answers",
+                "keep it short",
+                "be concise",
+                "quick answer",
+                "one sentence",
+            ]
+        ):
             return "short"
 
         # ðŸ”¥ 2. MEMORY (most recent wins)
@@ -6740,7 +6187,7 @@ if (not attachments) and (__name__ == "__main__"):
                 new_lines,
                 fromfile=f"{file_path} (current)",
                 tofile=f"{file_path} (proposed)",
-                lineterm=""
+                lineterm="",
             )
 
             preview = "".join(diff)
@@ -6792,7 +6239,9 @@ if (not attachments) and (__name__ == "__main__"):
                 f.write(current_content)
 
             mode = self._get_session_meta(session_id, "pending_fix_mode") or "file"
-            func_name = self._get_session_meta(session_id, "pending_fix_func_name") or ""
+            func_name = (
+                self._get_session_meta(session_id, "pending_fix_func_name") or ""
+            )
 
             if mode == "function" and not func_name:
                 return {
@@ -6843,7 +6292,9 @@ if (not attachments) and (__name__ == "__main__"):
 
             # AUTO SELF-HEAL CONTINUE
             working_state = self._get_working_state(session_id) or {}
-            pending_action = self._safe_str(working_state.get("pending_execution_action"))
+            pending_action = self._safe_str(
+                working_state.get("pending_execution_action")
+            )
 
             if pending_action == "retry_failed":
                 self._update_working_state(
@@ -6971,33 +6422,41 @@ if (not attachments) and (__name__ == "__main__"):
         style_rules = []
 
         if intent == "debugging":
-            style_rules.extend([
-                "Give the likely cause first.",
-                "Give the exact next fix or command.",
-                "Do not ask for pasted files unless there is no actionable next step.",
-                "Prefer file path, anchor, and replacement instructions.",
-            ])
+            style_rules.extend(
+                [
+                    "Give the likely cause first.",
+                    "Give the exact next fix or command.",
+                    "Do not ask for pasted files unless there is no actionable next step.",
+                    "Prefer file path, anchor, and replacement instructions.",
+                ]
+            )
 
         elif intent == "coding":
-            style_rules.extend([
-                "Prefer full-file or exact replacement code.",
-                "Include the file path when known.",
-                "Avoid partial vague snippets.",
-            ])
+            style_rules.extend(
+                [
+                    "Prefer full-file or exact replacement code.",
+                    "Include the file path when known.",
+                    "Avoid partial vague snippets.",
+                ]
+            )
 
         elif intent == "explanation":
-            style_rules.extend([
-                "Explain clearly.",
-                "Use concrete terms.",
-                "Keep the answer structured but not bloated.",
-            ])
+            style_rules.extend(
+                [
+                    "Explain clearly.",
+                    "Use concrete terms.",
+                    "Keep the answer structured but not bloated.",
+                ]
+            )
 
         else:
-            style_rules.extend([
-                "Be concise.",
-                "Answer directly.",
-                "Avoid generic chatbot filler.",
-            ])
+            style_rules.extend(
+                [
+                    "Be concise.",
+                    "Answer directly.",
+                    "Avoid generic chatbot filler.",
+                ]
+            )
 
         if intent == "debugging":
             next_action = "Give exact fix, command, file path, or anchor."
@@ -7282,9 +6741,9 @@ if (not attachments) and (__name__ == "__main__"):
         if any(marker in lower for marker in command_markers):
             policy["needs_commands"] = True
             policy["prefer_power_shell"] = True
-            policy["instruction"] += (
-                "Use PowerShell commands when commands are needed.\n"
-            )
+            policy[
+                "instruction"
+            ] += "Use PowerShell commands when commands are needed.\n"
 
         # -----------------------------
         # User dislikes examples
@@ -7299,9 +6758,9 @@ if (not attachments) and (__name__ == "__main__"):
 
         if any(marker in lower for marker in no_example_markers):
             policy["avoid_examples"] = True
-            policy["instruction"] += (
-                "Avoid examples. Give the exact needed code or action only.\n"
-            )
+            policy[
+                "instruction"
+            ] += "Avoid examples. Give the exact needed code or action only.\n"
 
         return policy
 
@@ -7345,17 +6804,20 @@ if (not attachments) and (__name__ == "__main__"):
             or ".css" in user_text_lc
         )
 
-        has_error = any(x in user_text_lc for x in [
-            "error:",
-            "traceback",
-            "syntaxerror",
-            "indentationerror",
-            "attributeerror",
-            "typeerror",
-            "nameerror",
-            "500",
-            "failed",
-        ])
+        has_error = any(
+            x in user_text_lc
+            for x in [
+                "error:",
+                "traceback",
+                "syntaxerror",
+                "indentationerror",
+                "attributeerror",
+                "typeerror",
+                "nameerror",
+                "500",
+                "failed",
+            ]
+        )
 
         debugging_request = any(
             x in user_text_lc
@@ -7466,58 +6928,61 @@ if (not attachments) and (__name__ == "__main__"):
             }
 
         if assistant_text.startswith("Auto-fix applied."):
-            return {
-                "assistant_text": assistant_text
-            }
+            return {"assistant_text": assistant_text}
         # =============================
         # LOCK AUTO-FIX RESPONSE (DO NOT MODIFY)
         # =============================
         if assistant_text.startswith("Auto-fix applied."):
-            return {
-                "assistant_text": assistant_text
-            }
+            return {"assistant_text": assistant_text}
         user_text_clean = self._safe_str(user_text).strip()
         user_text_lc = user_text_clean.lower()
 
         try:
-            memory_text = str(self._format_memory_context(
-                getattr(self, "_last_used_memory_items", [])
-            )).lower()
+            memory_text = str(
+                self._format_memory_context(
+                    getattr(self, "_last_used_memory_items", [])
+                )
+            ).lower()
         except Exception:
             memory_text = ""
 
-        smff_active = any(x in memory_text for x in [
-            "smff",
-            "full-file",
-            "full file",
-            "full code",
-            "powershell",
-            "direct",
-            "no fluff",
-        ])
+        smff_active = any(
+            x in memory_text
+            for x in [
+                "smff",
+                "full-file",
+                "full file",
+                "full code",
+                "powershell",
+                "direct",
+                "no fluff",
+            ]
+        )
 
-        code_intent = any(x in user_text_lc for x in [
-            "fix",
-            "function",
-            "code",
-            "python",
-            "flask",
-            "route",
-            "error",
-            "traceback",
-            "syntaxerror",
-            "indentationerror",
-            "attributeerror",
-            ".py",
-            ".js",
-            ".html",
-            ".css",
-        ])
+        code_intent = any(
+            x in user_text_lc
+            for x in [
+                "fix",
+                "function",
+                "code",
+                "python",
+                "flask",
+                "route",
+                "error",
+                "traceback",
+                "syntaxerror",
+                "indentationerror",
+                "attributeerror",
+                ".py",
+                ".js",
+                ".html",
+                ".css",
+            ]
+        )
 
         if smff_active and code_intent:
             assistant_text = (
-                assistant_text.strip()
-                + "\n\n"
+                assistant_text.strip() + "\n\n"
                 "SMFF mode:\n"
                 "- Send full file path.\n"
                 "- Send the full broken function or file.\n"
@@ -7551,12 +7016,8 @@ if (not attachments) and (__name__ == "__main__"):
 
         word_count = len(user_text_lc.split())
 
-        is_short_stuck_prompt = (
-            user_text_lc in stuck_exact
-            or (
-                word_count <= 6
-                and any(signal in user_text_lc for signal in stuck_exact)
-            )
+        is_short_stuck_prompt = user_text_lc in stuck_exact or (
+            word_count <= 6 and any(signal in user_text_lc for signal in stuck_exact)
         )
 
         if is_short_stuck_prompt:
@@ -7642,8 +7103,12 @@ if (not attachments) and (__name__ == "__main__"):
 
         strategy = strategy if isinstance(strategy, dict) else {}
 
-        intelligence["strategy"] = strategy.get("strategy") or intelligence.get("strategy") or "normal_answer"
-        intelligence["next_move"] = strategy.get("next_move") or intelligence.get("next_move")
+        intelligence["strategy"] = (
+            strategy.get("strategy") or intelligence.get("strategy") or "normal_answer"
+        )
+        intelligence["next_move"] = strategy.get("next_move") or intelligence.get(
+            "next_move"
+        )
         intelligence["response_strategy"] = strategy
 
         try:
@@ -7656,10 +7121,14 @@ if (not attachments) and (__name__ == "__main__"):
             exec_debug("SELF_CHECK_ERROR:", e)
             self_check = {"should_revise": False, "issues": []}
 
-        self_check = self_check if isinstance(self_check, dict) else {
-            "should_revise": False,
-            "issues": [],
-        }
+        self_check = (
+            self_check
+            if isinstance(self_check, dict)
+            else {
+                "should_revise": False,
+                "issues": [],
+            }
+        )
 
         response_policy = self._build_response_policy(
             user_text=user_text,
@@ -7705,10 +7174,7 @@ if (not attachments) and (__name__ == "__main__"):
                     )
 
                     if isinstance(exec_result, dict):
-                        execution = (
-                            exec_result.get("execution")
-                            or execution
-                        )
+                        execution = exec_result.get("execution") or execution
 
                         self._save_active_execution(
                             session_id,
@@ -7727,7 +7193,7 @@ if (not attachments) and (__name__ == "__main__"):
                         decision["mission"]["execution"] = execution
 
         except Exception as e:
-            exec_debug("EXECUTION_STEP_ERROR:", e)  
+            exec_debug("EXECUTION_STEP_ERROR:", e)
 
         return {
             "assistant_text": assistant_text,
@@ -7752,50 +7218,61 @@ if (not attachments) and (__name__ == "__main__"):
 
         # === SMFF HARD OVERRIDE FOR CODE HELP ===
         try:
-            memory_text = str(self._format_memory_context(
-                getattr(self, "_last_used_memory_items", [])
-            )).lower()
+            memory_text = str(
+                self._format_memory_context(
+                    getattr(self, "_last_used_memory_items", [])
+                )
+            ).lower()
         except Exception:
             memory_text = ""
 
-        smff_active = any(x in memory_text for x in [
-            "smff",
-            "full-file",
-            "full file",
-            "full code",
-            "powershell",
-            "direct",
-            "no fluff",
-        ])
+        smff_active = any(
+            x in memory_text
+            for x in [
+                "smff",
+                "full-file",
+                "full file",
+                "full code",
+                "powershell",
+                "direct",
+                "no fluff",
+            ]
+        )
 
-        code_intent = any(x in user_text_lc for x in [
-            "fix",
-            "function",
-            "code",
-            "python",
-            "flask",
-            "route",
-            "error",
-            "traceback",
-            "syntaxerror",
-            "indentationerror",
-            "attributeerror",
-            ".py",
-            ".js",
-            ".html",
-            ".css",
-        ])
+        code_intent = any(
+            x in user_text_lc
+            for x in [
+                "fix",
+                "function",
+                "code",
+                "python",
+                "flask",
+                "route",
+                "error",
+                "traceback",
+                "syntaxerror",
+                "indentationerror",
+                "attributeerror",
+                ".py",
+                ".js",
+                ".html",
+                ".css",
+            ]
+        )
 
-        asks_alternatives = any(x in user_text_lc for x in [
-            "alternative",
-            "alternatives",
-            "another way",
-            "different way",
-            "options",
-            "other answer",
-            "other answers",
-            "different answer",
-        ])
+        asks_alternatives = any(
+            x in user_text_lc
+            for x in [
+                "alternative",
+                "alternatives",
+                "another way",
+                "different way",
+                "options",
+                "other answer",
+                "other answers",
+                "different answer",
+            ]
+        )
 
         if smff_active and code_intent and not asks_alternatives:
             return (
@@ -7905,7 +7382,8 @@ if (not attachments) and (__name__ == "__main__"):
             if (
                 last.endswith(":")
                 or last.endswith("-")
-                or last_lc in {"example", "output", "result", "here’s how", "here's how"}
+                or last_lc
+                in {"example", "output", "result", "here’s how", "here's how"}
             ):
                 lines.pop()
                 continue
@@ -7918,7 +7396,10 @@ if (not attachments) and (__name__ == "__main__"):
             useful = [line for line in text.split("\n") if line.strip()]
             text = "\n".join(useful[:6]).strip() or text
 
-        if any(line.strip().startswith(("1.", "2.", "3.", "4.", "5.")) for line in text.split("\n")):
+        if any(
+            line.strip().startswith(("1.", "2.", "3.", "4.", "5."))
+            for line in text.split("\n")
+        ):
             text = "\n".join(text.split("\n")[:7]).strip()
 
         if response_policy.get("answer_length") == "short":
@@ -7975,7 +7456,9 @@ if (not attachments) and (__name__ == "__main__"):
 
             if len(clean_line.split()) > 5:
                 for hedge in hedges:
-                    clean_line = clean_line.replace(hedge, "").replace(hedge.title(), "")
+                    clean_line = clean_line.replace(hedge, "").replace(
+                        hedge.title(), ""
+                    )
 
             strong_lines.append(" ".join(clean_line.split()))
 
@@ -7997,7 +7480,13 @@ if (not attachments) and (__name__ == "__main__"):
 
         route = self._safe_str(decision.get("route")).lower()
         mode = self._safe_str(decision.get("mode")).lower()
-        intent = self._safe_str(intelligence.get("intent") or decision.get("intent") or mode or route or "chat").lower()
+        intent = self._safe_str(
+            intelligence.get("intent")
+            or decision.get("intent")
+            or mode
+            or route
+            or "chat"
+        ).lower()
 
         wants_full_file = any(
             phrase in text
@@ -8073,7 +7562,9 @@ if (not attachments) and (__name__ == "__main__"):
 
         elif is_debugging:
             strategy = "debug_triage"
-            next_move = "Lead with likely cause, then give the fastest verification command."
+            next_move = (
+                "Lead with likely cause, then give the fastest verification command."
+            )
 
         elif wants_continue:
             strategy = "continue_mission"
@@ -8112,17 +7603,11 @@ if (not attachments) and (__name__ == "__main__"):
         text = self._safe_str(assistant_text).strip()
         user_lc = self._safe_str(user_text).lower().strip()
 
-        strategy = self._safe_str(
-            intelligence.get("strategy") or ""
-        ).lower().strip()
+        strategy = self._safe_str(intelligence.get("strategy") or "").lower().strip()
 
-        route = self._safe_str(
-            intelligence.get("route") or ""
-        ).lower().strip()
+        route = self._safe_str(intelligence.get("route") or "").lower().strip()
 
-        mode = self._safe_str(
-            intelligence.get("mode") or ""
-        ).lower().strip()
+        mode = self._safe_str(intelligence.get("mode") or "").lower().strip()
 
         if not text:
             return text
@@ -8187,9 +7672,7 @@ if (not attachments) and (__name__ == "__main__"):
             "set up",
         ]
 
-        is_execution_intent = any(
-            k in user_lc for k in execution_triggers
-        )
+        is_execution_intent = any(k in user_lc for k in execution_triggers)
 
         if is_execution_intent:
             # If response is explanation-heavy,
@@ -8242,7 +7725,13 @@ if (not attachments) and (__name__ == "__main__"):
 
         route = self._safe_str(decision.get("route")).lower()
         mode = self._safe_str(decision.get("mode")).lower()
-        intent = self._safe_str(intelligence.get("intent") or decision.get("intent") or mode or route or "chat").lower()
+        intent = self._safe_str(
+            intelligence.get("intent")
+            or decision.get("intent")
+            or mode
+            or route
+            or "chat"
+        ).lower()
 
         wants_full_file = any(
             phrase in text
@@ -8318,7 +7807,9 @@ if (not attachments) and (__name__ == "__main__"):
 
         elif is_debugging:
             strategy = "debug_triage"
-            next_move = "Lead with likely cause, then give the fastest verification command."
+            next_move = (
+                "Lead with likely cause, then give the fastest verification command."
+            )
 
         elif wants_continue:
             strategy = "continue_mission"
@@ -8386,7 +7877,15 @@ if (not attachments) and (__name__ == "__main__"):
         raw_query = str(query or "").strip().lower()
 
         clean_query = raw_query
-        for word in ["latest", "news", "today", "current", "breaking", "updates", "update"]:
+        for word in [
+            "latest",
+            "news",
+            "today",
+            "current",
+            "breaking",
+            "updates",
+            "update",
+        ]:
             clean_query = clean_query.replace(word, "")
 
         clean_query = re.sub(r"\s+", " ", clean_query).strip()
@@ -8503,7 +8002,9 @@ if (not attachments) and (__name__ == "__main__"):
                 _seen = set()
 
                 for _raw in _attach_text.splitlines():
-                    _line = _nova_attach_re.sub(r"^\s*\d+\.\s*", "", str(_raw or "")).strip()
+                    _line = _nova_attach_re.sub(
+                        r"^\s*\d+\.\s*", "", str(_raw or "")
+                    ).strip()
                     _line = _line.replace("Attachment <unknown>", "uploaded attachment")
                     _line = _line.replace("Attachment content:", "").strip()
                     _line = _nova_attach_re.sub(r"\s+", " ", _line).strip()
@@ -8535,7 +8036,9 @@ if (not attachments) and (__name__ == "__main__"):
                     if _low.startswith("extracted attachment text"):
                         continue
 
-                    if _low.startswith("[mobile quick action attachment context active]"):
+                    if _low.startswith(
+                        "[mobile quick action attachment context active]"
+                    ):
                         continue
 
                     if not _compact or _compact in _seen:
@@ -8548,15 +8051,15 @@ if (not attachments) and (__name__ == "__main__"):
 
                 if _top:
                     _topic = "; ".join(_top[:3])
-                    _reply = "Attachment analysis:\n"
-                    _reply += f"This attachment appears to contain extracted image/PDF content about: {_topic}.\n\n"
+                    _reply = "Attachment received:\n"
+                    _reply += f"The uploaded attachment content appears related to: {_topic}.\n\n"
                     _reply += "Key points:\n"
                     for _i, _item in enumerate(_top, start=1):
                         _reply += f"{_i}. {_item}\n"
                     _reply += "\nPreview:\n" + "\n".join(_top[:6])
                 else:
                     _reply = (
-                        "Attachment analysis:\n"
+                        "Attachment received:\n"
                         "The attachment was received and text was extracted, but the available extraction looks too noisy to summarize cleanly."
                     )
 
@@ -8580,7 +8083,10 @@ if (not attachments) and (__name__ == "__main__"):
 
         # OPEN_WEB_SOURCE_FOLLOWUP_HANDLER_LOCK
         # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
-        if (not attachments) and (self._safe_str(decision.get("strategy")).strip().lower() == "open_web_source_followup"):
+        if (not attachments) and (
+            self._safe_str(decision.get("strategy")).strip().lower()
+            == "open_web_source_followup"
+        ):
             import re
 
             source_index = 0
@@ -8614,7 +8120,11 @@ if (not attachments) and (__name__ == "__main__"):
 
             try:
                 session_payload = self._get_session_payload(session_id)
-                messages = session_payload.get("messages") if isinstance(session_payload, dict) else []
+                messages = (
+                    session_payload.get("messages")
+                    if isinstance(session_payload, dict)
+                    else []
+                )
                 messages = messages if isinstance(messages, list) else []
 
                 for msg in reversed(messages):
@@ -8629,14 +8139,21 @@ if (not attachments) and (__name__ == "__main__"):
                     sources = meta.get("sources")
 
                     if isinstance(urls, list) and urls:
-                        prior_urls = [self._safe_str(url).strip() for url in urls if self._safe_str(url).strip()]
+                        prior_urls = [
+                            self._safe_str(url).strip()
+                            for url in urls
+                            if self._safe_str(url).strip()
+                        ]
                         prior_sources = sources if isinstance(sources, list) else []
                         break
             except Exception as exc:
                 exec_debug("OPEN_WEB_SOURCE_FOLLOWUP_LOOKUP_FAILED:", exc)
 
             # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
-            if (not attachments) and ((not prior_urls or source_index >= len(prior_urls)) and isinstance(getattr(self, "_last_web_source_urls", None), list)):
+            if (not attachments) and (
+                (not prior_urls or source_index >= len(prior_urls))
+                and isinstance(getattr(self, "_last_web_source_urls", None), list)
+            ):
                 cached_urls = [
                     self._safe_str(url).strip()
                     for url in getattr(self, "_last_web_source_urls", [])
@@ -8647,19 +8164,27 @@ if (not attachments) and (__name__ == "__main__"):
                 if (not attachments) and (cached_urls):
                     prior_urls = cached_urls
                     cached_sources = getattr(self, "_last_web_sources", [])
-                    prior_sources = cached_sources if isinstance(cached_sources, list) else []
+                    prior_sources = (
+                        cached_sources if isinstance(cached_sources, list) else []
+                    )
 
             # WEB_FOLLOWUP_DURABLE_SOURCE_CACHE_LOCK
             # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
-            if (not attachments) and (not prior_urls or source_index >= len(prior_urls)):
+            if (not attachments) and (
+                not prior_urls or source_index >= len(prior_urls)
+            ):
                 try:
                     import json
                     from pathlib import Path
 
-                    cache_path = Path(r"C:\Users\Owner\nova\data\nova_last_web_sources.json")
+                    cache_path = Path(
+                        r"C:\Users\Owner\nova\data\nova_last_web_sources.json"
+                    )
 
                     if cache_path.exists():
-                        cache_data = json.loads(cache_path.read_text(encoding="utf-8") or "{}")
+                        cache_data = json.loads(
+                            cache_path.read_text(encoding="utf-8") or "{}"
+                        )
                         cached_urls = cache_data.get("source_urls")
                         cached_sources = cache_data.get("sources")
 
@@ -8669,7 +8194,11 @@ if (not attachments) and (__name__ == "__main__"):
                                 for url in cached_urls
                                 if self._safe_str(url).strip()
                             ]
-                            prior_sources = cached_sources if isinstance(cached_sources, list) else []
+                            prior_sources = (
+                                cached_sources
+                                if isinstance(cached_sources, list)
+                                else []
+                            )
                 except Exception as exc:
                     exec_debug("WEB_FOLLOWUP_DURABLE_SOURCE_CACHE_READ_FAILED:", exc)
 
@@ -8696,14 +8225,18 @@ if (not attachments) and (__name__ == "__main__"):
                 )
             )
 
-            if attachment_language and (not prior_urls or source_index >= len(prior_urls)):
+            if attachment_language and (
+                not prior_urls or source_index >= len(prior_urls)
+            ):
                 assistant_msg = self._build_assistant_message(
                     "I see you are asking about an uploaded attachment, but I did not receive usable attachment data in this chat request. Re-upload the image/file, then send the question again.",
                     meta={
                         "strategy": "attachment_expected_but_missing",
                         "source_index": source_index,
                         "source_urls": prior_urls,
-                        "sources": prior_sources[:5] if isinstance(prior_sources, list) else [],
+                        "sources": (
+                            prior_sources[:5] if isinstance(prior_sources, list) else []
+                        ),
                     },
                 )
 
@@ -8713,20 +8246,28 @@ if (not attachments) and (__name__ == "__main__"):
                     user_msg=user_msg,
                     assistant_msg=assistant_msg,
                     messages=messages,
-                    memory_items=memory_items,
-                    started_at=started_at,
+                    memory_items=locals().get("memory_items")
+                    or locals().get("memory_context")
+                    or [],
+                    started_at=locals().get("started_at")
+                    or locals().get("now_iso")
+                    or "",
                     route="attachment_expected_but_missing",
                     intent="attachment",
                 )
 
-            if (not attachments) and (not prior_urls or source_index >= len(prior_urls)):
+            if (not attachments) and (
+                not prior_urls or source_index >= len(prior_urls)
+            ):
                 assistant_msg = self._build_assistant_message(
                     "I could not find a previous source to open. Run a fresh web search first.",
                     meta={
                         "strategy": "open_web_source_followup",
                         "source_index": source_index,
                         "source_urls": prior_urls,
-                        "sources": prior_sources[:5] if isinstance(prior_sources, list) else [],
+                        "sources": (
+                            prior_sources[:5] if isinstance(prior_sources, list) else []
+                        ),
                     },
                 )
 
@@ -8745,19 +8286,25 @@ if (not attachments) and (__name__ == "__main__"):
 
             text = selected_url
 
-
         # DIRECT_URL_TRUE_REASON_ONLY_LOCK
         # Only run direct URL fetch when route decision originally classified the USER input as a direct URL.
         # Cached source URLs / Google News URLs can also get copied into `text`, but they must not hijack
         # attachment quick actions like Summarize / Keypoints / Continue.
         original_user_text_for_direct_url = self._safe_str(user_text).strip()
-        direct_url_reasons = decision.get("reasons") if isinstance(decision, dict) else []
-        direct_url_reasons = direct_url_reasons if isinstance(direct_url_reasons, list) else []
+        direct_url_reasons = (
+            decision.get("reasons") if isinstance(decision, dict) else []
+        )
+        direct_url_reasons = (
+            direct_url_reasons if isinstance(direct_url_reasons, list) else []
+        )
 
         if (
             (not attachments)
             and ("direct_url" in direct_url_reasons)
-            and (original_user_text_for_direct_url.startswith("http://") or original_user_text_for_direct_url.startswith("https://"))
+            and (
+                original_user_text_for_direct_url.startswith("http://")
+                or original_user_text_for_direct_url.startswith("https://")
+            )
             and (text.startswith("http://") or text.startswith("https://"))
         ):
             print("DIRECT_URL_PATCH_HIT =", text)
@@ -8796,9 +8343,7 @@ if (not attachments) and (__name__ == "__main__"):
             ).strip()
 
             title = self._safe_str(
-                web_result.get("title")
-                or source_url
-                or text
+                web_result.get("title") or source_url or text
             ).strip()
 
             summary = self._safe_str(
@@ -8815,16 +8360,10 @@ if (not attachments) and (__name__ == "__main__"):
                 or ""
             ).strip()
 
-            error = self._safe_str(
-                web_result.get("error")
-                or ""
-            ).strip()
+            error = self._safe_str(web_result.get("error") or "").strip()
 
             if error and not summary and not body:
-                assistant_text = (
-                    "Web fetch failed:\n"
-                    + error
-                )
+                assistant_text = "Web fetch failed:\n" + error
             else:
                 summary_looks_raw = (
                     len(summary) > 400
@@ -8836,17 +8375,11 @@ if (not attachments) and (__name__ == "__main__"):
                     or "à¦" in summary
                 )
 
-                assistant_text = (
-                    ""
-                    if summary_looks_raw
-                    else summary
-                )
+                assistant_text = "" if summary_looks_raw else summary
 
                 if not assistant_text and (body or summary):
                     try:
-                        clean_body = self._clean_web_text(
-                            (body or summary)[:5000]
-                        )
+                        clean_body = self._clean_web_text((body or summary)[:5000])
 
                         prompt = (
                             "Summarize this fetched webpage cleanly.\n"
@@ -8969,7 +8502,9 @@ if (not attachments) and (__name__ == "__main__"):
                 exec_debug("RSS_QUERIES:", rss_queries)
 
                 for rss_query in rss_queries:
-                    rss_url = "https://news.google.com/rss/search?q=" + quote_plus(rss_query)
+                    rss_url = "https://news.google.com/rss/search?q=" + quote_plus(
+                        rss_query
+                    )
                     rss_res = requests.get(rss_url, timeout=20)
 
                     exec_debug("RSS_QUERY:", rss_query)
@@ -8985,7 +8520,9 @@ if (not attachments) and (__name__ == "__main__"):
                     for item in root.findall(".//item"):
                         title = self._safe_str(item.findtext("title") or "").strip()
                         link = self._safe_str(item.findtext("link") or "").strip()
-                        description = self._safe_str(item.findtext("description") or "").strip()
+                        description = self._safe_str(
+                            item.findtext("description") or ""
+                        ).strip()
 
                         if not title or not link:
                             continue
@@ -8995,12 +8532,14 @@ if (not attachments) and (__name__ == "__main__"):
 
                         seen_rss_urls.add(link)
 
-                        rss_results.append({
-                            "title": title,
-                            "snippet": description,
-                            "content": description,
-                            "url": link,
-                        })
+                        rss_results.append(
+                            {
+                                "title": title,
+                                "snippet": description,
+                                "content": description,
+                                "url": link,
+                            }
+                        )
 
                         if len(rss_results) >= 12:
                             break
@@ -9018,7 +8557,9 @@ if (not attachments) and (__name__ == "__main__"):
         exec_debug("WEB_FETCH_RESULT_TYPE:", type(web_result))
         exec_debug("WEB_FETCH_RESULT:", web_result)
 
-        raw_results = web_result.get("results", []) if isinstance(web_result, dict) else []
+        raw_results = (
+            web_result.get("results", []) if isinstance(web_result, dict) else []
+        )
         # ATTACHMENT_SOURCE_ROUTER_GUARD_LOCK: source/web follow-up routes must not hijack attachment messages.
         if (not attachments) and (not isinstance(raw_results, list)):
             raw_results = []
@@ -9051,23 +8592,37 @@ if (not attachments) and (__name__ == "__main__"):
                 if term in snippet:
                     priority += 10
 
-            if any(x in url for x in [
-                "reuters.com", "apnews.com", "bbc.com",
-                "bloomberg.com", "cnbc.com",
-                "cbc.ca", "globalnews.ca", "ctvnews.ca"
-            ]):
+            if any(
+                x in url
+                for x in [
+                    "reuters.com",
+                    "apnews.com",
+                    "bbc.com",
+                    "bloomberg.com",
+                    "cnbc.com",
+                    "cbc.ca",
+                    "globalnews.ca",
+                    "ctvnews.ca",
+                ]
+            ):
                 priority += 100
 
-            if any(x in url for x in [
-                "espn.com", "cbssports.com", "sports.yahoo.com",
-                "tsn.ca", "sportsnet.ca"
-            ]):
+            if any(
+                x in url
+                for x in [
+                    "espn.com",
+                    "cbssports.com",
+                    "sports.yahoo.com",
+                    "tsn.ca",
+                    "sportsnet.ca",
+                ]
+            ):
                 priority += 80
 
-            if any(x in url for x in [
-                "pwinsider.com", "fightful.com",
-                "wrestlingobserver.com"
-            ]):
+            if any(
+                x in url
+                for x in ["pwinsider.com", "fightful.com", "wrestlingobserver.com"]
+            ):
                 priority += 60
 
             if any(x in title for x in ["rumor", "reaction", "opinion"]):
@@ -9076,11 +8631,7 @@ if (not attachments) and (__name__ == "__main__"):
             return priority
 
         try:
-            cleaned_sources = sorted(
-                cleaned_sources,
-                key=_rank_key,
-                reverse=True
-            )
+            cleaned_sources = sorted(cleaned_sources, key=_rank_key, reverse=True)
         except Exception as e:
             exec_debug("FINAL_RANK_ERROR:", e)
 
@@ -9107,7 +8658,9 @@ if (not attachments) and (__name__ == "__main__"):
                 title_parts = title.rsplit(" - ", 1)
                 title = title_parts[0].strip()
                 rss_source = title_parts[1].strip()
-            url = self._safe_str(item.get("url") or item.get("href") or item.get("link") or "").strip()
+            url = self._safe_str(
+                item.get("url") or item.get("href") or item.get("link") or ""
+            ).strip()
 
             snippet = self._safe_str(
                 item.get("snippet")
@@ -9137,12 +8690,14 @@ if (not attachments) and (__name__ == "__main__"):
             if not source:
                 source = url
 
-            sources.append({
-                "title": title,
-                "url": url,
-                "source": source,
-                "snippet": snippet,
-            })
+            sources.append(
+                {
+                    "title": title,
+                    "url": url,
+                    "source": source,
+                    "snippet": snippet,
+                }
+            )
 
             source_urls.append(url)
 
@@ -9150,25 +8705,13 @@ if (not attachments) and (__name__ == "__main__"):
                 body += "\n\n" + snippet
 
         def _final_source_rank(source_item):
-            title_value = self._safe_str(
-                source_item.get("title")
-            ).lower()
+            title_value = self._safe_str(source_item.get("title")).lower()
 
-            source_value = self._safe_str(
-                source_item.get("source")
-            ).lower()
+            source_value = self._safe_str(source_item.get("source")).lower()
 
-            snippet_value = self._safe_str(
-                source_item.get("snippet")
-            ).lower()
+            snippet_value = self._safe_str(source_item.get("snippet")).lower()
 
-            combined = (
-                title_value
-                + " "
-                + source_value
-                + " "
-                + snippet_value
-            )
+            combined = title_value + " " + source_value + " " + snippet_value
 
             score = 0
 
@@ -9275,7 +8818,9 @@ if (not attachments) and (__name__ == "__main__"):
                     "I can give you",
                 ]:
                     if marker.lower() in assistant_text.lower():
-                        assistant_text = assistant_text[:assistant_text.lower().find(marker.lower())].strip()
+                        assistant_text = assistant_text[
+                            : assistant_text.lower().find(marker.lower())
+                        ].strip()
 
             except Exception as exc:
                 exec_debug("WEB_FETCH_SUMMARY_FAILED:", exc)
@@ -9293,21 +8838,13 @@ if (not attachments) and (__name__ == "__main__"):
             if not isinstance(item, dict):
                 continue
 
-            title_value = self._safe_str(
-                item.get("title")
-            ).strip()
+            title_value = self._safe_str(item.get("title")).strip()
 
-            url_value = self._safe_str(
-                item.get("url")
-            ).strip()
+            url_value = self._safe_str(item.get("url")).strip()
 
-            source_value = self._safe_str(
-                item.get("source")
-            ).strip()
+            source_value = self._safe_str(item.get("source")).strip()
 
-            snippet_value = self._safe_str(
-                item.get("snippet")
-            ).strip()
+            snippet_value = self._safe_str(item.get("snippet")).strip()
 
             snippet_value = html.unescape(snippet_value)
             snippet_value = re.sub(
@@ -9315,13 +8852,17 @@ if (not attachments) and (__name__ == "__main__"):
                 "",
                 snippet_value,
             )
-            snippet_value = snippet_value.replace(
-                "\xa0",
-                " ",
-            ).replace(
-                "&nbsp;",
-                " ",
-            ).strip()
+            snippet_value = (
+                snippet_value.replace(
+                    "\xa0",
+                    " ",
+                )
+                .replace(
+                    "&nbsp;",
+                    " ",
+                )
+                .strip()
+            )
 
             if not snippet_value:
                 snippet_value = title_value
@@ -9336,25 +8877,13 @@ if (not attachments) and (__name__ == "__main__"):
             )
 
         def _final_source_rank(item):
-            title_value = self._safe_str(
-                item.get("title")
-            ).lower()
+            title_value = self._safe_str(item.get("title")).lower()
 
-            source_value = self._safe_str(
-                item.get("source")
-            ).lower()
+            source_value = self._safe_str(item.get("source")).lower()
 
-            snippet_value = self._safe_str(
-                item.get("snippet")
-            ).lower()
+            snippet_value = self._safe_str(item.get("snippet")).lower()
 
-            combined = (
-                title_value
-                + " "
-                + source_value
-                + " "
-                + snippet_value
-            )
+            combined = title_value + " " + source_value + " " + snippet_value
 
             score = 0
 
@@ -9439,18 +8968,12 @@ if (not attachments) and (__name__ == "__main__"):
         exec_debug("WEB_SOURCE_URLS_FINAL:", source_urls)
         exec_debug(
             "WEB_SOURCE_ORDER_FINAL:",
-            [
-                item.get("source")
-                for item in sources
-                if isinstance(item, dict)
-            ],
+            [item.get("source") for item in sources if isinstance(item, dict)],
         )
-
 
         # Source rendering is handled by structured metadata/frontend cards.
         # Do not append manual Top sources text here.
         assistant_msg = self._build_assistant_message(
-
             assistant_text,
             meta={
                 "route": "web",
@@ -9536,11 +9059,7 @@ if (not attachments) and (__name__ == "__main__"):
         }:
             return True
 
-        if (
-            text.startswith("/image")
-            or text.startswith("/iimage")
-            or "/image" in text
-        ):
+        if text.startswith("/image") or text.startswith("/iimage") or "/image" in text:
             return True
 
         keywords = ["generate", "create", "make", "draw", "render", "design"]
@@ -9555,32 +9074,32 @@ if (not attachments) and (__name__ == "__main__"):
         return False
 
     def _image_prompt_from_text(self, user_text: str) -> str:
-            text = str(user_text or "").strip()
-            lowered = text.lower()
+        text = str(user_text or "").strip()
+        lowered = text.lower()
 
-            if lowered.startswith("/image"):
-                prompt = text[6:].strip()
-                return prompt or "Generate an image."
+        if lowered.startswith("/image"):
+            prompt = text[6:].strip()
+            return prompt or "Generate an image."
 
-            prefixes = (
-                "generate an image of ",
-                "generate an image ",
-                "generate image of ",
-                "generate image ",
-                "make an image of ",
-                "make an image ",
-                "create an image of ",
-                "create an image ",
-                "draw me ",
-                "draw ",
-            )
+        prefixes = (
+            "generate an image of ",
+            "generate an image ",
+            "generate image of ",
+            "generate image ",
+            "make an image of ",
+            "make an image ",
+            "create an image of ",
+            "create an image ",
+            "draw me ",
+            "draw ",
+        )
 
-            for prefix in prefixes:
-                if lowered.startswith(prefix):
-                    prompt = text[len(prefix):].strip()
-                    return prompt or text
+        for prefix in prefixes:
+            if lowered.startswith(prefix):
+                prompt = text[len(prefix) :].strip()
+                return prompt or text
 
-            return text or "Generate an image."
+        return text or "Generate an image."
 
     def _detect_mission_state(self, user_text: str = "", decision=None) -> dict:
         decision = decision if isinstance(decision, dict) else {}
@@ -9593,40 +9112,62 @@ if (not attachments) and (__name__ == "__main__"):
             "needs_full_file": False,
         }
 
-        if any(x in text for x in ["fix my bug", "fix bug", "error", "traceback", "syntaxerror", "indentationerror"]):
-            mission.update({
-                "mode": "debugging",
-                "current_task": "Fix current Nova bug",
-                "next_move": "Run compile, inspect exact error, apply smallest safe fix.",
-                "needs_full_file": True,
-            })
+        if any(
+            x in text
+            for x in [
+                "fix my bug",
+                "fix bug",
+                "error",
+                "traceback",
+                "syntaxerror",
+                "indentationerror",
+            ]
+        ):
+            mission.update(
+                {
+                    "mode": "debugging",
+                    "current_task": "Fix current Nova bug",
+                    "next_move": "Run compile, inspect exact error, apply smallest safe fix.",
+                    "needs_full_file": True,
+                }
+            )
             return mission
 
         if text in ["smff", "snff"] or "smff" in text:
-            mission.update({
-                "mode": "full_file",
-                "current_task": "Provide full-file or full-block replacement",
-                "next_move": "Use exact file path, anchor, replacement, and test command.",
-                "needs_full_file": True,
-            })
+            mission.update(
+                {
+                    "mode": "full_file",
+                    "current_task": "Provide full-file or full-block replacement",
+                    "next_move": "Use exact file path, anchor, replacement, and test command.",
+                    "needs_full_file": True,
+                }
+            )
             return mission
 
         if text in ["next", "continue", "go", "keep going", "next step"]:
-            mission.update({
-                "mode": "continue",
-                "current_task": "Continue current Nova build phase",
-                "next_move": "Choose the next concrete implementation step.",
-                "needs_full_file": False,
-            })
+            mission.update(
+                {
+                    "mode": "continue",
+                    "current_task": "Continue current Nova build phase",
+                    "next_move": "Choose the next concrete implementation step.",
+                    "needs_full_file": False,
+                }
+            )
             return mission
 
-        if "latest" in text or "news" in text or str(decision.get("route") or "").lower() == "web":
-            mission.update({
-                "mode": "web_fetch",
-                "current_task": "Fetch and summarize current information",
-                "next_move": "Return concise summary with sources when available.",
-                "needs_full_file": False,
-            })
+        if (
+            "latest" in text
+            or "news" in text
+            or str(decision.get("route") or "").lower() == "web"
+        ):
+            mission.update(
+                {
+                    "mode": "web_fetch",
+                    "current_task": "Fetch and summarize current information",
+                    "next_move": "Return concise summary with sources when available.",
+                    "needs_full_file": False,
+                }
+            )
             return mission
 
     def _extract_function_from_file(self, file_path: str, func_name: str) -> str:
@@ -9853,10 +9394,7 @@ if (not attachments) and (__name__ == "__main__"):
         except Exception as e:
             exec_debug("AUTO_FIX_FUNCTION_ERROR:", e)
 
-            assistant_text = (
-                "Auto-fix failed due to an internal error.\n\n"
-                f"{str(e)}"
-            )
+            assistant_text = "Auto-fix failed due to an internal error.\n\n" f"{str(e)}"
             assistant_msg = self._build_assistant_message(text=assistant_text)
 
             return {
@@ -9865,7 +9403,9 @@ if (not attachments) and (__name__ == "__main__"):
                 "ok": True,
             }
 
-    def _handle_execution_control(self, user_text: str, session_id: str, attachments=None):
+    def _handle_execution_control(
+        self, user_text: str, session_id: str, attachments=None
+    ):
         text = self._safe_str(user_text).strip().lower()
 
         execution_state = (
@@ -9936,10 +9476,7 @@ if (not attachments) and (__name__ == "__main__"):
         # =========================
         # BRAIN CONTROL GATE
         # =========================
-        working_state = (
-            self._get_working_state(session_id)
-            or {}
-        )
+        working_state = self._get_working_state(session_id) or {}
 
         brain_state = self._build_brain_state(
             execution_state=execution_state,
@@ -9954,7 +9491,6 @@ if (not attachments) and (__name__ == "__main__"):
         if text in execution_keywords:
             action = "execute"
             brain_state["decision"] = action
-
 
         # CHAT EXIT PATH
         if action == "chat" and text not in execution_keywords:
@@ -9973,7 +9509,7 @@ if (not attachments) and (__name__ == "__main__"):
                     self._execute_general_chat(user_text, session_id)
                 ),
                 "execution": None,
-                "brain_action": "chat"
+                "brain_action": "chat",
             }
 
         # =========================
@@ -10047,7 +9583,13 @@ if (not attachments) and (__name__ == "__main__"):
         if text in {"apply_auto_fix", "apply auto fix", "auto fix", "autofix"}:
             command = "apply_auto_fix"
 
-        elif text in {"retry", "retry_failed", "retry failed", "try again", "rerun failed"}:
+        elif text in {
+            "retry",
+            "retry_failed",
+            "retry failed",
+            "try again",
+            "rerun failed",
+        }:
             command = "retry_failed"
 
         elif text in {"run_all", "run all", "run it", "execute", "execute all"}:
@@ -10057,9 +9599,18 @@ if (not attachments) and (__name__ == "__main__"):
             command = "test_fail"
 
         elif text in {
-            "next", "nex", "continue", "continue on", "keep going", "go",
-            "run next", "next step", "what next", "what now",
-            "run_step", "run step",
+            "next",
+            "nex",
+            "continue",
+            "continue on",
+            "keep going",
+            "go",
+            "run next",
+            "next step",
+            "what next",
+            "what now",
+            "run_step",
+            "run step",
         }:
             if execution_state.get("status") == "failed":
                 command = "retry_failed"
@@ -10084,18 +9635,12 @@ if (not attachments) and (__name__ == "__main__"):
             )
 
         execution_state = (
-            self._load_execution_state(
-                session_id
-            )
+            self._load_execution_state(session_id)
             or execution_state
             or session.get("execution_state")
             or session.get("active_execution")
-            or session.get("meta", {}).get(
-                "execution_state"
-            )
-            or session.get("meta", {}).get(
-                "active_execution"
-            )
+            or session.get("meta", {}).get("execution_state")
+            or session.get("meta", {}).get("active_execution")
             or {}
         )
 
@@ -10110,16 +9655,10 @@ if (not attachments) and (__name__ == "__main__"):
         # =========================
         if command:
 
-            already_processing = bool(
-                execution_state.get(
-                    "_execution_processing"
-                )
-            )
+            already_processing = bool(execution_state.get("_execution_processing"))
 
             if already_processing:
-                execution_state[
-                    "_execution_processing"
-                ] = False
+                execution_state["_execution_processing"] = False
 
                 execution_state["lock"] = False
                 execution_state["waiting"] = True
@@ -10129,9 +9668,7 @@ if (not attachments) and (__name__ == "__main__"):
                     execution_state,
                 )
 
-            execution_state[
-                "_execution_processing"
-            ] = False
+            execution_state["_execution_processing"] = False
 
             return self._process_execution_command(
                 command=command,
@@ -10147,12 +9684,8 @@ if (not attachments) and (__name__ == "__main__"):
             execution_state
             or session.get("execution_state")
             or session.get("active_execution")
-            or session.get("meta", {}).get(
-                "execution_state"
-            )
-            or session.get("meta", {}).get(
-                "active_execution"
-            )
+            or session.get("meta", {}).get("execution_state")
+            or session.get("meta", {}).get("active_execution")
             or {}
         )
 
@@ -10161,29 +9694,16 @@ if (not attachments) and (__name__ == "__main__"):
             dict,
         ):
 
-            execution_snapshot = (
-                self._build_execution_snapshot(
-                    execution_state
-                )
-            )
+            execution_snapshot = self._build_execution_snapshot(execution_state)
 
-            steps = execution_snapshot[
-                "steps"
-            ]
+            steps = execution_snapshot["steps"]
 
-            current_index = execution_snapshot[
-                "current_index"
-            ]
+            current_index = execution_snapshot["current_index"]
 
-            status = execution_snapshot[
-                "status"
-            ]
+            status = execution_snapshot["status"]
 
-            current_step = execution_snapshot[
-                "current_step"
-            ]
+            current_step = execution_snapshot["current_step"]
             execution_state = {}
-
 
             if not steps:
                 execution_state["status"] = "idle"
@@ -10201,15 +9721,12 @@ if (not attachments) and (__name__ == "__main__"):
             )
 
             return {
-                    "ok": True,
-                    "assistant_message": {
-                        "role": "assistant",
-                        "text": (
-                            "Execution plan is empty. "
-                            "Create a new plan first."
-                        ),
-                    },
-                }
+                "ok": True,
+                "assistant_message": {
+                    "role": "assistant",
+                    "text": ("Execution plan is empty. " "Create a new plan first."),
+                },
+            }
 
             if command == "retry_failed":
                 return {
@@ -10224,15 +9741,10 @@ if (not attachments) and (__name__ == "__main__"):
             if (
                 steps
                 and all(
-                    isinstance(step, dict)
-                    and step.get("status") == "completed"
+                    isinstance(step, dict) and step.get("status") == "completed"
                     for step in steps
                 )
-                and self._safe_str(
-                    execution_state.get(
-                        "status"
-                    )
-                ).lower().strip()
+                and self._safe_str(execution_state.get("status")).lower().strip()
                 in {
                     "complete",
                     "completed",
@@ -10240,10 +9752,8 @@ if (not attachments) and (__name__ == "__main__"):
                 }
             ):
 
-                execution_state = (
-                    self._mark_execution_complete(
-                        execution_state,
-                    )
+                execution_state = self._mark_execution_complete(
+                    execution_state,
                 )
 
                 execution_state["current_index"] = len(steps)
@@ -10278,10 +9788,7 @@ if (not attachments) and (__name__ == "__main__"):
             # =========================
             # SYNC STATE
             # =========================
-            current_pointer = int(
-                execution_state.get("current_index", 0)
-                or 0
-            )
+            current_pointer = int(execution_state.get("current_index", 0) or 0)
 
             current_title = ""
 
@@ -10290,10 +9797,7 @@ if (not attachments) and (__name__ == "__main__"):
                 and current_pointer < len(steps)
                 and isinstance(steps[current_pointer], dict)
             ):
-                current_title = (
-                    steps[current_pointer].get("title", "")
-                    or ""
-                )
+                current_title = steps[current_pointer].get("title", "") or ""
 
             execution_state = self._sync_execution_state(
                 execution=execution_state,
@@ -10302,9 +9806,7 @@ if (not attachments) and (__name__ == "__main__"):
                 progress=current_pointer,
             )
 
-            synced_index = self._execution_current_index(
-                execution_state
-            )
+            synced_index = self._execution_current_index(execution_state)
 
             if synced_index < len(steps):
 
@@ -10320,18 +9822,14 @@ if (not attachments) and (__name__ == "__main__"):
                     progress=synced_index,
                 )
 
-                execution_state["current_step"] = (
-                    synced_step.get(
-                        "title",
-                        "",
-                    )
+                execution_state["current_step"] = synced_step.get(
+                    "title",
+                    "",
                 )
 
-                execution_state["current_step_title"] = (
-                    synced_step.get(
-                        "title",
-                        "",
-                    )
+                execution_state["current_step_title"] = synced_step.get(
+                    "title",
+                    "",
                 )
 
                 execution_state["next_moves"] = [
@@ -10381,9 +9879,7 @@ if (not attachments) and (__name__ == "__main__"):
                 "assistant_message": self._build_assistant_message(
                     "Execution returned no result."
                 ),
-                "session": self._get_session_payload(
-                    session_id
-                ),
+                "session": self._get_session_payload(session_id),
             }
 
             return {
@@ -10391,9 +9887,7 @@ if (not attachments) and (__name__ == "__main__"):
                 "assistant_message": self._build_assistant_message(
                     "Execution command processed."
                 ),
-                "session": self._get_session_payload(
-                    session_id
-                ),
+                "session": self._get_session_payload(session_id),
             }
 
         if not result:
@@ -10401,9 +9895,8 @@ if (not attachments) and (__name__ == "__main__"):
                 "ok": False,
                 "assistant_message": self._build_assistant_message(
                     "Execution command failed to produce output."
-                )
+                ),
             }
-
 
     # ATTACHMENT_BLOCKS_WEB_ROUTE_LOCK
     def _nova_current_text_has_attachment_context(self, text: str) -> bool:
@@ -10427,6 +9920,10 @@ if (not attachments) and (__name__ == "__main__"):
 
         # CHAT_SERVICE_HARD_ATTACHMENT_FINAL_LOCK
         try:
+            if not attachments:
+                raise RuntimeError(
+                    "NOVA_SKIP_STALE_ATTACHMENT_GUARD_NO_CURRENT_ATTACHMENTS"
+                )
             _txt = str(user_text or "").lower()
             _has_attachment_context = any(
                 marker in _txt
@@ -10436,12 +9933,18 @@ if (not attachments) and (__name__ == "__main__"):
                     "extracted attachment text",
                     "[mobile quick action attachment context active]",
                     "uploaded pdf attachment",
-                    "uploaded attachment"
+                    "uploaded attachment",
                 ]
             )
             _attachment_intent = any(
                 keyword in _txt
-                for keyword in ["summarize","summary","keypoint","key point","continue"]
+                for keyword in [
+                    "summarize",
+                    "summary",
+                    "keypoint",
+                    "key point",
+                    "continue",
+                ]
             )
             if _has_attachment_context and _attachment_intent:
                 _lines = []
@@ -10458,21 +9961,24 @@ if (not attachments) and (__name__ == "__main__"):
                 top = _lines[:8]
                 if top:
                     topic = "; ".join(top[:3])
-                    reply = "Attachment analysis:\\n"
-                    reply += f"This attachment appears to contain extracted image/PDF content about: {topic}.\\n\\n"
+                    reply = "Attachment received:\\n"
+                    reply += f"The uploaded attachment content appears related to: {topic}.\\n\\n"
                     reply += "Key points:\\n"
-                    for i,l in enumerate(top,start=1):
+                    for i, l in enumerate(top, start=1):
                         reply += f"{i}. {l}\\n"
                     reply += "\\nPreview:\\n" + "\\n".join(top[:6])
                 else:
                     reply = "Attachment analysis:\\nThe attachment was received and text was extracted, but it is too noisy to summarize cleanly."
                 return {
                     "ok": True,
-                    "assistant_message": {"role":"assistant","text":reply.strip()},
-                    "debug":{"route":"chat_service_hard_attachment_final","blocked_web_hijack":True},
-                    "skip_cleanup":True,
-                    "skip_post_processing":True,
-                    "skip_rewrite":True,
+                    "assistant_message": {"role": "assistant", "text": reply.strip()},
+                    "debug": {
+                        "route": "chat_service_hard_attachment_final",
+                        "blocked_web_hijack": True,
+                    },
+                    "skip_cleanup": True,
+                    "skip_post_processing": True,
+                    "skip_rewrite": True,
                 }
         except Exception:
             pass
@@ -10481,6 +9987,10 @@ if (not attachments) and (__name__ == "__main__"):
         # Hard stop: if app.py injected attachment text into user_text, do not let
         # direct URL / Google News / web routing hijack this request.
         try:
+            if not attachments:
+                raise RuntimeError(
+                    "NOVA_SKIP_STALE_ATTACHMENT_GUARD_NO_CURRENT_ATTACHMENTS"
+                )
             import re as _nova_attach_re
 
             _nova_attach_text = str(user_text or "")
@@ -10490,7 +10000,8 @@ if (not attachments) and (__name__ == "__main__"):
                 "attachment content:" in _nova_attach_lower
                 or "uploaded attachment context below" in _nova_attach_lower
                 or "extracted attachment text" in _nova_attach_lower
-                or "[mobile quick action attachment context active]" in _nova_attach_lower
+                or "[mobile quick action attachment context active]"
+                in _nova_attach_lower
             )
 
             _nova_attachment_intent = (
@@ -10549,8 +10060,12 @@ if (not attachments) and (__name__ == "__main__"):
                 _nova_seen = set()
 
                 for _nova_raw_line in _nova_attach_text.splitlines():
-                    _nova_line = _nova_attach_re.sub(r"^\s*\d+\.\s*", "", str(_nova_raw_line or "")).strip()
-                    _nova_line = _nova_line.replace("Attachment <unknown>", "uploaded attachment")
+                    _nova_line = _nova_attach_re.sub(
+                        r"^\s*\d+\.\s*", "", str(_nova_raw_line or "")
+                    ).strip()
+                    _nova_line = _nova_line.replace(
+                        "Attachment <unknown>", "uploaded attachment"
+                    )
                     _nova_line = _nova_line.replace("Attachment content:", "").strip()
                     _nova_line = _nova_attach_re.sub(r"\s+", " ", _nova_line).strip()
 
@@ -10558,15 +10073,21 @@ if (not attachments) and (__name__ == "__main__"):
                         continue
 
                     _nova_low = _nova_line.lower().strip(" :;-•*|")
-                    _nova_low_compact = _nova_attach_re.sub(r"[^a-z0-9]+", " ", _nova_low).strip()
+                    _nova_low_compact = _nova_attach_re.sub(
+                        r"[^a-z0-9]+", " ", _nova_low
+                    ).strip()
 
                     if _nova_low_compact in _nova_noise_exact:
                         continue
 
-                    if any(_nova_bad in _nova_low for _nova_bad in _nova_noise_contains):
+                    if any(
+                        _nova_bad in _nova_low for _nova_bad in _nova_noise_contains
+                    ):
                         continue
 
-                    if _nova_line.startswith("http://") or _nova_line.startswith("https://"):
+                    if _nova_line.startswith("http://") or _nova_line.startswith(
+                        "https://"
+                    ):
                         continue
 
                     if len(_nova_line) <= 2:
@@ -10581,7 +10102,9 @@ if (not attachments) and (__name__ == "__main__"):
                     if _nova_low.startswith("extracted attachment text"):
                         continue
 
-                    if _nova_low.startswith("[mobile quick action attachment context active]"):
+                    if _nova_low.startswith(
+                        "[mobile quick action attachment context active]"
+                    ):
                         continue
 
                     _nova_key = _nova_low_compact[:160]
@@ -10595,15 +10118,15 @@ if (not attachments) and (__name__ == "__main__"):
 
                 if _nova_top:
                     _nova_topic = "; ".join(_nova_top[:3])
-                    _nova_reply = "Attachment analysis:\n"
-                    _nova_reply += f"This attachment appears to contain extracted image/PDF content about: {_nova_topic}.\n\n"
+                    _nova_reply = "Attachment received:\n"
+                    _nova_reply += f"The uploaded attachment content appears related to: {_nova_topic}.\n\n"
                     _nova_reply += "Key points:\n"
                     for _nova_index, _nova_item in enumerate(_nova_top, start=1):
                         _nova_reply += f"{_nova_index}. {_nova_item}\n"
                     _nova_reply += "\nPreview:\n" + "\n".join(_nova_top[:6])
                 else:
                     _nova_reply = (
-                        "Attachment analysis:\n"
+                        "Attachment received:\n"
                         "The attachment was received and text was extracted, but the available extraction looks too noisy to summarize cleanly."
                     )
 
@@ -10653,7 +10176,9 @@ if (not attachments) and (__name__ == "__main__"):
                 or working_state.get("execution_state")
                 or {}
             )
-            execution_state = execution_state if isinstance(execution_state, dict) else {}
+            execution_state = (
+                execution_state if isinstance(execution_state, dict) else {}
+            )
 
             has_real_state = any(
                 [
@@ -10683,7 +10208,9 @@ if (not attachments) and (__name__ == "__main__"):
                 )
 
             next_move = self._safe_str(working_state.get("next_move")).strip()
-            message = next_move or "No active mission yet. Start one with: auto-plan <goal>"
+            message = (
+                next_move or "No active mission yet. Start one with: auto-plan <goal>"
+            )
 
             return {
                 "ok": True,
@@ -10760,51 +10287,43 @@ if (not attachments) and (__name__ == "__main__"):
             )
 
             if execution_state:
-                execution_state = (
-                    self._mark_execution_running(
-                        execution_state,
-                        step_index=(
-                            execution_state.get(
-                                "current_index",
-                                0,
-                            )
-                        ),
-                        current_step=(
-                            execution_state.get(
-                                "current_step",
-                                "",
-                            )
-                        ),
-                        waiting=(
-                            execution_state.get(
-                                "waiting",
-                                False,
-                            )
-                        ),
-                    )
+                execution_state = self._mark_execution_running(
+                    execution_state,
+                    step_index=(
+                        execution_state.get(
+                            "current_index",
+                            0,
+                        )
+                    ),
+                    current_step=(
+                        execution_state.get(
+                            "current_step",
+                            "",
+                        )
+                    ),
+                    waiting=(
+                        execution_state.get(
+                            "waiting",
+                            False,
+                        )
+                    ),
                 )
             self._save_execution_state(
                 session_id,
                 execution_state,
             )
 
-            session_payload = self._get_session_payload(
-                session_id
-            )
+            session_payload = self._get_session_payload(session_id)
 
             if isinstance(session_payload, dict):
 
-                session_payload["execution_state"] = (
-                    execution_state
-                )
+                session_payload["execution_state"] = execution_state
 
                 session_payload["active_execution"] = (
                     execution_state
                     if (
                         execution_state.get("steps")
-                        and self._safe_str(
-                            execution_state.get("status")
-                        ).lower()
+                        and self._safe_str(execution_state.get("status")).lower()
                         not in {
                             "complete",
                             "completed",
@@ -10827,7 +10346,6 @@ if (not attachments) and (__name__ == "__main__"):
                 }
 
         explicit_execution_commands = {
-
             "next",
             "nex",
             "continue",
@@ -10870,16 +10388,18 @@ if (not attachments) and (__name__ == "__main__"):
                 or {}
             )
 
-            if lowered == "resume" and not any([
-                ws.get("active_task"),
-                ws.get("current_file"),
-                ws.get("current_bug"),
-                ws.get("next_move"),
-                ws.get("checkpoint"),
-                execution.get("steps"),
-                execution.get("current_step"),
-                execution.get("status") == "running",
-            ]):
+            if lowered == "resume" and not any(
+                [
+                    ws.get("active_task"),
+                    ws.get("current_file"),
+                    ws.get("current_bug"),
+                    ws.get("next_move"),
+                    ws.get("checkpoint"),
+                    execution.get("steps"),
+                    execution.get("current_step"),
+                    execution.get("status") == "running",
+                ]
+            ):
                 return {
                     "ok": True,
                     "assistant_message": self._build_assistant_message(
@@ -10916,7 +10436,6 @@ if (not attachments) and (__name__ == "__main__"):
                     session_id=session_id,
                     attachments=attachments,
                 )
-
 
             if execution.get("locked"):
                 return {
@@ -11000,9 +10519,7 @@ if (not attachments) and (__name__ == "__main__"):
                 "assistant_message": self._build_assistant_message(
                     "No response generated (null pipeline result)."
                 ),
-                "debug": {
-                    "error": "null_result"
-                }
+                "debug": {"error": "null_result"},
             }
 
         return result
@@ -11016,16 +10533,13 @@ if (not attachments) and (__name__ == "__main__"):
 
         goal = self._build_goal(user_text)
 
-
         if (
             isinstance(goal, dict)
             and str(goal.get("type") or "").strip().lower() == "general"
             and str(goal.get("goal") or "").strip().lower() == "respond normally"
         ):
 
-            exec_debug(
-                "BLOCKED GENERAL CHAT EXECUTION PLAN"
-            )
+            exec_debug("BLOCKED GENERAL CHAT EXECUTION PLAN")
 
             self._save_execution_state(
                 session_id,
@@ -11096,14 +10610,9 @@ if (not attachments) and (__name__ == "__main__"):
 
         goal_text = self._safe_str(goal).lower().strip()
 
-        invalid_general_goal = (
-            "respond normally" in goal_text
-            or (
-                isinstance(goal, dict)
-                and self._safe_str(
-                    goal.get("goal")
-                ).lower().strip() == "respond normally"
-            )
+        invalid_general_goal = "respond normally" in goal_text or (
+            isinstance(goal, dict)
+            and self._safe_str(goal.get("goal")).lower().strip() == "respond normally"
         )
 
         if invalid_general_goal:
@@ -11189,19 +10698,15 @@ if (not attachments) and (__name__ == "__main__"):
                 if (
                     isinstance(execution_state, dict)
                     and execution_state.get("steps")
-                    and self._safe_str(
-                        execution_state.get("status")
-                    ).lower() != "complete"
+                    and self._safe_str(execution_state.get("status")).lower()
+                    != "complete"
                 )
                 else {}
             ),
         )
 
         try:
-            session_obj = (
-                self.sessions.get_session(session_id)
-                or {}
-            )
+            session_obj = self.sessions.get_session(session_id) or {}
 
             session_obj["execution_state"] = execution_state
 
@@ -11210,9 +10715,8 @@ if (not attachments) and (__name__ == "__main__"):
                 if (
                     isinstance(execution_state, dict)
                     and execution_state.get("steps")
-                    and self._safe_str(
-                        execution_state.get("status")
-                    ).lower() != "complete"
+                    and self._safe_str(execution_state.get("status")).lower()
+                    != "complete"
                 )
                 else {}
             )
@@ -11236,9 +10740,7 @@ if (not attachments) and (__name__ == "__main__"):
                 execution_state
                 if (
                     execution_state.get("steps")
-                    and self._safe_str(
-                        execution_state.get("status")
-                    ).lower()
+                    and self._safe_str(execution_state.get("status")).lower()
                     not in {
                         "complete",
                         "completed",
@@ -11262,7 +10764,9 @@ if (not attachments) and (__name__ == "__main__"):
 
         return execution_state
 
-    def _trigger_auto_fix_on_failure(self, session_id: str, error_text: str, action: str = ""):
+    def _trigger_auto_fix_on_failure(
+        self, session_id: str, error_text: str, action: str = ""
+    ):
         error_text = self._safe_str(error_text).strip() or "Unknown execution failure."
         action = self._safe_str(action).strip() or "unknown"
 
@@ -11300,8 +10804,7 @@ if (not attachments) and (__name__ == "__main__"):
                 "error": self._safe_str(e),
             }
 
-        return self._build_assistant_message(
-            text=f"""Execution failed.
+        return self._build_assistant_message(text=f"""Execution failed.
 
 Error:
 {error_text}
@@ -11309,8 +10812,7 @@ Error:
 Auto-fix trigger armed.
 
 Auto-fix result:
-{self._safe_str(auto_fix_result)}"""
-        )
+{self._safe_str(auto_fix_result)}""")
 
     def _process_execution(
         self,
@@ -11359,12 +10861,12 @@ Auto-fix result:
 
         steps = execution_state.get("steps") or []
 
-    
         current_index = int(
             execution_state.get(
                 "current_index",
                 0,
-            ) or 0
+            )
+            or 0
         )
 
         total = len(steps)
@@ -11374,10 +10876,8 @@ Auto-fix result:
         # =========================
         if current_index >= total:
 
-            execution_state = (
-                self._mark_execution_complete(
-                    execution_state,
-                )
+            execution_state = self._mark_execution_complete(
+                execution_state,
             )
 
             self._save_execution_state(
@@ -11438,15 +10938,11 @@ Auto-fix result:
 
             step["status"] = "completed"
 
-            execution_state["steps"][
-                current_index
-            ] = dict(step)
+            execution_state["steps"][current_index] = dict(step)
 
             steps = execution_state["steps"]
 
-            execution_state["current_index"] = (
-                current_index + 1
-            )
+            execution_state["current_index"] = current_index + 1
 
             next_index = execution_state["current_index"]
 
@@ -11454,15 +10950,9 @@ Auto-fix result:
 
                 next_step = steps[next_index]
 
-                execution_state["current_step"] = (
-                    self._safe_str(
-                        next_step.get("title")
-                    )
-                )
+                execution_state["current_step"] = self._safe_str(next_step.get("title"))
 
-                execution_state[
-                    "current_step_title"
-                ] = self._safe_str(
+                execution_state["current_step_title"] = self._safe_str(
                     next_step.get("title")
                 )
 
@@ -11482,82 +10972,50 @@ Auto-fix result:
 
             else:
 
-                execution_state = (
-                    self._mark_execution_complete(
-                        execution_state,
-                    )
+                execution_state = self._mark_execution_complete(
+                    execution_state,
                 )
 
             if self._safe_str(step.get("status")).lower() == "completed":
 
                 next_index = current_index + 1
 
-            execution_state["history"] = (
-                execution_state.get("history")
-                or []
-            )
+            execution_state["history"] = execution_state.get("history") or []
 
-            execution_state["history"].append(
-                f"completed: {step.get('title')}"
-            )
+            execution_state["history"].append(f"completed: {step.get('title')}")
 
             current_index += 1
 
-            execution_state[
-                "current_index"
-            ] = current_index
+            execution_state["current_index"] = current_index
 
             if current_index < total:
 
-                next_step = (
-                    steps[current_index]
-                )
+                next_step = steps[current_index]
 
-                execution_state[
-                    "current_step_title"
-                ] = next_step.get(
+                execution_state["current_step_title"] = next_step.get(
                     "title",
                     "",
                 )
 
                 try:
 
-                    current_step = steps[
-                        current_index
-                    ]
+                    current_step = steps[current_index]
 
-                    current_file = str(
-                        current_step.get(
-                            "target_file"
-                        ) or ""
-                    ).strip()
+                    current_file = str(current_step.get("target_file") or "").strip()
 
-                    current_bug = str(
-                        current_step.get(
-                            "error"
-                        ) or ""
-                    ).strip()
+                    current_bug = str(current_step.get("error") or "").strip()
 
                     self._update_working_state(
                         session_id,
                         {
-                            "current_file":
-                                current_file,
-                            "current_bug":
-                                current_bug,
+                            "current_file": current_file,
+                            "current_bug": current_bug,
                             "active_task": (
-                                execution_state.get(
-                                    "original_user_text",
-                                    ""
-                                )
+                                execution_state.get("original_user_text", "")
                             ),
                             "next_move": (
-                                current_step.get(
-                                    "title"
-                                )
-                                or current_step.get(
-                                    "action"
-                                )
+                                current_step.get("title")
+                                or current_step.get("action")
                                 or "continue"
                             ),
                         },
@@ -11572,9 +11030,7 @@ Auto-fix result:
 
             else:
 
-                execution_state[
-                    "current_step_title"
-                ] = ""
+                execution_state["current_step_title"] = ""
 
             self._save_execution_state(
                 session_id,
@@ -11591,7 +11047,6 @@ Auto-fix result:
 
             execution_state["last_error"] = str(e)
 
-
             self._save_active_execution(
                 session_id,
                 execution_state,
@@ -11599,36 +11054,27 @@ Auto-fix result:
 
             return execution_state
 
-
         # =========================
         # FINAL STATUS
         # =========================
         if current_index >= total:
 
-            execution_state = (
-                self._mark_execution_complete(
-                    execution_state,
-                )
+            execution_state = self._mark_execution_complete(
+                execution_state,
             )
 
         else:
 
-            execution_state = (
-                self._mark_execution_running(
-                    execution_state,
-                    step_index=current_index,
-                    current_step=(
-                        execution_state.get(
-                            "current_step",
-                            "",
-                        )
-                    ),
-                    waiting=(
-                        not execution_state.get(
-                            "auto_mode"
-                        )
-                    ),
-                )
+            execution_state = self._mark_execution_running(
+                execution_state,
+                step_index=current_index,
+                current_step=(
+                    execution_state.get(
+                        "current_step",
+                        "",
+                    )
+                ),
+                waiting=(not execution_state.get("auto_mode")),
             )
 
             if execution_state.get("auto_mode"):
@@ -11638,13 +11084,9 @@ Auto-fix result:
                     session_id,
                 )
 
-        execution_state["current_step"] = (
-            current_index
-        )
+        execution_state["current_step"] = current_index
 
-        goal_text = self._safe_str(
-            execution_state.get("goal")
-        ).lower().strip()
+        goal_text = self._safe_str(execution_state.get("goal")).lower().strip()
 
         if "respond normally" in goal_text:
 
@@ -11679,9 +11121,7 @@ Auto-fix result:
 
         state = self._run_next_step(state)
 
-        goal_text = self._safe_str(
-            state.get("goal")
-        ).lower().strip()
+        goal_text = self._safe_str(state.get("goal")).lower().strip()
 
         if "respond normally" in goal_text:
 
@@ -11921,41 +11361,30 @@ Auto-fix result:
             limit=500,
         )
 
-        primary = (
-            revised_clean
-            or prompt_clean
-            or "Generated image"
-        )
+        primary = revised_clean or prompt_clean or "Generated image"
 
         summary = f"Generated image from prompt: {primary}."
 
         if source_type:
             summary += (
-                f" Source type: "
-                f"{self._clean_artifact_text(source_type, limit=80)}."
+                f" Source type: " f"{self._clean_artifact_text(source_type, limit=80)}."
             )
 
         if generation_mode:
             summary += (
-                f" Mode: "
-                f"{self._clean_artifact_text(generation_mode, limit=80)}."
+                f" Mode: " f"{self._clean_artifact_text(generation_mode, limit=80)}."
             )
 
         body_parts = []
 
-        body_parts.append(
-            f"Prompt: {prompt_clean or 'N/A'}"
-        )
+        body_parts.append(f"Prompt: {prompt_clean or 'N/A'}")
 
         if revised_clean:
-            body_parts.append(
-                f"Revised prompt: {revised_clean}"
-            )
+            body_parts.append(f"Revised prompt: {revised_clean}")
 
         if source_type:
             body_parts.append(
-                "Source type: "
-                f"{self._clean_artifact_text(source_type, limit=80)}"
+                "Source type: " f"{self._clean_artifact_text(source_type, limit=80)}"
             )
 
         if generation_mode:
@@ -11991,13 +11420,9 @@ Auto-fix result:
 
         artifact = self._safe_dict(artifact)
 
-        meta = self._safe_dict(
-            artifact.get("meta")
-        )
+        meta = self._safe_dict(artifact.get("meta"))
 
-        viewer = self._safe_dict(
-            artifact.get("viewer")
-        )
+        viewer = self._safe_dict(artifact.get("viewer"))
 
         description = self._build_image_artifact_description(
             prompt=prompt,
@@ -12012,39 +11437,25 @@ Auto-fix result:
             or self._safe_str(viewer.get("image_url"))
         )
 
-        artifact["kind"] = (
-            self._safe_str(artifact.get("kind"))
-            or "image"
-        )
+        artifact["kind"] = self._safe_str(artifact.get("kind")) or "image"
 
-        artifact["group"] = (
-            self._safe_str(artifact.get("group"))
-            or "Images"
-        )
+        artifact["group"] = self._safe_str(artifact.get("group")) or "Images"
 
-        artifact["title"] = (
-            self._safe_str(artifact.get("title"))
-            or "Generated image"
-        )
+        artifact["title"] = self._safe_str(artifact.get("title")) or "Generated image"
 
         artifact["summary"] = description["summary"]
         artifact["preview"] = description["preview"]
         artifact["image_url"] = image_url or None
 
         artifact["source"] = (
-            self._safe_str(artifact.get("source"))
-            or "image_generation"
+            self._safe_str(artifact.get("source")) or "image_generation"
         )
 
-        meta["prompt"] = (
-            self._safe_str(meta.get("prompt"))
-            or self._safe_str(prompt)
-        )
+        meta["prompt"] = self._safe_str(meta.get("prompt")) or self._safe_str(prompt)
 
-        meta["revised_prompt"] = (
-            self._safe_str(meta.get("revised_prompt"))
-            or self._safe_str(revised_prompt)
-        )
+        meta["revised_prompt"] = self._safe_str(
+            meta.get("revised_prompt")
+        ) or self._safe_str(revised_prompt)
 
         meta["source_type"] = (
             self._safe_str(meta.get("source_type"))
@@ -12058,53 +11469,29 @@ Auto-fix result:
             or "text_to_image"
         )
 
-        meta["image_url"] = (
-            self._safe_str(meta.get("image_url"))
-            or image_url
-        )
+        meta["image_url"] = self._safe_str(meta.get("image_url")) or image_url
 
         meta["artifact_description"] = description["summary"]
 
-        viewer["kind"] = (
-            self._safe_str(viewer.get("kind"))
-            or "image"
-        )
+        viewer["kind"] = self._safe_str(viewer.get("kind")) or "image"
 
-        viewer["title"] = (
-            self._safe_str(viewer.get("title"))
-            or artifact["title"]
-        )
+        viewer["title"] = self._safe_str(viewer.get("title")) or artifact["title"]
 
         viewer["body"] = description["body"]
 
-        viewer["image_url"] = (
-            self._safe_str(viewer.get("image_url"))
-            or image_url
-        )
+        viewer["image_url"] = self._safe_str(viewer.get("image_url")) or image_url
 
-        viewer["source_url"] = self._safe_str(
-            viewer.get("source_url")
-        )
+        viewer["source_url"] = self._safe_str(viewer.get("source_url"))
 
-        viewer["filename"] = self._safe_str(
-            viewer.get("filename")
-        )
+        viewer["filename"] = self._safe_str(viewer.get("filename"))
 
-        viewer["image_missing"] = bool(
-            viewer.get("image_missing", False)
-        )
+        viewer["image_missing"] = bool(viewer.get("image_missing", False))
 
-        viewer["media_missing"] = bool(
-            viewer.get("media_missing", False)
-        )
+        viewer["media_missing"] = bool(viewer.get("media_missing", False))
 
-        viewer["audio_missing"] = bool(
-            viewer.get("audio_missing", False)
-        )
+        viewer["audio_missing"] = bool(viewer.get("audio_missing", False))
 
-        viewer["video_missing"] = bool(
-            viewer.get("video_missing", False)
-        )
+        viewer["video_missing"] = bool(viewer.get("video_missing", False))
 
         artifact["meta"] = meta
         artifact["viewer"] = viewer
@@ -12214,10 +11601,7 @@ Auto-fix result:
         bullets=None,
     ) -> dict:
 
-        clean_title = (
-            self._clean_web_text(title, limit=200)
-            or "Web result"
-        )
+        clean_title = self._clean_web_text(title, limit=200) or "Web result"
 
         clean_summary = self._clean_web_text(
             summary,
@@ -12251,9 +11635,7 @@ Auto-fix result:
 
         if not final_summary:
             if bullet_list:
-                final_summary = (
-                    " ".join(bullet_list[:2]).strip()
-                )
+                final_summary = " ".join(bullet_list[:2]).strip()
 
             elif clean_content:
                 final_summary = self._truncate_web_text(
@@ -12262,9 +11644,7 @@ Auto-fix result:
                 )
 
             else:
-                final_summary = (
-                    f"Fetched {clean_title}"
-                )
+                final_summary = f"Fetched {clean_title}"
 
         preview = self._truncate_web_text(
             final_summary,
@@ -12273,36 +11653,24 @@ Auto-fix result:
 
         body_parts = []
 
-        body_parts.append(
-            f"Title: {clean_title}"
-        )
+        body_parts.append(f"Title: {clean_title}")
 
         if clean_site:
-            body_parts.append(
-                f"Site: {clean_site}"
-            )
+            body_parts.append(f"Site: {clean_site}")
 
         elif clean_domain:
-            body_parts.append(
-                f"Domain: {clean_domain}"
-            )
+            body_parts.append(f"Domain: {clean_domain}")
 
         if clean_url:
-            body_parts.append(
-                f"URL: {clean_url}"
-            )
+            body_parts.append(f"URL: {clean_url}")
 
         if final_summary:
-            body_parts.append(
-                f"Summary: {final_summary}"
-            )
+            body_parts.append(f"Summary: {final_summary}")
 
         if bullet_list:
             body_parts.append("Key points:")
 
-            body_parts.extend(
-                [f"- {item}" for item in bullet_list]
-            )
+            body_parts.extend([f"- {item}" for item in bullet_list])
 
         if clean_content:
             body_parts.append("")
@@ -12326,13 +11694,9 @@ Auto-fix result:
         artifact = self._safe_dict(artifact)
         result = self._safe_dict(result)
 
-        meta = self._safe_dict(
-            artifact.get("meta")
-        )
+        meta = self._safe_dict(artifact.get("meta"))
 
-        viewer = self._safe_dict(
-            artifact.get("viewer")
-        )
+        viewer = self._safe_dict(artifact.get("viewer"))
 
         title = (
             self._safe_str(artifact.get("title"))
@@ -12341,14 +11705,12 @@ Auto-fix result:
             or "Web result"
         )
 
-        summary = (
-            self._safe_str(artifact.get("summary"))
-            or self._safe_str(result.get("summary"))
+        summary = self._safe_str(artifact.get("summary")) or self._safe_str(
+            result.get("summary")
         )
 
-        content = (
-            self._safe_str(artifact.get("body"))
-            or self._safe_str(result.get("content"))
+        content = self._safe_str(artifact.get("body")) or self._safe_str(
+            result.get("content")
         )
 
         source_url = (
@@ -12359,20 +11721,11 @@ Auto-fix result:
             or self._safe_str(url)
         )
 
-        artifact["kind"] = (
-            self._safe_str(artifact.get("kind"))
-            or "web_result"
-        )
+        artifact["kind"] = self._safe_str(artifact.get("kind")) or "web_result"
 
-        artifact["group"] = (
-            self._safe_str(artifact.get("group"))
-            or "Web"
-        )
+        artifact["group"] = self._safe_str(artifact.get("group")) or "Web"
 
-        artifact["title"] = (
-            self._safe_str(title)
-            or "Web result"
-        )
+        artifact["title"] = self._safe_str(title) or "Web result"
 
         artifact["summary"] = summary
         artifact["preview"] = self._truncate_web_text(
@@ -12388,10 +11741,7 @@ Auto-fix result:
 
         artifact["source_url"] = source_url
 
-        artifact["source"] = (
-            self._safe_str(artifact.get("source"))
-            or "web_fetch"
-        )
+        artifact["source"] = self._safe_str(artifact.get("source")) or "web_fetch"
 
         artifact["meta"] = meta
         artifact["viewer"] = viewer
@@ -12471,9 +11821,7 @@ Auto-fix result:
         if not decision.get("use_memory", True):
             return False
 
-        route = self._safe_str(
-            decision.get("route")
-        ).lower()
+        route = self._safe_str(decision.get("route")).lower()
 
         if route in {
             self._safe_str(
@@ -12510,10 +11858,7 @@ Auto-fix result:
             "https://",
         )
 
-        if any(
-            trigger in text
-            for trigger in skip_triggers
-        ):
+        if any(trigger in text for trigger in skip_triggers):
             return False
 
         return True
@@ -12529,10 +11874,7 @@ Auto-fix result:
         if not text:
             return ""
 
-        text = (
-            text.replace("\r", " ")
-            .replace("\n", " ")
-        )
+        text = text.replace("\r", " ").replace("\n", " ")
 
         text = re.sub(
             r"\s+",
@@ -12551,10 +11893,7 @@ Auto-fix result:
 
         lower = text.lower()
 
-        if any(
-            lower.startswith(x)
-            for x in bad_starts
-        ):
+        if any(lower.startswith(x) for x in bad_starts):
             return ""
 
         return text[:limit]
@@ -12568,21 +11907,13 @@ Auto-fix result:
 
         decision = decision or {}
 
-        user_text = self._safe_str(
-            user_text
-        ).lower()
+        user_text = self._safe_str(user_text).lower()
 
-        assistant_text = self._safe_str(
-            (assistant_msg or {}).get("text")
-        ).lower()
+        assistant_text = self._safe_str((assistant_msg or {}).get("text")).lower()
 
-        route = self._safe_str(
-            decision.get("route")
-        ).lower()
+        route = self._safe_str(decision.get("route")).lower()
 
-        mode = self._safe_str(
-            decision.get("mode")
-        ).lower()
+        mode = self._safe_str(decision.get("mode")).lower()
 
         continuity_triggers = [
             "what are we doing now",
@@ -12620,16 +11951,10 @@ Auto-fix result:
         if mode in {"planning", "analysis"}:
             return True
 
-        if any(
-            trigger in user_text
-            for trigger in continuity_triggers
-        ):
+        if any(trigger in user_text for trigger in continuity_triggers):
             return True
 
-        if any(
-            trigger in assistant_text
-            for trigger in assistant_triggers
-        ):
+        if any(trigger in assistant_text for trigger in assistant_triggers):
             return True
 
         return False
@@ -12639,9 +11964,7 @@ Auto-fix result:
         session_id: str,
     ):
 
-        state = self._get_working_state(
-            session_id
-        )
+        state = self._get_working_state(session_id)
 
         rows = [
             (
@@ -12673,117 +11996,68 @@ Auto-fix result:
         lines = []
 
         for label, value in rows:
-            value = self._clean_working_state_value(
-                value
-            )
+            value = self._clean_working_state_value(value)
 
             if value:
-                lines.append(
-                    f"{label}: {value}"
-                )
+                lines.append(f"{label}: {value}")
 
         if not lines:
             return ""
 
-        return (
-            "Working context:\n"
-            + "\n".join(lines)
-        )
+        return "Working context:\n" + "\n".join(lines)
 
     def _build_working_context_payload(
         self,
         session_id: str,
     ) -> dict:
 
-        state = self._get_working_state(
-            session_id
-        )
+        state = self._get_working_state(session_id)
 
         if not isinstance(state, dict):
             state = {}
 
         cleaned = {
-            "active_task":
-                self._clean_working_state_value(
-                    state.get("active_task", "")
-                ),
-
-            "current_file":
-                self._clean_working_state_value(
-                    state.get("current_file", "")
-                ),
-
-            "current_bug":
-                self._clean_working_state_value(
-                    state.get("current_bug", "")
-                ),
-
-            "last_success":
-                self._clean_working_state_value(
-                    state.get("last_success", "")
-                ),
-
-            "next_move":
-                self._clean_working_state_value(
-                    state.get("next_move", "")
-                ),
-
-            "checkpoint":
-                self._clean_working_state_value(
-                    state.get("checkpoint", "")
-                ),
-
-            "updated_at":
-                self._safe_str(
-                    state.get("updated_at", "")
-                ),
+            "active_task": self._clean_working_state_value(
+                state.get("active_task", "")
+            ),
+            "current_file": self._clean_working_state_value(
+                state.get("current_file", "")
+            ),
+            "current_bug": self._clean_working_state_value(
+                state.get("current_bug", "")
+            ),
+            "last_success": self._clean_working_state_value(
+                state.get("last_success", "")
+            ),
+            "next_move": self._clean_working_state_value(state.get("next_move", "")),
+            "checkpoint": self._clean_working_state_value(state.get("checkpoint", "")),
+            "updated_at": self._safe_str(state.get("updated_at", "")),
         }
 
         text_lines = []
 
         if cleaned["active_task"]:
-            text_lines.append(
-                f"- Active task: "
-                f"{cleaned['active_task']}"
-            )
+            text_lines.append(f"- Active task: " f"{cleaned['active_task']}")
 
         if cleaned["current_file"]:
-            text_lines.append(
-                f"- Current file: "
-                f"{cleaned['current_file']}"
-            )
+            text_lines.append(f"- Current file: " f"{cleaned['current_file']}")
 
         if cleaned["current_bug"]:
-            text_lines.append(
-                f"- Current bug: "
-                f"{cleaned['current_bug']}"
-            )
+            text_lines.append(f"- Current bug: " f"{cleaned['current_bug']}")
 
         if cleaned["last_success"]:
-            text_lines.append(
-                f"- Last success: "
-                f"{cleaned['last_success']}"
-            )
+            text_lines.append(f"- Last success: " f"{cleaned['last_success']}")
 
         if cleaned["next_move"]:
-            text_lines.append(
-                f"- Next move: "
-                f"{cleaned['next_move']}"
-            )
+            text_lines.append(f"- Next move: " f"{cleaned['next_move']}")
 
         if cleaned["checkpoint"]:
-            text_lines.append(
-                f"- Checkpoint: "
-                f"{cleaned['checkpoint']}"
-            )
+            text_lines.append(f"- Checkpoint: " f"{cleaned['checkpoint']}")
 
         text = ""
 
         if text_lines:
-            text = (
-                "Working context:\n"
-                + "\n".join(text_lines)
-            )
+            text = "Working context:\n" + "\n".join(text_lines)
 
         return {
             "show": bool(text_lines),
@@ -12798,29 +12072,21 @@ Auto-fix result:
         user_text: str,
     ) -> float:
 
-        user_text = self._safe_str(
-            user_text
-        ).strip().lower()
+        user_text = self._safe_str(user_text).strip().lower()
 
         if not user_text:
             return 0.0
 
         if isinstance(memory_item, dict):
-            text = self._safe_str(
-                memory_item.get("text")
-            )
+            text = self._safe_str(memory_item.get("text"))
 
-            kind = self._safe_str(
-                memory_item.get("kind")
-            )
+            kind = self._safe_str(memory_item.get("kind"))
 
         else:
             text = self._safe_str(memory_item)
             kind = ""
 
-        haystack = (
-            f"{kind} {text}"
-        ).strip().lower()
+        haystack = (f"{kind} {text}").strip().lower()
 
         if not haystack:
             return 0.0
@@ -12836,10 +12102,7 @@ Auto-fix result:
             "what am i building",
         ]
 
-        if any(
-            trigger in user_text
-            for trigger in project_query_triggers
-        ):
+        if any(trigger in user_text for trigger in project_query_triggers):
 
             if kind.lower() == "project":
                 score += 100.0
@@ -12877,9 +12140,7 @@ Auto-fix result:
         limit: int = 3,
     ):
 
-        all_memory = self._safe_list(
-            self._load_memory()
-        )
+        all_memory = self._safe_list(self._load_memory())
 
         if not all_memory:
             return []
@@ -12900,10 +12161,7 @@ Auto-fix result:
             reverse=True,
         )
 
-        return [
-            item
-            for _, item in ranked[:limit]
-        ]
+        return [item for _, item in ranked[:limit]]
 
     def _build_memory_recall_text(
         self,
@@ -12915,20 +12173,14 @@ Auto-fix result:
         items = []
 
         try:
-            if (
-                hasattr(self, "memory")
-                and self.memory
-                and hasattr(self.memory, "all")
-            ):
+            if hasattr(self, "memory") and self.memory and hasattr(self.memory, "all"):
                 items = self.memory.all() or []
 
         except Exception:
             items = []
 
         if not items:
-            return (
-                "I do not have any saved memory yet."
-            )
+            return "I do not have any saved memory yet."
 
         ranked = []
 
@@ -12945,11 +12197,7 @@ Auto-fix result:
             reverse=True,
         )
 
-        best = [
-            item
-            for score, item in ranked
-            if score > 0
-        ][:limit]
+        best = [item for score, item in ranked if score > 0][:limit]
 
         chosen = best if best else items[:limit]
 
@@ -12977,26 +12225,17 @@ Auto-fix result:
                     "nigga",
                 ]
 
-                if any(
-                    p in text.lower()
-                    for p in bad_patterns
-                ):
+                if any(p in text.lower() for p in bad_patterns):
                     continue
 
                 lines.append(f"- {text}")
                 continue
 
-            text = self._safe_str(
-                item.get("text")
-            ).strip()
+            text = self._safe_str(item.get("text")).strip()
 
-            kind = self._safe_str(
-                item.get("kind")
-            ).strip()
+            kind = self._safe_str(item.get("kind")).strip()
 
-            item_session_id = self._safe_str(
-                item.get("session_id")
-            ).strip()
+            item_session_id = self._safe_str(item.get("session_id")).strip()
 
             if not text:
                 continue
@@ -13015,10 +12254,7 @@ Auto-fix result:
                 "nigga",
             ]
 
-            if any(
-                p in text.lower()
-                for p in bad_patterns
-            ):
+            if any(p in text.lower() for p in bad_patterns):
                 continue
 
             prefix = "- "
@@ -13026,27 +12262,15 @@ Auto-fix result:
             if kind:
                 prefix = f"- [{kind}] "
 
-            if (
-                session_id
-                and item_session_id
-                and item_session_id == session_id
-            ):
-                prefix = (
-                    prefix.rstrip()
-                    + " [this session] "
-                )
+            if session_id and item_session_id and item_session_id == session_id:
+                prefix = prefix.rstrip() + " [this session] "
 
             lines.append(f"{prefix}{text}")
 
         if not lines:
-            return (
-                "I do not have any saved memory yet."
-            )
+            return "I do not have any saved memory yet."
 
-        return (
-            "Here s what I remember:\n"
-            + "\n".join(lines)
-        )
+        return "Here s what I remember:\n" + "\n".join(lines)
 
     def answer_from_web_results(
         self,
@@ -13056,11 +12280,7 @@ Auto-fix result:
 
         query = str(query or "").strip()
 
-        items = (
-            results
-            if isinstance(results, list)
-            else []
-        )
+        items = results if isinstance(results, list) else []
 
         cleaned: list[dict] = []
 
@@ -13071,27 +12291,15 @@ Auto-fix result:
             if not isinstance(item, dict):
                 continue
 
-            title = str(
-                item.get("title") or ""
-            ).strip()
+            title = str(item.get("title") or "").strip()
 
-            snippet = str(
-                item.get("snippet") or ""
-            ).strip()
+            snippet = str(item.get("snippet") or "").strip()
 
-            url = str(
-                item.get("url") or ""
-            ).strip()
+            url = str(item.get("url") or "").strip()
 
-            domain = str(
-                item.get("domain") or ""
-            ).strip()
+            domain = str(item.get("domain") or "").strip()
 
-            if not (
-                title
-                or snippet
-                or url
-            ):
+            if not (title or snippet or url):
                 continue
 
             if url:
@@ -13107,10 +12315,7 @@ Auto-fix result:
             )
 
         if not cleaned:
-            return (
-                f'I couldn t find strong '
-                f'live results for "{query}".'
-            )
+            return f"I couldn t find strong " f'live results for "{query}".'
 
         context_blocks: list[str] = []
 
@@ -13122,33 +12327,20 @@ Auto-fix result:
             parts: list[str] = []
 
             if item["title"]:
-                parts.append(
-                    f"Title: {item['title']}"
-                )
+                parts.append(f"Title: {item['title']}")
 
             if item["snippet"]:
-                parts.append(
-                    f"Snippet: {item['snippet']}"
-                )
+                parts.append(f"Snippet: {item['snippet']}")
 
             if item["domain"]:
-                parts.append(
-                    f"Source: {item['domain']}"
-                )
+                parts.append(f"Source: {item['domain']}")
 
             if item["url"]:
-                parts.append(
-                    f"URL: {item['url']}"
-                )
+                parts.append(f"URL: {item['url']}")
 
-            context_blocks.append(
-                f"[Result {idx}]\n"
-                + "\n".join(parts)
-            )
+            context_blocks.append(f"[Result {idx}]\n" + "\n".join(parts))
 
-        web_context = "\n\n".join(
-            context_blocks
-        )
+        web_context = "\n\n".join(context_blocks)
 
         system_prompt = (
             "You are answering a user's web "
@@ -13182,13 +12374,8 @@ Auto-fix result:
 
             text = ""
 
-            if (
-                hasattr(response, "output_text")
-                and response.output_text
-            ):
-                text = str(
-                    response.output_text
-                ).strip()
+            if hasattr(response, "output_text") and response.output_text:
+                text = str(response.output_text).strip()
 
             else:
                 text = str(response).strip()
@@ -13235,28 +12422,21 @@ Auto-fix result:
         fallback_parts = []
 
         if top.get("title"):
-            fallback_parts.append(
-                str(top["title"])
-            )
+            fallback_parts.append(str(top["title"]))
 
         if top.get("snippet"):
-            fallback_parts.append(
-                str(top["snippet"])
-            )
+            fallback_parts.append(str(top["snippet"]))
 
         if top.get("url"):
-            fallback_parts.append(
-                str(top["url"])
-            )
+            fallback_parts.append(str(top["url"]))
 
         return (
-            "\n".join(fallback_parts).strip()
-            or f'Here s what I found for "{query}".'
+            "\n".join(fallback_parts).strip() or f'Here s what I found for "{query}".'
         )
 
     # =========================
     # EXECUTION GUARD HELPERS
-    # =========================        
+    # =========================
 
     def _text_has_placeholder_debug_content(
         self,
@@ -13276,10 +12456,7 @@ Auto-fix result:
             "how to reproduce:",
         ]
 
-        return any(
-            marker in text
-            for marker in placeholder_markers
-        )
+        return any(marker in text for marker in placeholder_markers)
 
     def _has_real_debug_context(
         self,
@@ -13322,29 +12499,21 @@ Auto-fix result:
         step_title: str,
     ) -> bool:
 
-        return (
-            "apply"
-            in self._safe_str(step_title).lower()
-        )
+        return "apply" in self._safe_str(step_title).lower()
 
     def _step_requires_verification(
         self,
         step_title: str,
     ) -> bool:
 
-        return (
-            "verify"
-            in self._safe_str(step_title).lower()
-        )
+        return "verify" in self._safe_str(step_title).lower()
 
     def _step_output_indicates_real_change(
         self,
         step_output: str,
     ) -> bool:
 
-        lowered = self._safe_str(
-            step_output
-        ).lower()
+        lowered = self._safe_str(step_output).lower()
 
         return any(
             x in lowered
@@ -13361,9 +12530,7 @@ Auto-fix result:
         step_output: str,
     ) -> bool:
 
-        lowered = self._safe_str(
-            step_output
-        ).lower()
+        lowered = self._safe_str(step_output).lower()
 
         return any(
             x in lowered
@@ -13387,13 +12554,9 @@ Auto-fix result:
         execution = execution or {}
         attachments = attachments or []
 
-        goal_text = self._safe_str(
-            execution.get("goal")
-        )
+        goal_text = self._safe_str(execution.get("goal"))
 
-        current_step_text = self._safe_str(
-            execution.get("current_step")
-        )
+        current_step_text = self._safe_str(execution.get("current_step"))
 
         combined_text = "\n".join(
             part
@@ -13414,9 +12577,7 @@ Auto-fix result:
             lowered_text = combined_text.lower()
 
             if len(combined_text.strip()) < 10:
-                missing_parts.append(
-                    "clear problem description"
-                )
+                missing_parts.append("clear problem description")
 
             if (
                 "traceback" not in lowered_text
@@ -13424,9 +12585,7 @@ Auto-fix result:
                 and "exception" not in lowered_text
                 and "500" not in lowered_text
             ):
-                missing_parts.append(
-                    "exact error or traceback"
-                )
+                missing_parts.append("exact error or traceback")
 
             if (
                 "def " not in combined_text
@@ -13435,9 +12594,7 @@ Auto-fix result:
                 and "\\" not in combined_text
                 and "/" not in combined_text
             ):
-                missing_parts.append(
-                    "relevant code snippet or file path"
-                )
+                missing_parts.append("relevant code snippet or file path")
 
             instruction_lines = [
                 "Step blocked.",
@@ -13449,14 +12606,10 @@ Auto-fix result:
                 missing_parts,
                 start=1,
             ):
-                instruction_lines.append(
-                    f"{i}. {part}"
-                )
+                instruction_lines.append(f"{i}. {part}")
 
             if not missing_parts:
-                instruction_lines.append(
-                    "1. more detailed context"
-                )
+                instruction_lines.append("1. more detailed context")
 
             instruction_lines.append("")
             instruction_lines.append("Example:")
@@ -13464,27 +12617,17 @@ Auto-fix result:
             instruction_lines.append("Code: ...")
             instruction_lines.append("Expected: ...")
 
-            return False, "\n".join(
-                instruction_lines
-            )
+            return False, "\n".join(instruction_lines)
 
-        if self._step_requires_real_change(
-            step_title
-        ):
-            if not self._step_output_indicates_real_change(
-                step_output
-            ):
+        if self._step_requires_real_change(step_title):
+            if not self._step_output_indicates_real_change(step_output):
                 return (
                     False,
                     "No real code change detected.",
                 )
 
-        if self._step_requires_verification(
-            step_title
-        ):
-            if not self._step_output_indicates_real_verification(
-                step_output
-            ):
+        if self._step_requires_verification(step_title):
+            if not self._step_output_indicates_real_verification(step_output):
                 return (
                     False,
                     "No real verification detected.",
@@ -13507,11 +12650,7 @@ Auto-fix result:
 
         total = len(steps)
 
-        done = sum(
-            1
-            for s in steps
-            if (s or {}).get("done")
-        )
+        done = sum(1 for s in steps if (s or {}).get("done"))
 
         if total > 0 and done >= total:
             return "complete"
@@ -13525,10 +12664,7 @@ Auto-fix result:
         )
 
         if 0 <= idx < total:
-            title = str(
-                (steps[idx] or {}).get("title")
-                or ""
-            ).strip()
+            title = str((steps[idx] or {}).get("title") or "").strip()
 
             if title:
                 return title
@@ -13544,14 +12680,9 @@ Auto-fix result:
         if not isinstance(execution, dict):
             execution = {}
 
-        execution = self._normalize_execution_state(
-            dict(execution)
-        )
+        execution = self._normalize_execution_state(dict(execution))
 
-        goal = str(
-            execution.get("goal")
-            or ""
-        ).strip()
+        goal = str(execution.get("goal") or "").strip()
 
         steps = execution.get("steps") or []
 
@@ -13567,11 +12698,7 @@ Auto-fix result:
 
         total = len(steps)
 
-        done = sum(
-            1
-            for s in steps
-            if (s or {}).get("status") == "done"
-        )
+        done = sum(1 for s in steps if (s or {}).get("status") == "done")
 
         current_index = int(
             execution.get(
@@ -13584,12 +12711,7 @@ Auto-fix result:
         if 0 <= current_index < total:
 
             current_step = (
-                str(
-                    (steps[current_index] or {}).get(
-                        "title"
-                    )
-                    or ""
-                ).strip()
+                str((steps[current_index] or {}).get("title") or "").strip()
                 or "Untitled step"
             )
 
@@ -13622,19 +12744,9 @@ Auto-fix result:
 
             s = s or {}
 
-            title = (
-                str(s.get("title") or "").strip()
-                or "Untitled step"
-            )
+            title = str(s.get("title") or "").strip() or "Untitled step"
 
-            status = (
-                str(
-                    s.get("status")
-                    or "pending"
-                )
-                .strip()
-                .lower()
-            )
+            status = str(s.get("status") or "pending").strip().lower()
 
             if status == "done":
                 mark = "[x]"
@@ -13649,21 +12761,14 @@ Auto-fix result:
 
         lines.append("")
 
-        lines.append(
-            f"Progress: {done}/{total} complete"
-        )
+        lines.append(f"Progress: {done}/{total} complete")
 
-        lines.append(
-            f"Current step: {current_step}"
-        )
+        lines.append(f"Current step: {current_step}")
 
         assistant_text = "\n".join(lines)
 
         assistant_text = (
-            assistant_text
-            .replace("AUTO_EXECUTE", "")
-            .replace("TEST_FAIL", "")
-            .strip()
+            assistant_text.replace("AUTO_EXECUTE", "").replace("TEST_FAIL", "").strip()
         )
 
         return assistant_text
@@ -13693,9 +12798,7 @@ Auto-fix result:
         working_state,
     ):
 
-        ws = self._normalize_working_state(
-            working_state
-        )
+        ws = self._normalize_working_state(working_state)
 
         if not ws:
             return ""
@@ -13716,18 +12819,12 @@ Auto-fix result:
             value = ws.get(key, "").strip()
 
             if value:
-                lines.append(
-                    f"{label}: {value}"
-                )
+                lines.append(f"{label}: {value}")
 
         if not lines:
             return ""
 
-        return (
-            "Working context:\n"
-            + "\n".join(lines)
-        )
-
+        return "Working context:\n" + "\n".join(lines)
 
     def _build_continuity_context(self, session=None):
         session = session or {}
@@ -13751,7 +12848,9 @@ Auto-fix result:
 
         return "Recent conversation:\n" + "\n".join(lines)
 
-    def _compose_model_messages(self, user_text, session=None, decision=None, memory_context=None):
+    def _compose_model_messages(
+        self, user_text, session=None, decision=None, memory_context=None
+    ):
         session = session or {}
         memory_context = self._safe_str(memory_context).strip()
 
@@ -13760,7 +12859,9 @@ Auto-fix result:
 
         execution_text = ""
         try:
-            latest = self._find_latest_execution_artifact(session_id=session.get("id", ""))
+            latest = self._find_latest_execution_artifact(
+                session_id=session.get("id", "")
+            )
             if latest:
                 execution = latest.get("execution") or {}
                 if execution:
@@ -13768,35 +12869,28 @@ Auto-fix result:
         except Exception:
             execution_text = ""
 
-        messages = [
-            {"role": "system", "content": system_prompt}
-        ]
+        messages = [{"role": "system", "content": system_prompt}]
 
         if continuity_context:
-            messages.append({
-                "role": "system",
-                "content": continuity_context
-            })
+            messages.append({"role": "system", "content": continuity_context})
 
         if execution_text:
-            messages.append({
-                "role": "system",
-                "content": f"Current execution:\n{execution_text}"
-            })
+            messages.append(
+                {"role": "system", "content": f"Current execution:\n{execution_text}"}
+            )
 
         if memory_context:
-            messages.append({
-                "role": "system",
-                "content": (
-                    "Memory about the user (use this as ground truth when relevant):\n"
-                    f"{memory_context}"
-                )
-            })
+            messages.append(
+                {
+                    "role": "system",
+                    "content": (
+                        "Memory about the user (use this as ground truth when relevant):\n"
+                        f"{memory_context}"
+                    ),
+                }
+            )
 
-        messages.append({
-            "role": "user",
-            "content": user_text or ""
-        })
+        messages.append({"role": "user", "content": user_text or ""})
 
         return messages
 
@@ -13908,7 +13002,6 @@ Auto-fix result:
         if lowered.startswith(blocked_starts):
             return ""
 
-
         return raw
 
     def _should_save_memory_text(self, text, kind=None) -> bool:
@@ -14002,8 +13095,7 @@ Auto-fix result:
                 except TypeError:
                     # HARD FILTER: strip known bad kwargs
                     filtered_kwargs = {
-                        k: v for k, v in kwargs.items()
-                        if k not in {"route"}
+                        k: v for k, v in kwargs.items() if k not in {"route"}
                     }
 
                     try:
@@ -14236,7 +13328,16 @@ Auto-fix result:
             confidence = 0.95
             reasons.append("auto_plan_command")
 
-        elif any(x in text_lc for x in ["traceback", "syntaxerror", "indentationerror", "nameerror", "typeerror"]):
+        elif any(
+            x in text_lc
+            for x in [
+                "traceback",
+                "syntaxerror",
+                "indentationerror",
+                "nameerror",
+                "typeerror",
+            ]
+        ):
             intent = "debugging"
             route = "auto_fix_or_debug"
             strategy = "diagnose_fix"
@@ -14245,9 +13346,11 @@ Auto-fix result:
             reasons.append("error_signal")
 
         # SOURCE_FOLLOWUP_BEFORE_FULL_FILE_INTENT_LOCK
-        elif (
-            any(verb in text_lc for verb in ("open", "show", "view", "click", "read"))
-            and any(marker in text_lc for marker in (
+        elif any(
+            verb in text_lc for verb in ("open", "show", "view", "click", "read")
+        ) and any(
+            marker in text_lc
+            for marker in (
                 "first",
                 "second",
                 "third",
@@ -14263,7 +13366,7 @@ Auto-fix result:
                 "three",
                 "four",
                 "five",
-            ))
+            )
         ):
             intent = "web_fetch"
             route = self.ROUTE_WEB_FETCH
@@ -14273,23 +13376,26 @@ Auto-fix result:
             reasons.append("source_followup_forced_before_full_file")
 
         # LATEST_NEWS_BEFORE_FULL_FILE_INTENT_LOCK
-        elif any(marker in text_lc for marker in (
-            "latest",
-            "fresh",
-            "breaking",
-            "news",
-            "today",
-            "current",
-            "right now",
-            "recent",
-            "update",
-            "updates",
-            "source",
-            "sources",
-            "top sources",
-            "look up",
-            "search",
-        )):
+        elif any(
+            marker in text_lc
+            for marker in (
+                "latest",
+                "fresh",
+                "breaking",
+                "news",
+                "today",
+                "current",
+                "right now",
+                "recent",
+                "update",
+                "updates",
+                "source",
+                "sources",
+                "top sources",
+                "look up",
+                "search",
+            )
+        ):
             intent = "web_fetch"
             route = self.ROUTE_WEB_FETCH
             strategy = "fetch_current_sources"
@@ -14298,13 +13404,27 @@ Auto-fix result:
             reasons.append("latest_news_forced_before_full_file")
 
         # SOURCE_FOLLOWUP_HARD_INSERT_LOCK
-        elif (
-            any(verb in text_lc for verb in ("open", "show", "view", "click", "read"))
-            and any(marker in text_lc for marker in (
-                "first", "second", "third", "fourth", "fifth",
-                "1", "2", "3", "4", "5",
-                "one", "two", "three", "four", "five",
-            ))
+        elif any(
+            verb in text_lc for verb in ("open", "show", "view", "click", "read")
+        ) and any(
+            marker in text_lc
+            for marker in (
+                "first",
+                "second",
+                "third",
+                "fourth",
+                "fifth",
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "one",
+                "two",
+                "three",
+                "four",
+                "five",
+            )
         ):
             intent = "web_fetch"
             route = self.ROUTE_WEB_FETCH
@@ -14321,7 +13441,14 @@ Auto-fix result:
             confidence = 0.9
             reasons.append("full_file_request")
 
-        elif text_lc in {"where are we", "where are we now", "what are we doing", "what now", "status", "recap"}:
+        elif text_lc in {
+            "where are we",
+            "where are we now",
+            "what are we doing",
+            "what now",
+            "status",
+            "recap",
+        }:
             intent = "continuity"
             route = "continuity"
             strategy = "summarize_state"
@@ -14352,9 +13479,7 @@ Auto-fix result:
             autonomous_direction = "continue_execution"
 
         elif mission_state.get("recommended_next_move"):
-            autonomous_direction = (
-                mission_state.get("recommended_next_move")
-            )
+            autonomous_direction = mission_state.get("recommended_next_move")
 
         else:
             autonomous_direction = "await_user_input"
@@ -14367,10 +13492,8 @@ Auto-fix result:
             "priority": priority,
             "confidence": confidence,
             "reasons": reasons or ["default_intelligence_state"],
-
             "mission": mission_state,
             "autonomous_direction": autonomous_direction,
-
             "execution": execution_state,
             "failed_steps": failed_steps,
             "has_failed_steps": has_failed_steps,
@@ -14392,7 +13515,6 @@ Auto-fix result:
         session_id: str = "",
     ) -> dict:
 
-
         user_text = self._safe_str(user_text).strip()
 
         text = user_text.lower().strip()
@@ -14412,9 +13534,7 @@ Auto-fix result:
                 "mode": "runtime",
                 "runtime_command": user_text,
                 "confidence": 1.0,
-                "reasons": [
-                    "User requested runtime cognition lane."
-                ],
+                "reasons": ["User requested runtime cognition lane."],
             }
 
         intelligence_state = self._build_intelligence_state(
@@ -14551,11 +13671,7 @@ Auto-fix result:
 
         wants_live_web = any(trigger in lower_text for trigger in live_web_triggers)
 
-        if (
-            has_url
-            or wants_live_web
-            or user_text.lower().strip().startswith("/web")
-        ):
+        if has_url or wants_live_web or user_text.lower().strip().startswith("/web"):
             return {
                 "route": self.ROUTE_WEB_FETCH,
                 "mode": "web_fetch",
@@ -14586,31 +13702,22 @@ Auto-fix result:
 
         ws = self._get_working_state(session_id) or {}
 
-        updated_at = self._safe_str(
-            ws.get("updated_at")
-        ).strip()
+        updated_at = self._safe_str(ws.get("updated_at")).strip()
 
         has_working_mission = False
 
         if updated_at:
 
             try:
-                updated_dt = datetime.fromisoformat(
-                    updated_at.replace("Z", "+00:00")
-                )
+                updated_dt = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
 
-                now_dt = datetime.now(
-                    updated_dt.tzinfo
-                )
+                now_dt = datetime.now(updated_dt.tzinfo)
 
-                age_seconds = (
-                    now_dt - updated_dt
-                ).total_seconds()
+                age_seconds = (now_dt - updated_dt).total_seconds()
 
                 if age_seconds <= 600:
                     has_working_mission = bool(
-                        ws.get("active_task")
-                        and ws.get("next_move")
+                        ws.get("active_task") and ws.get("next_move")
                     )
 
             except Exception:
@@ -14697,9 +13804,7 @@ Auto-fix result:
                 "route": "execution",
                 "mode": "execution",
                 "confidence": 1.0,
-                "reasons": [
-                    "planner_prefix_detected"
-                ],
+                "reasons": ["planner_prefix_detected"],
                 "save_artifact": False,
                 "save_memory": True,
                 "use_memory": True,
@@ -14715,12 +13820,13 @@ Auto-fix result:
             "use_memory": True,
         }
 
-    def _looks_like_execution(self, user_text: str, decision: dict | None = None) -> bool:
+    def _looks_like_execution(
+        self, user_text: str, decision: dict | None = None
+    ) -> bool:
         text = str(user_text or "").strip().lower()
 
         if not text:
             return False
-
 
         # ðŸ”¥ PLAN CREATION
         if any(x in text for x in ["plan", "steps", "how to", "next steps"]):
@@ -14794,7 +13900,7 @@ Auto-fix result:
             "current_step": step_titles[0] if step_titles else "",
             "summary": str(assistant_text or "")[:200],
             "steps": step_objs,
-            "started_at": now_iso,
+            "started_at": locals().get("now_iso") or datetime.utcnow().isoformat(),
             "updated_at": now_iso,
         }
 
@@ -14852,10 +13958,8 @@ Auto-fix result:
         )
 
         if active_complete or execution_complete:
-            execution_state = (
-                self._mark_execution_complete(
-                    execution_state,
-                )
+            execution_state = self._mark_execution_complete(
+                execution_state,
             )
 
             active_execution["status"] = "complete"
@@ -14906,9 +14010,9 @@ Auto-fix result:
 
         execution["status"] = "completed"
         execution["current_step"] = ""
-        execution["summary"] = str(
-            assistant_text or execution.get("summary") or ""
-        )[:200]
+        execution["summary"] = str(assistant_text or execution.get("summary") or "")[
+            :200
+        ]
         execution["updated_at"] = self._iso_now()
 
         return execution
@@ -14937,9 +14041,7 @@ Auto-fix result:
             error=str(error_text or "Execution failed."),
         )
 
-        execution["summary"] = str(
-            error_text or execution.get("summary") or ""
-        )[:200]
+        execution["summary"] = str(error_text or execution.get("summary") or "")[:200]
         execution["updated_at"] = self._iso_now()
         return execution
 
@@ -14956,7 +14058,9 @@ Auto-fix result:
             return False
 
         latest_meta = latest.get("meta") if isinstance(latest, dict) else {}
-        latest_execution = latest_meta.get("execution") if isinstance(latest_meta, dict) else {}
+        latest_execution = (
+            latest_meta.get("execution") if isinstance(latest_meta, dict) else {}
+        )
         if not isinstance(latest_execution, dict):
             return False
 
@@ -15021,10 +14125,7 @@ Auto-fix result:
             if isinstance(persisted, dict) and persisted:
                 return persisted
 
-            persisted = (
-                session.get("execution_state")
-                or {}
-            )
+            persisted = session.get("execution_state") or {}
 
             if isinstance(persisted, dict) and persisted:
                 return persisted
@@ -15038,7 +14139,9 @@ Auto-fix result:
 
         return None
 
-    def _persist_execution_artifact(self, session_id: str, execution: dict | None) -> None:
+    def _persist_execution_artifact(
+        self, session_id: str, execution: dict | None
+    ) -> None:
         session_id = self._safe_str(session_id)
         if not session_id:
             return
@@ -15049,9 +14152,7 @@ Auto-fix result:
         if not isinstance(execution, dict):
             execution = {}
 
-        execution = self._normalize_execution_state(
-            dict(execution)
-        )
+        execution = self._normalize_execution_state(dict(execution))
 
         execution["session_id"] = session_id
         execution["active"] = True
@@ -15103,7 +14204,9 @@ Auto-fix result:
         try:
             artifacts = []
 
-            if hasattr(self, "artifact_service") and hasattr(self.artifact_service, "list_all"):
+            if hasattr(self, "artifact_service") and hasattr(
+                self.artifact_service, "list_all"
+            ):
                 artifacts = self.artifact_service.list_all()
             elif hasattr(self, "artifacts") and hasattr(self.artifacts, "list_all"):
                 artifacts = self.artifacts.list_all()
@@ -15120,7 +14223,9 @@ Auto-fix result:
                 if session_id and self._safe_str(a.get("session_id")) != session_id:
                     continue
 
-                execution = a.get("execution") or ((a.get("meta") or {}).get("execution")) or {}
+                execution = (
+                    a.get("execution") or ((a.get("meta") or {}).get("execution")) or {}
+                )
 
                 if execution:
                     exec_debug("MATCHED EXECUTION ARTIFACT =", a)
@@ -15141,7 +14246,9 @@ Auto-fix result:
             exec_debug("FIND EXECUTION FAILED =", e)
             return None
 
-    def _attach_execution(self, payload, user_text, assistant_msg, decision, session_id=""):
+    def _attach_execution(
+        self, payload, user_text, assistant_msg, decision, session_id=""
+    ):
         execution = self._build_execution(
             user_text=user_text,
             assistant_text=str(assistant_msg.get("text") or ""),
@@ -15153,7 +14260,9 @@ Auto-fix result:
         if not execution:
             return payload
 
-        steps = execution.get("steps") if isinstance(execution.get("steps"), list) else []
+        steps = (
+            execution.get("steps") if isinstance(execution.get("steps"), list) else []
+        )
         if steps:
             for i in range(len(steps)):
                 execution = self._execution_mark_running(execution, step_index=i)
@@ -15178,9 +14287,9 @@ Auto-fix result:
 
         return payload
 
-# =========================
-# EXECUTION PROGRESSION (PHASE 5)
-# =========================
+    # =========================
+    # EXECUTION PROGRESSION (PHASE 5)
+    # =========================
 
     def _looks_like_execution_progression(self, user_text: str) -> bool:
         text = self._safe_str(user_text).strip().lower()
@@ -15225,16 +14334,9 @@ Auto-fix result:
         self,
         execution_state,
     ):
-        execution_state = (
-            self._normalize_execution_state(
-                execution_state
-            )
-        )
+        execution_state = self._normalize_execution_state(execution_state)
 
-        steps = (
-            execution_state.get("steps")
-            or []
-        )
+        steps = execution_state.get("steps") or []
 
         if not isinstance(
             steps,
@@ -15253,76 +14355,33 @@ Auto-fix result:
         if current_index < 0:
             current_index = 0
 
-        if (
-            False
-            and current_index >= len(steps)
-        ):
+        if False and current_index >= len(steps):
             current_index = len(steps)
 
-        execution_state["current_index"] = (
-            current_index
-        )
+        execution_state["current_index"] = current_index
 
         current_step = ""
 
-        if (
-            steps
-            and current_index < len(steps)
-        ):
+        if steps and current_index < len(steps):
             step = steps[current_index]
 
             if isinstance(
                 step,
                 dict,
             ):
-                current_step = (
-                    step.get("title")
-                    or step.get("action")
-                    or ""
-                )
+                current_step = step.get("title") or step.get("action") or ""
 
         snapshot = {
-            "status": self._safe_str(
-                execution_state.get(
-                    "status"
-                )
-            ),
+            "status": self._safe_str(execution_state.get("status")),
             "steps": steps,
             "current_index": current_index,
             "current_step": current_step,
-            "history": (
-                execution_state.get(
-                    "history"
-                )
-                or []
-            ),
-            "progress": (
-                execution_state.get(
-                    "progress"
-                )
-                or 0
-            ),
-            "waiting": bool(
-                execution_state.get(
-                    "waiting"
-                )
-            ),
-            "complete": bool(
-                execution_state.get(
-                    "complete"
-                )
-            ),
-            "runtime_signal": self._safe_str(
-                execution_state.get(
-                    "runtime_signal"
-                )
-            ),
-            "next_moves": (
-                execution_state.get(
-                    "next_moves"
-                )
-                or []
-            ),
+            "history": (execution_state.get("history") or []),
+            "progress": (execution_state.get("progress") or 0),
+            "waiting": bool(execution_state.get("waiting")),
+            "complete": bool(execution_state.get("complete")),
+            "runtime_signal": self._safe_str(execution_state.get("runtime_signal")),
+            "next_moves": (execution_state.get("next_moves") or []),
         }
 
         return snapshot
@@ -15431,9 +14490,7 @@ Auto-fix result:
 
         for idx, step in enumerate(clean_steps):
 
-            existing_status = self._safe_str(
-                step.get("status")
-            ).lower().strip()
+            existing_status = self._safe_str(step.get("status")).lower().strip()
 
             if existing_status in {
                 "completed",
@@ -15461,11 +14518,9 @@ Auto-fix result:
             current_step=current_step,
             progress=current_index,
         )
-  
+
     def _advance_execution_one_step(self, execution):
-        execution = self._normalize_execution_state(
-            execution or {}
-        )
+        execution = self._normalize_execution_state(execution or {})
 
         steps = execution.get("steps") or []
         step_count = len(steps)
@@ -15532,7 +14587,9 @@ Auto-fix result:
     # Avoid adding new execution logic here.
     # =========================================
 
-    def _advance_execution_request(self, user_text: str, session_id: str = "", attachments=None):
+    def _advance_execution_request(
+        self, user_text: str, session_id: str = "", attachments=None
+    ):
         attachments = attachments or []
         session_id = self._safe_str(session_id)
         user_text = self._safe_str(user_text)
@@ -15540,7 +14597,9 @@ Auto-fix result:
 
         exec_debug("ADVANCE SESSION_ID =", session_id)
 
-        persisted_execution = self._get_persisted_execution_artifact(session_id=session_id)
+        persisted_execution = self._get_persisted_execution_artifact(
+            session_id=session_id
+        )
         latest_artifact = self._find_latest_execution_artifact(session_id=session_id)
 
         exec_debug("ADVANCE PERSISTED EXECUTION =", persisted_execution)
@@ -15608,16 +14667,15 @@ Auto-fix result:
                 step_index=max(
                     0,
                     min(
-                        len(
-                            live_execution.get("steps") or []
-                        ) - 1,
+                        len(live_execution.get("steps") or []) - 1,
                         int(
                             live_execution.get(
                                 "current_index",
                                 0,
                             )
                             or 0
-                        ) - 1,
+                        )
+                        - 1,
                     ),
                 ),
                 error="Execution step failed.",
@@ -15626,7 +14684,7 @@ Auto-fix result:
             self._save_execution_state(
                 session_id,
                 execution_state,
-            )      
+            )
 
             return {
                 "ok": False,
@@ -15657,12 +14715,12 @@ Auto-fix result:
                 },
             )
         goal_text = self._safe_str(execution.get("goal")).lower()
-        step_index = int(
-            execution.get("current_index", 0) or 0
-        )
+        step_index = int(execution.get("current_index", 0) or 0)
         if "plan" in goal_text:
             if step_index == 0:
-                step_output = "State inspected. Missing inputs identified. Ready to proceed."
+                step_output = (
+                    "State inspected. Missing inputs identified. Ready to proceed."
+                )
             elif step_index == 1:
                 step_output = "Proceeding with a general-purpose plan structure using assumptions."
             elif step_index == 2:
@@ -15744,11 +14802,13 @@ Next action:
             "meta": {
                 "auto_generated": True,
                 "auto_executed": False,
-                "complete": self._safe_str(execution.get("status")).lower() == "complete",
+                "complete": self._safe_str(execution.get("status")).lower()
+                == "complete",
                 "done": int(execution.get("progress", 0) or 0),
                 "total": len(execution.get("steps") or []),
                 "paused": False,
-                "active_execution": self._safe_str(execution.get("status")).lower() != "complete",
+                "active_execution": self._safe_str(execution.get("status")).lower()
+                != "complete",
             },
         }
 
@@ -15766,7 +14826,13 @@ Next action:
             try:
                 saved_artifact = self._call_first(
                     self.artifacts,
-                    ["save_artifact", "create_artifact", "add_artifact", "save", "create"],
+                    [
+                        "save_artifact",
+                        "create_artifact",
+                        "add_artifact",
+                        "save",
+                        "create",
+                    ],
                     artifact=artifact_payload,
                 )
             except Exception as e:
@@ -15801,16 +14867,23 @@ Next action:
             content = assistant_msg.get("content") or ""
             if isinstance(content, str):
                 assistant_msg["content"] = (
-                    content
-                    .replace("AUTO_EXECUTE", "")
-                    .replace("TEST_FAIL", "")
-                    .strip()
+                    content.replace("AUTO_EXECUTE", "").replace("TEST_FAIL", "").strip()
                 )
 
         if assistant_text:
-            self._set_session_meta(session_id, "last_answer_topic", self._safe_str(original_user_text)[:300])
-            self._set_session_meta(session_id, "last_answer_text", self._safe_str(assistant_text)[:4000])
-            self._set_session_meta(session_id, "last_answer_mode", self._get_session_meta(session_id, "answer_depth") or "short")
+            self._set_session_meta(
+                session_id,
+                "last_answer_topic",
+                self._safe_str(original_user_text)[:300],
+            )
+            self._set_session_meta(
+                session_id, "last_answer_text", self._safe_str(assistant_text)[:4000]
+            )
+            self._set_session_meta(
+                session_id,
+                "last_answer_mode",
+                self._get_session_meta(session_id, "answer_depth") or "short",
+            )
 
         return self._finalize_response(
             session_id=session_id,
@@ -15899,9 +14972,7 @@ Next action:
         waiting=False,
     ):
 
-        execution_state = dict(
-            execution_state or {}
-        )
+        execution_state = dict(execution_state or {})
 
         execution_state["status"] = "running"
         execution_state["complete"] = False
@@ -15919,18 +14990,11 @@ Next action:
         execution_state,
     ):
 
-        execution_state = dict(
-            execution_state or {}
-        )
+        execution_state = dict(execution_state or {})
 
-        steps = (
-            execution_state.get("steps")
-            or []
-        )
+        steps = execution_state.get("steps") or []
 
-        execution_state["status"] = (
-            "complete"
-        )
+        execution_state["status"] = "complete"
 
         execution_state["complete"] = True
         execution_state["waiting"] = False
@@ -15938,16 +15002,12 @@ Next action:
 
         execution_state["next_moves"] = []
 
-        execution_state["current_index"] = (
-            len(steps)
-        )
+        execution_state["current_index"] = len(steps)
 
         execution_state["current_step"] = ""
         execution_state["current_step_title"] = ""
 
-        execution_state["progress"] = (
-            len(steps)
-        )
+        execution_state["progress"] = len(steps)
 
         return execution_state
 
@@ -15960,25 +15020,17 @@ Next action:
         progress=None,
         waiting=None,
     ):
-        execution = (
-            execution
-            if isinstance(execution, dict)
-            else {}
-        )
+        execution = execution if isinstance(execution, dict) else {}
 
         original_steps = execution.get("steps")
 
-        execution = self._normalize_execution_state(
-            execution
-        )
+        execution = self._normalize_execution_state(execution)
 
         if isinstance(original_steps, list):
             execution["steps"] = original_steps
 
         steps = (
-            execution.get("steps")
-            if isinstance(execution.get("steps"), list)
-            else []
+            execution.get("steps") if isinstance(execution.get("steps"), list) else []
         )
 
         if current_index is not None:
@@ -15998,20 +15050,13 @@ Next action:
                     len(steps),
                 )
 
-            execution["current_index"] = (
-                current_index
-            )
+            execution["current_index"] = current_index
 
-            execution["current_step_index"] = (
-                current_index
-            )
+            execution["current_step_index"] = current_index
 
         else:
             try:
-                current_index = int(
-                    execution.get("current_index", 0)
-                    or 0
-                )
+                current_index = int(execution.get("current_index", 0) or 0)
             except Exception:
                 current_index = 0
 
@@ -16022,32 +15067,22 @@ Next action:
 
         if status is not None:
             execution["status"] = (
-                self._safe_str(status)
-                or execution.get("status")
-                or "idle"
+                self._safe_str(status) or execution.get("status") or "idle"
             )
 
         if current_step is not None:
-            execution["current_step"] = (
-                current_step
-            )
+            execution["current_step"] = current_step
 
-            execution["current_step_title"] = (
-                current_step
-            )
+            execution["current_step_title"] = current_step
 
         elif (
             steps
             and current_index < len(steps)
             and isinstance(steps[current_index], dict)
         ):
-            execution["current_step"] = (
-                steps[current_index].get("title", "")
-            )
+            execution["current_step"] = steps[current_index].get("title", "")
 
-            execution["current_step_title"] = (
-                steps[current_index].get("title", "")
-            )
+            execution["current_step_title"] = steps[current_index].get("title", "")
 
         if progress is not None:
             try:
@@ -16061,17 +15096,11 @@ Next action:
             )
 
         if waiting is not None:
-            execution["waiting"] = bool(
-                waiting
-            )
+            execution["waiting"] = bool(waiting)
 
-        execution["lock"] = bool(
-            execution.get("lock", False)
-        )
+        execution["lock"] = bool(execution.get("lock", False))
 
-        execution["complete"] = bool(
-            execution.get("status") == "complete"
-        )
+        execution["complete"] = bool(execution.get("status") == "complete")
 
         return execution
 
@@ -16087,17 +15116,20 @@ Next action:
         artifacts = []
 
         try:
-            artifacts = self._call_first(
-                self.artifacts,
-                [
-                    "list_artifacts",
-                    "get_artifacts",
-                    "get_all",
-                    "list",
-                    "all",
-                    "load_artifacts",
-                ],
-            ) or []
+            artifacts = (
+                self._call_first(
+                    self.artifacts,
+                    [
+                        "list_artifacts",
+                        "get_artifacts",
+                        "get_all",
+                        "list",
+                        "all",
+                        "load_artifacts",
+                    ],
+                )
+                or []
+            )
         except Exception:
             artifacts = []
 
@@ -16128,30 +15160,28 @@ Next action:
             "Summarize outcome and next move",
         ]
 
-        execution = self._normalize_execution_state({
-            "goal": goal,
-            "steps": [
-                {
-                    "id": f"step_{i + 1}",
-                    "title": s,
-                    "action": "execute",
-                    "input": s,
-                    "target_file": "",
-                    "target_function": "",
-                    "status": (
-                        "running"
-                        if i == 0
-                        else "pending"
-                    ),
-                    "result": "",
-                    "error": None,
-                }
-                for i, s in enumerate(steps)
-            ],
-            "progress": 0,
-            "current_step": steps[0],
-            "status": "running",
-        })
+        execution = self._normalize_execution_state(
+            {
+                "goal": goal,
+                "steps": [
+                    {
+                        "id": f"step_{i + 1}",
+                        "title": s,
+                        "action": "execute",
+                        "input": s,
+                        "target_file": "",
+                        "target_function": "",
+                        "status": ("running" if i == 0 else "pending"),
+                        "result": "",
+                        "error": None,
+                    }
+                    for i, s in enumerate(steps)
+                ],
+                "progress": 0,
+                "current_step": steps[0],
+                "status": "running",
+            }
+        )
 
         body = self._render_execution(execution)
 
@@ -16191,7 +15221,13 @@ Next action:
             try:
                 saved_artifact = self._call_first(
                     self.artifacts,
-                    ["save_artifact", "create_artifact", "add_artifact", "save", "create"],
+                    [
+                        "save_artifact",
+                        "create_artifact",
+                        "add_artifact",
+                        "save",
+                        "create",
+                    ],
                     artifact=artifact_payload,
                 )
             except Exception as e:
@@ -16235,8 +15271,16 @@ Next action:
     def _refresh_execution_header(self, body: str):
         lines = self._safe_str(body).splitlines()
 
-        total = sum(1 for line in lines if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"]))
-        done = sum(1 for line in lines if any(x in line for x in ["[x]", "[X]", "âœ”", "Ã¢Å“â€"]))
+        total = sum(
+            1
+            for line in lines
+            if any(x in line for x in ["[ ]", "[>]", "[x]", "[X]", "âœ”", "Ã¢Å“â€"])
+        )
+        done = sum(
+            1
+            for line in lines
+            if any(x in line for x in ["[x]", "[X]", "âœ”", "Ã¢Å“â€"])
+        )
 
         updated = "\n".join(lines)
         updated = re.sub(
@@ -16275,7 +15319,6 @@ Next action:
 
         return updated, done, total
 
-
     def _persist_message_fallback(self, session_id: str, message: dict) -> None:
         result = self._call_first(
             self.sessions,
@@ -16293,13 +15336,14 @@ Next action:
             message=message,
         )
 
-    def _persist_turn(self, session_id: str, user_msg: dict, assistant_msg: dict) -> None:
+    def _persist_turn(
+        self, session_id: str, user_msg: dict, assistant_msg: dict
+    ) -> None:
         try:
             self._persist_message_fallback(session_id, user_msg)
             self._persist_message_fallback(session_id, assistant_msg)
         except Exception as e:
             exec_debug("TURN PERSIST FAILED:", e)
-
 
     def _build_working_state_prompt_block(self, session_id: str) -> str:
         state = self._get_working_state(session_id) or {}
@@ -16386,8 +15430,6 @@ Next action:
         # WORKING STATE (PHASE 3)
         # ==============================
 
-
-
     def _set_working_state(self, session_id: str, state: dict):
         session_id = self._safe_str(session_id).strip()
         if not session_id:
@@ -16420,22 +15462,13 @@ Next action:
         assistant_text="",
     ):
 
-        current = (
-            self._get_working_state(session_id)
-            or {}
-        )
+        current = self._get_working_state(session_id) or {}
 
         patch = {}
 
-        lowered = (
-            self._safe_str(user_text)
-            .lower()
-            .strip()
-        )
+        lowered = self._safe_str(user_text).lower().strip()
 
-        current_updated_at = self._safe_str(
-            current.get("updated_at")
-        ).strip()
+        current_updated_at = self._safe_str(current.get("updated_at")).strip()
 
         stale_state = False
 
@@ -16446,13 +15479,9 @@ Next action:
                     current_updated_at.replace("Z", "+00:00")
                 )
 
-                now_dt = datetime.now(
-                    updated_dt.tzinfo
-                )
+                now_dt = datetime.now(updated_dt.tzinfo)
 
-                age_seconds = (
-                    now_dt - updated_dt
-                ).total_seconds()
+                age_seconds = (now_dt - updated_dt).total_seconds()
 
                 if age_seconds > 600:
                     stale_state = True
@@ -16494,17 +15523,11 @@ Next action:
                 "product positioning",
             )
         ):
-            patch["active_task"] = (
-                "polish Nova landing page and product positioning"
-            )
+            patch["active_task"] = "polish Nova landing page and product positioning"
 
-            patch["checkpoint"] = (
-                "landing_page_work"
-            )
+            patch["checkpoint"] = "landing_page_work"
 
-            patch["next_move"] = (
-                "tighten product messaging and demos"
-            )
+            patch["next_move"] = "tighten product messaging and demos"
 
         continuity_commands = {
             "where are we",
@@ -16529,9 +15552,8 @@ Next action:
             and execution_state.get("status") == "running"
         ):
 
-            if (
-                execution_state.get("current_index", 0)
-                < len(execution_state.get("steps") or [])
+            if execution_state.get("current_index", 0) < len(
+                execution_state.get("steps") or []
             ):
 
                 patch["active_task"] = (
@@ -16540,9 +15562,7 @@ Next action:
 
                 if not patch.get("checkpoint"):
 
-                    patch["checkpoint"] = (
-                        "working_state_resume_context"
-                    )
+                    patch["checkpoint"] = "working_state_resume_context"
 
                 if not patch.get("next_move"):
 
@@ -16561,21 +15581,18 @@ Next action:
             "who is jj redick",
         }
 
-        if (
-            lowered.strip() in generic_chat_inputs
-            or not any(
-                lowered.startswith(prefix)
-                for prefix in (
-                    "fix ",
-                    "build ",
-                    "create ",
-                    "make ",
-                    "implement ",
-                    "upgrade ",
-                    "wire ",
-                    "add ",
-                    "repair ",
-                )
+        if lowered.strip() in generic_chat_inputs or not any(
+            lowered.startswith(prefix)
+            for prefix in (
+                "fix ",
+                "build ",
+                "create ",
+                "make ",
+                "implement ",
+                "upgrade ",
+                "wire ",
+                "add ",
+                "repair ",
             )
         ):
 
@@ -16593,9 +15610,7 @@ Next action:
         ):
 
             if any(
-                user_text.lower()
-                .strip()
-                .startswith(prefix)
+                user_text.lower().strip().startswith(prefix)
                 for prefix in (
                     "fix ",
                     "build ",
@@ -16609,23 +15624,14 @@ Next action:
                 )
             ):
 
-                patch["active_task"] = (
-                    user_text.strip()[:240]
-                )
+                patch["active_task"] = user_text.strip()[:240]
 
-                patch["checkpoint"] = (
-                    "task_detected"
-                )
+                patch["checkpoint"] = "task_detected"
 
-                patch["next_move"] = (
-                    "continue task implementation"
-                )
+                patch["next_move"] = "continue task implementation"
 
         if not patch:
-            return (
-                self._get_working_state(session_id)
-                or {}
-            )
+            return self._get_working_state(session_id) or {}
 
         if (
             patch.get("active_task")
@@ -16640,10 +15646,7 @@ Next action:
             patch,
         )
 
-        return (
-            self._get_working_state(session_id)
-            or {}
-        )
+        return self._get_working_state(session_id) or {}
 
     def _replace_working_state(self, session_id: str, new_state: dict):
         session_id = self._safe_str(session_id).strip()
@@ -16663,7 +15666,6 @@ Next action:
 
         return clean_state
 
-
     def _archive_execution_state(
         self,
         session_id: str,
@@ -16675,44 +15677,23 @@ Next action:
 
             execution_state = execution_state or {}
 
-            completed_steps = (
-                self.execution_loop.completed_step_titles(
-                    execution_state
-                )
-            )
+            completed_steps = self.execution_loop.completed_step_titles(execution_state)
 
-            failed_steps = (
-                self.execution_loop.failed_step_titles(
-                    execution_state
-                )
-            )
+            failed_steps = self.execution_loop.failed_step_titles(execution_state)
 
             if not completed_steps and not failed_steps:
                 return
 
-            if completed_steps == [
-                "No saved execution plan found"
-            ]:
+            if completed_steps == ["No saved execution plan found"]:
                 return
 
             archive_entry = {
-                "status": str(
-                    execution_state.get("status")
-                    or ""
-                ).strip(),
-                "command": str(
-                    command
-                    or ""
-                ).strip(),
+                "status": str(execution_state.get("status") or "").strip(),
+                "command": str(command or "").strip(),
                 "completed_steps": completed_steps,
                 "failed_steps": failed_steps,
-                "last_action": str(
-                    execution_state.get("last_action")
-                    or ""
-                ).strip(),
-                "completed_at": datetime.now(
-                    timezone.utc
-                ).isoformat(),
+                "last_action": str(execution_state.get("last_action") or "").strip(),
+                "completed_at": datetime.now(timezone.utc).isoformat(),
             }
 
             sessions = self.sessions._load_sessions()
@@ -16725,10 +15706,7 @@ Next action:
             if index is None:
                 return
 
-            history = (
-                sessions[index].get("execution_history")
-                or []
-            )
+            history = sessions[index].get("execution_history") or []
 
             cleaned_history = []
 
@@ -16738,15 +15716,10 @@ Next action:
 
                 completed = item.get("completed_steps") or []
 
-                if completed == [
-                    "No saved execution plan found"
-                ]:
+                if completed == ["No saved execution plan found"]:
                     continue
 
-                if (
-                    not completed
-                    and not item.get("failed_steps")
-                ):
+                if not completed and not item.get("failed_steps"):
                     continue
 
                 cleaned_history.append(item)
@@ -16793,13 +15766,9 @@ Next action:
     def _reset_execution_state(self, session_id: str):
         previous_state = self._get_working_state(session_id) or {}
 
-        last_success = self._safe_str(
-            previous_state.get("last_success")
-        ).strip()
+        last_success = self._safe_str(previous_state.get("last_success")).strip()
 
-        checkpoint = self._safe_str(
-            previous_state.get("checkpoint")
-        ).strip()
+        checkpoint = self._safe_str(previous_state.get("checkpoint")).strip()
 
         last_success = ""
         checkpoint = ""
@@ -16917,58 +15886,61 @@ Next action:
         return text[:limit]
 
     def _is_valid_state_value(self, value):
-            if not value:
+        if not value:
+            return False
+
+        value = str(value).strip()
+        if not value:
+            return False
+
+        if len(value) > 120:
+            return False
+
+        if "\n" in value:
+            return False
+
+        bad_patterns = [
+            "recommended order",
+            "if you want",
+            "you can also",
+            "for example",
+        ]
+
+        lower = value.lower()
+        for p in bad_patterns:
+            if p in lower:
                 return False
 
-            value = str(value).strip()
-            if not value:
-                return False
-
-            if len(value) > 120:
-                return False
-
-            if "\n" in value:
-                return False
-
-            bad_patterns = [
-                "recommended order",
-                "if you want",
-                "you can also",
-                "for example",
-            ]
-
-            lower = value.lower()
-            for p in bad_patterns:
-                if p in lower:
-                    return False
-
-            return True
+        return True
 
     def _merge_working_state(self, current_state, updates):
-            current_state = current_state if isinstance(current_state, dict) else {}
-            updates = updates if isinstance(updates, dict) else {}
+        current_state = current_state if isinstance(current_state, dict) else {}
+        updates = updates if isinstance(updates, dict) else {}
 
-            merged = {
-                "active_task": "",
-                "current_file": "",
-                "current_bug": "",
-                "last_success": "",
-                "next_move": "",
-                "checkpoint": "",
-            }
+        merged = {
+            "active_task": "",
+            "current_file": "",
+            "current_bug": "",
+            "last_success": "",
+            "next_move": "",
+            "checkpoint": "",
+        }
 
-            for key in merged.keys():
-                old_value = self._clean_working_state_value(current_state.get(key, ""))
-                new_value = self._clean_working_state_value(updates.get(key, ""))
+        for key in merged.keys():
+            old_value = self._clean_working_state_value(current_state.get(key, ""))
+            new_value = self._clean_working_state_value(updates.get(key, ""))
 
-                merged[key] = new_value if new_value else old_value
+            merged[key] = new_value if new_value else old_value
 
-            from datetime import datetime, timezone
-            merged["updated_at"] = datetime.now(timezone.utc).isoformat()
+        from datetime import datetime, timezone
 
-            return merged
+        merged["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-    def _extract_working_state_updates(self, user_text: str, current_state: dict | None = None) -> dict:
+        return merged
+
+    def _extract_working_state_updates(
+        self, user_text: str, current_state: dict | None = None
+    ) -> dict:
         text = self._safe_str(user_text).strip()
         if not text:
             return {}
@@ -17003,7 +15975,9 @@ Next action:
 
         def _clean_value(value: str) -> str:
             value = self._safe_str(value).strip()
-            value = value.strip("+    â† (FOUR SPACES â€” press space 4 times)\r\n-:;,.")
+            value = value.strip(
+                "+    â† (FOUR SPACES â€” press space 4 times)\r\n-:;,."
+            )
             return value
 
         def _set_if_present(field_name: str, value: str):
@@ -17026,7 +16000,7 @@ Next action:
                 for marker in patterns:
                     idx = lowered.find(marker)
                     if idx != -1:
-                        raw_value = text[idx + len(marker):]
+                        raw_value = text[idx + len(marker) :]
                         _set_if_present(field_name, raw_value)
                         break
                 if field_name in updates:
@@ -17054,7 +16028,7 @@ Next action:
         for marker, field_name in continuity_markers:
             idx = lowered.find(marker)
             if idx != -1 and field_name not in updates:
-                raw_value = text[idx + len(marker):]
+                raw_value = text[idx + len(marker) :]
                 _set_if_present(field_name, raw_value)
 
         # -----------------------------
@@ -17091,80 +16065,73 @@ Next action:
         deduped = {}
         for key, value in updates.items():
             existing = self._safe_str(current_state.get(key)).strip()
-            if self._safe_str(value).strip() and self._safe_str(value).strip() != existing:
+            if (
+                self._safe_str(value).strip()
+                and self._safe_str(value).strip() != existing
+            ):
                 deduped[key] = value
 
         return deduped
 
     def _format_working_state(self, state):
-            def c(x): return x if x else " "
-            return (
-                f"Active task: {c(state.get('active_task'))}\n"
-                f"Current file: {c(state.get('current_file'))}\n"
-                f"Current bug: {c(state.get('current_bug'))}\n"
-                f"Last success: {c(state.get('last_success'))}\n"
-                f"Next move: {c(state.get('next_move'))}\n"
-                f"Checkpoint: {c(state.get('checkpoint'))}"
-            )
+        def c(x):
+            return x if x else " "
+
+        return (
+            f"Active task: {c(state.get('active_task'))}\n"
+            f"Current file: {c(state.get('current_file'))}\n"
+            f"Current bug: {c(state.get('current_bug'))}\n"
+            f"Last success: {c(state.get('last_success'))}\n"
+            f"Next move: {c(state.get('next_move'))}\n"
+            f"Checkpoint: {c(state.get('checkpoint'))}"
+        )
 
     # =========================
     # WORKING STATE HELPERS
     # =========================
 
     def _format_working_state_context(self, session_id: str) -> str:
-            state = self._get_working_state(session_id)
+        state = self._get_working_state(session_id)
 
-            if not isinstance(state, dict) or not state:
-                return ""
+        if not isinstance(state, dict) or not state:
+            return ""
 
-            lines = []
+        lines = []
 
-            friendly_state_map = {
-                "execution_cycle_complete": "continuity stabilization",
-                "execution_complete": "execution pipeline stabilized",
-                "retry_failed": "execution recovery and polish",
-                "run_step": "step-by-step execution flow",
-                "run_all": "autonomous execution mode",
-            }
+        friendly_state_map = {
+            "execution_cycle_complete": "continuity stabilization",
+            "execution_complete": "execution pipeline stabilized",
+            "retry_failed": "execution recovery and polish",
+            "run_step": "step-by-step execution flow",
+            "run_all": "autonomous execution mode",
+        }
 
-            def friendly(value):
-                value = self._safe_str(value).strip()
-                return friendly_state_map.get(value, value)
+        def friendly(value):
+            value = self._safe_str(value).strip()
+            return friendly_state_map.get(value, value)
 
-            if self._safe_str(state.get("active_task")):
-                lines.append(
-                    f"- Active task: {self._safe_str(state.get('active_task'))}"
-                )
+        if self._safe_str(state.get("active_task")):
+            lines.append(f"- Active task: {self._safe_str(state.get('active_task'))}")
 
-            if self._safe_str(state.get("current_file")):
-                lines.append(
-                    f"- Current file: {self._safe_str(state.get('current_file'))}"
-                )
+        if self._safe_str(state.get("current_file")):
+            lines.append(f"- Current file: {self._safe_str(state.get('current_file'))}")
 
-            if self._safe_str(state.get("current_bug")):
-                lines.append(
-                    f"- Current bug: {self._safe_str(state.get('current_bug'))}"
-                )
+        if self._safe_str(state.get("current_bug")):
+            lines.append(f"- Current bug: {self._safe_str(state.get('current_bug'))}")
 
-            if self._safe_str(state.get("last_success")):
-                lines.append(
-                    f"- Last success: {friendly(state.get('last_success'))}"
-                )
+        if self._safe_str(state.get("last_success")):
+            lines.append(f"- Last success: {friendly(state.get('last_success'))}")
 
-            if self._safe_str(state.get("next_move")):
-                lines.append(
-                    f"- Next move: {friendly(state.get('next_move'))}"
-                )
+        if self._safe_str(state.get("next_move")):
+            lines.append(f"- Next move: {friendly(state.get('next_move'))}")
 
-            if self._safe_str(state.get("checkpoint")):
-                lines.append(
-                    f"- Checkpoint: {friendly(state.get('checkpoint'))}"
-                )
+        if self._safe_str(state.get("checkpoint")):
+            lines.append(f"- Checkpoint: {friendly(state.get('checkpoint'))}")
 
-            if not lines:
-                return ""
+        if not lines:
+            return ""
 
-            return "Working context:\n" + "\n".join(lines)
+        return "Working context:\n" + "\n".join(lines)
 
     def _build_mission_state(
         self,
@@ -17184,9 +16151,7 @@ Next action:
         execution_status = self._safe_str(execution_state.get("status")).strip()
         execution_goal = self._safe_str(execution_state.get("goal")).strip()
 
-        invalid_execution_goal = (
-            "respond normally" in execution_goal.lower()
-        )
+        invalid_execution_goal = "respond normally" in execution_goal.lower()
 
         if invalid_execution_goal:
 
@@ -17228,17 +16193,23 @@ Next action:
 
         if "retry_failed" in next_move and execution_is_complete:
             next_move = "await_new_mission"
-            priorities.append("Execution is complete. Await a new mission instead of retrying stale state.")
+            priorities.append(
+                "Execution is complete. Await a new mission instead of retrying stale state."
+            )
 
         elif "retry_failed" in next_move:
             blockers.append("Execution recovery is still leaking retry state.")
             priorities.append("Inspect failed execution steps before retry logic runs.")
 
         if "execution_cycle_complete" in checkpoint:
-            priorities.append("Convert raw execution checkpoints into mission-aware summaries.")
+            priorities.append(
+                "Convert raw execution checkpoints into mission-aware summaries."
+            )
 
         if "execution_complete" in last_success:
-            priorities.append("Lock completed execution state so it does not resurrect as running.")
+            priorities.append(
+                "Lock completed execution state so it does not resurrect as running."
+            )
 
         if current_bug:
             blockers.append(current_bug)
@@ -17258,9 +16229,7 @@ Next action:
                 ]
             )
 
-        mission = self._safe_str(
-            mission
-        ).strip()
+        mission = self._safe_str(mission).strip()
 
         if self._is_control_command_value(mission):
             mission = ""
@@ -17337,7 +16306,9 @@ Next action:
 
         return "\n".join(lines).strip()
 
-    def _run_execution_next_move(self, active_task: str, next_move: str, session_id: str) -> str:
+    def _run_execution_next_move(
+        self, active_task: str, next_move: str, session_id: str
+    ) -> str:
         active_task = self._safe_str(active_task).strip()
         next_move = self._safe_str(next_move).strip()
         session_id = self._safe_str(session_id).strip() or "default"
@@ -17346,13 +16317,25 @@ Next action:
 
         move_type = "plan"
 
-        if "build execution loop" in combined_text or "build_execution_loop" in combined_text:
+        if (
+            "build execution loop" in combined_text
+            or "build_execution_loop" in combined_text
+        ):
             move_type = "plan"
-        elif "verify execution loop" in combined_text or "verify_execution_loop" in combined_text:
+        elif (
+            "verify execution loop" in combined_text
+            or "verify_execution_loop" in combined_text
+        ):
             move_type = "verify_execution_loop"
-        elif "persist execution result" in combined_text or "persist_execution_result" in combined_text:
+        elif (
+            "persist execution result" in combined_text
+            or "persist_execution_result" in combined_text
+        ):
             move_type = "persist_execution_result"
-        elif "review execution result" in combined_text or "review_execution_result" in combined_text:
+        elif (
+            "review execution result" in combined_text
+            or "review_execution_result" in combined_text
+        ):
             move_type = "review_execution_result"
 
         if "fix this file" in combined_text:
@@ -17429,9 +16412,15 @@ Next action:
 
                     if current_next in {"build execution loop", "build_execution_loop"}:
                         next_step_text = "verify execution loop"
-                    elif current_next in {"verify execution loop", "verify_execution_loop"}:
+                    elif current_next in {
+                        "verify execution loop",
+                        "verify_execution_loop",
+                    }:
                         next_step_text = "persist execution result"
-                    elif current_next in {"persist execution result", "persist_execution_result"}:
+                    elif current_next in {
+                        "persist execution result",
+                        "persist_execution_result",
+                    }:
                         next_step_text = "choose next autonomous task"
 
             followup_results = []
@@ -17603,7 +16592,9 @@ Next action:
 
         return "\n\n--- AUTO LOOP ---\n\n".join(results_log)
 
-    def _attempt_function_self_fix(self, session_id: str, active_task: str, error_text: str) -> str:
+    def _attempt_function_self_fix(
+        self, session_id: str, active_task: str, error_text: str
+    ) -> str:
         """
         Safer self-fix path for function-scoped repairs.
         """
@@ -17705,7 +16696,9 @@ Next action:
 
         return "unknown"
 
-    def _attempt_self_fix(self, session_id: str, active_task: str, error_text: str) -> str:
+    def _attempt_self_fix(
+        self, session_id: str, active_task: str, error_text: str
+    ) -> str:
         """
         Smart self-fix dispatcher.
         Tries safer function-level fix first, then falls back to file-level fix.
@@ -17732,7 +16725,10 @@ Next action:
             error_text=error_text,
         )
 
-        if "failed" not in function_fix_result.lower() and "exception" not in function_fix_result.lower():
+        if (
+            "failed" not in function_fix_result.lower()
+            and "exception" not in function_fix_result.lower()
+        ):
             return function_fix_result
 
         try:
@@ -17790,11 +16786,7 @@ Next action:
             if not isinstance(mem, dict):
                 continue
 
-            existing = str(
-                mem.get("content")
-                or mem.get("text")
-                or ""
-            ).strip()
+            existing = str(mem.get("content") or mem.get("text") or "").strip()
 
             if existing.lower() == memory_text.lower():
                 current_weight = float(mem.get("weight") or 1)
@@ -17907,11 +16899,7 @@ Next action:
                 ]
             )
 
-        priority_terms = [
-            term
-            for term in priority_terms
-            if term
-        ]
+        priority_terms = [term for term in priority_terms if term]
 
         has_real_state = any(
             [
@@ -17961,15 +16949,9 @@ Next action:
                     or ""
                 ).lower()
 
-                created_at = str(
-                    memory.get("created_at")
-                    or ""
-                ).lower()
+                created_at = str(memory.get("created_at") or "").lower()
 
-                updated_at = str(
-                    memory.get("updated_at")
-                    or ""
-                ).lower()
+                updated_at = str(memory.get("updated_at") or "").lower()
 
                 raw_weight = memory.get(
                     "weight",
@@ -17994,8 +16976,7 @@ Next action:
             ]
 
             if any(
-                pattern in content_lc
-                for pattern in blocked_runtime_memory_patterns
+                pattern in content_lc for pattern in blocked_runtime_memory_patterns
             ):
                 continue
 
@@ -18023,25 +17004,13 @@ Next action:
             if is_execution_chat and "operational" in category:
                 score += 15.0
 
-            if (
-                is_execution_chat
-                and (
-                    "working" in category
-                    or "state" in category
-                )
-            ):
+            if is_execution_chat and ("working" in category or "state" in category):
                 score += 14.0
 
             if is_execution_chat and "execution" in category:
                 score += 13.0
 
-            if (
-                is_execution_chat
-                and (
-                    "correction" in category
-                    or "fix" in category
-                )
-            ):
+            if is_execution_chat and ("correction" in category or "fix" in category):
                 score += 12.0
 
             if (
@@ -18051,16 +17020,8 @@ Next action:
             ):
                 score += 10.0
 
-            if (
-                is_execution_chat
-                and (
-                    "project" in category
-                    or "nova" in content_lc
-                )
-            ):
+            if is_execution_chat and ("project" in category or "nova" in content_lc):
                 score += 9.0
-
-
 
             if not has_real_state:
 
@@ -18076,10 +17037,7 @@ Next action:
                     "mission",
                 }
 
-                if (
-                    category in blocked_categories
-                    or kind in blocked_kinds
-                ):
+                if category in blocked_categories or kind in blocked_kinds:
                     score -= 100.0
 
             for term in priority_terms:
@@ -18119,10 +17077,7 @@ Next action:
                 "do not use",
             ]
 
-            if any(
-                marker in content_lc
-                for marker in stale_markers
-            ):
+            if any(marker in content_lc for marker in stale_markers):
                 score -= 20.0
 
             if updated_at or created_at:
@@ -18151,9 +17106,7 @@ Next action:
                 (
                     isinstance(item, dict)
                     and isinstance(item.get("memory"), dict)
-                    and self._safe_str(
-                        item.get("memory", {}).get("category")
-                    ).lower()
+                    and self._safe_str(item.get("memory", {}).get("category")).lower()
                     in {
                         "operational",
                         "execution",
@@ -18170,10 +17123,7 @@ Next action:
                     [
                         {
                             "score": item.get("score"),
-                            "content": str(
-                                item.get("content")
-                                or ""
-                            )[:120],
+                            "content": str(item.get("content") or "")[:120],
                         }
                         for item in ranked[:5]
                     ],
@@ -18188,10 +17138,7 @@ Next action:
 
         top = ranked[: max(1, int(limit or 12))]
 
-        return [
-            item["memory"]
-            for item in top
-        ]
+        return [item["memory"] for item in top]
 
     def _memory_text_tokens(
         self,
@@ -18204,24 +17151,71 @@ Next action:
             return set()
 
         stop_words = {
-            "the", "a", "an", "and", "or", "but", "if", "then", "than",
-            "to", "of", "for", "in", "on", "at", "by", "with", "from",
-            "is", "are", "was", "were", "be", "been", "being",
-            "it", "this", "that", "these", "those",
-            "i", "me", "my", "you", "your", "we", "our",
-            "do", "does", "did", "have", "has", "had",
-            "what", "when", "where", "why", "how",
-            "can", "could", "should", "would", "will",
-            "about", "into", "over", "under", "again", "right", "now",
+            "the",
+            "a",
+            "an",
+            "and",
+            "or",
+            "but",
+            "if",
+            "then",
+            "than",
+            "to",
+            "of",
+            "for",
+            "in",
+            "on",
+            "at",
+            "by",
+            "with",
+            "from",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "it",
+            "this",
+            "that",
+            "these",
+            "those",
+            "i",
+            "me",
+            "my",
+            "you",
+            "your",
+            "we",
+            "our",
+            "do",
+            "does",
+            "did",
+            "have",
+            "has",
+            "had",
+            "what",
+            "when",
+            "where",
+            "why",
+            "how",
+            "can",
+            "could",
+            "should",
+            "would",
+            "will",
+            "about",
+            "into",
+            "over",
+            "under",
+            "again",
+            "right",
+            "now",
         }
 
         tokens = set(re.findall(r"[a-z0-9_]{2,}", text))
 
-        return {
-            token
-            for token in tokens
-            if token not in stop_words
-        }
+        return {token for token in tokens if token not in stop_words}
 
     def _format_memory_context(
         self,
@@ -18269,27 +17263,71 @@ Next action:
             return set()
 
         stop_words = {
-            "the", "a", "an", "and", "or", "but", "if", "then", "than",
-            "to", "of", "for", "in", "on", "at", "by", "with", "from",
-            "is", "are", "was", "were", "be", "been", "being",
-            "it", "this", "that", "these", "those",
-            "i", "me", "my", "you", "your", "we", "our",
-            "do", "does", "did", "have", "has", "had",
-            "what", "when", "where", "why", "how",
-            "can", "could", "should", "would", "will",
-            "about", "into", "over", "under", "again", "right", "now",
+            "the",
+            "a",
+            "an",
+            "and",
+            "or",
+            "but",
+            "if",
+            "then",
+            "than",
+            "to",
+            "of",
+            "for",
+            "in",
+            "on",
+            "at",
+            "by",
+            "with",
+            "from",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "it",
+            "this",
+            "that",
+            "these",
+            "those",
+            "i",
+            "me",
+            "my",
+            "you",
+            "your",
+            "we",
+            "our",
+            "do",
+            "does",
+            "did",
+            "have",
+            "has",
+            "had",
+            "what",
+            "when",
+            "where",
+            "why",
+            "how",
+            "can",
+            "could",
+            "should",
+            "would",
+            "will",
+            "about",
+            "into",
+            "over",
+            "under",
+            "again",
+            "right",
+            "now",
         }
 
-        tokens = set(
-            re.findall(r"[a-z0-9_]{2,}", text)
-        )
+        tokens = set(re.findall(r"[a-z0-9_]{2,}", text))
 
-        return {
-            token
-            for token in tokens
-            if token not in stop_words
-        }
-
+        return {token for token in tokens if token not in stop_words}
 
     def _memory_kind_weight(self, kind: str) -> float:
         k = self._safe_str(kind).lower()
@@ -18298,7 +17336,7 @@ Next action:
             return 9.0
 
         if k in {"style"}:
-            return 8.0   # ðŸ”¥ NEW â€” how you want responses
+            return 8.0  # ðŸ”¥ NEW â€” how you want responses
 
         if k in {"preference"}:
             return 7.0
@@ -18315,136 +17353,136 @@ Next action:
         return 1.0
 
     def _memory_time_bonus(self, item: dict) -> float:
-            created_at = self._safe_str(item.get("updated_at") or item.get("created_at"))
-            if not created_at:
-                return 0.0
-
-            try:
-                dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-                now = datetime.now(timezone.utc)
-                age_days = max((now - dt).total_seconds() / 86400.0, 0.0)
-            except Exception:
-                return 0.0
-
-            if age_days <= 1:
-                return 1.5
-            if age_days <= 7:
-                return 1.0
-            if age_days <= 30:
-                return 0.5
+        created_at = self._safe_str(item.get("updated_at") or item.get("created_at"))
+        if not created_at:
             return 0.0
 
-            try:
-                dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-                now = datetime.now(timezone.utc)
-                age_days = max((now - dt).total_seconds() / 86400.0, 0.0)
-            except Exception:
-                return 0.0
-
-            if age_days <= 1:
-                return 1.5
-            if age_days <= 7:
-                return 1.0
-            if age_days <= 30:
-                return 0.5
+        try:
+            dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            now = datetime.now(timezone.utc)
+            age_days = max((now - dt).total_seconds() / 86400.0, 0.0)
+        except Exception:
             return 0.0
+
+        if age_days <= 1:
+            return 1.5
+        if age_days <= 7:
+            return 1.0
+        if age_days <= 30:
+            return 0.5
+        return 0.0
+
+        try:
+            dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            now = datetime.now(timezone.utc)
+            age_days = max((now - dt).total_seconds() / 86400.0, 0.0)
+        except Exception:
+            return 0.0
+
+        if age_days <= 1:
+            return 1.5
+        if age_days <= 7:
+            return 1.0
+        if age_days <= 30:
+            return 0.5
+        return 0.0
 
     def _memory_session_bonus(self, item: dict, session_id: str = "") -> float:
         current_session = self._safe_str(session_id)
         item_session = self._safe_str(item.get("session_id"))
 
         if current_session and item_session and current_session == item_session:
-            return 0.75   # â†“ reduced from 1.5
+            return 0.75  # â†“ reduced from 1.5
 
         return 0.0
 
-    def _score_memory_item(self, item: dict, user_text: str, session_id: str = "") -> float:
-            if not isinstance(item, dict):
-                return -999.0
+    def _score_memory_item(
+        self, item: dict, user_text: str, session_id: str = ""
+    ) -> float:
+        if not isinstance(item, dict):
+            return -999.0
 
-            memory_text = self._safe_str(item.get("text"))
-            if not memory_text:
-                return -999.0
+        memory_text = self._safe_str(item.get("text"))
+        if not memory_text:
+            return -999.0
 
-            query = self._safe_str(user_text)
-            query_lower = query.lower()
-            memory_lower = memory_text.lower()
+        query = self._safe_str(user_text)
+        query_lower = query.lower()
+        memory_lower = memory_text.lower()
 
-            query_tokens = self._memory_text_tokens(query)
-            memory_tokens = self._memory_text_tokens(memory_text)
+        query_tokens = self._memory_text_tokens(query)
+        memory_tokens = self._memory_text_tokens(memory_text)
 
-            overlap = query_tokens.intersection(memory_tokens)
-            overlap_score = float(len(overlap)) * 2.0
+        overlap = query_tokens.intersection(memory_tokens)
+        overlap_score = float(len(overlap)) * 2.0
 
-            exact_phrase_score = 0.0
-            if query_lower and query_lower in memory_lower:
-                exact_phrase_score += 5.0
+        exact_phrase_score = 0.0
+        if query_lower and query_lower in memory_lower:
+            exact_phrase_score += 5.0
 
-            contains_named_value = 0.0
-            for token in sorted(query_tokens, key=len, reverse=True):
-                if len(token) >= 4 and token in memory_lower:
-                    contains_named_value += 0.75
+        contains_named_value = 0.0
+        for token in sorted(query_tokens, key=len, reverse=True):
+            if len(token) >= 4 and token in memory_lower:
+                contains_named_value += 0.75
 
-            kind_score = self._memory_kind_weight(item.get("kind"))
-            time_score = self._memory_time_bonus(item)
-            session_score = self._memory_session_bonus(item, session_id=session_id)
+        kind_score = self._memory_kind_weight(item.get("kind"))
+        time_score = self._memory_time_bonus(item)
+        session_score = self._memory_session_bonus(item, session_id=session_id)
 
+        quality_score = 0.0
+        try:
+            quality_score = float(item.get("quality_score") or 0.0)
+        except Exception:
             quality_score = 0.0
-            try:
-                quality_score = float(item.get("quality_score") or 0.0)
-            except Exception:
-                quality_score = 0.0
 
-            generic_penalty = 0.0
-            if len(memory_tokens) <= 3:
-                generic_penalty -= 0.75
-            if memory_lower in {"ok", "yes", "no", "thanks"}:
-                generic_penalty -= 4.0
+        generic_penalty = 0.0
+        if len(memory_tokens) <= 3:
+            generic_penalty -= 0.75
+        if memory_lower in {"ok", "yes", "no", "thanks"}:
+            generic_penalty -= 4.0
 
-            return (
-                (overlap_score * 2.0)
-                + exact_phrase_score
-                + (contains_named_value * 1.5)
-                + kind_score
-                + time_score
-                + session_score
-                + quality_score
-                + generic_penalty
-            )
+        return (
+            (overlap_score * 2.0)
+            + exact_phrase_score
+            + (contains_named_value * 1.5)
+            + kind_score
+            + time_score
+            + session_score
+            + quality_score
+            + generic_penalty
+        )
 
-    def _memory_is_relevant_enough(self, item: dict, score: float, user_text: str) -> bool:
-            text = self._safe_str(item.get("text"))
-            if not text:
-                return False
-
-            query = self._safe_str(user_text).lower()
-
-            if any(x in query for x in ["remember", "memory", "about me", "my project"]):
-                return True
-
-            query_tokens = self._memory_text_tokens(user_text)
-            memory_tokens = self._memory_text_tokens(text)
-            overlap = query_tokens.intersection(memory_tokens)
-
-            if score >= 1.5:
-                return True
-
-            if len(overlap) >= 1:
-                return True
-
-            kind = self._safe_str(item.get("kind")).lower()
-            if kind in {"project", "preference", "profile", "goal"}:
-                return True
-
-
-
-
-
+    def _memory_is_relevant_enough(
+        self, item: dict, score: float, user_text: str
+    ) -> bool:
+        text = self._safe_str(item.get("text"))
+        if not text:
             return False
 
-        # ==============================
-        # IMAGE HELPERS
-        # ==============================
+        query = self._safe_str(user_text).lower()
+
+        if any(x in query for x in ["remember", "memory", "about me", "my project"]):
+            return True
+
+        query_tokens = self._memory_text_tokens(user_text)
+        memory_tokens = self._memory_text_tokens(text)
+        overlap = query_tokens.intersection(memory_tokens)
+
+        if score >= 1.5:
+            return True
+
+        if len(overlap) >= 1:
+            return True
+
+        kind = self._safe_str(item.get("kind")).lower()
+        if kind in {"project", "preference", "profile", "goal"}:
+            return True
+
+        return False
+
+    # ==============================
+    # IMAGE HELPERS
+    # ==============================
 
     def _is_image_generation_request(self, user_text: str) -> bool:
         text = str(user_text or "").strip().lower()
@@ -18457,13 +17495,9 @@ Next action:
             return True
 
         # strong keyword detection
-        keywords = [
-            "generate", "create", "make", "draw", "render", "design"
-        ]
+        keywords = ["generate", "create", "make", "draw", "render", "design"]
 
-        image_words = [
-            "image", "picture", "photo", "art", "scene", "visual"
-        ]
+        image_words = ["image", "picture", "photo", "art", "scene", "visual"]
 
         # ðŸ”¥ detect intent: action + image concept
         if any(k in text for k in keywords) and any(i in text for i in image_words):
@@ -18471,79 +17505,83 @@ Next action:
 
         return False
 
-
     def _build_image_generation_meta(
-            self,
-            prompt: str,
-            image_url: str,
-            revised_prompt: str = "",
-            parent_artifact_id: str = "",
-            source_type: str = "generated",
-            generation_mode: str = "text_to_image",
-            source_session_id: str = "",
-        ) -> dict:
-            return {
-                "prompt": str(prompt or "").strip(),
-                "revised_prompt": str(revised_prompt or "").strip(),
-                "image_url": str(image_url or "").strip(),
-                "source_type": str(source_type or "generated").strip(),
-                "parent_artifact_id": str(parent_artifact_id or "").strip(),
-                "generation_mode": str(generation_mode or "text_to_image").strip(),
-                "source_session_id": str(source_session_id or "").strip(),
-            }
+        self,
+        prompt: str,
+        image_url: str,
+        revised_prompt: str = "",
+        parent_artifact_id: str = "",
+        source_type: str = "generated",
+        generation_mode: str = "text_to_image",
+        source_session_id: str = "",
+    ) -> dict:
+        return {
+            "prompt": str(prompt or "").strip(),
+            "revised_prompt": str(revised_prompt or "").strip(),
+            "image_url": str(image_url or "").strip(),
+            "source_type": str(source_type or "generated").strip(),
+            "parent_artifact_id": str(parent_artifact_id or "").strip(),
+            "generation_mode": str(generation_mode or "text_to_image").strip(),
+            "source_session_id": str(source_session_id or "").strip(),
+        }
 
     def _build_image_generation_artifact(
-            self,
-            session_id: str,
-            prompt: str,
-            image_url: str,
-            revised_prompt: str = "",
-            parent_artifact_id: str = "",
-            source_type: str = "generated",
-            generation_mode: str = "text_to_image",
-        ) -> dict:
-            clean_prompt = str(prompt or "").strip()
-            artifact_text = f'Generated image for: "{clean_prompt}"'
+        self,
+        session_id: str,
+        prompt: str,
+        image_url: str,
+        revised_prompt: str = "",
+        parent_artifact_id: str = "",
+        source_type: str = "generated",
+        generation_mode: str = "text_to_image",
+    ) -> dict:
+        clean_prompt = str(prompt or "").strip()
+        artifact_text = f'Generated image for: "{clean_prompt}"'
 
-            meta = self._build_image_generation_meta(
-                prompt=clean_prompt,
-                image_url=image_url,
-                revised_prompt=revised_prompt,
-                parent_artifact_id=parent_artifact_id,
-                source_type=source_type,
-                generation_mode=generation_mode,
-                source_session_id=session_id,
-            )
+        meta = self._build_image_generation_meta(
+            prompt=clean_prompt,
+            image_url=image_url,
+            revised_prompt=revised_prompt,
+            parent_artifact_id=parent_artifact_id,
+            source_type=source_type,
+            generation_mode=generation_mode,
+            source_session_id=session_id,
+        )
 
-            bullets = []
-            if clean_prompt:
-                bullets.append(f"Prompt: {clean_prompt}")
-            if meta["revised_prompt"]:
-                bullets.append(f"Revised prompt: {meta['revised_prompt']}")
-            if meta["parent_artifact_id"]:
-                bullets.append(f"Parent artifact: {meta['parent_artifact_id']}")
+        bullets = []
+        if clean_prompt:
+            bullets.append(f"Prompt: {clean_prompt}")
+        if meta["revised_prompt"]:
+            bullets.append(f"Revised prompt: {meta['revised_prompt']}")
+        if meta["parent_artifact_id"]:
+            bullets.append(f"Parent artifact: {meta['parent_artifact_id']}")
 
-            return {
-                "kind": "image_generation",
+        return {
+            "kind": "image_generation",
+            "title": "Generated image",
+            "body": artifact_text,
+            "summary": artifact_text,
+            "preview": artifact_text,
+            "session_id": session_id,
+            "image_url": image_url,
+            "source": "image_generation",
+            "meta": meta,
+            "viewer": {
+                "kind": "image",
                 "title": "Generated image",
                 "body": artifact_text,
                 "summary": artifact_text,
-                "preview": artifact_text,
-                "session_id": session_id,
                 "image_url": image_url,
-                "source": "image_generation",
-                "meta": meta,
-                "viewer": {
-                    "kind": "image",
-                    "title": "Generated image",
-                    "body": artifact_text,
-                    "summary": artifact_text,
-                    "image_url": image_url,
-                    "analysis_text": f"This image was generated from the prompt: {clean_prompt}" if clean_prompt else artifact_text,
-                    "bullets": bullets,
-                    "source_url": "",
-                },
-            }
+                "analysis_text": (
+                    f"This image was generated from the prompt: {clean_prompt}"
+                    if clean_prompt
+                    else artifact_text
+                ),
+                "bullets": bullets,
+                "source_url": "",
+            },
+        }
+
 
 def _save_artifact_fallback(self, artifact: dict):
     if not isinstance(artifact, dict) or not artifact:
@@ -18567,28 +17605,28 @@ def _save_artifact_fallback(self, artifact: dict):
         return artifact
 
     def _persist_image_generation_artifact(
-            self,
-            session_id: str,
-            prompt: str,
-            image_url: str,
-            revised_prompt: str = "",
-            parent_artifact_id: str = "",
-            source_type: str = "generated",
-            generation_mode: str = "text_to_image",
-        ):
-            if not session_id or not image_url:
-                return None
+        self,
+        session_id: str,
+        prompt: str,
+        image_url: str,
+        revised_prompt: str = "",
+        parent_artifact_id: str = "",
+        source_type: str = "generated",
+        generation_mode: str = "text_to_image",
+    ):
+        if not session_id or not image_url:
+            return None
 
-            artifact = self._build_image_generation_artifact(
-                session_id=session_id,
-                prompt=prompt,
-                image_url=image_url,
-                revised_prompt=revised_prompt,
-                parent_artifact_id=parent_artifact_id,
-                source_type=source_type,
-                generation_mode=generation_mode,
-            )
-            return self._save_artifact_fallback(artifact)
+        artifact = self._build_image_generation_artifact(
+            session_id=session_id,
+            prompt=prompt,
+            image_url=image_url,
+            revised_prompt=revised_prompt,
+            parent_artifact_id=parent_artifact_id,
+            source_type=source_type,
+            generation_mode=generation_mode,
+        )
+        return self._save_artifact_fallback(artifact)
 
     def _handle_image_generation(
         self,
@@ -18612,9 +17650,7 @@ def _save_artifact_fallback(self, artifact: dict):
 
             image_bytes = base64.b64decode(image_b64)
 
-            filename = (
-                f"generated_{uuid.uuid4().hex}.png"
-            )
+            filename = f"generated_{uuid.uuid4().hex}.png"
 
             save_path = os.path.join(
                 self.uploads_dir,
@@ -18658,9 +17694,7 @@ def _save_artifact_fallback(self, artifact: dict):
                     and hasattr(self, "artifact_service")
                     and self.artifact_service
                 ):
-                    self.artifact_service.sync_artifacts_to_session(
-                        session_id
-                    )
+                    self.artifact_service.sync_artifacts_to_session(session_id)
             except Exception as e:
                 exec_debug("FORCED ARTIFACT SYNC FAILED:", e)
             assistant_image_message = {
@@ -18696,9 +17730,7 @@ def _save_artifact_fallback(self, artifact: dict):
                     exc,
                 )
 
-            refreshed_session = self.sessions.get_session(
-                session_id
-            )
+            refreshed_session = self.sessions.get_session(session_id)
 
             return {
                 "ok": True,
@@ -18734,9 +17766,7 @@ def _save_artifact_fallback(self, artifact: dict):
                 "prompt": prompt,
                 "revised_prompt": "",
                 "saved_artifact": None,
-                "session": self._get_session_payload(
-                    session_id
-                ),
+                "session": self._get_session_payload(session_id),
             }
 
     def _handle_web_fetch(self, url: str, session_id: str = "") -> dict:
@@ -18772,38 +17802,28 @@ def _save_artifact_fallback(self, artifact: dict):
         artifact = {}
 
         try:
-            if (
-                hasattr(self.web, "build_artifact_payload")
-                and callable(self.web.build_artifact_payload)
+            if hasattr(self.web, "build_artifact_payload") and callable(
+                self.web.build_artifact_payload
             ):
                 artifact = self.web.build_artifact_payload(result) or {}
 
         except Exception as e:
             artifact = {
                 "kind": "web_result",
-                "title": self._safe_str(result.get("title"))
-                or normalized_url,
+                "title": self._safe_str(result.get("title")) or normalized_url,
                 "summary": self._safe_str(result.get("summary")),
                 "body": self._safe_str(result.get("content")),
                 "preview": self._safe_str(result.get("preview")),
                 "source_url": self._safe_str(
-                    result.get("final_url")
-                    or result.get("url")
-                    or normalized_url
+                    result.get("final_url") or result.get("url") or normalized_url
                 ),
                 "meta": {
-                    "description": self._safe_str(
-                        result.get("description")
-                    ),
-                    "site_name": self._safe_str(
-                        result.get("site_name")
-                    ),
+                    "description": self._safe_str(result.get("description")),
+                    "site_name": self._safe_str(result.get("site_name")),
                     "domain": self._safe_str(result.get("domain")),
                     "content": self._safe_str(result.get("content")),
                     "url": self._safe_str(
-                        result.get("final_url")
-                        or result.get("url")
-                        or normalized_url
+                        result.get("final_url") or result.get("url") or normalized_url
                     ),
                     "status_code": result.get("status_code"),
                     "ssl_verified": result.get("ssl_verified"),
@@ -18811,29 +17831,20 @@ def _save_artifact_fallback(self, artifact: dict):
                 },
                 "viewer": {
                     "kind": "web_result",
-                    "title": self._safe_str(result.get("title"))
-                    or normalized_url,
+                    "title": self._safe_str(result.get("title")) or normalized_url,
                     "body": self._safe_str(result.get("content")),
-                    "analysis_text": self._safe_str(
-                        result.get("summary")
-                    ),
-                    "bullets": self._safe_list(
-                        result.get("bullets")
-                    ),
+                    "analysis_text": self._safe_str(result.get("summary")),
+                    "bullets": self._safe_list(result.get("bullets")),
                     "links": self._safe_list(result.get("links")),
                     "images": self._safe_list(result.get("images")),
                     "source_url": self._safe_str(
-                        result.get("final_url")
-                        or result.get("url")
-                        or normalized_url
+                        result.get("final_url") or result.get("url") or normalized_url
                     ),
                 },
             }
 
         if isinstance(artifact, dict):
-            artifact["session_id"] = (
-                session_id or artifact.get("session_id", "")
-            )
+            artifact["session_id"] = session_id or artifact.get("session_id", "")
             artifact.setdefault("created_at", fetched_at)
             artifact["updated_at"] = fetched_at
 
@@ -18843,11 +17854,7 @@ def _save_artifact_fallback(self, artifact: dict):
             url=normalized_url,
         )
 
-        saved_artifact = (
-            self._save_artifact_fallback(artifact)
-            if artifact
-            else None
-        )
+        saved_artifact = self._save_artifact_fallback(artifact) if artifact else None
 
         final_artifact = self._upgrade_web_artifact_payload(
             artifact=saved_artifact or artifact,
@@ -18885,13 +17892,8 @@ def _save_artifact_fallback(self, artifact: dict):
             else {}
         )
 
-        source_url = (
-            self._safe_str(meta.get("source_url"))
-            or self._safe_str(
-                result.get("final_url")
-                or result.get("url")
-                or normalized_url
-            )
+        source_url = self._safe_str(meta.get("source_url")) or self._safe_str(
+            result.get("final_url") or result.get("url") or normalized_url
         )
 
         source_urls = []
@@ -18905,9 +17907,7 @@ def _save_artifact_fallback(self, artifact: dict):
             "artifact": final_artifact,
             "viewer": viewer,
             "url": self._safe_str(
-                result.get("final_url")
-                or result.get("url")
-                or normalized_url
+                result.get("final_url") or result.get("url") or normalized_url
             ),
             "source_url": source_url,
             "source_urls": source_urls,
@@ -19025,9 +18025,7 @@ def _save_artifact_fallback(self, artifact: dict):
         user_text = self._safe_str(user_text)
         decision = decision if isinstance(decision, dict) else {}
 
-        route = self._safe_str(
-            decision.get("route")
-        ).lower()
+        route = self._safe_str(decision.get("route")).lower()
 
         tool_locked_routes = {
             self.ROUTE_WEB_FETCH,
@@ -19038,10 +18036,7 @@ def _save_artifact_fallback(self, artifact: dict):
             memory_context = ""
             working_context_block = ""
 
-        working_state = (
-            self._get_working_state(session_id)
-            or {}
-        )
+        working_state = self._get_working_state(session_id) or {}
 
         execution_state = (
             self._get_session_meta(
@@ -19051,16 +18046,18 @@ def _save_artifact_fallback(self, artifact: dict):
             or {}
         )
 
-        has_real_state = any([
-            working_state.get("active_task"),
-            working_state.get("current_file"),
-            working_state.get("current_bug"),
-            working_state.get("next_move"),
-            working_state.get("checkpoint"),
-            execution_state.get("steps"),
-            execution_state.get("current_step"),
-            execution_state.get("status") == "running",
-        ])
+        has_real_state = any(
+            [
+                working_state.get("active_task"),
+                working_state.get("current_file"),
+                working_state.get("current_bug"),
+                working_state.get("next_move"),
+                working_state.get("checkpoint"),
+                execution_state.get("steps"),
+                execution_state.get("current_step"),
+                execution_state.get("status") == "running",
+            ]
+        )
 
         memory_items = self._rank_memory_context(
             user_text=user_text,
@@ -19075,9 +18072,7 @@ def _save_artifact_fallback(self, artifact: dict):
             if not isinstance(item, dict):
                 return
 
-            text = self._safe_str(
-                item.get("text") or item.get("content")
-            )
+            text = self._safe_str(item.get("text") or item.get("content"))
 
             key = text.lower().strip()
 
@@ -19109,13 +18104,9 @@ def _save_artifact_fallback(self, artifact: dict):
             if not item.get("pinned"):
                 continue
 
-            category = self._safe_str(
-                item.get("category")
-            ).lower()
+            category = self._safe_str(item.get("category")).lower()
 
-            kind = self._safe_str(
-                item.get("kind")
-            ).lower()
+            kind = self._safe_str(item.get("kind")).lower()
 
             if not has_real_state:
 
@@ -19138,10 +18129,7 @@ def _save_artifact_fallback(self, artifact: dict):
                     "user",
                 }
 
-                if (
-                    category in identity_keywords
-                    or kind in identity_keywords
-                ):
+                if category in identity_keywords or kind in identity_keywords:
                     add_memory_item(item)
                     continue
 
@@ -19153,17 +18141,11 @@ def _save_artifact_fallback(self, artifact: dict):
                     "preference",
                 }
 
-                if (
-                    category in identity_keywords
-                    or kind in identity_keywords
-                ):
+                if category in identity_keywords or kind in identity_keywords:
                     cleaned_memory.append(item)
                     continue
 
-                if (
-                    category in blocked_categories
-                    or kind in blocked_kinds
-                ):
+                if category in blocked_categories or kind in blocked_kinds:
                     continue
 
             add_memory_item(item)
@@ -19180,9 +18162,7 @@ def _save_artifact_fallback(self, artifact: dict):
             if item.get("pinned"):
                 continue
 
-            kind = self._safe_str(
-                item.get("kind")
-            ).lower()
+            kind = self._safe_str(item.get("kind")).lower()
 
             if not has_real_state and kind in {
                 "goal",
@@ -19219,13 +18199,9 @@ def _save_artifact_fallback(self, artifact: dict):
             if item in selected_memory:
                 continue
 
-            category = self._safe_str(
-                item.get("category")
-            ).lower()
+            category = self._safe_str(item.get("category")).lower()
 
-            kind = self._safe_str(
-                item.get("kind")
-            ).lower()
+            kind = self._safe_str(item.get("kind")).lower()
 
             if not has_real_state:
 
@@ -19241,16 +18217,11 @@ def _save_artifact_fallback(self, artifact: dict):
                     "mission",
                 }
 
-                if (
-                    category in blocked_categories
-                    or kind in blocked_kinds
-                ):
+                if category in blocked_categories or kind in blocked_kinds:
                     continue
 
             try:
-                weight_num = float(
-                    item.get("weight", 1)
-                )
+                weight_num = float(item.get("weight", 1))
 
             except Exception:
                 weight_num = 1.0
@@ -19267,13 +18238,9 @@ def _save_artifact_fallback(self, artifact: dict):
             if len(selected_memory) >= 10:
                 break
 
-            category = self._safe_str(
-                item.get("category")
-            ).lower()
+            category = self._safe_str(item.get("category")).lower()
 
-            kind = self._safe_str(
-                item.get("kind")
-            ).lower()
+            kind = self._safe_str(item.get("kind")).lower()
 
             if not has_real_state:
 
@@ -19289,10 +18256,7 @@ def _save_artifact_fallback(self, artifact: dict):
                     "mission",
                 }
 
-                if (
-                    category in blocked_categories
-                    or kind in blocked_kinds
-                ):
+                if category in blocked_categories or kind in blocked_kinds:
                     continue
 
             add_memory_item(item)
@@ -19323,18 +18287,11 @@ def _save_artifact_fallback(self, artifact: dict):
                 if not isinstance(item, dict):
                     continue
 
-                category = self._safe_str(
-                    item.get("category")
-                ).lower()
+                category = self._safe_str(item.get("category")).lower()
 
-                kind = self._safe_str(
-                    item.get("kind")
-                ).lower()
+                kind = self._safe_str(item.get("kind")).lower()
 
-                if (
-                    category in blocked_categories
-                    or kind in blocked_kinds
-                ):
+                if category in blocked_categories or kind in blocked_kinds:
                     continue
 
                 cleaned_memory.append(item)
@@ -19347,11 +18304,7 @@ def _save_artifact_fallback(self, artifact: dict):
             memory_block = self._safe_str(memory_context)
 
         session = self._get_session_payload(session_id)
-        messages = (
-            session.get("messages", [])
-            if isinstance(session, dict)
-            else []
-        )
+        messages = session.get("messages", []) if isinstance(session, dict) else []
 
         cleaned_messages = []
 
@@ -19403,9 +18356,7 @@ def _save_artifact_fallback(self, artifact: dict):
         memory_style_block = ""
         try:
             memory_text = (
-                str(memory_block or "")
-                + " "
-                + str(memory_context or "")
+                str(memory_block or "") + " " + str(memory_context or "")
             ).lower()
 
             if (
@@ -19454,7 +18405,9 @@ def _save_artifact_fallback(self, artifact: dict):
             "session_id": session_id,
             "session": session if isinstance(session, dict) else {},
             "active_session": session if isinstance(session, dict) else {},
-            "messages": session.get("messages", []) if isinstance(session, dict) else [],
+            "messages": (
+                session.get("messages", []) if isinstance(session, dict) else []
+            ),
             "artifacts": self._list_artifacts_for_session(session_id),
             "memory": self._list_memory_for_session(session_id),
         }
@@ -19464,100 +18417,97 @@ def _save_artifact_fallback(self, artifact: dict):
         # ==============================
 
     def _execute_memory_recall(
-            self,
-            decision: dict,
-            user_text: str,
-            session_id: str,
-            attachments=None,
-        ) -> dict:
-            attachments = attachments or []
+        self,
+        decision: dict,
+        user_text: str,
+        session_id: str,
+        attachments=None,
+    ) -> dict:
+        attachments = attachments or []
 
-            user_msg = self._build_user_message(
-                user_text,
-                attachments=attachments,
-            )
+        user_msg = self._build_user_message(
+            user_text,
+            attachments=attachments,
+        )
 
-            assistant_text = self._build_memory_recall_text(
-                session_id=session_id,
-                user_text=user_text,
-                limit=int(decision.get("memory_limit") or self.memory_limit),
-            )
+        assistant_text = self._build_memory_recall_text(
+            session_id=session_id,
+            user_text=user_text,
+            limit=int(decision.get("memory_limit") or self.memory_limit),
+        )
 
-            assistant_msg = self._build_assistant_message(
-                text=assistant_text,
-                meta={
-                    "memory_recall": True,
-                },
-                attachments=[],
-            )
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            meta={
+                "memory_recall": True,
+            },
+            attachments=[],
+        )
 
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision=decision,
-                saved_artifact=None,
-            )
-
-
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=None,
+        )
 
     def _execute_planning(
-            self,
-            decision: dict,
-            user_text: str,
-            session_id: str,
-            attachments=None,
-        ) -> dict:
-            user_msg = self._build_user_message(user_text, attachments=attachments or [])
+        self,
+        decision: dict,
+        user_text: str,
+        session_id: str,
+        attachments=None,
+    ) -> dict:
+        user_msg = self._build_user_message(user_text, attachments=attachments or [])
 
-            assistant_text = self._run_chat_model(
-                user_text=user_text,
-                decision=decision,
-                session_id=session_id,
-            )
+        assistant_text = self._run_chat_model(
+            user_text=user_text,
+            decision=decision,
+            session_id=session_id,
+        )
 
-            assistant_msg = self._build_assistant_message(
-                text=assistant_text,
-                meta={"planning": True},
-                attachments=[],
-            )
+        assistant_msg = self._build_assistant_message(
+            text=assistant_text,
+            meta={"planning": True},
+            attachments=[],
+        )
 
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision=decision,
-                saved_artifact=None,
-            )
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=None,
+        )
 
     def _execute_attachment_analysis(
-            self,
-            decision: dict,
-            user_text: str,
-            session_id: str,
-            attachments=None,
-        ) -> dict:
-            attachments = attachments or []
-            user_msg = self._build_user_message(user_text, attachments=attachments)
-            result = self._handle_attachment_analysis(user_text, attachments)
+        self,
+        decision: dict,
+        user_text: str,
+        session_id: str,
+        attachments=None,
+    ) -> dict:
+        attachments = attachments or []
+        user_msg = self._build_user_message(user_text, attachments=attachments)
+        result = self._handle_attachment_analysis(user_text, attachments)
 
-            assistant_msg = self._build_assistant_message(
-                text=self._safe_str(result.get("text")) or "Attachment analysis completed.",
-                meta={"attachment_analysis": True},
-                attachments=[],
-            )
+        assistant_msg = self._build_assistant_message(
+            text=self._safe_str(result.get("text")) or "Attachment analysis completed.",
+            meta={"attachment_analysis": True},
+            attachments=[],
+        )
 
-            return self._finalize_response(
-                session_id=session_id,
-                user_text=user_text,
-                user_msg=user_msg,
-                assistant_msg=assistant_msg,
-                decision=decision,
-                saved_artifact=result.get("saved_artifact"),
-            )
-
+        return self._finalize_response(
+            session_id=session_id,
+            user_text=user_text,
+            user_msg=user_msg,
+            assistant_msg=assistant_msg,
+            decision=decision,
+            saved_artifact=result.get("saved_artifact"),
+        )
 
     def _execute_web_operator(self, user_text: str, session_id: str) -> dict:
         try:
@@ -19630,7 +18580,6 @@ def _save_artifact_fallback(self, artifact: dict):
                 saved_artifact=None,
             )
 
-
     def _ensure_session_payload(self, session_id: str) -> dict:
         session = self._call_first(
             self.sessions,
@@ -19675,15 +18624,11 @@ def _save_artifact_fallback(self, artifact: dict):
 
         attachments = attachments or []
 
-        execution = self._normalize_execution_state(
-            execution or {}
-        )
+        execution = self._normalize_execution_state(execution or {})
 
         steps = execution.get("steps") or []
 
-        current_index = self._execution_current_index(
-            execution
-        )
+        current_index = self._execution_current_index(execution)
 
         # =========================
         # EXECUTION COMPLETE
@@ -19703,9 +18648,7 @@ def _save_artifact_fallback(self, artifact: dict):
                 progress=len(steps),
             )
 
-            execution["current_step_title"] = (
-                "complete"
-            )
+            execution["current_step_title"] = "complete"
 
             execution["complete"] = True
 
@@ -19721,68 +18664,36 @@ def _save_artifact_fallback(self, artifact: dict):
                     "active_task": "",
                     "current_file": "",
                     "current_bug": "",
-                    "checkpoint": (
-                        "execution_complete"
-                    ),
+                    "checkpoint": ("execution_complete"),
                     "last_success": (
-                        self._safe_str(
-                            execution.get("goal")
-                        )
-                        or "execution_complete"
+                        self._safe_str(execution.get("goal")) or "execution_complete"
                     ),
-                    "execution_status": (
-                        "complete"
-                    ),
+                    "execution_status": ("complete"),
                 },
             )
 
             return {
                 "execution": execution,
-                "step_output": (
-                    "No remaining execution step."
-                ),
+                "step_output": ("No remaining execution step."),
                 "saved_artifact": {
                     "kind": "execution",
-                    "title": (
-                        self._safe_str(
-                            execution.get("goal")
-                        )
-                        or "Execution"
-                    ),
-                    "body": self._render_execution(
-                        execution
-                    ),
+                    "title": (self._safe_str(execution.get("goal")) or "Execution"),
+                    "body": self._render_execution(execution),
                     "execution": execution,
                     "meta": {
                         "execution": execution,
-                        "execution_id": (
-                            self._safe_str(
-                                execution.get("id")
-                            )
-                        ),
+                        "execution_id": (self._safe_str(execution.get("id"))),
                         "status": (
-                            self._safe_str(
-                                execution.get(
-                                    "status"
-                                )
-                            )
-                            or "complete"
+                            self._safe_str(execution.get("status")) or "complete"
                         ),
                         "progress": execution.get(
                             "progress",
                             len(steps),
                         ),
                         "current_step": (
-                            self._safe_str(
-                                execution.get(
-                                    "current_step"
-                                )
-                            )
-                            or "complete"
+                            self._safe_str(execution.get("current_step")) or "complete"
                         ),
-                        "goal": self._safe_str(
-                            execution.get("goal")
-                        ),
+                        "goal": self._safe_str(execution.get("goal")),
                     },
                 },
             }
@@ -19791,20 +18702,13 @@ def _save_artifact_fallback(self, artifact: dict):
         # CURRENT STEP
         # =========================
 
-        current_step = (
-            steps[current_index] or {}
-        )
+        current_step = steps[current_index] or {}
 
         step_title = (
-            self._safe_str(
-                current_step.get("title")
-            )
-            or f"Step {current_index + 1}"
+            self._safe_str(current_step.get("title")) or f"Step {current_index + 1}"
         )
 
-        goal = self._safe_str(
-            execution.get("goal")
-        )
+        goal = self._safe_str(execution.get("goal"))
 
         execution.setdefault(
             "step_results",
@@ -19822,18 +18726,12 @@ def _save_artifact_fallback(self, artifact: dict):
 
         user_prompt_parts = [
             f"Goal: {goal}",
-            (
-                f"Current step "
-                f"({current_index + 1}/{len(steps)}): "
-                f"{step_title}"
-            ),
+            (f"Current step " f"({current_index + 1}/{len(steps)}): " f"{step_title}"),
         ]
 
         if user_text.strip():
 
-            user_prompt_parts.append(
-                f"Latest user input: {user_text}"
-            )
+            user_prompt_parts.append(f"Latest user input: {user_text}")
 
         if attachments:
 
@@ -19845,19 +18743,12 @@ def _save_artifact_fallback(self, artifact: dict):
                     continue
 
                 name = self._safe_str(
-                    item.get("filename")
-                    or item.get("name")
-                    or item.get("stored_name")
+                    item.get("filename") or item.get("name") or item.get("stored_name")
                 )
 
-                url = self._safe_str(
-                    item.get("url")
-                )
+                url = self._safe_str(item.get("url"))
 
-                mime_type = self._safe_str(
-                    item.get("mime_type")
-                    or item.get("mime")
-                )
+                mime_type = self._safe_str(item.get("mime_type") or item.get("mime"))
 
                 bits = [
                     bit
@@ -19871,24 +18762,13 @@ def _save_artifact_fallback(self, artifact: dict):
 
                 if bits:
 
-                    attachment_lines.append(
-                        " - " + " | ".join(bits)
-                    )
+                    attachment_lines.append(" - " + " | ".join(bits))
 
             if attachment_lines:
 
-                user_prompt_parts.append(
-                    "Attachments:\n"
-                    + "\n".join(
-                        attachment_lines
-                    )
-                )
+                user_prompt_parts.append("Attachments:\n" + "\n".join(attachment_lines))
 
-        user_prompt = "\n\n".join(
-            part
-            for part in user_prompt_parts
-            if part
-        )
+        user_prompt = "\n\n".join(part for part in user_prompt_parts if part)
 
         step_output = ""
 
@@ -19896,39 +18776,29 @@ def _save_artifact_fallback(self, artifact: dict):
 
         try:
 
-            response = (
-                self.client.responses.create(
-                    model=self.chat_model,
-                    input=[
-                        {
-                            "role": "system",
-                            "content": system_prompt,
-                        },
-                        {
-                            "role": "user",
-                            "content": user_prompt,
-                        },
-                    ],
-                )
+            response = self.client.responses.create(
+                model=self.chat_model,
+                input=[
+                    {
+                        "role": "system",
+                        "content": system_prompt,
+                    },
+                    {
+                        "role": "user",
+                        "content": user_prompt,
+                    },
+                ],
             )
 
-            step_output = (
-                self._extract_text_response(
-                    response
-                ).strip()
-            )
+            step_output = self._extract_text_response(response).strip()
 
         except Exception as exc:
 
-            step_output = (
-                f"Step execution failed: {exc}"
-            )
+            step_output = f"Step execution failed: {exc}"
 
         if not step_output:
 
-            step_output = (
-                f"Completed step: {step_title}"
-            )
+            step_output = f"Completed step: {step_title}"
 
         step_result = {
             "step_index": current_index,
@@ -19937,9 +18807,7 @@ def _save_artifact_fallback(self, artifact: dict):
             "completed_at": self._iso_now(),
         }
 
-        execution["step_results"].append(
-            step_result
-        )
+        execution["step_results"].append(step_result)
 
         next_index = max(
             0,
@@ -19963,30 +18831,21 @@ def _save_artifact_fallback(self, artifact: dict):
                 progress=len(steps),
             )
 
-            execution["current_step_title"] = (
-                "complete"
-            )
+            execution["current_step_title"] = "complete"
 
             execution["complete"] = True
 
         else:
 
-            next_step = (
-                steps[next_index] or {}
-            )
+            next_step = steps[next_index] or {}
 
             execution = self._sync_execution_state(
                 execution=execution,
                 current_index=next_index,
                 status="running",
                 current_step=(
-                    self._safe_str(
-                        next_step.get("title")
-                    )
-                    or (
-                        f"Step "
-                        f"{next_index + 1}"
-                    )
+                    self._safe_str(next_step.get("title"))
+                    or (f"Step " f"{next_index + 1}")
                 ),
                 progress=max(
                     0,
@@ -19994,60 +18853,32 @@ def _save_artifact_fallback(self, artifact: dict):
                 ),
             )
 
-            next_step_title = (
-                self._safe_str(
-                    next_step.get("title")
-                )
-                or (
-                    f"Step "
-                    f"{next_index + 1}"
-                )
+            next_step_title = self._safe_str(next_step.get("title")) or (
+                f"Step " f"{next_index + 1}"
             )
 
-            execution["current_step"] = (
-                next_step_title
-            )
+            execution["current_step"] = next_step_title
 
-            execution["current_step_title"] = (
-                next_step_title
-            )
+            execution["current_step_title"] = next_step_title
 
         artifact_payload = {
             "kind": "execution",
-            "title": (
-                goal or "Execution"
-            ),
-            "body": self._render_execution(
-                execution
-            ),
+            "title": (goal or "Execution"),
+            "body": self._render_execution(execution),
             "execution": execution,
             "meta": {
                 "execution": execution,
                 "goal": goal,
                 "step_index": current_index,
                 "step_title": step_title,
-                "execution_id": (
-                    self._safe_str(
-                        execution.get("id")
-                    )
-                ),
-                "tool_bundle": (
-                    tool_bundle or {}
-                ),
-                "status": self._safe_str(
-                    execution.get("status")
-                ),
+                "execution_id": (self._safe_str(execution.get("id"))),
+                "tool_bundle": (tool_bundle or {}),
+                "status": self._safe_str(execution.get("status")),
                 "progress": execution.get(
                     "progress",
                     0,
                 ),
-                "current_step": (
-                    self._safe_str(
-                        execution.get(
-                            "current_step"
-                        )
-                    )
-                ),
+                "current_step": (self._safe_str(execution.get("current_step"))),
             },
         }
 
@@ -20074,7 +18905,9 @@ def _save_artifact_fallback(self, artifact: dict):
             "saved_artifact": artifact_payload,
         }
 
-    def _maybe_execute_tool(self, step_title: str, user_text: str, execution: dict | None = None) -> dict:
+    def _maybe_execute_tool(
+        self, step_title: str, user_text: str, execution: dict | None = None
+    ) -> dict:
         tool_decision = self._decide_tool_for_step(
             step_title=step_title,
             user_text=user_text,
@@ -20104,7 +18937,8 @@ def _save_artifact_fallback(self, artifact: dict):
 
         if traceback_paths:
             project_paths = [
-                p for p in traceback_paths
+                p
+                for p in traceback_paths
                 if "\\nova\\" in p.lower() or "/nova/" in p.lower()
             ]
 
@@ -20148,7 +18982,9 @@ def _save_artifact_fallback(self, artifact: dict):
 
         return ""
 
-    def _decide_tool_for_step(self, step_title: str, user_text: str, execution: dict | None = None) -> dict:
+    def _decide_tool_for_step(
+        self, step_title: str, user_text: str, execution: dict | None = None
+    ) -> dict:
         step_title = self._safe_str(step_title).lower()
         user_text = self._safe_str(user_text)
         lowered = user_text.lower()
@@ -20193,7 +19029,10 @@ def _save_artifact_fallback(self, artifact: dict):
                 }
 
         # list dir
-        if any(x in step_title for x in ["list files", "directory", "folder", "project structure"]):
+        if any(
+            x in step_title
+            for x in ["list files", "directory", "folder", "project structure"]
+        ):
             if path:
                 dir_path = path if os.path.isdir(path) else os.path.dirname(path)
                 if dir_path:
@@ -20216,16 +19055,19 @@ def _save_artifact_fallback(self, artifact: dict):
         # FIX INTENT DETECTION
         # =============================
 
-        is_fix_intent = any(x in lowered for x in [
-            "fix this",
-            "fix this file",
-            "fix bug",
-            "fix error",
-            "fix",
-            "debug",
-            "broken",
-            "not working",
-        ])
+        is_fix_intent = any(
+            x in lowered
+            for x in [
+                "fix this",
+                "fix this file",
+                "fix bug",
+                "fix error",
+                "fix",
+                "debug",
+                "broken",
+                "not working",
+            ]
+        )
 
         if "apply fix" in lowered:
             return {
@@ -20311,7 +19153,11 @@ def _save_artifact_fallback(self, artifact: dict):
         except Exception as e:
             return {"ok": False, "error": str(e), "tool_name": tool_name}
 
-        return {"ok": False, "error": f"Unknown tool: {tool_name}", "tool_name": tool_name}
+        return {
+            "ok": False,
+            "error": f"Unknown tool: {tool_name}",
+            "tool_name": tool_name,
+        }
 
     def _cleanup_memory_items(self) -> None:
         try:
@@ -20328,7 +19174,7 @@ def _save_artifact_fallback(self, artifact: dict):
                 if not text or len(text) < 4:
                     continue
 
-                if text in ["ok","hi","yo","test","next","go"]:
+                if text in ["ok", "hi", "yo", "test", "next", "go"]:
                     continue
 
                 if text in seen:
@@ -20345,6 +19191,7 @@ def _save_artifact_fallback(self, artifact: dict):
         except Exception as e:
             exec_debug("MEMORY CLEANUP FAILED:", e)
 
+
 def _chatservice_archive_execution_state_patch(
     self,
     session_id: str,
@@ -20359,6 +19206,7 @@ def _chatservice_archive_execution_state_patch(
 
 ChatService._archive_execution_state = _chatservice_archive_execution_state_patch
 
+
 def _nova_runtime_handle_image_generation(
     self,
     prompt: str,
@@ -20371,7 +19219,7 @@ def _nova_runtime_handle_image_generation(
         _nova_image_prompt_text = str(user_text or prompt or text or "").lower()
     except Exception:
         _nova_image_prompt_text = ""
-    
+
     if (
         "attachment " in _nova_image_prompt_text
         or "attachment images_" in _nova_image_prompt_text
@@ -20389,7 +19237,7 @@ def _nova_runtime_handle_image_generation(
             "skip_post_processing": True,
             "skip_rewrite": True,
         }
-    
+
     # RUNTIME_IMAGE_HIT_DIRECT_ATTACHMENT_GUARD_LOCK
     _nova_prompt_guard_text = str(prompt or "").lower()
 
@@ -20458,26 +19306,28 @@ def _nova_runtime_handle_image_generation(
         )
 
         try:
-            saved_artifact = self.artifacts.save_artifact({
-                "kind": "image_generation",
-                "type": "image_generation",
-                "title": "Generated image",
-                "body": prompt,
-                "summary": f"Generated image for: {prompt}",
-                "preview": image_url,
-                "session_id": session_id,
-                "source": source_type,
-                "image_url": image_url,
-                "prompt": prompt,
-                "revised_prompt": "",
-                "parent_id": parent_artifact_id or None,
-                "meta": {
+            saved_artifact = self.artifacts.save_artifact(
+                {
+                    "kind": "image_generation",
+                    "type": "image_generation",
+                    "title": "Generated image",
+                    "body": prompt,
+                    "summary": f"Generated image for: {prompt}",
+                    "preview": image_url,
+                    "session_id": session_id,
+                    "source": source_type,
                     "image_url": image_url,
                     "prompt": prompt,
-                    "generation_mode": "text_to_image",
-                    "source_type": source_type,
-                },
-            })
+                    "revised_prompt": "",
+                    "parent_id": parent_artifact_id or None,
+                    "meta": {
+                        "image_url": image_url,
+                        "prompt": prompt,
+                        "generation_mode": "text_to_image",
+                        "source_type": source_type,
+                    },
+                }
+            )
 
             exec_debug("IMAGE ARTIFACT RESULT:", saved_artifact)
 
@@ -20525,6 +19375,7 @@ def _nova_runtime_handle_image_generation(
             "session": self._get_session_payload(session_id),
         }
 
+
 ChatService._handle_image_generation = _nova_runtime_handle_image_generation
 
 # ============================================================
@@ -20542,3 +19393,5 @@ for name in CHAT_SERVICE_METHODS:
     obj = globals().get(name)
     if callable(obj):
         setattr(ChatService, name, obj)
+
+# MEMORY_ITEMS_NAMEERROR_SAFE_LOCK

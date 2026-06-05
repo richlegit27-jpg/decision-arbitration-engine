@@ -604,6 +604,11 @@ def api_state():
 # NOVA_WEAK_BACKEND_RESPONSE_GUARD_LOCK
 # NOVA_WEAK_BACKEND_RESPONSE_MOJIBAKE_GUARD_LOCK
 def _nova_replace_weak_backend_reply(user_text, result):
+    # DISABLE_WEAK_REPLY_HIJACK_20260605
+    # Do not replace valid model replies with stale project-phase text.
+    return result
+
+def _nova_replace_weak_backend_reply_disabled_old(user_text, result):
     """
     Last-mile response guard.
 
@@ -670,6 +675,7 @@ def _nova_replace_weak_backend_reply(user_text, result):
             )
         else:
             replacement = (
+        
                 "I’m here. The active Nova phase is frontend/mobile polish. "
                 "Give me the next task and I’ll move directly on it."
             )
@@ -2006,7 +2012,7 @@ def _nova_prevent_bad_exact_pong_response(assistant_text, user_text):
     if clean_user in allowed_pong_requests:
         return clean_answer
 
-    return "I’m here. The active Nova phase is frontend/mobile polish. Give me the next task and I’ll move directly on it."
+    return ""
 
 
 def _nova_try_project_state_direct_recall(user_text, session_id):
@@ -2152,6 +2158,121 @@ def _nova_filter_current_attachments_only(candidate_attachments, current_attachm
         filtered.append(item)
 
     return filtered
+
+
+# CASUAL_CHAT_GUARD_20260604
+@app.before_request
+def _nova_casual_chat_guard():
+    try:
+        from flask import request, jsonify
+
+        if request.path != "/api/chat" or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+        user_text = str(payload.get("user_text") or "").strip()
+        attachments = payload.get("attachments") or []
+
+        if attachments:
+            return None
+
+        clean = " ".join(user_text.lower().split()).strip(" ?!.")
+
+        casual_replies = {
+            "hi": "Hey.",
+            "hey": "Hey.",
+            "hello": "Hey.",
+            "yo": "Yo.",
+            "sup": "I’m here.",
+            "how are you": "I’m good. Ready when you are.",
+            "how are u": "I’m good. Ready when you are.",
+            "how you doing": "I’m good. Ready when you are.",
+            "whats up": "I’m here. Ready for the next move.",
+            "what's up": "I’m here. Ready for the next move.",
+        }
+
+        if clean not in casual_replies:
+            return None
+
+        session_id = str(payload.get("session_id") or "").strip()
+
+        return jsonify({
+            "ok": True,
+            "session_id": session_id,
+            "active_session_id": session_id,
+            "assistant_message": {
+                "role": "assistant",
+                "text": casual_replies[clean],
+                "attachments": [],
+                "meta": {
+                    "route": "casual_chat_guard"
+                }
+            },
+            "attachments": [],
+            "session_attachments": [],
+            "debug": {
+                "route": "casual_chat_guard"
+            }
+        })
+
+    except Exception:
+        return None
+
+
+
+# CASUAL_AND_ATTACHMENT_CLEANUP_20260604
+@app.before_request
+def _nova_early_casual_chat_guard():
+    try:
+        from flask import request, jsonify
+
+        if request.path != "/api/chat" or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+        user_text = str(payload.get("user_text") or "").strip()
+        attachments = payload.get("attachments") or []
+
+        if attachments:
+            return None
+
+        clean = " ".join(user_text.lower().split()).strip(" ?!.")
+
+        replies = {
+            "hi": "Hey.",
+            "hey": "Hey.",
+            "hello": "Hey.",
+            "yo": "Yo.",
+            "sup": "I’m here.",
+            "how are you": "I’m good. Ready when you are.",
+            "how are u": "I’m good. Ready when you are.",
+            "how you doing": "I’m good. Ready when you are.",
+            "whats up": "I’m here. Ready for the next move.",
+            "what's up": "I’m here. Ready for the next move.",
+        }
+
+        if clean not in replies:
+            return None
+
+        session_id = str(payload.get("session_id") or "").strip()
+
+        return jsonify({
+            "ok": True,
+            "session_id": session_id,
+            "active_session_id": session_id,
+            "assistant_message": {
+                "role": "assistant",
+                "text": replies[clean],
+                "attachments": [],
+                "meta": {"route": "early_casual_chat_guard"}
+            },
+            "attachments": [],
+            "session_attachments": [],
+            "debug": {"route": "early_casual_chat_guard"}
+        })
+
+    except Exception:
+        return None
 
 @app.post("/api/chat")
 
@@ -2471,14 +2592,44 @@ def api_chat():
             if attachment_original_filename == "<unknown>":
                 attachment_original_filename = ""
 
+            # ATTACHMENT_CONTENT_ROOT_FIX_20260604
             raw_attachment_name = (
                 attachment_filename
                 or attachment_original_filename
+                or Path(str(attachment.get("stored_name") or "")).name
                 or Path(str(attachment.get("file_url") or "")).name
                 or Path(str(attachment.get("url") or "")).name
                 or ""
             )
-            file_path = (UPLOADS_DIR / str(raw_attachment_name).strip().lstrip("/\\")).resolve()
+
+            local_path_value = str(attachment.get("local_path") or attachment.get("path") or "").strip()
+            candidate_paths = []
+
+            if local_path_value:
+                candidate_paths.append(Path(local_path_value).expanduser())
+
+            if raw_attachment_name:
+                safe_name = Path(str(raw_attachment_name).strip().lstrip("/\\")).name
+                candidate_paths.append((UPLOADS_DIR / safe_name).resolve())
+
+            file_path = None
+            uploads_root = UPLOADS_DIR.resolve()
+
+            for candidate in candidate_paths:
+                try:
+                    candidate = candidate.resolve()
+                except Exception:
+                    continue
+
+                if not candidate.exists() or not candidate.is_file():
+                    continue
+
+                if str(candidate).startswith(str(uploads_root)) or str(candidate).startswith(str(BASE_DIR.resolve())):
+                    file_path = candidate
+                    break
+
+            if file_path is None and raw_attachment_name:
+                file_path = (UPLOADS_DIR / Path(str(raw_attachment_name).strip().lstrip("/\\")).name).resolve()
             content_snippet = ""
             try:
                 if file_path.exists() and file_path.is_file() and str(file_path).startswith(str(UPLOADS_DIR.resolve())):
@@ -2565,7 +2716,7 @@ def api_chat():
                                 attachment_path,
                                 mime_type,
                             )
-                            continue
+                            content_snippet = "[Attachment received, but no readable text could be extracted.]"
                     else:
                         content_snippet = file_path.read_text(
                             encoding="utf-8",
@@ -2585,9 +2736,33 @@ def api_chat():
             except Exception as e:
                 app.logger.warning("[AttachmentContent] failed reading %s: %s", file_path, e)
 
+            # ATTACHMENT_OUTPUT_CLEANER_20260604
+            content_snippet = str(content_snippet or "")
+            content_snippet = content_snippet.replace("\ufeff", "").replace("\u200b", "").strip()
+
+            fallback_text = "[Attachment content could not be read from disk.]"
+
+            attachment_display_name = (
+                attachment.get("original_filename")
+                or attachment.get("filename")
+                or "<unknown>"
+            )
+
+            content_snippet = str(content_snippet or "")
+            content_snippet = content_snippet.replace("\ufeff", "").replace("\u200b", "").strip()
+
+            if not str(attachment.get("mime_type") or "").lower().startswith(("image/", "application/pdf")):
+                content_snippet = content_snippet.replace(
+                    "This attachment appears to contain image/search/PDF extraction text about:",
+                    ""
+                ).replace(
+                    "This attachment appears to contain extracted image/PDF content about:",
+                    ""
+                ).strip()
+
             attachment_content_lines.append(
-                f"Attachment {attachment.get('original_filename') or attachment.get('filename') or '<unknown>'} content:\n"
-                f"{content_snippet if content_snippet else '[Attachment file was remembered, but readable text content was not available on disk.]'}"
+                f"Attachment {attachment_display_name} content:\n"
+                f"{content_snippet if content_snippet else fallback_text}"
             )
 
         # GATE_REMEMBERED_ATTACHMENT_INJECTION_LOCK
@@ -6299,6 +6474,166 @@ def _nova_attachment_double_summary_cleanup(response):
         return response
 
 
+
+# ATTACHMENT_FOLLOWUP_RECALL_LOCK_20260604
+@app.before_request
+def _nova_attachment_followup_recall_gate():
+    try:
+        from flask import request, jsonify
+        import json
+        from pathlib import Path
+
+        if request.path != "/api/chat" or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+        user_text = str(payload.get("user_text") or "").strip()
+        session_id = str(payload.get("session_id") or "").strip()
+        attachments = payload.get("attachments") or []
+
+        lower = user_text.lower()
+        wants_attachment = (
+            "attachment" in lower
+            and (
+                "what was in" in lower
+                or "what is in" in lower
+                or "summarize" in lower
+                or "tell me" in lower
+            )
+        )
+
+        if not wants_attachment or attachments or not session_id:
+            return None
+
+        store_path = Path(__file__).resolve().parent / "data" / "nova_sessions.json"
+        if not store_path.exists():
+            return None
+
+        data = json.loads(store_path.read_text(encoding="utf-8"))
+        sessions = data.get("sessions") if isinstance(data, dict) else data
+        if not isinstance(sessions, list):
+            return None
+
+        session = None
+        for item in sessions:
+            if isinstance(item, dict) and str(item.get("id") or "") == session_id:
+                session = item
+                break
+
+        if not isinstance(session, dict):
+            return None
+
+        messages = session.get("messages") or []
+        found_text = ""
+
+        for msg in reversed(messages):
+            if not isinstance(msg, dict):
+                continue
+
+            text_value = str(msg.get("text") or "")
+            if "Attachment " not in text_value or " content:" not in text_value:
+                continue
+
+            if "[Attachment file was remembered, but readable text content was not available on disk.]" in text_value:
+                continue
+
+            marker_index = text_value.find("Attachment ")
+            found_text = text_value[marker_index:].strip()
+
+            for stop_marker in [
+                "\n\nSession attachment memory:",
+                "\n\nProject-aware context for Nova:",
+                "\n\nRelevant persistent memory:",
+            ]:
+                if stop_marker in found_text:
+                    found_text = found_text.split(stop_marker, 1)[0].strip()
+
+            break
+
+        if not found_text:
+            return None
+
+        answer = "The last readable attachment content I found in this session was:\n\n" + found_text
+
+        return jsonify({
+            "ok": True,
+            "active_session_id": session_id,
+            "session_id": session_id,
+            "assistant_message": {
+                "role": "assistant",
+                "text": answer,
+                "attachments": [],
+                "meta": {
+                    "route": "attachment_followup_recall_gate"
+                }
+            },
+            "debug": {
+                "route": "attachment_followup_recall_gate"
+            },
+            "session_attachments": []
+        })
+
+    except Exception:
+        return None
+
+
+
+# STOP_FAKE_ATTACHMENT_CHAT_20260604
+@app.before_request
+def _nova_stop_fake_attachment_chat_gate():
+    try:
+        from flask import request, jsonify
+
+        if request.path != "/api/chat" or request.method != "POST":
+            return None
+
+        payload = request.get_json(silent=True) or {}
+        user_text = str(payload.get("user_text") or "").strip()
+        attachments = payload.get("attachments") or []
+
+        clean = " ".join(user_text.lower().split())
+
+        casual_messages = {
+            "hi",
+            "hey",
+            "hello",
+            "yo",
+            "sup",
+            "how are you",
+            "how are you?",
+            "how you doing",
+            "how are u",
+            "whats up",
+            "what's up",
+        }
+
+        if attachments:
+            return None
+
+        if clean not in casual_messages:
+            return None
+
+        return jsonify({
+            "ok": True,
+            "assistant_message": {
+                "role": "assistant",
+                "text": "I’m good. Ready when you are.",
+                "attachments": [],
+                "meta": {
+                    "route": "normal_chat_casual_gate"
+                }
+            },
+            "attachments": [],
+            "session_attachments": [],
+            "debug": {
+                "route": "normal_chat_casual_gate"
+            }
+        })
+
+    except Exception:
+        return None
+
+
 if __name__ == "__main__":
     create_startup_backup()
     app.run(
@@ -6323,3 +6658,9 @@ if __name__ == "__main__":
 # HARD_BYPASS_CASUAL_GREETINGS_LOCK
 
 # CLEAN_IMAGE_PROMPT_RIGHT_BEFORE_CHAT_SERVICE_LOCK
+
+
+
+
+
+
