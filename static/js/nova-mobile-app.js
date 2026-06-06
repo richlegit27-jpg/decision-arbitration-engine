@@ -510,17 +510,54 @@ function closeSessionsPanel(panel) {
         row.style.display = "flex";
         row.style.gap = "6px";
         row.style.marginBottom = "6px";
+        row.style.background = "rgba(255,255,255,.06)";
+        row.style.border = "1px solid rgba(255,255,255,.14)";
+        row.style.borderRadius = "12px";
+        row.style.padding = "6px";
 
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "mobile-session-item";
         btn.style.flex = "1";
+        btn.style.color = "#f8fafc";
+        btn.style.background = "rgba(124,92,255,.22)";
+        btn.style.border = "1px solid rgba(255,255,255,.16)";
+        btn.style.borderRadius = "10px";
+        btn.style.padding = "10px";
+        btn.style.textAlign = "left";
+
+        const pinBtn = document.createElement("button");
+        pinBtn.type = "button";
+        pinBtn.textContent = session.pinned ? "📌" : "📍";
+        pinBtn.title = "Pin session";
+        pinBtn.style.width = "42px";
+        pinBtn.style.flex = "0 0 42px";
+        pinBtn.style.color = "#f8fafc";
+        pinBtn.style.background = "rgba(124,92,255,.35)";
+        pinBtn.style.border = "1px solid rgba(255,255,255,.16)";
+        pinBtn.style.borderRadius = "10px";
 
         const renameBtn = document.createElement("button");
         renameBtn.type = "button";
         renameBtn.textContent = "✏";
+        renameBtn.title = "Rename session";
         renameBtn.style.width = "42px";
         renameBtn.style.flex = "0 0 42px";
+        renameBtn.style.color = "#f8fafc";
+        renameBtn.style.background = "rgba(124,92,255,.45)";
+        renameBtn.style.border = "1px solid rgba(255,255,255,.16)";
+        renameBtn.style.borderRadius = "10px";
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.textContent = "🗑";
+        deleteBtn.title = "Delete session";
+        deleteBtn.style.width = "42px";
+        deleteBtn.style.flex = "0 0 42px";
+        deleteBtn.style.color = "#f8fafc";
+        deleteBtn.style.background = "rgba(255,80,80,.35)";
+        deleteBtn.style.border = "1px solid rgba(255,255,255,.16)";
+        deleteBtn.style.borderRadius = "10px";
 
         const shortId = String(session.id || "").slice(-6);
 
@@ -533,7 +570,9 @@ function closeSessionsPanel(panel) {
         }
 
         function renderTitle() {
-            btn.textContent = currentTitle() + " · " + shortId;
+            const pinnedText = session.pinned ? "📌 " : "";
+            btn.textContent = pinnedText + currentTitle() + " · " + shortId;
+            pinBtn.textContent = session.pinned ? "📌" : "📍";
         }
 
         renderTitle();
@@ -573,6 +612,36 @@ function closeSessionsPanel(panel) {
             scrollBottom();
         };
 
+        pinBtn.onclick = async function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const nextPinned = !session.pinned;
+
+            try {
+                const response = await fetch("/api/sessions/pin", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        session_id: session.id,
+                        pinned: nextPinned
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Pin failed with HTTP " + response.status);
+                }
+
+                session.pinned = nextPinned;
+                renderTitle();
+                loadSessionsPanel(sessionsPanel);
+            } catch (err) {
+                alert("Pin failed");
+            }
+        };
+
         renameBtn.onclick = async function (event) {
             event.preventDefault();
             event.stopPropagation();
@@ -609,8 +678,47 @@ function closeSessionsPanel(panel) {
             }
         };
 
+        deleteBtn.onclick = async function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const title = currentTitle();
+            const ok = confirm("Delete session: " + title + "?");
+
+            if (!ok) return;
+
+            try {
+                const response = await fetch("/api/sessions/delete", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        session_id: session.id
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Delete failed with HTTP " + response.status);
+                }
+
+                delete state.cachedMessages[session.id];
+                delete state.sessionTitles[session.id];
+
+                if (getSessionId() === session.id) {
+                    newChat();
+                }
+
+                loadSessionsPanel(sessionsPanel);
+            } catch (err) {
+                alert("Delete failed");
+            }
+        };
+
         row.appendChild(btn);
+        row.appendChild(pinBtn);
         row.appendChild(renameBtn);
+        row.appendChild(deleteBtn);
 
         return row;
     }
@@ -638,12 +746,18 @@ function closeSessionsPanel(panel) {
                 .filter(function (session) {
                     return session && session.id;
                 })
-                .sort(function (a, b) {
-                    const aTime = Date.parse(a.updated_at || a.created_at || "") || 0;
-                    const bTime = Date.parse(b.updated_at || b.created_at || "") || 0;
 
-                    return bTime - aTime;
-                })
+.sort(function (a, b) {
+    if (!!a.pinned !== !!b.pinned) {
+        return a.pinned ? -1 : 1;
+    }
+
+    const aTime = Date.parse(a.updated_at || a.created_at || "") || 0;
+    const bTime = Date.parse(b.updated_at || b.created_at || "") || 0;
+
+    return bTime - aTime;
+})
+
                 .slice(0, 25);
 
             console.log("[Nova Mobile Sessions]", sessions);
