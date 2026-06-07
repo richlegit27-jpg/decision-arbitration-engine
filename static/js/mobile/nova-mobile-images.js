@@ -1,5 +1,58 @@
+/* NOVA_MOBILE_IMAGES_MODULE_20260606 */
+
 (function () {
     "use strict";
+
+    function getDeps() {
+        return window.NovaMobileImageDeps || window.NovaMobileSessionDeps || {};
+    }
+
+    function safeToast(message) {
+        if (typeof window.showToast === "function") {
+            window.showToast(message);
+            return;
+        }
+
+        console.log("[Nova Mobile Images]", message);
+    }
+
+    function safeVibrate(ms) {
+        try {
+            if (navigator.vibrate) {
+                navigator.vibrate(ms || 8);
+            }
+        } catch (_) {}
+    }
+
+    function chatBox() {
+        const deps = getDeps();
+
+        if (typeof deps.chatBox === "function") {
+            return deps.chatBox();
+        }
+
+        return (
+            document.getElementById("mobileChatMessages") ||
+            document.getElementById("nova-mobile-messages") ||
+            document.querySelector(".mobile-chat-messages") ||
+            document.querySelector("[data-mobile-messages]")
+        );
+    }
+
+    function scrollBottom() {
+        const deps = getDeps();
+
+        if (typeof deps.scrollBottom === "function") {
+            deps.scrollBottom();
+            return;
+        }
+
+        const box = chatBox();
+
+        if (box) {
+            box.scrollTop = box.scrollHeight;
+        }
+    }
 
     function normalizeImageUrl(url) {
         const value = String(url || "").trim();
@@ -7,496 +60,249 @@
         if (!value) return "";
 
         try {
-            const parsed = new URL(
-                value,
-                window.location.origin
-            );
-
+            const parsed = new URL(value, window.location.origin);
             return parsed.pathname + parsed.search;
-        } catch {
+        } catch (_) {
             return value;
         }
     }
 
-    function openImageLightbox(url, altText) {
-        window.open(
-            url,
-            "_blank",
-            "noopener,noreferrer"
+    function isImageUrl(url) {
+        const value = normalizeImageUrl(url);
+
+        return (
+            value.includes("/api/uploads/") ||
+            value.includes("/generated_") ||
+            value.includes("/image_") ||
+            /\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(value)
         );
+    }
+
+    function extractImageUrlFromResponse(data) {
+        if (!data) return "";
+
+        const candidates = [
+            data?.artifact?.image_url,
+            data?.artifact?.preview,
+            data?.artifact?.url,
+            data?.artifacts?.[0]?.image_url,
+            data?.artifacts?.[0]?.preview,
+            data?.artifacts?.[0]?.url,
+            data?.assistant_message?.image_url,
+            data?.assistant_message?.url,
+            data?.image_url,
+            data?.url,
+            data?.preview
+        ];
+
+        for (const candidate of candidates) {
+            const value = normalizeImageUrl(candidate);
+
+            if (value && isImageUrl(value)) {
+                return value;
+            }
+        }
+
+        return "";
     }
 
     function getGalleryImages() {
         try {
-            const images = JSON.parse(
-                localStorage.getItem(
-                    "novaMobileImageGallery"
-                ) || "[]"
-            );
+            const images = JSON.parse(localStorage.getItem("novaMobileImageGallery") || "[]");
 
             if (!Array.isArray(images)) {
                 return [];
             }
 
             return images.filter(function (image) {
-                const url = normalizeImageUrl(
-                    image && image.url
-                );
-
-                return (
-                    url.match(
-                        /\.(png|jpg|jpeg|gif|webp)(\?|$)/i
-                    ) ||
-                    url.includes("/generated_") ||
-                    url.includes("/image_")
-                );
+                return isImageUrl(image && image.url);
             });
-        } catch {
+        } catch (_) {
             return [];
         }
     }
 
-    function openNovaImageViewer(url, altText) {
-        if (!url) return;
-
-        let currentUrl = url;
-        let gallery = getGalleryImages();
-
-        if (
-            !gallery.some(function (image) {
-                return (
-                    normalizeImageUrl(image.url) ===
-                    normalizeImageUrl(url)
-                );
-            })
-        ) {
-            gallery.unshift({
-                url,
-                alt: altText || "Nova image",
-                savedAt: Date.now()
-            });
-        }
-
-        let index = gallery.findIndex(function (image) {
-            return (
-                normalizeImageUrl(image.url) ===
-                normalizeImageUrl(currentUrl)
-            );
-        });
-
-        if (index < 0) {
-            index = 0;
-        }
-
-        let viewer = document.getElementById(
-            "nova-mobile-image-viewer"
-        );
-
-        if (!viewer) {
-            viewer = document.createElement("div");
-            viewer.id = "nova-mobile-image-viewer";
-            viewer.className =
-                "nova-mobile-image-viewer hidden";
-
-            viewer.innerHTML = `
-                <div class="nova-image-viewer-backdrop"></div>
-
-                <div class="nova-image-viewer-shell">
-                    <div class="nova-image-viewer-topbar">
-                        <button type="button" class="nova-image-viewer-btn" data-image-viewer-action="close">Close</button>
-                        <div class="nova-image-viewer-title">Nova Image</div>
-                        <button type="button" class="nova-image-viewer-btn" data-image-viewer-action="copy">Copy</button>
-                    </div>
-
-                    <div class="nova-image-viewer-stage">
-                        <button type="button" class="nova-image-viewer-nav left" data-image-viewer-action="prev">‹</button>
-                        <img class="nova-image-viewer-img" alt="Nova image">
-                        <button type="button" class="nova-image-viewer-nav right" data-image-viewer-action="next">›</button>
-                    </div>
-
-                    <div class="nova-image-viewer-actions">
-                        <button type="button" class="mobile-inline-action" data-image-viewer-action="open">Open</button>
-                        <button type="button" class="mobile-inline-action" data-image-viewer-action="share">Share</button>
-                        <button type="button" class="mobile-inline-action" data-image-viewer-action="download">Download</button>
-                    </div>
-                </div>
-            `;
-
-            document.body.appendChild(viewer);
-        }
-
-        const img = viewer.querySelector(
-            ".nova-image-viewer-img"
-        );
-
-        const title = viewer.querySelector(
-            ".nova-image-viewer-title"
-        );
-
-        function render() {
-            const item =
-                gallery[index] || {
-                    url: currentUrl,
-                    alt: altText || "Nova image"
-                };
-
-            currentUrl = item.url;
-
-            if (img) {
-                img.src = item.url;
-                img.alt = item.alt || "Nova image";
-            }
-
-            if (title) {
-                title.textContent =
-                    index +
-                    1 +
-                    " / " +
-                    Math.max(gallery.length, 1);
-            }
-        }
-
-        function closeViewer() {
-            viewer.classList.add("hidden");
-
-            document.body.classList.remove(
-                "nova-image-viewer-open"
-            );
-        }
-
-        function move(direction) {
-            if (!gallery.length) return;
-
-            index = index + direction;
-
-            if (index < 0) {
-                index = gallery.length - 1;
-            }
-
-            if (index >= gallery.length) {
-                index = 0;
-            }
-
-            render();
-            vibrate(8);
-        }
-
-        viewer.onclick = async function (event) {
-            const actionButton =
-                event.target.closest(
-                    "[data-image-viewer-action]"
-                );
-
-            const backdrop =
-                event.target.closest(
-                    ".nova-image-viewer-backdrop"
-                );
-
-            if (backdrop) {
-                closeViewer();
-                return;
-            }
-
-            if (!actionButton) return;
-
-            const action =
-                actionButton.getAttribute(
-                    "data-image-viewer-action"
-                );
-
-            if (action === "close") {
-                closeViewer();
-                return;
-            }
-
-            if (action === "prev") {
-                move(-1);
-                return;
-            }
-
-            if (action === "next") {
-                move(1);
-                return;
-            }
-
-            if (action === "copy") {
-                copyText(currentUrl);
-                return;
-            }
-
-            if (action === "open") {
-                window.open(
-                    currentUrl,
-                    "_blank",
-                    "noopener,noreferrer"
-                );
-                return;
-            }
-
-            if (action === "share") {
-                if (navigator.share) {
-                    try {
-                        await navigator.share({
-                            title: "Nova image",
-                            url: currentUrl
-                        });
-                    } catch {
-                        showToast("Share cancelled.");
-                    }
-                } else {
-                    copyText(currentUrl);
-                }
-
-                return;
-            }
-
-            if (action === "download") {
-                const link =
-                    document.createElement("a");
-
-                link.href = currentUrl;
-                link.download =
-                    "nova-image-" +
-                    Date.now() +
-                    ".png";
-
-                document.body.appendChild(link);
-
-                link.click();
-                link.remove();
-            }
-        };
-
-        let startX = 0;
-        let startY = 0;
-
-        viewer.ontouchstart = function (event) {
-            const touch =
-                event.touches &&
-                event.touches[0];
-
-            if (!touch) return;
-
-            startX = touch.clientX;
-            startY = touch.clientY;
-        };
-
-        viewer.ontouchend = function (event) {
-            const touch =
-                event.changedTouches &&
-                event.changedTouches[0];
-
-            if (!touch) return;
-
-            const diffX =
-                touch.clientX - startX;
-
-            const diffY =
-                touch.clientY - startY;
-
-            if (
-                Math.abs(diffY) > 120 &&
-                diffY > 0
-            ) {
-                closeViewer();
-                return;
-            }
-
-            if (
-                Math.abs(diffX) > 80 &&
-                Math.abs(diffX) >
-                    Math.abs(diffY)
-            ) {
-                move(diffX < 0 ? 1 : -1);
-            }
-        };
-
-        document.onkeydown = function (event) {
-            if (
-                viewer.classList.contains(
-                    "hidden"
-                )
-            ) {
-                return;
-            }
-
-            if (event.key === "Escape") {
-                closeViewer();
-            }
-
-            if (event.key === "ArrowLeft") {
-                move(-1);
-            }
-
-            if (event.key === "ArrowRight") {
-                move(1);
-            }
-        };
-
-        render();
-
-        viewer.classList.remove("hidden");
-
-        document.body.classList.add(
-            "nova-image-viewer-open"
-        );
-
-        vibrate(12);
-    }
-
     function saveMobileImageToGallery(url, altText) {
-        if (!url) return;
+        const normalizedUrl = normalizeImageUrl(url);
+
+        if (!normalizedUrl || !isImageUrl(normalizedUrl)) {
+            return;
+        }
 
         let images = [];
 
         try {
-            images = JSON.parse(
-                localStorage.getItem(
-                    "novaMobileImageGallery"
-                ) || "[]"
-            );
-        } catch {
+            images = JSON.parse(localStorage.getItem("novaMobileImageGallery") || "[]");
+        } catch (_) {
             images = [];
         }
 
-        const normalizedUrl =
-            normalizeImageUrl(url);
-
         images = images.filter(function (image) {
-            return (
-                normalizeImageUrl(image.url) !==
-                normalizedUrl
-            );
+            return normalizeImageUrl(image.url) !== normalizedUrl;
         });
 
         images.unshift({
-            url,
+            url: normalizedUrl,
             alt: altText || "Nova image",
             savedAt: Date.now()
         });
 
-        localStorage.setItem(
-            "novaMobileImageGallery",
-            JSON.stringify(
-                images.slice(0, 50)
-            )
-        );
+        localStorage.setItem("novaMobileImageGallery", JSON.stringify(images.slice(0, 50)));
+    }
+
+    function openImageLightbox(url) {
+        const normalizedUrl = normalizeImageUrl(url);
+
+        if (!normalizedUrl) return;
+
+        window.open(normalizedUrl, "_blank", "noopener,noreferrer");
+    }
+
+    function openNovaImageViewer(url, altText) {
+        const normalizedUrl = normalizeImageUrl(url);
+
+        if (!normalizedUrl) return;
+
+        saveMobileImageToGallery(normalizedUrl, altText);
+
+        let viewer = document.getElementById("nova-mobile-image-viewer");
+
+        if (!viewer) {
+            viewer = document.createElement("div");
+            viewer.id = "nova-mobile-image-viewer";
+            document.body.appendChild(viewer);
+        }
+
+        viewer.innerHTML = "";
+
+        viewer.style.cssText =
+            "position:fixed !important;" +
+            "inset:0 !important;" +
+            "z-index:2147483647 !important;" +
+            "background:rgba(0,0,0,.92) !important;" +
+            "display:flex !important;" +
+            "flex-direction:column !important;" +
+            "align-items:center !important;" +
+            "justify-content:center !important;" +
+            "padding:14px !important;";
+
+        const closeBtn = document.createElement("button");
+        closeBtn.type = "button";
+        closeBtn.textContent = "Close";
+        closeBtn.style.cssText =
+            "position:absolute;top:12px;right:12px;z-index:2;padding:10px 14px;border-radius:12px;";
+
+        const img = document.createElement("img");
+        img.src = normalizedUrl;
+        img.alt = altText || "Nova image";
+        img.style.cssText =
+            "max-width:100% !important;" +
+            "max-height:82vh !important;" +
+            "border-radius:14px !important;" +
+            "box-shadow:0 20px 80px rgba(0,0,0,.7) !important;";
+
+        closeBtn.onclick = function () {
+            viewer.style.display = "none";
+        };
+
+        viewer.onclick = function (event) {
+            if (event.target === viewer) {
+                viewer.style.display = "none";
+            }
+        };
+
+        viewer.appendChild(closeBtn);
+        viewer.appendChild(img);
+
+        safeVibrate(12);
+    }
+
+    function renderImageIntoBubble(bubble, url, altText) {
+        const normalizedUrl = normalizeImageUrl(url);
+
+        if (!bubble || !normalizedUrl) {
+            return false;
+        }
+
+        bubble.innerHTML = "";
+
+        const img = document.createElement("img");
+        img.src = normalizedUrl;
+        img.alt = altText || "Nova image";
+        img.loading = "lazy";
+        img.className = "nova-chat-image mobile-chat-image";
+        img.style.display = "block";
+        img.style.maxWidth = "100%";
+        img.style.borderRadius = "12px";
+        img.style.marginTop = "4px";
+
+        img.onclick = function () {
+            openNovaImageViewer(normalizedUrl, altText || "Nova image");
+        };
+
+        bubble.appendChild(img);
+        saveMobileImageToGallery(normalizedUrl, altText);
+
+        return true;
+    }
+
+    function appendImage(url, altText) {
+        const box = chatBox();
+        const normalizedUrl = normalizeImageUrl(url);
+
+        if (!box || !normalizedUrl) return null;
+
+        const wrapper = document.createElement("div");
+        wrapper.dataset.role = "assistant";
+        wrapper.className = "mobile-chat-message assistant mobile-chat-image-message";
+        wrapper.style.margin = "10px auto 10px 0";
+        wrapper.style.maxWidth = "90%";
+        wrapper.style.padding = "12px 14px";
+        wrapper.style.borderRadius = "16px";
+        wrapper.style.background = "rgba(255,255,255,.10)";
+        wrapper.style.color = "#f8fafc";
+
+        renderImageIntoBubble(wrapper, normalizedUrl, altText);
+
+        box.appendChild(wrapper);
+        scrollBottom();
+
+        return wrapper;
     }
 
     function openMobileImageGallery() {
         const images = getGalleryImages();
 
         if (!images.length) {
-            if (
-                typeof showToast === "function"
-            ) {
-                showToast(
-                    "No images saved yet."
-                );
-            }
-
+            safeToast("No images saved yet.");
             return;
         }
 
-        const latest = images[0];
-
-        openNovaImageViewer(
-            latest.url,
-            latest.altText ||
-                latest.alt ||
-                "Nova image"
-        );
-    }
-
-    function appendImage(url, altText) {
-        if (!chatContainer || !url) return;
-
-        const normalizedUrl =
-            String(url || "").trim();
-
-        const existingImage = Array.from(
-            chatContainer.querySelectorAll(
-                ".mobile-chat-image"
-            )
-        ).some(function (img) {
-            return (
-                String(
-                    img.getAttribute("src") || ""
-                ).trim() === normalizedUrl
-            );
-        });
-
-        if (existingImage) {
-            return;
-        }
-
-        saveMobileImageToGallery(
-            url,
-            altText
-        );
-
-        const wrapper =
-            document.createElement("div");
-
-        wrapper.className =
-            "mobile-chat-message assistant mobile-chat-image-message";
-
-        const img =
-            document.createElement("img");
-
-        img.className =
-            "mobile-chat-image";
-
-        img.src = normalizedUrl;
-
-        img.alt =
-            altText || "Nova image";
-
-        img.loading = "lazy";
-
-        img.addEventListener(
-            "click",
-            function () {
-                openNovaImageViewer(
-                    url,
-                    altText
-                );
-            }
-        );
-
-        wrapper.appendChild(img);
-
-        chatContainer.appendChild(wrapper);
-
-        scrollBottom();
-
-        setTimeout(
-            saveCurrentMessages,
-            0
-        );
+        openNovaImageViewer(images[0].url, images[0].alt || "Nova image");
     }
 
     async function copyText(text) {
         try {
-            await navigator.clipboard.writeText(
-                text || ""
-            );
-
-            showToast("Copied.");
-        } catch {
-            showToast("Copy failed.");
+            await navigator.clipboard.writeText(text || "");
+            safeToast("Copied.");
+        } catch (_) {
+            safeToast("Copy failed.");
         }
     }
 
     window.NovaMobileImages = {
-        normalizeImageUrl,
-        openImageLightbox,
-        getGalleryImages,
-        openNovaImageViewer,
-        saveMobileImageToGallery,
-        openMobileImageGallery,
-        appendImage,
-        copyText
+        normalizeImageUrl: normalizeImageUrl,
+        isImageUrl: isImageUrl,
+        extractImageUrlFromResponse: extractImageUrlFromResponse,
+        renderImageIntoBubble: renderImageIntoBubble,
+        appendImage: appendImage,
+        openImageLightbox: openImageLightbox,
+        openNovaImageViewer: openNovaImageViewer,
+        saveMobileImageToGallery: saveMobileImageToGallery,
+        getGalleryImages: getGalleryImages,
+        openMobileImageGallery: openMobileImageGallery,
+        copyText: copyText
     };
 
+    console.log("[Nova Mobile Images] module ready");
 })();

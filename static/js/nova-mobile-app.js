@@ -287,7 +287,9 @@
         try {
             const response = await fetch("/api/chat", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json"
+                },
                 signal: state.abortController.signal,
                 body: JSON.stringify({
                     user_text: text,
@@ -298,19 +300,34 @@
 
             const data = await response.json();
 
+            const imageUrl =
+                window.NovaMobileImages &&
+                typeof window.NovaMobileImages.extractImageUrlFromResponse === "function"
+                    ? window.NovaMobileImages.extractImageUrlFromResponse(data)
+                    : "";
+
             const answer =
+                imageUrl ||
                 data?.assistant_message?.text ||
                 data?.assistant_message?.content ||
                 data?.text ||
-                data?.image_url ||
-                data?.url ||
                 data?.error ||
                 "No response.";
 
             if (thinkingBubble) {
                 thinkingBubble.innerHTML = "";
 
-                if (isImageUrl(answer)) {
+                if (
+                    imageUrl &&
+                    window.NovaMobileImages &&
+                    typeof window.NovaMobileImages.renderImageIntoBubble === "function"
+                ) {
+                    window.NovaMobileImages.renderImageIntoBubble(
+                        thinkingBubble,
+                        imageUrl,
+                        text || "Generated image"
+                    );
+                } else if (isImageUrl(answer)) {
                     const img = document.createElement("img");
                     img.src = String(answer || "").trim();
                     img.loading = "lazy";
@@ -332,6 +349,7 @@
                     error && error.name === "AbortError"
                         ? "Stopped."
                         : "Request failed: " + (error && error.message ? error.message : String(error));
+
                 scrollBottom();
             }
         } finally {
